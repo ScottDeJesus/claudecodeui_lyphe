@@ -1,9 +1,9 @@
 import type { TFunction } from 'i18next';
 
 import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionLook';
-import { capitalized, kindName, spoken } from '@/modules/affected-areas/utils/tourModel';
-import type { AreaPhoto, Codebook, DayOneFloor, DayOneObject } from '@/shared/affected-areas-types';
-import type { RegionShape } from '@/shared/types';
+import { capitalized, kindName, roomWords, spoken } from '@/modules/affected-areas/utils/tourModel';
+import type { AreaPhoto, Codebook, DayOneFloor, DayOneObject, Placement } from '@/shared/affected-areas-types';
+import type { PanoRoom, RegionShape } from '@/shared/types';
 
 /*
  * THE DAY-ONE SKETCH'S PURE MODEL: what the drawing and the room list both read off one floor of the plan — every area,
@@ -116,4 +116,20 @@ export function numberedItems(floor: DayOneFloor, codebook: Codebook | null, t: 
     };
   });
   return [...areas, ...objects];
+}
+
+/**
+ * What a region's placement adds to its line on the pano screen: "Counted in Kitchen" when the plan credits the region to a
+ * room other than its photo's (the key AND the floor against the pano's: a kitchen on another floor is another room, and
+ * then the room is named with its floor), and "Seen in 3 photos" when several photos see the area it is counted in. A region
+ * with no placement, and a placement the plan could not put in any room, add nothing about a room. Read by `RegionList` and
+ * the 360° chosen-area line.
+ */
+export function placementNotes(placement: Placement | null, panoRoom: PanoRoom, t: TFunction): string[] {
+  if (placement === null) return [];
+  const elsewhere = placement.roomKey !== null && (placement.roomKey !== panoRoom.roomKey || placement.floor !== panoRoom.floor);
+  return [
+    elsewhere ? t('affectedAreas.dayOne.countedIn', { room: roomWords(placement.roomName, placement.floor, placement.floor !== panoRoom.floor, t) }) : null,
+    placement.views > 1 ? t('affectedAreas.dayOne.seenIn', { count: placement.views }) : null,
+  ].filter((note) => note !== null);
 }

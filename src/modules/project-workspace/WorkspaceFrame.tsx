@@ -2,6 +2,7 @@ import { useLayoutEffect } from 'react';
 
 import { AppSwitcherFab, AppSwitcherLayer, useCurrentApplication } from '@/modules/app-switcher';
 import { ChatHostFloating, useChatHost } from '@/modules/chat-host';
+import { CompanionPanel } from '@/modules/companion';
 import FloatingChatHeader from '@/modules/project-workspace/FloatingChatHeader';
 import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffects';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
@@ -12,7 +13,7 @@ import { useChatDoor } from '@/modules/project-workspace/hooks/useChatDoor';
 import { useChatHotkey } from '@/modules/project-workspace/hooks/useChatHotkey';
 
 /**
- * Rendered by ProjectWorkspaceShell inside its two providers (the chat's host and the application switcher): the fixed container that lays out the sidebar, main region and global overlays, where the pieces that read those providers are wired together.
+ * Rendered by ProjectWorkspaceShell inside its providers (the chat's host, the application switcher and Kaylee's picture): the fixed container that lays out the sidebar, main region and global overlays, where the pieces that read those providers are wired together.
  *
  * The floating chat is mounted here, inside the container, just before the FAB: above the application layer and
  * below the FAB, which stays the reader's way out. The FAB's drawn rect goes to the chat's host through
@@ -65,6 +66,7 @@ export default function WorkspaceFrame({
 
         <ProjectCommandPalette chatDoor={door} />
         <ChatHostFloating header={<FloatingChatHeader />} />
+        <CompanionPanel />
         <AppSwitcherFab chatDoor={door} onAnchorChange={reportAnchor} />
       </div>
     </>

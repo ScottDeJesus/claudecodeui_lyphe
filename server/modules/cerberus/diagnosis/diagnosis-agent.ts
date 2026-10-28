@@ -30,6 +30,9 @@ import {
  *   - `allowedTools` — exactly the MCP tools it was built with, so a tool is never one prompt away.
  *   - `settingSources: []` — no house hook, CLAUDE.md or skill runs inside it, and nothing on disk
  *     widens what it may do.
+ *   - `settings.autoMemoryEnabled: false` — the CLI files a project's auto-memory (`MEMORY.md`, the
+ *     operator's standing rules for coding agents) under the git root of the cwd, and the cwd sits inside
+ *     `~/.claude`, so `settingSources: []` alone leaves that file in the agent's context.
  *   - `strictMcpConfig` — the one MCP server is the one passed here; the operator's own MCP servers
  *     (`~/.claude.json`) are not loaded into a session whose whole point is a short list of reads.
  *   - `persistSession: false` — it never becomes a chat. A diagnosis's prompt is Cerberus's, not the
@@ -195,6 +198,7 @@ export async function runDiagnosisAgent(input: {
       strictMcpConfig: true,
       allowedTools: mcpToolNames,
       settingSources: [],
+      settings: { autoMemoryEnabled: false },
       persistSession: false,
       cwd,
       maxTurns: DIAGNOSIS_MAX_TURNS,

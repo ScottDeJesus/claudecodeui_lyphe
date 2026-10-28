@@ -4,11 +4,12 @@ import type { TFunction } from 'i18next';
 
 import { ActionMenu, Badge, Dialog, DialogContent, DialogTitle, LLMProviderLogo, Tooltip, buttonVariants } from '@/shared/ui';
 import { cn,copyTextToClipboard } from '@/shared/utils';
-import { LLM_PROVIDER_LABELS } from '@/shared/constants';
+import { LLM_PROVIDER_LABELS, PAGE_ANCHOR } from '@/shared/constants';
 import type { LLMProvider, Project, ProjectSession, SessionWithProvider } from '@/shared/types';
 import { api } from '@/shared/api';
 import { useSessionForkingProviders } from '@/shared/hooks/useProviderCapabilities';
 import { useCliVersion } from '@/shared/hooks/useCliVersion';
+import { usePageAnchor } from '@/shared/context/PageAnchorsContext';
 import { useAwaitingInputSessionIdSet, useSubagentRunningSessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { createSessionViewModel, formatCompactAge } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import SidebarSessionMeta from '@/modules/sidebar/SidebarSessionMeta';
@@ -118,6 +119,8 @@ function SidebarSessionItem({
   t,
 }: SidebarSessionItemProps) {
   const isCompact = useCompactSidebar();
+  // The whole row (both of its layouts) is an anchor a floating guide can point at while this chat is the one being read, drafted for or walked.
+  const anchorRef = usePageAnchor(PAGE_ANCHOR.chatRow(session.id));
   const { installed: installedCliVersion, staleSessionIds, staleVersionOf } = useCliVersion();
   const sessionView = createSessionViewModel(session, currentTime, t);
   const isSelected = selectedSession?.id === session.id;
@@ -258,7 +261,7 @@ function SidebarSessionItem({
         : `Copy ${providerLabel} session ID`;
 
   return (
-    <div className="group relative">
+    <div ref={anchorRef} className="group relative">
       {(showAttentionIndicator || showRecentIndicator) && (
         <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 transform">
           <Tooltip

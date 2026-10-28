@@ -91,6 +91,8 @@ export async function unsupportedClauses(
         tools: [],
         strictMcpConfig: true,
         settingSources: [],
+        // The operator's auto-memory is keyed to the git root of the cwd; see `runDiagnosisAgent`.
+        settings: { autoMemoryEnabled: false },
         persistSession: false,
         cwd: diagnosisWorkingDirectory(),
         maxTurns: 1,

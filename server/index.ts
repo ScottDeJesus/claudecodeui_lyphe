@@ -70,6 +70,8 @@ import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory
 import { createFollowupsModule } from './modules/followups/index.js';
 import { createNotesModule } from './modules/notes/index.js';
 import { createCerberusModule } from './modules/cerberus/index.js';
+import { createCompanionModule } from './modules/companion/index.js';
+import { createChatNamer } from './modules/chat-names/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createHealModule } from './modules/heal/index.js';
 import { createAgentLaunchModule } from './modules/agent-launch/index.js';
@@ -311,6 +313,12 @@ app.use('/api/followups-cmd', followups.commandRouter);
 const cerberus = createCerberusModule({ supervised });
 app.use('/api/cerberus', authenticateToken, cerberus.router);
 
+// Kaylee, the voice companion (protected): one conversation per account, beside every chat and tied to none.
+// Built once here because her conversations are CLI processes this server must wind down first on shutdown,
+// and she acts on chats through the same runtime gateway the chat socket uses, so an act of hers is the page's own.
+const companion = createCompanionModule({ runtime: chatRuntime });
+app.use('/api/companion', authenticateToken, companion.router);
+
 // The SAME board router behind a second door, for the `kanban-pm` MCP child and nothing else —
 // no verb is duplicated here, and there is deliberately NO `authenticateToken`: a Metis is not a
 // user and holds no user token. `kanbanMetisSecretGuard` is that door's own credential check, on a
@@ -394,6 +402,11 @@ app.use('/api/dispatch-souls', authenticateToken, dispatchSouls.router);
 // Built out here for the same reason again: its watcher starts after `listen` and stops on shutdown.
 const universe = createUniverseModule();
 app.use('/api/universe', authenticateToken, universe.router);
+
+// The pass that gives a chat a name a person can say, riding every run's end (no route: the sidebar
+// learns of a name from the same `session_upserted` frame every other change to a chat sends). Built
+// out here for the same reason again: it subscribes after `listen` and is stopped on shutdown.
+const chatNamer = createChatNamer();
 
 app.use('/api/notifications', authenticateToken, notificationRoutes);
 app.use('/api/ntfy/act', createNtfyActionRoutes({ runtime: chatRuntime })); // Public: ntfy buttons authenticate by signed token, not JWT.
@@ -757,11 +770,20 @@ async function startServer() {
             // Watch live runs for silence. Same placement and the same reason: the
             // notification it sends is about runs this server is now able to host.
             stopRunStallWatchdog = startRunStallWatchdog();
+
+            // Name chats at their runs' ends. Same placement: a name is written, and announced to the
+            // sockets this server is only now able to accept.
+            chatNamer.start();
         });
         if (handover) onTakeover(soleServerDuties);
 
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
+            // Her conversations wind down before anything else: each is a CLI process on the subscription, and
+            // a message that lands once this has run is refused (a 503) rather than waking one nothing would end.
+            // The wait is bounded: a CLI that answers nothing is ended by its own grace (5 s), which keeps running,
+            // and the rest of the shutdown must not sit behind it inside the supervisor's window.
+            await Promise.race([companion.stop(), delay(3_000, undefined, { ref: false })]);
             // The auto-run rule, the running diagnoses, the self-checks, the prune and the gateway's
             // accepting stop before anything else: a tick, a fix or a new warden link on a process that
             // is leaving would only meet its successor's.
@@ -783,6 +805,8 @@ async function startServer() {
             dispatchSouls.stop();
             universe.stop();
             stopRunStallWatchdog?.();
+            // A pass in flight holds a Haiku child; it ends here, ahead of the exit that would orphan it.
+            await chatNamer.stop();
             // Requests already running finish before anything they may still need is torn down, and
             // before the keepalive hosts are released: the successor takes them over only once this
             // process has exited, so a request here may still be starting a turn on one.

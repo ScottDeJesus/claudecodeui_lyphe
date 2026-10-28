@@ -366,6 +366,9 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
               timestamp: msg.timestamp,
               images,
               files,
+              // Which user turns came through Kaylee: a history read marks the persisted row and a
+              // live echo of her brief carries it, so the bubble can say so.
+              spokenVia: msg.spokenVia,
               ...sharedMetadata,
             });
           }

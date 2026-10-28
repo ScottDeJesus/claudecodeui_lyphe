@@ -29,6 +29,7 @@ import type {
   ProviderModelsDefinition,
   ProviderSkillSource,
   DispatcherModelChoice,
+  QueuedChatMessage,
   SubagentActivity,
   WorkspacePathValidationResult,
 } from '@/shared/types.js';
@@ -126,6 +127,39 @@ export function readAuthenticatedUserId(request: Request): number {
 }
 
 // ---------------------------
+//----------------- QUEUED CHAT MESSAGE UTILITIES ------------
+/**
+ * Reads a stored queued chat message (the parsed JSON of `session_drafts.queued_message`), or returns null when it
+ * has nothing to send: no text and no attachments.
+ *
+ * Used by the Database module's drafts repository, which appends a follow-up to the waiting message, and by the
+ * Scheduled Messages dispatcher, which sends it. Both must read a stored message the same way, or a merge could keep
+ * what the dispatcher then ignores. Rows from before attachments existed hold image-only descriptors in `images`;
+ * they are read as `attachments`. `options` is kept only when it is a plain object, `id` only when it is a
+ * non-empty string.
+ */
+export function readQueuedChatMessage(value: unknown): QueuedChatMessage | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const content = typeof record.content === 'string' ? record.content : '';
+  const attachments = Array.isArray(record.attachments)
+    ? record.attachments
+    : Array.isArray(record.images)
+      ? record.images
+      : [];
+  if (!content.trim() && attachments.length === 0) {
+    return null;
+  }
+  const options = record.options && typeof record.options === 'object' && !Array.isArray(record.options)
+    ? record.options as Record<string, unknown>
+    : undefined;
+  const id = typeof record.id === 'string' && record.id ? record.id : undefined;
+  return { ...(id ? { id } : {}), content, ...(options ? { options } : {}), attachments };
+}
+
+// ---------------------------
 //----------------- ROUTE PARAMETER PARSING ------------
 /**
  * Reads one Express route parameter as a string.
@@ -214,6 +248,14 @@ const FLAG_TRIM = new RegExp(
   + '|[\\t\\n\\v\\f\\r\\x1c-\\x1f \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+$',
   'g',
 );
+
+/**
+ * Python's `str.strip()` on a string, by the set `FLAG_TRIM` spells out. Consumed by the voice module's env-file
+ * reader (`gemini-key.ts`), which must read the house `.env` line for line as `~/.claude/scripts/gemini-image` does.
+ */
+export function pythonStrip(text: string): string {
+  return text.replace(FLAG_TRIM, '');
+}
 
 /** The ONE leading BOM the Python side's `utf-8-sig` decode takes off, and no other: a BOM anywhere else stays in the word, as it does there. */
 const LEADING_BOM = /^\uFEFF/;
@@ -1351,20 +1393,34 @@ export async function buildLookupMap(
   valueField: string
 ): Promise<Map<string, string>> {
   const lookup = new Map<string, string>();
+  const fileStream = fs.createReadStream(filePath);
+  const lineReader = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
 
   try {
-    const fileStream = fs.createReadStream(filePath);
-    const lineReader = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
-
     for await (const line of lineReader) {
       const trimmed = line.trim();
       if (!trimmed) {
         continue;
       }
 
-      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-      const key = parsed[keyField];
-      const value = parsed[valueField];
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        // A row can be half-written while the CLI is streaming into the file.
+        // Skip it rather than abandoning every later entry in the file.
+        continue;
+      }
+
+      // A row that parses to `null` (or any non-object) has no fields to read; indexing it would throw
+      // outside the guard above and drop every later entry just as a torn row did.
+      if (parsed === null || typeof parsed !== 'object') {
+        continue;
+      }
+
+      const row = parsed as Record<string, unknown>;
+      const key = row[keyField];
+      const value = row[valueField];
 
       if (typeof key === 'string' && typeof value === 'string' && !lookup.has(key)) {
         lookup.set(key, value);
@@ -1372,6 +1428,10 @@ export async function buildLookupMap(
     }
   } catch {
     // Missing or unreadable lookup files should not block session sync.
+  } finally {
+    // Close on every exit so a stream error cannot leak the file descriptor across repeated watcher scans.
+    lineReader.close();
+    fileStream.close();
   }
 
   return lookup;
@@ -1388,26 +1448,37 @@ export async function extractFirstValidJsonlData<T>(
   filePath: string,
   extractor: (parsedJson: unknown) => T | null | undefined
 ): Promise<T | null> {
-  try {
-    const fileStream = fs.createReadStream(filePath);
-    const lineReader = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+  const fileStream = fs.createReadStream(filePath);
+  const lineReader = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
 
+  try {
     for await (const line of lineReader) {
       const trimmed = line.trim();
       if (!trimmed) {
         continue;
       }
 
-      const parsed = JSON.parse(trimmed);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        // A row can be half-written while the CLI is streaming into the file.
+        // Skip it rather than giving up before a later valid row.
+        continue;
+      }
+
       const extracted = extractor(parsed);
       if (extracted) {
-        lineReader.close();
-        fileStream.close();
         return extracted;
       }
     }
   } catch {
-    // Ignore malformed or missing artifacts so full scans keep progressing.
+    // Ignore missing or unreadable artifacts so full scans keep progressing.
+  } finally {
+    // Close on every exit (match, no match, or stream error) so a malformed
+    // artifact cannot leak the file descriptor across repeated watcher scans.
+    lineReader.close();
+    fileStream.close();
   }
 
   return null;
@@ -1616,4 +1687,18 @@ export function humanizeTokens(n: number): string {
   if (n < 1000) return String(n);
   if (n < 999_950) return `${(n / 1e3).toFixed(1).replace(/\.0$/, '')}k`;   // the same cut
   return `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
+}
+
+
+// ---------------------------
+//----------------- ERROR WORDS ------------
+
+/**
+ * The words of whatever a `catch` caught, for a log line: an `Error`'s message, any other thrown value as a string.
+ *
+ * Consumed by the chat-names module (`chat-namer.service.ts`, `haiku-name.ts`), which logs why a naming pass could not run. Never throws,
+ * and says nothing about the stack: a log line that needs one logs the error itself.
+ */
+export function errorReason(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

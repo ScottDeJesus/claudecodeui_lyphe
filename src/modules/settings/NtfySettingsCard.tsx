@@ -1,13 +1,9 @@
 import { useTranslation } from 'react-i18next';
 
 import { useNtfySettings } from '@/modules/settings/hooks/useNtfySettings';
-import SettingsCard from '@/modules/settings/SettingsCard';
-import SettingsSection from '@/modules/settings/SettingsSection';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
-import { Button, Input, SettingRow } from '@/shared/ui';
-
-/** The text inputs' width. Wider than fits beside a 10rem text column on a phone, so the row drops the field below its label there, where it still fits the row. */
-const FIELD_WIDTH = 'w-64 max-w-full';
+import { SETTINGS_FIELD_WIDTH } from '@/shared/constants';
+import { Button, Input, SettingRow, SettingsCard, SettingsSection } from '@/shared/ui';
 
 /**
  * Rendered by the settings module's notifications tab: the ntfy phone-push channel — its
@@ -35,7 +31,7 @@ export default function NtfySettingsCard() {
           <SettingRow label={t('notifications.ntfy.server')}>
             <Input
               data-testid="ntfy-server"
-              className={FIELD_WIDTH}
+              className={SETTINGS_FIELD_WIDTH}
               value={draft.serverUrl}
               disabled={isLoading}
               onChange={(event) => setDraft({ serverUrl: event.target.value })}
@@ -57,7 +53,7 @@ export default function NtfySettingsCard() {
             <Input
               data-testid="ntfy-topic"
               autoComplete="off"
-              className={FIELD_WIDTH}
+              className={SETTINGS_FIELD_WIDTH}
               value={draft.topic}
               disabled={isLoading}
               onChange={(event) => setDraft({ topic: event.target.value })}
@@ -69,7 +65,7 @@ export default function NtfySettingsCard() {
               data-testid="ntfy-token"
               type="password"
               autoComplete="new-password"
-              className={FIELD_WIDTH}
+              className={SETTINGS_FIELD_WIDTH}
               value={draft.token}
               disabled={isLoading}
               placeholder={view?.hasToken ? t('notifications.ntfy.tokenKept') : undefined}
@@ -83,7 +79,7 @@ export default function NtfySettingsCard() {
           >
             <Input
               data-testid="ntfy-app-url"
-              className={FIELD_WIDTH}
+              className={SETTINGS_FIELD_WIDTH}
               value={draft.appUrl}
               disabled={isLoading}
               onChange={(event) => setDraft({ appUrl: event.target.value })}

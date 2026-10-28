@@ -3,9 +3,10 @@ import type { TFunction } from 'i18next';
 import type { ComponentType, HTMLAttributes, ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
-import type { Face, QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
+import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
+import type { CompanionSessionRef } from '@/shared/companion-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
 
@@ -252,8 +253,9 @@ export type RunningSessionListItem = {
  * One frame received from the chat websocket. The server guarantees every
  * frame carries a `kind` (provider message kinds plus gateway kinds such as
  * `chat_subscribed`, `session_upserted`, `loading_progress`,
- * `protocol_error`). The synthetic `websocket_reconnected` kind is injected
- * client-side when the socket re-opens after a drop.
+ * `scheduled_messages_changed`, `protocol_error`). The synthetic
+ * `websocket_reconnected` kind is injected client-side when the socket
+ * re-opens after a drop.
  */
 export type ServerEvent = {
   kind?: string;
@@ -534,6 +536,8 @@ export type ChatMessage = {
   files?: ChatAttachment[];
   /** The model id that produced this assistant turn, when the provider records one; the transcript resolves it to a catalog label so a raw id never reaches the screen. */
   model?: string;
+  /** Set on a user turn that came to the chat through Kaylee; the user bubble draws a "Through Kaylee" mark beside its copy control. Carried from `NormalizedMessage.spokenVia`. */
+  spokenVia?: 'kaylee';
   /**
    * The provider's identifier for the transcript row behind this message, when
    * the provider has stable per-row identity. Present on user turns from
@@ -757,6 +761,15 @@ export type NormalizedMessage = {
    */
   model?: string;
   /**
+   * Set on a user `text` row that came to this chat through Kaylee, the voice companion: the live
+   * echo of a brief she sent carries it, and a history read puts it back on the persisted row by
+   * matching the row's trimmed text (and a time at or after the send) against the chat's
+   * `relayed_sends` records, so the mark survives a reload. The transcript draws it as "Through
+   * Kaylee". Absent on every other row. Kept identical, with this same comment, on the
+   * NormalizedMessage in server/shared/types.ts and in src/shared/types.ts.
+   */
+  spokenVia?: 'kaylee';
+  /**
    * Mirrors optional transcript metadata from the server.
    *
    * These fields are currently used by Claude history normalization so local
@@ -904,9 +917,9 @@ export type CommandModalPayload = {
 /** A composer message queued while its session is still busy, holding the text, the in-memory and already-uploaded attachments and the send options snapshotted at queue time so it can be auto-sent unchanged once the session goes idle. */
 export type QueuedDraft = {
   /**
-   * Minted once when the message is queued, and kept through every save. The server remembers the
-   * id it last sent per session and ignores a save that brings it back, so a retried or stale save
-   * cannot send the message twice — while queueing the same text again, a new id, still works.
+   * Minted once when the message is queued. The server keeps it on the queued message — a message
+   * merged into a waiting one carries its newest member's id. Queueing does not look at it: the
+   * same id queued twice is two messages.
    */
   id?: string;
   content: string;
@@ -964,6 +977,131 @@ export type VoiceSnapshot = { state: VoicePlayState; error: string | null };
 
 /** Playback state of a text-to-speech utterance: 'idle', 'loading' or 'playing'. */
 export type VoicePlayState = 'idle' | 'loading' | 'playing';
+
+// ---------------------------
+
+//----------------- CHAT MIC PROVIDER AND GEMINI VOICE SETTINGS ------------
+
+/**
+ * Which speech-to-text backend the chat composer's mic uses for the account: 'openai' (the OpenAI-compatible backend,
+ * today's behavior and the default) or 'gemini' (Gemini on the server's key, with no key or header from the browser).
+ * Client mirror of the server's `VoiceProvider`. Read by the settings module's provider picker and voice-settings hook, and
+ * by the chat module's provider hook and `transcribeVoice`, which routes the clip on it. It governs the chat's mic alone:
+ * read-aloud stays on the OpenAI-compatible backend.
+ */
+export type VoiceProvider = 'openai' | 'gemini';
+
+/**
+ * The account's voice settings as `GET /api/voice/settings` answers them: the chat mic's `provider` and the Gemini choices
+ * (`gemini.transcriptionModel` and `gemini.speechModel`, 1-80 characters of letters, digits, `.`, `_` and `-`; `gemini.voice`,
+ * 1-40 characters of letters, digits, `_` and `-`; `gemini.soundTags`, the one list of sounds Kaylee may make: 1-30 tags, each 1-24
+ * lower-case letters with single spaces between words). Client mirror of the server's `VoiceSettings`. Read and saved by the
+ * settings module's `useVoiceSettings`; a save sends a `VoiceSettingsPatch`.
+ */
+export type VoiceSettings = {
+  provider: VoiceProvider;
+  gemini: { transcriptionModel: string; speechModel: string; voice: string; soundTags: string[] };
+};
+
+/**
+ * What `PUT /api/voice/settings` takes: any subset of `VoiceSettings`, the nested `gemini` object included, merged field by
+ * field. `gemini.soundTags: null` drops the account's own list, so Google's set (the server's `DEFAULT_SOUND_TAGS`) applies again.
+ * Sent by the settings module's `useVoiceSettings` through `api.voice.saveSettings`.
+ */
+export type VoiceSettingsPatch = {
+  provider?: VoiceProvider;
+  gemini?: Partial<Omit<VoiceSettings['gemini'], 'soundTags'>> & { soundTags?: string[] | null };
+};
+
+/**
+ * Which Gemini key the account's calls use, and the only part of it the page ever sees: 'stored' is his own (`last4` its
+ * last four characters), 'house' is the server's (`last4` null: the house's key is never shown, even in part) and 'none'
+ * means neither exists. Client mirror of the server's `GeminiKeyStatus`. Answered by every voice-settings call, held by
+ * the settings module's `useVoiceSettings` and drawn by its `GeminiVoiceSection`'s `keyStatus` prop.
+ */
+export type GeminiKeyStatus = { source: 'stored' | 'house' | 'none'; last4: string | null };
+
+// ---------------------------
+
+//----------------- COMPANION TALK PRESS ------------
+
+/**
+ * Where the page's one talk press to Kaylee stands: 'idle' (the mic closed), 'listening' (the first press opened the mic
+ * and it is recording) or 'transcribing' (the second press sent the clip and its words are not back yet). A press while a
+ * clip is transcribing records again at once, so 'listening' can follow 'transcribing'. Drawn by the companion module's
+ * talk button, and read by `useCompanionPresence`, which puts Listening and Transcribing ahead of her activity.
+ */
+export type TalkPressState = 'idle' | 'listening' | 'transcribing';
+
+/**
+ * The page's one talk press as her panel draws it: its `state`, `toggle` (one press: open the mic, or stop it and send the
+ * clip) and `error`, the sentence for what failed on the page itself (the mic refused, the upload failed), null when
+ * nothing did. A refused transcription is her harness's system line in the log, never this. Handed by the companion
+ * module's CompanionPanel to its view, which hands the press to the composer; the status line reads `state` through
+ * `CompanionPresence`, never from here.
+ */
+export type TalkPress = { state: TalkPressState; toggle: () => void; error: string | null };
+
+// ---------------------------
+
+//----------------- COMPANION VOICE ON THE PAGE ------------
+
+/**
+ * One sentence of Kaylee's by its place: the turn it belongs to and its index in that turn (0 first), as her log's entries
+ * and the speech route name it. Used for the sentence this page's player is sounding (`CompanionVoice.speaking`), which
+ * the companion module's CompanionLog marks.
+ */
+export type CompanionSentenceRef = { turnId: string; index: number };
+
+/**
+ * This page's voice as her panel draws it. `on` is the page's own switch, stored per device and on by default; `setOn`
+ * turns it, and off, the page neither plays nor fetches her speech while her text still streams. `speaking` is the
+ * sentence this page's player is sounding, held from its start until the next one starts and null only when the player
+ * falls silent (never between two sentences); `cut` is true for the breath after a talk press stopped her mid-sentence.
+ * Handed by the companion module's CompanionPanel to its view: the header draws the switch, the log marks the sentence.
+ * `useCompanionPresence` reads `speaking` and `cut` as Speaking and Cut.
+ */
+export type CompanionVoice = { on: boolean; setOn: (on: boolean) => void; speaking: CompanionSentenceRef | null; cut: boolean };
+
+// ---------------------------
+
+//----------------- COMPANION PRESENCE ON THE PAGE ------------
+
+/**
+ * What Kaylee is doing on this page right now, as the one word for her activity, her talk press and her player together.
+ * It has no word for her process (asleep, waking, failed) or a picture still loading: the status line takes those words
+ * from the picture, and here the state is what her activity says ('idle' at rest). The first three beat everything else,
+ * in this order, because they are the page's own: 'cut' (the 900 ms breath after a talk press stopped her voice
+ * mid-sentence) > 'listening' > 'transcribing' (his talk press) > 'speaking' (this page's player is sounding a sentence of
+ * hers). Below them it is her activity's phase, named as it is: 'reading_code' > 'reading_session' > 'drafting' >
+ * 'walking' > 'thinking' > 'idle'. Produced only by the companion module's `useCompanionPresence`.
+ */
+export type CompanionPresenceState =
+  | 'idle'
+  | 'listening'
+  | 'transcribing'
+  | 'thinking'
+  | 'speaking'
+  | 'reading_session'
+  | 'reading_code'
+  | 'drafting'
+  | 'walking'
+  | 'cut';
+
+/**
+ * Kaylee's presence on this page: the `state` and what it concerns, all taken from her server-held activity. `session` is
+ * the chat a read, a draft or a walk is about, `files` the file names a code read has open and `walk` the walkthrough's
+ * place (`at` of `total`, 1-based; `0` when it is set up and not begun); each is null when her activity names none. They
+ * are carried whatever the `state`, so a page-owned state such as 'listening' still knows where she was looking. One value
+ * per change of its parts, so a consumer that memoizes on it redraws only when she does. Built by the companion module's
+ * `useCompanionPresence` and drawn by its CompanionHeader, whose status line CompanionPanel hands it to.
+ */
+export type CompanionPresence = {
+  state: CompanionPresenceState;
+  session: CompanionSessionRef | null;
+  files: string[] | null;
+  walk: { at: number; total: number } | null;
+};
 
 // ---------------------------
 
@@ -1775,6 +1913,22 @@ export type PaletteNavRow = {
   label: string;
   keywords: string;
   run: () => void;
+};
+
+/**
+ * A group of the command palette that is not a list the palette builds itself: a `heading` and its rows, each a full `label`
+ * (drawn as given, with no "Go to"), the `keywords` the search also matches, the `icon` drawn before it and the act `run` when
+ * chosen. The workspace hands the palette Kaylee's group this way, so the palette knows nothing of what she is or what opening her does.
+ */
+export type PaletteGroup = {
+  heading: string;
+  rows: Array<{
+    key: string;
+    label: string;
+    keywords: string;
+    icon: ComponentType<{ className?: string }>;
+    run: () => void;
+  }>;
 };
 
 /** One view's badge on the workspace rail: `count` is the figure the badge draws (above zero — a zero is no badge at all), `words` the sentence a screen reader hears for it through the button's `aria-describedby`, since the drawn figure is hidden from it. `useRailBadges` builds them; RailButton draws them. */
@@ -2866,6 +3020,35 @@ export type PanoPress = {
  * `ReadControl` on the tour screen and the pano screen alike.
  */
 export type TourReaderProgress = { running: boolean; index: number; total: number; lastRefusal: string | null; skipped: number };
+
+/**
+ * A pano's room as the engine names it: the key and the floor a region's placement is compared with, to say "Counted in
+ * {room}" when the plan credits the region to another room. Handed down from the pano screen to the region lists and to the
+ * 360° chosen-area line.
+ */
+export type PanoRoom = { roomKey: string | null; floor: number | null };
+
+/**
+ * What the day-one sketch is handed for the open tour (`useDayOne`, drawn by `DayOneSketch` on the tour screen): the plan's
+ * floors and the layout status as they stand now (the tour's own, or a newer answer of the open's rebuild or of the walk),
+ * each floor's drawing as a URL by its sha (absent while its bytes load, null where they did not arrive), the press's latest
+ * answer and lane fault, the layout walk, what is left to read, and the verbs of the press and the drawing's Try again. The
+ * verbs that open a pano are the view root's, so they are not here.
+ */
+export type DayOneSection = {
+  floors: DayOneFloor[];
+  layout: LayoutStatus | null;
+  drawings: Record<string, string | null>;
+  rebuilding: boolean;
+  lastAnswer: LayoutReadResult | null;
+  pressTrouble: AffectedAreasTrouble | null;
+  walk: TourReaderProgress;
+  unreadPanos: number;
+  unreadViews: number;
+  onRetryDrawing: () => void;
+  onReadLayout: () => void;
+  onStopLayout: () => void;
+};
 
 /**
  * The Tours view's three screens, in the order its sub-switch offers them: the tours (picker, tour, pano), the Mark

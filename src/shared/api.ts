@@ -3,13 +3,14 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult, WriteAttempt } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult, VoiceProvider, VoiceSettingsPatch, WriteAttempt } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
+import type { CompanionSettings } from '@/shared/companion-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
-import { IS_PLATFORM } from '@/shared/utils';
+import { IS_PLATFORM, companionClientId, recordingFileName } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
 // Headers are a plain record rather than the full `HeadersInit` union so the
@@ -255,6 +256,9 @@ const post = withBody('POST');
 const put = withBody('PUT');
 const patch = withBody('PATCH');
 const del = withBody('DELETE');
+
+/** The request options every companion call carries: this page's name for her, in the header she reads it from. */
+const companionOptions = (): ApiRequestOptions => ({ headers: { 'x-companion-client': companionClientId() } });
 
 // ─── URL builders ───────────────────────────────────────────────────────────
 // Exported for the consumers that cannot go through `authenticatedFetch`:
@@ -644,9 +648,13 @@ export const api = {
     savePreferences: (updates: Record<string, unknown>) =>
       patch('/api/user/preferences', updates),
     drafts: () => get('/api/user/drafts'),
-    /** Writes only the parts given; an absent part is left as the server has it. */
-    saveDraft: (scope: string, draft: { text?: string; queuedMessage?: unknown }) =>
+    /** Writes only the text; the scope's stored queued message is left as the server has it. */
+    saveDraft: (scope: string, draft: { text: string }) =>
       put('/api/user/drafts', { scope, ...draft }),
+    /** Appends to the scope's queued message on the server and answers the message that is now queued. */
+    appendQueuedMessage: (scope: string, queuedMessage: unknown) =>
+      post('/api/user/drafts/queued-message', { scope, queuedMessage }),
+    clearQueuedMessage: (scope: string) => del('/api/user/drafts/queued-message', { scope }),
   },
 
   // Server-side settings: API keys, stored credentials, notifications, web push
@@ -832,6 +840,57 @@ export const api = {
         body: formData,
       }),
     tts: (text: string, options: ApiRequestOptions = {}) => post('/api/voice/tts', { text }, options),
+    // The account's chat-mic provider and Gemini transcription model, with the status of its one Gemini key:
+    // `{ settings: VoiceSettings, key: GeminiKeyStatus }`. A save answers the same shape; the key calls answer `{ key }`.
+    // The key goes out on its save and never comes back, only its status. A refusal is a 400 `VOICE_SETTINGS_INVALID`.
+    settings: () => get('/api/voice/settings'),
+    saveSettings: (patch: VoiceSettingsPatch) => put('/api/voice/settings', patch),
+    saveGeminiKey: (key: string) => put('/api/voice/gemini-key', { key }),
+    clearGeminiKey: () => del('/api/voice/gemini-key'),
+  },
+
+  // Kaylee, the voice companion. Every call names THIS page to her in `x-companion-client`: the page that last typed or
+  // opened her panel holds the floor, and a chat she opens is opened on that page alone. A refusal is the app's own
+  // envelope, so `refusalSentence` reads the words the panel shows. Her sentences, draft and notes come back as
+  // `companion_*` frames on the socket, not as answers here; the answers carry only what the caller folds in itself.
+  companion: {
+    // Her whole picture: the settings, the models, the process, the activity, the draft, the walk, the notes, the log.
+    picture: () => get('/api/companion', companionOptions()),
+    sendText: (text: string) => post('/api/companion/messages', { text }, companionOptions()),
+    // The panel opened on this page: she acts on it from now on.
+    floor: () => post('/api/companion/floor', undefined, companionOptions()),
+    // A partial of her settings; `register: null` restores the original register. Answers the settings as they now read.
+    saveSettings: (patch: Partial<CompanionSettings> | { register: null }) => put('/api/companion/settings', patch, companionOptions()),
+    editDraft: (text: string) => put('/api/companion/draft', { text }, companionOptions()),
+    clearDraft: () => del('/api/companion/draft', undefined, companionOptions()),
+    // Sends the draft as it stands. Answers `{ outcome: 'started' | 'folded' }`; a refused send is a 409 carrying the reason.
+    sendDraft: (mode: 'turn' | 'steer') => post('/api/companion/draft/send', { mode }, companionOptions()),
+    dismissNote: (id: number) => del(`/api/companion/notes/${id}`, undefined, companionOptions()),
+    // Stops her own turn; the chat sessions she talks about are not touched.
+    interrupt: () => post('/api/companion/interrupt', undefined, companionOptions()),
+    // Wipes her conversation, log, notes, draft, walk and focus. The wind-down of her process is awaited, so it can take a while.
+    clear: () => post('/api/companion/clear', undefined, { ...companionOptions(), timeoutMs: 90_000 }),
+    // His talk press: the clip as multipart `audio` (named by its type, as the chat's mic names its upload) and the recorder's own
+    // `durationMs` for it. Takes the floor for this page and answers 202 `{ text }` once the press has been heard and pushed to her;
+    // a hearing that came to nothing is a 409 `COMPANION_SPEECH_REFUSED` or a 502 `COMPANION_SPEECH_FAILED` carrying the sentence,
+    // and the system line in her log. An upload has no deadline of its own (see `timeoutSignal`).
+    press: (blob: Blob, mimeType: string, durationMs: number) => {
+      const body = new FormData();
+      body.append('audio', blob, recordingFileName(mimeType));
+      body.append('durationMs', String(Math.round(durationMs)));
+      return authenticatedFetch('/api/companion/press', { method: 'POST', body, ...companionOptions() });
+    },
+    // One of her sentences as raw PCM (24 kHz, mono, signed 16-bit little-endian), asked by the page that holds the floor. Answers the
+    // Response itself, its body still arriving, for the player to read: 200 audio, 204 nothing to say, 404 `COMPANION_NO_SENTENCE`,
+    // 409 `COMPANION_NOT_FLOOR` or `COMPANION_SPEECH_REFUSED` (Google's refusal in a sentence; the server has written the panel's line),
+    // 502 `COMPANION_SPEECH_FAILED`. `signal` is the request's only deadline (a sentence streams for as long as it is spoken): aborting
+    // it hangs up, which stops the synthesis when no other request is reading it.
+    speech: (turnId: string, index: number, signal: AbortSignal) =>
+      get(`/api/companion/speech/${encodeURIComponent(turnId)}/${index}`, { ...companionOptions(), signal }),
+    // The talk press while she sounds: `heard` is the last sentence of the turn whose playback ended and `interrupted` the one playing
+    // at the press (`null` for none). Answers 204 once her turn has been stopped, which can take seconds; her next message opens with `<cut>`.
+    cut: (input: { turnId: string; heard: number | null; interrupted: number | null }) =>
+      post('/api/companion/cut', input, companionOptions()),
   },
 
   system: {
@@ -1442,13 +1501,21 @@ export function voiceConfigSignature(): string {
 }
 
 /**
- * Transcribes recorded audio, posting directly to the user's configured OpenAI-compatible
- * endpoint when one is set and otherwise going through the CloudCLI voice proxy.
+ * Transcribes recorded audio. With the 'openai' provider (the default), it posts directly to the user's configured
+ * OpenAI-compatible endpoint when one is set and otherwise goes through the CloudCLI voice proxy. With 'gemini' it
+ * always goes through the proxy, which transcribes on the server's Gemini key: the browser's own endpoint is never
+ * reached and none of its `x-voice-*` headers (its OpenAI-compatible key and model) ride along. Callers pass the
+ * account's provider from the chat module's `useVoiceProvider`.
  */
-export function transcribeVoice(blob: Blob, filename: string): Promise<Response> {
-  const config = readVoiceConfig();
+export function transcribeVoice(blob: Blob, filename: string, provider: VoiceProvider = 'openai'): Promise<Response> {
   const body = new FormData();
 
+  if (provider === 'gemini') {
+    body.append('audio', blob, filename);
+    return api.voice.transcribe(body);
+  }
+
+  const config = readVoiceConfig();
   if (config.baseUrl.trim()) {
     body.append('file', blob, filename);
     body.append('model', config.sttModel || 'whisper-1');

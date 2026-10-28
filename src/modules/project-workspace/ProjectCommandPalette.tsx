@@ -1,13 +1,15 @@
+import { AudioLines } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSwitcherActions } from '@/modules/app-switcher';
 import { CommandPalette } from '@/modules/command-palette';
+import { useCompanion } from '@/modules/companion';
 import { selectGitRepository } from '@/modules/git-panel';
 import { useProjectCommandState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
 import { GIT_REPO_PATHS } from '@/shared/constants';
-import type { ChatDoor, PaletteNavRow } from '@/shared/types';
+import type { ChatDoor, PaletteGroup, PaletteNavRow } from '@/shared/types';
 
 /**
  * Rendered by WorkspaceFrame to bind this module's project state, and the chat's door, to the
@@ -61,6 +63,24 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
     [views, t, setActiveTab, openSettings],
   );
 
+  // Kaylee's group: one row that opens her panel. Her name is the one he gave her, so it is read off her picture, and the
+  // memo keeps the group's identity through the frames she sends (each sentence changes the picture, not her name).
+  const { picture, setOpen: setCompanionOpen } = useCompanion();
+  const companionName = picture?.settings.name ?? t('companion.defaultName');
+  const companionGroup = useMemo<PaletteGroup>(
+    () => ({
+      heading: t('companion.palette.group', { name: companionName }),
+      rows: [{
+        key: 'companion',
+        label: t('companion.palette.talk', { name: companionName }),
+        keywords: t('companion.palette.keywords'),
+        icon: AudioLines,
+        run: () => setCompanionOpen(true),
+      }],
+    }),
+    [t, companionName, setCompanionOpen],
+  );
+
   return (
     <CommandPalette
       selectedProject={selectedProject}
@@ -69,6 +89,7 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
       onShowTab={setActiveTab}
       onShowRepoInGitTab={showSelectedRepoInGitTab}
       navRows={navRows}
+      companionGroup={companionGroup}
       switcherActions={switcherActions}
     />
   );

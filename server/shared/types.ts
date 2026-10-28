@@ -222,6 +222,7 @@ export type GatewayEventKind =
   | 'kanban_event'
   | 'notes_changed'
   | 'followups_changed'
+  | 'scheduled_messages_changed'
   | 'cerberus_changed'
   | 'cerberus_run_output'
   | 'cerberus_diag_step'
@@ -345,6 +346,9 @@ export type NotesChangedEvent = { kind: 'notes_changed'; at: number };
 
 /** Sent to every open socket after a followup is filed, closed or reopened. It names the chat by its APP session id under `appSessionId` — deliberately NOT `sessionId`: the workspace flags a chat for attention (the unread mark) when any frame carries a `sessionId` that is not the one on screen (`useProjectsState`), and a chat's items moving is no news in the transcript. A widget re-reads when the id is its own chat's and ignores the frame otherwise. It carries no `seq`, so it can never become a transcript row. */
 export type FollowupsChangedEvent = { kind: 'followups_changed'; appSessionId: string; at: number };
+
+/** Sent to every open socket after a chat's scheduled messages changed: one was scheduled, cancelled or dismissed, claimed by the dispatcher as its turn starts, or failed to send. It names the chat by its APP session id under `sessionId` and nothing else — no message and no text — so a composer showing that chat re-reads the list through the authenticated per-user GET and every other composer ignores the frame. Because it carries `sessionId`, the workspace's unread mark (`useProjectsState`) and the transcript handler (`useChatRealtimeHandlers`) each name this kind and leave it alone; it carries no `seq`, so it can never become a transcript row. */
+export type ScheduledMessagesChangedEvent = { kind: 'scheduled_messages_changed'; sessionId: string; at: number };
 
 // ---------------------------
 //----------------- DISPATCHER: the store's one status document, mirrored key for key ------------
@@ -706,6 +710,15 @@ export type NormalizedMessage = {
    * on the client's own NormalizedMessage in src/shared/types.ts.
    */
   model?: string;
+  /**
+   * Set on a user `text` row that came to this chat through Kaylee, the voice companion: the live
+   * echo of a brief she sent carries it, and a history read puts it back on the persisted row by
+   * matching the row's trimmed text (and a time at or after the send) against the chat's
+   * `relayed_sends` records, so the mark survives a reload. The transcript draws it as "Through
+   * Kaylee". Absent on every other row. Kept identical, with this same comment, on the
+   * NormalizedMessage in server/shared/types.ts and in src/shared/types.ts.
+   */
+  spokenVia?: 'kaylee';
   /**
    * Optional display-oriented metadata used by providers that need to expose
    * richer transcript artifacts without introducing a brand-new message kind.
@@ -2076,11 +2089,12 @@ export type VoiceServiceResult<TValue> =
   | { ok: false; status: number; error: string };
 
 /**
- * Complete application-service surface consumed by the Voice HTTP router.
+ * Complete application-service surface for the OpenAI-compatible voice proxy.
  *
- * The composition root supplies a concrete implementation with environment
- * configuration and an injected outbound HTTP adapter. Unit tests use the same
- * contract with handwritten fetch fakes and never patch global state.
+ * The composition root (`voice.module.ts`) supplies a concrete implementation with
+ * environment configuration and an injected outbound HTTP adapter. It is consumed by
+ * the voice provider (`voice-provider.ts`, the `openai` branch of the chat mic's
+ * transcription and the proxy half of its `/health` answer) and by the HTTP router (`/tts`).
  */
 export type VoiceService = {
   getHealth(): { configured: boolean };
@@ -2093,6 +2107,90 @@ export type VoiceService = {
     overrides: VoiceRequestOverrides;
   }): Promise<VoiceServiceResult<VoiceSpeechPayload>>;
 };
+
+/**
+ * Which speech-to-text backend the chat composer's mic uses for an account.
+ *
+ * `openai` is the OpenAI-compatible proxy (`voice.service.ts`, today's behavior and the
+ * default); `gemini` is the Gemini transcription door. The choice governs only the chat
+ * composer's mic: the companion always hears through Gemini, whatever this says. Read by
+ * `voice-settings.ts` (which validates it), `voice-provider.ts` (which routes on it) and
+ * the settings routes (which answer it).
+ */
+export type VoiceProvider = 'openai' | 'gemini';
+
+/**
+ * One account's voice settings, the `voice` key of its `user_preferences`.
+ *
+ * `provider` defaults to `openai` and `gemini.transcriptionModel` to `gemini-3.8-flash`, the
+ * house's transcriber role; a stored field that fails its limit reads as its default.
+ * `gemini.speechModel` (default `gemini-3.8-flash-tts`) and `gemini.transcriptionModel` are each
+ * 1-80 characters of `[A-Za-z0-9._-]`; `gemini.voice` (default `Kore`) is 1-40 characters of
+ * `[A-Za-z0-9_-]`. `gemini.soundTags` is the ONE allow-list of the sounds Kaylee may make: 1-30
+ * tags, each 1-24 characters of lower-case letters with single spaces between words. The
+ * register she is taught and the filter that strips her sentences both read it, so she is never
+ * taught a sound the filter deletes; it defaults to the voice module's `DEFAULT_SOUND_TAGS` and
+ * a save of `soundTags: null` restores that default. The value is read fresh on every call and
+ * never cached, so a saved change is heard by the next press. Shared by `voice-settings.ts`
+ * (reads and saves it), `gemini-transcribe.ts` and `gemini-speech.ts` (read the models and the
+ * voice), the settings routes (answer it) and, through the voice barrel's `readVoiceSettings`,
+ * the companion (reads the sound tags).
+ */
+export type VoiceSettings = {
+  provider: VoiceProvider;
+  gemini: { transcriptionModel: string; speechModel: string; voice: string; soundTags: string[] };
+};
+
+/**
+ * Where an account's Gemini key comes from, and the only part of it a page may see.
+ *
+ * `stored` is the account's own active `gemini_api_key` credential; `house` is the
+ * server's key (`GEMINI_API_KEY`, else the `GEMINI_API_KEY=` line of `GEMINI_ENV_FILE`);
+ * `none` means neither exists. `last4` is the last four characters of a STORED key and
+ * `null` in every other case, so the house's key never leaves the server even in part. The
+ * key itself is never returned. Shared by `gemini-key.ts` (computes it) and the settings
+ * routes (answer it).
+ */
+export type GeminiKeyStatus = { source: 'stored' | 'house' | 'none'; last4: string | null };
+
+/**
+ * What one Gemini transcription came to, as a value rather than a throw.
+ *
+ * `ok: true` carries the trimmed words heard; an empty string is a success (nothing was
+ * said). `ok: false` names why and carries a ready sentence for the person: `no_key` (no key
+ * in reach; no request was made), `refused` (Google refused the key) and `failed` (anything
+ * else: another status, a network error or timeout, an answer without text). Every sentence
+ * has passed the key-shape redaction. Shared by `gemini-transcribe.ts` (builds it),
+ * `voice-provider.ts` (maps it to the chat mic's HTTP answer) and the companion's press
+ * door, which reads it through the voice barrel's `transcribeSpeech`.
+ */
+export type TranscribeAnswer =
+  | { ok: true; text: string }
+  | { ok: false; reason: 'no_key' | 'refused' | 'failed'; sentence: string };
+
+/**
+ * One piece of a spoken sentence: little-endian Int16 mono PCM at 24 kHz, always a whole number of
+ * samples (an odd byte left over at the end of a piece is carried into the next, so a player may
+ * read each piece as samples without re-aligning). Yielded by `SpeechAnswer.chunks`; the companion's
+ * speech route writes each piece to the page as it arrives.
+ */
+export type SpeechChunk = Uint8Array;
+
+/**
+ * What one Gemini speech synthesis came to, as a value rather than a throw.
+ *
+ * `ok: true` carries `chunks`, the sentence's PCM streamed as Google generates it; the first piece
+ * has already arrived when the answer is given, so every failure that comes before any audio is an
+ * `ok: false` answer. A failure after audio began makes the iterator throw an Error whose message
+ * is a ready sentence, and an abort on the call's signal simply ends it. `ok: false` names why and
+ * carries a ready sentence for the person: `no_key` (no key in reach; no request was made),
+ * `refused` (Google refused the key) and `failed` (anything else). Every sentence has passed the
+ * key-shape redaction. Shared by `gemini-speech.ts` (builds it) and the companion's speech route,
+ * which reads it through the voice barrel's `SpeechAnswer`.
+ */
+export type SpeechAnswer =
+  | { ok: true; chunks: AsyncIterable<SpeechChunk> }
+  | { ok: false; reason: 'no_key' | 'refused' | 'failed'; sentence: string };
 
 // ---------------------------
 //----------------- CLI MODULE CONTRACTS ------------
@@ -2616,3 +2714,80 @@ export type ClaudeApiPicture = {
 
 /** The door's answer when its picture cannot be read: the card draws "unknown" in words, never "not set", and offers the retry. */
 export type ClaudeApiUnreadable = { unreadable: true };
+
+// ---------------------------
+
+//----------------- CHAT NAMES: what the naming pass reads of a chat ------------
+
+/**
+ * A chat's first exchange as the naming pass reads it from the transcript: `ask` is the first message the person wrote himself,
+ * `reply` the first answer the model gave after it, each trimmed and cut to 2,000 characters. Both are non-empty — a chat that has
+ * no such pair yet has no `ChatFirstExchange` at all (`readFirstExchange` answers `null`). Read-only prose handed to a model as data,
+ * never as instructions. Consumed by the chat-names module: `first-exchange.ts` builds it, `haiku-name.ts` asks Haiku about it.
+ */
+export type ChatFirstExchange = {
+  ask: string;
+  reply: string;
+};
+
+// ---------------------------
+
+//----------------- CHAT DRAFT QUEUE: the message waiting behind a running turn ------------
+
+/**
+ * A chat message queued to be sent when its session is next idle, in the shape the composer submits it and
+ * `session_drafts.queued_message` stores it. `content` is the message text, `attachments` the JSON-safe descriptors
+ * `POST /api/assets/files` returned, `options` the composer's send options (model, effort, permission mode, ...)
+ * captured when it was queued, and `id` the composer-minted id of the newest message in it. A session holds at
+ * most one: a message queued while another waits is merged into it by the drafts repository, never replacing it. Consumed by
+ * the user module (accepts it), the database module's drafts repository (stores and merges it) and the
+ * scheduled-messages dispatcher (sends it, read through `readQueuedChatMessage`).
+ */
+export type QueuedChatMessage = {
+  id?: string;
+  content: string;
+  options?: Record<string, unknown>;
+  attachments: unknown[];
+};
+
+/**
+ * What `sessionDraftsDb.appendQueuedMessage` did with a message the composer asked to queue: `queued` stored it
+ * (`queuedMessage` is what the scope now holds, `appended` whether it was merged into a waiting message rather than
+ * stored alone), `not-combinable` refused it because it or the waiting message is a slash command, and `too-long`
+ * refused it because the merged text would pass the ceiling the caller named. A refusal stores nothing. Consumed by
+ * the database module's drafts repository (builds it) and the user module's service (turns a refusal into its
+ * 409 / 413 answer).
+ */
+export type QueuedAppendResult =
+  | { outcome: 'queued'; queuedMessage: QueuedChatMessage; appended: boolean }
+  | { outcome: 'not-combinable' }
+  | { outcome: 'too-long' };
+
+// ---------------------------
+
+//----------------- NOTIFICATION EVENTS ------------
+
+/**
+ * One house notification, the shape `createNotificationEvent` builds and the orchestrator is handed: what happened
+ * (`code`, ranked by `kind` and `severity`), to whom it belongs (`provider`, `sessionId`), the facts its wording is
+ * made from (`meta`) and the key that collapses a repeat (`dedupeKey`, `null` for the composite default of
+ * provider, kind, code and session). `provider` is a runtime's name or `'system'` for the house's own (the dispatcher,
+ * the stall watchdog); `kind` is one of `action_required`, `stop`, `error`, `limit`, `background` or `info` (the
+ * push preference it falls under); `severity` is `info`, `warning` or `error`. `sessionId` is the app session id
+ * once the orchestrator has normalized it, `null` for an event that belongs to no chat. `createdAt` is ISO-8601 UTC.
+ *
+ * The orchestrator is JavaScript and builds this by hand; the type states the contract it keeps. A reader of an event
+ * (a listener) takes it as read-only. Consumed by the notifications module (`notification-listeners.service.ts`, whose
+ * listeners are handed one) and by the companion module's alert feed, which maps `code` to what it tells her.
+ */
+export type NotificationEvent = {
+  provider: string;
+  sessionId: string | null;
+  kind: string;
+  code: string;
+  meta: Record<string, unknown>;
+  severity: string;
+  requiresUserAction: boolean;
+  dedupeKey: string | null;
+  createdAt: string;
+};

@@ -1001,6 +1001,12 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
     pendingTurn = null;
     turn?.settle();
   };
+  // The uuids of messages `steer` pushed into a turn in flight and no result has accounted for yet: a result that
+  // lists one folded it in; a result that ends the pending turn without it left the steer for the CLI's next turn.
+  const steeredUuids = new Set();
+  // The steers that missed their turn (a turn with no tool call left never takes one): each runs as the CLI's next turn, whose
+  // result lists its uuid. That result is the steer's own reply, not background work finishing.
+  const missedSteers = new Set();
   // The appends this process pushed (a compaction's seed): their `result` is no turn's end unless the
   // append was alone in its push (see the loop).
   const appends = createAppendLedger();
@@ -1284,6 +1290,32 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
       keepalive?.note({ ...turnBits(false), ack: false });
       console.log(`[Claude SDK] Message joined the running process for session ${sessionKey()}`);
       return settled;
+    },
+    /**
+     * Whether a steer was pushed that no result has accounted for yet. The CLI takes a pushed message only at a tool-result
+     * boundary, so it may still sit in the CLI's queue: asked by a Stop, which must not leave it behind to run as a turn
+     * after the Stop (abortClaudeSDKSession). Conservative on purpose: a steer already taken stays remembered until the
+     * turn's result, and a Stop in that stretch ends the process too.
+     */
+    get hasPendingSteer() {
+      return steeredUuids.size > 0;
+    },
+    /** Pushes one uuid-stamped user message into a turn in flight, opening no turn; false when no turn is pending or the process is closing. */
+    steer(content) {
+      // A Stop marks the instance before it interrupts: a steer accepted after that would be answered as a turn of its own.
+      if (closing || !queue || pendingTurn === null || abortedInstances.has(queryInstance)) return false;
+      const uuid = crypto.randomUUID();
+      queue.push({
+        type: 'user',
+        message: { role: 'user', content },
+        parent_tool_use_id: null,
+        uuid,
+        timestamp: new Date().toISOString()
+      });
+      steeredUuids.add(uuid);
+      idle?.touch(resolveIdleCloseMs(turnOptions.idleCloseMs));
+      console.log(`[Claude SDK] Steer folded into the running turn of session ${sessionKey()}`);
+      return true;
     }
   };
 
@@ -1775,6 +1807,21 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
           const turn = pendingTurn;
           const answersTurn = answersPendingTurn(message);
           const abortPending = abortedInstances.has(queryInstance);
+          if (steeredUuids.size > 0 && Array.isArray(message.user_message_uuids)) {
+            const listed = message.user_message_uuids;
+            const unlisted = [...steeredUuids].filter((uuid) => !listed.includes(uuid));
+            for (const uuid of listed) steeredUuids.delete(uuid);
+            if (answersTurn && unlisted.length > 0) {
+              console.log(`[Claude SDK] A steer for session ${sessionKey() || 'NEW'} missed its turn and runs as a turn of its own`);
+              for (const uuid of unlisted) {
+                steeredUuids.delete(uuid);
+                missedSteers.add(uuid);
+              }
+            }
+          }
+          // The result of a missed steer's own turn: told apart here so it is not taken for a background task finishing.
+          const ownSteers = Array.isArray(message.user_message_uuids) ? message.user_message_uuids.filter((uuid) => missedSteers.delete(uuid)) : [];
+          if (ownSteers.length > 0) console.log(`[Claude SDK] The steer for session ${sessionKey() || 'NEW'} that missed its turn has finished its own`);
           // A failed result already went out as its own signal; neither "finished" nor
           // "background agent finished" beside it would be true.
           const failedResult = message.is_error === true;
@@ -1809,6 +1856,19 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
             // The turn read above, still: the context ask is the one await between them, and a message
             // that joined during it has opened its own turn, which this result does not end.
             if (pendingTurn === turn) settleTurn();
+          } else if (!abortPending && ownSteers.length > 0) {
+            // The end of a missed steer's own turn. No run is registered for it (the run ended with the turn the steer
+            // missed, and the registry ignores a second `complete`), so it is announced the way a run's end is: the
+            // "finished" notification — never background work, which it is not. Stop reaches it by asking the runtime
+            // (`abortChatRun`).
+            if (!failedResult) notifyRunStopped({
+              userId: ws?.userId || null,
+              provider: 'claude',
+              sessionId: sessionId || capturedSessionId || null,
+              sessionName: sessionSummary,
+              stopReason: 'completed',
+              durationMs: typeof message.duration_ms === 'number' ? message.duration_ms : null
+            });
           } else if (!abortPending) {
             // A result no client is waiting on: work started in an earlier turn has finished
             // and pushed a follow-up turn of its own.
@@ -1976,6 +2036,8 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
  *   (the read carries the measurement). One follow-up does end that work early: a message that
  *   changes a launch argument (model, cwd, allowed tools, the CLI's own version) respawns, and a
  *   respawn retires this process wholesale — `addSession` logs the line when it happens.
+ * - A steer pushed and not yet answered (`hasPendingSteer`) → kill, with NO interrupt first, whatever else is in flight:
+ *   the interrupt is what makes the CLI dequeue the steer and answer it as a turn of its own. This outranks the lines around it.
  * - Nothing in flight → end stdin, as before: the next message spawns a fresh process.
  * - The interrupt went unanswered (or failed) → kill, as before. A wedged CLI must still stop, and
  *   this is the only path a Stop is allowed to take background work down with it.
@@ -2010,6 +2072,9 @@ async function abortClaudeSDKSession(sessionId) {
   // once the CLI has answered. The cost of being wrong that way is one process idling until the
   // idle closer's window; the cost of the other is the work.
   const backgroundWorkAtPress = session.process?.hasBackgroundWork === true;
+  // Read at the press too, for the same reason (the interrupt's result settles the steer's bookkeeping): a pushed message the
+  // CLI has not taken yet is dequeued by the interrupt itself and answered as a turn of its own, after the Stop, unseen.
+  const steerPendingAtPress = session.process?.hasPendingSteer === true;
 
   // Over the still-open stdin, so it arrives. It ends the turn and nothing else.
   //
@@ -2017,8 +2082,12 @@ async function abortClaudeSDKSession(sessionId) {
   // Awaited without a limit, Stop hung for good on such a process — every click logged here and
   // nothing ended, because the run is only completed once this returns. A process that does not
   // answer in the grace, or whose interrupt fails, is killed instead: Stop always stops.
-  const interrupting = session.instance.interrupt();
-  const answered = await Promise.race([
+  //
+  // NOT sent when a steer is pending: the interrupt is what makes the CLI dequeue that steer and start answering it, so by
+  // the time the kill landed the model was already running on the brief he had stopped (measured: it answered it after
+  // the kill's SIGTERM). The process is killed first and the turn dies with it.
+  const interrupting = steerPendingAtPress ? null : session.instance.interrupt();
+  const answered = interrupting === null ? false : await Promise.race([
     interrupting.then(() => true, (error) => {
       console.warn(`[Claude SDK] Interrupt failed for session ${sessionId}: ${error?.message || error}`);
       return false;
@@ -2026,11 +2095,11 @@ async function abortClaudeSDKSession(sessionId) {
     new Promise((resolve) => setTimeout(() => resolve(false), INTERRUPT_GRACE_MS).unref()),
   ]);
   // A late rejection from the abandoned interrupt is expected once the process is killed.
-  interrupting.catch(() => {});
+  interrupting?.catch(() => {});
 
   // Asked only of a process that DID answer: an unanswered interrupt winds down on the kill path,
   // background work or not.
-  const backgroundWork = answered
+  const backgroundWork = answered && !steerPendingAtPress
     && (backgroundWorkAtPress || session.process?.hasBackgroundWork === true);
 
   try {
@@ -2038,6 +2107,11 @@ async function abortClaudeSDKSession(sessionId) {
       // The turn is over for the client; the work it started is not over for this process.
       session.process.stopTurn();
       console.log(`[Claude SDK] Session ${sessionId} stopped, process kept: background work is still running and its result still belongs in this chat`);
+    } else if (steerPendingAtPress) {
+      // Nothing after a Stop may run: ending stdin would let the CLI answer the queued steer first. The next message spawns a
+      // fresh process on the transcript; the price is background work this process held, which dies with it.
+      console.log(`[Claude SDK] Session ${sessionId} had a steer the CLI had not answered; killing its process without an interrupt so the Stop leaves nothing queued`);
+      session.process?.kill();
     } else if (answered) {
       // End stdin; the next message spawns a fresh process.
       session.process?.close();
@@ -2112,9 +2186,20 @@ function listPendingSessionIds() {
   return [...sessionIds].sort();
 }
 
+/**
+ * Folds a message into the turn the session's process is running now, as the SDK folds a queued message into a turn
+ * in flight. 'not_running' when the session has no process, the process is closing, or no turn is pending to fold into.
+ * Read by `providerRuntimeService.steer`, which the companion's send reaches through the chat gateway.
+ */
+function steerClaudeSession(sessionId, content) {
+  const chatProcess = getSession(sessionId)?.process;
+  return chatProcess && !chatProcess.closing && chatProcess.steer(content) ? 'folded' : 'not_running';
+}
+
 export const claudeRuntime = {
   run: queryClaudeSDK,
   abort: abortClaudeSDKSession,
+  steer: steerClaudeSession,
   activity: (appSessionId) => liveActivityOf(getSession(appSessionId)),
   markIdleCheck: (appSessionId, tries) => getSession(appSessionId)?.process?.markIdleCheck?.(tries) ?? false,
   syncToolsets: (appSessionId) => {
@@ -2132,6 +2217,7 @@ export const claudeRuntime = {
 export {
   queryClaudeSDK,
   abortClaudeSDKSession,
+  steerClaudeSession,
   resolveToolApproval,
   getPendingApprovalsForSession,
   listPendingSessionIds,

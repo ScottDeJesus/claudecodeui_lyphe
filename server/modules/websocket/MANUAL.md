@@ -35,11 +35,11 @@ Runs one chat turn with no socket attached. Two consumers: the scheduled-message
 6. `sendToUser(userId, payload)` and `isUserConnected(userId)`
 Per-account reach into the open `/ws` sockets (`websocket-state.service.ts`). `sendToUser` puts one JSON frame on every open socket of that account and no other's; `isUserConnected` answers whether any is open. Ids compare as strings, so a number id and a string id are the same account. Consumed by the companion module's store (her frames) and alert feed (nothing to say to an absent page).
 7. `abortChatRun(sessionId, dependencies)` and `answerChatPermission(requestId, decision, dependencies)`
-The page's own stop and tool-approval answer as callable verbs (`chat-run-verbs.service.ts`), so a stop or an answer from the companion's `stop_session` / `answer_session` is the same act as from the chat. `abortChatRun` answers `'stopped'` or `'not_running'` and ends only the run it read (`completeRunIfCurrent`), never a successor started meanwhile. `answerChatPermission` answers `void`: an unknown or already-settled `requestId` is silent, so a caller that must report success reads `getPendingApprovalsForSession` first.
+The page's own stop and tool-approval answer as callable verbs (`chat-run-verbs.service.ts`), so a stop or an answer from the companion's `stop_session` / `answer_session` is the same act as from the chat. `abortChatRun` answers `'stopped'` or `'not_running'` and ends only the run it read (`completeRunIfCurrent`), never a successor started meanwhile. With no running run it asks the runtime whether the chat's process is mid-turn (a missed steer's turn, a background task's wake-up: turns no run is registered for) and stops that (`abortUnregisteredTurn`); a chat busy only with background work is `'not_running'`. `steerChatRun(sessionId, content, echo, dependencies)` folds a message into the run's turn and writes `echo` onto that run's writer after a fold (MAN-9068). `answerChatPermission` answers `void`: an unknown or already-settled `requestId` is silent, so a caller that must report success reads `getPendingApprovalsForSession` first.
 8. `startRunStallWatchdog()`
 Starts the sweep that turns a silent run into one `session.stuck` notification, and returns the function that stops it. Called once by `server/index.ts` inside the `listen` callback and stopped on shutdown, for the same reason the plan runner is: the notification is about runs this process is only now able to host. It lives in this module because the registry it reads owns runs — no provider knows it exists. What counts as silence, and which runs are deliberately never announced, is [docs/MANUAL.md (notifications)](../../../docs/MANUAL.md) §"A silent run is noticed from outside".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/index.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-verbs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts
 
 ## MAN-711 — Why Dependency Injection Is Used
 section: README/002 Why Dependency Injection Is Used
@@ -62,8 +62,8 @@ section: README/003 Service Map
 | `services/websocket-server.service.ts` | Creates `WebSocketServer`, binds `verifyClient`, routes connection by pathname |
 | `services/websocket-auth.service.ts` | Authenticates upgrade requests and attaches `request.user` |
 | `services/chat-websocket.service.ts` | Handles the `/ws` chat protocol (`chat.send` / `chat.edit-send` / `chat.abort` / `chat.subscribe` / `chat.permission-response` / `chat.presence` / `chat.ping`). `chat.abort` and `chat.permission-response` parse the frame and call `abortChatRun` / `answerChatPermission`; a detached turn that interrupts the run in its way calls `abortChatRun` too. `handleChatConnection` registers the socket's account (`registerSocketUser`) whenever the upgrade request names one. A visible `chat.presence` also marks that session read when it was unread, and broadcasts `session_upserted` only when a row changed. A socket that connects is sent one `session_host_liveness` snapshot (`sessionHostLivenessSnapshot()`, built when sent) after `whenHostsReadopted` resolves; `handleChatConnection` takes that wait as `ChatConnectionDependencies`, a run's exported `ChatWebSocketDependencies` plus it (session-host MAN-8122) |
-| `services/chat-run-verbs.service.ts` | `abortChatRun(sessionId, dependencies)` → `'stopped'` / `'not_running'`, ends only the run it read via `completeRunIfCurrent`; `answerChatPermission(requestId, decision, dependencies)` → `void`. Callers: the `/ws` handlers and the companion module |
-| `services/chat-run-registry.service.ts` | Tracks live provider runs per app session id: seq numbering, event replay buffer, provider-id mapping, completion state, and `lastEventAt` — the silence clock every recorded event resets. On the terminal `complete` it stamps `last_completed_at` once per run end (and `last_read_at` with it when the chat is on screen), then broadcasts `session_upserted` — except for a re-adopted run whose last turn end its host journal shows was already recorded (`completeRunIfCurrent(..., { alreadyRecorded: true })`, decided in `session-host/readopt-host.ts`), which closes without stamping |
+| `services/chat-run-verbs.service.ts` | `abortChatRun(sessionId, dependencies)` → `'stopped'` / `'not_running'`, ends only the run it read via `completeRunIfCurrent` (no running run: a process mid-turn is stopped through the runtime); `answerChatPermission(requestId, decision, dependencies)` → `void`; `steerChatRun(sessionId, content, echo, dependencies)` → `'folded'` / `'not_running'`. Callers: the `/ws` handlers and the companion module |
+| `services/chat-run-registry.service.ts` | Tracks live provider runs per app session id: seq numbering, event replay buffer, provider-id mapping, completion state, and `lastEventAt` — the silence clock every recorded event resets. On the terminal `complete` it stamps `last_completed_at` once per run end (and `last_read_at` with it when the chat is on screen), then broadcasts `session_upserted` — except for a re-adopted run whose last turn end its host journal shows was already recorded (`completeRunIfCurrent(..., { alreadyRecorded: true })`, decided in `session-host/readopt-host.ts`), which closes without stamping. `onRunCompleted(listener)` hands each listener `(appSessionId, { aborted, alreadyRecorded })`, `alreadyRecorded` true for exactly the run that closes without stamping: the dispatcher and `focus-feed` read `aborted`, `node-readopt` the session id alone; the chat namer (MAN-9067) skips both |
 | `services/chat-session-writer.service.ts` | Gateway writer handed to provider runtimes: remaps provider session ids to app ids, swallows `session_created`, assigns `seq` |
 | `services/run-stall-watchdog.service.ts` | Polls the registry's running runs and announces one that has gone quiet past the threshold. A poller rather than a timer per run, so a run that ended cannot leak one |
 | `services/shell-websocket.service.ts` | Handles `/shell` PTY lifecycle, reconnect buffering, auth URL detection |
@@ -168,9 +168,9 @@ flowchart TD
 
   D -->|chat.send| E[resolve session row -> startRun -> providerRuntimeService.run]
   D -->|chat.edit-send| J[history_truncated -> rewind at anchor -> dispatch]
-  D -->|chat.abort| F[providerRuntimeService.abort + synthetic complete]
+  D -->|chat.abort| F[abortChatRun - runtime abort then completeRunIfCurrent]
   D -->|chat.subscribe| G[chat_subscribed ack + attach socket + replay events seq > lastSeq]
-  D -->|chat.permission-response| H[providerRuntimeService.resolveToolApproval]
+  D -->|chat.permission-response| H[answerChatPermission - resolveToolApproval]
   D -->|chat.presence| K[markPresence for this socket]
   D -->|other| I[send kind:protocol_error]
 ```
@@ -316,6 +316,8 @@ Broadcasts `kind: simple_list_changed` after a simple-list folder is made, renam
 Broadcasts `kind: session_host_liveness` when a chat gains its first or loses its last session host, reaching this set through `modules/websocket/index.js`; `handleChatConnection` also sends the same kind, as a snapshot, to each socket that joins the set, once the keepalive hosts are re-adopted (`whenHostsReadopted`). The ids ride a `sessionIds` array, never a `sessionId` key (session-host, MAN-695).
 
 This design centralizes cross-module realtime fanout without requiring route-local references to WebSocket internals.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts
 
 ## MAN-724 — Writer Adapter (`WebSocketWriter`)
 section: README/015 Writer Adapter (`WebSocketWriter`)

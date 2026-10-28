@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 
-import { Button, SettingRow } from '@/shared/ui';
+import { Button, SettingRow, SettingsCard, SettingsSection } from '@/shared/ui';
 import { api, readApiJson } from '@/shared/api';
-import SettingsCard from '@/modules/settings/SettingsCard';
-import SettingsSection from '@/modules/settings/SettingsSection';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 
 type BrowserUseSettings = {

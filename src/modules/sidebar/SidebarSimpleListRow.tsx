@@ -3,6 +3,8 @@ import { Edit2, EyeOff, FolderInput, Loader2, MoreHorizontal, Smile, Trash2 } fr
 import type { TFunction } from 'i18next';
 
 import { ActionMenu, Tooltip } from '@/shared/ui';
+import { PAGE_ANCHOR } from '@/shared/constants';
+import { usePageAnchor } from '@/shared/context/PageAnchorsContext';
 import { cn } from '@/shared/utils';
 import type { RecentConversationListItem, SimpleListDragProps } from '@/shared/types';
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
@@ -71,6 +73,8 @@ export default function SidebarSimpleListRow({
   t,
 }: SidebarSimpleListRowProps) {
   const isCompact = useCompactSidebar();
+  // The row is an anchor a floating guide can point at while its chat is the one being read, drafted for or walked.
+  const anchorRef = usePageAnchor(PAGE_ANCHOR.chatRow(row.sessionId));
   // Whether the inline rename input is open for this row.
   const [isEditing, setIsEditing] = useState(false);
   // The rename input's live value, seeded from the row's title when editing starts.
@@ -100,6 +104,7 @@ export default function SidebarSimpleListRow({
 
   return (
     <div
+      ref={anchorRef}
       {...(dragProps ?? {})}
       data-testid="simple-chat-row"
       data-session-id={row.sessionId}

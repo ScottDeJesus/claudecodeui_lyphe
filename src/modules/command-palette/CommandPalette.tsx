@@ -25,7 +25,7 @@ import {
 import { useTheme } from '@/shared/context/ThemeContext';
 import { usePaletteOps } from '@/modules/command-palette/context/PaletteOpsContext';
 import { CHAT_TOGGLE_KEY, SETTINGS_MAIN_TABS } from '@/shared/constants';
-import type { AppTab, PaletteNavRow, Project, SwitcherAction } from '@/shared/types';
+import type { AppTab, PaletteGroup, PaletteNavRow, Project, SwitcherAction } from '@/shared/types';
 import { PaletteSwitcherGroup } from '@/modules/command-palette/PaletteSwitcherGroup';
 import { createSwitcherFilter } from '@/modules/command-palette/utils/switcherActFilter';
 import { useSessionsSource } from '@/modules/command-palette/hooks/useSessionsSource';
@@ -61,6 +61,11 @@ type CommandPaletteProps = {
    */
   navRows: PaletteNavRow[];
   /**
+   * Kaylee's group ("Talk to Kaylee"), drawn between the Applications and Navigate groups. The palette lists its rows and
+   * runs the one chosen; what opening her means is the workspace's to say.
+   */
+  companionGroup: PaletteGroup;
+  /**
    * The application switcher's five acts, from the switcher's own list (the one the radial draws), drawn
    * as the Applications group. The palette knows nothing of what an act does; it lists them and runs the
    * one selected.
@@ -76,6 +81,7 @@ function CommandPalette({
   onShowTab,
   onShowRepoInGitTab,
   navRows,
+  companionGroup,
   switcherActions,
 }: CommandPaletteProps) {
   const [open, setOpen] = React.useState(false);
@@ -212,7 +218,7 @@ function CommandPalette({
             onValueChange={setSearch}
           />
           {/* Tall enough for the Actions and Applications groups to stand whole on open (about 330px), so all
-              five acts are on screen and the list's fold falls inside the Navigate group; on a short window
+              five acts are on screen and the list's fold falls inside the Kaylee group; on a short window
               it keeps to what the window can hold, as the kit's 300px did. */}
           <CommandList className="max-h-[min(360px,calc(100dvh-6rem))]">
             <CommandEmpty>No results.</CommandEmpty>
@@ -241,6 +247,17 @@ function CommandPalette({
             )}
 
             {showActions && <PaletteSwitcherGroup actions={switcherActions} run={run} />}
+
+            {showActions && companionGroup.rows.length > 0 && (
+              <CommandGroup heading={companionGroup.heading}>
+                {companionGroup.rows.map(({ key, label, keywords, icon: Icon, run: runRow }) => (
+                  <CommandItem key={key} value={`${label} ${keywords}`} onSelect={() => run(runRow)}>
+                    <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="flex-1">{label}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
 
             {showActions && (
               <CommandGroup heading="Navigate">

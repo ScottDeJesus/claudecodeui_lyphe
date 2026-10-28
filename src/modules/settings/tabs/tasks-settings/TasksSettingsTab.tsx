@@ -1,10 +1,8 @@
 import { useTranslation } from 'react-i18next';
 
 import { useTasksSettings } from '@/modules/task-master';
-import SettingsCard from '@/modules/settings/SettingsCard';
-import SettingsSection from '@/modules/settings/SettingsSection';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
-import { SettingRow } from '@/shared/ui';
+import { SettingRow, SettingsCard, SettingsSection } from '@/shared/ui';
 
 /** Rendered by Settings for the "tasks" tab, configuring task tracking preferences. */
 export default function TasksSettingsTab() {

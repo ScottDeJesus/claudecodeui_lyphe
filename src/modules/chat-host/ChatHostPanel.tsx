@@ -63,9 +63,8 @@ const BODY_CLEARANCE: Record<PanelPlacement['grip'], string> = {
  * ONE FRAME, THREE PARTS, TOP TO BOTTOM: the header, the body the chat is adopted into, and the grip at the
  * corner away from the FAB. The frame is the kit's Card — its surface, its border, its rounded corner — with the
  * two things a card resting on a page does not need: a firmer border (`border-input`, the strong one) so a dark
- * panel over a dark application still has an edge, and the scale's `--shadow-lift` (the rung between a menu and
- * a modal) so it reads as an object standing over the application and not as a pane of it. The shadow is one
- * inline style, as the composer's menus spell theirs: the token has no Tailwind name.
+ * panel over a dark application still has an edge, and the scale's lift rung, `shadow-lift` (`--shadow-lift`, the
+ * rung between a menu and a modal), so it reads as an object standing over the application and not as a pane of it.
  *
  * `z-[45]` is set against the shell's stacking context: above the application layer (z-40) so the panel is
  * never covered by the app it floats over, below the FAB (60) so the reader's way out is always on top of it,
@@ -90,13 +89,12 @@ export function ChatHostPanel({ placement, header, bodyRef, onResize, onResizeEn
       aria-label={t('chatHost.panelLabel')}
       data-chat-host-panel=""
       data-grip={placement.grip}
-      className={cn('fixed z-[45] flex flex-col overflow-hidden border-input', HEADER_CLEARANCE[placement.grip])}
+      className={cn('fixed z-[45] flex flex-col overflow-hidden border-input shadow-lift', HEADER_CLEARANCE[placement.grip])}
       style={{
         left: placement.left,
         top: placement.top,
         width: placement.width,
         height: placement.height,
-        boxShadow: 'var(--shadow-lift)',
       }}
     >
       {header}

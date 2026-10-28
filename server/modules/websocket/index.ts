@@ -5,6 +5,9 @@ export { sendToUser, isUserConnected } from './services/websocket-state.service.
 // Consumed by the companion module's tools: `stop_session` is the page's own stop and `answer_session`
 // the page's own permission answer, so a stop or an answer from her is the same act as from the chat.
 export { abortChatRun, answerChatPermission } from './services/chat-run-verbs.service.js';
+// Consumed by the companion module's send verb: a brief sent to a chat that is working is folded into the turn running
+// now (`send_to_session` and the draft card's Send steer), with its echo written onto that run's stream.
+export { steerChatRun } from './services/chat-run-verbs.service.js';
 export { createWebSocketServer } from './services/websocket-server.service.js';
 // Consumed by the cerberus module's `warden-link.ts`: every warden socket is pinged every 30 s and a
 // half-open one terminated, the same keep-alive the browser gateway's sockets get.

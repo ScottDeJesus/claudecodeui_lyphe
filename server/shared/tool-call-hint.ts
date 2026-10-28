@@ -3,6 +3,9 @@ import path from 'node:path';
 /** How many characters of a Bash command a one-line hint carries. */
 const BASH_HINT_CHARACTERS = 60;
 
+/** How many characters of a tool call's input an ask that is about to be decided carries. */
+const ASK_INPUT_CHARACTERS = 600;
+
 /** The tools whose hint is the file's basename: the folder says little and the line must stay short. */
 const FILE_TOOLS = new Set(['Read', 'Edit', 'MultiEdit', 'Write']);
 
@@ -24,8 +27,12 @@ function inputRecord(toolInput: unknown): Record<string, unknown> {
     : {};
 }
 
-/** One line of `text`: every run of whitespace, line breaks included, becomes a single space. */
-function oneLine(text: string): string {
+/**
+ * One line of `text`: every run of whitespace, line breaks included, becomes a single space, and the ends are
+ * trimmed. Consumed by this file's hints and by the companion's house reads (`tools/house-reads.ts`,
+ * `tools/chat-activity.ts`), which fold a chat's name and its last words to one line the same way.
+ */
+export function oneLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
@@ -54,4 +61,37 @@ export function describeToolCall(toolName: string, toolInput: unknown): string {
   }
 
   return hint ? `${toolName} ${hint}` : toolName;
+}
+
+/**
+ * A tool call as the line a person (or she) DECIDES on: the tool's name, then what it would do, in full up to 600
+ * characters and then cut with a count of what was left out. `describeToolCall`'s hint is for scanning a list and cuts a
+ * Bash command at 60 characters, which hides the tail of almost every real command (a `&& rsync --delete` sits past
+ * it); an ask that waits for a yes or a no is read whole. Bash is its command, a file tool the file's whole path, any
+ * other tool its input as JSON. A line break inside the text shows as ` ↵ `, so `ls⏎rm -rf x` never reads as one command.
+ *
+ * Consumers: the companion's `pending_ask` line (`tools/chat-activity.ts`, `askLine`) and the sentences of `answer_session`
+ * (`tools/ask-decision.ts`), where she decides whether to allow what a chat asked to run.
+ */
+export function describeToolInput(toolName: string, toolInput: unknown): string {
+  const input = inputRecord(toolInput);
+  let body = '';
+  if (toolName === 'Bash' && typeof input.command === 'string') {
+    body = input.command;
+  } else if (FILE_TOOLS.has(toolName) && typeof input.file_path === 'string') {
+    body = input.file_path;
+  } else if (Object.keys(input).length > 0) {
+    try {
+      body = JSON.stringify(input);
+    } catch {
+      // An input with no JSON form (a cycle) says nothing more than the tool's name.
+      body = '';
+    }
+  }
+  const folded = body.trim().replace(/[ \t]*\r?\n\s*/g, ' ↵ ').replace(/[ \t]+/g, ' ');
+  const characters = Array.from(folded);
+  const shown = characters.length > ASK_INPUT_CHARACTERS
+    ? `${characters.slice(0, ASK_INPUT_CHARACTERS).join('')}… (${characters.length - ASK_INPUT_CHARACTERS} more characters not shown)`
+    : folded;
+  return shown ? `${toolName} ${shown}` : toolName;
 }

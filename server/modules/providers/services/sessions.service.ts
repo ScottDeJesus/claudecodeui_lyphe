@@ -6,6 +6,7 @@ import { projectsDb, sessionCompactionsDb, sessionsDb } from '@/modules/database
 import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
+import { markRelayedSends } from '@/modules/providers/services/session-relayed-sends.js';
 import { collectSessionAgents, readHistoryCompanionStamp } from '@/modules/providers/services/session-agents.service.js';
 import { collectSessionSoulLaunches, collectStampedSoulLaunches } from '@/modules/providers/services/session-soul-launches.service.js';
 import type {
@@ -625,10 +626,12 @@ export const sessionsService = {
 
     return {
       ...result,
-      messages: result.messages.map((message) => ({
+      // Marked here, after the page is cut, so a cached page and a directly read one both come out
+      // marked and the cache itself never holds a mark (`markRelayedSends` copies what it marks).
+      messages: markRelayedSends(sessionId, result.messages.map((message) => ({
         ...message,
         sessionId,
-      })),
+      }))),
       ...(agents ? { agents: agents.map((agent) => ({ ...agent, sessionId })) } : {}),
       ...(soulLaunches ? { soulLaunches } : {}),
     };
@@ -793,6 +796,10 @@ export const sessionsService = {
 
   /**
    * Renames one session by id without requiring the caller to pass provider.
+   *
+   * The one door a person's rename reaches (the sidebar's PUT), so
+   * it also marks the name as given: the namer never replaces a name a person chose. A title the app
+   * writes itself goes through `updateSessionCustomName` alone and stays unmarked.
    */
   renameSessionById(sessionId: string, summary: string): { sessionId: string; summary: string } {
     const session = sessionsDb.getSessionById(sessionId);
@@ -803,7 +810,7 @@ export const sessionsService = {
       });
     }
 
-    sessionsDb.updateSessionCustomName(sessionId, summary);
+    sessionsDb.renameByPerson(sessionId, summary);
     return { sessionId, summary };
   },
 };

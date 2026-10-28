@@ -43,6 +43,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home
 | `PRESS_PX` | 6 | `.vv-region-badge::before`, `inset: -6px` (`media.css`) |
 
 - A paint size changed alone moves badges onto what they were placed to clear, or keeps them off space that is free.
-- The order a place is weighed in (`Cost`: covers no earlier badge or spot · middle on no other region's box · touches its own box · press clear of neighbours · least on other boxes) is the contract, stated in MAN-8945's `badgePlacement` row; a change to it changes that row in the same edit.
+- `REACH_PX` (17) is half a badge and a press, and `SWEEP_PX` (11) half a badge: both follow the two sizes above.
+- The order a place is weighed in (`Cost`: no earlier badge or spot with a middle within `REACH_PX` · covers no earlier badge or spot · middle on no other region's box · touches its own box · press clear of neighbours · least on other boxes, then a sweep of the whole picture when none of the 24 clears every press) is the contract, stated in MAN-8945's `badgePlacement` row; a change to it changes that row in the same edit.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/regionBadgePlaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/spots.css

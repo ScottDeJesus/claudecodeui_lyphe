@@ -1,144 +1,106 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { transcribeVoice } from '@/shared/api';
+import { currentVoiceProvider } from '@/modules/chat/hooks/useVoiceProvider';
+import { refusalSentence, transcribeVoice } from '@/shared/api';
+import { useMicRecorder } from '@/shared/hooks/useMicRecorder';
 import type { VoiceInputState } from '@/shared/types';
-
-// Mobile-safe recording: iOS Safari 18.4+ supports webm/opus; older iOS needs mp4.
-const MIME_CANDIDATES = [
-  'audio/webm;codecs=opus',
-  'audio/webm',
-  'audio/mp4',
-  'audio/ogg;codecs=opus',
-  'audio/ogg',
-];
-
-function pickMime(): string {
-  for (const t of MIME_CANDIDATES) {
-    try {
-      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) return t;
-    } catch {
-      /* isTypeSupported can throw on some iOS versions */
-    }
-  }
-  return '';
-}
-
+import { recordingFileName } from '@/shared/utils';
 
 /**
- * Push-to-talk dictation. Records the mic, uploads to /api/voice/transcribe
- * (an OpenAI-compatible speech-to-text backend via the Express proxy), and
- * returns the transcript through onTranscript.
+ * Push-to-talk dictation. Records the mic (useMicRecorder), transcribes it through the account's provider as useVoiceProvider
+ * last read it, at the moment the clip is sent (the OpenAI-compatible backend, posted to the browser's own endpoint or the
+ * Express proxy, or Gemini through the proxy on the server's key), and returns the transcript through onTranscript. A refusal
+ * from Gemini (no key, a refused key) is handed to onError as the server's own sentence.
  */
 export function useVoiceInput(
   onTranscript: (text: string, send?: boolean) => void,
   onError?: (msg: string) => void,
 ) {
-  const [state, setState] = useState<VoiceInputState>('idle');
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
-  const cancelledRef = useRef(false);
-  const startingRef = useRef(false);
-  // Whether the in-progress stop should auto-send the transcript (vs just fill the box).
-  const sendRef = useRef(false);
-
-  const stopTracks = () => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-  };
-
-  // Stop the mic if the component unmounts mid-recording.
+  // True from the moment a clip is handed to the speech service until its answer lands. The recorder is idle for that
+  // whole stretch, so the button's spinner can't be derived from the recorder's own state.
+  const [transcribing, setTranscribing] = useState(false);
+  // Set on unmount. A transcription is awaited across the network, so every step after an await asks it before
+  // touching state or calling the caller's handlers; the recorder keeps its own copy for its half.
+  const unmountedRef = useRef(false);
+  // The latest callbacks, read when a transcript or an error arrives: a clip outlives the render that started its
+  // recording, and this keeps `start` and `stop` the same functions across renders.
+  const handlersRef = useRef({ onTranscript, onError });
   useEffect(() => {
-    cancelledRef.current = false;
+    handlersRef.current = { onTranscript, onError };
+  });
+
+
+  // The transcription half must stay quiet once the component is gone; the recorder guards its own half.
+  useEffect(() => {
+    unmountedRef.current = false;
     return () => {
-      cancelledRef.current = true;
-      startingRef.current = false;
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-      recorderRef.current = null;
+      unmountedRef.current = true;
     };
   }, []);
 
-  const start = useCallback(async () => {
-    if (startingRef.current || (recorderRef.current && recorderRef.current.state !== 'inactive')) return;
-    startingRef.current = true;
+  const transcribe = useCallback(async (clip: { blob: Blob; mimeType: string }, shouldSend: boolean) => {
+    if (unmountedRef.current) return;
+    const { blob, mimeType } = clip;
+    if (blob.size < 800) {
+      handlersRef.current.onError?.('Recording too short');
+      return;
+    }
+    setTranscribing(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
-      });
-      if (cancelledRef.current) {
-        stream.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      streamRef.current = stream;
-      const mimeType = pickMime();
-      const rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      recorderRef.current = rec;
-      chunksRef.current = [];
-
-      rec.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      rec.onstop = async () => {
-        stopTracks();
-        if (cancelledRef.current) return;
-        // Capture and clear the send intent for this stop before any async work.
-        const shouldSend = sendRef.current;
-        sendRef.current = false;
-        const type = rec.mimeType || 'audio/webm';
-        const blob = new Blob(chunksRef.current, { type });
-        if (blob.size < 800) {
-          setState('idle');
-          onError?.('Recording too short');
+      // Read now, not when the recording began: the picker may have moved in between.
+      const clipProvider = currentVoiceProvider();
+      const res = await transcribeVoice(blob, recordingFileName(mimeType), clipProvider);
+      if (!res.ok) {
+        // Gemini's refusals are sentences for the person ("No Gemini key: set one in Settings → Voice"), so they are
+        // shown as they came. The OpenAI-compatible branch keeps its status words.
+        const sentence = clipProvider === 'gemini' ? await refusalSentence(res) : null;
+        if (sentence) {
+          if (!unmountedRef.current) handlersRef.current.onError?.(sentence);
           return;
         }
-        setState('transcribing');
-        try {
-          const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
-          const res = await transcribeVoice(blob, `recording.${ext}`);
-          if (!res.ok) throw new Error(`transcribe ${res.status}`);
-          const data = await res.json();
-          if (cancelledRef.current) return;
-          const text = String(data?.text || '').trim();
-          if (text) onTranscript(text, shouldSend);
-          else onError?.('No speech detected');
-        } catch (e) {
-          if (!cancelledRef.current) {
-            onError?.(`Transcription failed: ${e instanceof Error ? e.message : String(e)}`);
-          }
-        } finally {
-          if (!cancelledRef.current) setState('idle');
-        }
-      };
-
-      rec.start();
-      setState('recording');
+        throw new Error(`transcribe ${res.status}`);
+      }
+      const data = await res.json();
+      if (unmountedRef.current) return;
+      const text = String(data?.text || '').trim();
+      if (text) handlersRef.current.onTranscript(text, shouldSend);
+      else handlersRef.current.onError?.('No speech detected');
     } catch (e) {
-      recorderRef.current = null;
-      stopTracks();
-      if (cancelledRef.current) return;
-      const err = e as { name?: string; message?: string };
-      let msg = `Mic error: ${err?.message || e}`;
-      if (err?.name === 'NotAllowedError') msg = 'Microphone access denied.';
-      else if (err?.name === 'NotFoundError') msg = 'No microphone found.';
-      onError?.(msg);
-      setState('idle');
+      if (!unmountedRef.current) {
+        handlersRef.current.onError?.(`Transcription failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
     } finally {
-      startingRef.current = false;
-    }
-  }, [onTranscript, onError]);
-
-  // Stop recording. Pass { send: true } to auto-send the transcript once it's ready.
-  // Guard on the recorder's own state (not React state) so a double tap, or the mic
-  // and Send buttons both firing, can't call stop() on an already-inactive recorder.
-  const stop = useCallback((opts?: { send?: boolean }) => {
-    const rec = recorderRef.current;
-    if (rec && rec.state !== 'inactive') {
-      sendRef.current = opts?.send ?? false;
-      rec.stop();
+      if (!unmountedRef.current) setTranscribing(false);
     }
   }, []);
+
+  // A recording that ended by itself (the device went away) is transcribed as a plain stop: nothing asked it to send.
+  const transcribeEndedClip = useCallback((clip: { blob: Blob; mimeType: string }) => {
+    void transcribe(clip, false);
+  }, [transcribe]);
+
+  const mic = useMicRecorder(transcribeEndedClip);
+  const { start: startMic, stop: stopMic } = mic;
+
+  const start = useCallback(async () => {
+    try {
+      await startMic();
+    } catch (e) {
+      handlersRef.current.onError?.(e instanceof Error ? e.message : String(e));
+    }
+  }, [startMic]);
+
+  // Stop recording. Pass { send: true } to auto-send the transcript once it's ready.
+  // The recorder answers null when it was not recording, so a double tap, or the mic
+  // and Send buttons both firing, transcribes one clip and the second call is dropped.
+  const stop = useCallback((opts?: { send?: boolean }) => {
+    const shouldSend = opts?.send ?? false;
+    void stopMic().then((clip) => {
+      if (clip) void transcribe(clip, shouldSend);
+    });
+  }, [stopMic, transcribe]);
+
+  const state: VoiceInputState = transcribing ? 'transcribing' : mic.state;
 
   const toggle = useCallback(() => {
     if (state === 'recording') stop();

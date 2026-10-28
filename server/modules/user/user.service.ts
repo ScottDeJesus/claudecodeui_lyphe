@@ -1,3 +1,4 @@
+import type { QueuedAppendResult, QueuedChatMessage } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
 type GitConfig = {
@@ -26,7 +27,14 @@ type UserDependencies = {
   };
   drafts: {
     getDrafts(userId: number): DraftRecord[];
-    saveDraft(userId: number, scope: string, draft: { text?: string; queuedMessage?: unknown | null }): void;
+    saveDraft(userId: number, scope: string, text: string): void;
+    appendQueuedMessage(
+      userId: number,
+      scope: string,
+      message: QueuedChatMessage,
+      maxContentLength: number,
+    ): QueuedAppendResult;
+    clearQueuedMessage(userId: number, scope: string): QueuedChatMessage | null;
     deleteDraft(userId: number, scope: string): void;
   };
   readSystemGitConfig(): Promise<GitConfig>;
@@ -56,6 +64,37 @@ const readDraftScope = (value: unknown): string => {
     });
   }
   return scope;
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+const tooLongQueuedMessage = () => new AppError('The queued message is too long to store', {
+  code: 'QUEUED_MESSAGE_TOO_LONG',
+  statusCode: 413,
+});
+
+/** Reads the message the composer asks to queue; one with nothing to send, or past the draft ceiling, is refused. */
+const readQueuedMessageInput = (value: unknown): QueuedChatMessage => {
+  const message = isPlainObject(value) ? value : {};
+  const content = typeof message.content === 'string' ? message.content : '';
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  if (!content.trim() && attachments.length === 0) {
+    throw new AppError('A queued message needs text or attachments', {
+      code: 'INVALID_QUEUED_MESSAGE',
+      statusCode: 400,
+    });
+  }
+  if (content.length > MAX_DRAFT_TEXT_LENGTH) {
+    throw tooLongQueuedMessage();
+  }
+  return {
+    ...(typeof message.id === 'string' && message.id ? { id: message.id } : {}),
+    content,
+    ...(isPlainObject(message.options) ? { options: message.options } : {}),
+    attachments,
+  };
 };
 
 const readPreferenceUpdates = (body: unknown): Record<string, unknown> => {
@@ -163,27 +202,63 @@ export function createUserService(dependencies: UserDependencies) {
       return { success: true, drafts: dependencies.drafts.getDrafts(userId) };
     },
 
+    /**
+     * Saves the composer's draft text, and only that. A queued message changes through
+     * `appendQueuedMessage` and `clearQueuedMessage`, so a `queuedMessage` in the body — the
+     * replace-write of a page loaded before those routes — is ignored and the stored one stays as
+     * it was. It is not refused: that page sends its text in the same body, and a 4xx would lose it.
+     * `written` names what was stored, so a caller can see that the queue was not.
+     */
     saveDraft(userId: number, scopeInput: unknown, body: unknown) {
       const scope = readDraftScope(scopeInput);
-      const payload = (body ?? {}) as { text?: unknown; queuedMessage?: unknown };
-      // Only the parts present in the body are written (see `sessionDraftsDb.saveDraft`): a text
-      // save must leave a queued message the dispatcher may already have sent alone.
-      const text = 'text' in payload
-        ? (typeof payload.text === 'string' ? payload.text : '')
-        : undefined;
+      const payload = isPlainObject(body) ? body : {};
+      if (!('text' in payload)) {
+        return { success: true, written: [] as string[] };
+      }
 
-      if (text !== undefined && text.length > MAX_DRAFT_TEXT_LENGTH) {
+      const text = typeof payload.text === 'string' ? payload.text : '';
+      if (text.length > MAX_DRAFT_TEXT_LENGTH) {
         throw new AppError('Draft text is too long to store', {
           code: 'DRAFT_TEXT_TOO_LONG',
           statusCode: 413,
         });
       }
 
-      dependencies.drafts.saveDraft(userId, scope, {
-        text,
-        queuedMessage: 'queuedMessage' in payload ? (payload.queuedMessage ?? null) : undefined,
-      });
-      return { success: true };
+      dependencies.drafts.saveDraft(userId, scope, text);
+      return { success: true, written: ['text'] };
+    },
+
+    /**
+     * Queues a message behind the session's running turn. A message already waiting there is kept
+     * and this one is added after it, so a burst of follow-ups all reach the provider, in order,
+     * as the next turn.
+     *
+     * A slash command is the one exception: it only works as a turn of its own, so it is refused
+     * rather than merged, and the composer keeps it.
+     */
+    appendQueuedMessage(userId: number, scopeInput: unknown, queuedMessageInput: unknown) {
+      const scope = readDraftScope(scopeInput);
+      const message = readQueuedMessageInput(queuedMessageInput);
+      // The same ceiling as a draft's text, applied to the merged message too: each append grows the
+      // one stored message.
+      const result = dependencies.drafts.appendQueuedMessage(userId, scope, message, MAX_DRAFT_TEXT_LENGTH);
+      if (result.outcome === 'too-long') {
+        throw tooLongQueuedMessage();
+      }
+      if (result.outcome === 'not-combinable') {
+        throw new AppError(
+          'A slash command runs as a turn of its own, so it cannot be combined with the queued message. '
+            + 'Send it after the queued message has gone.',
+          { code: 'QUEUED_MESSAGE_NOT_COMBINABLE', statusCode: 409 },
+        );
+      }
+      return { success: true, queuedMessage: result.queuedMessage, appended: result.appended };
+    },
+
+    /** Answers the message it removed (null when none was waiting), so the composer can hand all of it back. */
+    clearQueuedMessage(userId: number, scopeInput: unknown) {
+      const queuedMessage = dependencies.drafts.clearQueuedMessage(userId, readDraftScope(scopeInput));
+      return { success: true, queuedMessage };
     },
 
     deleteDraft(userId: number, scopeInput: unknown) {

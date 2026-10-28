@@ -389,7 +389,7 @@ One labelled setting and its control. Exported from `src/shared/ui/index.ts`. Ev
 | Floor is 10rem. Switch-only rows stay inline at 320, 341, 357, 360 and 390px at 1.0× and 1.072× text scale, and from 357px at 1.2×. | Measured 2026-09-29. 13rem dropped every switch row below its text at 320 (208 + 16 + 52 > 254px) and was too wide at the operator's 1.072× text scale (fix-pass M1). 9rem also holds 341px at 1.2×. |
 | A switch-only row seen dropping below its text near 341–360px: lower the floor. Steppers, buttons, inputs and badges drop below their text by design. | |
 | Icon slot never shrinks, label span is `min-w-0`. No caller patches a glyph. | A wrapping label squeezed a bare icon to nothing. |
-| A fixed-width field carries `max-w-full` (`w-64 max-w-full`, `NtfySettingsCard.tsx` `FIELD_WIDTH`). No `w-full sm:w-*` workaround. | Both were patches for the squeeze the floor now handles. |
+| A fixed-width field carries `max-w-full` (`w-64 max-w-full`, `SETTINGS_FIELD_WIDTH` in `src/shared/constants.ts`: `NtfySettingsCard.tsx` and the companion module's Settings form). No `w-full sm:w-*` workaround. | Both were patches for the squeeze the floor now handles. |
 | `null` children ⇒ no wrapper. | An empty `shrink-0` wrapper takes its own flex line and adds a blank band under the text (Jev's scope rows). |
 | A status badge rides the label line, with `null` children (`AccountContent`'s Connected badge). | In the controls slot the floor treats a badge like a button and drops it under the text at 320px. |
 
@@ -779,8 +779,8 @@ The chat's state hooks bind timers, frames, listeners and observers to `useHostW
 | `useSessionPresence`'s 30 s heartbeat | paces the server's 90 s expiry, not anything the reader sees; an interval armed on a window that closes dies with it |
 | `useRestartOnInstalledCli.ts` deadlines (15 s, 5 s, 20 s) | the restart state machine, measured from absolute times |
 | `usePinnedSubagentRows.ts` expiry repaint | hours away |
-| `useVoiceAvailable.ts` | listens for `VOICE_CONFIG_SYNC_EVENT`, which settings dispatches on the opener's `window` |
-| `useVoiceInput.ts` `navigator` | the opener's |
+| `useVoiceAvailable.ts`, `useVoiceProvider.ts` | listen for `VOICE_CONFIG_SYNC_EVENT`, which settings dispatches on the opener's `window` |
+| `useMicRecorder.ts` `navigator` (the chat's dictation records through it) | the opener's |
 | `useChatSessionState` bare timers: the 8 s loading-wheel guard, the "Load all" hint pulses, the search-jump and landing retries, the 4 s highlight flash | each bounds a wait; the reader is not waiting on it |
 | `useChatComposerState`'s 5 s draft poll | reconciles data |
 
@@ -795,7 +795,7 @@ The chat's state hooks bind timers, frames, listeners and observers to `useHostW
 - Both exit 1 with the failed checks listed. The move probe sends no model turn and writes no app data.
 - `.verify/lib/scratch-chat.mjs` is the shared helper for a probe that sends a real turn: `createScratchChat(session, projectPath?)` (default `PROBE_PROJECT`, `.verify/lib/probe-project.mjs`; a probe that needs a node-assigned project names a scratch project, and only `cerberus-eis-proof.mjs` may name the real `/opt/eis-app`, MAN-7924), `openScratchChatOnHaiku(session, id)` (opens `/session/<id>`; when the rail's Chat button (`nav[aria-label="Views"] button[aria-label="Chat"]`) is not `aria-current`, opens the drawer (`openDrawer` from `lib/layout-nav.mjs`, a phone's rail sits in it) and presses the button; picks Haiku in the composer's `MODEL_CHIP`; throws if the chip does not read Haiku, so no turn is sent), `sendTurn(page, text)`, `deleteScratchChat(session, id)`; constants `MODEL_CHIP`, `SCROLLER`, `COMPOSER`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useHostMoveScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/streamFlushTimer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-window-bindings-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-window-bindings-move.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useHostMoveScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/streamFlushTimer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useMicRecorder.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-window-bindings-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-window-bindings-move.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs
 
 ## MAN-7464 — chat-host — the live chat's one node, its provider and its slot
 
@@ -960,7 +960,7 @@ Three presentational components in `src/modules/chat-host/`: the floating chat's
 
 ## `ChatHostPanel` rules
 
-1. Frame is the kit `Card`: `position: fixed`, `z-[45]`, `border-input` (the strong border), inline `boxShadow: var(--shadow-lift)`. Attributes: `role="region"`, `aria-label` = `chatHost.panelLabel`, `data-chat-host-panel`, `data-grip={placement.grip}`.
+1. Frame is the kit `Card`: `position: fixed`, `z-[45]`, `border-input` (the strong border), `shadow-lift` (the lift rung, `--shadow-lift`). Attributes: `role="region"`, `aria-label` = `chatHost.panelLabel`, `data-chat-host-panel`, `data-grip={placement.grip}`.
 2. Parts top to bottom: `header`; body `div[data-chat-host-body].flex.min-h-0.flex-1.flex-col.bg-background` (gets `bodyRef`, empty: the chat's node is moved in by `moveTo`); the grip's wrapper at `placement.grip`, 2px in from the corner (`GRIP_CORNER`).
 3. `z-[45]`: above the application layer (40), below the FAB (60). Measured in the fixture on the shell's own container.
 4. The panel measures nothing and moves nothing: rect and grip corner arrive in `placement`.
@@ -3300,7 +3300,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/af
 
 ## MAN-8575 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses
 
-The Tours view: a DocuSketch tour's affected areas drawn on a view's photo, or on the pano's six views as one 360° sphere. Three screens, one at a time: `TourPicker` → `TourScreen` → `PanoScreen`. Data is `api.affectedAreas` (wire MAN-8558, lane MAN-8559, routes MAN-8540). Drawn with the library's `RegionImage`, `Gallery` (MAN-8579) and `SphereView` (MAN-8943); the 360° screen's pieces, rules and proof: MAN-8956. A switch at the view's top (`ToursSwitch`: Tours · Mark · Tables) chooses the surface: Tours is that walk; the Tables screen (`TablesScreen`, how right the reader is per kind) is beside it, not a step of it: MAN-8581; the marks (the mark bar, Missed one, the Mark screen, the understanding mark) judge what the walk draws: MAN-8582, rules MAN-8583.
+The Tours view: a DocuSketch tour's affected areas drawn on a view's photo, or on the pano's six views as one 360° sphere. Three screens, one at a time: `TourPicker` → `TourScreen` → `PanoScreen`. `TourScreen` carries the DAY-ONE SKETCH between its room list and its panos: the engine's plan drawn with each pano's spot, each area and each fixture laid on it, a list by room beside the job's sketch and first drying report, the scale and pin lines, and "Read the room layout", the layout press and its walk (MAN-9038; the walk: MAN-8576). A region on the pano screen says where it is counted (`placementNotes`, MAN-9038). Data is `api.affectedAreas` (wire MAN-8558, lane MAN-8559, routes MAN-8540). Drawn with the library's `RegionImage`, `Gallery` (MAN-8579) and `SphereView` (MAN-8943); the 360° screen's pieces, rules and proof: MAN-8956. A switch at the view's top (`ToursSwitch`: Tours · Mark · Tables) chooses the surface: Tours is that walk; the Tables screen (`TablesScreen`, how right the reader is per kind) is beside it, not a step of it: MAN-8581; the marks (the mark bar, Missed one, the Mark screen, the understanding mark) judge what the walk draws: MAN-8582, rules MAN-8583.
 
 ## State of the module
 | fact | value |
@@ -3308,7 +3308,7 @@ The Tours view: a DocuSketch tour's affected areas drawn on a view's photo, or o
 | phase | live: the Cerberus tab's fourth view, reading the lane; run whole against the live engine 2026-10-17 (`.verify/affected-areas-view.mjs`, `.verify/affected-areas-walk.mjs`); its 360° screen run 2026-10-22 (`.verify/affected-areas-sphere.mjs`: MAN-8956) |
 | mounted | `CerberusPanel` imports the lazy `AffectedAreasView` through this module's barrel and draws it after History in the strip, only once center's overview has answered (`overview !== null`, as every view), inside a `KeptView` (MAN-8918): mounted on the first show of the Tours tab, `hidden` after, kept mounted while the Cerberus workspace tab stands (leaving that tab for Chat unmounts the panel and the view with it, and the tour, pano, `shown` and the sphere's look are lost then). why: the tour, pano, `shown` and scroll survive a visit to Fleet (MAN-7891); the views share ONE scroller, so the panel's `useKeptViews` keeps Tours's offset (written as Tours is left, restored as it returns) |
 | words | `affectedAreas.*` and `cerberus.tours.{tab,tabHint}` in `src/modules/i18n/locales/en/common.json` |
-| shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `PanoShown` (`'sphere'` or a `Face`), `TourReaderProgress`, `AffectedAreasTrouble` in `src/shared/types.ts`; the sphere's `CubeFaces`, `SphereShape`, `SphereLook`, `SphereTrouble`: MAN-8943; the marks' `ToursScreenKey`, `RegionLayer`, `MarkWalk`, `MissedStage`: MAN-8582 |
+| shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `PanoShown` (`'sphere'` or a `Face`), `TourReaderProgress`, `AffectedAreasTrouble`, `PanoRoom` (a pano's `roomKey` and `floor`, against which a region's placement says "Counted in {room}"), `DayOneSection` (what `DayOneSketch` is handed, MAN-9038) in `src/shared/types.ts`; the sphere's `CubeFaces`, `SphereShape`, `SphereLook`, `SphereTrouble`: MAN-8943; the marks' `ToursScreenKey`, `RegionLayer`, `MarkWalk`, `MissedStage`: MAN-8582 |
 | shared constants | `AFFECTED_AREAS_LANE_FAULTS` (`no_secret`, `unreachable`, `unreadable`: the faults of the lane whatever was asked, each said in `affectedAreas.trouble.<fault>`) in `src/shared/constants.ts`; read by `LaneTrouble`, `ThresholdControl`, `MarkRefusal`. `MARK_NOTE_MAX` (500) beside it: MAN-8582 |
 
 ## 360° on the pano screen
@@ -3333,8 +3333,8 @@ section: The Tours view — src/modules/affected-areas: where state lives, what 
 | `@/shared/hooks/useLaneRead` | one JSON read of the lane kept for its key, shared with the Bulletins hooks (MAN-8917): `{ value, trouble, retry }` plus `reload` (quiet, keeps the value) and `replace(value, forKey)` (writes an answer that came by another road under the key it is GIVEN, and drops every read begun before it); reads when the key is set or `retry`/`reload` is called, never on a timer |
 | `hooks/useTours.ts` · `useTour.ts` · `useCodebook.ts` | the picker's list (30 newest, the search text cut at 80 characters, read once typing has rested 300 ms, and only while the view is shown; `reload` when the picker comes back) · the open tour · the codebook |
 | `hooks/usePano.ts` | the open pano, the dry run beside it (what a read would buy), and `pressRead(force)`: one armed press at a time per pano (kept in `inFlight`, so a press still out shows as busy when the person leaves the pano and comes back), its answer replaces the pano and the plan at once, under the key the press was made for and outranking any read begun before it, unless the person has gone to another pano. A pano the tour lists with no views is not read (its GET is a 404 until it is cut): its dry run cuts it, and until then the screen is handed it with no views; a cut that brings no answer is that pano's trouble, drawn as the header and a banner with Try again |
-| `hooks/useTourReader.ts` | Read the rest: the unread panos in capture order, one armed press each, after the last one answered, passing a pano whose views cannot be cut; `{ walk, start, stop }` |
-| `hooks/useImageUrl.ts` | `useImageUrls(shas, attempt = 0)` (a list: the open pano's six photos, and the gallery's tiles through `useTilePhotos`; a new `attempt` is a new key, so the same shas are fetched again: Try again on a photo that did not arrive) and `useImageUrl(sha)` (one photo: the Mark screen's): bytes fetched with the token, object URLs revoked on unmount and on a change, aborted on a change, null on failure |
+| `hooks/useTourReader.ts` | Read the rest: the unread panos in capture order (`panosInCaptureOrder`, `utils/tourModel.ts`, the sort `useLayoutWalk` shares), one armed press each, after the last one answered, passing a pano whose views cannot be cut; `{ walk, start, stop }` |
+| `hooks/useImageUrl.ts` | `useImageUrls(shas, attempt = 0)` (a list: the open pano's six photos, and the gallery's tiles through `useTilePhotos`; a new `attempt` is a new key, so the same shas are fetched again: Try again on a photo that did not arrive), `useDrawingUrls(shas, attempt = 0)` (the same fetch over the day-one plan's SVGs, by `drawingSha`: `useDayOne`'s) and `useImageUrl(sha)` (one photo: the Mark screen's): bytes fetched with the token, object URLs revoked on unmount and on a change, aborted on a change, null on failure |
 | `hooks/useTilePhotos.ts` | the tour screen's gallery photos: `useImageUrls` for the first `GALLERY_MAX` (24, `utils/tourModel.ts`) panos' Ahead views, and a second `useImageUrls` for the rest once the gallery's `onOverflowOpen` fires, so a 45-pano tour fetches 24 photos until "+N" is pressed, then the other 21 and none again. Nothing is fetched off the tour screen, and leaving it forgets the opened state (the gallery comes back collapsed) |
 | `hooks/useViewShown.ts` | `isInLayout(element)` (asked before a read starts), `useViewShown(ref)` (whether the view is in layout, as state) and `useWhenShown(shown, fn)` (a word when it comes back) |
 | `hooks/usePanoPlace.ts` | the open pano's place: `shown` (`PanoShown`: `'sphere'` or one of the six `Face`s), `sphereLook`, `selectedRegionId`, `enlarged` and `layer`, with `openPano(entry)` (opens on 360° looking where the pano's Ahead view was cut, `AHEAD_LOOK` when it lists none; nothing chosen, All again), `letGo()` (nothing chosen, not enlarged) and the verbs `onShow` (a tab pressed: nothing chosen; 360° from a view looks where that view looked), `onLook`, `onSelectRegion`, `onLayer`, `onMarkOn(face, regionId)` (that view shown with the area still chosen), `onEnlarge`, `onShrink`, `onFullscreen`. The root keeps no copy of the five and calls the two verbs inside its own handlers (`onOpenTour`, `onBack`, `onOpenPano`, `onBackToTour`) |
@@ -3379,7 +3379,7 @@ section: The Tours view — src/modules/affected-areas: where state lives, what 
 1. state (`query`, `tourId`, `panoId`, `photoAttempt`, `place = usePanoPlace()` holding `shown`, `sphereLook`, `selectedRegionId`, `enlarged`, `layer`)
 2. reads (`useTours`, `useTour`, `usePano`, `useCodebook`), each `{ value, trouble, retry }`; `useTour` adds `reload`, `usePano` adds `press`, `pressRead`, `reload`
 3. derivations (`summary`, `entry`, `room`, `unread = tourUnread(...)`)
-4. photos, walk, handlers (`useImageUrls(…, photoAttempt)`, `useTilePhotos`, `useTourReader`, `on*`)
+4. photos, walk, handlers (`useImageUrls(…, photoAttempt)`, `useTilePhotos`, `useTourReader`, `useDayOne` (the day-one sketch's plan, drawings, dry run and layout walk, handed to `TourScreen` as one `DayOneSection`; each answer of its walk that moved the plan reads the tour and the open pano again, as the reader's walk does), `on*`, `onOpenPanoAt` (an area opens its photo's pano at its face with its region chosen, an object at its face alone))
 
 A step reads only what the steps above it produce. why: the open pano's six photos are read off `marked.pano ?? entry` with no reordering.
 
@@ -4248,9 +4248,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils
 | piece | does |
 |---|---|
 | `FaceStrip.tsx` | `Tabs` (underline): `sphere` first (`affectedAreas.sphere.tab`, count `panoCounts(views).areas`), then the six `FACES`. Accessible name `affectedAreas.pano.viewsLabel`. Scrolls sideways in its own box; the selected tab is brought in by `scrollLeft`, never `scrollIntoView` (it walks every scrollable ancestor) |
-| `PanoSphere.tsx` | props `panoId`, `views`, `photos`, `room`, `layer`, `selectedRegionId`, `enlarged`, `codebook`, `reading`, `onLayer`, `onSelectRegion`, `look`, `onLook`, `onFullscreen`, `onMarkOn`, `onRetryPhotos`. Top to bottom: `LayerSwitch` in the photo's tool row; `SphereView` (`key={panoId}`, mounted only while its block is in layout, `useViewShown(blockRef)`); while an area is chosen `ChosenArea`; the caption with Enlarge (`onFullscreen(true)`, disabled while `faces === null`); the hint |
-| `ChosenArea` (in `PanoSphere.tsx`) | `role="group"` `data-sphere-chosen`: the number as a `Badge` in the area's look, its kind (`effectiveClass ?? class`), its view's name, and `Mark it on {view}` (`data-sphere-press="mark-on"`, `onMarkOn(face, regionId)`). Sends nothing |
-| `PanoAreas.tsx` | props `views: ViewDetail[]`, `selectedRegionId`, `codebook`, `onSelectRegion`. The views in `FACES` order; a view with regions draws its name as `<h3>` over its `RegionList` (`headingId`). Under them: "Nothing found on …" (read, no regions) and "Not read yet: …". A view holding an area drawn by hand is listed read or not |
+| `PanoSphere.tsx` | props `panoId`, `views`, `photos`, `room`, `panoRoom` (`PanoRoom`, `src/shared/types.ts`: the pano's `roomKey` and `floor`, built by `PanoScreen`), `layer`, `selectedRegionId`, `enlarged`, `codebook`, `reading`, `onLayer`, `onSelectRegion`, `look`, `onLook`, `onFullscreen`, `onMarkOn`, `onRetryPhotos`. Top to bottom: `LayerSwitch` in the photo's tool row; `SphereView` (`key={panoId}`, mounted only while its block is in layout, `useViewShown(blockRef)`); while an area is chosen `ChosenArea`; the caption with Enlarge (`onFullscreen(true)`, disabled while `faces === null`); the hint |
+| `ChosenArea` (in `PanoSphere.tsx`) | `role="group"` `data-sphere-chosen`: the number as a `Badge` in the area's look, its kind (`effectiveClass ?? class`), its view's name, `placementNotes(region.placement, panoRoom, t)` on a line of its own under the kind ("Counted in {room}" when the plan credits the area to another room, "Seen in {n} photos" above 1; nothing before the plan has placed it; MAN-9038), and `Mark it on {view}` (`data-sphere-press="mark-on"`, `onMarkOn(face, regionId)`). Sends nothing |
+| `PanoAreas.tsx` | props `views: ViewDetail[]`, `panoRoom` (handed on to each `RegionList`), `selectedRegionId`, `codebook`, `onSelectRegion`. The views in `FACES` order; a view with regions draws its name as `<h3>` over its `RegionList` (`headingId`). Under them: "Nothing found on …" (read, no regions) and "Not read yet: …". A view holding an area drawn by hand is listed read or not |
 | photos | one record, `useImageUrls(panoViews shas, photoAttempt)` in the root: the sphere stitches all six and a shown view reads its own out of it, so opening a view costs no second read |
 
 `PanoSphere` inputs: faces = `cubeFaces(views, photos)` (null until all six photos have arrived: the box is a skeleton); outlines = `sphereShapes` over the views that carry `regions` only, with `layer` and `selectedRegionId`.
@@ -4435,8 +4435,8 @@ section: The views rail, composed — `WorkspaceRail`, `RailButton`, the focus t
 |---|---|
 | size | `size-11` below md (touch floor), `md:size-10`; glyph `size-5`, stroke 1.75 |
 | name | `aria-label={label}` and nothing else; no native `title`. why: a `title` stacks a second tooltip on the kit's |
-| lit | `aria-current="page"`; `bg-accent-soft text-accent-ink hover:bg-accent-soft-hover`; a `before:` bar 2×20px on the rail's own left edge: `-left-0.5` on a phone (44px button in 48px), `md:-left-1` (40px in 48px). `forced-colors:before:bg-[Highlight]`: forced colours flatten ground and bar to the canvas and leave the lit view unmarked |
-| unlit | `text-muted-foreground hover:bg-secondary hover:text-foreground` |
+| lit | `aria-current="page"`; `RAIL_BUTTON_LIT` (`src/shared/constants.ts`): `bg-accent-soft text-accent-ink hover:bg-accent-soft-hover`; a `before:` bar 2×20px on the rail's own left edge: `-left-0.5` on a phone (44px button in 48px), `md:-left-1` (40px in 48px). `forced-colors:before:bg-[Highlight]`: forced colours flatten ground and bar to the canvas and leave the lit view unmarked. The companion module's door (`CompanionDoorView`) lights with the same constant while her panel is open, its state `aria-expanded` |
+| unlit | `RAIL_BUTTON_UNLIT` (`src/shared/constants.ts`): `text-muted-foreground hover:bg-secondary hover:text-foreground` |
 | badge | `data-tone="warn"` with `bg-tone-dot border-tone-ink`, `h-4 min-w-4`, `text-[10.5px] leading-normal`. Figure `aria-hidden`, `99+` past 99; the sentence sits in an `sr-only` span (`useId()`) named by `aria-describedby`. Box at `right-[calc(50%-20px)] top-[calc(50%-18px)]`: a wider figure grows leftward over the glyph and stays inside the rail. Fill is 2.07:1 on the rail's ground, so the edge and the figure carry it |
 | badge ring | `ring-2` in the button's own ground: lit `ring-accent-soft`, hover `ring-accent-soft-hover`; unlit `ring-background`, hover `ring-secondary` |
 | focus | token ring, `focus-visible:z-10`; `max-md:focus-visible:outline-offset-0`. why: at the house's 2px offset a 44px button's ring is 52px wide in a 48px rail, clipped by the region |
@@ -4572,17 +4572,20 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Pr
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-sidebar-rail.mjs
 
-## MAN-9038 — The day-one sketch section — src/modules/affected-areas: DayOneSketch, DayOnePlan, DayOneRooms, DayOnePress, utils/dayOneModel.ts, dayOne-fake.ts and their two probes
+## MAN-9038 — The day-one sketch section — src/modules/affected-areas: DayOneSketch, DayOnePlan, DayOneRooms, DayOnePress, useDayOne, useLayoutPlan, useLayoutWalk, utils/dayOneModel.ts, dayOne-fake.ts and their probes
 
-Scaffold, 2026-10-26: composed over fake data. `TourScreen.tsx` mounts it at its `FILL: day-one` marker, unwired; the wiring of each handler and data hook is named at its own `FILL:` marker (`grep -rn "FILL:" src/modules/affected-areas`).
+Wired 2026-10-26. `TourScreen.tsx` mounts `DayOneSketch` between `TourRooms` and the panos, keyed `day-one-<tourId>` (the card above is keyed by the tour too, and siblings may not share a key). The section's data is `useDayOne` (below), called once at the view root and handed down as one `DayOneSection`; the verbs that open a pano (`onOpenPanoAt`, `onOpenPano`) are the root's. The section itself stays presentational.
 
 | file | holds |
 |---|---|
 | `DayOneSketch.tsx` | the section: `data-day-one` = `plan` \| `none` \| `unavailable` \| `pending` \| `unknown`. Eyebrow `affectedAreas.dayOne.title`; status line (`panosRead` of `panosTotal` · drawn when · "from the calibration reads" when `contractVersions` holds `layout.cal0`); a floor switch (`SegmentedControl`) only when `floors.length > 1`; `DayOnePress` top right; `DayOnePlan` beside `DayOneRooms` from 960 px of container, under it below. Its one state is the chosen floor's place in `floors` |
-| `DayOnePlan.tsx` | one floor: `RegionImage` (`badgePlacement="clear"`, MAN-8945) over the engine's drawing; one outline and number per area, fixture and piece of contents; one spot per pano named "{room} 360° photo" ("…, n of m" for a room with several shots). Caption lines `data-day-one-line="scale" \| "pins" \| "spots"`. Enlarge opens a display-only copy in `Lightbox`. Drawing bytes absent: waiting surface; failed: `data-day-one-failed` box with Try again (`onRetryDrawing`) |
+| `DayOnePlan.tsx` | one floor: `RegionImage` (`badgePlacement="clear"`, MAN-8945) over the engine's drawing; one outline and number per area, fixture and piece of contents; one spot per pano named "{room} 360° photo" ("…, n of m" for a room with several shots). Caption lines `data-day-one-line="scale" \| "pins" \| "spots"`. Enlarge opens a display-only copy in `Lightbox`. Drawing bytes absent: waiting surface; a drawing that moves while a walk runs (its address is its content's hash) keeps the last one on screen until the new one arrives, and the plan is keyed by its floor's number, not its drawing, so an enlarged drawing stays open and a focused number stays held; failed: `data-day-one-failed` box with Try again (`onRetryDrawing`) |
 | `DayOneRooms.tsx` | per room (`data-day-one-room`): size, area, perimeter, ceiling, each side's source with its band, a warning when unpinned, the sketch and first-report checks; then its numbered rows (`data-day-one-item`) with "Seen in {n} photos" above 1 |
-| `DayOnePress.tsx` | `data-day-one-press`: the unread panos and views, today's budget, the walk (meter, Stop), the refusals in words |
-| `utils/dayOneModel.ts` | pure, one model for the drawing and the list: `numberedItems(floor, codebook, t)` → `SketchItem[]`; `feet`, `band`, `inches` |
+| `DayOnePress.tsx` | `data-day-one-press`: the unread panos and views, today's budget, the walk (meter, Stop), the refusals in words, and what a part read left ("2 of 6 views could not be read.", said once the walk is over) |
+| `hooks/useDayOne.ts` | the section's data for the open tour (`DayOneSection`, `src/shared/types.ts`): the plan in force (`useLayoutPlan`), each floor's drawing as an object URL through the token (`useDrawingUrls`, `hooks/useImageUrl.ts`; `onRetryDrawing` bumps its attempt), the press (ONE unarmed layout press for the first pano needing a read when the tour opens and the view is shown, none when nothing is left; an armed answer outranks a dry run still out), and what is left to read (`layoutUnread`, `utils/tourModel.ts`) |
+| `hooks/useLayoutPlan.ts` | the tour's `layout` and `dayOne`, unless a newer word of its own stands over them, held only while the detail it was learnt against is the one on screen (a detail read again replaces it): the open's ONE `buildPlan` of a `stale` plan (no model; waits for the view to be shown; `rebuilding` while out; its fault is `trouble`), and `adopt`, the status a layout press answered with |
+| `hooks/useLayoutWalk.ts` | the layout walk, `useTourReader`'s shape over `api.affectedAreas.readLayout`: the panos with a view whose layout is unread or not `current` (`layoutQueue`, capture order), one armed press each, "Reading 3 of 8", Stop after this pano; a refusal ends it, except `views_refused` (passed and counted); two panos in a row whose every view failed (`viewsFailed` with no `viewsRead`: the engine's own `_DEAD_PANOS`; such a pano is `partial`, not refused) end it as `failing`, said "Two panos in a row could not be read at all"; a press with no answer in time (`unreachable`) is pressed again ONCE, the second finding its reads cached; it sends only while the press is on screen (`isShown`: the view in layout, the Tours surface, no pano open — the meter and Stop are nowhere else), so a pano opened mid-walk ends it after the pano in hand and the press offers what is left on return; each answer is handed on (`onAnswer`), and one that carries a `layout` has the root read the tour and the open pano again, quietly |
+| `utils/dayOneModel.ts` | pure, one model for the drawing and the list: `numberedItems(floor, codebook, t)` → `SketchItem[]`; `feet`, `band`, `inches`; `placementNotes(placement, panoRoom, t)`, the pano screen's "Counted in {room}" (the credited room's key AND floor against the pano's) and "Seen in {n} photos" (`RegionList`, `PanoSphere`'s chosen line, a line of its own under the kind) |
 | `dayOne-fake.ts` | `FAKE_DAY_ONE` (Clarence Tse's tour, one entry per state of the section) and `FAKE_DRAWINGS`; imported only by the scaffold probe, 2026-10-26 |
 
 Rules:
@@ -4590,13 +4593,2268 @@ Rules:
 - Numbers: the wire numbers areas only (`DayOneArea.number`, from 1 per floor, in the plan's room order). `numberedItems` numbers fixtures and contents after the last area, in the wire's order. The drawing's tab order is the areas by number, then the objects.
 - An area is drawn in `REGION_LOOK` of its member (`regionState`); a fixture or contents in the neutral tone with the light wash.
 - Words never sit on the drawing: a number meets its row in `DayOneRooms`.
-- `DayOnePress` reads `lastAnswer`: the dry run on open, then each armed answer the walk lands. why: its budget lines go stale otherwise.
+- `DayOnePress` reads `lastAnswer`: the dry run on open, then each armed answer the walk lands. why: its budget lines go stale otherwise. A walk's answer replaces the section's status line at once; the tour is read again after each answer that carries a layout, and the floors, the status and the counts follow the plan the press rebuilt.
 - A press on an area or object calls `onOpenPanoAt(panoId, face, regionId)`, `regionId` null for an object; a press on a spot calls `onOpenPano(panoId)`. The Lightbox copy passes spots without `onPress`: inert.
 - The drawing loads as an `<img>`, so it cannot follow the theme: the engine's SVG carries its own white ground. Spots are the one fixed-colour mark on it (MAN-8947); room names clear of the spots: INV-9720.
 - Words: `affectedAreas.dayOne.*` in `src/modules/i18n/locales/en/common.json`, `en` only.
 
-Probes (`.verify/`, git-ignored; run against the real :5183 client, no model call):
+Probes (`.verify/`, git-ignored; run against the real :5183 client, no model call; `lib/day-one-kit.mjs` holds the open-the-tour and verdict plumbing the first two share):
+- `node .verify/affected-areas-day-one.mjs [--tour <id>] [--evidence <dir>]`: Clarence Tse's tour at 390 and 1280 px, pressing nothing armed. Holds the section to the wire (outlines, badges, spots, rooms, the drawing's bytes through the token, the status counts), the dry run (unarmed, for the first pano needing a read, its budget line the answer's numbers), an area on the drawing and in the list opening its pano at its face with its region chosen, a spot opening its pano on 360°; then over a rewritten answer (edited in the browser, nothing written): an object opening its face with no region, a `stale` tour sending ONE rebuild, a drawing that did not arrive and Try again, a region the plan credits to another room saying "Counted in … · Seen in 2 photos" on 360°, on the sphere's chosen line and on its face.
+- `node .verify/affected-areas-day-one-walk.mjs [--tour <id>] [--evidence <dir>]`: the layout walk with every armed press answered inside the browser (never forwarded: nothing is bought), the unarmed dry run going through. Five walks: Stop, a refusal (budget), a press with no answer pressed again once, no answer twice, a pano passed over; the tour's own layout reads on the wire are compared before and after.
 - `node .verify/affected-areas-day-one-scaffold.mjs [--states a,b] [--evidence <dir>]`: mounts `DayOneSketch` over each `FAKE_DAY_ONE` state, photographs 390 and 1280 px in both themes, presses every callback, and exits 1 on a FAIL. Fails when a `partial` or `built` number is less than 80% shown or its middle's press lands elsewhere (light theme).
-- `node .verify/affected-areas-day-one-unchanged.mjs --stage before|after`: the live Tours view's words, element count and class multiset must be equal across the two stages; exits 1 on any difference.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/dayOne-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOnePlan.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOnePress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOneRooms.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOneSketch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/dayOneModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-unchanged.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/dayOne-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOnePlan.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOnePress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOneRooms.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOneSketch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useDayOne.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLayoutPlan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLayoutWalk.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/dayOneModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/day-one-kit.mjs
+
+## MAN-9055 — server/modules/companion/tools — house reads: his chats, the resolvers, the roster, a chat's state and activity line
+
+Kaylee's reads of the house. Every read answers from the database and the running server at call time: nothing cached, nothing polling, no usage or spend in any answer (ruling 17).
+
+## `house-reads.ts` — the one door the tool files read the house through
+| Export | Answers |
+|---|---|
+| `listHisChats()` | `HisChat[]` `{ sessionId, name, project, projectPath, updatedAt }`, newest first; `updatedAt` epoch ms, 0 when unreadable. |
+| `chatRows()` | `ChatRow[]` `{ chat, state }`, ONE liveness read for all; ordered waiting, working, live, asleep; recency kept inside a state. |
+| `resolveChat(ref)` | `ChatResolution` `{ ok: true, chat: CompanionSessionRef }` or `{ ok: false, sentence }`. |
+| `listVisibleProjects()` | `HisProject[]` `{ name, path }`: registered, not archived, not in a hidden root; by display name. |
+| `resolveProject(ref)` | `ProjectResolution` `{ ok: true, project }` or `{ ok: false, sentence }`. |
+| `rosterText()` | The body of `<sessions>`; caller `companion-account.ts` (`readRoster`), read at each push. A failed read is logged (`[Companion] the roster could not be read`) and answers one sentence; never throws. |
+| `chatNameOf(sessionId)` | The name the sidebar shows for ANY chat row (archived, hidden-root, or one the resolvers would not offer), one line, else `Untitled Session`. `list_followups` names a follow-up's chat by it: an item outlives the sidebar entry it came from. |
+| `chatState`, `activityLine`, `askLine`, `pendingAsksOf`, `ChatState` | Re-exported from `chat-activity.ts`. |
+
+## His chats
+- A row of `sessions` with `isArchived = 0`, in a project that is not archived and not in a hidden root (`visibleProjectPathSql`, the sidebar's own test), whose `provider_session_id` is NULL or differs from `session_id`.
+- `sessions` holds thousands of synced soul transcripts whose session id equals their provider id; none is his chat.
+- `sessions` has no user column: every account sees the same chats, as the sidebar does.
+- Name: `custom_name` folded to one line, else `Untitled Session`. Project: custom name, else the folder basename, folded to one line either way (`projectDisplayName`), else `no project`.
+
+## The hidden fallback
+- A probe chat lives under `/tmp`, a hidden root, so it is never his chat by the test above.
+- `resolveChat` falls back to non-archived app chats of hidden projects only when NONE of his fits, and only by id or exact name.
+- `resolveProject` falls back to a registered, non-archived project of a hidden root only when named by its EXACT path.
+- The roster and both lists never include the fallback pool.
+
+## Resolution rules
+| Ref | Result |
+|---|---|
+| empty | sentence: name the chat/project; `list_sessions` / `list_projects` shows them |
+| chat: id, or exact name (case-insensitive; the roster's entity spelling of a name also matches) | the one match |
+| chat or project: several match | sentence naming each with project and id (chat) or path (project); at most 12 chats shown, then `and N more` |
+| none | sentence; a ref of 3+ characters also names chats/projects that merely contain it in the name |
+| project: display name (case-insensitive) or registered path | the one match |
+
+## `chat-activity.ts` — what a chat is doing now
+`ChatState` = `working` | `waiting` | `live` | `asleep`. `asleep` is still sendable: a message wakes it and resumes where it left off.
+
+`chatStates(sessionIds)` reads `sessionHostLivenessSnapshot()` ONCE for the list. Per chat, first match wins:
+1. `waiting`: `providerRuntimeService.getPendingApprovalsForSession` is non-empty.
+2. `working`: `chatRunRegistry.isProcessing`.
+3. `live`: a session host holds the chat.
+4. `asleep`.
+
+`waiting` beats `working`: a chat blocked on an ask still has its run registered; reading it `working` would hide the ask she exists to notice. Reversing it is one line in `chatStates`.
+
+`activityLine(sessionId, state?)` — ONE line, always (`oneLine` at the single exit):
+| State | Line |
+|---|---|
+| working | last tool call in the run's replay buffer (`describeToolCall`), else the last assistant words cut at 80 code points, else `just started` |
+| waiting | `AskUserQuestion`: `asks "<first question, 100 code points>"` plus ` (and N more)`; `ExitPlanMode`: `a plan is ready and waits for his approval`; else `wants permission: <describeToolCall>`; no ask found: `waiting on him` |
+| live, asleep | `idle just now` / `idle N min` / `idle N h` (under 48 h) / `idle N d`; `idle, no recorded activity` when the row has no time |
+
+Cuts count code points (`cutAt`), so none lands inside an emoji.
+
+`pendingAsksOf(sessionId)` is the gateway's list of the asks a chat is blocked on, oldest first. `askLine(ask, detailed = false)` is the waiting line above for ONE ask; `detailed` is the line she decides on: with exactly one question, ` Options: A | B | C` (the option labels) follows, and a permission carries what it would run in full (`describeToolInput`: a Bash command whole up to 600 characters, a count of what was cut) with the rule an "always" would store. Without it a Bash command is cut at 60 characters, as a roster line is scanned. `activityLine` uses it for the oldest ask undetailed; `read_session`'s `pending_ask` uses it for every ask detailed.
+
+## Roster (`rosterText`)
+- One line per working, waiting or live chat: `name · project · state: activity · id <sessionId>`; 20 lines at most, waiting first; `…and N more active; list_sessions with scope active names them.` past 20.
+- No active chat: `None of his chats is working, waiting or live.`
+- Then `Asleep, still sendable: <12 most recent names>` plus `, and N more`.
+
+## Probes
+`.verify/companion-house-reads.mjs` (read-only on the live database, prints resolvers, roster, handler text), `.verify/companion-house-states.mjs` (working, waiting, live on in-process stand-ins), `.verify/companion-view-of.mjs`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/house-reads.ts
+
+## MAN-9056 — server/modules/companion/tools — list_sessions and list_projects: scopes, the phrase search and the first-words read
+
+`sessionTools()` (`session-tools.ts`) returns the SDK `tool()` definitions of `list_sessions` and `list_projects`. Both carry `readOnlyHint` and set neither focus nor her activity. Both read the house through `house-reads.ts` (see the house-reads row).
+
+## Descriptions
+- Each description is `toolLine(name)` (`session/companion-prompt.ts`): the tool's line from the prompt's `TOOLS` section.
+- `toolLine` throws when the prompt has no line for the tool: a tool added without a `TOOLS` line fails the first use of an account, because that is when its tool list is built.
+
+## `list_sessions(scope)`
+`scope`: string, trimmed, 1–200 characters. A line is `name · project · state · activity · id`.
+| scope | Lists |
+|---|---|
+| `active` | every chat not asleep (working, waiting, live); none: says so and names scope `recent` |
+| `recent` | the 15 most recent asleep chats |
+| anything else | chats whose name, project and first words together hold EVERY word of the phrase (case-insensitive, any order); 10 at most, then `More chats match; narrow the phrase to see the rest.` |
+
+- Order within a scope: waiting, working, live, asleep; recent first inside a state.
+- A chat's first words are read only when its name and project did not already answer, and only until the list is full.
+
+## `list_projects()`
+- One line per visible project: `name · path`, by display name. A path is printed raw: it is what she passes back to `resolveProject`.
+- None registered: `No project is registered yet, so a new session has nowhere to start.`
+
+## Failure
+A failed read is logged (`[Companion] <tool> could not read the house`) and returns `isError` text `… could not read the house just now (<reason>). Try once more; if it fails again, tell him.`
+
+## `chat-first-words.ts` — `firstWordsOf(sessionId)`
+- Up to 400 characters, one line, from the HEAD of the chat's transcript JSONL (`extractFirstValidJsonlData`): the first plain user row of the chat itself (not a sidechain, not `isMeta`, not a row opening with `<`). Gives up after 200 rows.
+- Never `fetchHistory`: it parses a transcript end to end (largest of his: 27 MB) and caches 8, so a search through it thrashes the cache.
+- A compacted chat opens with a seed beginning `This session is being continued from a previous conversation`; the preamble through `Summary:` is stripped and `*`/`#` removed, so the summary names the chat's threads. 2026-10-26: 12 of his 19 chats open this way.
+- Claude chats only (`provider === 'claude'` with a `jsonl_path`); anything else answers `''`. Never throws.
+- A found answer is kept per process; a miss is not (the first message may not have arrived).
+- Best effort: it feeds a search and is never something she says as fact.
+
+## `server/shared/tool-text-result.ts`
+`textResult(text, isError = false)` → `{ content: [{ type: 'text', text }] }` plus `isError: true` on a refusal; the sentence says what to do next. Has an `.oxlintrc.json` boundaries entry; `session-tools.ts`, `draft-tools.ts` and `act-tools.ts` answer through it.
+
+`guardedToolResult(toolName, doing, run)` runs one tool's work: a throw is logged `[Companion] <tool> could not <doing>` and answered as `isError` text `<tool> could not <doing> just now (<reason>). Try once more; if it fails again, tell him.` `session-tools.ts` (doing: `read the house`), `draft-tools.ts` and `act-tools.ts` (doing: `stop the chat`, `rename the chat`, `answer the chat`) share it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-first-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/session-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/tool-text-result.ts
+
+## MAN-9057 — server/modules/notifications — the session presence store: markPresence, clearPresence, isSessionWatched, isSessionOnScreen, viewOf
+
+`services/session-presence.service.ts` records which session each open browser tab shows. `notifications/index.ts` exports all five functions below.
+
+## Store
+- One in-memory `Map<connection, { userId, sessionId, visible, updatedAt }>`, keyed by the chat websocket connection object itself; the record lives as long as the connection.
+- It lives in notifications, not websocket: the ntfy channel reads it, and importing the websocket barrel there would close the cycle websocket → providers → notifications → websocket.
+- A tab repeats its report every 30 s while visible. `DEFAULT_FRESH_MS` = 90 000: silence past it means gone or asleep.
+- `FORGET_AFTER_MS` = 600 000: `markPresence` drops records this old (a connection that closed without `clearPresence`).
+- A connection whose numeric `readyState` is not OPEN (1) never counts and is deleted by the next read; a key with no `readyState` is judged by freshness alone.
+- User ids compare as strings (a number on one path, a string on another).
+
+## Functions
+| Function | Answers | Caller |
+|---|---|---|
+| `markPresence(connection, { userId, sessionId, visible })` | sets the record, stamps `updatedAt` | chat websocket, each `chat.presence` report |
+| `clearPresence(connection)` | deletes the record | chat websocket, on close |
+| `isSessionWatched(userId, sessionId, { freshMs? })` | does one of THIS user's tabs show the session visibly and fresh; false for a null user or session | ntfy channel: skips the push when true |
+| `isSessionOnScreen(sessionId, { freshMs? })` | the same, whichever user | chat run registry: stamps a finishing on-screen chat read. A run carries no user and `sessions` has no user column |
+| `viewOf(userId)` | `string \| null`: the chat on the account's freshest visible tab | the companion's `<view>` message: `viewedChat(userId)` in `companion-account.ts`, read at every push and named for her only when `resolveChat` can resolve it |
+
+## `viewOf` rules
+- The FRESHEST visible, live, 90 s-fresh record of the account decides, not any tab: two windows open, the one that reported last is the one he looks at.
+- When that tab shows no chat (home page, a settings screen) the answer is `null`, never an older tab's chat.
+- A hidden tab, a closed socket or a record past 90 s never counts.
+- No `freshMs` option: always `DEFAULT_FRESH_MS`.
+
+## Probe
+`.verify/companion-view-of.mjs`: 13 checks on the real presence store.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/session-presence.service.ts
+
+## MAN-9058 — server/modules/companion — the door: routes, input limits, refusals, module wiring
+
+Kaylee's HTTP door. Transport only: a route reads who asks, checks the SHAPE of the body, calls one service verb (see the service row) and answers. What a verb means is the service's.
+
+## Wiring
+- `index.ts` exports `createCompanionModule` alone; every other symbol of the folder is private to it.
+- `createCompanionModule({ runtime })` returns `{ router, stop }`: it calls `companionService.attachRuntime(runtime)` BEFORE building the router, so no request reaches a verb with no gateway. `stop` is `companionService.stopAll`.
+- `runtime` is the `ProviderRuntimeGateway` the chat socket uses, so an act of hers is the page's own act.
+- Building the module launches no process: a conversation starts on an account's first message.
+- Mount: `/api/companion` behind `authenticateToken` (the account is `req.user`). Mounted in `server/index.ts` (`app.use('/api/companion', authenticateToken, companion.router)`).
+- Shutdown: `shutdownRuntimeServices` in `server/index.ts` awaits `companion.stop()` first, raced against 3 s (`Promise.race` with `delay(3_000)`), before `cerberus.stop()` and the rest. why: a CLI that answers nothing is ended by its own 5 s grace, which keeps running, and the shutdown must not sit behind it inside the supervisor's window (INV-9807).
+
+## Routes (`companion.routes.ts`)
+| Route | Reads | Answers | Verb |
+|---|---|---|---|
+| `GET /` | client id optional | 200 `CompanionPicture` | `picture` |
+| `POST /messages` | client id REQUIRED; `{ text }` 1–8000 | 202 `{ accepted: true }`; her sentences return as frames on the page's socket | `sendText` |
+| `POST /floor` | client id REQUIRED | 204 | `takeFloor` |
+| `PUT /settings` | JSON object, a partial of the settings | 200 `CompanionSettings` | `saveSettings` |
+| `PUT /draft` | `{ text }` 1–20000 | 200 `CompanionDraft` | `editDraft` |
+| `DELETE /draft` | – | 204 | `clearDraft` |
+| `DELETE /notes/:id` | `id` matches `/^[1-9]\d{0,14}$/` | 204 | `dismissNote` |
+| `POST /interrupt` | – | 204 | `interrupt` |
+| `POST /clear` | – | 204 | `clear` |
+| `POST /press` | client id REQUIRED; multipart: `audio` (one file, ≤ 25 MB, memory storage — the voice module's bound) and `durationMs` (a whole number 0–3600000, the page's own clock for the clip) | 202 `{ text }` — what he said as heard, `''` for the empty press; the answer comes once the press has been pushed in its turn | `press` (takes the floor first; `companion-press.ts`, MAN-9059) |
+| `GET /speech/:turnId/:index` | client id REQUIRED, and it must be the floor's; `turnId` `/^[A-Za-z0-9_-]{1,100}$/`, `index` 0–100000 | 200 `audio/l16; rate=24000; channels=1` streamed (one of her sentences as PCM); 204 for a sentence with nothing to say; the refusals below. `HEAD` is 405 | `speech` (`companion-speech.ts`, MAN-9110) |
+| `POST /cut` | client id optional; `{ turnId, heard: number \| null, interrupted: number \| null }`, all three keys required | 204, after her turn was interrupted | `cut` (`companion-speech.ts`, MAN-9111) |
+| `POST /draft/send` | client id REQUIRED; `{ mode: 'turn' \| 'steer' }` (anything else is a 400 `COMPANION_INPUT_INVALID`) | 200 `{ outcome: 'started' \| 'folded' }`; a refused send is a 409 `COMPANION_SEND_REFUSED` whose message is the sentence the draft card shows | `sendDraft` (takes the floor first: the chat opens on the page that pressed) |
+
+- The send itself is `companion-send.ts`, shared with `send_to_session` and `create_session`: checks, fold or turn, options, new chat, what clears — MAN-9072. The route adds the floor only (`sendDraft` takes it first).
+- An answer is the thing itself, never wrapped (`{ settings }`, `{ data }`).
+- `POST /messages`, `/floor`, `/press` and `/draft/send` REQUIRE the client id header (the page that pressed takes the floor); `GET /speech/…` REQUIRES it too (it names the page asking for her voice and takes no floor); every other route validates it if present and does not need it.
+
+## Input (`companion-input.ts`)
+| Name | Rule |
+|---|---|
+| `x-companion-client` | the page's own id; `/^[A-Za-z0-9._:-]{1,100}$/`; present and malformed = 400, never read as absent |
+| `MESSAGE_TEXT_MAX` | 8000 characters |
+| `DRAFT_TEXT_MAX` | 20000 characters, counted by `characterCount` (code points); the routes and the draft tool (`tools/draft-tools.ts`) share both |
+| `readBodyText` | trims, then 1..max code points (an emoji counts one); the trimmed text is what is stored, so a later equality check on it compares trimmed text |
+| `readBodyWholeNumber` | a whole number `min`..`max` from a number or a string of digits (no sign, point or leading zero: a multipart field arrives as text); `POST /press`'s `durationMs` |
+| `readTurnIdParam`, `readBodyTurnId` | a turn id: `/^[A-Za-z0-9_-]{1,100}$/`; else 400 naming `turnId` |
+| `readSentenceIndexParam` | the speech path's index: digits, no sign, no leading zero, 0–100000; else 400 naming `index` |
+| `readBodySentenceIndex` | a cut's `heard` or `interrupted`: the key present, a whole number 0–100000 or `null` (a digit string is a 400); else 400 naming the field |
+| `readBodyObject` | requires `request.is('application/json')` AND an object body; no body or `text/plain` = 400; an explicit `{}` sent as JSON is a legal empty patch. why: `express.json()` leaves `{}` for a missing body, and a save that sent nothing must not answer 200 |
+
+The page's request helper sets `Content-Type: application/json` on every non-FormData call; a script sends it itself.
+
+## Refusals
+Envelope (the entrypoint's `AppError` handler): `{ success: false, error: { code, message, details } }`.
+| Status | `code` | When |
+|---|---|---|
+| 400 | `COMPANION_INPUT_INVALID` | any shape failure above, a settings value past its limit; `message` names the field and its limit; `details.field` names the field |
+| 400 | `COMPANION_INPUT_INVALID` | `POST /press`: no `audio` file, an `audio` that multer refused (past 25 MB, under another field name, not well-formed multipart) — `details.field` is `audio`; a `durationMs` that is missing or not a whole number 0–3600000 — `details.field` is `durationMs`; a clip that transcribes to more than 8000 characters (a typed line's limit) — `details.field` is `audio`, and a `system` log line says so |
+| 400 | `COMPANION_INPUT_INVALID` | `GET /speech/…` and `POST /cut`: a `turnId` or index that is malformed, a cut that leaves out `heard` or `interrupted`, a request with no client id — `details.field` names it |
+| 404 | `COMPANION_NO_SENTENCE` | `GET /speech/…`: the turn is not her current one, the log holds no sentence at that index, or the log was cleared (MAN-9110) |
+| 409 | `COMPANION_NOT_FLOOR` | `GET /speech/…` from a page that does not hold the floor |
+| 409 | `COMPANION_NO_DRAFT` | `PUT /draft` while no draft is held |
+| 409 | `COMPANION_SPEECH_REFUSED` | `POST /press` when Gemini cannot be asked or refuses the key (`no_key`, `refused`), and `GET /speech/…` for the same two; `message` is the sentence ("No Gemini key: set one in Settings → Voice") |
+| 502 | `COMPANION_SPEECH_FAILED` | `POST /press` when Gemini answered something that is not words (`failed`: another status, a network error or timeout, an answer without text), and `GET /speech/…` when the synthesis failed before its first byte; `message` is the sentence |
+| 409 | `COMPANION_SEND_REFUSED` | `POST /draft/send` when the send is refused (no draft, an empty draft, the chat gone, a send already going out, a new chat in a folder that is gone, a chat that did not take the brief — the door refused it); `message` is the sentence the draft card shows |
+| 503 | `COMPANION_STOPPING` | `POST /messages` and `POST /press` after `stopAll` |
+
+## Probe
+`.verify/companion-module.mjs`: see the service row. The speech door and the cut: `.verify/kaylee-speech-door.sh` (no Gemini call) and `.verify/kaylee-speech-door-live.mjs` (MAN-9110). The press door: `.verify/kaylee-press-refused.sh` (no key in reach, the door's 400s, a stand-in for Gemini's 500 and 403; no Gemini request) and `.verify/kaylee-press-live.sh` (curl as account 1 on :3011, haiku, one Gemini call) — MAN-9059.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/index.ts
+
+## MAN-9059 — server/modules/companion — the service verbs, one account's wiring, the picture, the tool registry and deps
+
+## `companion.service.ts` — `companionService`
+One `CompanionAccount` per CloudCLI account, made on that account's first call (`accountOf`) and never before. A made account is ASLEEP: no process launches until a message is pushed. Every verb takes the account's id first, so a call cannot reach another account's rows, pages or conversation.
+
+| Verb | Does |
+|---|---|
+| `attachRuntime(gateway)` | stores the gateway and clears the stopped flag; `createCompanionModule` calls it before any verb. An account made with no gateway throws. |
+| `picture(userId)` | `buildPicture` |
+| `takeFloor(userId, client)` | the page holds the floor from now on |
+| `sendText(userId, client, text)` | takes the floor for the typing page, logs the line (`role: 'operator'`, `via: 'typed'`), pushes it to her. 503 `COMPANION_STOPPING` once `stopAll` has run. |
+| `press(userId, client, { audio, durationMs })` | a press of his talk button, answering `{ text }` (`''` for the empty press); built by `createPress` in `companion-press.ts`. See Press. 503 `COMPANION_STOPPING` once `stopAll` has run, before the press is heard and again before it is pushed. |
+| `speech(userId, client, { turnId, index }, signal)` | one of her sentences as streamed PCM for the page `client`, which must hold the floor; an `AppError` refusal comes before the first byte. `speak` of `createSpeech` (`companion-speech.ts`): MAN-9110 |
+| `cut(userId, { turnId, heard, interrupted })` | the talk press while she speaks: aborts the turn's syntheses, owes `<cut>`, interrupts her. MAN-9111 |
+| `saveSettings(userId, patch)` | stores, emits `companion_settings` to every page, and on a model change calls `session.setModel`. A switch the CLI refuses or does not answer within `CLI_GRACE_MS` (5 s) is a `system` log line; the save and the stored model stand, and her next wake runs on it. |
+| `editDraft(userId, text)` | replaces the held draft's words, keeps its target; 409 `COMPANION_NO_DRAFT` when none is held |
+| `clearDraft`, `dismissNote` | a note already gone is not an error |
+| `interrupt` | stops her own turn; a Stop with no turn does nothing |
+| `clear(userId)` | see Clear |
+| `stopAll()` | sets the stopped flag, then per account `speechCache.end()` and per session `interrupt()` and `close('the server is stopping')`; one failure is logged and does not hold the rest |
+| `warm(userId)` | starts her process with nothing pushed (`session.warm()`); the alert feed calls it when a gather window opens. Refused silently once stopped. |
+| `alert(userId, alerts)` | the alerts the alert feed let through: one `alert` log line each (`CompanionAlert.line`), then ONE `pushAlerts` message of their envelopes. A row that cannot be written is logged and costs no push. Refused silently once stopped. |
+| `runFailed(sessionId)` | the alert feed heard `run.failed`/`run.limit`/`api.error`/`login.expired` for this chat, whatever its gates decided: marks the chat for 30 s. why: the runtime raises the failure and then still sends `complete` (exit 0) with NO `error` row, so without the mark a failed run was told twice, `failed` and then "finished". |
+| `runCompleted(sessionId, aborted)` | a chat's run ended. Returns at once. Takes (and clears) the chat's failed-run mark first; skips an aborted or failed run. For each account whose stored focus is the chat (`companionDb.userIdsFocusedOn`, so an account not touched since boot is found) and whose Live is on, reads the run's reply BEFORE awaiting anything (`readRunReply`), then builds the `<session event="finished">` (`focusNewsEnvelope`) and pushes it (`pushFocusNews`); after the build (a dactyl can take up to 180 s) Live is read again and a stopped server drops it. |
+
+### Clear
+0. `speechCache.end()`: every synthesis aborted, every turn unspeakable until the next turn starts (MAN-9111).
+1. `session.clear()` runs SYNCHRONOUSLY: detaches her process and forgets her CLI conversation. why: a message landing mid-clear wakes a fresh conversation, never a resume.
+2. `store.clearAccount()` wipes log, notes, draft, walk, focus; every page empties at once.
+3. Awaits the old process's wind-down (up to the CLI grace).
+- `relayed_sends` rows stay: they belong to the chats.
+
+### Press (`companion-press.ts`)
+Every press is ONE turn and she always answers, if only with a word (ruling 6): nothing listens between presses.
+1. The press takes the floor for the pressing page, at once.
+2. It is HEARD: `durationMs` < 400 (the page's clock) or a clip of no bytes is the empty press with no Gemini call; any other clip goes through the voice barrel's `transcribeSpeech(userId, audio)` (Gemini, not counted against any budget), whose empty answer is the empty press too. The hearing is told to answer `[no speech]` for a clip with no words (a model asked to "output nothing" invented a question for 2 s of silence; told to answer the mark, a silent clip has still come back as words — open defect INV-9876, MAN-9099 §Standing defect), and a whole answer that is one bracketed note (`[no speech]`, `[silence]`, `(inaudible)`) is read as empty text — `gemini-transcribe.ts`, shared with the chat mic.
+3. It is SETTLED: his line joins the log (`role: 'operator'`, `via: 'spoken'`, the transcript as text, `''` for the empty press) and is pushed — `pushOperator(text, 'spoken')`, or `pushOperatorEmpty()` for `<operator via="spoken" heard="nothing"></operator>`.
+- ARRIVAL ORDER: hearing starts when a press arrives (two uploads can be in flight), but each account keeps one chain and a press is settled only after the press before it was pushed or refused. why: a slow transcription must not let a later press overtake it into her conversation.
+- A hearing that is refused or fails pushes nothing and does not wake her: a `system` log line "I could not hear that: <sentence>" and an AppError carrying the sentence — 409 `COMPANION_SPEECH_REFUSED` (`no_key`, `refused`), 502 `COMPANION_SPEECH_FAILED` (`failed`). A `transcribeSpeech` that throws is a defect: logged, and settled as `failed`.
+- A transcript past `MESSAGE_TEXT_MAX` (8000 characters, counted by code points like a typed line) is refused the same way: a `system` line and a 400 `COMPANION_INPUT_INVALID` naming `audio`, not logged and pushed whole.
+- A message pushed while a turn runs joins that turn, so her one answer can cover both lines of two quick presses.
+- Proof: `.verify/kaylee-press-refused.sh` (no key: 409 "No Gemini key: set one in Settings → Voice", the system line, her process asleep, 0 requests to Gemini; the 400s; stubbed 500/403 and their order) and `.verify/kaylee-press-live.sh` (the fixture clip and, right behind it, a 0.2 s one, on haiku: `{ "text": "What chats are working?" }` and `{ "text": "" }`, the log in that order, her JSONL, one `[voice] gemini transcribe` journal line, no spend-ledger file added).
+
+### Stop
+- Flag lives in the service; `sendText`, `press`, `warm`, `alert` and the focus push (`runCompleted`, after its build, with Live) check it.
+- `attachRuntime` clears it: a newly built module takes messages again.
+- `module.stop()` unsubscribes both feeds BEFORE `stopAll`.
+
+## `feeds/` — what she hears unasked
+Both feeds start in `createCompanionModule` and are subscriptions to events the house already raises; nothing polls.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-picture.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-press.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/tool-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-press-live.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-press-refused.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-press-refused.sh
+
+## MAN-9069 — server/modules/companion — the service verbs, one account's wiring, the picture — `alert-feed.ts` — `startAlertFeed(service)`
+section: server/modules/companion — the service verbs, one account's wiring, the picture, the tool registry and deps/001 `alert-feed.ts` — `startAlertFeed(service)`
+
+`onNotification` (notifications module) hears every event the orchestrator is handed after the session is normalized and BEFORE the push preference and the push dedupe (a `background` event is off for pushes by default and would never arrive behind that gate; a shared dedupe would let a push and her consume each other's slot). A listener that throws costs no push.
+An event is dropped unless ALL hold, checked cheapest first: its code is in `ALERT_KIND_BY_CODE`; his Live is on; a page of his is connected (`isUserConnected`); not a repeat by the feed's own 20 s dedupe keyed `<user>:<dedupeKey or provider:kind:code:session>` (checked last, so a dropped event does not use up its slot).
+| Code | `<alert kind>` |
+|---|---|
+| `dispatcher.finished`, `dispatcher.epic_finished` | feature finished |
+| `run.background_completed` | background work landed |
+| `agent.notification` | asking |
+| `permission.required` | permission |
+| `run.failed`, `run.limit`, `api.error`, `login.expired` | failed |
+| `session.stuck` | stuck |
+Nothing else is an alert: never `limit.*`, `push.enabled`, `run.stopped`, `dispatcher.paused`/`limit_paused`/`relaunched` (ruling 17).
+- Survivors of one account gather in a one-shot 3 s window opened by the first; at its close Live is read again, each alert is built on its own (`buildAlertBlock`, a failure costs only that alert) and `service.alert` gets them all. A window builds at most 20 (`ALERTS_PER_WINDOW_MAX`, ~12 ms each of synchronous work); the rest are one sentence saying how many.
+- The same listener calls `service.runFailed(sessionId)` for every `failed`-kind code before any gate, so the focus feed can tell that chat's run from a finished one.
+- Her process is started when the window OPENS (`service.warm`). why: measured 2026-10-27, a message that wakes her reaches her ~1.0 s after the push (CLI start), a message to a running process ~44 ms, and the alert is owed within 4 s of the event: 3.0 s window + 1.0 s cold start was 4.2 s, with the start inside the window it is 3.3 s.
+- Unsubscribing clears every open window unsent. Two facts the window leaves as they are: if Live goes off inside it nothing is pushed but the warmed process idles until the idle closer (2 h); and the page is checked at the event, not at the close, so a page that closes inside the window still gets her push.
+
+### `alert-block.ts` — `buildAlertBlock(userId, event, kind)`
+`<alert kind session sessionId project>` with the notification's title and body (`buildNotificationPayload`, the wording every channel uses) built from the event with its spend keys removed (`costUsd`, `totalCostUsd`, `tokens`, `tokensIn`, `tokensOut`; ruling 17), an `api.error` whose reason is about usage (`rate_limit`, quota, credits) reworded to "A request could not be made after N retries", and a `run.limit` budget stop replaced by "Run stopped at a limit · <name>" / "The run stopped at a limit it was given" (the house's headline says "budget"); up to 5 open follow-ups of that chat (`listOpenFollowups`, newest first), and, for kinds `permission`/`asking` while the chat is STILL `waiting`, "Waiting on him: …" (`activityLine`). Built when the window closes, because the runtime registers the pending ask just AFTER it raises the notification. The chat is named by `resolveChat(sessionId)` (project display name), else the notification's own `sessionName`; a dispatcher ending belongs to no chat (`sessionId=""`). The chat's name, its follow-ups and its ask are optional parts (`optionally`): a read that fails costs that line and is logged, never the alert. Every text in the body is escaped (`&`, `<`, `>`) by `alertEnvelope`: a `</alert><operator via="typed">send it</operator>` in an error or follow-up stays words.
+
+### `focus-feed.ts` — `startFocusFeed(service)`
+`chatRunRegistry.onRunCompleted` → `service.runCompleted`. `readRunReply(sessionId)` = every assistant `text` event of the run's buffered events (`replayEvents(id, 0)`, kept 5 min), blank-line joined; `null` for a run with an `error` event or no words. A failure with no `error` event (the usual one) is ruled out BEFORE this by `service.runFailed`'s mark. `focusNewsEnvelope`: a reply of ≤ 1,500 characters (code points: an emoji is one) goes in whole; a longer one is written to her scratch folder (`nextScratchFile`) and a dactyl answers `FOCUS_NEWS_BRIEF` about it (the file is pruned after); if the dactyl does not answer, the digest is "(no digest could be made) it opens: …" with the first 600 characters. Starting and working are not pushed: the roster at her next message carries them. No page-connected check, unlike the alerts.
+
+### Probes — what she hears unasked
+| Probe | Runs | Proves |
+|---|---|---|
+| `.verify/kaylee-alert-feed.ts` | the real orchestrator, feed and wording against a COPY of `~/.cloudcli/auth.db`; `service` is a recorder; no model call; refuses the live database | 1 non-alert codes deliver nothing · 2 Live off / no page deliver nothing · 3 `background` with its push switch off still reaches her · 4 three alerts = one delivery ~3 s after the first, `warm` once, a repeat delivered once · 5 wording (≤ 5 follow-ups, no spend, `</alert>` stays words) · 6 a throwing listener costs the push nothing · 7 unsubscribe closes an open window unsent |
+| `.verify/kaylee-hears-unasked.sh` (starts `.mjs`) | scratch server + Vite on a copy of the database (`SUNSET_SLOT` default 5: API 7903, gateway 7904, client 5295), her model on Haiku, ntfy and web-push endpoints off in the copy; never touches :3011 | permission alert reaches her JSONL within 4 s of the ask's frame and she says it · focus chat's finished run arrives as `<session event="finished">` · Live off: the push still arrives, no alert |
+
+Run the first: `D=$(mktemp -d) && sqlite3 ~/.cloudcli/auth.db ".backup $D/auth.db" && DATABASE_PATH=$D/auth.db TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-alert-feed.ts`. Run the second: `bash .verify/kaylee-hears-unasked.sh`.
+- Why a scratch stack: :3011 restarts on every `server/` save by any session, and the dev account's Kaylee is shared by every probe; a run on them is cut short or cleared.
+- Trap: "Run date in Bash." raises NO `permission.required` on this box (`~/.claude/settings.json` allows `Bash(*)`); the `.mjs` makes its own project (`<PROBE_PROJECT>-hears`) with a project-level `ask` rule on `Bash(date:*)`.
+- Not covered live: the ntfy channel, and the 20 s dedupe (feed probe only).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-picture.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/focus-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/tool-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-hears-unasked.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-hears-unasked.sh
+
+## MAN-9070 — server/modules/companion — the service verbs, one account's wiring, the picture — `companion-account.ts` — `createCompanionAccount(userId, runtime)`
+section: server/modules/companion — the service verbs, one account's wiring, the picture, the tool registry and deps/002 `companion-account.ts` — `createCompanionAccount(userId, runtime)`
+
+The one place that says which session callback writes which row and sends which frame.
+| Session callback | Effect |
+|---|---|
+| `onSentence` | `kaylee` log line (store sends `companion_sentence`) |
+| `onTurnStarted` | `speechCache.startTurn(turnId)` FIRST (the audio of every earlier turn is freed), then the `companion_turn` frame. why: a page pulls sentence 0 the moment its frame arrives (MAN-9111) |
+| `onTurnEnded` | `companion_turn` frame |
+| `onActivity` | holds the activity, sends `companion_activity` |
+| `onProcess` | `companion_process` frame |
+| `onSystemLine` | `system` log line |
+| `readSettings`, `readState`, `readRoster` (`rosterText`), `readView` | read at push time, never earlier |
+| `readSoundTags` | `readVoiceSettings(userId).gemini.soundTags`: read when a turn starts (the parse) and at each push (the register); INV-9938 |
+
+- `readView` = the chat on his screen (`viewOf(userId)`), named for her only if `resolveChat` can resolve it.
+- Activity is held here (`currentActivity()`); starts `IDLE_ACTIVITY`.
+- `CompanionAccount.speechCache` is made here, one per account (MAN-9111); the speech door reads the floor and the sentences through `store` (MAN-9110).
+
+## `companion-picture.ts` — `buildPicture(account)`
+- Shape: `{ settings, models, process, activity, turnId, focus, draft, walk, notes, log, floor }`; `log` = newest 200 rows (store keeps 400).
+- The catalog is awaited FIRST, everything else read after it in one synchronous run: no frame lands between two fields.
+- Model labels: `COMPANION_MODELS` (`sonnet`, `opus`, `haiku`) matched to `readClaudeModelsDefinition().OPTIONS` by family (`[1m]` suffix ignored); label = the option's `label` as given ("Sonnet 5.5"), else the capitalized family word. why: the catalog has already split the description at ` · `.
+- A catalog read that fails is logged (`[Companion] the CLI model catalog could not be read`) and the picker shows the family words.
+- `readClaudeModelsDefinition` is exported by `server/modules/providers/index.ts` for this reader.
+
+## `tools/companion-tools.ts`
+| Export | Is |
+|---|---|
+| `COMPANION_MCP_SERVER_NAME` | re-export of `session/companion-launch.ts`; the SDK names a tool `mcp__<name>__<tool>` |
+| `COMPANION_TOOL_NAMES` | the thirteen names, `toolNames()` of `session/companion-prompt.ts`: the lines of the prompt's TOOLS section that open `name(` |
+| `buildCompanionTools(deps)` | `[...sessionTools(), ...readTools(deps), ...draftTools(deps), ...actTools(deps)]`: the thirteen below |
+| `CompanionToolDeps` | what every tool file is handed |
+| `ToolActivityPhase` | `CompanionPhase` minus `idle`, `thinking` (the turn's own) |
+
+- The session's `init` check (`unexpectedTools`) compares the CLI's tool list against what is built here.
+- `COMPANION_TOOL_NAMES` is the prompt's order (`toolNames()`); `buildCompanionTools` is the file order below. Each tool's description is its prompt line (`toolLine(name)`).
+
+### The thirteen tools
+| tool | file | activity while it runs | focus | row |
+|---|---|---|---|---|
+| `list_sessions`, `list_projects` | `session-tools.ts` | none | none | MAN-9056 |
+| `read_session` | `read-tools.ts` | `reading_session` (the chat) | the chat | MAN-9066 |
+| `list_followups` | `read-tools.ts` | none | none | MAN-9066 |
+| `ask_dactyl` | `read-tools.ts` | `reading_code` (the files) | none | MAN-9066 |
+| `show_note` | `draft-tools.ts` | none | none | MAN-9061 |
+| `update_draft` | `draft-tools.ts` | `drafting` (the chat; none for a project target) | the chat, after the write, when the target is a session | MAN-9061 |
+| `walk` | `draft-tools.ts` | `walking` (the chat, `{ at, total }`) | the chat, on every success | MAN-9061 |
+| `send_to_session` | `draft-tools.ts` | `drafting` (the chat) | the chat, after the send | MAN-9072 |
+| `create_session` | `draft-tools.ts` | `drafting` (no chat) | the new chat, after the send | MAN-9072 |
+| `stop_session`, `rename_session`, `answer_session` | `act-tools.ts` | none | the chat, after the act (a renamed chat under its new name) | MAN-9065 |
+- FOCUS IS INFERRED, never a tool: a tool that names a chat calls `deps.setFocus(chat)`, which writes and announces (`companion_focus`) only when the chat moved or was renamed.
+- THE DRAFT RULE: only the draft is ever sent. `send_to_session` and `create_session` carry the brief's `text`, and it must equal the draft's words; a mismatch is refused naming the draft's target and its first words, and nothing is sent. Both go through `deps.sendDraft` (MAN-9072); so does the panel's Send.
+- A tool never throws: a refusal is `deps.refuse(sentence)` (`isError` text saying what to do next), a handler that throws is logged and answered the same way.
+
+## `tools/tool-deps.ts` — `createToolDeps({ userId, store, runtime, activity })`
+| Dep | Does |
+|---|---|
+| `setFocus(chat)` | writes and announces focus only when the chat moved or was renamed; no focus tool exists |
+| `withActivity(phase, chat, files, run)` | sets her activity for as long as `run` takes; a `walking` phase carries `{ at, total }` of the held walk |
+| `openChatOnFloor(sessionId)` | emits `companion_open_chat` `{ sessionId, floor }`; nothing while no page holds the floor |
+| `refuse(sentence)` | `isError` text saying what to do next; never a throw |
+| `sendDraft(request)` | the one door the draft goes out by (`createDraftSender` in `companion-send.ts`, built on `setFocus` and `openChatOnFloor`); `send_to_session`, `create_session` and the panel's Send all call it |
+
+`withActivity` end rule:
+1. Each running tool's activity is kept in `running`, oldest first.
+2. At a tool's end, the activity changes only if the tool's OWN activity is still the standing one. A stopped turn's `idle` stands; a late tool never repaints her busy.
+3. When it changes: to the newest activity still in `running`, else `THINKING_ACTIVITY`.
+- 2026-10-26: a tool left running when its turn is stopped keeps its entry until it ends; a later turn's tool ending in that window can briefly show it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-picture.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/tool-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
+
+## MAN-9071 — server/modules/companion — the service verbs, one account's wiring, the picture — Probe
+section: server/modules/companion — the service verbs, one account's wiring, the picture, the tool registry and deps/003 Probe
+
+`.verify/companion-module.mjs`: real `createCompanionModule` router on a loopback express app, curl on every request, a real Haiku conversation; 47 checks (settings, message and frames, a `list_sessions` call, picture, refusals, interrupt, clear, live model change, `stop()` mid-turn in 663 ms on 2026-10-26).
+```
+D=$(mktemp -d /tmp/companion-module.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+DATABASE_PATH=$D/auth.db CERBERUS_DB_PATH=$D/cerberus.db TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-module.mjs
+```
+- Refuses unless `DATABASE_PATH` is under `/tmp`.
+- Runs as real account 1: leaves her JSONL under `~/.claude/projects/-home-lyphe--claude-state-companion-1/` (a hidden root).
+- Haiku answered "What chats are working?" from the roster in her message without a tool; the probe asks once by name to prove the tool path.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-picture.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/tool-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
+
+## MAN-9061 — server/modules/companion/tools — update_draft, show_note and walk: the draft she keeps, her note cards and the walkthrough cursor
+
+`draftTools(deps)` (`draft-tools.ts`) returns the SDK `tool()` definitions of `show_note`, `update_draft`, `walk`, `send_to_session` and `create_session`, in that order. The first three write through the account's store, so `companion_note`, `companion_draft` or `companion_walk` reaches his panel when she calls it; the last two send the draft (MAN-9072). None is `readOnlyHint`. This row covers the first three. Each description is `toolLine(name)`; the argument descriptions carry what the prompt's shorthand leaves out (the prompt's `update_draft(target, …)` is the pair `session` / `project`).
+
+Every handler runs inside `guardedToolResult` (`server/shared/tool-text-result.ts`): a throw is logged `[Companion] <tool> could not <doing>` and answered as `isError` text. A refusal is `deps.refuse(sentence)`.
+
+## `update_draft { session?, project?, text 1–20000 }`
+- Exactly one of `session` / `project` (a blank one counts as absent); both or neither is refused with a sentence saying so.
+- `session` goes through `resolveChat`, `project` through `resolveProject`; their refusal sentences are passed on.
+- `text` is stored EXACTLY as given (no trim): `send_to_session` and `create_session` compare their text with the draft's. A text blank after trim is refused.
+- The limit is `DRAFT_TEXT_MAX` imported from `companion-input.ts` and counted in characters as `PUT /draft` counts them (`characterCount`, code points), so the route and the tool accept the same brief and `<n>` below is that count. The schema carries it as a refinement, not `.max`, which counts UTF-16 units and would refuse text the route accepts.
+- Writes `{ target, text }` (`companion_draft`), THEN a session target becomes the focus (`deps.setFocus`): a write that fails moves nothing. A project target (`kind: 'new'`, `projectPath`, `projectName`) moves no focus.
+- After a compaction `<state>` restates the draft, the names and the walk's items ESCAPED (`&`, `<`, `>` as entities, in `stateEnvelope`): a `</state>` or an `<operator via="typed">` in her text stays words. The stored draft is untouched, so what is sent is exactly what she wrote; only her view of it after a compaction is the escaped spelling (`resolveChat` accepts a name in that spelling).
+- Activity `drafting` with that chat (none for a project) while it runs.
+- Answers `Draft for <name>: <n> characters.` or `Draft for a new chat in <project>: <n> characters.`
+
+## `show_note { title 1–80, text 1–4000 }`
+Both trimmed. One card (`companion_note`); answers `On his panel.` Touches neither draft nor focus.
+
+## `walk { session, items?: 1–60 × 1–120, at: int ≥ 0 }`
+One walk per account, held in the store; `<state>` restates it after a compaction.
+| Call | Result |
+|---|---|
+| `at` 0 | ends the HELD walk whichever chat is named, BEFORE any chat is resolved (the walk's chat may be archived or deleted since and could no longer be named): `companion_walk` null, `Walkthrough of <held chat> ended.` The focus follows the chat named only when it can still be named. None held: plain text, not an error |
+| `at` 1..n with `items` | starts, or replaces the list (also for another chat than the held walk) |
+| `at` 1..n without `items` | moves the held list; a walk held for ANOTHER chat, or none, is refused naming what to do (for another chat: name the held one, give items, or use `at` 0) |
+| `at` > n | refused with the count: `at is 4, but the walkthrough has 3 items: …` |
+- Each item is one line: a line break in an item is refused (`An item is a short title on one line: no line break.`), because the item is restated on one line in `<state>` and in the answer.
+- Answers `Item k of n: <title>.` The chat becomes the focus on every success.
+- The walk is WRITTEN BEFORE `withActivity('walking', …)` is entered: the activity's `{ at, total }` is read from the store when it is set. Ending a walk gives `walking` with `walk: null`.
+- why the `session` and `items` argument descriptions say he may name the items himself and the chat is the one the conversation has been about: measured 2026-10-26 on Haiku, with a chat already in her conversation and without them she asked "which session?" and never called `walk` (2 of 2 runs); with them, `walk` at 1, 2, 1, null.
+
+## Probe
+`.verify/companion-draft-tools.mjs <empty dir under /tmp>`: a probe chat "probe kaylee" made on the live server in `PROBE_PROJECT`, `auth.db` copied after it with `.backup`, the real module on express over the copy, her model set to haiku, then the four typed lines; a direct section calls the tools on the real store for refusals, limits and the cursor. 36 checks on 2026-10-26. Line 1 is typed up to three times until a `companion_draft` frame arrives: Haiku fails it two ways — she passes a part of the name (`"kaylee"` for `probe kaylee`), and, commoner (2 of 4 fresh runs, 2026-10-26), she searches `list_sessions` for "probe kaylee" / "probe" / "kaylee" and never calls `update_draft`, because the probe chat sits in a hidden root that `list_sessions` cannot show while `update_draft` resolves it by its exact name. A turn that never calls the tool is not a defect of the tool.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/draft-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-draft-tools.mjs
+
+## MAN-9062 — src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the stance, the status line, the rules and the fixture
+
+## Parts — `src/modules/companion/`
+
+Three surfaces. Each is a VIEW that draws every state from props and a thin wrapper that binds it to the page's picture (provider, reducer, mounting: MAN-9083). Composed from the kit: `Select`, `Switch`, `ConfirmDialog`, `TextArea`, `PromptInput`, `Card`, `Banner` (MAN-569).
+
+| surface | view (all composition) | wrapper | mounted by |
+|---|---|---|---|
+| her panel | `CompanionPanelView` (`CompanionPanel.tsx`) | `CompanionPanel`: reads `useCompanion()`; `targetWorking` = the draft's target chat is in the page's busy set (`useBusySessionIdSet`) | `WorkspaceFrame`, after the floating chat, ALWAYS rendered |
+| her door | `CompanionDoorView` (`CompanionDoorButton.tsx`) | `CompanionDoorButton` | `WorkspaceRail`'s foot, above the Inbox |
+| her Settings section | `CompanionSettingsView` (`CompanionSettingsSection.tsx`) | `CompanionSettingsSection`: `useCompanionSettings` fetches `GET /api/companion`, saves `PUT /api/companion/settings`; `useTalkBindingCapture` takes the next key or mouse button when Bind is pressed and saves it as `talkBinding` (MAN-9101) | `VoiceSettingsTab`, after its own sections, voice on or off |
+
+- Parts under the panel: `CompanionHeader` (status line, Stop, close, focus, model `Select`, Live `Switch`, Clear behind a `ConfirmDialog`; given `voice`, a row of its own under them, `CompanionVoiceSwitch`: "Voice on this device", the kit `Switch` closing the row under Clear, a `Volume2` / `VolumeX` glyph following it, the whole row its label), `CompanionLog` (entries newest last; alerts and system lines in their tone; given `speaking`, that sentence alone wrapped in `[data-companion-speaking-sentence][data-tone=info]`: a band `bg-tone-ink/20` widened by `ring-2 ring-tone-ink/20`, a 2px bar of the full ink in the ring's left edge (`shadow-[-2px_0_0_0] shadow-tone-ink`, the mark's 3:1: 5.3:1 light, 10.3:1 dark against the canvas, where the band alone is 1.32:1 / 1.51:1), `box-decoration-clone`, `forced-colors:underline`; ring and bar are shadows, so no word moves), `CompanionWalkStrip`, `CompanionNotes`, `CompanionDraftCard` (target, editable `TextArea`, Send turn, Send steer, Clear), `CompanionComposer` (`PromptInput`, Enter sends), `CompanionSentence` (her sounds drawn as marks at their offsets), `CompanionSettingsForm` (her name, his name, the register in a monospace `TextArea` with "Restore the original", the delivery note).
+- Hooks: `useFollowNewest` (the log follows the newest line until he scrolls up; `jumpToNewest`), `useGrowingField` (textarea sized to its words, measured only while drawn), `useCardFloor` (the draft card's `min-height`), `useTalkBinding(binding, toggle)` (below).
+- The talk button's binding (`TalkBinding`, MAN-9086; stored as `CompanionSettings.talkBinding`, MAN-9087):
+  - `utils/talkBinding.ts` is the one pure rule, importing nothing but the type. `talkBindingFromEvent(event)` answers `{ binding }`, `{ refusal }` (a sentence that says why) or `null` (a modifier on its own, which starts a chord; a key with no nameable `code`; a mouse button past forward); `matchesTalkBinding(binding, event)` matches a keydown on `code` and all four modifiers exactly, never a `repeat`, and a mousedown on `button`; `isTalkBindingRepeat(binding, event)` is true for the auto-repeat of the bound chord held down; the label is the modifiers in the order Ctrl, Alt, Shift, Meta joined to the key by `+` (`KeyK` → `K`, `Digit1` → `1`; `Space` and `F8` as they are), or `Mouse middle`, `Mouse back`, `Mouse forward`. A change to what may be bound is an edit there (and in the server's `checkTalkBinding`, MAN-9087).
+  - `hooks/useTalkBinding.ts` listens on `window` and on `useChatHost().pipWindow` (through the chat-host barrel) in the capture phase, re-binding when the binding or the window changes. A match calls `preventDefault()` and `stopPropagation()` and then `toggle` (read through a ref written in a layout effect, as `useChatHotkey` reads its own). A held chord's repeats never call `toggle` but are swallowed the same way (a held F5 or Ctrl+S is not handed to the browser). A matched mouse button's paired `mouseup` and `auxclick` are swallowed the same way, so the back button records and does not navigate, and its `pointerdown` and `pointerup` are stopped (not prevented: that would cancel the mousedown), so a popover that closes on an outside pointerdown stays open. The pairing is a ref in the hook: it survives a re-bind and a press of any other button between the two halves, and ends at the armed button's auxclick, at its next mousedown, or when the binding goes to `null`; a mouseup or auxclick whose mousedown was passed over is left alone. A `null` and an `undefined` binding (a server that predates the field) both bind nothing. A binding on the chat's own chord (Ctrl or ⌘ with `CHAT_TOGGLE_KEY`) fires both `useChatHotkey` and the talk button: nothing refuses it. While any element in the document carries `data-talk-binding-capture` (Settings, capturing a new binding) every keydown, pointerdown and mousedown is passed over, so pressing the old binding to re-bind does not press the button.
+  - Proof: `.verify/kaylee-talk-binding-rule.ts` (the rule under `node --import tsx`) and `.verify/kaylee-talk-binding-hook.mjs` (the hook, mounted on :5183 with trusted key presses and a CDP back button, in the main window and in the picture-in-picture window).
+- The talk press: `CompanionTalkButton` (composer slot), `TalkBindingField` (Settings row), `TalkPress` / `TalkPressState` (`src/shared/types.ts`), the status line's Listening and Transcribing, the log's "Nothing heard": MAN-9093. `useTalkPress`, `talk` on the context and the capture: MAN-9101. Proof: MAN-9095, and the whole plan on the live page, MAN-9100.
+- `CompanionAvatar` (her drawn face, one SVG keyed by `data-state`, the `--kaylee-mouth` variable): MAN-9124.
+- `companion-fake.ts`: fixture pictures (`FAKE_PANEL`, `FAKE_SETTINGS`); only the fixtures import it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDoorButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+
+## MAN-9089 — src/modules/companion — Kaylee's panel, rail door and Settings section: the — The door: an `aria-label`ed rail button, `data-companion-door`, `aria-expanded` = the open state
+section: src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the stance, the status line, the rules and the fixture/001 The door: an `aria-label`ed rail button, `data-companion-door`, `aria-expanded` = the open state
+
+- The door: an `aria-label`ed rail button, `data-companion-door`, `aria-expanded` = the open state; `RAIL_BUTTON_LIT` while the panel is open, `RAIL_BUTTON_UNLIT` at rest. Its words carry `defaultValue`s: it stands in the rail before anything else of hers loads. Its name and tooltip are her name alone (`companion.door.label`, default `{{name}}`), as the rail's views are named for what they show: it opens and closes the panel, so no action word. "Talk to <name>" is the panel's talk button (MAN-9093).
+- The palette row ("Talk to Kaylee") and the wiring: MAN-9083.
+
+## Status line (`statusOf`, `CompanionHeader`)
+What she is doing is ONE value, `presence` (`CompanionPresence`, `src/shared/types.ts`), built by `useCompanionPresence()` (`hooks/useCompanionPresence.ts`, MAN-9113) from her activity, the page's talk press and the page's player, in one order: `cut` > `listening` > `transcribing` > `speaking` > the activity's phase. `CompanionPanel` calls the hook once and hands the value down (`CompanionPanelView presence` → `CompanionHeader presence`); the header reads no other part of her activity, press or voice, so whatever else draws what she is doing reads the same state. The process is NOT in it: asleep, waking, failed and the loading picture are words the line takes from `picture.process` / the null picture, while `presence.state` stays what the activity says (`idle` at rest), so a consumer that must tell them from idle reads the process beside the presence, as the header does. `statusOf(picture, presence)`: the page's four states speak first; then the process (the picture's, not part of presence); an awake process is the presence's activity states. `role="status"`, so a change is announced. Words carry the state; the dot's tone only adds to it.
+| state | words | tone |
+|---|---|---|
+| presence `cut` (`voice.cut`: 900 ms after a talk press stopped her voice) | `Cut` | neutral, still |
+| `listening` (his press) | `Listening` | positive, moving |
+| `transcribing` (his press) | `Transcribing` | info, moving |
+| `speaking` (`voice.speaking`: this page's player sounds a sentence: set at its start, held until the next one starts, `null` only when the player falls silent — MAN-9113) | `Speaking` | info, moving |
+| no picture yet | loading | neutral, moving |
+| process `failed` | `Stopped · your next message starts her again` (claims no cause; the Banner carries the server's sentence) | warn |
+| `asleep` / `waking` | `Asleep · your next message wakes her` / `Waking up` | neutral / info, moving |
+| `idle` (the activity's phase) | `Idle` | positive |
+| `thinking` | `Thinking` | info, moving |
+| `reading_session` | `Reading <chat>` (`Reading a chat` with none) | info, moving |
+| `reading_code` | `Reading code`; with files `Reading code · a.ts, b.ts` (two named at most), more: `· N files` | info, moving |
+| `drafting` | `Drafting for <chat>`; no chat: `Drafting a new chat` | info, moving |
+| `walking` | `Walking <chat> · item k of n`; no walk: `Walking a result` | info, moving |
+- The page's rows win over every other row, loading, `failed` and `asleep` included. why: an open mic is never hidden. `Cut` wins over `Listening` for its breath; the talk button stays lit the whole time, so the open mic is still shown. Their keys `companion.status.cut` / `.listening` / `.transcribing` / `.speaking` carry `defaultValue`s (`Status.fallback`). Her state returns when the page has none.
+- Errors are amber, never red. Row two shows the focus chat while one is held; row three the model picker, Live and Clear; row four, given `voice`, "Voice on this device" (`CompanionVoiceSwitch`, `[data-companion-voice-row]`). why a row of its own: row three has 50px spare on the 400px column and none at 320px, and the switch is this device's where row three's controls are hers on every device.
+
+## Stance — `CompanionPanelView`
+| viewport | box | layer |
+|---|---|---|
+| `lg`+ | 400px column, `lg:inset-y-3 lg:right-3`, `lg:border-input lg:shadow-lift` | `z-[45]`: over the application layer (40), under the rail (50) and the FAB (60) |
+| below `lg` | `absolute inset-0` sheet, no radius/border/shadow | `z-[61]`: over the sidebar drawer (50, holds the door) and the FAB (60, sits in the sheet's send lane) |
+
+- Positioned inside the workspace shell's fixed box, not the screen: it already clears the status bar, notch and keyboard.
+- Stays MOUNTED while closed (`hidden`): his unsent words and the log's scroll survive. why: render it always, never only when open.
+- The panel is `[container-type:size]`: anything placed inside it portals its overlays (a fixed child resolves against the panel). `ConfirmDialog`, menus and toasts already portal.
+- Escape: inside the panel it closes and is claimed (`preventDefault`, window capture phase); outside it is untouched. why: the chat aborts its turn on any unclaimed Escape.
+- Closing from inside returns focus to `[data-companion-door]` when on screen. Opening on `(pointer: fine)` focuses her composer; on touch it does not (no keyboard).
+- Height: header and composer stand. Composer field grows to 25% of the panel's height, then scrolls. Log keeps 3.5rem. Dock (walk, notes, draft) is `max-h-[max(55%,23rem)]`, gives way last.
+- Dock order of giving way: notes first (floor: first title + ✕ + count), then the draft's field (floor 88px). The dock scrolls only past those floors, the draft card whole inside it.
+- A failed process draws a warn `Banner` under the header (the server's sentence) beside the log's system line.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDoorButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+
+## MAN-9090 — src/modules/companion — Kaylee's panel, rail door and Settings section: the — Rules later edits keep
+section: src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the stance, the status line, the rules and the fixture/002 Rules later edits keep
+
+| rule | why |
+|---|---|
+| The draft card saves his edit when the field blurs and BEFORE any send. | what is sent is what is on screen |
+| `onSendDraft(mode)` rejects with the server's sentence on refusal; the card shows it and keeps everything on screen. | no silent loss |
+| Send steer shows only while `targetWorking` and the draft targets a session; then it leads, Send turn follows. Otherwise Send turn alone. | a send to a working chat folds whatever button was pressed, so the two buttons differ in what they SAY |
+| Clear memory, Clear draft and Restore the original register each open a `ConfirmDialog` first. | each destroys work |
+| Model and Live show his choice at once, restore the old value with a toast on a refused save. | a control that snaps back reads as refused |
+| Settings fields save one at a time on blur (inputs also on Enter), trimmed, only when changed and within `LIMITS` (MAN-9087). | "Saved as you change them" |
+| The Settings section raising a dialog passes `wrapperClassName="z-[10000]"` to `ConfirmDialog`. | Settings is a body portal at `z-[9999]`; the default `z-50` opens behind it |
+| The draft card's rows stay in normal flow, `flex-col`, `justify-content` start; the dock, the card and its wrapper keep `min-h-0`; `useCardFloor` stays. | the floor is measured from the last in-flow row's bottom; only out-of-flow rows (the field's `sr-only` label) are skipped |
+| `useCardFloor` writes `min-height` on every render and on a width change with no render (`ResizeObserver` acting only when the width moved, a frame later). | `scrollHeight` lost the card's bottom padding once squeezed |
+| The door lights with `RAIL_BUTTON_LIT` and rests with `RAIL_BUTTON_UNLIT` (`src/shared/constants.ts`). | one lit look with the views rail (MAN-9006) |
+| Settings text fields take `SETTINGS_FIELD_WIDTH` (`src/shared/constants.ts`). | one width across Settings (MAN-7425) |
+| `SettingsSection` and `SettingsCard` come from `@/shared/ui`, never the settings module. | settings → companion → settings loops and breaks HMR |
+| Text goes through `t('companion.*')` (`en/common.json`); the Settings section reads `voiceSettings.companion.*` (`en/settings.json`). | |
+
+## Seams
+| seam | state |
+|---|---|
+| The settings save's answer | folded into the picture before the save resolves (MAN-9083) |
+| The send's answer | `sendDraft(mode)` resolves with `'started'` or `'folded'`; the card needs no more (the draft clears and the chat opens by their own frames) and shows a refusal's sentence |
+| Talk button | `CompanionTalkButton` stands in `PromptInputTools` (`data-companion-talk-slot`) before Send, drawn from the panel's `talk?: TalkPress`; without `talk` the cluster draws nothing and takes no room (MAN-9093) |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDoorButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+
+## MAN-9091 — src/modules/companion — Kaylee's panel, rail door and Settings section: the — Proof — `.verify/companion-panel-scaffold.mjs`
+section: src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the stance, the status line, the rules and the fixture/003 Proof — `.verify/companion-panel-scaffold.mjs`
+
+```bash
+node .verify/companion-panel-scaffold.mjs [--states awakeIdle,dense,...] [--evidence <dir>]
+```
+- Gitignored (`.verify/`): exists on disk only. Live client `:5183`. Exits 1 on any FAIL; zero console errors required.
+- Mounts the three VIEWS on `companion-fake.ts` pictures through `lib/companion-kit.mjs`: panel in the workspace shell's fixed box (`.pwa-status-clear.fixed`), door in the rail's foot above the Inbox, section in a Settings-modal-width column at `z-9999`. Every press is recorded in `window.__companionKit.events`, none acted on.
+- Photographs 1440×900 and 390×844, light and dark: states `loading asleepEmpty waking awakeIdle thinking readingSession readingCode drafting walking failed longLog draftWorking draftNew walk notes dense closed`, the door lit and unlit, the Settings states.
+- Checks: status line per state; the stance and layers above; no sideways scroll; dock ≤ 55% with the draft whole; Escape claimed inside, ignored outside; draft saved before send; refusals keep words; settings limits; Restore asks first; a short panel (`--keyboard-height` 380px, 390×844) with a draft and a 12-line message cuts nothing; the card keeps its bottom padding, re-checked after narrowing to 320px with no render between.
+- 2026-10-26: 275 of 275 checks, zero console errors.
+- The script is 297 lines (ceiling 300): any new check goes in `lib/companion-kit.mjs`.
+- Fragile against a server restart mid-run.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDoorButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+
+## MAN-9065 — server/modules/companion/tools — stop_session, rename_session and answer_session: acting on a chat through the house's own verbs
+
+`actTools(deps)` (`act-tools.ts`) returns the SDK `tool()` definitions of `stop_session`, `rename_session` and `answer_session`, in the order her prompt lists them. Each does what its page door does, through the house's own verb, so an act of hers and one of his hand leave the same marks. None is `readOnlyHint`; each description is `toolLine(name)`. Each names a chat: it is resolved with `resolveChat` (its refusal sentence is passed on), and after the act it becomes her focus (`deps.setFocus`; a rename carries the NEW name). None sets an activity: each is over in a moment and no `CompanionPhase` says "acting". Every handler runs inside `guardedToolResult`; a refusal is `deps.refuse(sentence)`.
+
+## `stop_session { session }`
+`abortChatRun(sessionId, { runtime })` from the websocket barrel — the very verb `chat.abort` calls. `'stopped'` → "Stopped <name>; it is still there."; `'not_running'` → "<name> was not running." The chat stays alive: the run ends aborted, the sidebar spinner drops, the row is not archived.
+
+## `rename_session { session, name 1–60, one line }`
+`sessionsService.renameSessionById` (the sidebar's rename door: stores the name and marks it `name_given`, so the namer never replaces it) then `broadcastSessionUpserted`, which draws the name on every open page with no reload. A broadcast that fails is logged and does not fail the rename: the name is stored. What she holds of the chat follows the name: the focus, the draft's target and the walkthrough (`carryRename`), so the panel's draft card and `<state>` never name a chat that `resolveChat` no longer finds by that name. A name another chat of his already carries is stored all the same, and the answer says so, with both chats' ids: `resolveChat` refuses a name two chats share ("fits 2 chats"), so she is told to use ids.
+
+## `answer_session { session, answer 1–2000 }`
+Answers the OLDEST pending approval of the chat (`getPendingApprovalsForSession`, by `receivedAt`; the others are counted in the sentence) through `answerChatPermission` — the verb `chat.permission-response` calls. With nothing pending: an `isError` sentence that says so. What the ask would run is shown to her IN FULL where she decides on it — `read_session pending_ask` and `answer_session`'s own sentences (`describeToolInput` in `server/shared/tool-call-hint.ts`: a Bash command whole, a file tool's whole path, any other input as JSON; 600 characters, then a count of what was cut; a line break shows as ` ↵ `) — and `pending_ask` adds the rule an "always" would store. The 60-character `describeToolCall` hint stays for the roster, where a line is scanned. What an answer means to each ask is `ask-decision.ts`'s, and every decision is the page's own:
+
+| ask | answer | decision |
+|---|---|---|
+| a permission (any tool) | `allow` | `{ allow: true }` |
+| | `deny` | `{ allow: false, message: 'User denied tool use' }` |
+| | `always` | `{ allow: true, rememberEntry }` and the entry merged into `claudePermissions` |
+| `AskUserQuestion`, one question | an option's label, matched case-insensitively (the option's own spelling is sent), else her words; `allow`, `deny` and `always` are refused unless an option is called that, because an answer sent to the chat cannot be taken back | `{ allow: true, updatedInput: { ...input, answers: { [question]: answer } } }` (`AskUserQuestionPanel.tsx`, `handleSubmit`) |
+| `AskUserQuestion`, several | — | refused: "answer it in the chat"; the resolver is not called |
+| `ExitPlanMode` / `exit_plan_mode` | `allow` | `{ allow: true }` |
+| | `deny` | `{ allow: false, message: 'User asked to revise the plan' }` (`PlanDisplay.tsx`) |
+
+Any other word on a permission or a plan is refused with the words that are accepted; a permission's refusal also names the entry `always` would store. `always` on a plan or a question is not an answer.
+
+### "always" is what the page's "Allow and remember" is
+- The entry is `buildClaudeToolPermissionEntry(toolName, input)` (`providers/list/claude/claude-tool-permission-entry.ts`, exported by the providers barrel): the tool's name, or `Bash(<first word>:*)`, `Bash(git <sub>:*)`. It is a PORT of the page's `buildClaudeToolPermissionEntry` (`src/modules/chat/utils/chatPermissions.ts`) written beside the runtime's grammar matcher (`matchesToolPermission`, `claude-runtime.provider.js`): the two must stay one rule, so a rule the page wrote and one she wrote are the same string.
+- `rememberAllowedTool` (`act-tools.ts`) writes it into the account's `claudePermissions` through `userPreferencesDb`: added to `allowedTools`, removed from `disallowedTools`, every other key of the preference kept (`permissionMode`, `skipPermissions`). A second call for an entry already allowed and not denied writes nothing. Read and write share no `await`, so two chats answered "always" in one tick both land.
+- The write comes FIRST and the answer after, as the page does (`handleGrantToolPermission` then `handlePermissionDecision`): a write that fails leaves the ask unanswered and the call can be made again. The decision's `rememberEntry` is what the runtime pushes into the LIVE run's `allowedTools` (`canUseTool`).
+- The page reads its preferences once, at sign-in (`hydrateUserPreferences`), and sends its own copy as `toolsSettings` with every turn: a page open before she answered "always" does not know the entry until it reloads, and a Settings save from it writes the preference whole. Her "always" receipt says so: "a page that was already open keeps its old list until it reloads."
+
+## Showing
+`.verify/companion-act-direct.mjs <empty dir under /tmp>` (no model call, a copy of `auth.db`): 23 checks on 2026-10-27 — the nothing-pending refusal, the merge over a `disallowedTools` entry with the other keys kept, the no-op second call, two parallel "always", the oldest-ask rule, the two-question refusal, the free answer, both plan decisions, `abortChatRun` on an idle chat, the rename's stored mark and the focus's new name, the zod limits.
+`.verify/companion-act-tools-scratch.sh` (`LEGS=` picks legs): Haiku probe chats in permission mode `default`, her model on Haiku, her turns typed in the real panel, her JSONL read back. All five legs passed on 2026-10-27: "Allow it." (the turn finishes), "Always allow it." (`Bash(uname:*)` in `claudePermissions.allowedTools`, then removed through the page's Settings, the row back to what it was), "Answer it: tea." (the reply is "Tea."), "Stop it." five seconds into the seq loop (an aborted `complete` 1.6 s after, the spinner dropped, the row kept), "Call that chat probe acts." (a `session_upserted` carrying the name, the row `probe acts|1`, the name drawn on the page without a reload).
+
+## Gotchas a probe meets
+- **This box asks about nothing.** `~/.claude/settings.json` allows `Bash(*)` and the runtime loads the `user`, `project` and `local` setting sources, so "Run date in Bash." raises no permission. An `ask` rule outranks an `allow` rule, so the probe writes `.claude/settings.json` with `ask: ["Bash(date:*)", "Bash(uname:*)"]` in a project of its own. A project's settings apply to EVERY chat launched there: written into the shared `PROBE_PROJECT` it made another session's `date` chat start asking (measured 2026-10-27), so the probe's project is `${PROBE_PROJECT}-act`, removed by unlink and rmdir after.
+- **Account 1 has one Kaylee.** Lines typed by two probes on the live server land in one conversation, and her "Stop it." stopped a chat that was not the typist's (her log: "The probe long chat is halted"). The scratch runner gives the probe its own server over a database copy (`scripts/sunset-probe.sh`, slot 6) and a scratch Vite; `/clear` on the copy forgets the live conversation id first, so she never resumes the live JSONL.
+- **A plan-runner child's environment reaches the chats.** The scratch server starts every probe chat's CLI with its own environment, and `hooks/runner_never_stop.py` refuses `AskUserQuestion` in any process with `PLAN_RUNNER_CHILD=1`: the ask leg's chat was refused and filed a followup instead of asking. The runner unsets the plan-runner and session-identity variables before it starts the server.
+- **A session host outlives its server.** Each chat that raised an ask leaves a keepalive `session-host/host.js <host id> <sessions dir>` with a live Haiku CLI child after the scratch server stops (measured 2026-10-27). The runner ends the slot's hosts (SIGTERM, matched on the slot's own sessions dir as a whole word) before it stops the server.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-tool-permission-entry.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-direct.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools-scratch.sh
+
+## MAN-9066 — server/modules/companion/tools — read_session, list_followups and ask_dactyl: the scopes, the turn windows and the dactyl path rules
+
+`readTools(deps)` (`read-tools.ts`) returns the SDK `tool()` definitions of `read_session`, `list_followups` and `ask_dactyl`, in that order, after `list_sessions` and `list_projects`. All three carry `readOnlyHint`. Each description is `toolLine(name)`. Every handler runs inside `guardedToolResult` (a throw is logged and answered as `isError` text); a refusal is `deps.refuse(sentence)`. No usage or spend is in any answer (ruling 17).
+
+## `read_session { session, scope }` (both 1–200 characters)
+The chat goes through `resolveChat` (an unknown one: its sentence). It becomes her FOCUS, and her activity is `reading_session` with that chat while the tool runs. `scope` is matched without regard to case for `last_turn`, `recent` and `pending_ask`; any other string is a PHRASE.
+| scope | Answers |
+|---|---|
+| `last_turn` | `"<name>", its last turn (<UTC time>):` then `He said:`, `Its reply:` (the reply's text blocks, tool-call lines left out) and `Tool calls in this turn: N`; a running chat adds that the reply may grow. Over 6,000 characters (counted as code points) the turn is rendered alone and a dactyl digest answers instead (`LAST_TURN_DIGEST_BRIEF`). No turn in the history: a chat that never ran says nothing has been said; one with a conversation of its own whose transcript reads empty (file gone) says no turn can be read and to say nothing about what it did. |
+| `recent` | the last 10 turns rendered, then a digest (`RECENT_DIGEST_BRIEF`) |
+| `pending_ask` | `1. <askLine>` per ask, oldest first, with the first question's option labels (single-question asks); none: `Nothing is waiting on him in "<name>".` |
+| a phrase | the turns whose text holds it (case-insensitive, whitespace folded), each with one turn either side, rendered, then a digest (`phraseDigestBrief`); none: `The transcript of "<name>" does not mention "<phrase>".` |
+- History is `sessionsService.fetchHistory(id, { limit: null })`, grouped by `groupTurns`.
+- A rendered file is the next NUMBERED file of her scratch folder (`0004-last-turn.md`, one past the highest number there, taken in the same tick it is written), then `pruneScratch` keeps the newest 20. The answer ends with the file's path, so a sharper question can go to `ask_dactyl` (her scratch is an allowed root). Its turns carry the CHAT's own numbers (`renderTurnWindow`: `## Turn 8`, the title `10 of 129 turns`), and a gap between non-adjacent windows is marked (`(turns 5 to 7 are not shown here)`).
+- What one dactyl takes is bounded: `newestThatFit` weighs each turn as `dactyl` does (UTF-8 bytes + 7 per line) against 300,000 of its 327,680-byte gate (room for the brief and the title). A window over it keeps the NEWEST turns that fit, and the answer says how many older ones were left out and how to reach them. A turn that is over the budget ALONE is set aside by number ("Turn 10 is more than one reader takes and is left out.") and the older turns are still digested; only when EVERY turn of the window is that long does she get an `isError` that there is nothing to digest. The dactyl's own "Read a range of it yourself" refusal therefore never reaches her.
+- A chat still running adds "It is still working, so what it has written may grow." to a digest as it does to an inline last turn.
+- The dactyl is stopped with the call: both `read_session` and `ask_dactyl` pass the handler's `extra.signal` to `runDactylRead`, which sends SIGTERM (SIGKILL after 5 s) when it fires and answers "The reader was stopped: the call was cancelled."
+- A digest that fails answers the dactyl's own sentence plus the file's path; the render is not lost.
+
+## Turn windows (`transcript-turns.ts`)
+A turn opens at his text message and holds the reply rows after it; a `<task-notification>` row joins the turn it belongs to, labelled, and is no turn of his. A window of turns is chosen in `transcript-turns.ts` and written by `renderTurnWindow`. `renderTurns` (the whole history under its own numbers) has no tool caller; only `.verify/probe-companion-reads.mjs` calls it. The focus feed writes its reply with `nextScratchFile`. A phrase is searched in his words, the reply's words and its tool-call lines — never the file's headings ("He said", "Tool calls"). `.verify/companion-turn-windows.mjs` runs `groupTurns`/`turnsAround` on real strings; it is pure and touches no file.
+
+## `list_followups { session? }`
+`resolveChat` for a given session (it names a chat but moves neither focus nor activity), through the barrel's `listOpenFollowups`. One line each, newest first: `<chat name> · next|gap · <text>`; the text is `Followup.text` untouched, which is what the Next steps widget shows. A named chat is listed whole, as the widget shows it (up to the service's own ceiling of 200, then "These are the newest 200"). Every chat together are cut at 20 (the service is asked for 21 to know), and the last line then says to name one chat. A chat's name is `chatNameOf` (any chat row, archived or hidden too).
+
+## `ask_dactyl { files 1–8, brief 1–4000, context? }`
+Every file and the context go through `resolveDactylFiles` (`dactyl-paths.ts`) BEFORE any dactyl starts; one refusal sentence names every file refused, and nothing runs. Her activity is `reading_code` with the real paths. `runDactylRead` runs `dactyl --read <files> --brief - [--context <file>]`; exit 2 or 3 answers its own line as the error; the answer is its stdout (spend lines removed).
+**Path rules.** A file must resolve through `realpath` to a regular file under a visible project's path, `~/.claude` or her scratch, and must not be denied. Denied: any path segment (case-insensitive) that starts with `.env`, `credentials`, `secrets`, `id_rsa` or `.claude.json`; ends in `.env`, `.pem`, `.key`, `.p12`, `.pfx`, `.db`, `.token` or `_history`; holds `.sqlite`; is an SSH key name (`id_dsa*`, `id_ecdsa*`, `id_ed25519*`, or any `id_*` with no extension); is one of `.git-credentials`, `.netrc`, `.npmrc`, `.pgpass`, `.pypirc`, `.htpasswd`, `hosts.yml`, `hosts.yaml`, `.ssh`, `.aws`, `.gnupg`, `.kube`, `.docker`; anything under `~/.claude/state/claude_account`; `~/.claude/.credentials.json`; and, by PLACE, anything in a home dot-folder or dotfile other than `~/.claude` (`~/.cloudcli`, `~/.codex`, `~/.openclaw`, `~/.config`, `~/.vscode-server`, …). The place rule is the cure for the shape the names kept missing: applications keep tokens and keys in `~/.<app>/` under names no list predicts (`auth.json`, `agent-host-token`, `device.json`, `openclaw.json` were all reachable 2026-10-27 after the names were widened once). No registered project lives in a home dot-folder, and `~/.claude` stays whole. The name rules remain a net for the other roots (`/home/lyphe` itself and `/opt` are registered projects): the first widening followed a review that found `~/.git-credentials`, `~/.npmrc`, `~/.pgpass`, `gh/hosts.yml`, a `*.env` file, `secrets.local.json`, `~/.bash_history` and `~/.claude.json` reachable. `id_*` is not blanket (an `id_utils.py` passes) because the key names and the extensionless form are what keys are called, and `.ssh` is denied whole. The name is judged FIRST, whether or not the file exists (a missing `.env` is refused as a `.env`), and the resolved path again, so a link named `notes.txt` that points at a `.env` is refused with `(which is …)`. `~/` is the home folder; a name that is not a full path (`server/shared/prompt-stream.ts`) is looked for under the visible projects — one holder is the file, none or several is a sentence. The files handed to the dactyl are the REAL paths that were judged. The argument description says nothing about secrets on purpose: measured 2026-10-27, with "refused by name" in it Haiku declined the `.env` itself and never called the tool; without it she calls, and the tool's refusal (naming `.env`, "no dactyl was started") is what she relays.
+
+## Probes
+`.verify/companion-read-tools.mjs <empty dir under /tmp>`: two Haiku probe chats in `PROBE_PROJECT` ("probe long": a short turn then 120 lines; "probe kaylee": one short turn and one follow-up through the command door), her panel opened on :5183 on Haiku, the four typed lines with the status words, tool calls and results read from her JSONL, the `dactyl --session-status` hand count around the `.env` line; then every scope and the path-rule matrix called directly on a snapshot of `auth.db`. 57 checks passed on 2026-10-27 before the review fixes added matrix names and changed the long-turn check; it has not been re-run live since. Chats are made just before their first turn and remade (up to 3 times) when the CLI answers "No conversation found": a chat that completes with `provider_session_id` equal to its own id never reached the provider, measured twice right after a server handover; and `resolveChat` then cannot find it (his chats exclude `session_id = provider_session_id`). A long reply is asked as numbered lines: "the word lorem repeated 1500 times" did not finish in 170 s on Haiku. Account 1 (`verve`) is the dev account every live probe types to, so another soul's probe can write into her conversation, draft and model mid-run (measured 2026-10-27: a `send_to_session` to another probe's chat came out of this one's turn); the probe prints CONTAMINATED when an operator line in her log is not its own.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/dactyl-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-read-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-turn-windows.mjs
+
+## MAN-9067 — server/modules/chat-names — the naming pass: the trigger, the five questions, the write, the Haiku call, the sayable rule
+
+Gives an app chat a name a person could say aloud, once a turn of it has ended. Writes `sessions.custom_name`, never `name_given` (MAN-9060, INV-9787). Edits that break it: INV-9817. `server/index.ts` builds it (`createChatNamer()`), calls `chatNamer.start()` in the listen callback after `startRunStallWatchdog()`, and `await chatNamer.stop()` in `shutdownRuntimeServices`.
+
+## Files
+| file | owns |
+| --- | --- |
+| `index.ts` | exports `createChatNamer` only |
+| `chat-namer.service.ts` | `createChatNamer(): { start(): void; stop(): Promise<void> }` — the trigger, the five questions, the write |
+| `first-exchange.ts` | `readFirstExchange(sessionId)` → `ChatFirstExchange { ask, reply }` or `null` |
+| `haiku-name.ts` | `askHaikuForName(exchange, signal)` → a cleaned name or `null`; never rejects |
+| `sayable-name.ts` | `isSayableName(name)` — one rule, applied to the chat's current name and to Haiku's answer |
+
+## Trigger — `chatRunRegistry.onRunCompleted`
+No timer, no boot sweep: a chat that already holds an unsayable name is named at its next turn. why: the house names its events, it does not poll.
+
+| completion | the namer |
+| --- | --- |
+| `aborted` (Stop pressed) | skips |
+| `alreadyRecorded` (a re-adopted host whose turn ended before this process began) | skips: a boot or a handover names nothing |
+| any other | `considerChat` on a microtask; the listener answers synchronously and never holds a completion |
+
+`start()` twice is a no-op. `stop()` unsubscribes, aborts every pass in flight (the Haiku child ends with it) and awaits them with `Promise.allSettled`.
+
+## The five questions — cheapest first; Haiku is asked only when all pass
+| # | question | read from |
+| --- | --- | --- |
+| 1 | an app chat, not archived | `sessionsDb.nameFactsOf`: `appCreated`, `isArchived`; `null` (no row) stops |
+| 2 | `name_given` still 0 | `nameFactsOf.nameGiven` |
+| 3 | the current name fails `isSayableName` | `nameFactsOf.customName` |
+| 4 | neither in flight nor already tried by this process | `inFlight` (`Map<sessionId, Promise<void>>`), `attempted` (`Set`) |
+| 5 | the transcript holds a first exchange | `readFirstExchange` non-`null` |
+
+- Questions 1 to 4 are synchronous and claim the chat in one step (`inFlight.set`), so two completions never start two passes.
+- A project's visibility is no question: a probe chat in `PROBE_PROJECT` (a hidden root under `/tmp`) is named like any other.
+- `attempted` is filled at question 5's yes: one Haiku try per chat per process, whatever the answer; a restart allows one more. A chat with nothing to read yet is asked again at its next turn.
+
+## The write
+1. `askHaikuForName` → `null`: log `[Chat names] <id> was not named this time; it keeps "<name>"`, write nothing.
+2. Re-read `nameFactsOf`, no `await` between this read and step 3:
+   - `null`: log `was deleted while Haiku was answering; "<name>" is not written`.
+   - `nameGiven` set or `customName` no longer the name that failed question 3: log `was renamed while Haiku was answering; "<name>" is not written`.
+3. `sessionsDb.updateSessionCustomName(id, name)` — never `renameByPerson`. Log `[Chat names] named <id> "<name>" (was "<old>")`.
+4. `broadcastSessionUpserted(id)` — the frame the sidebar, the simple list, the floating chat's picker, the notifications and Kaylee's roster redraw on. A send failure is logged; the name stays written.
+
+A pass that throws logs `the pass for <id> failed; the chat keeps its name: <reason>`.
+Read the log: `journalctl -u cloudcli-server-dev | grep '\[Chat names\]'`. Every line carries the session id.
+
+## `readFirstExchange`
+Reads `sessionsService.fetchHistory(id, { limit: null })` — the rows the person sees. Rejects when the chat is gone or its transcript cannot be read.
+
+| side | taken |
+| --- | --- |
+| `ask` | the first user `text` row he wrote: non-empty, not starting `<system-reminder>` or `<task-notification>`; a slash command he typed counts |
+| `reply` | the first assistant `text` row after it: non-empty, not `isCompactSummary`, not `isLocalCommandStdout`, not `model === '<synthetic>'` |
+
+Each side is cut to 2,000 characters (`MOST_CHARACTERS_PER_SIDE`) without splitting a surrogate pair. `null` when the transcript holds no such pair.
+
+## `askHaikuForName`
+One `query()`, one turn, no session of its own.
+
+| option | value |
+| --- | --- |
+| `model` | `'haiku'` |
+| `systemPrompt` | `NAMING_SYSTEM_PROMPT`, verbatim below |
+| `tools` / `settingSources` / `strictMcpConfig` | `[]` / `[]` / `true` |
+| `settings` | `{ autoMemoryEnabled: false }` |
+| `persistSession` / `maxTurns` | `false` / `1` |
+| `cwd` | `~/.claude/state/chat-names`, made on demand: a hidden root, so a stray launch is in no project list |
+| `env` | `userFacingEnv()` plus `launchAccountEnv().env` |
+| `pathToClaudeCodeExecutable` | `resolveClaudeCodeExecutablePath(process.env.CLAUDE_CLI_PATH)`, passed when it resolves |
+| prompt | `FIRST MESSAGE:\n<ask>\n\nFIRST REPLY:\n<reply>` |
+| bound | `NAMING_TIMEOUT_MS` = 30 s, and the namer's `signal` |
+| init check | the CLI's `system`/`init` message lists its `tools`; any entry ends the pass with `null` |
+
+`NAMING_SYSTEM_PROMPT`, verbatim:
+```text
+You name a chat session for a person who refers to it aloud. Read the session's first message and first reply, and answer with a name of two to four plain words saying what the chat is about, the way a person would call it in conversation, for example Kanban board, Login fix, Estimate drafts. No punctuation, no quotes, no emoji, no file names, no paths, no slash commands. Reply with the name only.
+```
+
+Returns `null` and writes nothing, each with one `[Chat names]` line, when: the SDK fails; 30 s pass; `signal` fires; the CLI's init message lists any tool; the result is not `subtype === 'success'` or has `is_error`; the cleaned reply fails the check.
+
+`cleanedName(reply)`:
+1. refuse a reply of several lines or holding an emoji (`\p{Extended_Pictographic}`);
+2. drop outer quote marks and trailing punctuation, repeatedly; collapse spaces; capitalize the first letter;
+3. accept only 2 to 4 words (`FEWEST_NAME_WORDS`, `MOST_NAME_WORDS`) that pass `isSayableName`.
+
+A reply in a language written without spaces counts as one word and is refused: the chat keeps its name.
+
+## `isSayableName(name)` — true when, after `trim()`, all six hold
+1. 1 to 5 words (whitespace split);
+2. at most 40 characters;
+3. the first character is a letter or a digit (`\p{L}`, `\p{N}`);
+4. none of `/ # \ < > { } [ ] | * _ ~`, a backtick or `"`;
+5. not matching `/^untitled\b/i`;
+6. not UUID-shaped (`8-4-4-4-12` hex digits).
+
+`null`, `undefined` and `""` are not sayable. why: the names he gave pass; slash commands, placeholders and prompts fail. A new chat is named with its first message's first four words (`buildCloudCliSessionName`, `sessions.service.ts`), so "Help me plan a" passes: the rule asks whether the name can be spoken, not whether it says anything.
+
+2026-10-27, under `tsx`, strings read from the live `sessions.custom_name`:
+
+| name | verdict | fails |
+| --- | --- | --- |
+| `Live mode` | true | |
+| `PM flow` | true | |
+| `Fix every broken sign-in` | true | |
+| `Photo Evidence Cooberator` | true | |
+| `Help me plan a` | true | |
+| `/git` | false | 3, 4 |
+| `/upload STEVEN KENDALL` | false | 3, 4 |
+| `Untitled Session` | false | 5 |
+| `# day-one-sketch-from-panos — phase 3: …` (120 characters, 19 words) | false | 1, 2, 3, 4 |
+| ``TASK: reply with exactly one line: `claude answered`. Nothing else, no tools.`` (12 words, 77 characters) | false | 1, 2, 4 |
+
+## Prove it
+`node .verify/chat-namer-live.mjs` → `ALL PASS`. Every turn is on Haiku in `PROBE_PROJECT` (under `/tmp`, a hidden root), chats deleted after.
+
+| leg | shows |
+| --- | --- |
+| A | first turn: "Untitled Session" becomes a name, `name_given` 0, unchanged 10 s later; renamed by hand: `name_given` 1, a second turn leaves it and logs no `[Chat names]` line |
+| B | a sayable `initialMessage`: no `[Chat names]` line for the id |
+| C | a rename sent at `complete` wins: `was renamed while Haiku was answering` |
+
+A probe chat is in no sidebar list (`visibleProjectPathSql` leaves a hidden root out) and its `session_upserted` frame carries `project: null`, which the page's project store drops: the leg reads the frame off the page's websocket instead.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/first-exchange.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/sayable-name.ts
+
+## MAN-9072 — server/modules/companion — the send: `companion-send.ts` and `tools/send-options.ts`, what a draft checks, runs, records and clears
+
+The one place a draft goes out. Callers: the panel's Send (`POST /draft/send` → `companionService.sendDraft` → `account.sendDraft`), her `send_to_session` and `create_session` (`tools/draft-tools.ts`). The DRAFT is the only thing sent. One sender per account: `createDraftSender({ userId, store, runtime, setFocus, openChatOnFloor })`, built in `tools/tool-deps.ts`.
+
+## Request and answer
+| name | shape |
+|---|---|
+| `DraftSendRequest` | `{ mode: 'turn' \| 'steer', text?, chat?, newChat?: { projectPath, title } }` |
+| `DraftSendOutcome` | `{ outcome: 'started' \| 'folded' \| 'refused', sentence }`; `sentence` is what she tells him, or the card shows |
+
+A refusal keeps the draft. `send_to_session` passes `text` and `chat`; `create_session` passes `text` and `newChat` with `mode: 'turn'`; the panel passes `mode` alone.
+
+## Checks, in order (each a `refused`)
+1. A send already going out for this account (`sending`): one at a time. why: she calls tools in parallel and two pages can press Send; a second read of the draft before the first cleared it would send it twice.
+2. No draft held; a draft blank after trim.
+3. `text` given and not the draft's words, trimmed.
+4. `chat` given and the draft is not for that session.
+5. `newChat` given and the draft is not for a new chat in that `projectPath`.
+
+Refusals 3 to 5 name the draft: its target and its first 160 code points, on one line (`describeDraft`). Nothing reaches a chat that was not on his screen first.
+
+## To a chat (`sendToChat`)
+| when | does | outcome |
+|---|---|---|
+| the row is missing or archived | nothing sent | `refused` |
+| `chatRunRegistry.isProcessing` and `steerChatRun` answers `'folded'` | folds the brief into the running turn, whichever `mode` was asked; the echo goes onto that run's writer | `folded` |
+| idle, or the fold found no turn | `runDetachedChatTurn` with `sendOptionsFor`; its `beforeRun` hook writes the echo; the verb waits for the run to have STARTED, never for the turn | `started`; `refused` when the door refused or the hook never ran |
+
+- `folded` means pushed, not "the turn changed course": MAN-9068. The sentence says the brief is taken at the next tool step or runs as its own turn after the turn finishes.
+- A `steer` to an idle chat starts a turn; its sentence says so.
+- Echo: a user text row `local_kaylee_<uuid>`, `spokenVia: 'kaylee'`; the page swaps it for the persisted row, which the history read marks again.
+- Every send is recorded: `relayedSendsDb.record(sessionId, 'turn' \| 'steer', words)`. A failed write is logged (`[Companion] a send could not be recorded…`) and never costs the send.
+
+## To a new chat (`sendToNewChat`)
+1. Unless the project belongs to a node (`projectsDb.nodeForPath` non-null), `diagnoseProjectFolder`: a folder that is gone or not a folder is a `refused` BEFORE anything is made.
+2. `sessionsService.createAppSession('claude', projectPath, words, true)`: on the simple list, as the page's New chat makes one.
+3. With a title, `sessionsDb.updateSessionCustomName` alone: `name_given` stays 0, the namer may replace it (INV-9787).
+4. `broadcastSessionUpserted`; a failure is logged and the send goes on.
+5. `sendOptionsFor(userId, null, 'claude', { focusSessionId, name })`, then the turn. A first message that did not start is a `refused` that says the chat exists.
+
+## After a send
+- The draft clears only if `draft.updatedAt` is still the one that went: a rewrite made while the send was out is the next brief.
+- The chat becomes her focus (`setFocus`) and the page that holds the floor opens it (`openChatOnFloor`: the `companion_open_chat` frame, to the floor's client id only).
+
+## Options — `sendOptionsFor(userId, sessionId, provider, newChat?)` → `ChatSendOptions`
+Read as the chat's own composer would read them. An option the source records none of is LEFT OUT, never defaulted.
+| option | existing chat | new chat (`sessionId` null) |
+|---|---|---|
+| `model`, `effort` | the row's, when it records a model and its `provider` equals this one | the focus chat's (`NewChatBasis.focusSessionId`, same provider, has a model), else `sessionsDb.latestModelChoice(provider)` |
+| `permissionMode` | the row's `permission_mode`; none recorded → left out, the chat runs on the default | `sessionsDb.latestPermissionMode(provider)` |
+| `toolsSettings`, `skipPermissions` | `userPreferencesDb.getPreferences(userId)[`${provider}Permissions`]` read AT THE SEND; not a record → `{ allowedTools: [], disallowedTools: [], skipPermissions: false }` | same |
+| `sessionSummary` | the row's `custom_name`, else `''` | the title, else the name `createAppSession` gave |
+
+- A permission mode is never borrowed for a chat that exists. why: a probe chat whose chip reads "Ask before every edit" ran in bypass when the last chat he used had bypass.
+- `latestModelChoice` and `latestPermissionMode` narrow to the provider. why: a model id or mode is a provider's own word; a Codex model handed to a Claude chat fails its first turn.
+- Measured 2026-10-27 (scratch copy): a new chat recorded `bypassPermissions` (the newest chat's) while its composer chip read "Ask before every edit"; they agree after his first typed send.
+
+## Open (operator rulings pending)
+- A new chat takes the newest chat's permission mode and model across accounts (`sessions` has no user column).
+- A refused panel press still takes the floor (`companionService.sendDraft` takes it before the send).
+- `POST /draft/send` carries no `updatedAt`: it sends the draft held at the press.
+
+## Probe
+`.verify/companion-send.mjs` legs `steer,idle,create,mismatch,panel`; `.verify/companion-send-scratch.sh` runs them on a scratch server over a copy of the database (the live box has one Kaylee shared by everyone at work).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-send.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/send-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-send.mjs
+
+## MAN-9077 — server/modules/companion/session — her launch: the options, the hidden working directory, persistence and resume, the idle close, setModel live
+
+One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(userId, settings, tools, providerSessionId)` (`session/companion-launch.ts`) builds its options; `launchCompanionCli(input)` (`session/companion-process.ts`) runs it. She is built like the Cerberus diagnosis agent (`cerberus/diagnosis/diagnosis-agent.ts`). What a CLI message means: the conversation row (`companion-events.ts`).
+
+## Options
+| option | value | why |
+|---|---|---|
+| `model` | `settings.model` (`sonnet` \| `opus` \| `haiku`) | read when the launch begins |
+| `systemPrompt` | `fillSystemPrompt(settings.operatorName)`, a plain string | never the Claude Code preset: no house rule, CLAUDE.md or skill reaches her |
+| `settingSources` | `[]` | nothing on disk widens what she may do |
+| `settings` | `{ autoMemoryEnabled: false }` | the CLI keys auto-memory (`MEMORY.md`, his standing rules) to the git root of the cwd; hers sits inside `~/.claude` |
+| `tools` | `[]` | no built-in tool: no shell, edit or web |
+| `mcpServers` | `{ companion: createSdkMcpServer({ name: 'companion', tools }) }` | her thirteen tools, in-process |
+| `strictMcpConfig` | `true` | his own MCP servers (`~/.claude.json`) are not loaded |
+| `allowedTools` | each tool's name under `mcp__companion__` | exactly hers, so a tool is never one prompt away |
+| `includePartialMessages` | `true` | text deltas feed the sentence stream |
+| `maxTurns` | 30 | per turn of hers: one answer to him, every tool call inside it |
+| `cwd` | `companionWorkingDirectory(userId)` | below |
+| `env` | `{ ...userFacingEnv(), ...(await launchAccountEnv()).env }` | the account the house chose, on the subscription |
+| `pathToClaudeCodeExecutable` | `resolveClaudeCodeExecutablePath(CLAUDE_CLI_PATH)`; key absent when it does not resolve | |
+| `resume` | the held CLI session id; key ABSENT for a fresh launch, never empty | |
+
+- `persistSession` is left on: her conversation is a JSONL the next launch resumes.
+- `COMPANION_MCP_SERVER_NAME = 'companion'` is defined in `companion-launch.ts` and re-exported by `tools/companion-tools.ts`: one spelling.
+- Init check: every `system`/`init` (it arrives at the start of EVERY turn) passes `unexpectedTools(listed, tools)`. A CLI tool that is not one of hers fails the launch before the model sees a turn: `Her session held tools it should not have (<names>), so it was not run.`
+
+## Working directory
+- `~/.claude/state/companion/<user id>`, made at launch if absent; one per account. Nothing is read from it.
+- It sits under a hidden project root (`server/shared/hidden-project-paths.ts`): her conversation never reaches a project list, and the heal reads her turns as a program's, never as the operator's correction (INV-4352).
+- Her JSONL: `~/.claude/projects/-home-lyphe--claude-state-companion-<user id>/`.
+
+## Persistence and resume
+| step | does |
+|---|---|
+| first `init` of a launch, and any `init` whose `session_id` differs from the held one | `writeProviderSessionId(id)` → `companion_state.provider_session_id` |
+| next launch | `resumeForLaunch()`: `resumableSessionId(held)` → `resume`; the memory is the CLI's own JSONL |
+| server restart | nothing held in memory matters: her next message launches with `resume` and her memory is back |
+| held id not UUID-shaped | `resumableSessionId` answers `null`; warn `[Companion] account <id>: the held session id is not a UUID; she starts fresh`. why: the CLI refuses a non-UUID with a plain failure, not "No conversation found", so it would fail every push for ever |
+| held id the CLI has no conversation for | the refused-resume fallback: conversation row |
+| Clear | writes `null`; conversation row |
+
+## The idle close
+- `createIdleCloser` of `server/shared/prompt-stream.ts` (MAN-9078 for its rules), `idleMs: resolveIdleCloseMs(undefined)`: `CLAUDE_CHAT_IDLE_CLOSE_MS` when set and ≥ 5 s, never above 2 h, else `DEFAULT_IDLE_CLOSE_MS` = 2 h.
+- The clock is silence since the last MESSAGE: `CompanionCli.push` calls `idle.touch()`. It is armed when the launch is created, so a `warm` launch that gets no message also closes after the window.
+- `isBusy` = a turn in flight (`turns.turnId !== null`); she has no background task and no watcher. Busy at the window: log `idle window reached after N min, but a turn is in flight; asking again in a minute`, re-asked every 60 s.
+- Closed idle: log `closing her idle process after N min without a message`, `onIdleClose` → the session's `closeProcess('idle')` → she is `asleep`. The memory stays; the next push resumes it.
+
+## `setModel` live
+| when | does |
+|---|---|
+| process up | `conversation.setModel(model)`, bounded by `CLI_GRACE_MS` = 5 s; no answer = throws `her CLI did not answer a switch to <model> within 5 s` |
+| launch under way (options being built) | remembered as `wantedModel`; applied once the query exists, if it differs from the launch's model; a failure is logged `the model change made while she woke was not applied` |
+| no process | nothing to apply: the next launch reads the stored model |
+- No relaunch, no lost memory: the conversation continues on the new model. `companionService.saveSettings` calls it on a model change; a throw becomes the system line `She could not switch to <model> while awake; she will use it the next time she wakes.` and the save stands.
+
+## Ending a launch (`CompanionCli`)
+| verb | does |
+|---|---|
+| `push(message)` | queues the message, restarts the idle clock |
+| `interrupt()` | `conversation.interrupt()`, answer within 5 s → `{ stillQueued: string[] }`; silence or a failure → `'unanswered'` (the session then closes the process: a CLI that ignores a Stop would ignore the next message) |
+| `close()` | cancels the clock, `queue.end()` (EOF = wind down), waits up to 5 s for the loop, then `conversation.close()` |
+| `kill()` | cancels the clock, ends the queue, `conversation.close()` now |
+- Once ended by us (`close`, `kill`, the idle closer) the launch reports NOTHING more: its messages are drained unheard and `onEnded` fires only for a loop that ended by itself. The queue never ends on its own: why, in the prompt-stream row.
+
+## Proof
+`.verify/kaylee-session.mjs` (run under `tsx`, account 999, Haiku, stand-in callbacks): init check, hello, memory across a message, `setModel` sonnet then haiku with no relaunch, resume after close, refused resume, Stop.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-launch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-process.ts
+
+## MAN-9079 — server/modules/companion/session — her conversation: the process states, the loop's events, which result ends a turn, the refused resume, Clear and Stop
+
+`createCompanionSession(deps)` (`session/companion-session.ts`) is one account's live conversation; `companion-account.ts` builds it (MAN-9070). The session reads nothing itself: `CompanionSessionDeps` (`companion-session-types.ts`) hands it the readers (`MessageReaders`), the sinks (`TurnSink`) and the held CLI session id. Launch: MAN-9077. Message order: MAN-9080. Sentence stream: MAN-9081.
+
+## `CompanionSession` surface
+| member | does |
+|---|---|
+| `pushOperator(text, via)` / `pushOperatorEmpty()` / `pushAlerts(blocks)` / `pushFocusNews(envelope)` | assemble ONE message, start a turn if she is idle, wake a closed process. `pushAlerts([])` pushes nothing |
+| `warm()` | opens a launch with no message, so the CLI's ~1 s start is spent while a caller waits (the alert feed's gather window). No-op while a launch exists |
+| `oweCut(heard: string \| null, interrupted: string \| null)` | the next message opens with `<cut heard interrupted/>` (MAN-9080). Called by the companion's `cut` before it awaits `interrupt()` (MAN-9111). `pushOperator(…, 'spoken')` and `pushOperatorEmpty()` (`<operator via="spoken" heard="nothing"></operator>`, a press that carried no words) are the press door's (`companion-press.ts`, MAN-9059) |
+| `interrupt()` | her Stop: below |
+| `setModel(model)` | `live?.cli.setModel`; MAN-9077 |
+| `clear()` | below |
+| `close(reason)` | `closeProcess`: detach, then `cli.close()` |
+| `process`, `turnId` | the condition the panel shows; the turn in flight or `null` |
+
+## Process states (`CompanionProcess`)
+| `state` | set when |
+|---|---|
+| `asleep` | start; `detach` (idle close, Clear, `close`) |
+| `waking` | a launch opens, until its first `init` |
+| `awake` | the launch's first `init` passed the tool check; log `[Companion] account <id>: started\|resumed session <id> on <model>; the CLI listed N tools, all hers` |
+| `failed` | `fail(launch, sentence)`: tool check, a failed result, a thrown loop, a loop that ended by itself. `error` = the sentence |
+- A failure of her own is a system log line and a panel banner, NEVER something she says (ruling 17): the failure text is a synthetic assistant message, not stream deltas, so the sentence stream never sees it.
+- `fail` kills the launch, forgets `unanswered`, ends the turn `failed`, sets `failed`, writes the system line. The next push launches again.
+- A callback that throws is caught by `guarded(label, userId, fn)` (`guarded-callback.ts`): `[Companion] account <id>: the <label> callback threw`; the conversation goes on.
+
+## The loop's events (`readLoopEvent`, pure)
+| CLI message | event | session does |
+|---|---|---|
+| `system`/`init` | `init { sessionId, tools, model }` | tool check; store `session_id` when it differs from the held one; first of a launch = `awake` |
+| `stream_event` `content_block_delta` `text_delta`, `parent_tool_use_id` null | `text { delta }` | `turns.text` → sentence stream |
+| `stream_event` `content_block_stop` | `block_end` | flush the stream: a block ends with no whitespace after its last sentence |
+| `system`/`compact_boundary` | `compacted` | `assembler.oweState()` |
+| `result` | `result { answered, failure, resumeRefused }` | below |
+| anything else, thinking and tool-input deltas, a sub-agent's deltas | none | |
+- `answered` = `user_message_uuids`, else `[user_message_uuid]`, else `[]`.
+- `failure`: `success` + `is_error` → `Her answer failed: <result>`; `error_max_turns` → `Her turn ran out of steps before she finished.`; any other subtype → `Her answer failed: <errors>`. A refused resume has `failure: null`.
+- `failureSentence(lead, reason)`: whitespace collapsed; sentences of developer advice dropped (`Run --…`, `Please ensure…`, `Usage:…`, anything naming `options.<x>`; INV-7173); exactly one closing period.
+- Measured 2026-10-26 (live CLI, streaming input, Haiku): `init` arrives at the start of EVERY turn with the same `session_id`; `result` lists in `user_message_uuids` every message of ours the turn took, a mid-turn fold included.
+
+## Which result ends which turn (`createTurnTracker`)
+- A turn starts when a message is pushed while she is idle (`admit`): `onTurnStarted(turnId)` and activity `thinking`. A message pushed mid-turn joins it.
+- Every pushed message carries a uuid; the tracker remembers which turn it went into.
+| `result` lists | meaning |
+|---|---|
+| a uuid of the turn in flight | ends it `answered` (`failure` null) or `failed` |
+| only uuids of a turn already stopped | `stale`: that turn's late answer; ends nothing |
+| no uuid | read as the turn in flight's (the CLI's startup failures) |
+- A message the ended turn did not consume starts the next turn at once, so the panel never shows her speaking outside a turn.
+- Each sentence carries `turnId` and `index` (from 0; counts only sentences `parseExpression` kept). A stopped or failed turn drops its buffered half-sentence.
+- At a turn's end: `onTurnEnded(turnId, outcome, error)`, then activity `idle` unless the callback pushed and began the next turn.
+- `THINKING_ACTIVITY` and `IDLE_ACTIVITY` are exported for `companion-account.ts`.
+
+## Stop (`interrupt`)
+1. `turns.stop()` ends the turn `stopped`; none in flight = nothing else happens.
+2. Launch still being built (`!cli.up`) → `closeProcess('stopped before her process was up')`.
+3. `cli.interrupt()`; `'unanswered'` → `closeProcess('her process did not answer the interrupt')`.
+4. Answered → `turns.adopt(stillQueued)`: messages queued behind the stopped turn run as a turn of their own.
+
+## The refused resume
+- Seen as a `result` whose errors match `/No conversation found with session ID/i` (then the iterator throws), or a thrown error matching `/No conversation found/i`.
+- Does: kill the launch; `writeProviderSessionId(null)`; system line `Her memory could not be resumed; she starts fresh`; `assembler.oweState()` (focus, draft, walk went with the conversation); ONE new launch with no `resume`, carrying `unanswered`. Log `[Companion] account <id>: the CLI has no conversation <id>; she starts fresh`.
+- A refusal in any other wording is a `failed`; a held id that is not UUID-shaped never gets that far (`resumableSessionId`, MAN-9077).
+
+## Clear (`clear`)
+1. `writeProviderSessionId(null)` and `assembler.forget()` BEFORE anything is awaited.
+2. `detach('cleared')` takes the launch out of the conversation synchronously and sets `asleep`. why: a push landing during the wind-down is a wake into a fresh conversation, never a resume of the one being cleared.
+3. A turn in flight is interrupted now; `cli.close()` is awaited.
+4. A push that already woke a new launch is not overwritten.
+The rows go with it: MAN-9059 §Clear.
+
+## Proof
+`.verify/kaylee-session.mjs` (`--pure` for the steps with no model call): stand-in callbacks print each event; steps init, hello, memory, model, resume, refused, stop.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-events.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/guarded-callback.ts
+
+## MAN-9080 — server/modules/companion/session — what she is pushed: the order of a message and when each part is sent, the envelopes, the prompt and register fills
+
+Every message to her is assembled at the moment it is pushed (`createMessageAssembler`, `session/companion-message.ts`) and nothing reaches her silently. Envelope builders: `session/companion-envelopes.ts` (pure). Texts and fills: `session/companion-prompt.ts` (pure).
+
+## Order of one message
+| # | part | sent when |
+|---|---|---|
+| 1 | `<state>` | owed once after `compact_boundary` and after a refused resume; lines `Focus: <name> · <project> · id <id>`, `Draft for <target>: <text>`, `Walkthrough of <name>: item k of n, "<title>"; items: 1. … 2. …` (`not begun` at 0), each only when held; nothing at all when none is held |
+| 2 | `<cut heard="…" interrupted="…"/>` | owed once after `oweCut(heard, interrupted)`, called by the companion's `cut` (`POST /cut`, MAN-9111). Each value is a sentence's display text, escaped as an attribute; `""` = none (`heard=""`: no sentence had ended; `interrupted=""`: none was playing). A later cut replaces one no message has carried |
+| 3 | `<sessions at="HH:MM">` | on a wake; then only when the roster TEXT differs from the last one sent. Body: MAN-9055 |
+| 4 | `<view session="…" sessionId="…"/>` or `<view>none</view>` | on a wake; then only when it differs from the last one sent |
+| 5 | the body | `<operator via="typed\|spoken">text</operator>`, the empty press `<operator via="spoken" heard="nothing"></operator>`, one or more `<alert>` (joined by newline), or one `<session>` |
+| 6 | `<register>…</register>` | EVERY message: `fillRegister(readSettings(), readSoundTags())`, read from his settings each time; the sounds it lists are the account's `gemini.soundTags` (MAN-9081), read at the same push. why: he edits it; it is never in the system prompt |
+- Roster and view are compared by their TEXT, not by the envelope: `<sessions at>` carries the clock, which changes every minute.
+- A wake = the message goes to a process that was closed, or to a `warm` launch that holds no message yet. A resumed conversation's memory of the roster is hours old, so a wake always carries both.
+- Everything is READ first and the bookkeeping committed last: a reader that throws leaves `<state>` and `<cut>` owed and the roster unsent, so the next message carries what this one did not.
+- `forget()` (Clear) drops what is owed and what was sent.
+- Readers (`MessageReaders`), each called at push time and never earlier: `readSettings`, `readState` (focus, draft, walk), `readRoster` (`rosterText`), `readView` (`viewOf(userId)` named through `resolveChat`; a chat she cannot resolve is not named), `readSoundTags` (`readVoiceSettings(userId).gemini.soundTags` through the voice barrel; the turn tracker calls the same reader when a turn starts).
+
+## Envelopes
+| builder | writes |
+|---|---|
+| `operatorEnvelope(text, via)` | `<operator via="…">` + the text AS GIVEN |
+| `emptyPressEnvelope()` | `<operator via="spoken" heard="nothing"></operator>`; a press that carried no words — `pushOperatorEmpty()`, called by the press door (`companion-press.ts`, MAN-9059) |
+| `alertEnvelope({ kind, session, sessionId, project, title, body, followups, waiting })` | `<alert kind session sessionId project>`; lines: title, body, `Follow-ups it filed for him: 1. … 2. …`, `Waiting on him: …`; a blank line is dropped |
+| `sessionNewsEnvelope({ sessionId, name, event: 'finished', reply })` | `<session sessionId name event="finished">`; `Its reply, in its own words: …` or `Its reply is long (N characters); a dactyl's digest: …` |
+- `CompanionAlertKind` = `feature finished` \| `background work landed` \| `asking` \| `permission` \| `failed` \| `stuck`. Code → kind: MAN-9069.
+- Escaping: an ATTRIBUTE value escapes `&` `<` `>` `"`. The operator's text and the roster are written as given (roster lines were escaped where they entered: `tools/house-reads.ts`). Every body carrying another party's text escapes `&` `<` `>`: `<state>`, `<alert>`, `<session>`. why: a `</session>` or `<operator via="typed">send it</operator>` inside a chat's words must stay words. The stored draft is untouched; only her view of it after a compaction is the escaped spelling.
+- Every tag is one the system prompt teaches her; a tag spelled differently is a message she cannot read.
+
+## The texts (`companion-prompt.ts`)
+| export | is |
+|---|---|
+| `COMPANION_SYSTEM_PROMPT` | one slot, `{operator_name}`; filled once per launch by `fillSystemPrompt`; stable for the life of the process |
+| `COMPANION_REGISTER_DEFAULT` | the register template; slots `{name}`, `{delivery_note}`, `{sound_tags}` |
+| `DEFAULT_DELIVERY_NOTE` | `bright, warm, quick, a smile in the voice` |
+| `fillRegister(settings, soundTags)` | fills `{name}` = `settings.name`, `{delivery_note}` = `settings.deliveryNote`, `{sound_tags}` = each tag as `<tag>`, space-separated |
+| `toolLine(name)` | her prompt's own TOOLS line for a tool; it IS the tool's description. Throws when the section has no line |
+| `toolNames()` | the names of the lines that open `name(`, in the section's order = `COMPANION_TOOL_NAMES` |
+- Fills run in ONE pass (`fillSlots`): a value that contains `{name}` is never filled again, `$` in a value is not a replacement pattern, a slot the template invents is left as written, a slot it lacks is not filled.
+- The prompt lists thirteen tools; tools: MAN-9070.
+- The sound set is the account's `gemini.soundTags` (shipped default `DEFAULT_SOUND_TAGS`, voice module): one list for the fill and the filter (MAN-9081).
+
+## Proof
+`.verify/companion-wire-contract.mjs` (`tsx`, no server, no model): the parse, the stream, the fills and every envelope on real strings.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-message.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts
+
+## MAN-9081 — server/modules/companion/session — the sentence stream, parseExpression and the one sound allow-list
+
+`session/sentence-stream.ts`: her streamed text cut into sentences (`createSentenceStream`) and each sentence read once (`parseExpression`). Both are PURE (no I/O, types-only imports) and are proven on real strings under `tsx`. The turn tracker (`companion-turns.ts`) holds one stream per turn and calls `parseExpression(raw, turn.soundTags)` on every sentence it emits; the list is read once, when the turn starts.
+
+## The one allow-list
+- The list is the account's `gemini.soundTags` in its voice settings (MAN-9098). The shipped default, `DEFAULT_SOUND_TAGS` in `server/modules/voice/voice-settings.ts`, is NOT held here: `giggle`, `chuckle`, `laugh`, `gasp`, `sigh`, `phew`, `tsk`, `breath`, `short pause`, `long pause`.
+- It feeds BOTH the register's `{sound_tags}` slot (`fillRegister`, each as `<tag>`, space-separated; read at EACH push through `MessageReaders.readSoundTags`) and the filter (`parseExpression` keeps a sound only when its tag is on it; the turn tracker reads the list when a turn STARTS, so one turn is parsed by one list). why: she is taught exactly the sounds the filter keeps, never one it then deletes.
+- Both readers take `readVoiceSettings(userId).gemini.soundTags` through the voice barrel; `companion-account.ts` wires the reader.
+- Tags compare lower-case with whitespace collapsed.
+
+## `createSentenceStream(onSentence)` → `{ push(delta), flush() }`
+| rule | detail |
+|---|---|
+| end of a sentence | `.` `!` `?` `…` then whitespace; or a newline (always). A run of terminators and closers (`?!`, `...`, `."`) is one end |
+| decided by the character AFTER | whitespace ends it; anything else (the `5` of `3.5`, the letter of `e.g.`) does not; the end of the buffer decides nothing yet |
+| kept whole | `e.g.` `i.e.` `etc.` `vs.` `mr.` `mrs.` `ms.` `dr.` `prof.` `jr.` `sr.` `cf.`; decimals; a leading list number (`1.`, `- 2.`) |
+| run-on | past 300 characters: cut at the last comma (kept) or space (dropped) inside the first 300; never inside a `<…>` or `[…]` opened in the 40 characters before (`SPAN_REACH_CHARS`); with neither, a hard cut at 300 |
+| `flush()` | emits what is left. Called at the end of EACH text block (`block_end`) and at a turn's successful end. why: a block ends with no whitespace after its last sentence; without it the next block's first words join it and its `[mood]` is lost |
+- Sentences arrive trimmed and never empty. The cut depends on the text alone: one character at a time and all at once give the same sentences.
+- The buffer moves before the callback runs, so a consumer that throws cannot make a sentence repeat.
+
+## `parseExpression(raw, soundTags)` → `{ mood, speech, display, sounds } | null`
+| step | does |
+|---|---|
+| input | U+E000 (the parse's own sound mark) is removed first |
+| list marker | `- ` `* ` `+ ` `• ` `1. ` `2) ` and a heading's `#` run are stripped, on both sides of the mood |
+| mood | a leading `[…]` of 1–3 words → `mood`, lower-cased. More words is not a mood. Every other `[…]` span is dropped |
+| angle spans | a tag on the list → a sound: stays in `speech` as `<tag>`, leaves `display`, listed in `sounds`. Any other span is dropped and the words between its open and close tag stay (`<whisper>secret</whisper>` → `secret`). A `<` followed by whitespace or `=` is a comparison and stays as text; an unclosed `<` stays |
+| markdown | `**` `__`, paired `*x*` / `_x_` and backticks go; `snake_case` is not emphasis |
+| spacing | whitespace collapses; a space before punctuation closes up |
+| answer | `null` when `display` is empty and no sound was kept |
+- `sounds[i].at` = the length of `display` (JS string length, UTF-16 units) at the point the sound stood, measured before the space after the word it follows: the mark sits on that word's end.
+- Kept fields by consumer: `display`, `mood`, `sounds` → the `kaylee` log line (the panel draws sounds as marks at their offsets: `CompanionSentence.tsx`). `speech` is not stored: the speech door rebuilds a sentence's words from its log row (`display` with each sound written back as `<tag>` at its `at`, MAN-9110), so `speech` has no consumer.
+- `index` of a sentence in its turn counts only sentences that were not `null`.
+
+## Proof
+`.verify/companion-wire-contract.mjs`: `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-wire-contract.mjs` — parse, stream and fills on real strings; no server, no model call.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts
+
+## MAN-9082 — server/modules/companion — storage: the four tables, companionDb, relayedSendsDb, the store's frame per write, the floor and Clear
+
+`COMPANION_SCHEMA_SQL` (`server/modules/database/companion-schema.ts`) is exec'd by `runMigrations` beside `FOLLOWUPS_SCHEMA_SQL`. Every statement is `IF NOT EXISTS`: editing a column there changes NOTHING on a database that has the table; a later column needs `addColumnToTableIfNotExists` in `migrations.ts` (as `sessions.permission_mode` does: MAN-9085). Rows → wire shapes and frames: `companion-store.ts`.
+
+## The four tables
+| table | key | holds | dies with |
+|---|---|---|---|
+| `companion_state` | `user_id` (one row per account) | `provider_session_id` (her CLI conversation; NULL until her first `init` and after Clear), `focus_json` (`CompanionSessionRef`), `draft_json` (`CompanionDraft`), `walk_json` (`CompanionWalk`), `floor` (the client id holding the floor), `updated_at` | the account (`ON DELETE CASCADE`) |
+| `companion_log` | `id` AUTOINCREMENT, index `(user_id, id)` | `at`, `role` (`operator` \| `kaylee` \| `alert` \| `system`, CHECK), `via` (`typed` \| `spoken`, CHECK), `turn_id`, `turn_index`, `text`, `mood`, `sounds_json` (NULL for none, never `[]`) | the account |
+| `companion_notes` | `id` AUTOINCREMENT | `at`, `title`, `text` | the account |
+| `relayed_sends` | `id` AUTOINCREMENT, index on `session_id` | `session_id` → `sessions(session_id)`, `via`, `text`, `sent_at` | the chat (`ON DELETE CASCADE`) |
+- `AUTOINCREMENT`, never reused: the panel holds a note id it may ask to dismiss and an entry id it has drawn; a number it remembers never names another row.
+- `relayed_sends` hangs on the CHAT because a relayed send is a fact of the chat's history. It survives Clear.
+- Merge paths: the three paths in `sessions.db.ts` that delete a watcher's duplicate row (`assignProviderSessionId`, `repointSessionToProviderSession`, `createForkedSession`) move `followups` and do NOT move `relayed_sends`, and need not: the companion records a send only for a chat of her list (`session_id <> provider_session_id`), never for a watcher row. A writer that records sends for any other kind of row must extend those paths first (MAN-9003).
+
+## `companionDb` (`repositories/companion.db.ts`; ROWS in, rows out: snake_case, JSON as text)
+| verb | does |
+|---|---|
+| `readState(userId)` | the row or `null` |
+| `writeState(userId, patch)` | upsert of the columns the patch names (`provider_session_id`, `focus_json`, `draft_json`, `walk_json`, `floor`); a key left out or `undefined` is untouched, `null` sets NULL; stamps `updated_at`; answers the row |
+| `userIdsFocusedOn(sessionId)` | accounts whose `focus_json.sessionId` is the chat, ascending; read from the rows, so an account untouched since boot is found; non-JSON `focus_json` names no one (guard is a `CASE`, not `AND`) |
+| `appendLog(userId, entry)` | insert + delete everything beyond the newest `COMPANION_LOG_KEEP` = 400 of the account, one transaction; answers the row with its id |
+| `readLog(userId, limit)` | newest `limit` rows, oldest first; `limit` clamped to 0..400, non-finite = 400 |
+| `addNote`, `listNotes`, `removeNote(userId, id)` | `listNotes` oldest first; `removeNote` is false for another account's id |
+| `clearAccount(userId)` | one transaction: deletes the account's log and notes; resets `provider_session_id`, `focus_json`, `draft_json`, `walk_json` to NULL. `floor` STAYS; `relayed_sends` is never touched; no state row is created for an account with none. Answers `{ logRemoved, notesRemoved, stateReset }` |
+Every statement names its account in `WHERE`/`VALUES`: an id of another account reads as no row.
+
+## `relayedSendsDb` (`repositories/relayed-sends.db.ts`)
+- `record(sessionId, via, text)`: stores `text.trim()`, `sent_at` = now (ISO, ms); answers the row. `via` is the companion's send mode (`turn` \| `steer`). Nothing updates or deletes a row.
+- `listForSession(sessionId)`: oldest first.
+- Reader: the history mark (MAN-9084). Writer: `companion-send.ts` (MAN-9072).
+
+## The store (`createCompanionStore(userId)`): one frame per write
+The write comes first and the frame second, in the same tick; a failed write sends none. Frames reach THIS account's open pages through `sendToUser`, nobody else's.
+| verb | frame |
+|---|---|
+| `setProviderSessionId` | none |
+| `setFloor(client)` | `companion_floor { floor }` on EVERY write of a client id, not only a change; a cleared floor (`null`) sends none |
+| `setFocus(ref \| null)` | `companion_focus` |
+| `setDraft(input \| null)`, `setWalk(input \| null)` | `companion_draft`, `companion_walk` (store stamps `updatedAt`; answers what was stored) |
+| `appendLog(line)` | `companion_sentence` for `role: 'kaylee'`, else `companion_log` |
+| `addNote`, `removeNote(id)` | `companion_note`; `companion_note_removed` only when this account had the note |
+| `emit(frame)` | the frames that are not rows: `companion_turn`, `companion_activity`, `companion_process`, `companion_settings`, `companion_open_chat`, `companion_cleared` |
+| `clearAccount()` | `companionDb.clearAccount`, then `companion_cleared` |
+- A JSON column that does not read as its shape (a hand edit, a later build) is dropped with `[Companion] Dropping <column> of account <id>`: it never throws; the picture still loads.
+- `readState()` → `{ providerSessionId, focus, draft, walk, floor }`.
+
+## The floor
+- `companion_state.floor` = the `x-companion-client` id of the page that last typed (`POST /messages`), pressed Send (`POST /draft/send`), pressed her talk button (`POST /press`, taken before the clip is heard) or opened her panel (`POST /floor`).
+- Every write of the floor sends `companion_floor { floor }` to the account's pages (MAN-9086). The page whose client id equals it plays her voice; every other shows the words only (MAN-9113). A page that missed the move (a socket that reconnected) hears it again the next time anyone speaks to her, and reads it in the picture's `floor` when it re-seeds.
+- The speech door answers only the floor page (MAN-9110).
+- `openChatOnFloor(sessionId)` emits `companion_open_chat { sessionId, floor }` only while a floor is held. Every page receives it; only the page whose client id equals `floor` opens the chat (MAN-9083).
+- The id is minted per tab by the page (`companionClientId()` in `src/shared/utils.ts`: 16 random bytes in hex, kept in `sessionStorage`) and rides every `api.companion.*` call as `x-companion-client`.
+
+## Clear, in storage terms
+Rows deleted: the account's log, notes, `provider_session_id`, focus, draft, walk. Rows kept: `floor`, `relayed_sends`. Order of the steps: MAN-9059 §Clear.
+
+## Proof
+`.verify/companion-storage.ts` (against a `.backup` copy of `auth.db`; refuses the live database): 405 appends leave 400 with the first five ids gone; a state round trip; a note added, listed, removed; `clearAccount` keeps the floor and `relayed_sends`; a relayed send; `latestPermissionMode`. `.verify/companion-store.mjs`: the store's frame per write, one account's page and another's silent.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-store.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/companion-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/relayed-sends.db.ts
+
+## MAN-9083 — src/modules/companion — the page's picture: CompanionProvider, the reducer, the floor, api.companion and the wiring into the workspace
+
+The views are MAN-9062. This row is the state they draw from and the places the workspace mounts them. Shapes: `src/shared/companion-types.ts`, mirrored field for field with `server/shared/companion-types.ts` (MAN-9086). Server side: MAN-9058, MAN-9059.
+
+## Barrel (`src/modules/companion/index.ts`) — everything else is private
+`CompanionProvider`, `useCompanion`, `CompanionPanel`, `CompanionDoorButton`, `CompanionSettingsSection`.
+
+## Where each is mounted
+| surface | mounted by |
+|---|---|
+| `CompanionProvider` | `project-workspace/CompanionHost.tsx`, which `ProjectWorkspaceShell` renders around `WorkspaceFrame`, inside `ChatHostProvider`, `AppSwitcherProvider` and `AccountsProvider`. `useCompanion()` throws outside it |
+| `CompanionPanel` | `WorkspaceFrame`, after `ChatHostFloating`, before `AppSwitcherFab`; ALWAYS rendered |
+| `CompanionDoorButton` | `WorkspaceRail`'s foot: after `UsageRings`, before the foot views (the Inbox) and Settings |
+| palette row | `ProjectCommandPalette` builds `companionGroup` and passes it to `CommandPalette` (prop `companionGroup`), drawn between the Applications and Navigate groups when actions show and the group has rows. One row: key `companion`, label `t('companion.palette.talk', { name })` ("Talk to Kaylee"), icon `AudioLines`, `run: setOpen(true)`. `name` = `picture?.settings.name`, else `t('companion.defaultName')` |
+| Settings section | `VoiceSettingsTab`, after its voice section, NOT gated by `voiceEnabled`; the section fetches and saves for itself (`useCompanionSettings`: `GET /api/companion`, `PUT /api/companion/settings`) |
+- Opening a chat for her (`onOpenChat`, `CompanionHost.openCompanionChat(sessionId)`): `setActiveTab('chat')`, `navigate('/session/<id>')`, and when an application covers the main region (`useCurrentApplication() !== null`) the chat host's `open()` floats the chat over it. The callback changes identity as applications come and go; the provider reads the newest at the moment a frame arrives.
+- Text: `t('companion.*')` in `en/common.json`; the Settings section reads `voiceSettings.companion.*` in `en/settings.json`.
+
+## `useCompanion()` → `CompanionContextValue`
+| member | does |
+|---|---|
+| `picture`, `open`, `clientId` | `CompanionPicture \| null` (null until the first read lands); whether her panel is open on THIS page; this page's id |
+| `setOpen(open)` | opening `POST`s `/floor` |
+| `sendText(text)` | `POST /messages` |
+| `saveSettings(patch \| { register: null })` | `PUT /settings`; the answer is folded in as `companion_settings` before the call resolves |
+| `editDraft(text)` | `PUT /draft`; the answer is folded in as `companion_draft` |
+| `sendDraft(mode)` | `POST /draft/send`; resolves with the `outcome` (`'started'` \| `'folded'`); rejects with the server's sentence on a refusal |
+| `clearDraft`, `dismissNote(id)`, `interrupt`, `clear` | `DELETE /draft`, `DELETE /notes/:id`, `POST /interrupt`, `POST /clear` |
+| `talk` | `TalkPress` = `{ state: 'idle' \| 'listening' \| 'transcribing'; toggle(); error }`: this page's ONE talk press, from `useTalkPress(speech)` called once in the provider (MAN-9101). Readers: the panel's talk button, the bound key or mouse button, and `useCompanionPresence` (`state`, into the status line's Listening and Transcribing). Not part of the picture: it is this page's mic. A press cuts her off when this page's player sounds (MAN-9113) |
+| `voice` | `CompanionVoice` = `{ on, setOn, speaking, cut }`: this page's voice, from `useCompanionVoice` called once in the provider (MAN-9113). Readers: the panel (the switch, the log's mark) and `useCompanionPresence` (`speaking`, `cut`, into the status line's Speaking and Cut). Not part of the picture: it is this device's switch and this page's player |
+- The provider also calls `useTalkBinding(picture?.settings.talkBinding ?? null, talk.toggle)` (MAN-9062 §Parts). A press never opens her panel.
+- The provider unlocks the page's audio inside `setOpen(true)` and `sendText`, and silences the voice in `interrupt` (before the request) and on a `companion_cleared` frame (MAN-9113).
+- `ensureOk`: a non-2xx answer throws an `Error` whose message is `refusalSentence(response)` (the server's own sentence), else `Request failed (<status>)`.
+
+## `api.companion` (`src/shared/api.ts`; the only place these URLs are written)
+| call | route |
+|---|---|
+| `picture()` | `GET /api/companion` |
+| `sendText(text)` | `POST /api/companion/messages` |
+| `floor()` | `POST /api/companion/floor` |
+| `saveSettings(patch)` | `PUT /api/companion/settings` |
+| `editDraft(text)`, `clearDraft()` | `PUT`, `DELETE /api/companion/draft` |
+| `sendDraft(mode)` | `POST /api/companion/draft/send` |
+| `dismissNote(id)` | `DELETE /api/companion/notes/<id>` |
+| `interrupt()` | `POST /api/companion/interrupt` |
+| `clear()` | `POST /api/companion/clear`, `timeoutMs: 90_000` (the wind-down is awaited) |
+| `speech(turnId, index, signal)` | `GET /api/companion/speech/<turnId>/<index>`, `turnId` through `encodeURIComponent`. Answers the `Response` itself with its body still arriving, for the player to read: 200 audio, 204, or the refusals of MAN-9110. `signal` is its only deadline (a sentence streams for as long as it is spoken); aborting hangs up and stops the synthesis. `speechPull.ts` is its one caller |
+| `cut({ turnId, heard, interrupted })` | `POST /api/companion/cut`, JSON; answers the `Response` (204). `speechPull.ts` is its one caller (MAN-9111) |
+| `press(blob, mimeType, durationMs)` | `POST /api/companion/press`, multipart `audio` + `durationMs`; answers 202 `{ text }` or the 409/502 of a hearing that came to nothing (MAN-9101, MAN-9058 §Refusals). Returns the `Response`; `useTalkPress` is its one caller |
+- EVERY call carries `x-companion-client: companionClientId()` (`src/shared/utils.ts`). Server rules: MAN-9058 §Input. The floor: MAN-9082.
+
+## The picture is seeded, then kept — nothing polls
+1. `GET /api/companion` once at mount. A body that fails `isCompanionPicture` is a failed read: warn `[Companion] Could not read her picture`, the page keeps what it had.
+2. After that, every `companion_*` frame on the page's one socket is folded by `reduceCompanion(picture, frame)`.
+3. Read again on: the socket's `websocket_reconnected` (frames were missed), a `companion_cleared` frame, and the panel opened while `picture === null`.
+4. A frame that arrives while a read is out is queued and folded over its answer. A read asked for while one is out discards that one and reads again. A `companion_cleared` drops the queue and discards a read in flight.
+5. `companion_open_chat` is not folded: it opens the chat only when `frame.floor === clientId`; every other page of the account ignores it.
+
+## `reduceCompanion` (`utils/companionReducer.ts`, pure, imports types only)
+| frame | does |
+|---|---|
+| `companion_log`, `companion_sentence` | the entry joins `log` by `id`, ascending; a held id changes nothing; only the newest `LOG_KEPT` = 200 stay |
+| `companion_turn` | `started` sets `turnId`; `ended` clears it only when it is the running turn's |
+| `companion_activity`, `_focus`, `_draft`, `_walk`, `_settings`, `_process` | replaces the field |
+| `companion_floor` | `floor` replaces `picture.floor` when it is text and differs; the same object back otherwise. The voice pull arms on `floor === clientId` (MAN-9113) |
+| `companion_note` / `companion_note_removed` | joins by `id` / removes by `id` |
+| `companion_cleared` | empties `log`, `notes`, `draft`, `walk`, `focus`, `turnId`, sets activity `idle`; `settings`, `process`, `models` and `floor` stay (the provider then reads again) |
+| unknown kind, or a payload the panel cannot read | the SAME object back |
+- Folding a frame twice is harmless (ids and replacement), which is why a read and the socket need no ordering. `isCompanionPicture` requires `floor` to be text or `null`.
+
+## Proof
+- `.verify/companion-lands.mjs` (live :5183 against :3011, Haiku): door, panel over an application, memory across a model switch, a second page of the account, the other account's page, Clear; records every `companion_*` frame to `<evidence>/frames.json`.
+- `.verify/companion-reducer.mjs <frames.json>` (`tsx`): folds the recorded frames over each picture and sets the result beside the next `GET`.
+- `.verify/companion-lands-page.mjs` (no model call): the palette row opens the panel; Settings reads and saves; `companion_open_chat` opens the chat on the named page alone.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/CompanionHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx
+
+## MAN-9086 — server/shared/companion-types.ts — the wire contract: the types, the fourteen frames, who sends each and what the page does
+
+`server/shared/companion-types.ts` (group header `//----------------- COMPANION CONTRACTS ------------`) is the one home of every shape Kaylee puts on a wire. A sibling of `shared/types.ts`, as `cerberus-types.ts` is. `src/shared/companion-types.ts` mirrors it field for field and is edited together with it; nothing is server-only.
+- Mirror check: `diff <(sed -n '/COMPANION CONTRACTS/,$p' server/shared/companion-types.ts | grep -E '^export type') <(sed -n '/COMPANION CONTRACTS/,$p' src/shared/companion-types.ts | grep -E '^export type')` prints nothing.
+- Every time is an ISO-8601 string. JSON is camelCase on every wire, SQL snake_case (`turnId` / `turn_id`).
+
+## Types
+| type | shape |
+|---|---|
+| `CompanionModel` | `'sonnet' \| 'opus' \| 'haiku'` |
+| `CompanionSettings` | `name` (1–40, no line break, default `Kaylee`), `operatorName` (1–40), `register` (200–16000, slots `{name}` `{delivery_note}` `{sound_tags}`), `deliveryNote` (0–120, no line break), `model` (default `sonnet`), `live` (default `false`), `talkBinding` (`TalkBinding \| null`, default `null`; `PUT` with `null` unbinds). Storage and defaults: MAN-9087 |
+| `TalkBinding` | the key or mouse button that presses her talk button: `{ kind: 'key', code, ctrl, alt, shift, meta, label }` (`code` is a `KeyboardEvent.code`, 1–40 of `[A-Za-z0-9]`; a function key `F1`–`F24`, or Ctrl, Alt or Meta held with the key) or `{ kind: 'mouse', button: 1 \| 3 \| 4, label }` (middle, back, forward); `label` 1–40, no line break (`F8`, `Ctrl+Space`, `Mouse back`). Server limits: MAN-9087; the page's one rule that accepts, matches and labels a press: MAN-9062 |
+| `CompanionSessionRef` | `{ sessionId, name, project }` |
+| `CompanionPhase` | `idle` \| `thinking` \| `reading_session` \| `reading_code` \| `drafting` \| `walking` |
+| `CompanionActivity` | `{ phase, session: Ref \| null, files: string[] \| null, walk: { at, total } \| null }` |
+| `CompanionDraftTarget` | `{ kind: 'session', session }` \| `{ kind: 'new', projectPath, projectName }` |
+| `CompanionDraft` | `{ target, text, updatedAt }` |
+| `CompanionWalk` | `{ session, items: string[], at, updatedAt }`; `at` is 1-based, 0 = not begun |
+| `CompanionSound` | `{ tag, at }`; `at` = offset into the entry's `text` (MAN-9081) |
+| `CompanionLogEntry` | `{ id, at, role: 'operator' \| 'kaylee' \| 'alert' \| 'system', via: 'typed' \| 'spoken' \| null, turnId, index, text, mood, sounds: CompanionSound[] }` |
+| `CompanionNote` | `{ id, at, title, text }` |
+| `CompanionProcess` | `{ state: 'asleep' \| 'waking' \| 'awake' \| 'failed', error: string \| null }` |
+| `CompanionTurnOutcome` | `answered` \| `stopped` \| `failed` |
+| `CompanionPicture` | `{ settings, models: [{ value, label }], process, activity, turnId, focus, draft, walk, notes, log, floor }`; `GET /api/companion`; `log` = newest 200 (MAN-9070) |
+| `CompanionFrame` | the union below |
+
+## Frames — all carried by the gateway socket `/ws` to the account's open pages (`sendToUser`)
+| `kind` | payload | sent by | when |
+|---|---|---|---|
+| `companion_log` | `entry` | `store.appendLog` | any log line but hers: the operator's typed line, an `alert`, a `system` line |
+| `companion_sentence` | `entry` | `store.appendLog` | each sentence she says (`role: 'kaylee'`) |
+| `companion_turn` | `turnId, state: started \| ended, outcome, error` | the account's turn callbacks | a turn begins / ends; `outcome` and `error` only on `ended` |
+| `companion_activity` | `activity` | `companion-account.ts` `setActivity` | the turn sets `thinking` / `idle`; a tool sets its phase while it runs |
+| `companion_focus` | `focus \| null` | `store.setFocus` | a tool names a chat that is not the focus, or one whose name or project changed. Clear sends `companion_cleared` alone, which empties the focus on the page |
+| `companion_draft` | `draft \| null` | `store.setDraft` | `update_draft`, `PUT`/`DELETE /draft`, a send that clears it |
+| `companion_walk` | `walk \| null` | `store.setWalk` | the `walk` tool |
+| `companion_note` / `companion_note_removed` | `note` / `id` | `show_note` / `DELETE /notes/:id` (removed only when the account had it) | |
+| `companion_settings` | `settings` | `saveSettings` | `PUT /settings` |
+| `companion_process` | `process` | the session's `onProcess` | each state change |
+| `companion_open_chat` | `sessionId, floor` | `openChatOnFloor` | a send or a new chat; none while no page holds the floor. The page whose client id equals `floor` opens the chat (MAN-9083) |
+| `companion_floor` | `floor` (the client id now holding it) | `store.setFloor` | every write of the floor: a typed line, a press, Send, the panel opened. Sent even when the holder did not change. The page whose client id equals `floor` plays her voice; the others show the text only (MAN-9082, MAN-9113) |
+| `companion_cleared` | none | `store.clearAccount` | Clear |
+- Writer of each row and frame per callback: MAN-9070. Row → frame per store verb: MAN-9082. What a page does with each: MAN-9083.
+- A frame is a notification of a write already committed: a failed write sends none; a payload JSON cannot carry is logged and sent nowhere (MAN-723).
+- Later phases add types and frame kinds HERE and redefine nothing.
+- Model labels (`CompanionPicture.models`): MAN-9070 §`companion-picture.ts`.
+
+## Proof
+`.verify/companion-wire-contract.mjs` runs the pure files; `.verify/companion-reducer.mjs` folds recorded frames of a real page over the pictures the server answered.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/companion-types.ts
+
+## MAN-9087 — server/modules/companion — her settings: the stored overrides, the defaults, the limits and the operator's name
+
+`companion-settings.ts`: `readCompanionSettings(userId)` and `saveCompanionSettings(userId, patch)` are the one place that knows the settings' shape and limits. Both are synchronous end to end (two saves cannot interleave read and write) and touch no socket: telling the pages (`companion_settings`) is the service's act (MAN-9059).
+
+## Storage
+- The account's `user_preferences` key `companion`, via `userPreferencesDb`.
+- What is stored is the OVERRIDES, never the resolved settings. A field he has not set is absent, so its default stays live: `operatorName` follows `users.git_name`, the register follows the product's text instead of freezing a copy a page echoed back.
+- A stored field that no longer passes its limit reads as unset and the next save drops it (the generic `PATCH /api/user/preferences` can write any key; this module's route is not the only way in).
+- Read FRESH on every call, never cached: the register is re-read at every push (MAN-9080), so a save is the next message's voice.
+
+## Defaults (`readCompanionSettings`)
+| field | default |
+|---|---|
+| `name` | `Kaylee` |
+| `operatorName` | below |
+| `register` | `COMPANION_REGISTER_DEFAULT` |
+| `deliveryNote` | `DEFAULT_DELIVERY_NOTE` |
+| `model` | `sonnet` |
+| `live` | `false`: alerts and focus news reach her only while he has turned it on |
+| `talkBinding` | `null`: no key or mouse button presses her talk button |
+- `operatorName` default, first that passes its limit: the first word of `users.git_name` (up to the first whitespace; a name written as one run is cut at the first lower-to-upper boundary: `ScottDeJesus` → `Scott`), else the username with its first letter upper-cased, else `Operator`.
+- `COMPANION_MODELS` = `sonnet`, `opus`, `haiku`: the picker's order.
+
+## Limits (`TEXT_LIMITS`, counted in code points: an emoji is one)
+| field | min | max | one line |
+|---|---|---|---|
+| `name` | 1 | 40 | yes |
+| `operatorName` | 1 | 40 | yes |
+| `register` | 200 | 16000 | no |
+| `deliveryNote` | 0 | 120 | yes |
+- Text is trimmed first (`"   "` is length 0). One line = no `\n`, `\r`, `\v`, `\f`, U+0085, U+2028 or U+2029 (the pattern is `[\n\r\v\f\u0085\u2028\u2029]`).
+- `model` must be one of `COMPANION_MODELS`; `live` must be a boolean.
+- `talkBinding` is `null` or a `TalkBinding` (MAN-9086), rebuilt field by field (a stray key is not stored). `label` is a text limit of its own (`talkBinding.label`, 1–40, one line, trimmed). A `key` binding: `code` is 1–40 of `[A-Za-z0-9]`; `ctrl`, `alt`, `shift`, `meta` are each a boolean; and it is accepted only when `code` is `F1`–`F24` (`/^F(?:[1-9]|1\d|2[0-4])$/`) or `ctrl`, `alt` or `meta` is true (Shift alone does not make a key a shortcut). A `mouse` binding: `button` is 1, 3 or 4 (not the left button 0, every click, nor the right button 2, the menu). The page's `talkBindingFromEvent` (`src/modules/companion/utils/talkBinding.ts`) holds the same rule for what it offers to save; the two are edited together.
+
+## `saveCompanionSettings(userId, patch)` → the settings as they now read
+- `patch` is checked as untyped input (a route hands it a request body): not an object → 400.
+- A key that is not a setting is refused, not ignored: `<key, 40 characters at most> is not a setting; the settings are name, operatorName, register, deliveryNote, model, live, talkBinding.`
+- A field set to `undefined` is left as it was. `register: null` deletes the override: the default template returns; `talkBinding: null` deletes its override: nothing is bound.
+- Nothing is written unless EVERY field passes. The first failure throws `inputInvalid(sentence, field)` → 400 `COMPANION_INPUT_INVALID`, `details.field` = the field (MAN-9058 §Refusals). Sentences: `<field> must be <min>-<max> characters[ with no line break] (it is not text \| it has a line break \| it has <n>).`, `model must be one of sonnet, opus, haiku.`, `live must be true or false.`, and for the talk binding (all with `details.field` = `talkBinding`): `talkBinding must be null or an object with a kind of key or mouse.`, `talkBinding.kind must be key or mouse.`, `talkBinding.label must be 1-40 characters with no line break (…)`, `talkBinding.button must be 1 (middle), 3 (back) or 4 (forward).`, `talkBinding.code must be 1-40 characters of letters and digits (it is a KeyboardEvent.code, as KeyK).`, `talkBinding.ctrl, alt, shift and meta must each be true or false.`, `talkBinding must be a function key (F1-F24) or hold Ctrl, Alt or Meta with the key: a key on its own fires while you type.`
+- A register equal to `COMPANION_REGISTER_DEFAULT.trim()` is not stored as an override. why: a page that echoes the whole settings object back must not freeze today's default against every later edit of it.
+- No override left → the preference row is deleted.
+
+## Callers
+| reader | reads for |
+|---|---|
+| `companion-account.ts` | the session's `readSettings`: every push (model, names, register, delivery note) |
+| `companion-picture.ts` | `GET /api/companion` |
+| `companion.service.ts` | `saveSettings` behind `PUT /settings`, which also applies a model change live (MAN-9077 §`setModel` live); the `live` gate of focus news, at the run's end and again after its digest |
+| `feeds/alert-feed.ts` | the `live` gate of alerts, at the event and again when the gather window closes (MAN-9069) |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-settings.ts
+
+## MAN-9088 — Probing Kaylee — the rules every probe of her keeps, the hidden-chat naming rule and the probes that exist
+
+A probe that makes her think, or that makes a chat think through her, spends a real model turn on a box where one Kaylee per account is shared by everyone at work. These rules bind every probe of her.
+
+## Rules
+| rule | detail |
+|---|---|
+| Her model is Haiku | set it before talking to her: the panel's model picker, or `PUT /api/companion/settings` `{"model":"haiku"}`. Never Sonnet or Opus for a probe. A switch with no message after it only switches the running process |
+| Probe chats live in `PROBE_PROJECT` | `/tmp/cloudcli-probe-chat` (`.verify/lib/probe-project.mjs`; `ensureProbeProject()` makes the folder: the turn's launch falls back to `$HOME` when it is missing). Every chat she sends to, steers, stops, answers or creates during a probe lives there, never in a real project. Why: the heal files a typed turn as the operator's unless the chat's project sits in a hidden root (`HIDDEN_PROJECT_ROOTS`, INV-4352) |
+| Every probe chat sends with `model: 'haiku'` | the composer's own model chip (`.verify/lib/scratch-chat.mjs`: `createScratchChat`, `MODEL_CHIP`) |
+| Turns are short and few | one line, one word back |
+| A hidden chat or project is resolved only when named EXACTLY | below |
+| Never type to the other account's Kaylee | load its page, send nothing |
+| Pure functions are shown under `tsx` on real strings | `parseExpression`, the sentence stream, the fills, the envelopes, `reduceCompanion` on recorded frames. No server, no model |
+| Her voice and her hearing are not counted against a Gemini budget, yet a probe still calls Gemini as little as the code allows | a refusal is proven with `GEMINI_API_KEY` unset and `GEMINI_ENV_FILE` an empty file (no call); the call shape once on `gemini-3.8-flash-lite-tts` with one short sentence; the speech model is set to `gemini-3.8-flash-lite-tts` for every probe that makes her speak; no probe loops over sentences beyond one short counting turn (INV-9908) |
+| Not on :3011 when a restart cuts the run | `server/` saves restart :3011 and the dev account's Kaylee is shared: a run there is cut short or cleared. Use a scratch stack or a copy of the database |
+
+## The hidden-chat naming rule
+- A probe chat sits under `/tmp`, a hidden root, so it is never one of "his chats": the roster, `list_sessions` and `list_projects` do not show it.
+- `resolveChat` reaches it only by id or by its exact name (case-insensitive); `resolveProject` only by the project's exact registered path. A PART of the name ("kaylee" for "probe kaylee") resolves nothing. Rule and code: MAN-9055 §The hidden fallback.
+- So a probe names the chat exactly in its message ("Draft for probe kaylee: …"), and the page shows the chat so `<view>` names it for her.
+- Measured 2026-10-26 on Haiku: with a hidden chat she often searched `list_sessions` for the name and never called `update_draft`. A turn that never calls the tool is not a defect of the tool: the probe retypes up to three times (MAN-9061 §Probe).
+
+## Stacks
+| stack | when |
+|---|---|
+| live :3011 / :5183 | `companion-lands.mjs`, `kaylee-whole.mjs`: the dev account, Haiku, probe chats in `PROBE_PROJECT` |
+| scratch server + Vite on a copy of the database | `companion-send-scratch.sh`, `companion-act-tools-scratch.sh`, `kaylee-hears-unasked.sh`: never touch :3011 |
+| the real module on express over a `.backup` copy under `/tmp` | `companion-module.mjs`, `companion-draft-tools.mjs`: runs as account 1, leaves her JSONL under `~/.claude/projects/-home-lyphe--claude-state-companion-1/`; refuse a database outside `/tmp` |
+| `tsx`, no server | `companion-wire-contract.mjs`, `companion-reducer.mjs`, `companion-turn-windows.mjs` |
+
+## The probes (`.verify/`, gitignored: on disk only)
+| script | shows |
+|---|---|
+| `kaylee-session.mjs [--pure]` | her conversation: init check, memory, `setModel` live, resume, refused resume, Stop (MAN-9077, MAN-9079) |
+| `companion-module.mjs` | routes, frames, a `list_sessions` call, refusals, interrupt, clear, live model change, `stop()` mid-turn (MAN-9071) |
+| `companion-storage.ts`, `companion-store.mjs` | tables and the store's frames (MAN-9082) |
+| `companion-house-reads.mjs`, `companion-house-states.mjs`, `companion-view-of.mjs` | the roster, a chat's state, `viewOf` (MAN-9055, MAN-9057) |
+| `companion-draft-tools.mjs`, `companion-read-tools.mjs`, `companion-act-tools.mjs`, `companion-turn-windows.mjs`, `probe-companion-reads.mjs` | the tool files (MAN-9061, MAN-9066, MAN-9065) |
+| `companion-send.mjs` (legs `steer,idle,create,mismatch,panel`) | the send (MAN-9072, MAN-9068) |
+| `kaylee-alert-feed.ts`, `kaylee-hears-unasked.sh` | alerts and focus news (MAN-9069) |
+| `kaylee-p3-run-verbs.mjs` | the page's own stop and permission answer through the shared verbs (websocket MAN-710) |
+| `kaylee-through-mark.mjs`, `companion-permission-mode.mjs`, `prompt-stream-join.mjs` | the mark, `permission_mode`, the shared prompt stream (MAN-9084, MAN-9085, MAN-9078) |
+| `companion-panel-scaffold.mjs` | the views on fixture pictures (MAN-9062) |
+| `kaylee-talk-scaffold.sh` (`.mjs`) | the talk press, binding row, chat-mic picker and Gemini section on fixtures; her panel and Settings > Voice against an untouched client; no model turn, no Gemini call (MAN-9095) |
+| `kaylee-clip.mjs`, `kaylee-press-refused.sh`, `kaylee-press-live.sh`, `kaylee-talk-chat-mic.mjs`, `kaylee-talk-whole.mjs`, `mic-recorder-move.mjs`, `kaylee-talk-binding-hook.mjs`, `kaylee-talk-binding-rule.ts` | the spoken probes: their one fixture clip, which of them calls Gemini and how often (MAN-9100) |
+| `companion-lands.mjs`, `companion-lands-page.mjs`, `companion-reducer.mjs` | the page (MAN-9083) |
+| `kaylee-voice-speech.mjs` | `synthesizeSentence`, the three voice settings and the sound-tag readers: ONE paid sentence on `gemini-3.8-flash-lite-tts` and its transcription back, the rest free (MAN-9105) |
+| `kaylee-speech-door.sh` (`.mjs`) | the speech door and the cut with NO Gemini call: no key in reach, Google's host a stand-in (MAN-9110, MAN-9111) |
+| `kaylee-speech-door-live.mjs` | the same door on :3011 as account 1: at most 2 Gemini calls, Kaylee on `haiku` (MAN-9110) |
+| `kaylee-voice-pcm-player.mjs` | the page's player on generated tones, live :5183, no Gemini call (MAN-9112) |
+| `kaylee-voice-scaffold.sh` (`.mjs`) | the voice switch, the speaking mark, Speaking and Cut and the Gemini section's voice rows on fixtures; its live half exits 1 against the wired panel; run `--only fixtures` (MAN-9106) |
+| `kaylee-voice-whole.mjs` | the whole voice once: two pages, the pull, the cut, the floor, the switch, Settings; one counting turn on `gemini-3.8-flash-lite-tts`; step 7 with no Gemini call (MAN-9113) |
+| `kaylee-whole.mjs` | the whole system once on :3011 / :5183: panel from the rail door, Haiku in the picker, a probe chat named "probe kaylee", "What chats are working?", "Draft for probe kaylee: reply with the single word PONG.", "Send it."; screenshots 1440×900 and 390×844 under `.verify/shots/kaylee-whole/` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/probe-project.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs
+
+## MAN-9092 — useMicRecorder — the mic's one recorder, and useVoiceInput on top
+
+`src/shared/hooks/useMicRecorder.ts` owns the mic: opens it on `start`, answers the clip and its `durationMs` on `stop`, closes the tracks always. It lives in `src/shared/hooks` because two modules use it.
+
+| consumer | uses |
+|---|---|
+| the chat's `useVoiceInput` (`src/modules/chat/hooks/useVoiceInput.ts`) | `start`, `stop`; the clip's blob and type go to `transcribeVoice`; `durationMs` is not read; `onEnded` → a plain-stop transcription |
+| the companion's `useTalkPress` (`src/modules/companion/hooks/useTalkPress.ts`, MAN-9101) | `start`, `stop`; blob, type and `durationMs` go to `api.companion.press`; `durationMs` is the clock of the server's 0.4 s empty-press rule; `onEnded` → a press |
+- Neither consumer calls `cancel()`; it is for a caller that must close the mic without a clip.
+- The move out of `useVoiceInput` changed nothing the chat sees: `useVoiceInput` keeps its signature and behavior (`.verify/mic-recorder-move.mjs`).
+
+## `useMicRecorder(onEnded?)`
+
+| member | does |
+| --- | --- |
+| `state` | `'idle'` \| `'recording'`; `'recording'` from `setState` after `rec.start()` until the recorder's stop event lands |
+| `start(): Promise<void>` | opens `getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}})`; a second call while one is pending or recording is dropped (one mic) |
+| `stop(): Promise<MicClip \| null>` | resolves the clip; `null` when nothing was recording, after `cancel()`, after an unmount |
+| `cancel()` | closes the mic at once, detaches the recorder's handlers, resolves a pending `stop()` with `null`; a `start()` still waiting on `getUserMedia` hands its mic straight back (`generationRef`) |
+| `onEnded(clip)` | called with the clip when the recorder stops by itself (tracks ended: a device unplugged); nobody awaits that clip |
+
+- `MicClip` = `{ blob, mimeType, durationMs }`. `durationMs` runs from the recorder's start to the instant `stop()` was called; for a self-stopped recording, to the stop event.
+- `start()` rejects with a sentence fit to show: `Microphone access denied.` (`NotAllowedError`), `No microphone found.` (`NotFoundError`), else `Mic error: <message>`. A start cancelled by `cancel()` resolves without opening the mic and says nothing, whether `getUserMedia` answered or failed.
+- MIME order: `audio/webm;codecs=opus`, `audio/webm`, `audio/mp4`, `audio/ogg;codecs=opus`, `audio/ogg`; the first `MediaRecorder.isTypeSupported` wins, none → the browser default.
+- Each recorder owns its own chunks and stream. why: a late stop event must not close a newer recorder's mic.
+- A second `stop()` while one is pending resolves `null` at once and the first keeps its resolver. why: `stop()` leaves the recorder `inactive` in the same call (a double tap, or the mic and Send both firing, transcribes one clip).
+- `navigator` stays the opener's (MAN-7452 §"Deliberately on the opener").
+
+## `useVoiceInput(onTranscript, onError?)` — the transcription half
+
+Returns `{ state, toggle, stop }`; `state` = `'transcribing'` while a clip is out, else the recorder's `state`. `stop({ send: true })` passes `send` to `onTranscript(text, send)`.
+
+| clip | result |
+| --- | --- |
+| `blob.size < 800` | `onError('Recording too short')`, no request |
+| upload | `transcribeVoice(blob, 'recording.<ext>', provider)` (`m4a` for mp4, `ogg` for ogg, else `webm`) in `src/shared/api.ts`, `provider` read from `currentVoiceProvider()` (the store `useVoiceProvider` keeps) when the clip is sent. `'openai'` (the default): a configured `baseUrl` → `POST <baseUrl>/audio/transcriptions` (`file`, `model` = `sttModel` or `whisper-1`); else the CloudCLI voice proxy (`audio` part, `x-voice-*` headers). `'gemini'`: always `POST /api/voice/transcribe` (`audio` part), no `x-voice-*` header, never the browser's endpoint |
+| non-ok response | `'gemini'` with a sentence in the body (`error`: the 409 no key or refused key, the 502 failure): `onError(<that sentence>)`. Otherwise `onError('Transcription failed: transcribe <status>')` |
+| empty text | `onError('No speech detected')` |
+| self-stopped clip | transcribed as a plain stop (`send` false) via `onEnded` |
+
+- `onTranscript` / `onError` are read through a ref: `start`, `stop`, `toggle` keep stable identity across renders.
+- After unmount nothing is drawn and no handler is called.
+
+## `useVoiceProvider()` and `useVoiceAvailable(purpose)`
+
+`useVoiceProvider(active)` (`src/modules/chat/hooks/useVoiceProvider.ts`) answers `'openai' | 'gemini'`, the account's chat-mic provider (`GET /api/voice/settings` → `settings.provider`).
+- One GET per page serves every active caller (a module-level store read through `useSyncExternalStore`); it is made by the first active caller to mount and again on `VOICE_CONFIG_SYNC_EVENT`, which one page-level listener holds while any active caller is mounted. Reads run one at a time; one asked for while another is out runs after it, once.
+- `active` false subscribes to nothing, so it asks nothing: `useVoiceAvailable` passes `enabled && purpose === 'dictate'`, so a page with voice off makes no `/api/voice` request, and a read-aloud control never asks `GET /api/voice/settings` (it asks `GET /api/voice/health` when no browser `baseUrl` is set, §`useVoiceAvailable`).
+- `'openai'` until the server answers, and when a read fails. why: today's behavior is the default, and a page that cannot ask must not draw a mic it cannot be sure of (the server's `GET /api/voice/health` is the proxy's own answer for every account, so it does not draw one either).
+- The voice fields dispatch the same event on every edit, so reads are also spaced: at most one per 400 ms (`MIN_READ_GAP_MS`), a request inside the gap waiting for its end.
+- A first read that fails stands until the next event or a reload; a change made on another tab or sign-in as another account in the same tab is not seen until then. The brief fixed that contract (one GET per page, re-read on the event).
+
+`useVoiceAvailable(purpose: 'speak' | 'dictate' = 'speak')`: `'speak'` (read-aloud, `MessageSpeakControl`) is unchanged: voice on, and a browser `baseUrl` or the server's health, which is the OpenAI-compatible proxy's own `configured` for every account. why: read-aloud has no Gemini door — `POST /api/voice/tts` is the proxy's alone (MAN-9098) — so the picker does not govern it. `'dictate'` (the composer's mic, `ChatComposer`) is voice on alone when the provider is `'gemini'`, and read-aloud's answer on `'openai'`. why: Gemini transcribes on the server's key, so the browser needs no backend.
+
+`VoiceInputButton`'s error bubble sits at the mic's left edge, wraps at `min(18rem, 100vw − 4.5rem)`, and rises above the hover tooltip where a pointer hovers. why: a Gemini refusal is a whole sentence ("No Gemini key: set one in Settings → Voice"), and a bubble centered on the phone footer's left-hand mic ran off the screen.
+
+## Probe
+
+| command | proves |
+| --- | --- |
+| `node .verify/kaylee-talk-chat-mic.mjs --stub` | the chat's mic on the provider: no mic on OpenAI-compatible (no backend on this box), one shared `GET /api/voice/settings`, the mic on Gemini over the same open composer, the clip sent as `audio` with no `x-voice-*` header and no request to a browser `baseUrl`, a provider read that fails (stubbed 500) hides the mic until `VOICE_CONFIG_SYNC_EVENT` asks again, the refusal sentence inside the screen and clear of the tooltip at 1440×900 and 390×844, light and dark. Without `--stub`: one live Gemini transcription of the fixture clip, one `[voice] gemini transcribe` line in the journal |
+| `node .verify/mic-recorder-move.mjs` | chat mic on :5183 with a stubbed `getUserMedia` and transcription backend: 2 s recording fills the composer (mic → square → mic, tracks live then ended, upload `recording.webm` / `whisper-1`, > 800 bytes); two presses 50 ms apart give "Recording too short", one mic; a press during a pending `getUserMedia` is dropped; tracks ended under a live recording still transcribe; a router push to an unmatched path ends the track (a `page.goto` would destroy the document) |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/VoiceInputButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceAvailable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceInput.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceProvider.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useMicRecorder.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/mic-recorder-move.mjs
+
+## MAN-9093 — src/modules/companion — the talk press: TalkPress, the talk button, the binding row, Listening and Transcribing on the status line, "Nothing heard"
+
+The views of the page's one talk press: the talk button in her composer, the binding row in Settings, Listening and Transcribing on the status line, "Nothing heard" in the log. A view draws from props; `CompanionProvider` holds the press (MAN-9101) and `CompanionPanel` / `CompanionSettingsSection` hand it down (§Mounting). The key and mouse rule and the listener: MAN-9062 §Parts (`useTalkBinding`, `talkBinding.ts`); the capture: MAN-9101; the stored binding: MAN-9087.
+
+## Types — `src/shared/types.ts`
+| type | shape |
+|---|---|
+| `TalkPressState` | `'idle' \| 'listening' \| 'transcribing'`. A press while a clip transcribes records again at once: `listening` can follow `transcribing` |
+| `TalkPress` | `{ state: TalkPressState; toggle: () => void; error: string \| null }` |
+- `toggle` = one press: open the mic, or stop it and send the clip.
+- `error` = what failed on the page itself (mic refused, clip not sent). A refused transcription is her harness's system line in the log, never `error`.
+
+## Props that carry it
+| prop | on | absent |
+|---|---|---|
+| `talk?: TalkPress` | `CompanionPanelView`, then `CompanionComposer` | no talk button |
+| `presence: CompanionPresence` (required) | `CompanionPanelView`, then `CompanionHeader`'s status line; `CompanionPanel` gets it from `useCompanionPresence()`, which reads `talk.state` into `listening` / `transcribing` (MAN-9089, MAN-9113) | — |
+| `voice?: CompanionVoice` (`src/shared/types.ts`: `on`, `setOn`, `speaking`, `cut`) | `CompanionPanelView`, then `CompanionHeader` (`on`/`setOn`: the "Voice on this device" row) and `CompanionLog` (`speaking`: the sentence marked) | no voice row, nothing marked |
+| `talkBinding?: ReactNode` | `CompanionSettingsView` | nothing drawn. Present, it stands in a `SettingsCard` above her fields once settings are read |
+
+## `CompanionTalkButton` — props `state`, `error`, `onToggle`, `name`
+| state | look | accessible name |
+|---|---|---|
+| `idle` | `ghost` icon, mic in `text-muted-foreground` | `companion.talk.start` — `Talk to {{name}}` |
+| `listening` | `tonal` + `ring-2 ring-primary` pulse (`motion-safe:animate-pulse`) | `companion.talk.stop` — `Stop and send` |
+| `transcribing` | `Spinner` (28) laid over the mic; still pressable | `companion.talk.transcribing` — `Transcribing · press to talk again` |
+- Wrapper `span[data-companion-talk=<state>]`. Slot: `PromptInputTools[data-companion-talk-slot]` in the composer, before Send.
+- `error` set: `data-tone="warn"`, mic in `text-tone-ink`, an `sr-only` copy of the sentence as `aria-describedby`.
+- The error's sentence is drawn by `CompanionComposer`: `p[role=alert][data-companion-talk-error]`, `ml-auto`, amber with ▲, IN FLOW above the box. Both clear with the next press.
+
+| rule | why |
+|---|---|
+| The sentence is never a bubble over the button | the composer box clips it; unclipped it covered Send steer / Send turn (photographed) |
+| A plain `Button`, no `aria-pressed` | its name changes with its state; a toggle's must not |
+| Keep `h-8 w-8 rounded-lg` and `before:-inset-1.5` under `(pointer:coarse)` | 32px to the eye, 44px catch (Verve touch floor), Send's size and corner |
+| Keep `[@media(pointer:coarse)]:mr-2` | the 44px catches of talk and Send meet and do not overlap |
+| The rail door is not named "Talk to <name>" | that name is this button's; the door is named for what it shows (MAN-9089) |
+
+## Status line and log
+- Listening and Transcribing: MAN-9089 §Status line.
+- `CompanionLog`: a `spoken` entry whose `text.trim()` is empty draws `data-heard="nothing"`, a `border-dashed` outline in `text-muted-foreground` reading `companion.log.nothingHeard` — `Nothing heard`, under the usual `You · spoken` caption. Drawn from the data alone: no prop gates it, so it shows on her live log wherever such a line exists.
+- `companion-fake.ts`: panel state `heard` holds one spoken line and one empty one.
+
+## `TalkBindingField` — props `label`, `capturing`, `refusal`, `onBind`, `onClear`, `onCancel`
+Settings > Voice > Companion's "Talk button" row (`voiceSettings.companion.talkBinding.*`, `en/settings.json`), in `CompanionSettingsView`'s `talkBinding` slot.
+| state | line under the `SettingRow` |
+|---|---|
+| unbound (`label` null) | `Not bound` + `Bind` |
+| bound | `kbd[data-talk-binding-label]` + `Bind` (name `Bind the talk button`) + `Clear` (name `Clear the talk button`) |
+| capturing | `div[role=status][data-talk-binding-prompt]` `Press a key or mouse button… Escape cancels` + `Cancel` (`[data-talk-binding-cancel]`) |
+- Root: `[data-talk-binding]` = `unbound` \| `bound` \| `capturing`; `data-talk-binding-capture` ONLY while capturing. That attribute is what `useTalkBinding` reads to pass every keydown, pointerdown and mousedown over (MAN-9062).
+- Focus: into the prompt when capture starts; to `Bind` when it ends, only if focus fell to the body.
+- `refusal` replaces the helper: `role=alert`, amber, ▲; the sentence already says what to use.
+- A parent's capture MUST pass a left press on `[data-talk-binding-cancel]` over, or Cancel cannot be clicked with the mouse.
+
+## Mounting
+| place | does |
+|---|---|
+| `CompanionProvider` | calls `useTalkPress(speech)` once (`speech` = `useCompanionVoice`'s `{ unlock, cutOff, release }`, MAN-9113) and `useTalkBinding(picture?.settings.talkBinding ?? null, talk.toggle)`; `talk` is a member of `useCompanion()` (MAN-9083, MAN-9101) |
+| `CompanionPanel` | `talk` from `useCompanion()` → `CompanionPanelView talk={talk}` → `CompanionComposer talk`; `useCompanionPresence()` → `CompanionPanelView presence` → `CompanionHeader` |
+| `CompanionComposer` | `{talk && <CompanionTalkButton state error onToggle name />}` in `[data-companion-talk-slot]`; `talk.error` in `p[data-companion-talk-error]` |
+| `CompanionSettingsSection` | `useTalkBindingCapture((talkBinding) => save({ talkBinding }))` (MAN-9101) → `talkBinding={<TalkBindingField label={settings?.talkBinding?.label ?? null} … />}` |
+- The talk button, the bound key or mouse button, and a press in the floating chat's picture-in-picture window are the SAME press: one `talk`, one mic.
+
+## Proof
+`.verify/kaylee-talk-scaffold.sh`: MAN-9095 (the views on fixtures). `.verify/kaylee-talk-whole.mjs`: MAN-9100 (the whole plan on the live page).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/TalkBindingField.tsx
+
+## MAN-9094 — src/modules/settings/tabs — Settings > Voice: the chat mic's provider picker and the Gemini section
+
+Views drawn from props; the tab binds them. Server side: `server/modules/voice/` (`saveGeminiKey`, `saveVoiceSettings`, `geminiKeyStatus`): MAN-9098. Kaylee's own section in the same tab: MAN-9062.
+
+## `VoiceSettingsTab` — section order
+1. Voice on/off.
+2. Voice on only: backend section (`voiceSettings.backendTitle`) — the OpenAI-compatible fields.
+3. `GeminiVoiceSection`, voice on or off.
+4. `CompanionSettingsSection`, voice on or off.
+- Rule: with Gemini picked, only the `voiceSettings.sttModel` field leaves; its row goes `sm:grid-cols-4` → `sm:grid-cols-3`. Base URL, API key, TTS model, voice, format, the note and the section's sentence stay. why: read-aloud uses that backend whatever the picker says; the picker governs the chat mic alone.
+- Kaylee hears through Gemini whatever the picker says.
+
+## Mounted
+- The tab's head reads `useVoiceSettings()` (`src/modules/settings/hooks/useVoiceSettings.ts`): `{ settings, keyStatus, saving, error, providerRefusal, saveSettings, saveKey, clearKey, retry }`. `openaiPicked = (settings?.provider ?? 'openai') === 'openai'`.
+- `VoiceProviderPicker` is first in the backend section (voice on); `GeminiVoiceSection` sits before `CompanionSettingsSection`, voice on or off, with `onRetry={retry}`; its `keyStatus` prop is `GeminiKeyStatus | null` (`src/shared/types.ts`, beside `VoiceProvider` and `VoiceSettings`).
+- `VoiceSettingsTab` hands the Gemini section the stored speech rows: `speechModel`, `voice` and `soundTags` read from `settings.gemini` (undefined while the settings are unread, so no row stands over a value the page cannot see), and saves each through `saveSettings({ gemini: { transcriptionModel | speechModel | voice | soundTags } })` (`soundTags`: the whole list, or `null` for Restore). The server's rules for them: MAN-9102; the list's one home: INV-9938.
+- The picker's `onChange` saves only a provider other than the one picked (`pickedProvider`): the option already picked sends nothing. A refused provider save leaves the picker where it was and its sentence (`providerRefusal`, `[data-voice-provider-refused]`) stands under the picker; the Gemini card's `error` line, two sections below, carries the same sentence.
+- `GET /api/voice/settings` is read once on mount (and again on `retry`); nothing is optimistic.
+- `saveSettings(patch)` and the key saves run one at a time in the order made, through one queue; a read that was out when a save landed is dropped as older.
+- A save that carried `provider` and landed dispatches `VOICE_CONFIG_SYNC_EVENT`, after the server's answer. why: the chat's `useVoiceProvider` and `useVoiceAvailable` re-read on it, so an open composer follows the picker in the same tab.
+- The key is passed to `api.voice.saveGeminiKey(key)` (`PUT /api/voice/gemini-key`) and never held by the hook; the answer is `{ key: GeminiKeyStatus }`.
+- `api.voice.{ settings, saveSettings, saveGeminiKey, clearGeminiKey }` (`src/shared/api.ts`) are the only places these URLs are written. `settings` and `saveSettings` answer `{ settings, key }`; `saveSettings` takes a `Partial<VoiceSettings>`.
+
+## `VoiceProviderPicker` — props `value: 'openai' \| 'gemini'`, `onChange`
+Kit `Field` (label `voiceSettings.provider.label` — `Speech to text`, helper `…provider.help`) around a `SegmentedControl` (radio group, arrows move the choice): `OpenAI-compatible` \| `Gemini`. The control sits in a block `div`, so the tray is as wide as its words.
+
+## `GeminiVoiceSection` — props
+| prop | meaning |
+|---|---|
+| `keyStatus` | `{ source: 'stored' \| 'house' \| 'none'; last4: string \| null }`; `null` while the account's settings are read |
+| `transcriptionModel` | the stored model name |
+| `saving` | a save is out: Save/Replace/Clear are busy |
+| `error` | the server's sentence for the last refused save; with `keyStatus` null, the read that failed |
+| `onSaveKey(key)`, `onClearKey()`, `onTranscriptionModel(model)` | the saves |
+| `speechModel?` + `onSpeechModel?` | both given: the Speech model row (`[data-gemini-speech-model-field]`, placeholder `gemini-3.8-flash-tts`, `MODEL_SHAPE`); its helper names `gemini-3.8-flash-lite-tts` as the cheap choice, the name held whole (`WholeWords`) |
+| `voice?` + `onVoice?` | both given: the Voice row (`[data-gemini-voice-field]`, placeholder `Kore`, `VOICE_SHAPE` `^[A-Za-z0-9_-]{1,40}$`, the server's `VOICE_PATTERN`) |
+| `soundTags?` + `onSoundTags?` | both given: the card's last row, `SoundTagsField`; `onSoundTags(null)` restores Google's set |
+| `onRetry?` | draws `Try again` on the failed-read banner |
+- Absent, a row is not drawn. Row order: API key, Transcription model, Speech model, Voice, Sound tags.
+- `keyStatus === null`: `[data-gemini-voice=loading]` waiting card; with `error`, `[data-gemini-voice=failed]` warn `Banner` (+ `Try again` when `onRetry`), no fields. why: a field over a value the page cannot see overwrites a good one.
+- Ready: `[data-gemini-voice=ready]`, a divided `SettingsCard` of the rows given (API key and Transcription model always), then `p[data-gemini-voice-save]` = `saving` \| `refused` \| `idle` (always mounted).
+- Key line under `API key` (`[data-gemini-key]` = source): `✓ Using your key ending <last4>`, `✓ Using the house's key` (positive), `▲ No key: Gemini is off` (warn).
+- Key field: `type=password`, `[data-gemini-key-field]`; Enter or `Save` (`Replace` once stored) sends; `Clear` only while `stored`.
+- The three name rows are one component, `GeminiNameField` (`voice-settings/sections/GeminiNameField.tsx`; props `label`, `help`, `invalid`, `stored`, `placeholder`, `shape`, `hook`, `saving`, `onSave`): `[data-gemini-<hook>-field]`, saved on blur or Enter, only when changed and valid; follows the stored value while untouched; a name sent is not sent again until no save is out (Enter then blur sends once).
+- Model field: `[data-gemini-model-field]`, placeholder `gemini-3.8-flash`.
+
+## `SoundTagsField` — props `tags`, `saving`, `onChange(tags \| null)`
+- Root `[data-gemini-sound-tags]` = the count. The list in its order as kit `Chip`s (`action`), each a press that removes it, named `Remove <tag>`, ✕ glyph; `[data-gemini-sound-tag]` on the word. The last one left is a static chip (no ✕) with the line `At least one sound stays on the list.`
+- Under `(pointer: coarse)` each removable chip is `min-h-11` (44px) and the gap `gap-2`. why: a press removes at once, and a miss takes the neighbour.
+- Focus after a removal: once the list no longer holds the sound, the chip now at its index (the last chip if it was last), or the add field when only the static last chip is left; a refused removal leaves focus where it was; a focus moved elsewhere meanwhile is not taken. A `useEffect` on `tags` and `saving`; refs only.
+- Add: one `form`, the API key row's shape: `[data-gemini-sound-tag-field]` (`basis-48`) + `Add` (Enter too), the line `basis-full` under them. Typed words are read as the parse reads a tag: trimmed, spaces collapsed, lower case. Refused under the field, `role=alert`, amber ▲: not `^[a-z]+(?: [a-z]+)*$` or over 24 characters; already listed (`“hum” is on the list already.`). At 30, `Add` waits and a line says so; the field stays live (keeps focus).
+- The typed word stays until the list holds it: a refused add loses nothing; the server's sentence is the card's last line.
+- `Restore Google's set` (`[data-gemini-sound-tags-restore]`) is the `SettingRow`'s control, `outline` `sm` with `RotateCcw`, as the register's `Restore the original` (`CompanionSettingsForm`, MAN-9062): beside the title while there is room, under it on a phone. It opens a `ConfirmDialog` (`z-[10000]`; Cancel, Restore destructive), then `onChange(null)`. why: it drops every sound he added; the server holds Google's set, the page no copy. One tab, one way to draw a restore.
+- Nothing optimistic; while `saving`, every chip, `Add` and Restore are `busy`. why: the next list is made from the one drawn.
+
+| rule | why |
+|---|---|
+| `TAG_SHAPE`, `MAX_TAGS` 30, `MAX_TAG_CHARS` 24 mirror the server's `checkSoundTags` (`server/modules/voice/voice-settings.ts`) | edited together |
+
+| rule | why |
+|---|---|
+| `KEY_SHAPE` `^[\x21-\x7e]{20,200}$`; a typed key that fails says `A Gemini key is 20–200 plain ASCII characters with no spaces.` (`voiceSettings.gemini.keyInvalid`) under the field and is not sent | the server's `saveGeminiKey` limit (`gemini-key.ts`, MAN-9098); edited together |
+| `MODEL_SHAPE` `^[A-Za-z0-9._-]{1,80}$`; invalid says why in place of the helper | the server's `MODEL_PATTERN` (`voice-settings.ts`); edited together |
+| The key field empties the moment a key is sent; the key is never shown back beyond `last4` | no key stands in the page after its save |
+| `Clear` opens a `ConfirmDialog` (`Forget your Gemini key?`: `Cancel`, `Forget the key`); `onClearKey` runs only on `Forget the key` | a forgotten key cannot be shown again |
+| That `ConfirmDialog` takes `wrapperClassName="z-[10000]"`; it opens only while `stored` | Settings is a body portal at `z-[9999]` (MAN-9090); a key cleared elsewhere leaves nothing to ask |
+
+## Proof
+`.verify/kaylee-talk-scaffold.sh`: MAN-9095. `.verify/kaylee-talk-chat-mic.mjs [--stub]` runs the tab and the chat's mic on :5183 as account 1: the picker, the key set ("… ending KE12") and cleared, the model saved on blur (the PUT answered by the probe), the mic shown and hidden with the picker over the same open composer, and the clip sent to `/api/voice/transcribe` as `audio` with no `x-voice-*` header. `--stub` answers `/api/voice/transcribe` itself (no Gemini call) and adds the refusal sentence at both sizes and themes; without it, one live transcription of the fixture clip.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVoiceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiNameField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiVoiceSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/SoundTagsField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VoiceProviderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/VoiceSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs
+
+## MAN-9095 — src/modules/companion — Proof — .verify/kaylee-talk-scaffold.sh (the talk press, the binding row, the chat mic's picker and the Gemini section)
+
+```bash
+bash .verify/kaylee-talk-scaffold.sh [--evidence <dir>] [--only fixtures|live]
+node .verify/kaylee-talk-scaffold.mjs [--evidence <dir>] [--before <url>] [--only fixtures|live]
+```
+- Gitignored (`.verify/`): on disk only. Pieces: MAN-9093 (talk press), MAN-9094 (Settings > Voice). Live client `:5183`; no Gemini call, no model turn.
+- Exits 1 on any FAIL; zero console errors from either half. Photographs: `.verify/shots/kaylee-talk-scaffold/` + `shots.json`.
+- Photographs 1440×900 and 390×844, light and dark.
+
+## Fixtures (`lib/talk-fixtures.mjs`, `lib/talk-kit.mjs`)
+- `talk-kit.mjs` mounts the app's own components over the live page through `mountReact.mjs`: her panel (`CompanionPanelView` on `companion-fake.ts`) in the workspace shell's fixed box with a fake `talk`, and the talk button in the panel's `[data-companion-talk-slot]`. Settings > Voice is the LIVE modal (`voiceEnabled` pinned on, nothing written): the picker first in the backend section, the Gemini section after it, her live section replaced by `CompanionSettingsView` on `FAKE_SETTINGS` with the binding row in `talkBinding`.
+- Every press is recorded in `window.__talkKit.events`, none acted on.
+- Checks: the button per state (name, plain button, 32px, before send, ring only listening, spinner only transcribing, taken in every state); status line per press (also over `thinking`, `failed`, `loading`); the error right above the box, amber, announced, inside the panel, standing over nothing with a draft docked; the log's spoken and empty lines; the picker hands its value and drops only the speech-to-text field on Gemini; the Gemini section per key source, refused, waiting, unread; a short key refused under its field, a good one sent on Enter and gone from the page; the model saved on leaving its field only when valid; Clear asks first; the binding row's focus follows capture and `data-talk-binding-capture` exists only while capturing.
+
+## Live (`lib/talk-live.mjs`, `lib/talk-probe.mjs`)
+- Her panel (from the rail's door) and Settings > Voice, as they stand. Settings > Voice asserts the sections `Voice`, `Backend`, `Gemini`, `Companion` in that order, the six OpenAI-compatible fields, picker 1, Gemini section 1, binding row 1 (`lib/talk-live.mjs:141`: the row is mounted, MAN-9093 §Mounting). Her panel's live check asserts the talk button mounted in its slot (`[data-companion-talk-slot]` holds 1 child of width > 0, `[data-companion-talk]` 1) and her own status line (not Listening or Transcribing). The whole plan on the live page: `.verify/kaylee-talk-whole.mjs` (MAN-9100).
+- With `--before`, her panel on an untouched client: the DOM must be identical (exact) and the picture within `ANTI_ALIASING_ALLOWANCE` = 8 pixels. The `voice-*` surfaces are not paired: the untouched client has no picker or Gemini section. The one live redraw, his empty spoken line ("Nothing heard"), is photographed as drawn and set aside on both before the pair is compared.
+- Opening her panel takes account 1's floor; opening Settings makes the app's own settings write.
+
+## The untouched client (`kaylee-talk-scaffold.sh`)
+- A scratch Vite on `TALK_BEFORE_PORT` (default 5197) through `lib/vite-scratch-before.config.mjs`: the files in the script's `BEFORE_FILES` are served as git HEAD holds them, everything else as the tree has it; it proxies to the dev API `:3011`, read only. Its dependency cache is a scratch directory, never `node_modules/.vite`.
+- Refuses to start when the port listens. Kills only a pid that is a plain number above 1 whose command line is vite; removes only its own `mktemp -d` scratch.
+- A phase that changes another live client file adds it to `BEFORE_FILES`.
+- `lib/vite-scratch-before.config.mjs` also serves a snapshot directory (`PNH_BEFORE_DIR`) in place of git HEAD, and `lib/talk-live.mjs` exports its comparers: MAN-9106.
+
+## Measured
+- 2026-10-27, before the fix-pass: 205 fixture checks and 38 live checks passed (12 pairs, 0 differing pixels in the final run), zero console errors. The fix-pass changed the probe's checks to match (Clear asks first, Try again, read-aloud's fields stay on Gemini) and did not re-run them.
+- `lib/talk-fixtures.mjs` is 294 lines (ceiling 300): a new check goes in a new lib file.
+- A reload from another session's edit kills a run; re-run.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-scaffold.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/talk-fixtures.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/talk-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/talk-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/talk-probe.mjs
+
+## MAN-9098 — server/modules/voice — the account's `voice` preference, its Gemini key, the settings routes and the transcribe provider branch
+
+`server/modules/voice/` serves two speech-to-text backends per account: the OpenAI-compatible proxy (`voice.service.ts`, the default) and Gemini (`gemini-*.ts`), and it speaks Kaylee's sentences through Gemini (`gemini-speech.ts`, MAN-9105). `voice.module.ts` builds `voiceRoutes`; `server/index.ts` mounts it at `/api/voice` behind `authenticateToken`. The Gemini call itself: MAN-9099. Rules: INV-9908.
+
+## Barrel — `index.ts`
+| export | consumer |
+|---|---|
+| `voiceRoutes` | `server/index.ts` |
+| `transcribeSpeech` (= `transcribeWithGemini`) | `companion/companion-press.ts`: every press, whatever the chat's provider says |
+| `synthesizeSentence` | `companion/companion-speech.ts`: one call per sentence a floor page pulls (MAN-9105, MAN-9110) |
+| `readVoiceSettings` | `companion/companion-account.ts`: `readSoundTags`, the account's `gemini.soundTags` read at the start of each turn (the parse) and at each push (the register). Inside the module: `gemini-transcribe.ts`, `gemini-speech.ts`, `voice-provider.ts`, the settings routes |
+| `DEFAULT_SOUND_TAGS` | `.verify/companion-wire-contract.mjs` (the parse proven against the shipped set). Its one home is `voice-settings.ts`; the companion's filter and her register read the account's list through `readVoiceSettings` (INV-9938) |
+| type `TranscribeAnswer` | `companion-press.ts`: tells a refusal from a failure |
+| type `SpeechAnswer` | `companion/companion-speech.ts`: tells a refusal (`no_key`, `refused`, `failed`) from a stream |
+- Types in `server/shared/types.ts`: `VoiceProvider`, `VoiceSettings`, `GeminiKeyStatus`, `TranscribeAnswer`, `SpeechChunk`, `SpeechAnswer`. The page mirrors the first three in `src/shared/types.ts`, with `VoiceSettingsPatch` (what `PUT /settings` takes; `soundTags: null` allowed).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
+
+## MAN-9102 — server/modules/voice — the account's `voice` preference, its Gemini key, the — The `voice` preference — `voice-settings.ts`
+section: server/modules/voice — the account's `voice` preference, its Gemini key, the settings routes and the transcribe provider branch/001 The `voice` preference — `voice-settings.ts`
+
+- Stored under the `voice` key of the account's `user_preferences` (`userPreferencesDb`), as OVERRIDES: only fields the account set. why: a default the house later changes still reaches an account that never chose.
+- Read fresh on every call, never cached: a saved change is heard by the next press.
+- A stored field that fails its limit reads as its default (the generic `PATCH /api/user/preferences` can write any key).
+
+| field | default | limit |
+|---|---|---|
+| `provider` | `openai` | `openai` or `gemini` |
+| `gemini.transcriptionModel` | `gemini-3.8-flash` (the house's transcriber role) | 1–80 characters of `[A-Za-z0-9._-]` (`MODEL_PATTERN`). why: it becomes a path segment of the Gemini URL |
+| `gemini.speechModel` | `gemini-3.8-flash-tts`; `gemini-3.8-flash-lite-tts` is the cheap choice | the same `MODEL_PATTERN` |
+| `gemini.voice` | `Kore` | 1–40 characters of `[A-Za-z0-9_-]` |
+| `gemini.soundTags` | `DEFAULT_SOUND_TAGS`: `giggle`, `chuckle`, `laugh`, `gasp`, `sigh`, `phew`, `tsk`, `breath`, `short pause`, `long pause` | 1–30 tags, each 1–24 characters of `[a-z]` words with single spaces between them (no blank tag, no leading or trailing space), none twice. `soundTags: null` in a patch drops the account's own list, so the default reads again |
+
+- `gemini.soundTags` is the ONE allow-list of the sounds she may make: the register she is taught (`{sound_tags}`) and the filter that strips her sentences (`parseExpression`) both read it (MAN-9081). `DEFAULT_SOUND_TAGS` lives in `voice-settings.ts` and nowhere else; `readVoiceSettings` hands out a copy, never the shipped array.
+
+- `provider` picks the backend of the chat composer's mic only. The companion hears through Gemini whatever it says; read-aloud (`POST /tts`, `GET /health`) stays on the OpenAI-compatible backend.
+- `saveVoiceSettings(userId, patch)` merges a partial field by field (nested `gemini` included) and answers the settings as stored. Nothing is written when any field is refused. The read and the write have no `await` between them, so two saves cannot merge from the same stored value.
+
+Refusals — all 400 `VOICE_SETTINGS_INVALID`, `details.field` as listed:
+| patch | sentence | field |
+|---|---|---|
+| not an object | `The settings must be a JSON object.` | `settings` |
+| a key other than `provider`, `gemini` | `<key, 40 characters at most> is not a voice setting; the fields are provider and gemini (transcriptionModel, speechModel, voice, soundTags).` | the key |
+| `provider` not a listed word | `provider must be "openai" or "gemini".` | `provider` |
+| `gemini` not an object | `gemini must be an object holding transcriptionModel, speechModel, voice, soundTags.` | `gemini` |
+| `gemini.<other>` | `gemini.<other, 40 characters at most> is not a voice setting; the fields are gemini.transcriptionModel, gemini.speechModel, gemini.voice, gemini.soundTags.` | `gemini.<other>` |
+| a model past its limit | `gemini.transcriptionModel must be 1 to 80 characters of letters, digits, dots, underscores and hyphens.` (likewise `gemini.speechModel`) | `gemini.transcriptionModel` or `gemini.speechModel` |
+| `voice` past its limit | `gemini.voice must be 1 to 40 characters of letters, digits, underscores and hyphens.` | `gemini.voice` |
+| `soundTags` not a list of 1–30 valid tags | `gemini.soundTags must be a list of 1 to 30 sound tags, each 1 to 24 lower-case letters with single spaces between words.` | `gemini.soundTags` |
+| a tag listed twice | `gemini.soundTags lists "<tag>" more than once.` | `gemini.soundTags` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
+
+## MAN-9103 — server/modules/voice — the account's `voice` preference, its Gemini key, the — The key — `gemini-key.ts`
+section: server/modules/voice — the account's `voice` preference, its Gemini key, the settings routes and the transcribe provider branch/002 The key — `gemini-key.ts`
+
+- Stored in `user_credentials` as `credential_type` `gemini_api_key` (`credentialsDb`), name `Gemini API key`, description `Voice: Gemini transcription and speech`. One key per account.
+- `resolveGeminiKey(userId)` — order, read at call time and never cached:
+  1. the account's stored active credential;
+  2. `GEMINI_API_KEY` in the process environment (Python-stripped);
+  3. the `GEMINI_API_KEY=` line of the file `GEMINI_ENV_FILE` names (default `/opt/shadow-connector/.env`);
+  4. `null`: none.
+- `resolveGeminiKey` is NOT in the barrel. Its readers are `gemini-transcribe.ts` and `gemini-speech.ts`.
+- The env file is parsed as `~/.claude/scripts/gemini-image` `_read_api_key` parses it: lines split at Python's `str.splitlines()` boundaries, each stripped by Python's own whitespace set (`pythonStrip`), an `export ` prefix dropped, the name before the first `=` compared after stripping, the value stripped then stripped of quote marks, a line with an empty value skipped; the first line that yields a value wins. An absent or unreadable file is no house key.
+- `geminiKeyStatus(userId)` → `{ source, last4 }`:
+  | source | when | last4 |
+  |---|---|---|
+  | `stored` | the account has a stored key | its last four characters |
+  | `house` | no stored key; step 2 or 3 yields one | `null` |
+  | `none` | no key at all | `null` |
+- Only `last4` of the account's OWN key is ever shown. The house's key is never shown, even in part. No answer carries a key.
+- `saveGeminiKey(userId, key)`: 20–200 printable ASCII characters (`\x21`–`\x7e`: no space, no line break, nothing non-ASCII). why: the key rides an HTTP header, and a character that cannot be sent would pass the limit and fail later as a network error. Refusal: 400 `VOICE_SETTINGS_INVALID`, `details.field` `key`, sentence `key must be a string of 20 to 200 printable ASCII characters with no spaces or line breaks.`; the sentence never repeats the key. A body without a string `key` is refused the same way.
+- The new `gemini_api_key` row is created FIRST, then every other row of the type is deleted, active or not. why: a failed insert leaves the earlier key standing instead of none.
+- `clearGeminiKey(userId)` deletes all the account's `gemini_api_key` rows; its calls then use the house key (`source` `house`, or `none`).
+- The page checks the same class before it sends (`KEY_SHAPE` `^[\x21-\x7e]{20,200}$`): MAN-9094.
+
+## Routes — `voice.routes.ts`, `/api/voice`
+| verb | path | body | answer |
+|---|---|---|---|
+| GET | `/health` | none | the proxy's own `{ configured }`, the same for every account (read-aloud's speaker reads it) |
+| GET | `/settings` | none | 200 `{ settings: VoiceSettings, key: GeminiKeyStatus }` |
+| PUT | `/settings` | a partial `{ provider?, gemini?: { transcriptionModel?, speechModel?, voice?, soundTags? } }` | the same shape; 400 `VOICE_SETTINGS_INVALID` |
+| PUT | `/gemini-key` | `{ key }` | 200 `{ key: GeminiKeyStatus }`; 400 `VOICE_SETTINGS_INVALID` naming `key` |
+| DELETE | `/gemini-key` | none | 200 `{ key: GeminiKeyStatus }` |
+| POST | `/transcribe` | multipart `audio` (≤ 25 MB, memory) | 200 `{ text }`; see the next section |
+| POST | `/tts` | `{ text }` | the proxy's audio stream |
+- A `VOICE_SETTINGS_INVALID` answer is the app's envelope `{ success: false, error: { code, message, details } }` (MAN-9058 §Refusals); the page reads `message` through `refusalSentence`.
+- 2026-10-27, live :3011: `GET /settings` → `{"settings":{"provider":"openai","gemini":{"transcriptionModel":"gemini-3.8-flash","speechModel":"gemini-3.8-flash-tts","voice":"Kore","soundTags":[the ten]}},"key":{"source":"house","last4":null}}`, `grep -c AIza` on the body → 0; `PUT /settings {"bogus":1}` → 400 `bogus is not a voice setting; the fields are provider and gemini (transcriptionModel, speechModel, voice, soundTags).`
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
+
+## MAN-9104 — server/modules/voice — the account's `voice` preference, its Gemini key, the — `POST /transcribe` — the provider branch (`voice-provider.ts`)
+section: server/modules/voice — the account's `voice` preference, its Gemini key, the settings routes and the transcribe provider branch/003 `POST /transcribe` — the provider branch (`voice-provider.ts`)
+
+`createVoiceProvider(voiceService).transcribeForChat(userId, audio, overrides)`, called by the route with the upload (`mimeType` default `audio/webm`, `fileName` default `recording.webm`):
+| account's `provider` | does |
+|---|---|
+| `openai` (default) | `voiceService.transcribe({ audio, overrides })` exactly as before; reads the browser's `x-voice-*` headers |
+| `gemini` | `transcribeWithGemini(userId, audio)`; the `x-voice-*` headers are ignored |
+
+On `gemini`:
+| `TranscribeAnswer` | HTTP | body |
+|---|---|---|
+| `ok` | 200 | `{ text }`; `''` when the model reported no words (a silent clip is not certain to come back `''`: INV-9876, MAN-9099 §Standing defect) |
+| `no_key`, `refused` | 409 | `{ error: <sentence> }` (a plain string, not the envelope). why: the person fixes both in Settings → Voice |
+| `failed` | 502 | `{ error: <sentence> }` |
+- Sentences: MAN-9099. The chat's `useVoiceInput` shows them as they came (MAN-9092).
+- An upload multer refuses is 400 `{ error: <its message> }`; no `audio` part is 400 `{ error: 'No audio uploaded' }`.
+- `GET /health` takes no part in this decision: it answers the proxy's `configured` with Gemini picked too. The composer's mic follows `GET /settings` (MAN-9092 §`useVoiceProvider`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
+
+## MAN-9099 — server/modules/voice — `transcribeWithGemini`: the generateContent call, the three refusals, the key rules and what is never counted
+
+`transcribeWithGemini(userId, audio: VoiceAudioUpload): Promise<TranscribeAnswer>` (`gemini-transcribe.ts`) turns one clip into the words spoken, for one account. It never throws for an expected failure. Settings, key and routes: MAN-9098. Rules: INV-9908. Open defect: INV-9876 (§Standing defect).
+
+| consumer | reaches it as |
+|---|---|
+| `voice-provider.ts` | the chat composer's mic when the account's `provider` is `gemini` |
+| `companion/companion-press.ts` | the voice barrel's `transcribeSpeech`: every press of the talk button |
+
+## Answer — `TranscribeAnswer`
+| answer | when | `sentence` |
+|---|---|---|
+| `{ ok: true, text }` | the model answered; `text` is trimmed; `''` when it reported no words or only a bracketed note (`[no speech]`). A silent clip is not certain to come back `''` (§Standing defect) | – |
+| `{ ok: false, reason: 'no_key' }` | no key in reach (MAN-9098 §The key); NO request is made | `No Gemini key: set one in Settings → Voice` |
+| `{ ok: false, reason: 'refused' }` | HTTP 401 or 403, or a 400 whose error names the key (`API_KEY_INVALID` in the body, or `api key` in Google's message, case-insensitive) | `Gemini refused the key: <Google's message>` |
+| `{ ok: false, reason: 'failed' }` | any other status, a network error, a timeout, a reply with no text | `Gemini could not transcribe this: <why>` |
+
+`<why>` of `failed`:
+| cause | `<why>` |
+|---|---|
+| another HTTP status | `HTTP <status>: <Google's message, else the first 300 characters of the body, else HTTP <status>>` |
+| no answer in time | `no answer within 60 s` |
+| network error | the error's message, then ` (<cause's message>)` when it has one |
+| `promptFeedback.blockReason` and no candidate | `the request was blocked (<reason>)` |
+| no candidate | `the answer held no candidate` |
+| candidate with no text and `finishReason` other than `STOP` | `the answer held no text (finish reason <reason>)`; `missing` when the reply names none |
+
+HTTP of each reason on the chat route: `no_key`, `refused` → 409; `failed` → 502 (MAN-9098 §`POST /transcribe`). On the press door: 409 `COMPANION_SPEECH_REFUSED`, 502 `COMPANION_SPEECH_FAILED` (MAN-9059 §Press).
+
+## The request
+- `POST https://generativelanguage.googleapis.com/v1beta/models/<model>:generateContent`; `<model>` = the account's `gemini.transcriptionModel` through `encodeURIComponent`.
+- Headers: `x-goog-api-key: <key>`, `Content-Type: application/json`.
+- Body: `{ contents: [{ role: 'user', parts: [{ text: TRANSCRIPTION_INSTRUCTION }, { inline_data: { mime_type, data: <the clip, base64> } }] }], generationConfig: { temperature: 0 } }`. The clip rides inline; no Files API.
+- `TRANSCRIPTION_INSTRUCTION`: transcribe verbatim, in the language spoken; output only the words, no commentary, labels, timestamps or quotation marks; if the audio holds no spoken words at all (silence, room noise, a click, breathing, music) output exactly `[no speech]` and nothing else; never write words that were not spoken. why: asked to transcribe 2 s of digital silence under "output nothing", the model wrote a question nobody asked; the mark gives it a word to say. It does not make a silent clip come back `''` (§Standing defect).
+
+## MIME mapping — `geminiMimeType`
+| recorder's type | sent as |
+|---|---|
+| `audio/mp4` (Safari's AAC) | `audio/m4a` |
+| any other | the base type lower-cased, parameters dropped (`audio/webm;codecs=opus` → `audio/webm`) |
+
+## Retry and bound
+- Every attempt carries `AbortSignal.timeout(60_000)`.
+- ONE retry, after 2 s, when the first answer is 429 or 503. Any other status, a network error and a timeout are not retried. So a call can run 60 + 2 + 60 s.
+
+## Reading the reply — `readTranscript`
+- The text is candidate 0's parts that are strings and not `thought: true`, joined, trimmed.
+- Empty text with `finishReason` `STOP` is a success with `text` `''`.
+- A whole answer that is one bracketed note — `[no speech]`, `[silence]`, `(inaudible)`; `ANNOTATION_ONLY`: `[…]` or `(…)` of 1–40 characters on one line, an optional trailing `.` — is a success with `text` `''`. Words with a bracket inside them are kept whole.
+
+## The key — rules of this file
+- The key is resolved per call (`resolveGeminiKey`, MAN-9098).
+- It rides the `x-goog-api-key` header only: never the URL, a log line or a sentence.
+- Every sentence returned passes `redactKey` (`gemini-errors.ts`, shared with `gemini-speech.ts`, MAN-9105): the key's own text, and anything shaped `AIza[0-9A-Za-z_-]{20,}`, becomes `[key]`. The status, message and failure helpers (`isRetryableStatus`, `googleMessage`, `namesTheKey`, `describeFetchFailure`, `parseJsonObject`) live there too.
+
+## Standing defect — INV-9876
+- A clip with no words in it, longer than the press door's 0.4 s empty-press floor, can still come back as invented words under the current instruction. 2026-10-27, `gemini-3.8-flash`, 2 s of silence, two runs of INV-9876's probe: `I'll do that`, then `the world's most`.
+- Both are `ok` answers. The press door logs and pushes them as his line (MAN-9059 §Press); the chat mic fills the composer with them.
+- Nothing in this file separates them from speech: read an `ok` text as what the model heard, not proof that something was said.
+
+## Never counted
+- The door carries no `admit`, no `record` and no budget name. Operator, 2026-10-26: "Kaylee doesn't count for the budget." The chat mic on Gemini rides the same door and is not counted.
+- Measured (MAN-9059 §Press): after a live press, `/opt/shadow-connector/state/gemini_plan_spend/` gained no file.
+
+## Log
+- One line per call, never the key: `[voice] gemini transcribe <model> <clip bytes> B <ms> ms → ok|no_key|refused|failed`. The journal is shared: a probe names its call by the bytes it uploaded (the fixture posted by curl is 122924 B, MAN-9100).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts
+
+## MAN-9100 — Probing Kaylee — the spoken probes: the fixture clip `kaylee-what-chats-are-working.wav`, its maker `.verify/kaylee-clip.mjs`, and which probe feeds it
+
+Every spoken probe of kaylee--talk feeds one clip, so none synthesizes speech again. Her model on `haiku` first (MAN-9088 §Rules). `.verify/` is gitignored: on disk only.
+
+## The clip — `.verify/fixtures/kaylee-what-chats-are-working.wav`
+| fact | value |
+|---|---|
+| words | `What chats are working?` |
+| voice | Gemini `gemini-3.8-flash-lite-tts`, voice `Kore`, style `plain, clear, unhurried` |
+| format | RIFF WAV, PCM, 1 channel, 16-bit, 24 kHz |
+| size | 122924 bytes = 44-byte header + 122880 bytes of samples = 2.56 s (2026-10-27, `wave` module) |
+| heard as | `What chats are working?` through `transcribeWithGemini` on `gemini-3.8-flash` (MAN-9059 §Press) |
+
+## The maker — `node .verify/kaylee-clip.mjs`
+- File present: prints `the fixture clip is already made; no Gemini call`, the path, bytes and seconds; exit 0 (run 2026-10-27).
+- File absent: ONE Gemini call, then the file is written and kept for good.
+  1. `POST https://generativelanguage.googleapis.com/v1beta/interactions` with `stream: true`, `response_format: { type: 'audio', mime_type: 'audio/l16' }`, `generation_config.speech_config: [{ voice: 'Kore' }]`; the audio is every `step.delta` whose `delta.type` is `audio` (base64 PCM), up to `interaction.completed`.
+  2. Only if Google refuses that shape (non-2xx): ONE fallback, `generateContent` with `responseModalities: ['AUDIO']`.
+- A stream that ends without `interaction.completed` after some audio throws and writes NO file. why: the file is written once and kept; half a sentence is not the fixture.
+- An Interactions answer with no audio step: the whole answer is kept at `$TMPDIR/kaylee-clip-answer.<pid>.txt` and the run fails. why: reading it differently never costs a second call.
+- The key is read as `~/.claude/scripts/gemini-image` reads it (`GEMINI_API_KEY`, else the `GEMINI_API_KEY=` line of `GEMINI_ENV_FILE`, default `/opt/shadow-connector/.env`) and never printed; every message passes a `AIza…` → `[key]` redaction.
+- Exit 4: no key. Exit 3: the call or its reading failed.
+- To change the words: delete the file and run the maker once, knowingly.
+
+## Who feeds on it
+| probe | how | Gemini calls |
+|---|---|---|
+| `.verify/kaylee-press-refused.sh` | posts the file to `POST /api/companion/press` on a scratch server with no key in reach (MAN-9059 §Press) | 0 |
+| `.verify/kaylee-press-live.sh` | curl as account 1 on :3011: the file with `durationMs` 2200, then its first 4800 samples as a 0.2 s clip (`durationMs` 200) | 1 (the short clip is the empty press) |
+| `.verify/kaylee-talk-chat-mic.mjs` | Chromium fake mic; the chat's mic (MAN-9092, MAN-9094) | 0 with `--stub`, else 1 |
+| `.verify/kaylee-talk-whole.mjs` | Chromium fake mic; the whole plan once on :3011 / :5183 (below) | 2 |
+| `.verify/mic-recorder-move.mjs`, `.verify/kaylee-talk-scaffold.sh`, `.verify/kaylee-talk-binding-*` | no clip: a stubbed `getUserMedia`, fixtures, or a hook mounted alone | 0 |
+
+- Chromium's flags: `--use-fake-ui-for-media-stream --use-fake-device-for-media-stream --use-file-for-fake-audio-capture=<wav>%noloop`. `%noloop` plays the file once per stream; the page records the browser's own container (webm), not the wav, so its journal byte count differs from the file's.
+
+## `kaylee-talk-whole.mjs [--steps 1,2,3] [--stub-chat-mic]` — the plan once
+| step | shows |
+|---|---|
+| 1 | no binding: the back button navigates (the control) |
+| 2 | Settings > Voice > Companion: a plain `K` and a left click each refused with their sentence; Escape cancels; the back button bound as `Mouse back`, and the page does not navigate |
+| 3 | a spoken press with an application in the drawer: Listening and no navigation; again after 2.5 s: Transcribing, then his line and her answer naming real chats; photographed at 1440×900 and 390×844, light and dark, in the one press |
+| 4 | the panel's talk button twice within 0.4 s: `Nothing heard`, her short answer, no transcription call |
+| 5 | the chat in its picture-in-picture window (Ctrl+.): the back button there records; with her panel closed a press does not open it |
+| 6 | Gemini picked for the chat's mic: 2.5 s recorded on a scratch chat fills the composer (`--stub-chat-mic` answers `/api/voice/transcribe` from the probe) |
+| 7 | the Gemini spend ledger's listing before and after (unchanged); the journal's `[voice] gemini transcribe` lines of THIS run's clips |
+| 9 | failures answered by the probe's own routes: a refused hearing returns to idle with no page error; an unsent clip, a server sentence and a refused mic are the page's error until the next press; a press while a clip is out records anew |
+- Back-button presses go through a CDP session's `Input.dispatchMouseEvent` (`button: 'back'`), which Playwright's mouse cannot send.
+- It puts back the binding (through Settings' Clear), the model and the provider, and deletes its scratch chat. Her log keeps the lines of the presses.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/fixtures/kaylee-what-chats-are-working.wav, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/talk-whole-kit.mjs
+
+## MAN-9101 — src/modules/companion — `useTalkPress` and `talk` on the context, the binding capture `useTalkBindingCapture`, and the press the page sends
+
+The page's one talk press and the capture that binds it. The press's types and views: MAN-9093. The key/mouse rule and the listener: MAN-9062 §`useTalkBinding`. The server's side: MAN-9059 §Press. The recorder: MAN-9092.
+
+## `useTalkPress(voice): TalkPress` (`hooks/useTalkPress.ts`)
+- Called ONCE, by `CompanionProvider` (`context/CompanionContext.tsx`), handed the page's voice (`{ unlock, cutOff, release }` of `useCompanionVoice`). A second call is a second mic and a second state.
+- `toggle()` asks the voice before the mic: `unlock()` first, inside the press's gesture; the press that OPENS the mic calls `cutOff()`, which holds her voice while he records and, when she is sounding or a sentence is queued, stops her and sends the cut (`POST /api/companion/cut`); the press that ENDS the recording, a mic that never opened and a device that went away each call `release()`. The clip's upload awaits the cut's settling, so the cut is owed before the press is pushed. Detail: MAN-9113 §The cut on the press; the server's side: MAN-9111.
+- `CompanionProvider` also calls `useTalkBinding(picture?.settings.talkBinding ?? null, talk.toggle)` beside it. why: the account's binding arrives with the picture's settings, so a re-bind on any page reaches every page by its `companion_settings` frame.
+- `talk: TalkPress` is a member of `useCompanion()` (MAN-9083). Readers: the panel's talk button, the bound key or mouse button, and `useCompanionPresence` (`state`, into the status line's Listening and Transcribing).
+- A press NEVER opens her panel; `POST /api/companion/press` takes the floor itself.
+
+| `state` | when |
+|---|---|
+| `listening` | the recorder is `recording` (wins over everything) |
+| `transcribing` | not recording and a clip is out: between the stopping press and the server's answer |
+| `idle` | otherwise |
+
+- TAP TO TALK: `toggle()` once opens the mic; again stops it and sends the clip. The mic is open only while `listening`: `useMicRecorder` closes its tracks on stop.
+- LISTENING WINS: a press while an earlier clip is out records again at once; `transcribing` returns after it if a clip is still out. The count of clips in flight (`hearing`) is a number, not a flag. The server settles presses in arrival order (MAN-9059), so none is kept here.
+- NO PRESS IS LOST: the intent (`wantedRef`) is set the moment a press lands, and what it asks of the recorder waits behind whatever an earlier press asked and has not finished (`turnRef`). why: the browser can take a moment, or a permission prompt for as long as the person likes, to hand over the mic, and the recorder refuses a second `start()` while one is pending.
+- The clip goes out with `api.companion.press(blob, mimeType, durationMs)`: `durationMs` is `useMicRecorder`'s, so the server's 0.4 s empty-press rule reads the page's own clock. Nothing waits for the upload; the next press may record at once.
+- A recording whose device goes away stops by itself and arrives through the recorder's `onEnded`: it is sent as his second press.
+- A stop that finds no clip (the mic was refused, the page left) lowers the count and sends nothing.
+
+`error` — only what failed on the page itself; it stays until the next press:
+| cause | `error` |
+|---|---|
+| the mic could not open | the recorder's sentence: `Microphone access denied.`, `No microphone found.`, `Mic error: <message>` |
+| the upload got no answer | `Your recording could not be sent.` |
+| any other refusal | the server's own sentence (`refusalSentence`), else `Your recording could not be sent.` |
+- 409 `COMPANION_SPEECH_REFUSED` and 502 `COMPANION_SPEECH_FAILED` are NOT an `error`: the server has already written them into her log as the system line `I could not hear that: <sentence>`; the state returns to `idle`. why: the sentence belongs in the conversation, once.
+
+## `api.companion.press(blob, mimeType, durationMs)` (`src/shared/api.ts`)
+- `POST /api/companion/press`, multipart: `audio` = the blob named `recording.<m4a|ogg|webm>` (`recordingFileName(mimeType)`, as the chat's mic names its upload) and `durationMs` = the rounded integer; header `x-companion-client`.
+- Answers 202 `{ text }` once the press has been heard and pushed to her; the refusals are in MAN-9058 §Refusals. An upload has no deadline of its own.
+
+## `useTalkBindingCapture(saveBinding)` (`hooks/useTalkBindingCapture.ts`)
+Used by `CompanionSettingsSection`, which passes `saveBinding = (talkBinding) => save({ talkBinding })` (`PUT /api/companion/settings`, MAN-9087). Returns `{ capturing, refusal, begin, cancel, clear }` to `TalkBindingField` (MAN-9093).
+- `begin()` (the Bind button): window listeners in the CAPTURE phase take the next `keydown` or `mousedown`, whatever has focus.
+- `talkBindingFromEvent` (MAN-9062) answers the press: a binding → saved, capture ends; a refusal sentence → shown as `refusal` and the capture goes on, so the next press can be the right one.
+- PASSED OVER (the capture waits): a modifier on its own (the start of a chord); a key with no nameable `code`; a mouse button past forward; any press on Cancel (`[data-talk-binding-cancel]`); the auto-repeat of the key that opened it (swallowed); a plain Tab.
+- ESCAPE cancels from wherever focus is, Cancel included; the binding stays as it was. It is swallowed, so it never reaches the chat's Escape, which stops a running turn.
+- An accepted press is swallowed whole (`preventDefault`, `stopPropagation`, `stopImmediatePropagation`): not the old binding's listener, not a dialog, not the browser hears it.
+- The release of a mouse button the capture took — bound, or refused (left, right) — is swallowed too (`swallowRelease`): its `mouseup`, then its `click` (left) or `auxclick` (the others); the right button adds `contextmenu`. why: the back button's release would navigate back, a left click would land on what is under it.
+  - The swallow is held at module level, not by the hook. why: the press that ends the capture unmounts the capture's listeners before its own release arrives.
+  - The NEXT `mousedown` of any button ends the pairing. why: the press that binds removes the prompt it went down on, and a browser sends no click or auxclick to an element that left the page; without this the next real press of that button is lost.
+- `clear()` saves `null`.
+- A refused save shows the server's own sentence as `refusal`; a failure that carries none (the browser's `TypeError` of a request with no answer, or a throw that is no `Error`) shows `Your binding could not be saved.`
+- While `capturing`, `TalkBindingField`'s root carries `data-talk-binding-capture`, which makes `useTalkBinding` pass every keydown, pointerdown and mousedown over (MAN-9062).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBindingCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts
+
+## MAN-9105 — server/modules/voice — synthesizeSentence: Kaylee's voice from Gemini, the streamed Interactions call, the answer, the abort and what is never counted
+
+`synthesizeSentence(userId, { text, style, signal }): Promise<SpeechAnswer>` (`gemini-speech.ts`) speaks one sentence of hers in the account's Gemini voice, streamed as PCM. `text` is the sentence's `speech` (sounds kept as `<tag>`), `style` its delivery. It never throws for an expected failure. Settings, key, routes: MAN-9098. The transcribing twin: MAN-9099. Rules: INV-9908. The sound-tag list's one home: INV-9938. Proof: `.verify/kaylee-voice-speech.mjs`.
+
+| consumer | reaches it as |
+|---|---|
+| `companion/companion-speech.ts` (the speech door, MAN-9110) | the voice barrel's `synthesizeSentence`: one call per sentence a floor page pulls, aborted on the cut or the hang-up (MAN-9111) |
+
+## Answer — `SpeechAnswer`
+| answer | when | `sentence` |
+|---|---|---|
+| `{ ok: true, chunks }` | the FIRST audio has already arrived: `chunks` yields it, then the rest | – |
+| `{ ok: false, reason: 'no_key' }` | no key in reach (MAN-9098 §The key); NO request is made | `No Gemini key: set one in Settings → Voice` |
+| `{ ok: false, reason: 'refused' }` | HTTP 401 or 403, or a 400 that names the key | `Gemini refused the key: <Google's message>` |
+| `{ ok: false, reason: 'failed' }` | any other status, a network error, a timeout, an `error` event before any audio, a stream that closes holding no audio | `Gemini could not speak this: <why>` |
+
+- Failures before the first audio are ANSWERS, so the route can refuse with a status (409 `COMPANION_SPEECH_REFUSED`) before it commits to a 200 stream. A failure AFTER audio began makes the iterator THROW an Error whose message is the sentence (an `error` event; the stream closing before `interaction.completed`: `the audio stopped before Google finished it`; a dropped connection; `no answer within 60 s`). An abort on `signal` is not a failure: the iterator simply ends.
+- `<why>` of `failed` before audio: `HTTP <status>: <Google's message, else the first 300 characters of the body, else HTTP <status>>`; `no answer within 60 s`; the fetch error's message and its cause's; `Google reported an error: <message>`; `the answer held no audio`; `the answer had no body`. The wording helpers are shared with `gemini-transcribe.ts` in `gemini-errors.ts` (`redactKey`, `googleMessage`, `namesTheKey`, `isRetryableStatus`, `describeFetchFailure`, `parseJsonObject`).
+
+## The request
+- `POST https://generativelanguage.googleapis.com/v1beta/interactions`, headers `x-goog-api-key: <key>` (nowhere else) and `Content-Type: application/json`, body `{ model, input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style }] }] }], response_format: { type: 'audio', mime_type: 'audio/l16' }, generation_config: { speech_config: [{ voice }] }, stream: true }`. `model` = the account's `gemini.speechModel`, `voice` = its `gemini.voice`, both read fresh per call. A blank `style` sends no `annotations`.
+- Google answers server-sent events. Measured 2026-10-27 on `gemini-3.8-flash-lite-tts`: `interaction.created`, `interaction.status_update`, `step.start`, then `step.delta` ×37 (each `delta.type` `audio`, `delta.data` base64 PCM), `step.stop`, `interaction.completed`. The event's name is its `event:` line, else the data's own `event_type`/`type`. Only audio deltas are read; `interaction.completed` ends it; an `error` event fails it.
+- PCM is little-endian Int16, mono, 24 kHz. Every yielded piece is a WHOLE number of samples: an odd trailing byte is carried into the next piece (tested: deltas of 801, 600 and 599 bytes yield 800, 600, 600).
+
+## Retry, bound, abort
+- ONE retry, after 1 s, when the first answer is 429 or 503 (before any audio); the pause ends at once on an abort. Any other status and a network error are not retried.
+- One 60 s bound on the whole call (the ask to the last byte).
+- `signal` aborting ends the stream at once (a pending `next()` resolves done) and cancels the request, so nothing more is generated. A consumer that stops early (`return()` on the iterator, even before its first read) cancels it too and the call's line is written; an abort that lands before the first read delivers no piece (`firstThenRest` is a hand-written iterator for that reason: a generator's body does not start until its first `next()`). An already-aborted signal makes no request, and an abort before the first audio answers `{ ok: true, chunks }` with `chunks` empty (no `ok: false`). Measured: an abort after the first chunk ended the iterator in 1 ms, the replay server saw the connection close with 4 of 42 events sent.
+
+## The key and the budget
+- The key is resolved per call (`resolveGeminiKey`) and rides the header only; every sentence passes `redactKey`.
+- NOT COUNTED (operator, 2026-10-26, "Kaylee doesn't count for the budget"): no `admit` before, no `record` after, no budget name. Measured: `/opt/shadow-connector/state/gemini_plan_spend/` listing identical before and after the paid proof.
+
+## Log
+- One line per call, written when it ends, never the key: `[voice] gemini speech <model> <characters> ch <bytes> B <ms> ms → ok|no_key|refused|failed|aborted`. `<bytes>` is the PCM delivered so far. Measured: `[voice] gemini speech gemini-3.8-flash-lite-tts 41 ch 138240 B 1322 ms → ok` (2.88 s of audio, first chunk 951 ms after the ask, 37 chunks of 1920–7680 B).
+
+## Gotcha — the voice slurs "build is"
+- `Okay so <short pause> the build is green!` with style `bright, warm, quick, a smile in the voice; delighted` is voiced, has a 340 ms pause where `<short pause>` stands, and nothing bracketed is spoken. It does NOT say "build is" clearly: Gemini's transcriber heard `Okay, so, the middle's green!` (lite) and `Okay, so the bill is green.` (flash-tts); faster-whisper `base` heard `Okay, so the bill's green!`. The delivered bytes are Google's, byte for byte (the PCM equals the base64 of the 37 stored deltas), so the slur is the voice's, not the module's. `.verify/kaylee-voice-speech.mjs` therefore judges that `green` was heard and that `short pause` was not spoken, and prints the words; a probe that must assert on "build" should choose a sentence without a fast contraction.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-speech.mjs
+
+## MAN-9106 — src/modules/companion — Proof — .verify/kaylee-voice-scaffold.sh (the voice switch, the speaking mark, Speaking and Cut, the Gemini section's voice rows)
+
+```bash
+bash .verify/kaylee-voice-scaffold.sh [--evidence <dir>] [--only fixtures|live]
+node .verify/kaylee-voice-scaffold.mjs [--evidence <dir>] [--before <url>] [--only fixtures|live]
+```
+- Gitignored (`.verify/`): on disk only. Pieces: MAN-9062 (`CompanionVoiceSwitch`, the log's speaking mark), MAN-9089 (Speaking and Cut on the status line), MAN-9093 (`voice?: CompanionVoice`), MAN-9094 (`GeminiNameField`, `SoundTagsField`). Live client `:5183`; no Gemini call, no model turn.
+- Exits 1 on any FAIL; zero console errors from either half. Photographs: `.verify/shots/kaylee-voice-scaffold/` + `shots.json`, at 1440×900 and 390×844, light and dark.
+
+## Fixtures (`lib/voice-kit.mjs`, `lib/voice-fixtures-panel.mjs`, `lib/voice-fixtures-settings.mjs`)
+- `voice-kit.mjs` mounts the app's own `CompanionPanelView` on `companion-fake.ts` (state `spoken`: a finished turn whose third sentence wraps and holds a sound) with a fake `talk` and `voice`, in the workspace shell's fixed box. Settings > Voice is the LIVE modal: its Gemini section is set aside and the fixture's `GeminiVoiceSection` stands in its place, driven by `FakeGemini`, a stand-in server: each save recorded, `saving` true in the same press and counted per save, the answer after `delay` ms, `soundTags: null` answered with `GOOGLE_TEN`, or refused with `refuse`.
+- `GOOGLE_TEN` is checked against the server's `DEFAULT_SOUND_TAGS` in `server/modules/voice/voice-settings.ts`.
+- Panel checks: the voice row on/off (name `Voice on this device`, glyph, the switch's right edge on Clear's, the controls row's picker and Clear unmoved, no row without `voice`); one sentence marked, the third, info tone, its sound inside, across wrapped lines, no character moved (paragraph height and every text node's first and last character); the band is a ground plus a same-colour ring, no underline; the status line for cut over listening, cut over speaking, listening after the cut, transcribing over speaking, speaking, voice off, no voice; a press on the switch and on its words each hand `!on`.
+- Settings checks: rows in order (API key, Transcription model, Speech model, Voice, Sound tags); placeholders; the speech model helper naming `gemini-3.8-flash-lite-tts`, held whole; ten chips named `Remove <tag>`; ten plus one; an add read as the parse reads a tag, busy while out, the field emptied when it lands; taken and misshapen words refused under the field; a remove; Restore asking first, Cancel sending nothing, Restore sending `null`; a refused add keeping the word; the last tag; thirty; the two names saved trimmed on blur or Enter, once; misshapen names refused in the helper's place; the transcription model as before.
+
+- Not asserted: the speaking mark's ink bar (the ring check passes on any shadow that contains the ground), the focus move after a removed chip, the 44px removable chip under `(pointer: coarse)`, Restore's place in the row's control slot (only that it exists).
+
+## Live (`lib/voice-live.mjs`) — exits 1 against the wired panel
+- Photographs her panel from the rail's door and Settings > Voice, and asserts the panel before the voice was wired: `facts.voiceRow === 0` and no mark (`voice-live.mjs:63-64`), the Gemini section's rows `API key` and `Transcription model` only (`:90`), and with `--before` every pair the same DOM. `CompanionPanel` now passes `voice` and the tab passes the speech rows, so `bash .verify/kaylee-voice-scaffold.sh` and `--only live` exit 1. Run `--only fixtures`. The live voice: `.verify/kaylee-voice-whole.mjs` (MAN-9113).
+- Opening her panel takes account 1's floor; opening Settings makes the app's own settings write.
+
+## The untouched client (`kaylee-voice-scaffold.sh`)
+- A scratch Vite on `VOICE_BEFORE_PORT` (default 5198) through `lib/vite-scratch-before.config.mjs`, with `PNH_BEFORE_DIR=.verify/before/kaylee-voice-scaffold`: the files in `BEFORE_FILES` are served as that snapshot holds them, taken before the scaffold's first edit (kaylee--talk's work under it was not committed, so git HEAD was older than "before"); everything else as the tree has it. Without `PNH_BEFORE_DIR` the config serves git HEAD, as before.
+- Refuses to start when the port listens or the snapshot lacks a listed file. Kills only a pid that is a plain number above 1 whose command line is vite; removes only its own `mktemp -d` scratch.
+
+## Measured
+- 2026-10-27, before review 1's fix-pass (Restore in the row's control slot, the speaking mark's ink bar, focus after a removed chip, 44px removable chips under a finger), which was not re-run: 128 fixture checks passed in one run, zero console errors. `.verify/kaylee-talk-scaffold.mjs --only fixtures` still passed its 207 checks after `GeminiNameField` took the transcription row.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-scaffold.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/vite-scratch-before.config.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-fixtures-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-fixtures-settings.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-live.mjs
+
+## MAN-9110 — server/modules/companion — the speech door: GET /speech/:turnId/:index, the floor rule, the sentence rebuilt from its log row, the refusals and the request line
+
+`GET /api/companion/speech/:turnId/:index` speaks ONE of her sentences to the page that holds the floor, as raw PCM streamed while Gemini synthesizes it. The page pulls (MAN-9113); the server never pushes audio. Verb: `companionService.speech` = `speak` of `createSpeech` (`companion-speech.ts`). The voice call: MAN-9105. The cache and `POST /cut`: MAN-9111. Not counted against any Gemini budget: the door asks none (INV-9908). Rules: INV-9939.
+
+## Request
+| part | rule |
+|---|---|
+| `x-companion-client` | REQUIRED: 400 `COMPANION_INPUT_INVALID` without it (MAN-9058 §Input). It must be the floor's, below |
+| `:turnId` | `/^[A-Za-z0-9_-]{1,100}$/` (`readTurnIdParam`); else 400 naming `turnId` |
+| `:index` | digits, no sign, no leading zero, 0–100000 (`readSentenceIndexParam`); else 400 naming `index` |
+| `HEAD` | 405 `Allow: GET`. why: Express answers a HEAD with the GET handler, which would start a synthesis for a response that carries no audio |
+
+## Checks, in this order (`serve`)
+1. The request's client is not `store.readState().floor` → 409 `COMPANION_NOT_FLOOR`.
+2. `speechCache.isCurrent(turnId)` is false → 404 `COMPANION_NO_SENTENCE`. The current turn is in memory: a server restart, Clear and shutdown leave none, so every sentence answers 404 until the next turn starts.
+3. `speechCache.find(turnId, index)` holds an entry (finished, or still being synthesized) → joined: no second call, logged `(cache)`.
+4. Otherwise `store.readSentence(turnId, index)` is `null` → 404. `utteranceOf` is `null` → 204, no entry cached, no call. Else `startSynthesis`: an entry put in the cache, `synthesizeSentence(userId, { text, style, signal: entry.abort.signal })`, logged `(gemini)`.
+5. The request joins the entry (`joinEntry`) and waits for `entry.opened`: the first audio, or the refusal, thrown before a byte.
+
+## Answers
+| status | `code` | when | body |
+|---|---|---|---|
+| 200 | – | first audio arrived | PCM, little-endian Int16, mono, 24 kHz, whole samples per write; `Content-Type: audio/l16; rate=24000; channels=1`, `Cache-Control: no-store`, `X-Accel-Buffering: no` |
+| 204 | – | nothing to say | none |
+| 400 | `COMPANION_INPUT_INVALID` | a malformed param, or no client id | the field's sentence |
+| 404 | `COMPANION_NO_SENTENCE` | not the current turn, an index the log holds no `kaylee` row for, or a cleared log | `She has no such sentence to say: it is not in her current turn.` |
+| 409 | `COMPANION_NOT_FLOOR` | check 1 | `Another page holds the floor, so her voice plays there; this page shows her words only.` |
+| 409 | `COMPANION_SPEECH_REFUSED` | `synthesizeSentence` answered `no_key` or `refused` | Google's sentence, e.g. `No Gemini key: set one in Settings → Voice` |
+| 502 | `COMPANION_SPEECH_FAILED` | `synthesizeSentence` answered `failed` before the first byte | its sentence (key redacted) |
+- Envelope: MAN-9058 §Refusals. The mapping is `geminiRefusal` (`companion-input.ts`), shared with the press door.
+- A synthesis that fails or stops AFTER the first byte ends the response where the audio stopped; the status is already 200. The door writes `[companion] speech <turn>/<index>: the audio stopped early: <sentence>` on stderr (`fill`, `companion-speech.ts`) and drops the entry. `[companion] speech: the audio stream stopped before its end` (`streamPcm`) is the route's own catch for an iterator that throws, which `followEntry` does not. The write waits on `drain` or `close` between pieces.
+- A page that hangs up (`response` `close`) aborts its request's signal; the synthesis stops when its LAST follower leaves unfinished. An entry that stopped before its end leaves the cache: half a sentence is never replayed.
+- A second request for a sentence still being synthesized FOLLOWS it: the audio that has arrived, then each piece on a wake (no poll). One call serves both.
+
+## The refusal's system line
+- The first `no_key` or `refused` of a turn writes ONE `system` log line `I could not speak: <sentence>` (`claimRefusalLine(turnId)`); later refused sentences of that turn write none. A `failed` writes none. A panel write that throws is logged and does not change the answer.
+- The page stops pulling that turn on a 409 (MAN-9113) and shows nothing of its own: the line arrives as a `companion_log` frame.
+
+## The sentence, rebuilt from its log row (`companion-utterance.ts`, pure)
+- Row: `companionDb.readSentence(userId, turnId, index)`, the newest `kaylee` row of that turn and index (`turn_id`, `turn_index`). The cache holds audio only; the words come from the row.
+- `text` = the row's display `text` with each sound written back as `<tag>` at its offset `at` (clamped to the text), ordered by offset then by the order made. A space on each side of a tag, none outside at the start or end; `.,!?;:…` right after a tag closes up. Equals `parseExpression`'s `speech` up to spacing; `speech` itself is not stored.
+- `style` = the account's `deliveryNote` (`readCompanionSettings`), or `<deliveryNote>; <mood>` when the sentence led with a mood; the mood alone when the note is empty; both empty = no style (no `annotations` in the request). why short: Google warns that a long style block makes the voice drift.
+- Nothing to say = no letter or digit (any script) once `<…>` spans are removed, so `<short pause>` alone, or punctuation alone, answers 204.
+
+## Log
+- One line per request: `[companion] speech <turn>/<index> client=<id> → <status> (<cache|gemini>)`. The parenthesis is absent when the request was refused before either (404, 409 `COMPANION_NOT_FLOOR`, 204). A non-`AppError` throw logs 500.
+- One `[voice] gemini speech …` line per call (MAN-9105). A probe counts requests and calls by these two.
+
+## Proof
+- `bash .verify/kaylee-speech-door.sh`: no Gemini call. `GEMINI_API_KEY` unset, `GEMINI_ENV_FILE` an empty file, `DATABASE_PATH` a `.backup` copy of `auth.db`, all under one `mktemp -d`. The real routes, door, cache, store and `synthesizeSentence`; stand-ins for her session (records `oweCut` and `interrupt`) and Google's host (a wrapped `fetch` answering server-sent events). Eight legs: no key and the 204s; the guards; a sentence streamed, then from the cache; the text and style Gemini was given, and a follower; a hang-up; the cut; refusals and failures; the 4 MB bound, the expiry, a new turn, shutdown. 2026-10-27: 50 of 50 checks passed.
+- `node .verify/kaylee-speech-door-live.mjs`: curl against :3011 as account 1 with a `/ws` socket printing the `companion_*` frames; Kaylee on `haiku` (stops otherwise); exits 2 when account 1 holds a Gemini key of its own (`key.source` `stored`), since leg 3 stores a made-up key and deletes it; at most 2 Gemini calls on `gemini-3.8-flash-lite-tts`; the spend-ledger listing before and after.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-utterance.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-speech-door-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-speech-door.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-speech-door.sh
+
+## MAN-9111 — server/modules/companion — the speech cache and the cut: the bounds, POST /cut, oweCut and <cut heard interrupted/>
+
+The door's audio is kept per account for the current turn (`companion-speech-cache.ts`), and a talk press while she speaks is the cut (`POST /cut`, `cut` in `companion-speech.ts`). The door: MAN-9110. The page's side of the cut: MAN-9113. What she is pushed: MAN-9080. Rules: INV-9939.
+
+## The cache — one per account
+- Made by `createCompanionAccount` (`speechCache` on `CompanionAccount`, MAN-9070). Shape: `Map<turnId, Map<index, SpeechEntry>>`.
+- `SpeechEntry` = `{ pcm: Buffer[]; done: boolean; abort: AbortController; bytes; followers; opened; wakes }`.
+  - `pcm` the audio so far. `done` true once no more will come (finished, failed or aborted). `abort` stops the synthesis underneath.
+  - `opened` settles with `null` at the first audio, or with the `AppError` the door answers. `followers` counts the requests reading it. `wakes` are the requests waiting for more.
+
+| verb | does |
+|---|---|
+| `startTurn(turnId)` | frees the audio of every earlier turn; `turnId` is the only speakable turn from now. Called by `onTurnStarted` BEFORE the `companion_turn` frame. why: a page pulls sentence 0 the moment its frame arrives |
+| `isCurrent`, `find`, `put`, `remove` | the door's reads and writes; `remove` takes an entry out only while it is still the one held for that sentence |
+| `trim()` | keeps the byte bound; called after each chunk lands |
+| `abortTurn(turnId)` | the cut: aborts every unfinished synthesis of the turn, the freed ones (orphans) of that turn included, and answers how many it stopped. Finished sentences stay |
+| `end()` | aborts every synthesis, forgets every turn AND the current one: Clear (`companionService.clear`, before the session is told) and `stopAll`. why: a sentence streaming to a page would hold the HTTP drain open |
+| `claimRefusalLine(turnId)` | true once per turn: the turn's one `I could not speak` line (MAN-9110) |
+
+| bound | value | behaviour |
+|---|---|---|
+| size | `SPEECH_CACHE_MAX_BYTES` = 4 MB per account (about 87 s of audio) | the oldest FINISHED sentence is dropped first; a sentence still being synthesized is never dropped for room, someone is listening |
+| age | `SPEECH_CACHE_TTL_MS` = ten minutes after the LAST sentence was added | one `setTimeout` (`unref`), reset by each `put`, cleared when the audio is freed: an expiry, not a poll. It frees AUDIO only; the turn stays current, so a sentence asked after the gap is synthesized again (never a 404) |
+| turn | the next turn starts | the earlier turns' audio is freed |
+
+- ORPHAN: a synthesis in flight when its audio is freed (a new turn, the expiry) is not stopped. It finishes for the page that holds it, kept outside `turns` so no new request finds it, and still reached by `abortTurn(its turn)` and `end()`.
+- An entry that stopped before its end (a failure, an abort, a hang-up) leaves the cache.
+
+## `POST /cut`
+- Request: JSON `{ turnId: string, heard: number | null, interrupted: number | null }`. Client id optional (checked when present). `turnId` as the speech route's. `heard` and `interrupted` are REQUIRED keys, each a whole number 0–100000 or `null`; a digit string, a negative, a missing key: 400 `COMPANION_INPUT_INVALID` naming the field (`readBodyTurnId`, `readBodySentenceIndex`).
+- `heard` = index of the last sentence of that turn whose playback ENDED; `interrupted` = the index playing at the press. `null` = none.
+- 204, answered AFTER her turn was interrupted (seconds, when her process is slow to answer).
+- The press is the cut's only trigger: an alert never cuts her. It needs no floor and no current turn.
+
+`cut(userId, { turnId, heard, interrupted })` (`companion-speech.ts`), in this order:
+1. `speechCache.abortTurn(turnId)`: nothing more is spent on that turn.
+2. `session.oweCut(textOf(heard), textOf(interrupted))`. `textOf(i)` = the display text of the turn's log row `i` (`store.readSentence`), `null` for a `null` index or a row the log no longer holds.
+3. Log: `[companion] cut <turn> heard=<n|none> interrupted=<n|none>: <k> synthesis(es) stopped`.
+4. `await session.interrupt()`: stops her running turn; with none, nothing.
+- why 2 before 4: the press's own message can arrive while she is stopping and must already carry the cut.
+- A turn the log no longer holds still stops her and owes a cut with both values empty.
+
+## Owed, then carried
+- `CompanionSession.oweCut(heard: string | null, interrupted: string | null)` → the assembler stores `{ heard ?? '', interrupted ?? '' }`. A later cut replaces one no message has carried yet. Clear drops it.
+- The next message pushed to her (normally the press's own) carries `<cut heard="…" interrupted="…"/>` as its second part, after `<state>` (MAN-9080). Builder: `cutEnvelope(heard, interrupted)` (`companion-envelopes.ts`); each value is a display text escaped as an attribute (`&` `<` `>` `"`), `""` for none.
+- The system prompt teaches it: `heard` is the last sentence that played to its end (empty when none), `interrupted` the sentence he cut off, which he heard only in part; nothing after those was heard.
+
+## Proof
+`bash .verify/kaylee-speech-door.sh` (MAN-9110) legs 6 and 8: a malformed cut is refused and owes nothing; a cut aborts the turn's syntheses, owes the two texts and interrupts her; the 4 MB bound, the expiry, a new turn and `end()`. The whole path with her real JSONL: `.verify/kaylee-voice-whole.mjs` step 2 (MAN-9113).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech-cache.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-message.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session-types.ts
+
+## MAN-9112 — src/modules/companion — pcmPlayer: one AudioContext, gapless scheduling on the audio clock, onSentence, level and the synchronous stop
+
+`createPcmPlayer(): PcmPlayer` (`utils/pcmPlayer.ts`) turns the speech door's PCM streams into sound, sentence after sentence with no gap. Private to the companion module (not in its barrel). The page's one is made by `useCompanionVoice` (`useState(createPcmPlayer)`, MAN-9113). Input: the format of `GET /speech` (MAN-9110): little-endian Int16, mono, 24 kHz, no container.
+
+| caller | uses |
+|---|---|
+| `utils/speechPull.ts` | `enqueue`, `playing`, `lastEnded`, `stop` |
+| `hooks/useCompanionVoice.ts` | `unlock`, and `onSentence` (hands the pull its `start` and `end`) |
+
+## `PcmPlayer`
+| member | does |
+|---|---|
+| `enqueue(turnId, index, body)` | plays the sentence after those already enqueued, reading `body` as it arrives. A chunk may end mid-sample: the odd byte is carried to the next chunk. Never throws. A body it cannot read (locked, or `null`) is logged and skipped. A `turnId`/`index` already queued is cancelled, not logged. A browser with no Web Audio is logged and its body cancelled |
+| `stop()` | SYNCHRONOUS: stops and disconnects every scheduled source, cancels every body being read, empties the queue. No event follows. `playing()` is `null` in the same call. A sentence enqueued afterwards plays normally |
+| `playing()` | the sentence between its `start` and `end` events, else `null`: before the first, after `stop()`, and for the instant between one sentence's `end` and the next one's `start` (two separate audio callbacks) |
+| `lastEnded()` | the last sentence that sounded to its end; survives `stop()`. A stopped sentence is not one. A body that brought no audio is not one (its `end` is still sent) |
+| `level()` | the analyser's RMS over its last 1024 samples (43 ms), 0..1. 0 when no context exists, the context is not `running`, or from the instant of `stop()` until the analyser window and one render quantum (128 frames) have passed: the cut audio is hidden, not left to fade |
+| `onSentence(listener)` | `{ turnId, index, phase: 'start' \| 'end' }` for each sentence; answers the unsubscribe. A listener that throws is logged; the others still hear it |
+| `unlock()` | makes or resumes the AudioContext. Call inside a gesture with nothing awaited first: the context is made and `resume()` called before the first `await` |
+
+## The graph
+- One `AudioContext` per player, made lazily by `unlock()` or the first `enqueue()`: a page that never speaks opens none. Made at 24 kHz so a buffer plays with no resampling (a buffer resampled one chunk at a time glitches at every edge); a browser that refuses gets its own rate and a warning.
+- Every source → one `GainNode` → one `AnalyserNode` (`fftSize` 1024) → destination.
+
+## Gapless scheduling
+- Chunks go on the audio clock, never a timer. Each starts where the one before it ends, counted in whole samples since the run began: `startAt = runStart + runSamples / 24000` (a running sum of floats would drift).
+- A new run begins only when nothing is scheduled ahead: the end of what is scheduled is under `currentTime` + `JOIN_GUARD_SECONDS` (0.01 s). It starts at `RESTART_LEAD_SECONDS` (0.05 s) past `currentTime`, rounded up to the context's sample grid.
+- ORDER: a later sentence's chunks wait in `waiting` until every earlier body is over, so sentences never interleave.
+- A body that fails partway is spoken as far as it got; the sentence ends there rather than hanging the queue.
+
+## Events
+- Nothing polls: the audio clock reports both. `start` = the `ended` of a silent one-sample marker scheduled at the sentence's first chunk. `end` = the `ended` of its last real buffer, once the body is over.
+- `drain()` is the only place events go out: in enqueue order, `start` before `end`, whatever order the browser delivered the callbacks in. The join between two sentences reads as one instant.
+- They fire when the audio thread renders the moment, which is the output latency (a few tens of ms) before it is audible.
+- A body with no audio takes its turn: `start` then `end` back to back, so whoever waits on it (the pull) is not left waiting.
+
+## Proof
+`node .verify/kaylee-voice-pcm-player.mjs` (live :5183, Playwright, generated tones, no Gemini call, nothing mocked but the network). Web Audio is observed where the player calls it. Legs: two sentences in one go in odd 37-byte chunks (events and their times, gap between consecutive scheduled buffers, samples handed over against samples sent, the level); a stream far slower than its sound; a stop 300 ms into a 3 s tone (`playing()` null in the same call, body cancelled, every source stopped, no event, level 0 within 100 ms); a sentence after the stop. Exits 1 on any FAIL and on any console error. 2026-10-27, run by the review on a loaded box: every leg PASS, exit 0, 1,947 buffers scheduled, largest gap between consecutive buffers 0, `stop()` in 0.40 ms with 322 sources stopped and the body cancelled, level 0 at 100 ms.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/pcmPlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-pcm-player.mjs
+
+## MAN-9113 — src/modules/companion — her voice on the page: useCompanionVoice, the pull (speechPull.ts), the per-device switch, the cut on the press and the presence that orders the page's states
+
+The page that holds the floor pulls her sentences from `GET /speech` (MAN-9110) and plays them through its player (MAN-9112). A press while she sounds is the cut (MAN-9111). Server side of the floor: MAN-9082. Rules: INV-9940.
+
+## `useCompanionVoice({ picture, clientId })` (`hooks/useCompanionVoice.ts`)
+- Called ONCE, by `CompanionProvider`. Answers `{ voice, unlock, cutOff, release, silence }`.
+- `voice: CompanionVoice` = `{ on, setOn, speaking, cut }` (`src/shared/types.ts`) is the `voice` member of `useCompanion()` (MAN-9083). `unlock`, `cutOff` and `release` go to `useTalkPress(speech)`; `unlock` and `silence` are also the provider's.
+- The pull runs while `on && picture.floor === clientId`: `engine.arm()` when that becomes true, `engine.disarm()` when it stops (hang up the request, `player.stop()`, `speaking` null). Every other page, and a page with the switch off, makes NO speech request and shows the words only.
+- `engine.see(picture)` runs on every folded picture, floor or not, so the pull knows the log when it arms.
+
+## The switch — per device
+- `localStorage['companion-voice']`: `'off'` = off; any other value or none = ON (default). A storage that refuses the read = on; one that refuses the write = the switch holds for the page's life.
+- `voice.setOn(next)` stores it and, when turning on, calls `player.unlock()` (the click is the gesture).
+- Drawn by `CompanionVoiceSwitch`, "Voice on this device", row four of `CompanionHeader` (MAN-9089); off, her words still stream into the log.
+
+## Unlock — the page's audio opens inside a gesture
+`unlock()` (a no-op while the switch is off) is the FIRST statement of: opening her panel (`setOpen(true)`), `sendText`, and every talk press (`useTalkPress.toggle`).
+
+## The pull (`utils/speechPull.ts`, `createSpeechPull(player, setSpeaking)`)
+Plain closures; the only clocks are a picture, an answer and the player's `start` event. Nothing polls.
+| rule | detail |
+|---|---|
+| what it asks | `api.companion.speech(turnId, index, signal)` for the smallest index at or after `next` whose `kaylee` row is in `picture.log` for the running turn: "the frame has arrived" |
+| how far ahead | `pending` holds the request from its ask until the player STARTS that sentence (`onSentence` `start`). So: the one sounding, plus one asked or queued. Sentence k is asked when its frame has arrived and nothing is pending: at once when the player is idle, else when k-1 starts. So the silence between two sentences is k's synthesis latency minus k-1's length, when positive: about 360 ms after a one-word sentence (reported by the fill review, 2026-10-27; no fix designed) |
+| joining mid-turn | `arm()` begins after the last sentence the log holds, so a page that takes the floor mid-turn starts with the next frame to arrive |
+| a new turn | `picture.turnId` changed → `follow(turnId, 0)`: an unanswered request is hung up, what the player already holds plays out. With no turn running, the newest sentence's turn the page never followed is joined after its last sentence (not read out late) |
+| 200 `audio/l16` with a body | `player.enqueue`; `next` = index + 1 |
+| 204; any 5xx; a 200 that is not `audio/l16`; a failed fetch | skipped (`next` = index + 1); the last three warn |
+| 409 (`COMPANION_SPEECH_REFUSED`, `COMPANION_NOT_FLOOR`), 404, any other refusal | `stopped` for the turn; the next turn starts again. The refusal's sentence is NOT shown by the page: the server wrote it as a `system` line (MAN-9110) |
+| a socket reconnect | the picture is re-seeded and `see()` runs; the pull keeps its place |
+| `speaking` | set at a sentence's `start`, held until the next one starts, `null` only when the player is silent and nothing is pending: never between two sentences |
+| `silence()` | hang up, `stopped` for the turn, `player.stop()`, `speaking` null; the floor is kept. Called by Stop (`interrupt`, before the request) and the `companion_cleared` frame |
+
+## The cut on the press (`useTalkPress.toggle`, MAN-9101)
+1. `unlock()`.
+2. The press that OPENS the mic calls `cutOff()`: `held` = true (nothing is asked for while he records, so her voice never enters his clip).
+   - If `player.playing()` or a request is pending: `turnId` = the playing sentence's, else the pending one's; `heard` = `player.lastEnded().index` when it is of that turn, else `null`; `interrupted` = the playing index when of that turn, else `null`. Then `silence()` and `POST /api/companion/cut { turnId, heard, interrupted }` (MAN-9111). `cutOff` answers that request's settling, never rejecting. Nothing sounding and nothing on its way: `null`, no request, the press only holds the pull.
+   - `voice.cut` is true for `CUT_SHOWN_MS` = 900 ms.
+3. The mic opens at once; the clip's upload awaits the cut's settling (`cutOwedRef`), so the cut is owed before the press is pushed.
+4. The press that ends the recording, a mic that never opened and a device that went away each call `release()`: `held` false, `next` = at least one past every sentence in the log, then the pull resumes. What she said while his mic was open is not read out afterwards.
+
+## The presence — the one state, in one order
+`presenceOf(activity, talkState, cut, speaking)` (`hooks/useCompanionPresence.ts`, pure): `cut` (`voice.cut`) > `listening` > `transcribing` (`talk.state`) > `speaking` (`voice.speaking !== null`) > the activity's phase (`reading_code`, `reading_session`, `drafting`, `walking`, `thinking`, `idle`: one at a time, so they never compete; a phase this build cannot name reads as `thinking`; no picture yet reads as `idle`). `session`, `files` and `walk` always come from the activity, whatever the state. `useCompanionPresence()` is that function over `useCompanion()`'s `picture.activity`, `talk.state` and `voice`, memoized on those parts: THE ONLY READER of the three (not of the process: the header still reads `picture.process` for asleep, waking and failed), keyed on the activity's value so a repeated frame mints no new object, called by `CompanionPanel`, whose `presence` reaches `CompanionHeader`'s status line (words and tones: MAN-9089). The `.verify/lib/*-kit.mjs` fixtures call `presenceOf` where no provider stands. The log marks the sentence whose `turnId` and `index` equal `voice.speaking` (`CompanionLog`, `[data-companion-speaking-sentence]`; MAN-9062).
+
+## Proof
+`node .verify/kaylee-voice-whole.mjs [--steps 0,…,7]`: live :5183 and :3011 as account 1, Kaylee on `haiku`, the speech model on `gemini-3.8-flash-lite-tts`; two Chromium pages (a laptop 1440×900, a phone 390×844) with the fake-media flags. Steps: 0 setup; 1 the phone asks "Count from one to six, one number per sentence." (the phone speaks and marks, the laptop makes no speech request); 2 the cut on the third sentence (silent within 0.1 s, `{ turnId, heard: 1, interrupted: 2 }`, her next JSONL user message opens with `<cut heard=… interrupted=…/>`); 3 the laptop presses talk and the floor moves; 4 the laptop's switch off; 5 Settings (the speech model, voice and sound tags; `hum` into her next `<register>`; Restore); 6 the spend ledger before and after; 7 the pull's edges with the door answered by the probe, no Gemini call (`lib/voice-whole-edges.mjs`). It puts Kaylee's model, the speech model and the sound tags back as found.
+
+`node .verify/kaylee-presence-whole.mjs` (live :5183 and :3011 as account 1, Kaylee on `haiku`, the speech model on `gemini-3.8-flash-lite-tts`, Chromium with the fake-media flags; the voice switch OFF until the last step, so the long turn costs no Gemini call): a requestAnimationFrame loop installed before the app runs keeps every change of `[data-companion-status]` with its frame. One turn naming a probe chat by id (a hidden project's chat is on her roster only through the `<view>`, the freshest tab of the shared account, or an id she is handed): `Reading <chat>`, `Drafting for <chat>`, each drawn within 250 ms of its `companion_activity` frame (asserted; 2026-10-27 measured about 15 ms); two talk presses in 0.26 s: `Listening`, then `Transcribing`; the voice switch on and one short sentence: `Speaking`, exactly one speech call, answered. The four in their order, no console error from the recorder on; the longest gap between read frames is printed, not asserted (it is the host's load). It leaves her focus on the deleted probe chat (no route sets it back; only her Clear empties it). 2026-10-27: all pass, before the `Transcribing` and exactly-one checks were added.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/speechPull.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-kit.mjs
+
+## MAN-9123 — The queued message — one per session, appended to on the server, sent by the dispatcher: routes, merge, claim, restore and the composer's rules
+
+A message sent while a turn runs is queued; the dispatcher sends it when the session is idle. One queued message per `(user_id, draft_scope)` row of `session_drafts` (column `queued_message`).
+
+## Routes (`server/modules/user/user.routes.ts`, mounted at `/api/user`)
+| Route | Body | Answers |
+|---|---|---|
+| `POST /drafts/queued-message` | `{ scope, queuedMessage: { id?, content, options?, attachments } }` | 200 `{ success, queuedMessage, appended }` — what the scope now holds; `appended` = merged into a waiting message |
+| `DELETE /drafts/queued-message` | `{ scope }` | 200 `{ success, queuedMessage }` — the message it removed, `null` when nothing was waiting |
+| `PUT /drafts` | `{ scope, text? }` | 200 `{ success, written }` — `written` is what was stored: `["text"]`, or `[]` when the body had no `text`. A `queuedMessage` in the body is ignored |
+| `DELETE /drafts` | `{ scope }` | 200 — deletes the scope's whole row: text and queued message both. Only a page loaded before the per-part saves calls it |
+
+| Refusal | Code | Status |
+|---|---|---|
+| no text and no attachments | `INVALID_QUEUED_MESSAGE` | 400 |
+| content, or merged content, over `MAX_DRAFT_TEXT_LENGTH` (100 000 chars) | `QUEUED_MESSAGE_TOO_LONG` | 413 |
+| the waiting message or the new one starts with `/` (after leading whitespace) | `QUEUED_MESSAGE_NOT_COMBINABLE` | 409 |
+A refusal stores nothing.
+
+## Merge — `sessionDraftsDb.appendQueuedMessage(userId, scope, message, maxContentLength)`
+1. One transaction: read the stored message, merge, write. Returns `QueuedAppendResult` (`server/shared/types.ts`): `queued` | `not-combinable` | `too-long`.
+2. `content` = both texts joined by a blank line (empty parts dropped); `attachments` concatenated in order.
+3. `options` and `id` = the newer message's, falling back to the older.
+4. Never touches `draft_text`.
+5. A message queued after the dispatcher claimed the earlier one is stored alone. why: the claim cleared the column; nothing is sent twice.
+- `readQueuedChatMessage` (`server/shared/utils.ts`) is the one reader of a stored value; the repo and the dispatcher both use it. It reads legacy `images` as `attachments`.
+
+## Clear — `sessionDraftsDb.clearQueuedMessage(userId, scope)`
+- Nulls `queued_message`, returns the removed `QueuedChatMessage | null`, deletes the row if empty (`deleteEmptyDraft`).
+
+## Dispatch (`scheduled-message-dispatcher.service.ts`, `POLL_INTERVAL_MS = 30_000`)
+1. `listQueuedMessages` → per session idle: `claimQueuedMessage` (compare-and-null on the exact stored string; a row the claim leaves empty is deleted).
+2. Send through `runDetachedChatTurn`.
+3. Turn did not start → `restoreQueuedMessage`: puts the claimed message back IN FRONT of anything queued since (merged); the row is upserted, since the claim may have deleted it.
+
+## Text save — `sessionDraftsDb.saveDraft(userId, scope, text)`
+- `PUT /drafts` writes `draft_text` and nothing else; it never touches `queued_message`. A body that still carries `queuedMessage` (a page loaded before the append route) has that field ignored, and its text is saved. why not a 4xx: that page sends its text in the same body, and a refusal would lose it.
+- What that page's queue and cancel become: it sends `{ scope, queuedMessage: X }` to queue and `{ scope, queuedMessage: null }` to Edit or Delete, with no `text`. Both answer 200 `written: []` and change nothing. So the queue the page draws is never stored (nothing is sent), and a card it cancels stays stored and is sent by the dispatcher. Honouring the explicit `null` would let a stale tab wipe a follow-up another tab just added, so the operator holds that call.
+- A queued message changes only through append, clear, `DELETE /drafts` (the whole row) and the dispatcher's claim and restore.
+
+## Client — `src/shared/chatDrafts.ts`
+- `appendQueuedMessage(scope, message)` → `{ queuedMessage, appended }`; rejects `QueueRefusedError { code }` when the server refused.
+- `clearQueuedMessage(scope)` → `{ landed, removed, sentence }`.
+- The page's copy of the queue (and its localStorage mirror `chat-drafts`) changes only on a server answer: an append's reply or a `landed` clear. It is never written back to the server.
+- Per-scope requests are serialized (`queueRequests`); `queueRevisions` makes a `hydrateChatDrafts` that began before a local change keep the local copy.
+- The debounced text save sends `text` only.
+
+## Composer — `useChatComposerState.ts`
+| Action | Rule |
+|---|---|
+| queue | emptied composer; on refusal the text returns in front of anything typed since, and an error line shows (`input.queue.notCombinable` for 409, else `Failed to queue message: …`) |
+| Edit / Delete | `takeCardOffServerQueue` clears on the server and acts on the message the server REMOVED, never the card's copy; a second press while a clear is in flight is ignored |
+| clear did not land | card stays; error line `Failed to remove the queued message: … It is still queued.` |
+| Edit, nothing removed | composer left empty. why: the dispatcher already sent it; filling it sends twice |
+| Delete, server held more than the card | error line carries the full deleted text |
+| session switch during a clear | the text goes to the origin session's draft (`writeDraftText`); the open card and composer are left alone |
+| card refresh | `hydrateChatDrafts` every 5 s and on `visibilitychange` to visible |
+- Those two error lines are English literals; only `input.queue.*` keys are translated (en, es, ko, zh-CN).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-drafts.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/scheduled-messages/services/scheduled-message-dispatcher.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/user/user.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/user/user.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/user/user.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/QueuedMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/chatDrafts.ts
+
+## MAN-9124 — src/modules/companion CompanionAvatar — Kaylee's face: props, looks, the --kaylee-mouth contract, ring numbers, accessible name, fixture
+
+## `CompanionAvatar` — Kaylee's face (`src/modules/companion/CompanionAvatar.tsx`, `CompanionAvatar.css`)
+
+One SVG drawn in code on Verve tokens, no image. Fills a square of `size` px and owns no chrome: the disc, the dock and the motion around her are the button's. Mounted by: nothing yet; `FILL(fill)` in `CompanionFab.tsx` marks the mount and the one in `CompanionAvatar.tsx` marks the mouth loop.
+
+### Props — `CompanionAvatar({ presence, level, size, name? })`
+| prop | type | use |
+|---|---|---|
+| `presence` | `CompanionPresence` | `state` picks the look; `walk` feeds the ring; `session.name` / `files` feed the accessible name |
+| `level` | `() => number` | the page player's `level()`; read only by the mouth loop, never a changing prop (a level through React redraws sixty times a second). Raw RMS ~0.02–0.3: the loop scales it to 0..1 before writing the variable |
+| `size` | `number` | px |
+| `name` | `string?` | her name as he set it; absent ⇒ `t('companion.defaultName')` |
+
+### Looks — `data-state` on the `<svg class="kaylee">`
+| state | accent on | pose |
+|---|---|---|
+| `idle` | none | breath, blink |
+| `listening` | `.kaylee__ears` | head tilted, brows up |
+| `transcribing` | `.kaylee__dots` | looks down, dots faster |
+| `thinking` | `.kaylee__dots` | looks up and away, crooked smile |
+| `speaking` | none | mouth is the variable's |
+| `reading_session` | `.kaylee__bubble` | eyes along its lines |
+| `reading_code` | `.kaylee__page` | eyes across it |
+| `drafting` | `.kaylee__draft` | pencil writes a stroke under her chin |
+| `walking` | `.kaylee__walk` | ring filled clockwise from the top to `walk.at / walk.total`; `.kaylee__halo` is `display: none` in both motion modes |
+| `cut` | `.kaylee__surprise` | wide eyes, high brows, round mouth, one blink; `.kaylee__mouth-open` is `display: none` |
+
+- Markup always holds every part; `[data-state]` turns on one accent and sets the pose. A look is a still frame; movement lives only inside `@media (prefers-reduced-motion: no-preference)` at the foot of the stylesheet. why: reduced motion keeps each look and drops the movement with no rule of its own.
+- Pose uses `rotate` / `scale` / `translate`, never `transform`. why: a breathing keyframe (`scale`) must not fight the tilt (`rotate`).
+- Palette: Verve tokens only, plus two `#fff` glints (white in both themes). `--kaylee-rim` is the face's own darker edge (garnish 40% over `--ink` in light, over `--canvas` in dark). why: it holds on any ground, the FAB's green disc included.
+- Ids: one `useId()` per face prefixes the gradient and clip ids. why: a page holds several faces.
+
+### `--kaylee-mouth` — the mouth contract
+| rule | detail |
+|---|---|
+| range | `0` closed smile .. `1` open wide; default `0` on `.kaylee` |
+| writer | the `fill` loop, on the svg element's own `style`; React never sets it, so a redraw cannot overwrite it |
+| open mouth | `.kaylee__mouth-open` scales on it (`0.4 + v * 0.6`) and is hidden at `0` (`opacity: clamp(0, v * 40, 1)`) |
+| heard only while `data-state='speaking'` | `.kaylee:not([data-state='speaking']) .kaylee__mouth-open { opacity: 0 }`; a value left in the variable never opens a stopped face, so the loop need not reset it |
+| reduced motion | the CSS ignores the variable while speaking: `scale: 1 0.78; opacity: 1` (half open, still); the loop may run, need not |
+
+### Ring numbers
+- `walk.at/walk.total` in a pill over the lower face, hidden until `.kaylee:hover`, or hover / `:focus-visible` of any `button`, `a`, `[role='button']`, `[tabindex]` ancestor. The button around her needs no wiring.
+- Font 22 units, minus 3 per digit past 3 characters, floor 12; pill width `min(68, natural + 14)`. A longer walk is squeezed with `textLength` + `lengthAdjust='spacingAndGlyphs'` (`1391/1391`, `12345/12345` stay inside the face).
+- `walk.total` 0 ⇒ the track alone; `walk.at` 0 ⇒ the arc is empty.
+
+### Accessible name
+- `role="img"`, `aria-label` = `nameOf()`: her name, then the state in words, keys `companion.avatar.*` in `en/common.json` (`defaultValue` carries the English; other locales fall back to English).
+- `reading_session`: chat name, else "a chat". `reading_code`: 0 files ⇒ "code"; ≤ `FILES_NAMED` (2) ⇒ base names joined by `, `; more ⇒ "{{count}} files". `drafting`: "for {{chat}}", else "a new chat". `walking`: chat + `walk` ⇒ "walking {{chat}}, item {{at}} of {{total}}", else "walking a result". `cut`: "stopped talking".
+- A button around her may replace it with its own label.
+- `FILES_NAMED` and `baseName` are copied in `CompanionHeader.tsx`: edit both.
+
+### Proof — `.verify/kaylee-avatar-states.mjs`
+- `node .verify/kaylee-avatar-states.mjs` (live page on :5183): every state at 48 and 96 px, light and dark, the speaking mouth at 0.15 / 0.55 / 1 (the variable written straight onto the svg), the ring at 2 of 5; once with full motion, once with `prefers-reduced-motion: reduce` emulated. PASS/FAIL per line, exit 1 on any FAIL.
+- Checks: name, gate (reduced motion: no element of any face names an animation), accent, mouth, left-over variable opens only a speaking face, ring, names, pose, numbers, motion, phone (390 px), errors.
+- Shots: `.verify/shots/kaylee-avatar-{motion,reduced,numbers,phone}-{light,dark}.png`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs

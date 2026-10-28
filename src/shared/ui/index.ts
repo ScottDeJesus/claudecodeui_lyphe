@@ -165,6 +165,11 @@ export { ScrollArea } from '@/shared/ui/ScrollArea';
 export { SegmentedControl } from '@/shared/ui/SegmentedControl';
 export { Select } from '@/shared/ui/Select';
 export { SettingRow } from '@/shared/ui/SettingRow';
+// The settings tab's section title and row card, admitted by their second module: the companion's Settings section,
+// which the voice tab composes but the companion module owns. Imported from the settings module, that section would
+// close a loop (settings → companion → settings) that breaks HMR even through the lazy Settings import.
+export { SettingsCard } from '@/shared/ui/SettingsCard';
+export { SettingsSection } from '@/shared/ui/SettingsSection';
 // The panel pinned to the right edge over a scrim, on Dialog's host-window portal and Escape rule. The
 // cerberus tab's CheckSheet is the first; it is a kit piece rather than a module's own because a
 // detail that sits beside a screen is every screen's, and the Escape order it keeps with a dialog or

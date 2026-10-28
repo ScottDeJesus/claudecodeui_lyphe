@@ -15,7 +15,8 @@ import { getConnection } from '@/modules/database/connection.js';
  * keeps the newest `COMPANION_LOG_KEEP` rows per account and deletes the rest in the same
  * transaction as the insert, so the table never holds more than that for one account.
  *
- * Consumers: `server/modules/companion/companion-store.ts` — the lane's only reader and writer.
+ * Consumers: `server/modules/companion/companion-store.ts` — the lane's reader and writer, `readSentence` included — and
+ * `companion.service.ts`, which asks `userIdsFocusedOn` which accounts a finished run is news to.
  * Reach it through `@/modules/database/index.js`. Every statement runs on the caller's
  * connection; only `appendLog` and `clearAccount` open a transaction of their own, so each lands
  * whole or not at all.
@@ -107,6 +108,24 @@ export const companionDb = {
   },
 
   /**
+   * The accounts whose focus is the chat `sessionId` (an app session id), ascending. Read straight from the rows,
+   * so an account whose Kaylee has not been touched since the server booted is found too. A `focus_json` that is
+   * not JSON (a hand edit) names no one rather than failing the read for every account: `json_extract` would
+   * throw on it, and SQLite does not promise to evaluate `json_valid` first inside an `AND`, so the guard is a `CASE`.
+   */
+  userIdsFocusedOn(sessionId: string): number[] {
+    const rows = getConnection()
+      .prepare(
+        `SELECT user_id FROM companion_state
+         WHERE CASE WHEN json_valid(focus_json) THEN json_extract(focus_json, '$.sessionId') END = ?
+         ORDER BY user_id`
+      )
+      .all(sessionId) as Array<{ user_id: number }>;
+
+    return rows.map((row) => row.user_id);
+  },
+
+  /**
    * Upserts the columns the patch names — creating the row when the account has none — stamps
    * `updated_at`, and answers the row as stored. The column list is built only from
    * `STATE_PATCH_COLUMNS`, so a key outside it is ignored rather than ever reaching the SQL text.
@@ -185,6 +204,24 @@ export const companionDb = {
          ) ORDER BY id`
       )
       .all(userId, bounded) as CompanionLogRow[];
+  },
+
+  /**
+   * Her sentence `turnIndex` of the turn `turnId`, or `null` when the account has no such sentence (an unknown turn or index,
+   * a log row pruned past the keep window, or a log that Clear emptied). Only `kaylee` rows carry a turn and an index, so the
+   * role is part of the match; the newest row wins should a turn ever hold two of one index. The speech door reads it to
+   * rebuild the text a voice is asked to say.
+   */
+  readSentence(userId: number, turnId: string, turnIndex: number): CompanionLogRow | null {
+    const row = getConnection()
+      .prepare(
+        `SELECT ${LOG_COLUMNS} FROM companion_log
+         WHERE user_id = ? AND role = 'kaylee' AND turn_id = ? AND turn_index = ?
+         ORDER BY id DESC LIMIT 1`
+      )
+      .get(userId, turnId, turnIndex) as CompanionLogRow | undefined;
+
+    return row ?? null;
   },
 
   /** Inserts one card for the account, stamped now, and answers the row as stored. */

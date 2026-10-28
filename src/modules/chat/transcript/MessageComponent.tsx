@@ -1,6 +1,6 @@
 import { memo, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitBranchIcon, PencilIcon } from 'lucide-react';
+import { AudioLinesIcon, GitBranchIcon, PencilIcon } from 'lucide-react';
 
 import { MARKDOWN_CARDS_CLASS } from '@/shared/constants';
 import { LLMProviderLogo } from '@/shared/ui';
@@ -206,6 +206,15 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
                   </div>
                 </CollapsibleUserText>
                 <div className="mt-1 flex items-center justify-end gap-1 text-xs text-muted-foreground">
+                  {message.spokenVia === 'kaylee' && (
+                    /* A brief the voice companion relayed into this chat. Always visible, and drawn in an
+                       export too: it says where the message came from, which is a fact of the row, not a
+                       control. Left of the controls so the copy button keeps the bubble's right edge. */
+                    <span className="mr-auto inline-flex items-center gap-1">
+                      <AudioLinesIcon aria-hidden="true" className="h-3.5 w-3.5" />
+                      {t('message.throughKaylee', { defaultValue: 'Through Kaylee' })}
+                    </span>
+                  )}
                   {onEditMessage && message.transcriptAnchorId && (
                     <button
                       type="button"

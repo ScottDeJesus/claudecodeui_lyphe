@@ -146,8 +146,6 @@ export function DayOneRooms({ floor, codebook, onOpenPanoAt }: DayOneRoomsProps)
                                     type="button"
                                     aria-label={[`${item.number}. ${item.name}`, notes].filter((part) => part !== '').join(' · ')}
                                     data-day-one-item={item.id}
-                                    // FILL: onOpenPanoAt — the root's verb, as a press on the drawing: the pano of `item.photo`, at its face, with
-                                    // `place.onMarkOn(face, regionId)` for an area and `place.onShow(face)` for an object (no region).
                                     onClick={() => onOpenPanoAt(item.photo.panoId, item.photo.face, item.photo.regionId)}
                                     className="inline-flex min-h-8 items-center gap-1 rounded-md px-1 hover:bg-background max-md:min-h-11"
                                   >

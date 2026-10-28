@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCodebook } from '@/modules/affected-areas/hooks/useCodebook';
+import { useDayOne } from '@/modules/affected-areas/hooks/useDayOne';
 import { useImageUrls } from '@/modules/affected-areas/hooks/useImageUrl';
 import { useMarkedRegions } from '@/modules/affected-areas/hooks/useMarkedRegions';
 import { usePano } from '@/modules/affected-areas/hooks/usePano';
@@ -18,7 +19,7 @@ import { TourPicker } from '@/modules/affected-areas/TourPicker';
 import { TourScreen } from '@/modules/affected-areas/TourScreen';
 import { ToursSwitch } from '@/modules/affected-areas/ToursSwitch';
 import { tourName, tourUnread } from '@/modules/affected-areas/utils/tourModel';
-import type { Region } from '@/shared/affected-areas-types';
+import type { Face, Region } from '@/shared/affected-areas-types';
 import type { ToursScreenKey } from '@/shared/types';
 
 /** A screen arriving: Verve's page entrance, as the Cerberus tab's own views enter. It plays each time one opens. */
@@ -34,7 +35,8 @@ const SCREEN_ENTER = 'motion-safe:animate-[vv-pagein_.45s_theme(transitionTiming
  * surfaces, and each keeps its place while another shows:
  * - Tours, three screens, one at a time, each opened from the one before:
  *   1. `TourPicker`: search, and the recent tours with how far each is read.
- *   2. `TourScreen`: a tour's job (what the reader is told) and its panos as a gallery, with Read the rest.
+ *   2. `TourScreen`: a tour's job (what the reader is told), its rooms, the day-one sketch (the plan drawn from the panos'
+ *      room layouts, with its own Read the room layout) and its panos as a gallery, with Read the rest.
  *   3. `PanoScreen`: a pano's six faces, the shown one outlined and numbered beside the list of its areas, what the
  *      reader understood, the room's drying numbers, the read press, and the presses that judge an area.
  * - Mark (`MarkScreen`): a queue the engine orders, one area at a time.
@@ -142,6 +144,13 @@ export function AffectedAreasView() {
     },
   });
   const walk = reader.walk;
+  // The day-one sketch's data and layout walk. The walk sends only while its meter and Stop are on screen (the tour screen of
+  // the Tours surface, not a pano or Mark), and an answer that moved the plan has the tour and the open pano read again.
+  const dayOne = useDayOne(tourId, detail, {
+    shown,
+    isShown: () => viewShown() && activeScreen === 'tours' && panoId === null,
+    onPlanMoved: () => { afterAnswer(); if (panoId !== null && viewShown()) pano.reload(); },
+  });
 
   /** Brings the view's top into view when the panel was scrolled past it, and leaves a panel already showing it alone. */
   const showTop = () => {
@@ -167,6 +176,12 @@ export function AffectedAreasView() {
     setPanoId(openedPanoId);
     place.openPano(detail?.panos.find((candidate) => candidate.panoId === openedPanoId));
     showTop();
+  };
+  // The sketch's presses: an area opens its photo's pano at its face with its region chosen, an object (no region) at its face.
+  const onOpenPanoAt = (openedPanoId: string, face: Face, regionId: string | null) => {
+    onOpenPano(openedPanoId);
+    if (regionId === null) place.onShow(face);
+    else place.onMarkOn(face, regionId);
   };
   const onBackToTour = () => {
     setPanoId(null);
@@ -206,8 +221,11 @@ export function AffectedAreasView() {
         unreadPanos={unread.panos}
         unreadViews={unread.views}
         walk={walk}
+        dayOne={dayOne}
+        codebook={codebook.value}
         onBack={onBack}
         onOpenPano={onOpenPano}
+        onOpenPanoAt={onOpenPanoAt}
         onOverflowOpen={onOverflowOpen}
         onReadRest={onReadRest}
         onStopRest={onStopRest}

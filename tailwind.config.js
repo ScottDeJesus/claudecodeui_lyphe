@@ -105,6 +105,17 @@ export default {
         md: "calc(var(--radius-input) - 2px)",
         sm: "calc(var(--radius-input) - 4px)",
       },
+      // Verve's elevation ladder (tokens.css's `--shadow-*`), named so a screen spells a rung — `shadow-lift`
+      // — and never `var(--shadow-lift)`. Names over tokens tokens.css already declares, as the colours above
+      // are: no new shadow. Rest, hover, lift (an object standing over the page: the floating panels),
+      // overlay (menus and popovers), modal.
+      boxShadow: {
+        rest: "var(--shadow-rest)",
+        hover: "var(--shadow-hover)",
+        lift: "var(--shadow-lift)",
+        overlay: "var(--shadow-overlay)",
+        modal: "var(--shadow-modal)",
+      },
       // Named so a call site spells the intent, not the curve: `ease-spring`, `duration-move`.
       transitionTimingFunction: {
         enter: 'var(--ease-enter)',

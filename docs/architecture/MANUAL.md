@@ -984,8 +984,9 @@ Four things in that picture are easy to get backwards:
   message into the CLI already running for that conversation and settles when THAT turn's
   `result` lands, matched by the uuid stamped on the user message; the process stays up for
   the next message and closes only after two hours without one, never while a background
-  task or watcher is running in it (`chat-process.ts`). A model, effort or permission-mode
-  change is applied to the running query, and so is a GROWN allowed-tool list; a changed
+  task or watcher is running in it (`server/shared/prompt-stream.ts`). A model, effort or permission-mode
+  change is applied to the running query (the live-versus-launch split is `planLiveChanges` in
+  `list/claude/chat-process.ts`), and so is a GROWN allowed-tool list; a changed
   working directory, MCP configuration, an edited message (`resumeAnchorId`), a conversation
   restarted from scratch, any change to the disallowed list or a tool REMOVED from the allowed
   list (both are launch arguments the CLI resolves before ever asking the callback), and the
@@ -1917,8 +1918,10 @@ by the provider id until the app claims them.**
 
 `sessions-watcher.service.ts` watches four provider directories with chokidar on native file
 events (inotify, one watch per file and directory; `depth: 6`, `ignoreInitial`) — never polling,
-whose one stat watcher per entry stalled a freshly booted API for seconds while it armed — keeps
-only `*.jsonl` files —
+whose one stat watcher per entry stalled a freshly booted API for seconds while it armed — never
+descends into or reports what `createWatcherIgnoredMatcher(rootPath)` ignores (below the root only:
+`.DS_Store`, names ending `.tmp` / `.swp`, any whole path segment `node_modules`, `.git`, `dist`,
+`build`, `subagents`, `tool-results`), keeps only `*.jsonl` files —
 `opencode.db` for OpenCode — and calls `sessionSynchronizerService.synchronizeProviderFile`.
 Indexed ids are queued and flushed with a 500 ms debounce and a 2 s maximum wait
 (`PROJECTS_UPDATE_DEBOUNCE_MS`, `PROJECTS_UPDATE_MAX_WAIT_MS`), then handed to

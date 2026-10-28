@@ -11,30 +11,14 @@ import type { CompanionSound } from '@/shared/companion-types.js';
  * to be sized — the same paragraph pushed a character at a time or all at once yields the same
  * sentences.
  *
- * Consumers: `session/companion-session.ts` (the stream, one per turn and flushed at the end of each
- * text block, and the parse of every sentence it emits) and `session/companion-prompt.ts`'s callers (`DEFAULT_SOUND_TAGS`, the one
- * allow-list: she is taught exactly the sounds the parse keeps, so she is never taught a sound the
- * filter then deletes).
+ * The sounds the parse keeps are the caller's list, never one of its own: the account's `gemini.soundTags`
+ * (the voice module's settings), which `session/companion-turns.ts` hands it for every sentence of a turn and
+ * `session/companion-message.ts` hands `fillRegister` at every push. She is taught exactly the sounds the parse
+ * keeps, so she is never taught a sound the filter then deletes.
+ *
+ * Consumers: `session/companion-turns.ts` (the stream, one per turn and flushed at the end of each
+ * text block, and the parse of every sentence it emits).
  */
-
-/**
- * The ten sounds she may make, in the register's order. The register's `{sound_tags}` slot is filled
- * from this list and `parseExpression` keeps a sound only when it is on it — one list, so what she is
- * taught and what survives the filter cannot drift apart. Consumed by the companion session (the
- * register fill and every parse) and by the voice that synthesizes `speech`.
- */
-export const DEFAULT_SOUND_TAGS: readonly string[] = [
-  'giggle',
-  'chuckle',
-  'laugh',
-  'gasp',
-  'sigh',
-  'phew',
-  'tsk',
-  'breath',
-  'short pause',
-  'long pause',
-];
 
 /** A sentence longer than this is a run-on and is cut at its last comma or space; every piece is at most this long. */
 const MAX_SENTENCE_CHARS = 300;

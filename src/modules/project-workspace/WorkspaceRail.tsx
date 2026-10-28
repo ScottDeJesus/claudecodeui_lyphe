@@ -4,10 +4,12 @@ import { useTranslation } from 'react-i18next';
 
 import { AccountRailButton, UsageRings } from '@/modules/accounts';
 import { AppSwitcherDock } from '@/modules/app-switcher';
+import { CompanionDoorButton } from '@/modules/companion';
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useRailBadges } from '@/modules/project-workspace/hooks/useRailBadges';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
 import RailButton from '@/modules/project-workspace/RailButton';
+import { PAGE_ANCHOR } from '@/shared/constants';
 import type { AppTab, DockPress, SidebarListState, WorkspaceView, WorkspaceViewGroup } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
@@ -116,6 +118,8 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
     <RailButton
       key={view.id}
       viewId={view.id}
+      // The Files button is where a guide points while dactyls read code and the tree is not drawn.
+      anchorKey={view.id === 'files' ? PAGE_ANCHOR.railFiles : undefined}
       label={view.label}
       icon={view.icon}
       lit={view.id === activeTab}
@@ -153,6 +157,7 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
       </div>
       <div className="relative z-40 flex flex-none flex-col items-center">
         <UsageRings />
+        <CompanionDoorButton />
         {footViews.map(viewButton)}
         <RailButton
           label={t('rail.settings')}

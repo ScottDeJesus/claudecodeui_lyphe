@@ -129,7 +129,8 @@
     "scrollToBottom": "Ir al final",
     "queue": {
       "sendNext": "Poner en cola el siguiente mensaje",
-      "update": "Actualizar mensaje en cola",
+      "append": "Añadir al mensaje en cola",
+      "notCombinable": "No se pudo poner el mensaje en cola: un comando de barra se ejecuta como un turno propio, así que no se puede combinar con el mensaje en cola. Envíalo cuando el mensaje en cola ya haya salido.",
       "label": "En cola",
       "willSend": "Se enviará cuando esto termine",
       "edit": "Editar mensaje en cola",

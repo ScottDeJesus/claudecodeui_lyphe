@@ -2,9 +2,8 @@ import { useTranslation } from 'react-i18next';
 
 import { JEV_SCOPES, useJevSwitches } from '@/shared/hooks/useJevSwitches';
 import type { JevScopeName } from '@/shared/hooks/useJevSwitches';
-import { Button, SettingRow } from '@/shared/ui';
+import { Button, SettingRow, SettingsCard } from '@/shared/ui';
 import { JevLogo } from '@/shared/ui/JevLogo';
-import SettingsCard from '@/modules/settings/SettingsCard';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 
 /**

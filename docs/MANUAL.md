@@ -6529,6 +6529,7 @@ section: notifications/002 How an event travels
 flowchart LR
   RT["Provider runtime"] -->|"notifyRunFailed · notifyRunStopped · notifyUserIfEnabled"| OR["Orchestrator"]
   DP["Dispatcher lane"] -->|"a plan ending · notifyUserIfEnabled"| OR
+  OR -->|"every event, before the gates"| LS["Listeners · onNotification"]
   OR -->|"event preference, 20 s dedupe"| PL["buildNotificationPayload"]
   PL --> WP["webPush"]
   PL --> DT["desktop"]
@@ -6538,6 +6539,17 @@ flowchart LR
 `notifyUserIfEnabled` in `server/modules/notifications/services/notification-orchestrator.service.js`
 owns the fan-out:
 
+0. **Listeners.** `notifyUserIfEnabled` announces the event to `announceToListeners`
+   (`notification-listeners.service.ts`) right after the session is normalized and BEFORE the
+   preference and the dedupe below: each subscriber of `onNotification` is handed `(userId, event)`
+   for every event the orchestrator is handed, a `background` one that is off for pushes included,
+   repeats included. A listener keeps its own dedupe and cannot consume a push's slot; each is
+   called inside its own guard, so one that throws (or rejects) is logged and costs no push and no
+   other listener. `onNotification(listener)` (exported by the notifications barrel) returns an
+   idempotent unsubscribe; a listener that subscribes or unsubscribes while it runs changes the NEXT
+   announcement, not this one. A listener is called synchronously and returns quickly; anything slow
+   is its to start. The only subscriber today is the companion's alert feed, which turns the codes
+   Kaylee says unasked into `<alert>`s while his Live is on (see the companion manual).
 1. **Event preference.** The event's `kind` maps to one switch in the user's notification
    preferences (`KIND_TO_PREF_KEY`): `action_required` → `events.actionRequired`, `stop` →
    `events.stop`, `error` → `events.error`, `limit` → `events.limits`, `background` →
@@ -6588,7 +6600,7 @@ push — a second push needs events to resume and then stop again. Two runs are 
 run whose session has a tool approval still pending (that silence is the run waiting for you, and
 the approval push already went out), and a run that has ended.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-orchestrator.service.js
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-listeners.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-orchestrator.service.js, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-alert-feed.ts
 
 ## MAN-614 — Where the Claude runtime's error and limit signals come from
 section: notifications/002 How an event travels/003 Where the Claude runtime's error and limit signals come from
@@ -10702,7 +10714,7 @@ Types in `src/shared/types.ts`: `HostWindowValue` = `{ hostWindow: Window; subsc
 | `DockableFab`, `usePointerDrag`, `SplitPane` | live in the opener, around the chat |
 | `KanbanLane`, `KanbanCard` | the board's own code |
 | `pinnedDismissals` `storage` listener | `storage` is `localStorage`'s news, the opener's |
-| `useVoiceAvailable` | listens for an event settings dispatches on the opener's `window` |
+| `useVoiceAvailable`, `useVoiceProvider` | listen for an event settings dispatches on the opener's `window` |
 | `widgetBridgeScript.ts` | runs inside the widget's own frame |
 | the websocket, `SessionProtectionContext`, `ToastContext`, the Jev switch stores | one per page; toasts draw in the opener's tab |
 | `ThemeContext` | writes the opener's `<body>`; the window mirrors it (MAN-7490) |

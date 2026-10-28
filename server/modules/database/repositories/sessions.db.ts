@@ -13,6 +13,8 @@ type SessionRow = {
   project_path: string | null;
   jsonl_path: string | null;
   custom_name: string | null;
+  /** `1` when a person gave the chat its name (the sidebar rename), `0` when anything else did. */
+  name_given: number;
   /** Model this session runs with; NULL until the app records one for it. */
   model: string | null;
   /** Reasoning effort this session runs with; NULL until the app records one. */
@@ -44,7 +46,7 @@ type RecentSessionsPage = {
 };
 
 const SESSION_ROW_COLUMNS =
-  'session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, model, effort, permission_mode, forked_from_session_id, simple_list_at, simple_list_rank, icon, last_completed_at, last_read_at, isArchived, created_at, updated_at';
+  'session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, name_given, model, effort, permission_mode, forked_from_session_id, simple_list_at, simple_list_rank, icon, last_completed_at, last_read_at, isArchived, created_at, updated_at';
 
 /**
  * The same list, addressed to the `sessions` table, for the queries that join `projects` — both
@@ -278,8 +280,10 @@ export const sessionsDb = {
    * If the filesystem watcher indexed the provider transcript before this
    * mapping was recorded (a duplicate row keyed by the provider id exists),
    * the duplicate is merged into the app row: its transcript path and name
-   * are adopted and the duplicate row is removed. Runs in a transaction so
-   * the sidebar can never observe both rows at once.
+   * are adopted and the duplicate row is removed. The app row keeps its own
+   * name unless only the duplicate's was given by a person; the mark
+   * (`name_given`) is the larger of the two. Runs in a transaction so the
+   * sidebar can never observe both rows at once.
    */
   assignProviderSessionId(sessionId: string, providerSessionId: string): void {
     const db = getConnection();
@@ -298,14 +302,29 @@ export const sessionsDb = {
         // The chat's followups follow it onto the surviving row; the cascade would drop them with the duplicate.
         followupsDb.moveToSession(duplicate.session_id, sessionId);
         db.prepare('DELETE FROM sessions WHERE session_id = ?').run(duplicate.session_id);
+        // A name travels with its mark: a name a person gave the duplicate replaces an app row's name
+        // he did not give. Every right-hand side reads the row as it was before this UPDATE, so the
+        // `name_given` test below sees the app row's own mark, not the one `MAX` writes.
         db.prepare(
           `UPDATE sessions SET
              provider_session_id = ?,
              jsonl_path = COALESCE(jsonl_path, ?),
-             custom_name = COALESCE(custom_name, ?),
+             custom_name = CASE
+               WHEN ? = 1 AND name_given = 0 THEN COALESCE(?, custom_name)
+               ELSE COALESCE(custom_name, ?)
+             END,
+             name_given = MAX(name_given, ?),
              updated_at = CURRENT_TIMESTAMP
            WHERE session_id = ?`
-        ).run(providerSessionId, duplicate.jsonl_path, duplicate.custom_name, sessionId);
+        ).run(
+          providerSessionId,
+          duplicate.jsonl_path,
+          duplicate.name_given,
+          duplicate.custom_name,
+          duplicate.custom_name,
+          duplicate.name_given,
+          sessionId,
+        );
         return;
       }
 
@@ -491,20 +510,42 @@ export const sessionsDb = {
   /**
    * The permission mode of the most recently active session that has one recorded, or `null` when
    * no session does. Ordered by `julianday` because `updated_at` is written in two spellings (SQLite's
-   * `CURRENT_TIMESTAMP` and the watcher's ISO), which do not sort as text.
+   * `CURRENT_TIMESTAMP` and the watcher's ISO), which do not sort as text. `provider` narrows it to that provider's chats:
+   * a mode is a provider's own word, so a chat of one provider never takes another's.
    */
-  latestPermissionMode(): string | null {
+  latestPermissionMode(provider?: string): string | null {
     const db = getConnection();
     const row = db
       .prepare(
         `SELECT permission_mode FROM sessions
-         WHERE permission_mode IS NOT NULL
+         WHERE permission_mode IS NOT NULL AND (? IS NULL OR provider = ?)
          ORDER BY julianday(COALESCE(updated_at, created_at)) DESC, rowid DESC
          LIMIT 1`
       )
-      .get() as { permission_mode: string } | undefined;
+      .get(provider ?? null, provider ?? null) as { permission_mode: string } | undefined;
 
     return row?.permission_mode ?? null;
+  },
+
+  /**
+   * The model and effort of the most recently active session that has a model recorded, or `null` when no
+   * session does. Read by the companion's send for a NEW chat that has no focus chat to take its choice from: a
+   * chat with none recorded runs on the catalog's default, which is not what he has been working with. Ordered like
+   * `latestPermissionMode`, for the same reason. `provider` narrows it to that provider's chats: a model id is a
+   * provider's own word, and a Codex model handed to a Claude chat fails its first turn.
+   */
+  latestModelChoice(provider?: string): { model: string; effort: string | null } | null {
+    const db = getConnection();
+    const row = db
+      .prepare(
+        `SELECT model, effort FROM sessions
+         WHERE model IS NOT NULL AND model <> '' AND (? IS NULL OR provider = ?)
+         ORDER BY julianday(COALESCE(updated_at, created_at)) DESC, rowid DESC
+         LIMIT 1`
+      )
+      .get(provider ?? null, provider ?? null) as { model: string; effort: string | null } | undefined;
+
+    return row ?? null;
   },
 
   updateSessionCustomName(sessionId: string, customName: string): void {
@@ -514,6 +555,74 @@ export const sessionsDb = {
        SET custom_name = ?
        WHERE session_id = ?`
     ).run(customName, sessionId);
+  },
+
+  /**
+   * Marks a chat's name as one a person gave it, so the namer never replaces it.
+   *
+   * Consumed by `renameByPerson` below, the one writer of the mark. The mark has no undo: a name he
+   * typed stays his even if he later types the one the namer would have chosen.
+   */
+  markNameGiven(sessionId: string): void {
+    const db = getConnection();
+    db.prepare(
+      `UPDATE sessions
+       SET name_given = 1
+       WHERE session_id = ?`
+    ).run(sessionId);
+  },
+
+  /**
+   * A person's rename: the new name and its mark, written as one act. Consumed by
+   * `sessionsService.renameSessionById`, the one door a person's rename reaches.
+   *
+   * One transaction, so a failure on the second write cannot leave the name he just gave stored with
+   * the mark still 0 — the namer would replace it at the chat's next turn.
+   */
+  renameByPerson(sessionId: string, customName: string): void {
+    const db = getConnection();
+    db.transaction(() => {
+      sessionsDb.updateSessionCustomName(sessionId, customName);
+      sessionsDb.markNameGiven(sessionId);
+    })();
+  },
+
+  /**
+   * The facts the namer decides on: the name, whether a person gave it, whether the app created the
+   * chat, and whether it is archived. Consumed by the chat-names module.
+   *
+   * `appCreated` is the app's own allocation of the id: its row was inserted before any provider run
+   * (`provider_session_id` still NULL) or the two ids have since parted. A chat discovered on disk has
+   * the one id in both columns. `null` when no row answers to the id.
+   */
+  nameFactsOf(sessionId: string): {
+    customName: string | null;
+    nameGiven: boolean;
+    appCreated: boolean;
+    isArchived: boolean;
+  } | null {
+    const db = getConnection();
+    const row = db
+      .prepare(
+        `SELECT custom_name,
+                name_given,
+                (provider_session_id IS NULL OR session_id <> provider_session_id) AS app_created,
+                isArchived
+         FROM sessions
+         WHERE session_id = ?`
+      )
+      .get(sessionId) as
+      | { custom_name: string | null; name_given: number; app_created: number; isArchived: number }
+      | undefined;
+
+    if (!row) return null;
+
+    return {
+      customName: row.custom_name,
+      nameGiven: row.name_given === 1,
+      appCreated: row.app_created === 1,
+      isArchived: Boolean(row.isArchived),
+    };
   },
 
   getSessionById(sessionId: string): SessionRow | null {

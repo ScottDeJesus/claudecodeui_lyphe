@@ -1,0 +1,347 @@
+/*
+ * Kaylee's face (CompanionAvatar.tsx). Drawn in a 100-unit square on Verve's tokens and nothing else, so it follows the theme
+ * on the same frame every token does. WARM, NEVER BUSY: one orb of light, one accent at a time.
+ *
+ * HOW A STATE IS BUILT. The markup always holds every part; `[data-state]` turns on that state's accent and sets the face's
+ * POSE (a tilt, where the eyes look, which brows lift). That is the state's LOOK, and it is a still frame. Everything that
+ * MOVES is added inside `@media (prefers-reduced-motion: no-preference)` at the foot, so reduced motion keeps every look
+ * and drops the movement without a rule of its own, and no look depends on an animation having run.
+ *
+ * Pose uses the individual transform properties (`rotate`, `scale`, `translate`) rather than `transform`, so a keyframe that
+ * breathes (`scale`) never fights the tilt (`rotate`) a state holds.
+ */
+
+.kaylee {
+  display: block;
+  flex: none;
+  /* The orb breathes and the dots orbit past the viewBox's edge by a hair; nothing of hers is cut. */
+  overflow: visible;
+
+  /* THE MOUTH: 0 closed smile .. 1 open wide. Written by whatever drives her voice; at rest the smile. */
+  --kaylee-mouth: 0;
+
+  /* The light's palette, all Verve. Features are the theme's ink on a warm orb. */
+  --kaylee-skin-hi: color-mix(in srgb, var(--chart-2) 38%, #fff);
+  --kaylee-skin: color-mix(in srgb, var(--chart-2) 72%, var(--garnish));
+  --kaylee-skin-lo: color-mix(in srgb, var(--garnish) 82%, var(--chart-2));
+  --kaylee-rim: color-mix(in srgb, var(--garnish) 40%, var(--ink));
+  --kaylee-glow: var(--chart-2);
+  --kaylee-feature: var(--ink);
+  --kaylee-cheek: color-mix(in srgb, var(--danger-dot) 30%, transparent);
+  --kaylee-tongue: color-mix(in srgb, var(--danger-dot) 55%, var(--garnish));
+  /* Paper she holds, and the lines on it. */
+  --kaylee-paper: var(--surface);
+  --kaylee-paper-edge: var(--ink-muted);
+  --kaylee-ink-line: var(--ink-faint);
+  /* The tones of her work, the same words the panel's status dot says: green she hears, blue she works. */
+  --kaylee-hear: var(--pos-dot);
+  --kaylee-work: var(--info-dot);
+  --kaylee-write: var(--accent);
+  --kaylee-ring: var(--accent);
+  --kaylee-track: color-mix(in srgb, var(--ink) 16%, transparent);
+}
+
+/* In dark the orb is the lamp: amber, lit from inside, its features the page's own ground. */
+.dark .kaylee {
+  --kaylee-skin-hi: color-mix(in srgb, var(--garnish) 55%, #fff);
+  --kaylee-skin: var(--garnish);
+  --kaylee-glow: var(--garnish);
+  --kaylee-skin-lo: color-mix(in srgb, var(--garnish) 86%, var(--garnish-soft));
+  --kaylee-rim: color-mix(in srgb, var(--garnish) 40%, var(--canvas));
+  --kaylee-feature: var(--canvas);
+  --kaylee-cheek: color-mix(in srgb, var(--danger-dot) 34%, transparent);
+  --kaylee-tongue: color-mix(in srgb, var(--danger-dot) 60%, var(--garnish));
+  --kaylee-track: color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+/* Every part turns about its own middle unless a rule below says otherwise. */
+.kaylee * {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.kaylee__body,
+.kaylee__ears,
+.kaylee__dots,
+.kaylee__halo {
+  transform-box: view-box;
+  transform-origin: 50px 50px;
+}
+
+/* ---------------------------------------------------------------- the orb */
+
+.kaylee__skin-hi { stop-color: var(--kaylee-skin-hi); }
+.kaylee__skin { stop-color: var(--kaylee-skin); }
+.kaylee__skin-lo { stop-color: var(--kaylee-skin-lo); }
+.kaylee__glow-in { stop-color: var(--kaylee-glow); stop-opacity: 0.4; }
+.kaylee__glow-out { stop-color: var(--kaylee-glow); stop-opacity: 0; }
+
+.kaylee__head {
+  stroke: var(--kaylee-rim);
+  stroke-width: 1.6;
+}
+.kaylee__sheen {
+  fill: none;
+  stroke: #fff; /* a sheen is white in both modes, as Verve draws the switch's knob */
+  stroke-opacity: 0.55;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.kaylee__cheek { fill: var(--kaylee-cheek); }
+
+/* ---------------------------------------------------------------- the features */
+
+.kaylee__pupil { fill: var(--kaylee-feature); }
+.kaylee__glint { fill: #fff; } /* the sparkle in her eye is white in both modes, on the dark pupil */
+
+.kaylee__brow {
+  fill: none;
+  stroke: var(--kaylee-feature);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  opacity: 0;
+}
+
+.kaylee__lip {
+  fill: none;
+  stroke: var(--kaylee-feature);
+  stroke-width: 2.8;
+  stroke-linecap: round;
+}
+/* The open mouth hangs from the lip. Its scale is the variable, remapped so the first sliver of an opening already clears
+   the lip's own width (an opening under ~.33 of the raw scale would hide behind the curve), and it is hidden outright at 0.
+   THE VARIABLE IS HEARD ONLY WHILE SHE SPEAKS: in every other state the open mouth is off, so a value the voice loop left
+   behind in its last frame can never open her mouth on a face that is not speaking. */
+.kaylee__mouth-open {
+  transform-origin: 50px 59px;
+  scale: 1 calc(0.4 + var(--kaylee-mouth) * 0.6);
+  opacity: clamp(0, calc(var(--kaylee-mouth) * 40), 1);
+}
+.kaylee:not([data-state='speaking']) .kaylee__mouth-open { opacity: 0; }
+.kaylee__throat { fill: var(--kaylee-feature); }
+.kaylee__tongue { fill: var(--kaylee-tongue); }
+.kaylee__surprise {
+  fill: var(--kaylee-feature);
+  display: none;
+}
+
+/* ---------------------------------------------------------------- the accents, off until their state */
+
+.kaylee__ears,
+.kaylee__dots,
+.kaylee__bubble,
+.kaylee__page,
+.kaylee__draft,
+.kaylee__walk {
+  display: none;
+}
+
+.kaylee__ear {
+  fill: none;
+  stroke: var(--kaylee-hear);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+}
+.kaylee__ear--far { opacity: 0.55; }
+.kaylee__ear--right { --kaylee-hear-from: 3px; }
+
+.kaylee__dot { fill: var(--kaylee-work); }
+
+.kaylee__paper {
+  fill: var(--kaylee-paper);
+  stroke: var(--kaylee-paper-edge);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.kaylee__line {
+  fill: none;
+  stroke: var(--kaylee-ink-line);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.kaylee__line--a { stroke: var(--kaylee-work); }
+.kaylee__line--b { stroke: var(--kaylee-write); }
+.kaylee__line--c { stroke: var(--garnish); }
+
+.kaylee__stroke {
+  fill: none;
+  stroke: var(--kaylee-write);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-dasharray: 1 1;
+}
+.kaylee__pencil { translate: 66px 92px; }
+.kaylee__pencil-body { fill: var(--warn-dot); stroke: var(--kaylee-paper-edge); stroke-width: 1.2; stroke-linejoin: round; }
+.kaylee__pencil-tip { fill: var(--warn-soft); stroke: var(--kaylee-paper-edge); stroke-width: 1.2; stroke-linejoin: round; }
+.kaylee__pencil-end { fill: var(--danger-dot); stroke: var(--kaylee-paper-edge); stroke-width: 1.2; stroke-linejoin: round; }
+
+.kaylee__track {
+  fill: none;
+  stroke: var(--kaylee-track);
+  stroke-width: 5;
+}
+.kaylee__progress {
+  /* The arc starts at twelve o'clock and runs clockwise. */
+  rotate: -90deg;
+  fill: none;
+  stroke: var(--kaylee-ring);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+/* The numbers, at the middle of the lower face: shown while the face is hovered or its button focused. */
+.kaylee__count { opacity: 0; }
+.kaylee__count rect {
+  fill: var(--surface);
+  stroke: var(--kaylee-ring);
+  stroke-width: 1.8;
+}
+.kaylee__count text {
+  fill: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.kaylee:hover .kaylee__count,
+:is(button, a, [role='button'], [tabindex]):is(:hover, :focus-visible) .kaylee .kaylee__count {
+  opacity: 1;
+}
+
+/* ---------------------------------------------------------------- the states: what is on, and the pose of the face */
+
+/* idle: the orb as it is, with a breath and a blink (below). Nothing else is on. */
+
+/* listening: her head tilts toward the sound, her brows lift, and the arcs at her ears are on. */
+.kaylee[data-state='listening'] .kaylee__ears { display: inline; }
+.kaylee[data-state='listening'] .kaylee__body { rotate: -5deg; }
+.kaylee[data-state='listening'] .kaylee__brow { opacity: 1; translate: 0 -1.5px; }
+
+/* transcribing: she looks down, as at a page she is writing, with the dots turning. */
+.kaylee[data-state='transcribing'] .kaylee__dots { display: inline; }
+.kaylee[data-state='transcribing'] .kaylee__eyes { translate: 0 1.8px; }
+
+/* thinking: her eyes go up and away, one brow cocked, a small crooked smile, with the dots turning. */
+.kaylee[data-state='thinking'] .kaylee__dots { display: inline; }
+.kaylee[data-state='thinking'] .kaylee__eyes { translate: 3.2px -3px; }
+.kaylee[data-state='thinking'] .kaylee__brow--right { opacity: 1; translate: 0 -2.5px; rotate: -6deg; }
+.kaylee[data-state='thinking'] .kaylee__lip { rotate: -9deg; scale: 0.72 1; translate: 3px 0; }
+.kaylee[data-state='thinking'] .kaylee__body { rotate: 3deg; }
+
+/* speaking: the mouth is the variable's; the rest of her is happy to be heard. Nothing else is on. */
+
+/* reading a chat: a bubble at her side, her eyes along its lines. */
+.kaylee[data-state='reading_session'] .kaylee__bubble { display: inline; }
+.kaylee[data-state='reading_session'] .kaylee__eyes { translate: 2.4px 2.2px; }
+.kaylee[data-state='reading_session'] .kaylee__lip { scale: 0.8 1; }
+
+/* reading code: a small page at her side, her eyes across it. */
+.kaylee[data-state='reading_code'] .kaylee__page { display: inline; }
+.kaylee[data-state='reading_code'] .kaylee__eyes { translate: 2.6px 2.6px; }
+.kaylee[data-state='reading_code'] .kaylee__lip { scale: 0.8 1; }
+
+/* drafting: a pencil writing a stroke under her chin, her eyes on it. */
+.kaylee[data-state='drafting'] .kaylee__draft { display: inline; }
+.kaylee[data-state='drafting'] .kaylee__eyes { translate: 2.2px 3.4px; }
+.kaylee[data-state='drafting'] .kaylee__lip { scale: 0.8 1; }
+.kaylee[data-state='drafting'] .kaylee__body { rotate: 3deg; }
+
+/* walking: the ring is on, and the halo gives it the room. */
+.kaylee[data-state='walking'] .kaylee__walk { display: inline; }
+.kaylee[data-state='walking'] .kaylee__halo { display: none; }
+
+/* cut: surprised, eyes wide, brows high and a small round mouth. */
+.kaylee[data-state='cut'] .kaylee__eye { scale: 1.16; }
+.kaylee[data-state='cut'] .kaylee__brow { opacity: 1; translate: 0 -4px; }
+.kaylee[data-state='cut'] .kaylee__lip,
+.kaylee[data-state='cut'] .kaylee__mouth-open { display: none; }
+.kaylee[data-state='cut'] .kaylee__surprise { display: inline; }
+
+/* Reduced motion keeps the speaking mouth, but still: half open, the look of someone mid-word, never flapping on the voice. */
+@media (prefers-reduced-motion: reduce) {
+  .kaylee[data-state='speaking'] .kaylee__mouth-open {
+    scale: 1 0.78;
+    opacity: 1;
+  }
+}
+
+/* ---------------------------------------------------------------- the movement, for those who want it */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Every state: she breathes and she blinks. */
+  .kaylee__body { animation: kaylee-breath 4.2s ease-in-out infinite alternate; }
+  .kaylee__halo { animation: kaylee-glow 4.2s ease-in-out infinite alternate; }
+  .kaylee__eye { animation: kaylee-blink 5.6s ease-in-out infinite; }
+  .kaylee__mouth-open { transition: scale 70ms linear; }
+
+  /* An accent arrives with a small pop, so a change of state is a welcome and not a cut. */
+  .kaylee__ears,
+  .kaylee__bubble,
+  .kaylee__page,
+  .kaylee__draft,
+  .kaylee__walk,
+  .kaylee__surprise {
+    animation: kaylee-pop var(--dur-move) var(--ease-spring) backwards;
+  }
+  .kaylee__eyes { transition: translate var(--dur-move) var(--ease-enter); }
+  .kaylee__count { transition: opacity var(--dur-quick) ease; }
+  .kaylee__progress { transition: stroke-dasharray var(--dur-move) var(--ease-enter); }
+
+  /* listening: the arcs at her ears pulse in toward her, the far arc a beat behind the near. */
+  .kaylee[data-state='listening'] .kaylee__ear--near { animation: kaylee-hear 1.3s ease-out infinite; }
+  .kaylee[data-state='listening'] .kaylee__ear--far { animation: kaylee-hear 1.3s ease-out 0.25s infinite backwards; }
+
+  /* transcribing and thinking: the dots turn about her, thinking the slower. */
+  .kaylee[data-state='transcribing'] .kaylee__dots { animation: kaylee-pop var(--dur-move) var(--ease-spring) backwards, kaylee-orbit 1.1s linear infinite; }
+  .kaylee[data-state='thinking'] .kaylee__dots { animation: kaylee-pop var(--dur-move) var(--ease-spring) backwards, kaylee-orbit 1.9s linear infinite; }
+
+  /* reading: her eyes sweep a line, drop to the next and sweep back. The code is read faster than the chat. */
+  .kaylee[data-state='reading_session'] .kaylee__eyes { animation: kaylee-read 4.4s ease-in-out infinite; transition: none; }
+  .kaylee[data-state='reading_code'] .kaylee__eyes { animation: kaylee-read 2.6s ease-in-out infinite; transition: none; }
+
+  /* drafting: the stroke draws itself, left to right, with the pencil riding its tip; then a breath, and again. */
+  .kaylee[data-state='drafting'] .kaylee__stroke { animation: kaylee-write 2.8s linear infinite; }
+  .kaylee[data-state='drafting'] .kaylee__pencil { animation: kaylee-pencil 2.8s linear infinite; }
+
+  /* cut: a quick blink of surprise. */
+  .kaylee[data-state='cut'] .kaylee__eye { animation: kaylee-startle 0.5s ease-in-out; }
+}
+
+@keyframes kaylee-breath { from { scale: 1; } to { scale: 1.03; } }
+@keyframes kaylee-glow { from { opacity: 0.75; scale: 0.98; } to { opacity: 1; scale: 1.03; } }
+@keyframes kaylee-blink {
+  0%, 92%, 100% { scale: 1; }
+  95% { scale: 1 0.08; }
+}
+@keyframes kaylee-pop { from { opacity: 0; scale: 0.6; } }
+@keyframes kaylee-hear {
+  0% { opacity: 0.15; translate: var(--kaylee-hear-from, -3px) 0; }
+  60% { opacity: 1; translate: 0 0; }
+  100% { opacity: 0.15; translate: 0 0; }
+}
+@keyframes kaylee-orbit { to { rotate: 360deg; } }
+@keyframes kaylee-read {
+  0%, 6% { translate: -2.4px -1.8px; }
+  38% { translate: 3.4px -1.8px; }
+  48%, 54% { translate: -2.4px 1.6px; }
+  86% { translate: 3.4px 1.6px; }
+  100% { translate: -2.4px -1.8px; }
+}
+@keyframes kaylee-write {
+  0% { stroke-dashoffset: 1; opacity: 1; }
+  80% { stroke-dashoffset: 0; opacity: 1; }
+  92% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes kaylee-pencil {
+  0% { translate: 36px 92px; opacity: 1; }
+  13.3% { translate: 41px 89px; }
+  26.7% { translate: 46px 92px; }
+  40% { translate: 51px 95px; }
+  53.3% { translate: 56px 92px; }
+  66.7% { translate: 61px 89px; }
+  80%, 92% { translate: 66px 92px; opacity: 1; }
+  100% { translate: 66px 92px; opacity: 0; }
+}
+@keyframes kaylee-startle {
+  0%, 100% { scale: 1.16; }
+  40% { scale: 1.16 0.08; }
+}

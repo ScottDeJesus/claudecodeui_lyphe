@@ -113,6 +113,7 @@ export function PanoScreen({
   const understanding = shown === 'sphere' ? null : detail?.views.find((candidate) => candidate.face === shown)?.understanding ?? null;
   const photo = view === undefined ? null : photos[view.sha256] ?? null;
   const floor = detail?.floor ?? entry?.floor ?? null;
+  const panoRoom = { roomKey: detail?.roomKey ?? entry?.roomKey ?? null, floor };
   const capturedAt = detail?.capturedAt ?? entry?.capturedAt ?? null;
   const roomTitle = roomWords(detail?.roomName ?? entry?.roomName ?? null, floor, false, t);
   const faceName = shown === 'sphere' ? '' : t(`affectedAreas.faces.${shown}`);
@@ -149,7 +150,7 @@ export function PanoScreen({
   if (shown === 'sphere') {
     // 360°: every area of every read view under the name of the view it was marked on, so two areas numbered 1 are told apart.
     // Until the detail answers, the column waits as a view's does (`ReadingList`): the listing counts a pano's areas but carries none.
-    list = detail === null ? <ReadingList /> : <PanoAreas views={detail.views} selectedRegionId={selectedRegionId} codebook={codebook} onSelectRegion={onSelectRegion} />;
+    list = detail === null ? <ReadingList /> : <PanoAreas views={detail.views} panoRoom={panoRoom} selectedRegionId={selectedRegionId} codebook={codebook} onSelectRegion={onSelectRegion} />;
   } else if (view?.read?.status !== 'read') {
     list = (
       <Card className="flex flex-col gap-1 px-[18px] py-4">
@@ -162,7 +163,7 @@ export function PanoScreen({
   else {
     list = (
       <RegionList
-        regions={regions}
+        regions={regions} panoRoom={panoRoom}
         selectedId={selectedRegionId}
         kindLabel={(cls) => kindName(cls, codebook)}
         label={t('affectedAreas.pano.listLabel', { face: faceName })}
@@ -233,7 +234,7 @@ export function PanoScreen({
             <figure className="m-0 flex min-w-0 flex-col gap-2 [@container(min-width:720px)]:sticky [@container(min-width:720px)]:top-4">
               {shown === 'sphere' ? (
                 <PanoSphere
-                  panoId={detail?.panoId ?? entry?.panoId ?? ''} views={views} photos={photos} room={roomTitle}
+                  panoId={detail?.panoId ?? entry?.panoId ?? ''} views={views} photos={photos} room={roomTitle} panoRoom={panoRoom}
                   layer={layer} selectedRegionId={selectedRegionId} enlarged={enlarged} codebook={codebook} reading={detail === null}
                   onLayer={onLayer} onSelectRegion={onSelectRegion} look={sphereLook} onLook={onLook}
                   onFullscreen={onFullscreen} onMarkOn={onMarkOn} onRetryPhotos={onRetryPhotos}
