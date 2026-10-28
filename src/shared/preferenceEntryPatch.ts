@@ -26,7 +26,9 @@ import type { PreferenceEntryPatch } from '@/shared/types';
  * A STRING LIST HOLDS STRINGS (`STRING_ONLY_ENTRY_KEYS`). `filesPins` is a list of folder paths, each
  * its own key: an entry that is not a string is not stored, and one already stored is dropped by the
  * next patch to its list, so `pinned` never holds a non-string entry. The server's merge says the same,
- * and keeps only the string entries of a list sent whole.
+ * and keeps only the string entries of a list sent whole. `claudePermissions` is the same kind of list
+ * (its `allowedTools` and `disallowedTools`, a rule string each), but its callers hold and write the WHOLE
+ * document, so its wire value is made from the difference (`entryDocumentDiff`).
  *
  * The store's other needs live here too, beside the rule they follow: folding two patches queued
  * inside one debounce window (`foldEntryPatches`), rebuilding a failed patch from what the store
@@ -44,7 +46,7 @@ type EntryDocument = Record<string, unknown>;
 const FORWARD_ONLY_ENTRY_KEYS: ReadonlySet<string> = new Set(['roadmapSeen']);
 
 /** The preference keys whose lists hold bare strings only, each its own entry key: any other entry is not stored. The server's `STRING_ONLY_KEYS` mirrors it. */
-const STRING_ONLY_ENTRY_KEYS: ReadonlySet<string> = new Set(['filesPins']);
+const STRING_ONLY_ENTRY_KEYS: ReadonlySet<string> = new Set(['filesPins', 'claudePermissions']);
 
 /** What a key's lists hold beyond the common rule: `forwardOnly` (a stamp never moves back) and `stringOnly` (an entry is a bare string). */
 export type EntryRule = { forwardOnly: boolean; stringOnly: boolean };
@@ -113,6 +115,37 @@ export function applyEntryPatch(document: unknown, patch: PreferenceEntryPatch, 
 }
 
 /**
+ * What a device writes when its caller hands it the WHOLE document: the lists as entry patches against the copy this device
+ * held (`previous`), each field that is not a list as itself when it differs, and nothing for what did not change. A list
+ * the caller rebuilt from a copy older than the server's names only the entries it added and the entries it dropped, so an
+ * entry another writer added since is neither asserted nor erased; `{}` when nothing differs. A field `next` lacks is
+ * not named, so it stands. Used by `userSettings.ts` for a key whose callers keep the document whole (`claudePermissions`).
+ */
+export function entryDocumentDiff(previous: unknown, next: unknown): Record<string, unknown> {
+  if (!isRecord(next)) return {};
+  const before = isRecord(previous) ? previous : {};
+  const diff: Record<string, unknown> = {};
+  for (const [field, value] of Object.entries(next)) {
+    if (!Array.isArray(value)) {
+      if (JSON.stringify(before[field]) !== JSON.stringify(value)) diff[field] = value;
+      continue;
+    }
+    const had = new Set((Array.isArray(before[field]) ? before[field] : []).filter((entry): entry is string => typeof entry === 'string'));
+    const has = new Set(value.filter((entry): entry is string => typeof entry === 'string'));
+    const listPatch: Record<string, string | null> = {};
+    for (const entry of has) if (!had.has(entry)) listPatch[entry] = entry;
+    for (const entry of had) if (!has.has(entry)) listPatch[entry] = null;
+    if (Object.keys(listPatch).length > 0) diff[field] = listPatch;
+  }
+  return diff;
+}
+
+/** The lists of a `entryDocumentDiff` result and only them: what the outbox keeps (a plain value is not an entry). */
+export function entryListsOf(diff: Record<string, unknown>): PreferenceEntryPatch {
+  return Object.fromEntries(Object.entries(diff).filter(([, value]) => isRecord(value))) as PreferenceEntryPatch;
+}
+
+/**
  * Two patches queued before a flush, as one: per entry, the newer (`incoming`) wins, and an entry it
  * names loses its earlier slot first. The fold has to apply as the two applied one after the other
  * (`patchList` drops a named entry before it appends it), so a key named twice sits where the NEWER
@@ -144,9 +177,13 @@ function laidOver(earlier: Record<string, unknown>, listPatch: Record<string, un
 export function refreshEntryPatch(current: unknown, sent: unknown): unknown {
   if (!isRecord(sent)) return sent;
   const document = isRecord(current) ? current : {};
-  const refreshed: Record<string, Record<string, unknown>> = {};
+  const refreshed: Record<string, unknown> = {};
   for (const [list, listPatch] of Object.entries(sent)) {
-    if (!isRecord(listPatch)) continue;
+    if (!isRecord(listPatch)) {
+      // A plain field riding beside the lists (`claudePermissions.skipPermissions`): the value the store holds now, and nothing if it holds none.
+      if (document[list] !== undefined) refreshed[list] = document[list];
+      continue;
+    }
     const held = new Map<string, unknown>();
     for (const entry of Array.isArray(document[list]) ? document[list] : []) {
       const key = entryKeyOf(entry);

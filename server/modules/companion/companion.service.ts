@@ -32,14 +32,14 @@ import { focusNewsEnvelope, readRunReply } from './feeds/focus-feed.js';
  *     were sent through her (`relayed_sends`) stays, because those rows belong to the chats;
  *   - `stopAll` winds every conversation and every synthesis down for shutdown and from then on refuses a message with a
  *     503: the HTTP drain comes after it, and a process woken then would have nothing left to end it;
- *   - `alert`, `runFailed` and `runCompleted` are the verbs the house's feeds call (each is explained at its verb);
+ *   - `alert`, `runFailed`, `runCompleted` and `chatDeleted` are the verbs the house's feeds call (each is explained at its verb);
  *     `alert` and the focus push refuse once `stopAll` has run, for the reason a message does.
  *
  * THE RUNTIME is the gateway her tools stop, answer and send through. The module is built by the entrypoint, which owns
  * it, so `createCompanionModule` attaches it before anything can call a verb; an account made before that is refused.
  *
  * Consumers: `companion.routes.ts` (every verb but the feeds'), `companion.module.ts` (`attachRuntime`, `stopAll`)
- * and the alert and focus feeds (`alert`, `runFailed`, `runCompleted`).
+ * and the alert, focus and deleted-chat feeds (`alert`, `runFailed`, `runCompleted`, `chatDeleted`).
  */
 
 /**
@@ -265,6 +265,29 @@ function createCompanionService() {
       const reply = readRunReply(sessionId);
       if (reply === null) return;
       for (const { userId, focus } of audience) void deliverFocusNews(userId, focus, reply);
+    },
+
+    /**
+     * A chat row was deleted: every account whose focus is that chat drops the focus, and its pages hear `companion_focus` null.
+     * Found from the stored rows (`userIdsFocusedOn`), so an account whose Kaylee has not been touched since the server
+     * booted is found too. One account that fails is logged and does not hold the rest. Her draft's target and her walkthrough
+     * are left as they are: a deleted chat there is told to her when she is next asked to send to it, or ended by her `walk` 0.
+     */
+    chatDeleted(sessionId: string): void {
+      let audience: number[];
+      try {
+        audience = companionDb.userIdsFocusedOn(sessionId);
+      } catch (error) {
+        console.error(`[Companion] could not find who is focused on the deleted session ${sessionId}`, error);
+        return;
+      }
+      for (const userId of audience) {
+        try {
+          accountOf(userId).store.setFocus(null);
+        } catch (error) {
+          console.error(`[Companion] account ${userId}: her focus on the deleted session ${sessionId} was not dropped`, error);
+        }
+      }
     },
 
     /**

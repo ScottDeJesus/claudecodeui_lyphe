@@ -105,17 +105,24 @@ function mergeGutters(stored: unknown, incoming: unknown): unknown {
  * by the next patch to its list, so `pinned` never holds a non-string entry, however it is sent. The client's `applyEntryPatch`
  * keeps the same rule (`STRING_ONLY_ENTRY_KEYS`).
  *
+ * `claudePermissions` is the fourth: its `allowedTools` and `disallowedTools` are lists of rule strings (each its own entry key)
+ * that two kinds of writer change, a page (the chat's "always", the Settings autosave) and the server (her "always" receipt,
+ * `rememberAllowedTool`), and the page wrote its whole copy back: a page open since before her receipt erased the entry
+ * she had remembered. The page now sends the difference from the copy it held (`{ allowedTools: { [rule]: rule } }` adds,
+ * `{ [rule]: null }` removes), and its other fields (`skipPermissions`, `permissionMode`) ride beside the lists as plain values,
+ * which replace as before. The server's own receipt still sends whole lists, which replace their list alone.
+ *
  * A STAMP LIST MOVES FORWARD ONLY (`FORWARD_ONLY_KEYS`). The rule is "replace the named entry", except
  * that a `roadmapSeen` patch carrying an OLDER `at` than the stored entry is a stale device's retry and
  * is not applied: it would move the stamp backward, and the other device would play what it had already
  * played. The client's `applyEntryPatch` keeps the same rule (`FORWARD_ONLY_ENTRY_KEYS`), and the writer
  * still never sends a stamp older than the one it read (`useCelebrations`).
  */
-const ENTRY_LISTED_KEYS: ReadonlySet<string> = new Set(['dispatcher', 'roadmapSeen', 'filesPins']);
+const ENTRY_LISTED_KEYS: ReadonlySet<string> = new Set(['dispatcher', 'roadmapSeen', 'filesPins', 'claudePermissions']);
 /** The keys whose entries carry an `at` that only moves forward. Mirrors the client's `FORWARD_ONLY_ENTRY_KEYS`. */
 const FORWARD_ONLY_KEYS: ReadonlySet<string> = new Set(['roadmapSeen']);
 /** The keys whose lists hold bare strings only, each its own entry key. Mirrors the client's `STRING_ONLY_ENTRY_KEYS`. */
-const STRING_ONLY_KEYS: ReadonlySet<string> = new Set(['filesPins']);
+const STRING_ONLY_KEYS: ReadonlySet<string> = new Set(['filesPins', 'claudePermissions']);
 
 /** What one key's lists hold beyond the common rule. Mirrors the client's `EntryRule`. */
 type EntryRule = { forwardOnly: boolean; stringOnly: boolean };
@@ -216,7 +223,7 @@ export const userPreferencesDb = {
    * Merge-patches preferences: keys present in `updates` are written, keys
    * absent are left alone, and a key given as `undefined` is deleted.
    *
-   * `chatGutters` merges one level deeper, per chat, and `dispatcher`, `roadmapSeen` and `filesPins` per entry of their lists — see
+   * `chatGutters` merges one level deeper, per chat, and `dispatcher`, `roadmapSeen`, `filesPins` and `claudePermissions` per entry of their lists — see
    * `mergeGutters` and `mergeEntryLists` above for why neither can be replaced wholesale.
    *
    * Runs in one transaction so a multi-key save from the settings dialog can

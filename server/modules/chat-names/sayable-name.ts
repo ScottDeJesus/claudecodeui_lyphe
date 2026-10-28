@@ -6,6 +6,35 @@ const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 const MOST_WORDS = 5;
 const MOST_CHARACTERS = 40;
 
+/** Scripts whose words are not set apart by a space: for these a whitespace-separated token is a phrase, not a word. */
+const SCRIPTS_WITHOUT_SPACES = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: 'word' });
+
+/** Whether any of the name's letters is in a script whose words a space does not set apart (Han, Kana, Thai, Lao, Khmer, Myanmar). */
+export function hasScriptWithoutSpaces(name: string): boolean {
+  return SCRIPTS_WITHOUT_SPACES.test(name);
+}
+
+/**
+ * How many words a name holds, the way its language writes them: a token between spaces is one word, except a token in a script
+ * without spaces, which the runtime's word segmenter (ICU's dictionaries) divides. So "Kanban board" is 2, "Login-fix" is 1 (a hyphenated
+ * word stays one), "看板ボード" is 2 and "見積書の下書き" is 4. The dictionary divides finer than a person hears: it splits "カンバン" into two and
+ * "数据库" into two (`haiku-name.ts` allows one word more for it). Consumed by `cleanedName` for the naming pass's word rule; `isSayableName`
+ * below still reads a current name by its whitespace tokens.
+ */
+export function countWords(name: string): number {
+  let words = 0;
+  for (const token of name.split(/\s+/)) {
+    if (token === '') continue;
+    if (!SCRIPTS_WITHOUT_SPACES.test(token)) {
+      words += 1;
+      continue;
+    }
+    for (const part of WORD_SEGMENTER.segment(token)) if (part.isWordLike) words += 1;
+  }
+  return words;
+}
+
 /**
  * Whether a person could say this chat's name aloud. Consumed by the namer, for the chat's current name and for Haiku's answer.
  *

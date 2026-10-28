@@ -3207,6 +3207,8 @@
       "close": "Close {{name}}",
       "loading": "Opening {{name}}'s conversation…",
       "loadingStatus": "Loading…",
+      "readFailed": "Couldn't open {{name}}'s conversation: {{reason}}",
+      "retry": "Try again",
       "failedUnknown": "{{name}} stopped."
     },
     "status": {

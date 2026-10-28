@@ -5,6 +5,7 @@ import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import { createCompanionRoutes } from './companion.routes.js';
 import { companionService } from './companion.service.js';
 import { startAlertFeed } from './feeds/alert-feed.js';
+import { startDeletedChatFeed } from './feeds/deleted-chat-feed.js';
 import { startFocusFeed } from './feeds/focus-feed.js';
 
 /**
@@ -18,8 +19,9 @@ import { startFocusFeed } from './feeds/focus-feed.js';
  * The two feeds start here, so what she hears unasked is live the moment the module is: the alert feed (the
  * house's notifications, while Live is on) and the focus feed (the focus chat's finished runs). Both are
  * subscriptions to events the house already raises — nothing polls — and both cost nothing for an account whose
- * Live is off. Building the module launches no process: her conversations start asleep, on an account's first
- * message.
+ * Live is off. A third subscription tells her nothing: when the chat she is focused on is deleted her focus ends
+ * (`startDeletedChatFeed`). Building the module launches no process: her conversations start asleep, on an
+ * account's first message.
  *
  * `stop()` unsubscribes the feeds FIRST, so nothing new is pushed to a conversation that is winding down, then
  * runs the service's `stopAll` — each running conversation is interrupted and its input ended, and a message that
@@ -34,11 +36,13 @@ export function createCompanionModule({ runtime }: { runtime: ProviderRuntimeGat
   companionService.attachRuntime(runtime);
   const stopAlertFeed = startAlertFeed(companionService);
   const stopFocusFeed = startFocusFeed(companionService);
+  const stopDeletedChatFeed = startDeletedChatFeed(companionService);
   return {
     router: createCompanionRoutes(companionService),
     stop: () => {
       stopAlertFeed();
       stopFocusFeed();
+      stopDeletedChatFeed();
       return companionService.stopAll();
     },
   };

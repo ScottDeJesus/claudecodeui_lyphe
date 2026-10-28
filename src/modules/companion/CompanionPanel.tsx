@@ -12,12 +12,16 @@ import { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPres
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
 import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
 import type { CompanionPresence, CompanionVoice, TalkPress } from '@/shared/types';
-import { Banner, Card, Spinner } from '@/shared/ui';
+import { Banner, Button, Card, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type CompanionPanelViewProps = {
   /** Her picture as the page holds it; null until the first read lands. */
   picture: CompanionPicture | null;
+  /** Why the read of the picture failed, while there is none: the panel says so with a Try again (`onReread`) instead of waiting for ever. */
+  readFailure?: string | null;
+  /** Reads the picture again. Absent, a failed read is told without the button. */
+  onReread?: () => void;
   /** The page's open state: closed, the panel stays mounted (his unsent words and the log's place survive) and undrawn. */
   open: boolean;
   /** Whether the draft's target chat is working right now. */
@@ -72,7 +76,8 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  * page sounds her, then Loading, Stopped, Asleep or Waking while her process is not awake); a warn
  * Banner while her process has failed — the server's sentence, pinned where the eye lands, while the log keeps the
  * system line as history and the status line says the next message starts her again; the log, marking the sentence
- * being spoken; the dock — the walkthrough, her notes, the draft; the composer, with the talk button before send.
+ * being spoken (before the first read lands, a waiting row; once a read has failed, a warn Banner with the reason and a
+ * Try again, since the picture is not coming by itself — the status line still says Loading, as the one state has no word for it); the dock — the walkthrough, her notes, the draft; the composer, with the talk button before send.
  *
  * THE PANEL SHARES ITS HEIGHT, AND THE COMPOSER NEVER GIVES WAY. A phone's keyboard shrinks the shell to the strip above
  * it, a phone turned sideways is 375px tall, a long message grows the composer: whatever the room, nothing is cut at the
@@ -95,8 +100,8 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  * rail's door, or her disc, wherever it stands on screen.
  */
 export function CompanionPanelView({
-  picture, open, targetWorking, presence, talk, voice, onClose, onSendText, onModelChange, onLiveChange, onInterrupt, onClear,
-  onEditDraft, onSendDraft, onClearDraft, onDismissNote,
+  picture, readFailure, onReread, open, targetWorking, presence, talk, voice, onClose, onSendText, onModelChange, onLiveChange, onInterrupt,
+  onClear, onEditDraft, onSendDraft, onClearDraft, onDismissNote,
 }: CompanionPanelViewProps) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -161,7 +166,17 @@ export function CompanionPanelView({
         </div>
       )}
 
-      {picture === null ? (
+      {picture === null && readFailure ? (
+        // A read that failed is said, with the way to try again: the spinner below would wait on a picture that is not coming.
+        <div data-companion-log="failed" className="min-h-0 flex-1 overflow-y-auto bg-background p-3">
+          <Banner
+            tone="warn"
+            action={onReread && <Button variant="outline" size="sm" onClick={onReread}>{t('companion.panel.retry')}</Button>}
+          >
+            {t('companion.panel.readFailed', { name, reason: readFailure })}
+          </Banner>
+        </div>
+      ) : picture === null ? (
         <div data-companion-log="loading" className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-background p-4">
           <Spinner size={28} label={t('companion.panel.loading', { name })} />
         </div>
@@ -215,7 +230,9 @@ export function CompanionPanelView({
  */
 export function CompanionPanel() {
   // `voice` is the switch and the sentence sounding, for the header's switch and the log's mark; the status line reads `presence` instead.
-  const { picture, open, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk, voice } = useCompanion();
+  const {
+    picture, readFailure, reread, open, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk, voice,
+  } = useCompanion();
   const presence = useCompanionPresence();
   // The page's own set of chats with a turn running: Send steer shows while the draft's target is in it, because only then is there a turn to fold into.
   const busySessionIds = useBusySessionIdSet();
@@ -225,6 +242,8 @@ export function CompanionPanel() {
   return (
     <CompanionPanelView
       picture={picture}
+      readFailure={readFailure}
+      onReread={reread}
       open={open}
       targetWorking={targetWorking}
       presence={presence}

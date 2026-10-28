@@ -307,6 +307,8 @@ async function dispatchRun(
     sessionId,
     cwd: clientOptions.cwd ?? session.project_path ?? undefined,
     projectPath: session.project_path ?? clientOptions.projectPath,
+    // Set by a server caller (`runDetachedChatTurn`) or by nobody: a page's own `messageUuid` never reaches the runtime.
+    messageUuid: typeof extraRuntimeOptions.messageUuid === 'string' ? extraRuntimeOptions.messageUuid : undefined,
     // Where the project's sessions run. Only the Claude runtime reads it (only Claude has a session
     // host), and it is the server's answer, never the client's: set after the client's options.
     node: session.project_path ? projectsDb.nodeForPath(session.project_path) : null,
@@ -636,6 +638,12 @@ export async function runDetachedChatTurn(
     interruptActiveRun?: boolean;
     /** Runs after the run is registered, before the provider: re-adoption ends an already-completed turn here. */
     beforeRun?: (run: NonNullable<ReturnType<typeof chatRunRegistry.startRun>>) => void | Promise<void>;
+    /**
+     * The uuid to stamp on this turn's user message, which the Claude CLI keeps as the transcript row's own: the caller that
+     * records the send (the companion's) can then name its row. A runtime option the SERVER sets: a `chat.send` from a page
+     * cannot carry one (`dispatchRun` clears it from the client's options).
+     */
+    messageUuid?: string;
   },
   dependencies: ChatWebSocketDependencies,
 ): Promise<{ started: boolean; error: string | null }> {
@@ -669,7 +677,7 @@ export async function runDetachedChatTurn(
     session,
     { sessionId: input.sessionId, content: input.content, options: input.options ?? {} },
     dependencies,
-    {}, input.beforeRun, // no extra runtime options; the hook is dispatchRun's eighth argument
+    { messageUuid: input.messageUuid }, input.beforeRun, // the one extra runtime option; the hook is dispatchRun's eighth argument
   );
 }
 

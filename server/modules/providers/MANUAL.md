@@ -977,22 +977,22 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/cl
 A user message that came to a chat through Kaylee wears a small "Through Kaylee" mark, live and after a reload.
 
 ## The record and the live row
-- `companion-send.ts` records every send: `relayedSendsDb.record(sessionId, 'turn' | 'steer', words)` (table: MAN-9082). The text is stored trimmed.
+- `companion-send.ts` records every send: `relayedSendsDb.record(sessionId, 'turn' | 'steer', words, messageUuid?)` (table: MAN-9082). The text is stored trimmed. A TURN stamps a uuid on its message (`runDetachedChatTurn`'s `messageUuid`, a server-only option: `dispatchRun` clears any a page sends; `claude-runtime.provider.js` `buildPromptMessages` uses it when it is a uuid) which the CLI keeps as the transcript row's own uuid, and records it in `relayed_sends.message_uuid`. A steer records none, and neither does a turn into a chat of another provider: only the Claude runtime reads `options.messageUuid`, so `companion-send.ts` stamps one only when the chat's provider is `claude`, and any other provider's row is marked by the text rule below.
 - Live echo: a user `text` row with id `local_kaylee_<uuid>`, `spokenVia: 'kaylee'`, written by the send (MAN-9072). A steer's echo is the only live row: the SDK stream replays no `user` row for a steer (MAN-9068).
 - Persisted row: the history read marks it again. A steer's persisted row is the `queued_command` attachment drawn as a user row (`claude-queued-prompt.ts`, MAN-9068); without it there is nothing to mark.
 
 ## `markRelayedSends(sessionId, messages)` (`providers/services/session-relayed-sends.ts`)
 `sessionsService.fetchHistory` applies it to EVERY page it returns, after the page is cut, cached or read directly. The mark rides the same REST payload as the row.
-A user row gets `spokenVia: 'kaylee'` when ALL hold:
+A send WITH a `message_uuid` marks that row and no other: a user `text` row whose id is the uuid or the uuid plus `_text…` (`transcriptUuidOf`), whatever its words or time. A send WITHOUT one (a steer, and every send recorded before the column) is matched by text, below. A user row gets `spokenVia: 'kaylee'` by the text rule when ALL hold:
 | test | rule |
 |---|---|
 | shape | `kind === 'text'`, `role === 'user'`, `content` a string |
 | words | `content.trim()` is not empty and equals the trimmed text of one of this chat's `relayed_sends` |
 | time | the row's `timestamp` is at or after that send's `sent_at` minus `SEND_CLOCK_SKEW_MS` = 5000 |
-- Matched by TEXT, not by transcript uuid, on purpose: `claude-runtime.provider.js` stays untouched by this feature.
+- Why steers stay on the text rule: a steer's persisted row is the `queued_command` attachment, whose `source_uuid` was not shown to be the pushed message's uuid (two real steers pushed mid-turn on 2026-10-28 were filed as plain user rows with the pushed uuid, the house's own measured form is the attachment): matching it by uuid on a guess could drop a real mark.
 - Per text, the earliest threshold of any send of it decides: a brief sent twice marks both of its rows.
 - Never marks: a blank row (a picture-only row has `content: ''`; blank never matches blank), a row whose timestamp does not parse, a send whose `sent_at` does not parse or whose text is empty. `SEND_CLOCK_SKEW_MS` exists because the row's time is the CLI's clock and `sent_at` is this server's.
-- The same words typed by hand AFTER a send also wear the mark (designed, INV-9854).
+- The same words typed by hand AFTER a TURN send wear nothing (its row is named by uuid). After a STEER (or a send recorded before `message_uuid`) they still wear the mark: the text rule's limit.
 - A row it marks is a copy; every other row is the object it was given; the input is never mutated, because `fetchHistory` hands it rows the full-history cache also holds.
 - Reads `relayed_sends` once per call. A chat with none, or a read that throws, returns `messages` itself; the throw is logged `[relayed-sends] could not read the relayed sends of session <id>; the page goes out unmarked` and never fails the page.
 
@@ -1004,6 +1004,7 @@ A user row gets `spokenVia: 'kaylee'` when ALL hold:
 | `MessageComponent` user bubble | `AudioLinesIcon` + `t('message.throughKaylee', { defaultValue: 'Through Kaylee' })`, left of the bubble's controls (`mr-auto`) so the copy button keeps the right edge; always visible; drawn in an export too: it says where the message came from, not a control |
 
 ## Proof
+`.verify/kaylee-through-mark-row.mjs` (live, one Haiku chat; the companion's own send through `POST /api/companion/draft/send`): the relayed row's id starts with the recorded `message_uuid` and is marked; the same words typed by hand afterwards are not.
 `.verify/kaylee-through-mark.mjs`: one Haiku chat in `PROBE_PROJECT`, three turns from the composer: A the brief's words before any record exists, B the same words after `relayedSendsDb.record`, C different words after it. REST: only B carries `spokenVia`; after a reload only B's bubble draws the mark.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-relayed-sends.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/MessageComponent.tsx

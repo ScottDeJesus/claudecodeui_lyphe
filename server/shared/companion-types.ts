@@ -19,12 +19,12 @@
 // nothing.
 
 /**
- * The three Claude models Kaylee can run on, by the alias the CLI takes. Chosen from the panel's
+ * The four Claude models Kaylee can run on, by the alias the CLI takes. Chosen from the panel's
  * picker (`CompanionPicture.models` lists them with their labels) and stored as
  * `CompanionSettings.model`; a change is applied live to her running process without losing her
  * memory.
  */
-export type CompanionModel = 'sonnet' | 'opus' | 'haiku';
+export type CompanionModel = 'sonnet' | 'fable' | 'opus' | 'haiku';
 
 /**
  * The key or mouse button that presses Kaylee's talk button, bound in Settings > Voice > Companion and

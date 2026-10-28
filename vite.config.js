@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -8,11 +7,12 @@ import compressResponses from './vite-plugins/compressResponses.js'
 import precompressedAssets from './vite-plugins/precompressedAssets.js'
 
 // The client shows the installed package version so it can be compared against the
-// version the server process is actually running. Reading package.json here and
-// injecting it keeps the frontend free of imports that reach outside src/.
-// Read from disk rather than require()d: the require cache outlives a dev-server config
-// restart, which would keep serving the old version after a bump.
-const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+// version the server process is actually running. Importing package.json here and
+// injecting it keeps the frontend free of imports that reach outside src/. Imported, not
+// read from disk: Vite bundles this config with esbuild, which makes package.json a config
+// dependency, so a version bump restarts the dev server on its own and the new number is
+// baked in. A one-time read here served the old version until the config itself changed.
+import pkg from './package.json'
 
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.

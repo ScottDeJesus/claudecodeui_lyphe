@@ -7680,7 +7680,7 @@ order, the selected provider. They are not folded into `uiPreferences`: that blo
 boolean reducer (`src/shared/uiPreferences.ts`), and a project id is a `string | null`, not a
 flag. `filesPins` (`{ pinned: string[] }`, the folders pinned on the Files view's strip) is the Files
 view's one key. `useFilesPins` reads it and `pinFolder` / `unpinFolder` write it by entry patch, never whole
-(INV-9662; the other entry-patched keys: `dispatcher` INV-4406, `roadmapSeen` INV-6580). The store itself —
+(INV-9662; the other entry-patched keys: `dispatcher` INV-4406, `roadmapSeen` INV-6580, `claudePermissions` INV-10017). The store itself —
 how a write reaches the mirror before the server, the legacy-key seeding
 rule, why a setting born after that migration seeds nothing — is documented once, in
 [src/shared/userSettings.ts](../src/shared/userSettings.ts)'s own header.
@@ -13217,11 +13217,12 @@ Two per-user preferences, kept in the per-user store every setting lives in (mir
 
 | half | list | holds | file |
 |---|---|---|---|
-| client | `ENTRY_PATCHED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins` | folds two patches queued in one debounce per entry, retries only the failed entries, keeps the persisted outbox until the server has them | `src/shared/userSettings.ts` |
-| server | `ENTRY_LISTED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins` | `mergeEntryLists` replaces the named entry and keeps the others; at most `ENTRY_LIST_CAP` (200) entries, newest last. Under `FORWARD_ONLY_KEYS` (`roadmapSeen`) an entry whose `at` is older than the stored one is a stale device's retry and is NOT applied; a `null` entry still drops, so a rewind is drop, then write. Under `STRING_ONLY_KEYS` (`filesPins`) an entry that is not a string is not stored, and a stored one is dropped by the next patch to its list. The client's `applyEntryPatch` and `unreflectedEntries` take the key's `EntryRule` (`entryRuleOf`, `src/shared/preferenceEntryPatch.ts`: `FORWARD_ONLY_ENTRY_KEYS`, `STRING_ONLY_ENTRY_KEYS`) and say the same | `server/modules/database/repositories/user-preferences.db.ts` |
+| client | `ENTRY_PATCHED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins`, `claudePermissions` | folds two patches queued in one debounce per entry, retries only the failed entries, keeps the persisted outbox until the server has them | `src/shared/userSettings.ts` |
+| server | `ENTRY_LISTED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins`, `claudePermissions` | `mergeEntryLists` replaces the named entry and keeps the others; at most `ENTRY_LIST_CAP` (200) entries, newest last. Under `FORWARD_ONLY_KEYS` (`roadmapSeen`) an entry whose `at` is older than the stored one is a stale device's retry and is NOT applied; a `null` entry still drops, so a rewind is drop, then write. Under `STRING_ONLY_KEYS` (`filesPins`) an entry that is not a string is not stored, and a stored one is dropped by the next patch to its list. The client's `applyEntryPatch` and `unreflectedEntries` take the key's `EntryRule` (`entryRuleOf`, `src/shared/preferenceEntryPatch.ts`: `FORWARD_ONLY_ENTRY_KEYS`, `STRING_ONLY_ENTRY_KEYS`) and say the same | `server/modules/database/repositories/user-preferences.db.ts` |
 
 - One list without the other sends patches the server stores whole, or stores whole what the client patches. The two change together.
 - `filesPins` is the third key in both lists, not forward-only and string-only; its writes and reader rules: INV-9662.
+- `claudePermissions` is the fourth, string-only, and the one whose callers write the whole document: the store sends the difference from the copy the device held (`WHOLE_DOCUMENT_ENTRY_KEYS`); INV-10017.
 - A stamp writer never sends an `at` older than the one it read, and the merge drops an older one a stale device retries. Rule: INV-6580.
 - Entries of removed roadmaps are never pruned.
 

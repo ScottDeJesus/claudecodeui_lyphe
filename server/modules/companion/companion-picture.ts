@@ -30,7 +30,7 @@ const familyOf = (value: string): string => value.replace(/\[1m\]$/i, '').toLowe
 const capitalized = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 
 /**
- * The picker's three models with their labels. A catalog that cannot be read is logged with what failed and
+ * The picker's models with their labels. A catalog that cannot be read is logged with what failed and
  * answers the words alone: the panel must still open, and a model change must still be possible.
  */
 async function modelOptions(): Promise<CompanionPicture['models']> {

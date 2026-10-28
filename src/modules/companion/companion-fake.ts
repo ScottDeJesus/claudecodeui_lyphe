@@ -19,6 +19,7 @@ const ago = (seconds: number): string => new Date(NOW - seconds * 1000).toISOStr
 
 const MODELS: CompanionPicture['models'] = [
   { value: 'sonnet', label: 'Sonnet 5.5' },
+  { value: 'fable', label: 'Fable 5.1' },
   { value: 'opus', label: 'Opus 5.5' },
   { value: 'haiku', label: 'Haiku 5.5' },
 ];

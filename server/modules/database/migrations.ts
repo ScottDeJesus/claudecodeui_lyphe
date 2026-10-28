@@ -586,6 +586,19 @@ const addSessionNameGivenColumn = (db: Database): void => {
 };
 
 /**
+ * Adds `relayed_sends.message_uuid`: the transcript uuid of the user row a relayed brief became.
+ *
+ * A turn Kaylee starts stamps its message with a uuid the CLI keeps as the row's own, so the history mark follows the row
+ * instead of its words (`session-relayed-sends.ts`). NULL for every send recorded before this column and for a steer,
+ * whose persisted row is a queued-command attachment: those keep the text rule.
+ */
+const addRelayedSendMessageUuidColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'relayed_sends').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'relayed_sends', columnNames, 'message_uuid', 'TEXT');
+};
+
+/**
  * Adds the `permission_mode` column that records the permission mode a session last ran under.
  *
  * Recorded beside `model` and `effort` on every send, so a send the companion relays can run in
@@ -747,6 +760,7 @@ export const runMigrations = (db: Database) => {
     // `users`), and the briefs she has relayed into chats (cascading from `sessions`, which exists
     // by here with its `permission_mode` column).
     db.exec(COMPANION_SCHEMA_SQL);
+    addRelayedSendMessageUuidColumn(db);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');

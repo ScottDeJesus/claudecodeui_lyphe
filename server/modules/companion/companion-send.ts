@@ -33,7 +33,10 @@ import { sendOptionsFor, type ChatSendOptions } from './tools/send-options.js';
  *     into (it ended in the instant between) runs as a turn instead;
  *   - a steer to an idle chat starts a turn. The sentence says which of the two happened.
  * Every send is recorded in `relayed_sends`, and its echo is a user text row `local_kaylee_<uuid>` marked
- * `spokenVia: 'kaylee'`, which the page swaps for the persisted row (marked again by the history read).
+ * `spokenVia: 'kaylee'`, which the page swaps for the persisted row (marked again by the history read). A TURN
+ * stamps its own uuid on its message (`runDetachedChatTurn`'s `messageUuid`), which the CLI keeps as the transcript
+ * row's uuid, and records it: the history mark then follows that row, not its words. A steer cannot (its persisted
+ * row is a queued-command attachment) and is recorded without one.
  *
  * AFTER A SEND the draft clears, the chat becomes her focus and the page that holds the floor opens it. A NEW chat is
  * made on the simple list as the page's New chat makes it, named with the title when one is given (through
@@ -75,10 +78,10 @@ function describeDraft(draft: CompanionDraft): string {
   return `The draft is for ${where} and begins: "${head}"`;
 }
 
-/** Records a send for the history mark. The mark is cosmetic: a failed write is logged and never costs the send. */
-function recordRelayed(sessionId: string, via: 'turn' | 'steer', words: string): void {
+/** Records a send for the history mark; `messageUuid` is the uuid a turn stamped on its message. The mark is cosmetic: a failed write is logged and never costs the send. */
+function recordRelayed(sessionId: string, via: 'turn' | 'steer', words: string, messageUuid: string | null = null): void {
   try {
-    relayedSendsDb.record(sessionId, via, words);
+    relayedSendsDb.record(sessionId, via, words, messageUuid);
   } catch (error) {
     console.error('[Companion] a send could not be recorded for its "Through Kaylee" mark', { sessionId, error });
   }
@@ -104,15 +107,19 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
   function startTurn(sessionId: string, provider: LLMProvider, words: string, options: ChatSendOptions): Promise<{ started: boolean; error: string | null }> {
     return new Promise((resolve) => {
       let hooked = false;
+      // The uuid of the user row this turn writes: stamped on the message by the runtime, kept by the CLI, recorded with the send.
+      // Only the Claude runtime stamps one (`options.messageUuid`); a chat of another provider records none, and its row is marked by the text rule.
+      const messageUuid = provider === 'claude' ? randomUUID() : undefined;
       runDetachedChatTurn(
         {
           sessionId,
           userId,
           content: words,
           options: { ...options },
+          messageUuid,
           beforeRun: (run) => {
             run.writer.send(echoOf(sessionId, provider, words));
-            recordRelayed(sessionId, 'turn', words);
+            recordRelayed(sessionId, 'turn', words, messageUuid ?? null);
             hooked = true;
             resolve({ started: true, error: null });
           },

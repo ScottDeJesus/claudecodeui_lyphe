@@ -1,6 +1,7 @@
 import { getConnection } from '@/modules/database/connection.js';
 import { followupsDb } from '@/modules/database/repositories/followups.db.js';
 import { projectsDb } from '@/modules/database/repositories/projects.db.js';
+import { announceSessionsDeleted } from '@/modules/database/repositories/session-deletion.js';
 import { SESSION_UNREAD_SQL } from '@/modules/database/repositories/session-user-state.db.js';
 import { NEXT_TOP_SIMPLE_LIST_RANK_SQL } from '@/modules/database/repositories/simple-list-ladder.db.js';
 import { normalizeProjectPath } from '@/shared/utils.js';
@@ -941,7 +942,10 @@ export const sessionsDb = {
   deleteSessionsByProjectPath(projectPath: string): void {
     const db = getConnection();
     const normalizedProjectPath = normalizeProjectPath(projectPath);
+    const ids = (db.prepare('SELECT session_id FROM sessions WHERE project_path = ?').all(normalizedProjectPath) as Array<{ session_id: string }>)
+      .map((row) => row.session_id);
     db.prepare(`DELETE FROM sessions WHERE project_path = ?`).run(normalizedProjectPath);
+    announceSessionsDeleted(ids);
   },
 
   getSessionName(sessionId: string, provider: string): string | null {
@@ -972,7 +976,9 @@ export const sessionsDb = {
 
   deleteSessionById(sessionId: string): boolean {
     const db = getConnection();
-    return db.prepare('DELETE FROM sessions WHERE session_id = ?').run(sessionId).changes > 0;
+    const deleted = db.prepare('DELETE FROM sessions WHERE session_id = ?').run(sessionId).changes > 0;
+    if (deleted) announceSessionsDeleted([sessionId]);
+    return deleted;
   },
 
   /**

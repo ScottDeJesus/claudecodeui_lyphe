@@ -671,6 +671,9 @@ function backgroundWorkIds(sdkMessage) {
     .map((block) => block.id);
 }
 
+/** Whether `value` is a uuid a caller may name for a user message: the SDK and the CLI take no other shape. */
+const isMessageUuid = (value) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
 /**
  * Builds the SDK user messages for one turn.
  *
@@ -687,9 +690,10 @@ function backgroundWorkIds(sdkMessage) {
  * @param {Array} files - Non-image attachment descriptors
  * @param {string} cwd - Project working directory attachment paths resolve against
  * @param {string[]} [transcriptAppend] - A compaction's seed: text blocks the CLI appends to the conversation without a turn of their own, ahead of the send's own message
+ * @param {string} [messageUuid] - The uuid to stamp on the send's own message (a server caller's: `options.messageUuid`); ignored unless it is a uuid, and a fresh one is made
  * @returns {Promise<Array<Object>>} SDKUserMessage records for the turn: the append when there is one, then the send's own message
  */
-async function buildPromptMessages(command, images, files, cwd, transcriptAppend) {
+async function buildPromptMessages(command, images, files, cwd, transcriptAppend, messageUuid) {
   const append = transcriptAppendMessage(transcriptAppend);
   const hasImages = normalizeImageDescriptors(images).length > 0;
   // An append-only send (a compaction's seed): the append is the whole push, and no empty prompt follows it.
@@ -709,8 +713,10 @@ async function buildPromptMessages(command, images, files, cwd, transcriptAppend
     },
     parent_tool_use_id: null,
     // Echoed back on the `result` that answers this message (`user_message_uuids`), which is
-    // how the process loop tells the turn's own result from a background follow-up's.
-    uuid: crypto.randomUUID(),
+    // how the process loop tells the turn's own result from a background follow-up's. The CLI also
+    // keeps it as the transcript row's own uuid, so a caller that named one (the companion's send:
+    // `options.messageUuid`) can find its row in the history.
+    uuid: isMessageUuid(messageUuid) ? messageUuid : crypto.randomUUID(),
     timestamp: new Date().toISOString()
   };
   return append ? [append, own] : [own];
@@ -892,7 +898,7 @@ async function joinProcess(live, command, options, ws, context) {
     await live.retire();
     return null;
   }
-  const messages = await buildPromptMessages(command, options.images, options.files, options.cwd, options.transcriptAppend);
+  const messages = await buildPromptMessages(command, options.images, options.files, options.cwd, options.transcriptAppend, options.messageUuid);
   const turnEnded = live.pushTurn(messages, ws, options);
   return turnEnded ? { turnEnded } : null;
 }
@@ -1391,7 +1397,7 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
 
       // Streaming input, always: the queue keeps stdin open for the life of the process. A
       // re-adopted process is joined with no prompt at all — its turn is already in the CLI.
-      const promptMessages = reattach ? [] : await buildPromptMessages(command, options.images, options.files, options.cwd, options.transcriptAppend);
+      const promptMessages = reattach ? [] : await buildPromptMessages(command, options.images, options.files, options.cwd, options.transcriptAppend, options.messageUuid);
       appends.note(promptMessages);
       if (reattach?.turnCompleteSent) {
         settleFirstTurn();

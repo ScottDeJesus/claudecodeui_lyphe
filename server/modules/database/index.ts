@@ -144,6 +144,7 @@ export type {
   SessionDraftRecord,
 } from '@/modules/database/repositories/session-drafts.db.js';
 export { sessionsDb } from '@/modules/database/repositories/sessions.db.js';
+export { onSessionsDeleted } from '@/modules/database/repositories/session-deletion.js';
 // sessionCompactionsDb: used by the compaction module to swap a chat onto its compacted session and back, to hold a
 // turn-end compaction until the context has grown past the latest one and to give a start-over its seed again
 // (`latestCompaction`), and by Providers to stitch a compacted chat's history and index its old transcripts for

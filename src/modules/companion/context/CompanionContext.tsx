@@ -16,6 +16,13 @@ import { companionClientId } from '@/shared/utils';
 type CompanionContextValue = {
   /** Her picture as this page holds it; null until the first read lands (and after a read that failed, until the next event re-reads). */
   picture: CompanionPicture | null;
+  /**
+   * Why the last read failed (the server's own sentence when it gave one), while this page holds no picture; null once a picture
+   * is held and while a read is out. The panel says so instead of waiting for ever, and offers `reread`.
+   */
+  readFailure: string | null;
+  /** The panel's Try again after a failed read: the failure gives way to the waiting row while the read is out. */
+  reread: () => void;
   /** Whether her panel is open on this page. */
   open: boolean;
   /** This page's name for itself to her: the floor is whichever page last typed or opened her panel. */
@@ -108,7 +115,8 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  * the one socket (`companion_*` frames) through the pure reducer. It is read again whenever the frames can no longer be
  * trusted to have told the whole story: after the socket reconnects (frames were missed while it was down), after a
  * clear (the server's own word on what is left), and when the panel opens on a page whose first read failed. Every one of
- * those is an event; nothing here polls.
+ * those is an event; nothing here polls. A read that failed while the page holds no picture is `readFailure`, which the panel
+ * shows with a Try again (`reread`); the picture stays null until a read lands.
  *
  * FRAMES AND THE READ ARE NOT ORDERED. While a read is out, each frame is also queued, and folded over the answer when it
  * lands, so a frame the answer predates is not lost; the reducer folds a frame twice without harm. A clear is the exception:
@@ -130,6 +138,8 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   const { subscribe } = useWebSocket();
   // The picture this page draws. State, not a ref: the panel, the door and the palette all render from it.
   const [picture, setPicture] = useState<CompanionPicture | null>(null);
+  // Why the last read failed; cleared when a read lands and when Try again starts one. Meaningful only while `picture` is null.
+  const [readFailure, setReadFailure] = useState<string | null>(null);
   // Whether her panel is open on THIS page. The page's own: another tab of the same account opens and closes her on its own.
   const [open, setOpenState] = useState(false);
   // This page's name for itself, read once so it cannot change under a conversation; the floor and every frame addressed to a page use it.
@@ -181,10 +191,14 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
           if (seedAgainRef.current) continue;
           const queued = queuedRef.current;
           queuedRef.current = [];
-          if (aliveRef.current) setPicture(queued.reduce(reduceCompanion, read));
+          if (aliveRef.current) {
+            setPicture(queued.reduce(reduceCompanion, read));
+            setReadFailure(null);
+          }
         } catch (error) {
-          // The socket's next reconnect, or opening the panel, reads again; there is no retry loop to run here.
+          // The socket's next reconnect, opening the panel, or the panel's Try again reads again; there is no retry loop to run here.
           console.warn('[Companion] Could not read her picture:', error);
+          if (aliveRef.current) setReadFailure((error instanceof Error && error.message) || 'Request failed');
         }
       } while (seedAgainRef.current);
     } finally {
@@ -260,6 +274,11 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
     if (open && picture === null) void seed();
   }, [open, picture, seed]);
 
+  const reread = useCallback(() => {
+    setReadFailure(null);
+    void seed();
+  }, [seed]);
+
   const setOpen = useCallback((next: boolean) => {
     setOpenState(next);
     if (!next) return;
@@ -322,12 +341,13 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
 
   const value = useMemo<CompanionContextValue>(
     () => ({
-      picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk,
+      picture, readFailure: picture === null ? readFailure : null, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft,
+      clearDraft, dismissNote, interrupt, clear, talk,
       voice: speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
     }),
     [
-      picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk,
-      speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level,
+      picture, readFailure, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear,
+      talk, speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level,
     ],
   );
 
