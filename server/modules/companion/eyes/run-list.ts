@@ -116,7 +116,7 @@ function dispatcherRuns(picture: NonNullable<Awaited<ReturnType<CompanionHouse['
         line: `${planTitle} › ${clipText(phase.title, TASK_TITLE_MAX)} · ${state.words} · ${when.words} · run ${chain.chain_id}`,
         state,
         at: when.at,
-        haystack: [plan.name, planTitle, phase.key, phase.title, chain.agent, chain.slug].join(' ').toLowerCase(),
+        haystack: plainWords([plan.name, planTitle, phase.key, phase.title, chain.agent, chain.slug].join(' ')),
       });
     }
   }
@@ -159,8 +159,13 @@ function chatRunItem(run: { id: string; kind: 'chain' | 'soul'; agent: string; b
     line: `${chat} › ${run.agent} "${quoted}" · ${run.state.words} · ${when.words} · run ${run.id}`,
     state: run.state,
     at: when.at,
-    haystack: [chat, run.agent, run.brief].join(' ').toLowerCase(),
+    haystack: plainWords([chat, run.agent, run.brief].join(' ')),
   };
+}
+
+/** A name as he says it: lower case, dashes and underscores read as spaces ("kaylee--avatar--fill" is "kaylee avatar fill"), as the cards' `spoken` reads them. */
+function plainWords(text: string): string {
+  return text.toLowerCase().replace(/[-_]+/g, ' ');
 }
 
 /** `scope` as the keyword it is, or the phrase it is not: the three words match without regard to case. */
@@ -179,7 +184,7 @@ function inScope(item: RunItem, scope: RunScope, nowS: number): boolean {
     case 'failed':
       return (item.state.kind === 'bad' || item.state.kind === 'waiting') && nowS - item.at <= FAILED_S;
     default:
-      return item.haystack.includes(scope.phrase.toLowerCase());
+      return item.haystack.includes(plainWords(scope.phrase));
   }
 }
 

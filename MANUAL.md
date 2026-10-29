@@ -4857,7 +4857,7 @@ One `CompanionAccount` per CloudCLI account, made on that account's first call (
 ### Clear
 0. `speechCache.end()`: every synthesis aborted, every turn unspeakable until the next turn starts (MAN-9111).
 1. `session.clear()` runs SYNCHRONOUSLY: detaches her process and forgets her CLI conversation. why: a message landing mid-clear wakes a fresh conversation, never a resume.
-2. `store.clearAccount()` wipes log, notes, draft, pending action, unanswered words, walk, focus; every page empties at once. A standing action's row in `companion_actions` is ended `cancelled` in the same transaction and kept (MAN-9082).
+2. `store.clearAccount()` wipes log, notes, draft, pending action, unanswered words, walk, focus; every page empties at once. A standing action's row in `companion_actions` is ended `cancelled` in the same transaction and kept, unless a take has claimed it (MAN-9082).
 3. Awaits the old process's wind-down (up to the CLI grace).
 - `relayed_sends` rows stay: they belong to the chats. So does her record of actions (`companion_actions`): it is a fact about the house.
 
@@ -4951,7 +4951,7 @@ The one place that says which session callback writes which row and sends which 
 |---|---|
 | `COMPANION_MCP_SERVER_NAME` | re-export of `session/companion-launch.ts`; the SDK names a tool `mcp__<name>__<tool>` |
 | `COMPANION_TOOL_NAMES` | the names of her tools, `toolNames()` of `session/companion-prompt.ts`: the lines of the prompt's TOOLS section that open `name(` |
-| `buildCompanionTools(deps)` | `[...sessionTools(), ...readTools(deps), ...draftTools(deps), ...actTools(deps)]`, then the eyes' (`eyes/*-reads.ts`): `roadmapReads`, `runReads`, `docReads`, `alertReads`, `panelReads`, `houseReads` |
+| `buildCompanionTools(deps)` | `[...sessionTools(), ...readTools(deps), ...draftTools(deps), ...actTools(deps)]`, then the eyes' (`eyes/*-reads.ts`): `roadmapReads`, `runReads`, `docReads`, `alertReads`, `panelReads`, `houseReads`, then the hands': `handsTools(deps)` |
 | `CompanionToolDeps` | what every tool file is handed: the account, its store, the runtime gateway, the `house` (MAN-9142: the readers only a module instance holds) and the helpers below |
 | `ToolActivityPhase` | `CompanionPhase` minus `idle`, `thinking` (the turn's own) |
 
@@ -4977,6 +4977,7 @@ The one place that says which session callback writes which row and sends which 
 | `list_alerts` | `eyes/alert-reads.ts` | none (she stays `thinking`) | none | MAN-9153 |
 | `read_kanban`, `read_heal`, `read_notes`, `read_schedules` | `eyes/panel-reads.ts` | none (she stays `thinking`) | none | MAN-9159, MAN-9160 |
 | `read_git`, `read_cerberus`, `read_memory`, `read_settings` | `eyes/house-reads.ts` | none (she stays `thinking`) | none | MAN-9158 |
+| `prepare_action`, `take_action`, `cancel_action` | `hands/hands-tools.ts` | none (she stays `thinking`) | none | MAN-9174, MAN-9171, MAN-9172, MAN-9173 |
 - FOCUS IS INFERRED, never a tool: a tool that names a chat calls `deps.setFocus(chat)`, which writes and announces (`companion_focus`) only when the chat moved or was renamed.
 - THE DRAFT RULE: only the draft is ever sent. `send_to_session` and `create_session` carry the brief's `text`, and it must equal the draft's words; a mismatch is refused naming the draft's target and its first words, and nothing is sent. Both go through `deps.sendDraft` (MAN-9072); so does the panel's Send.
 - A tool never throws: a refusal is `deps.refuse(sentence)` (`isError` text saying what to do next), a handler that throws is logged and answered the same way.
@@ -5075,7 +5076,7 @@ Three surfaces. Each is a VIEW that draws every state from props and a thin wrap
 | her Settings section | `CompanionSettingsView` (`CompanionSettingsSection.tsx`) | `CompanionSettingsSection`: `useCompanionSettings` fetches `GET /api/companion`, saves `PUT /api/companion/settings`; `useTalkBindingCapture` takes the next key or mouse button when Bind is pressed and saves it as `talkBinding` (MAN-9101) | `VoiceSettingsTab`, after its own sections, voice on or off |
 
 - Parts under the panel: `CompanionHeader` (status line, Stop, close, focus, model `Select`, Live `Switch`, Clear behind a `ConfirmDialog`; given `voice`, a row of its own under them, `CompanionVoiceSwitch`: "Voice on this device", the kit `Switch` closing the row under Clear, a `Volume2` / `VolumeX` glyph following it, the whole row its label), `CompanionLog` (entries newest last; alerts and system lines in their tone; given `speaking`, the one sentence whose `turnId` and `index` both equal `speaking`'s alone wrapped in `[data-companion-speaking-sentence][data-tone=info]`: a band `bg-tone-ink/20` widened by `ring-2 ring-tone-ink/20`, a 2px bar of the full ink in the ring's left edge (`shadow-[-2px_0_0_0] shadow-tone-ink`, the mark's 3:1: 5.3:1 light, 10.3:1 dark against the canvas, where the band alone is 1.32:1 / 1.51:1), `box-decoration-clone`, `forced-colors:underline`; ring and bar are shadows, so no word moves), `CompanionWalkStrip`, `CompanionNotes`, `CompanionDraftCard` (target, editable `TextArea`, Send turn, Send steer, Clear), `CompanionComposer` (`PromptInput`, Enter sends), `CompanionSentence` (her sounds drawn as marks at their offsets), `CompanionSettingsForm` (her name, his name, the register in a monospace `TextArea` with "Restore the original", the delivery note).
-- `CompanionActionCard` (the action waiting for his word, `picture.pending`): in the dock above the draft, keyed by `pending.id`, a `role="region"` named by its head. The head "Waiting for your word" in the warn tone with the Roadmap's amber pulse; the action as a sentence (`companion.action.verb.*`: the verb, then the target's `spoken` in its weight) over the target's kind and house names (a run's whole id, a page's id and block), wrapping to two lines (`line-clamp-2`; the `title` holds the whole line); the prompt, or a follow-up's words, through `QuestionText` (as the Roadmap draws the census) in a well capped at 30cqh, 12cqh beside his lines; his carried lines quoted, each with its 24-hour time, under each question's label, in a well of their own. HIS LINES ARE THE LAST TO GIVE WAY: they travel word for word, so their well has no cap, no scroll and no tab stop and they stand whole at any length; while the card stands the dock has no cap, so the room comes first from the log (down to its 3.5rem floor), then from the notes and the draft's field, and past that the dock scrolls as one region with the sticky foot in sight. The prompt gives way instead: 12cqh beside his lines, and in a round (`answer`) the questions with their options fold behind "The questions, with their options" (kit `Collapsible`, `CardFoldBody`: inert while folded; 24cqh opened), since each question heads his answers to it; a labelled group with no lines is a question he left unanswered, said as "No answer — it goes as “(no answer)”" with ▲ (the hands send one group per question of the round). Groups are keyed by their place. The foot in the tone's wash, "Say: “<say>”" beside the mic and "Aloud, not typed · Lapses at HH:MM" (the clock her prepare answer says it in), is sticky to the dock's bottom edge (`-bottom-1`, a ring of `--surface` masking what passes under it), so in a dock too short for the card (a phone's keyboard up, a phone on its side) the words that fire it, its lapse and a refused Withdraw (said inside the foot) stay in sight. The Withdraw × (`aria-label` "Withdraw") is drawn only given `onWithdraw` (optional on the view and the card; the live `CompanionPanel` passes the provider's `cancelAction`); its hint stands to its left. A press (`hooks/useWithdraw.ts`) calls `onWithdraw()` once: the × is busy while it is out, and a refusal is said inside the foot (`companion.action.withdrawRefused` with the server's sentence, else `withdrawRefusedPlain`); withdrawn, the provider folds `companion_pending: null` and the card goes with it. It stands whole (`shrink-0`). THE LAPSE IS A DEADLINE, NOT A CLOCK (`hooks/useActionLapse.ts`): one `window.setTimeout` to `pending.expiresAt`, set when the card mounts and cleared when it unmounts or the deadline changes (the panel keys the card by `pending.id`, so a new action is a new card); from that moment the card draws nothing, and an action already past its time never draws. A stamp that is not a time sets no timer. The server closes the row itself at the next prepare, take or cancel. A lapsed card alone in the dock closes it (`empty:hidden`). Every word is a `t()` with its English default (`companion.action.*`). Fixtures: `FAKE_PANEL.action*`; `actionRound` is a three-question round at the length he really speaks (his spoken lines average 96 characters), its third question unanswered.
+- `CompanionActionCard` (the action waiting for his word, `picture.pending`): in the dock above the draft, keyed by `pending.id`, a `role="region"` named by its head. The head "Waiting for your word" in the warn tone with the Roadmap's amber pulse; the action as a sentence (`companion.action.verb.*`: the verb, then the target's `spoken` in its weight) over the target's kind and house names (a run's whole id, a page's id and block), wrapping to two lines (`line-clamp-2`; the `title` holds the whole line); the prompt, or a follow-up's words, through `QuestionText` (as the Roadmap draws the census) in a well capped at 30cqh, 12cqh beside his lines; his carried lines quoted, each with its 24-hour time, under each question's label, in a well of their own. HIS LINES ARE THE LAST TO GIVE WAY: they travel word for word, so their well has no cap, no scroll and no tab stop and they stand whole at any length; while the card stands the dock has no cap, so the room comes first from the log (down to its 3.5rem floor), then from the notes and the draft's field, and past that the dock scrolls as one region with the sticky foot in sight. The prompt gives way instead: 12cqh beside his lines, and in a round (`answer`) the questions with their options fold behind "The questions, with their options" (kit `Collapsible`, `CardFoldBody`: inert while folded; 24cqh opened), since each question heads his answers to it; a labelled group with no lines is a question he left unanswered, said as "No answer — it goes as “(no answer)”" with ▲ (the hands send one group per question of the round). Groups are keyed by their place. The foot in the tone's wash, "Say: “<say>”" beside the mic and "Aloud, not typed · Lapses at HH:MM" (the clock her prepare answer says it in), is sticky to the dock's bottom edge (`-bottom-1`, a ring of `--surface` masking what passes under it), so in a dock too short for the card (a phone's keyboard up, a phone on its side) the words that fire it, its lapse and a refused Withdraw (said inside the foot) stay in sight. The Withdraw × (`aria-label` "Withdraw") is drawn only given `onWithdraw` (optional on the view and the card; the live `CompanionPanel` passes `() => cancelAction(<the pending id>)`, so the × withdraws the action on screen and none is passed while there is none); its hint stands to its left. A press (`hooks/useWithdraw.ts`) calls `onWithdraw()` once: the × is busy while it is out, and a refusal is said inside the foot (`companion.action.withdrawRefused` with the server's sentence, else — no sentence, or no answer — `withdrawRefusedPlain`); withdrawn, the provider clears that action from the picture (only while it still holds it) and the card goes with it. It stands whole (`shrink-0`). THE LAPSE IS A DEADLINE, NOT A CLOCK (`hooks/useActionLapse.ts`): one `window.setTimeout` to `pending.expiresAt`, set when the card mounts and cleared when it unmounts or the deadline changes (the panel keys the card by `pending.id`, so a new action is a new card); from that moment the card draws nothing, and an action already past its time never draws. A stamp that is not a time sets no timer. The server closes the row itself at the next prepare, take or cancel. A lapsed card alone in the dock closes it (`empty:hidden`). Every word is a `t()` with its English default (`companion.action.*`). Fixtures: `FAKE_PANEL.action*`; `actionRound` is a three-question round at the length he really speaks (his spoken lines average 96 characters), its third question unanswered.
 - Hooks: `useFollowNewest` (the log follows the newest line until he scrolls up; `jumpToNewest`), `useGrowingField` (textarea sized to its words, measured only while drawn), `useCardFloor` (the draft card's `min-height`), `useTalkBinding(binding, toggle)` (below).
 - The talk button's binding (`TalkBinding`, MAN-9086; stored as `CompanionSettings.talkBinding`, MAN-9087):
   - `utils/talkBinding.ts` is the one pure rule, importing nothing but the type. `talkBindingFromEvent(event)` answers `{ binding }`, `{ refusal }` (a sentence that says why) or `null` (a modifier on its own, which starts a chord; a key with no nameable `code`; a mouse button past forward); `matchesTalkBinding(binding, event)` matches a keydown on `code` and all four modifiers exactly, never a `repeat`, and a mousedown on `button`; `isTalkBindingRepeat(binding, event)` is true for the auto-repeat of the bound chord held down; the label is the modifiers in the order Ctrl, Alt, Shift, Meta joined to the key by `+` (`KeyK` → `K`, `Digit1` → `1`; `Space` and `F8` as they are), or `Mouse middle`, `Mouse back`, `Mouse forward`. A change to what may be bound is an edit there (and in the server's `checkTalkBinding`, MAN-9087).
@@ -5086,7 +5087,7 @@ Three surfaces. Each is a VIEW that draws every state from props and a thin wrap
 - Her disc and her rail cell (`CompanionFab.tsx`, `CompanionDock.tsx`): MAN-9125; what they read from the provider: MAN-9129; proof on the live page: MAN-9130.
 - `companion-fake.ts`: fixture pictures (`FAKE_PANEL`, `FAKE_SETTINGS`); only the fixtures import it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionActionCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-action-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionActionCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useActionLapse.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useWithdraw.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-action-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
 
 ## MAN-9089 — src/modules/companion — Kaylee's panel, rail door and Settings section: the — The door: an `aria-label`ed rail button, `data-companion-door`, `aria-expanded` = the open state
 section: src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the stance, the status line, the rules and the fixture/001 The door: an `aria-label`ed rail button, `data-companion-door`, `aria-expanded` = the open state
@@ -5681,6 +5682,8 @@ Every message to her is assembled at the moment it is pushed (`createMessageAsse
 - Fills run in ONE pass (`fillSlots`): a value that contains `{name}` is never filled again, `$` in a value is not a replacement pattern, a slot the template invents is left as written, a slot it lacks is not filled.
 - The prompt's TOOLS section lists every tool she holds; the registry: MAN-9070.
 - `THE HOUSE, WHEN HE POINTS AT IT` (after WHAT YOU MUST NOT DO, before TOOLS): the rule (call the panel's tool before saying a word about it; every one takes `panel: true`), then one pointer line per panel naming its tool, in the TOOLS section's order. A new eyes tool adds its pointer line and its TOOLS line together: `toolLine` throws on a missing TOOLS line; a pointer line is read only by the probe of its own tool (`.verify/companion-doc-reads.mjs`: DocSpace's; `.verify/companion-run-reads.mjs`: the runs', and that it stands after the roadmap's and before DocSpace's).
+- `ON HIS WORD` (after THE HOUSE, before TOOLS): the hands' rule in her words. She does nothing in the house on her own judgment; `prepare_action` puts the action on his panel and tells her what to read back; she reads back the action and its name (for an Accept, the head of the prompt) and stops; only when he then says the thing itself with its name, aloud, she calls `take_action` with his words exactly as he spoke them. A bare yes, a typed line or words that do not name it are not his word; notes, answers and rulings travel in his own spoken words; `cancel_action` when he changes his mind. The server holds the line whatever she says (MAN-9171, INV-10099). Its tools' lines are in TOOLS; `toolLine` throws on a missing one.
+- The design record is the DocSpace page "Voice companion prompt" (block "System prompt"): the sections and tool lines above are its words, and a change to the prompt's words is made in both.
 - The sound set is the account's `gemini.soundTags` (shipped default `DEFAULT_SOUND_TAGS`, voice module): one list for the fill and the filter (MAN-9081).
 
 ## Proof
@@ -5743,7 +5746,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 | `companion_actions` | `id` TEXT, index `(user_id, prepared_at)` | her record of the actions she prepared for his word, one row each: `action`, `target_json`, `pin_json` (server-only), `prompt`, `carried_json`, `prepared_at`, `expires_at`; once taken `said`, `said_at`, `said_log_id`; once ended `ended_at`, `outcome` (CHECK `took` \| `already` \| `refused` \| `cancelled` \| `replaced` \| `expired`) and `answer`. No `outcome` = still waiting | the account |
 - `AUTOINCREMENT`, never reused: the panel holds a note id it may ask to dismiss and an entry id it has drawn; a number it remembers never names another row.
 - `relayed_sends` hangs on the CHAT because a relayed send is a fact of the chat's history. It survives Clear.
-- `companion_actions` is a fact about the HOUSE (what was done, on whose word, when). Clear never deletes from it; it ends any row with no outcome `cancelled` in its own transaction. An action ends once (`endAction` writes only a row with no outcome), and a lapse is found by the next prepare, take or cancel that meets it and ended `expired` — never by a timer.
+- `companion_actions` is a fact about the HOUSE (what was done, on whose word, when). Clear never deletes from it; it ends any row with no outcome and no claim `cancelled` in its own transaction (a row a take has claimed is spared: the take ends it). An action ends once (`endAction` writes only a row with no outcome), and a lapse is found by the next prepare, take or cancel that meets it and ended `expired` — never by a timer.
 - Merge paths: the three paths in `sessions.db.ts` that delete a watcher's duplicate row (`assignProviderSessionId`, `repointSessionToProviderSession`, `createForkedSession`) move `followups` and do NOT move `relayed_sends`, and need not: the companion records a send only for a chat of her list (`session_id <> provider_session_id`), never for a watcher row. A writer that records sends for any other kind of row must extend those paths first (MAN-9003).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-store.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/companion-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion-actions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/relayed-sends.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-pending.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-frame-tap.mjs
@@ -5761,8 +5764,8 @@ section: server/modules/companion — storage: the five tables, companionDb, rel
 | `readLog(userId, limit)` | newest `limit` rows, oldest first; `limit` clamped to 0..400, non-finite = 400 |
 | `addNote`, `listNotes`, `removeNote(userId, id)` | `listNotes` oldest first; `removeNote` is false for another account's id |
 | `heardSince(userId, since)` | his (`operator`) and her (`kaylee`) log lines with `at` after `since`, oldest first, at most 400 (the whole log the account keeps): `{ id, at, role, via, text }`. What `take_action` checks his word against. THROWS when `since` is not a stored stamp (`isStoreStamp`, `server/shared/utils.ts`: fixed-width ISO-8601 UTC with milliseconds that parses as a date; `''` would read as before every line) — pass `pending.preparedAt` through unchanged |
-| `openAction(userId, row)`, `endAction(userId, id, end)`, `listActions(userId, limit)` | the record of actions (`repositories/companion-actions.db.ts`, spread into `companionDb`). `openAction` inserts a row with no outcome and answers it. `endAction` writes `ended_at` (now by default), `outcome` and, when given, `said`, `said_at`, `said_log_id`, `answer` — only to a row with no outcome, and answers whether this call ended it. `listActions` answers the newest `limit` (≤ 1000) by `prepared_at`, newest first |
-| `clearAccount(userId)` | one transaction: ends every `companion_actions` row of the account that has no outcome as `cancelled`; deletes the account's log and notes; resets `provider_session_id`, `focus_json`, `draft_json`, `walk_json`, `pending_json`, `unanswered_json` to NULL. `floor` STAYS; `relayed_sends` and every row of `companion_actions` are kept; no state row is created for an account with none. Answers `{ logRemoved, notesRemoved, stateReset }` |
+| `openAction`, `claimAction`, `noteRefusal`, `endAction`, `listActions` | the record of actions (`repositories/companion-actions.db.ts`, spread into `companionDb`). `openAction(userId, row)` inserts a row with no outcome and answers it. `claimAction(userId, id, { said, said_at, said_log_id })` writes the firing line on a row with no outcome and no claim, in ONE statement, so of two takes exactly one wins; answers whether this call did. `noteRefusal(userId, id, sentence)` writes `answer` on a row still waiting (no outcome, unclaimed): the newest refusal of a take. `endAction(userId, id, end)` writes `ended_at` (now by default), `outcome` and, when given, `said`, `said_at`, `said_log_id`, `answer` — only to a row with no outcome, and a CLAIMED row only for a call carrying that claim's `said_log_id`; answers whether this call ended it. `listActions(userId, limit)` answers the newest `limit` (≤ 1000) by `prepared_at`, newest first |
+| `clearAccount(userId)` | one transaction: ends every `companion_actions` row of the account that has no outcome and no claim as `cancelled` (a row a take has claimed is spared: the take ends it with the door's outcome); deletes the account's log and notes; resets `provider_session_id`, `focus_json`, `draft_json`, `walk_json`, `pending_json`, `unanswered_json` to NULL. `floor` STAYS; `relayed_sends` and every row of `companion_actions` are kept; no state row is created for an account with none. Answers `{ logRemoved, notesRemoved, stateReset }` |
 Every statement names its account in `WHERE`/`VALUES`: an id of another account reads as no row.
 
 ## `relayedSendsDb` (`repositories/relayed-sends.db.ts`)
@@ -5822,7 +5825,8 @@ The views are MAN-9062. This row is the state they draw from and the places the 
 | `CompanionDock` | `WorkspaceRail`'s foot: after `UsageRings`, before the foot views (the Inbox) and Settings (her cell; it draws her door while the disc is out: MAN-9125) |
 | palette row | `ProjectCommandPalette` builds `companionGroup` and passes it to `CommandPalette` (prop `companionGroup`), drawn between the Applications and Navigate groups when actions show and the group has rows. One row: key `companion`, label `t('companion.palette.talk', { name })` ("Talk to Kaylee"), icon `AudioLines`, `run: setOpen(true)`. `name` = `picture?.settings.name`, else `t('companion.defaultName')` |
 | Settings section | `VoiceSettingsTab`, after its voice section, NOT gated by `voiceEnabled`; the section fetches and saves for itself (`useCompanionSettings`: `GET /api/companion`, `PUT /api/companion/settings`) |
-- Opening for her (`onOpen(target: CompanionOpenTarget)`, `CompanionHost.openOnThisPage`), called by the provider only for a `companion_open` whose `floor` is this page's client id; `CompanionHost` answers each target. `chat`: `setActiveTab('chat')`, `navigate('/session/<id>')`, and when an application covers the main region (`useCurrentApplication() !== null`) the chat host's `open()` floats the chat over it. `card`: when an application covers the workspace, `useBackToWorkspace()` first; then `setActiveTab('runner')` and `useRevealCard()` (a `navigate` to the current path with `?runner=<plan>`, which `useRunnerLanding` takes and strips; the Roadmap tab's In flight face shows the card). `page`: `useShowApplication()('archpulse', '/#page=<id>' + (blockId ? '&block=<id>' : ''))`, which puts ArchPulse up at the page or, when it is up, moves that pane there (MAN-491). The callback changes identity as applications come and go and the route moves; the provider reads the newest at the moment a frame arrives.
+- Opening for her (`onOpen(target: CompanionOpenTarget)`, `CompanionHost.openOnThisPage`), called by the provider only for a `companion_open` whose `floor` is this page's client id; `CompanionHost` answers each target. `chat`: `setActiveTab('chat')`, `navigate('/session/<id>')`, and when an application covers the main region (`useCurrentApplication() !== null`) the chat host's `open()` floats the chat over it. `card`: when an application covers the workspace, `useBackToWorkspace()` first; then `setActiveTab('runner')` and `useRevealCard()` (a `navigate` to the current path with `?runner=<plan>`, which `useRunnerLanding` takes and strips; the Roadmap tab's In flight face scrolls to the plan's card, or to an epic's deck by its name). The face draws only what is live: a hidden or shipped plan has no card there, so an open of one brings the tab forward with nothing to scroll to. `page`: `useShowApplication()('archpulse', '/#page=<id>' + (blockId ? '&block=<id>' : ''))`, which puts ArchPulse up at the page or, when it is up, moves that pane there (MAN-491). The callback changes identity as applications come and go and the route moves; the provider reads the newest at the moment a frame arrives.
+- Proof of the action card's lapse and ×, and of the three opens: `node .verify/companion-card-live.mjs` on :5183 against :3011 as account 1 (`open` runs the open legs alone). Frames are handed to the page's real socket handler; the only writes are `DELETE /api/companion/action` and the floor take; the × legs refuse to run while a real action stands on the account. Legs 5 and 6 open whichever plan card the lane draws.
 - Text: `t('companion.*')` in `en/common.json`; the Settings section reads `voiceSettings.companion.*` in `en/settings.json`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/CompanionHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx
@@ -5840,7 +5844,7 @@ section: src/modules/companion — the page's picture: CompanionProvider, the re
 | `editDraft(text)` | `PUT /draft`; the answer is folded in as `companion_draft` |
 | `sendDraft(mode)` | `POST /draft/send`; resolves with the `outcome` (`'started'` \| `'folded'`); rejects with the server's sentence on a refusal |
 | `clearDraft`, `dismissNote(id)`, `interrupt`, `clear` | `DELETE /draft`, `DELETE /notes/:id`, `POST /interrupt`, `POST /clear` |
-| `cancelAction()` | `DELETE /action`: his × on the card of the action waiting for his word. On the 2xx the provider folds `companion_pending: null` itself, as `editDraft` folds its answer, so the card never stays up while its frame is in flight; a refusal rejects with the server's sentence, which the card says at its foot. `CompanionPanel` passes it to the card as `onWithdraw` |
+| `cancelAction(actionId)` | `DELETE /action`: his × on the card of the action `actionId` waiting for his word. On the 2xx the provider clears that action from the picture itself, as `editDraft` folds its answer, so the card never stays up while its frame is in flight, and only while the page still holds `actionId`. The request names no action: the server withdraws whichever action stands when it handles `DELETE /action`, so a newer prepare that replaced the card he pressed × on before the request landed is withdrawn too — the page's echo keeps it for that instant (id mismatch) and the route's `companion_pending: null` frame removes it. Nothing fires either way. A refusal rejects with the server's sentence, or with an empty message when it sent none or never answered, which the card says in its own plain words. `CompanionPanel` passes it to the card as `onWithdraw`, bound to the action on screen |
 | `recentSend` | `string \| null`: the id of the chat she opened in the last `RECENT_SEND_MS` = 4000 ms — the chat a send went to, or one she was told to open (counted from the `companion_open` frame for a chat target that this page heard), else null. `useAvatarTarget` points the button at that chat's composer while it is set |
 | `fabPosition`, `moveFab(next)` | where her disc rests (`{ docked: true }` or a point) and its setter, which stores `companion-fab`: from `useCompanionFab()`, called once in the provider (MAN-9129) |
 | `dockRect`, `registerDock(rect)` | the rail cell's rect while on screen, and the cell's report of it (MAN-9129) |
@@ -5864,7 +5868,7 @@ section: src/modules/companion — the page's picture: CompanionProvider, the re
 | `floor()` | `POST /api/companion/floor` |
 | `saveSettings(patch)` | `PUT /api/companion/settings` |
 | `editDraft(text)`, `clearDraft()` | `PUT`, `DELETE /api/companion/draft` |
-| `cancelAction()` | `DELETE /api/companion/action`: his × on the card of the action waiting for his word; answers 204 whether or not one was standing. The provider folds `companion_pending: null` on the 2xx, and the frame the route sends folds the same value again |
+| `cancelAction()` | `DELETE /api/companion/action`: his × on the card of the action waiting for his word; answers 204 whether or not one was standing. The provider clears the withdrawn action (by its id) on the 2xx, and the frame the route sends folds `companion_pending: null` again |
 | `sendDraft(mode)` | `POST /api/companion/draft/send` |
 | `dismissNote(id)` | `DELETE /api/companion/notes/<id>` |
 | `interrupt()` | `POST /api/companion/interrupt` |
@@ -5879,7 +5883,7 @@ section: src/modules/companion — the page's picture: CompanionProvider, the re
 2. After that, every `companion_*` frame on the page's one socket is folded by `reduceCompanion(picture, frame)`.
 3. Read again on: the socket's `websocket_reconnected` (frames were missed), a `companion_cleared` frame, the panel opened while `picture === null`, and the panel's Try again (`reread`) while a failed read keeps `picture` null.
 4. A frame that arrives while a read is out is queued and folded over its answer. A read asked for while one is out discards that one and reads again. A `companion_cleared` drops the queue and discards a read in flight.
-5. `companion_open` is not folded. For a chat target (`target.kind === 'chat'`) every page notes it in `recentSend`; `onOpen(target)` is called, for a chat, a card or a page, only when `frame.floor === clientId`, and every other page of the account does nothing with it. `CompanionHost` answers each target (MAN-9083).
+5. `companion_open` is not folded. A target that fails `isOpenTarget` (an unknown kind, or a chat without its session id, a card without its plan, a page without its id) is dropped. For a chat target (`target.kind === 'chat'`) every page notes it in `recentSend`; `onOpen(target)` is called, for a chat, a card or a page, only when `frame.floor === clientId`, and every other page of the account does nothing with it. `CompanionHost` answers each target (MAN-9083).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/CompanionHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx
 
@@ -6522,8 +6526,14 @@ Every spoken probe of kaylee--talk feeds one clip, so none synthesizes speech ag
 - A stream that ends without `interaction.completed` after some audio throws and writes NO file. why: the file is written once and kept; half a sentence is not the fixture.
 - An Interactions answer with no audio step: the whole answer is kept at `$TMPDIR/kaylee-clip-answer.<pid>.txt` and the run fails. why: reading it differently never costs a second call.
 - The key is read as `~/.claude/scripts/gemini-image` reads it (`GEMINI_API_KEY`, else the `GEMINI_API_KEY=` line of `GEMINI_ENV_FILE`, default `/opt/shadow-connector/.env`) and never printed; every message passes a `AIza…` → `[key]` redaction.
-- Exit 4: no key. Exit 3: the call or its reading failed.
+- Exit 4: no key. Exit 3: the call or its reading failed. Exit 2: `KAYLEE_CLIP_FILE` is not a bare `.wav` file name.
 - To change the words: delete the file and run the maker once, knowingly.
+- Other clips: the same request for other words, through three env vars. `kaylee-eyes-clips.mjs` (MAN-9178) calls the maker this way, once per absent clip.
+  | env | default | holds |
+  |---|---|---|
+  | `KAYLEE_CLIP_WORDS` | `What chats are working?` | the words spoken |
+  | `KAYLEE_CLIP_FILE` | `kaylee-what-chats-are-working.wav` | a bare `.wav` name, written under `.verify/fixtures/` |
+  | `KAYLEE_CLIP_STYLE` | `plain, clear, unhurried` | the `speech_metadata` style of the Interactions request |
 
 ## Who feeds on it
 | probe | how | Gemini calls |
@@ -7360,7 +7370,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionF
 | `cerberus()` | `buildOverview(readInputs())`, what `GET /api/cerberus/overview` answers | `createCerberusModule().overview` |
 | `heal` | `Pick<HealService, …>` of its `summary` and `kind` — the heal module's one service, so the worker's binary keeps its one rule (`HEAL_REFLEX_BIN`) | `createHealModule().service` |
 
-**Write doors:** `createDispatcherModule().relay(order)` and `createDispatchSoulsModule().resumeRun(order)` carry her acts on his spoken word (MAN-9152). `CompanionHouse` holds neither yet.
+**Write doors, handles of the same house** (the hands fire through them: MAN-9173):
+| Handle | Is | Built by |
+|---|---|---|
+| `relay(order)` | one act on his spoken word for the dispatcher lane: the answers to an open prompt go through the ask book's third door `kaylee`, every other verb is the dispatcher's own, each carrying kaylee--press's record of his word. Never throws: a refusal is a `RelayAnswer` (MAN-9152) | `createDispatcherModule().relay` |
+| `resumeRun(order)` | a chain resumed with his rulings, `plan-runner chain --resume`; answered the same way (MAN-9152) | `createDispatchSoulsModule().resumeRun` |
 
 **Plumbing, one argument at a time:** `createCompanionModule({ runtime, house })` → `companionService.attachRuntime(gateway, house)` → `createCompanionAccount(userId, runtime, house)` → `createToolDeps({ …, house })` → `CompanionToolDeps.house`. An account made before both are attached throws (a verb called early is refused, as it was for the gateway alone).
 
@@ -7368,7 +7382,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionF
 
 **Probes** that build her tools by hand pass `.verify/lib/probe-house.mjs`'s stand-in house.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/house.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-card-text.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/dispatch-souls.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/heal/heal.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.module.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/house.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-card-text.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/dispatch-souls.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/heal/heal.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/heal/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.module.ts
 
 ## MAN-9151 — server/modules/companion/eyes — eyes-answer.ts and panel-words.ts: the seam every eyes read answers through, and the table of the panels' English
 
@@ -7575,7 +7589,7 @@ The words every one of them says its lines in (`maskCredentials`, `clipLine`, `f
 - `--user` defaults to 1, the probe account; `--user=2` is his, for reads that stay whole, never with `--digest`.
 - Live showing, 2026-10-28 on :3011 (account 1, her on `haiku`): "What is on the Kanban board?" → `read_kanban board`; "How is the heal list?" → `read_heal summary`; "Is any schedule drifting?" → `read_schedules drift`; a fixture note → `read_notes list` and `read_notes "harbor light"`. `grep -c -i -E "cost|token|spend"` over her 19 sentences: 0.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-reads.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedules-read.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-reads.mjs
 
 ## MAN-9160 — server/modules/companion/eyes — panel-reads.ts: read_heal, read_notes and read_schedules
 
@@ -7639,7 +7653,7 @@ A RUN is one of two things:
 | `running` | state kind `running` |
 | `recent` | not running, ended within 24 h |
 | `failed` | state kind `bad` or `waiting`, ended within 7 days |
-| anything else | a phrase, matched as a substring over: dispatcher run — plan name, plan title, task key, task title, agent, slug; chat run — chat name, agent, the whole brief |
+| anything else | a phrase, matched as a substring over: dispatcher run — plan name, plan title, task key, task title, agent, slug; chat run — chat name, agent, the whole brief. Phrase and fields are lower-cased and every run of dashes or underscores read as a space (`plainWords`), so "avatar fill" finds `kaylee--avatar--fill` as "avatar--fill" does |
 
 - Lines: dispatcher `<plan title> › <task title, ≤70 chars> · <state> · <when> · run <chain id>`; chat `<chat name> › <agent> "<first 6 words of the brief>" · <state> · <when> · run <id>`. `<when>` = `since <moment>` while running, else the moment it ended. The plan title is the roadmap feature's title (`planTitles(house.roadmap())`), else the plan's name.
 - Order: running first, then newest `at` first; cap `RUNS_MAX` = 15 through `cappedLines` (the rest named by count). `panel: true` puts the whole list on his panel (`toPanel`).
@@ -7829,3 +7843,283 @@ Strings and rows in, strings out, no I/O. The tools that use them are MAN-9165. 
 - A lane that has not landed adds nothing; a lane whose read throws is logged once per call (`[Companion] list_followups could not read the <roadmap|dispatcher> picture for the plan steps`) and counts as not landed. Both `null` ⇒ every entry `''`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/card-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/card-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/followup-plans.ts
+
+## MAN-9171 — server/modules/companion/hands — the check of his word (action-word.ts): the six checks and their sentences, the action words, the name rule
+
+`hands/action-word.ts` is the check of his word: the pure judgment `take_action` makes before anything in the house moves (protocol: MAN-9174). No I/O, no clock of its own (the caller passes `now`), no import but the contract's types. Shown by replaying rows: `.verify/kaylee-action-word.mjs`.
+
+## What counts as his word
+- HIS WORD IS A PRESS: a log row with `role: 'operator'` and `via: 'spoken'`. A typed line neither fires an action nor is carried; the empty press (`''`) names nothing.
+- THE NAME: every significant word of the target's `spoken`, or of its house name read as words, is among his words, in any order. House name: a card's `name`, a run's `plan` (else its `runId`), a page's `pageId`; a chat and a follow-up have `spoken` alone. why: "Kaylee's eyes" heard as "Kaylee eyes" must still fire.
+- NOT SIGNIFICANT (never required): the, a, an, of, to, for, on, in, at, and, card, plan, feature, epic, run, page, chat, session, follow, up, followup, please, it, its, my, this, that.
+- A name with no significant word names nothing. A name whose every significant word is one of the action's own words (the card "Epic queue" under `queue`) names nothing either: `canBeNamed(target, action)` is false, and the prepare refuses it at once (MAN-9172) instead of putting a card up that only lapses.
+- THE READ-BACK: a row of hers (`role: 'kaylee'`) after `preparedAt` and before his line names the target (`namesTarget`).
+- AN ORDER, NOT A NO OR A QUESTION (`takesItBack`): refused when the line ends in `?`, opens with should, can, could, would, do, does, is, are or will, or holds a negator (no, nope, not, never, without, cannot, dont, doesnt, didnt, cant, couldnt, wont, wouldnt, shouldnt, isnt, arent, wasnt, werent, havent, hasnt). The target's own name words are set aside first ("No more polling" can be ordered). It can refuse a plain order that says "no" ("Queue it, no problem"); it never accepts a refusal. The cure for a false refusal is to say the order again.
+- Every time comparison is written as the thing that must hold, so a stamp that does not parse fails. The stamps are the store's own (`isStoreStamp`, `server/shared/utils.ts`).
+- A line is compared trimmed with every run of whitespace one space. The firing line is the NEWEST spoken line, after `preparedAt` and at or before `expiresAt`, equal to `said`; a blank `said` matches none.
+- KNOWN LIMIT, SIBLINGS: the check holds ONE target and cannot see the cards beside it. "Queue kaylee eyes." fires a pending card `kaylee`; `restorly--chat` is covered by "restorly" alone. What holds the line is the full name in `say` and in her read-back, which he hears first.
+
+## `ACTION_WORDS` (the first of each is the one a refusal names and the prepare tells her to listen for)
+| action | words |
+|---|---|
+| `queue` | queue, accept, approve |
+| `hide` | hide |
+| `show` | show, unhide |
+| `rework` | rework, re work |
+| `answer` | answer, answers |
+| `recut` | recut, re cut, cut |
+| `stop` | stop, pause |
+| `resume` | resume, start, unpause |
+| `kick` | kick, wake |
+| `resume_run` | resume, rerun, re run, continue |
+| `open` | open, show, pull up, bring up |
+| `close_followup` | close, done, tick, check off |
+- `wordsOf(text)`: NFC, lower case, apostrophes (`' ‘ ’ ʼ`) dropped, every other run of non-letters and non-digits one space; `''` and punctuation are no words.
+- `holdsActionWord(said, action)`: one of the action's words stands in his words as a run, side by side, in order. "restart" does not hold "start"; "pull it up" does not hold "pull up". This is the plain predicate; check 6 asks `holdsActionWordBesidesName`.
+- `holdsActionWordBesidesName(said, target, action)` (private, check 6): the significant words of each name of the target that his words cover are taken out of his line, one occurrence each, and an action word must stand in what is left; the name covered most fully decides, so it fails closed. why: a name can hold an action word beside others (the card "Probe eyes accept" under a queue, `accept` being a queue word), and the name would then be its own verb: the bare name, or "Open probe eyes accept." under a queue, fired it. Now "Queue probe eyes accept." fires; the bare name and a misheard "cue probe eyes accept" are refused with check 6's sentence; a name that is the verb as well ("Queue queue drying") is ordered by saying the verb once more.
+
+## `checkHisWord({ pending, said, now, lines })`: the checks, in order
+`lines` are `heardSince`'s rows, oldest first. `pending` is the action's `action`, `target`, `preparedAt`, `expiresAt`, `say`, or `null`. The first failing check answers `{ ok: false, sentence }`; none failing answers `{ ok: true, line: { id, at, text } }`.
+| # | fails when | sentence |
+|---|---|---|
+| 1 | `pending` is `null` | `Nothing is waiting for his word; prepare it first.` |
+| 1 | `canBeNamed` is false | `No line of his can fire this: "<spoken>" has no word of its own that is not the action itself or a filler word. Cancel it and tell him it cannot be done by voice.` |
+| 2 | `now` is not at or before `expiresAt` | `It lapsed at <HH:MM>; prepare it again.` |
+| 3 | no spoken line after `preparedAt`, at or before `expiresAt`, equals `said` (a typed line, a line before the prepare, a blank `said`) | `That is not a line he spoke after the card went up. He must say it aloud: <say>.` |
+| 4 | no row of hers, after `preparedAt` and before the firing line, names the target | `You have not read it back to him yet. Say it back first: <say>.` |
+| 5 | `said` does not name the target | `His words do not name <spoken>.` |
+| 6 | `said` holds none of the action's words besides the target's name | `His words do not say <first action word>.` |
+| 6 | `takesItBack` | `That is a no or a question, not an order. He must say the order itself, aloud: <say>.` |
+- `HH:MM` is the box's local clock; a stamp that does not parse reads `an unknown time`.
+- `take_action` passes `said` as logged. A transcript that heard "queue" as "cue" is passed as logged, not asked again; check 6 then refuses it with its sentence.
+- Check 4 reads the log, not what she says she did: her sentences are rows of the same log.
+
+## Probe
+`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-action-word.mjs` prints each case with its answer and the number of the check that refused it, `UNEXPECTED` and exit 1 when a case answers otherwise. No store, no model. Run it before editing `ACTION_WORDS`, the not-significant list, the negators or check 6. Its "verb stands beside the name" cases show check 6's rule (`holdsActionWordBesidesName`): a plan `probe-eyes-accept` under a queue fires on "Queue probe eyes accept." and is refused at check 6 by the bare name, by "Cue probe eyes accept." and by "Open probe eyes accept."; under an open, "Open …" fires and "Queue …" is refused; a name that is the verb as well ("Queue drying") fires on "Queue queue drying." and is refused on "Queue drying.". Before the rule, the first three of those refusals fired.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-action-word.mjs
+
+## MAN-9172 — server/modules/companion/hands — the recipes (action-recipe.ts, action-targets.ts, carried-lines.ts): what each of the twelve actions takes, checks and pins at prepare
+
+`hands/action-recipe.ts` (`prepareRecipe(deps, input)`) is what each of the twelve actions takes and checks at `prepare_action` (protocol: MAN-9174). Nothing here moves anything in the house: it answers a `PreparedAction` for `hands-tools.ts` to put on his panel, or the sentence that refuses and says what to do next. Targets: `hands/action-targets.ts`. His carried lines: `hands/carried-lines.ts`.
+
+## Before any recipe
+| input | refused with |
+|---|---|
+| `words` on queue, hide, show, answer, recut, stop, resume, kick, open or close_followup | `<action> carries no words of his; leave words out.` (`answer`: `answer carries his lines in answers, one group per question; words are not taken. Leave words out.`) |
+| `answers` on any action but `answer` | `Only answer carries answers; <action> does not. Leave answers out.` |
+| a prepared target for which `canBeNamed(target, action)` is false (MAN-9171) | `No line of his can fire this: "<spoken>" has no word of its own that is not the action itself or a filler word. Tell him it cannot be done by voice.` |
+
+## The twelve
+The card actions read the roadmap and dispatcher pictures once (`findCard`, `house.roadmap()` + `house.dispatcher()`); a dispatcher not yet landed → `The dispatcher has not been read yet; ask again in a moment.` The card's open prompt is `openAsk(card, book)` (`eyes/card-lines.ts`): the dispatcher picture's own `asking` for a plan, or for an epic its lead plan's.
+| action | needs | refused when | pins | prompt on the card | read-back |
+|---|---|---|---|---|---|
+| `queue` | an open Accept prompt | no prompt: `There is no Accept prompt open on <spoken>. No prompt is open on it; read_card with scope prompt shows what it waits on.`; a questions round: `… It has a questions round open, not an Accept; …` | `ask` | `acceptPrompt` | `Queue <spoken>: <acceptHead>.` |
+| `hide` | an open Accept prompt (Hide approves it and holds it out of the queue), else an approved card | no prompt and: the dispatcher does not hold it; it is already hidden; it is not approved | `ask` at a prompt, else none | `acceptPrompt` at a prompt | at a prompt as `queue`; else `Hide <spoken>: it is approved, so this holds it out of the queue, paused, until he shows it.` |
+| `show` | a hidden card the dispatcher holds | the dispatcher does not hold it; it is not hidden | none | none | `Show <spoken>: it is hidden now, and this puts it back in the queue.` |
+| `rework` | `words` (his notes) | no `words`: `A Rework carries his notes, in his own spoken words. Ask him what to change, let him say it aloud, then prepare again with words: his lines exactly as he said them.`; a questions round open (`answer` takes those); no Accept open and the dispatcher does not hold the card (no designer) | `ask` at an Accept, else none | `acceptPrompt` at an Accept | `Rework <spoken> with his notes: "<line>" …; <acceptHead>.`; with no Accept `… There is no Accept prompt open, so the notes go to its designer as a message.` |
+| `answer` | a questions round and `answers` | no round: `No questions round is open on <spoken>; read_card with scope questions shows whether there is one.`; no `answers`; a question number above the round's count; two groups naming one number | `ask` and `questions` (the question number each carried group answers, in group order) | `questionsPrompt` | `Send the answers to <spoken>: question 1, "<line>"; question 2, no answer.` |
+| `recut`, `stop`, `resume`, `kick` | a card the dispatcher holds | not held; finished (`complete`), except `kick` | none | none | `Re-cut <spoken>: this sends its design to be cut into tasks again.` · `Stop …: this pauses it and ends its running work.` · `Resume …: this lets it run again.` · `Kick …: this wakes the dispatcher.` |
+| `resume_run` | `words` (his rulings) and a chain that stopped | no `words`; the run is one soul's launch (`list_runs` shows the chain it belongs to); no record of the chain; status `running`; status `done` or `nothing-changed` | `chainId` | none | `Resume the run <spoken> with his rulings: "<line>" ….` |
+| `open` | a card, a run, a page or a chat | nothing named; the name fits more than one kind | `open` (a `CompanionOpenTarget`) | none | `Open <spoken>: it comes up on the screen he is using.` |
+| `close_followup` | `#<id>` of an open follow-up of his | not `#<id>` (or `follow-up #<id>`): `A follow-up is named by its number, #<id>, as list_followups prints it.`; not among his open ones: `#<id> is not one of his open follow-ups; list_followups shows the ones that are.` | `followupId` | none | `Close the follow-up on <spoken>: "<first sentence>"` |
+- Every pinned `ask` is the dispatcher picture's own `asking` at the prepare. The door later sends it, and the ask book refuses a prompt that changed meanwhile (MAN-8494).
+- An `answer` carries a group per question of the round: a question he left unanswered gets an empty group, on his card and in her read-back, and `(no answer)` in the brief (MAN-9173).
+
+## Targets — `action-targets.ts`
+Each resolves through the resolver her eyes use, so a name means one thing whether she reads or acts. Every target carries `spoken`, the name HE says it by; the card draws it and the check of his word requires it (MAN-9171).
+| target kind | resolved by | `spoken` |
+|---|---|---|
+| `card` | `resolveCard` (MAN-9165): name, title or a unique fragment. The name of an epic carries `.arc` (`<name>.arc`), which is how a door tells an epic from a plan of the same name; `arc` is the epic's name for a plan | the title when six words or fewer, else the name with dashes as spaces |
+| `run` | `resolveRun` (MAN-9162): a chain id or launch id, or `<plan> <task>`. `plan` is the dispatcher's, `null` for a chat's run | the chain's slug as words (`kaylee--eyes--hands` is "kaylee eyes hands"), else the plan's name, else the id |
+| `page` | `resolvePage` (MAN-9157): an id or exact title, optionally `#<block id>`; `blockId` is kept only when the page holds a block by that id | the page's title |
+| `chat` | `resolveChat` (MAN-9055): name or id | the chat's name |
+| `followup` | `#<id>` in `listOpenFollowups(userId, null, 200)` | the first five words of its text, trailing punctuation cut |
+- `open` tries card, run, page, chat. Writing the kind in front (`chat: kaylee eyes`) tries that kind alone. Several kinds fitting is refused: `"<ref>" fits <n> kinds of thing: <each, named>. Say which by writing the target with its kind in front, for example "<kind>: <ref>".` A kind that did not answer (DocSpace down) is skipped when another fits. None fits: `Nothing of his is named "<ref>": not a card, a run, a page or a chat. list_roadmap, list_runs, search_docs and list_sessions find them.`
+- Where an open lands: a card → `{ kind: 'card', plan: <card name> }`; a run of a plan → that plan's card; a chat's run → the chat that launched it (neither: `The run <id> has neither a plan card nor a chat of his to open.`); a page → `{ kind: 'page', pageId, blockId }`; a chat → `{ kind: 'chat', sessionId }`.
+
+## Carried lines — `carried-lines.ts` (`resolveCarriedLines`)
+- Notes, an answer round's answers and rulings are HIS words. A line she passes in `words` or `answers` must equal one of his SPOKEN lines of the last 30 minutes (`CARRIED_WINDOW_MS`; `heardSince`), compared trimmed with whitespace folded. A typed line is not carried.
+- Each entry takes the newest spoken line equal to it that no earlier entry took: two entries equal one line only when he said it twice. An answer round resolves ONE list across every group.
+- A line not found refuses, naming it (cut at 120 characters): `"<line>" is not a line he spoke in the last 30 minutes, so it cannot travel as his words. Ask him to say it aloud, then prepare the action again with his line exactly as he said it.`
+- `inOrderSaid` puts a group in the order he said the lines (by log id); that is the order they are joined in, whatever order she listed them.
+- A carried group is `{ label, lines: [{ logId, at, text }] }`: `label` null for notes and rulings, the question's text for an answer round. The card draws each line with its time.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-recipe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/carried-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-recipes.ts
+
+## MAN-9173 — server/modules/companion/hands — the doors (action-doors.ts): where each action goes, the briefs his lines make, the rulings file
+
+`hands/action-doors.ts` (`fireAction(deps, pending, press)`) is where each of the twelve actions goes when `take_action` fires it (protocol: MAN-9174). Every door is the house's own. A door never throws: what it cannot do is `refused` with the sentence that says why, and anything a door throws is `console.error('[Companion] <action> on his word did not complete', …)` and `refused` with `the house could not do it just now (<message>)`.
+
+## Where each action goes
+| action | door | order sent |
+|---|---|---|
+| `queue` | `house.relay` | `{ verb: 'queue', ask, press }` (the pinned Accept) |
+| `hide` at an Accept | `house.relay` | `{ verb: 'hide-lock', ask, press }`: approves and holds out of the queue |
+| `hide`, no prompt | `house.relay` | `{ verb: 'hide', name, press }` |
+| `rework` at an Accept | `house.relay` | `{ verb: 'rework-lock', ask, notes, press }` |
+| `rework`, no prompt | `house.relay` | `{ verb: 'tell', name, brief: notes, press }`: the notes to the card's designer |
+| `answer` | `house.relay` | `{ verb: 'answers', ask, brief, press }` |
+| `show`, `recut`, `stop`, `resume`, `kick` | `house.relay` | `{ verb: <action>, name, press }` |
+| `resume_run` | `house.resumeRun` | `{ chainId, rulingsFile, press }` |
+| `open` | `deps.openOnFloor(open)` | `companion_open { target, floor }` to the page that holds the floor; answers `took` `<spoken> is up on the screen he is using.` At no floor: refused `No page of his holds the floor; he must open your panel first.` |
+| `close_followup` | `closeFollowupForAccount(userId, id)` (MAN-9145) | his own tick: `took` `Follow-up #<id> is ticked off as his own.`; an id no longer among his open ones is `already`, `Follow-up #<id> was already closed.` |
+- `name` is the card target's `name`: the plan's name, or `<name>.arc` for an epic.
+- The lanes' side of `relay` and `resumeRun`, the record they write and what the dispatcher and the runner do with it: MAN-9152 (Accept and answers go to the ask book's third door `kaylee`: MAN-8494). `CompanionHouse` carries both doors (MAN-9142).
+- A pin that is missing answers refused, naming what was lost, `prepare it again`: `that action lost the prompt it was prepared on`, `… the questions …` (also when the pinned question numbers do not match the carried groups), `… the run …`, `… the place it was prepared for`, `… the follow-up …`; `that action names no card` when the target is no card.
+- why the order is built from the PIN and never the picture now: the dispatcher refuses a prompt that changed since he heard it read back (MAN-8494).
+
+## What the designer and the runner read — his lines, verbatim
+| brief | form |
+|---|---|
+| Rework `notes`, `tell` `brief`, resumed run's rulings | his carried lines' texts, in the order he said them, joined by blank lines |
+| `answers` `brief` | per question of the pinned ask, in the round's order: `Q: <question text>` newline `A: <his lines joined by a space>`, or `A: (no answer)`; the pairs joined by blank lines. A group lands under its question by the pin's question NUMBER, never by text (two questions of a round may share it) |
+- The record of his word is never written into a brief. It rides as `--relay <record>`.
+
+## The rulings file
+- `resume_run` writes the rulings to her scratch (`companionScratchDir(userId)`, `nextScratchFile(folder, 'rulings')`), a trailing newline added, then `pruneScratch(folder)`: the folder keeps its newest 20 regular files; the file just written is the newest. Nothing removes a folder.
+- why the PATH travels in `ResumeRunOrder.rulingsFile` and not the rulings: dispatch-souls cannot reach her scratch without importing the companion (MAN-9152).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-clips.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-whole.mjs
+
+## MAN-9178 — server/modules/companion/hands — the doors (action-doors.ts): where each action — Proof
+section: server/modules/companion/hands — the doors (action-doors.ts): where each action goes, the briefs his lines make, the rulings file/001 Proof
+
+`.verify/kaylee-eyes-scratch.sh` stages a scratch CloudCLI server over a copied auth database and a scratch `DISPATCHER_HOME`; it never touches :3011, :5183, the live dispatcher home or the live auth database. `KAYLEE_EYES_PLANS` (a list of `accept`, `second`, `questions`; default `accept second`) says which plans it loads: `accept` and `second` have their Accept prompt raised; `questions` loads in state `questions` with two questions open and no cut (phases load only on a designed plan), and the server raises its questions round.
+
+`.verify/kaylee-eyes-hands.mjs` (the default command, over `accept second`): typed "Get probe eyes accept ready to queue." → the card and her read-back; the fixture clip "Queue probe eyes accept." (`.verify/kaylee-eyes-clips.mjs`, one `gemini-3.8-flash-lite-tts` call per clip, only when the file is absent) played as a press; a typed "Queue probe eyes second." fires nothing. `.verify/kaylee-eyes-recipes.ts` drives the other recipes through the real handlers with the two doors stood in (they record the order and answer `took`).
+
+`.verify/kaylee-eyes-whole.mjs` (`KAYLEE_EYES_PLANS="accept questions" bash .verify/kaylee-eyes-scratch.sh node .verify/kaylee-eyes-whole.mjs`) is the whole arc on one stack. A Playwright page on the scratch client opens her panel, so it holds the floor, and every press is posted with that page's `x-companion-client` (read from the tab's `sessionStorage`). It runs a queue (typed prepare, the clip, the store's `approved` and `relayed` events); a second action (a hide) with a typed "Hide probe eyes accept." that fires nothing, taken down by her `cancel_action`; an answer round (two answer clips pressed first, a typed prepare that carries those two lines, the send clip, the queued designer outing's brief); an open of the card (the page lands on the Roadmap tab's In flight face, on that card); a close (a follow-up filed through a scratch chat's command door, `closed_by = 'user'`). It prints her panel's lines, her tool calls, the store's rows and `companion_actions`.
+- The page's voice is switched off before her panel opens: `companion-voice` is set to `off` in the scratch client's localStorage and the page reloaded (the switch is read when the page starts), and the probe checks the panel's switch reads `off`. why: a page that holds the floor with the switch on, the default, pulls each sentence of hers through `GET /api/companion/speech/…`, a Gemini synthesis apiece and outside the plan's meter; six runs of this probe measured on the order of two hundred. A rebuilt page step must keep it.
+- The typed "Hide probe eyes accept." step says which thing held. Nothing fires either because she declined to call `take_action` or because the server refused her call, and only the second is the server's rule. The probe counts her `take_action` calls before and after the typed line: with one, the row's `answer` must hold the server's sentence ("That is not a line he spoke after the card went up"); with none, it prints that the refusal was NOT exercised by this step (the pure check is replayed on recorded rows by `kaylee-action-word.mjs`, MAN-9171).
+- The two checks that carry "his words verbatim" are equalities on his log, not substring tests on the card's name: the `relayed` event must hold his firing line exactly as the log row holds it (plain or JSON-escaped), and the queued outing's brief must hold the whole `Q: <question>\nA: <his logged lines joined by a space>` blocks, in order and joined by blank lines, as `action-doors.ts` composes them (a card's group label is the question), with no relay record in it. Both stay `BLOCKED` until the door lands.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-clips.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-whole.mjs
+
+## MAN-9179 — server/modules/companion/hands — the doors (action-doors.ts): where each action — The checks that want kaylee--press's `--relay` door print `BLOCKED`, not `PASS`, while `dispatcher
+section: server/modules/companion/hands — the doors (action-doors.ts): where each action goes, the briefs his lines make, the rulings file/002 The checks that want kaylee--press's `--relay` door print `BLOCKED`, not `PASS`, while `dispatcher
+
+- The checks that want kaylee--press's `--relay` door print `BLOCKED`, not `PASS`, while `dispatcher accept --help` does not list `--relay`, and the exit code is 3 when only those are missing. Measured 2026-10-28 on that tree: the queue ends `refused` with `usage: dispatcher accept [-h] [--hidden] [--lock TOKEN]`, the answers round `refused` with `usage: dispatcher [-h]`, nothing is approved and no outing is queued; the typed take, her cancel, the open and the close pass. The probe also asserts that refusal is the dispatcher's own and wrote nothing.
+- A chat's account is known only while it has a run or a live host (`accountOfChat`), so the follow-up is filed after the scratch chat's one Haiku turn, as its CLI would file it (a chat that never ran is refused 403). That chat's session host lives in tmux and outlives both the chat's deletion and the scratch server, so the probe ends the tmux sessions named for its chat id (`tmux -L cloudcli-sessions`) when it is done. A follow-up is spoken of by the first five words of its text (`findFollowup`), so its clip says ordinary words: "probe eyes wait on" was heard "ProbeEyes wait on", and "retest the lane drag" "lean drag", neither naming the follow-up.
+- The speech-to-text is not steady on these clips: "Queue probe eyes accept." was heard "queue probe eyes accept", "cue probe eyes accept" and "cue probe eyes except"; one answer clip was blocked outright (`request was blocked (OTHER)`). Each press is heard once, with one exception: a press that was not heard, or that was meant to fire the standing action and fired nothing, is pressed once more, as he would say it again, and a typed prepare that leaves nothing of its kind on his panel is typed once more (a second time with its own wording for the answers round, where Haiku read "probe eyes questions" as the accept card and "questions" as read_card's scope). No clip is pressed a third time. "cue probe eyes accept" fires nothing: the plan's own name holds `accept`, so the verb must stand outside the name (MAN-9171, check 6), and that line says none. A clip's `style` (the queue clip is spoken slowly) is passed to `kaylee-clip.mjs` as `KAYLEE_CLIP_STYLE`.
+
+`.verify/kaylee-eyes-reads.mjs` (the dev server, account 1's Kaylee on Haiku, put back as found): the fifteen typed questions of her eyes, each in a fresh conversation (the pair "Find the DocSpace page about the voice companion." and "Give me its outline." shares one). It prints the tool she called, read back from her CLI transcript (the JSONL under `~/.claude/projects/`, in the folder her working directory encodes), the first line of its answer and her sentences, then `grep -c -i -E "cost|token|usage|spend"` over her sentences of the run (0). A line a server restart cut in two is asked again once.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-clips.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-whole.mjs
+
+## MAN-9174 — server/modules/companion/hands — prepare_action, take_action and cancel_action: the protocol, the claim, the lapse and the ending (hands-tools.ts, action-end.ts, action-prompts.ts)
+
+Her hands: `prepare_action`, `take_action`, `cancel_action` (`hands/hands-tools.ts`, `handsTools(deps)`, built by `buildCompanionTools`, MAN-9070). Each description is its prompt line (`toolLine`). None is `readOnlyHint`.
+Ruling 3, the operator's: "only on my explicit spoken word for that specific card, never on her own judgment, and never from a bare yes"; "each one said back to me before it fires". The server holds it. Prepare pins what he is shown; take fires only when `checkHisWord` passes on her log (MAN-9171). Recipes: MAN-9172. Doors: MAN-9173. Rules an edit must keep: INV-10099.
+
+## Inputs (zod)
+| tool | field | rule |
+|---|---|---|
+| `prepare_action` | `action` | one of the twelve `CompanionActionKind` |
+| | `target` | string, trimmed, 1–300; resolved per action (MAN-9172) |
+| | `words` | optional, 1–20 lines of 1–8000; only `rework` and `resume_run` take them (required there) |
+| | `answers` | optional, ≤20 `{ question: int ≥ 1, words: 1–20 lines }`; only `answer` takes them (required there) |
+| `take_action` | `said` | string, trimmed, 1–8000: his spoken line, as logged |
+| `cancel_action` | none | |
+
+## `prepare_action`, in order
+1. `endLapsedAction` (§Ending below): a standing action past its `expiresAt` ends `expired`. A take of this process carrying the standing action out → refused `The action on his panel is being carried out now; wait for its answer.`
+2. `prepareRecipe` (MAN-9172): the sentence that refuses, or the action with its pin, prompt, carried lines, `say` and read-back.
+3. `open` with `state.floor === null` → refused `No page of his holds the floor; he must open your panel first.` (`NO_FLOOR`).
+4. Step 1 again: the recipe awaited, and a take may have begun.
+5. `id` = `randomUUID()`; `preparedAt` = now; `expiresAt` = `preparedAt` + 5 min (`WAIT_MS`).
+6. `companionDb.openAction` writes the row of `companion_actions` (MAN-9082) with no outcome. A standing action, if any, ends `replaced`. `store.setPending(pending)` writes `pending_json` WITH the pin and sends `companion_pending` WITHOUT it. A `setPending` that throws ends the new row `cancelled`.
+7. Answers: `On his panel, waiting for his word: <SAY_VERB lower-cased> <spoken>. Read it back to him: <read-back> It fires only when he says aloud "<say>", or words of his own naming <spoken> and saying <first action word>. It lapses at <HH:MM>.` and, when one was standing, ` That replaced "<its say>", which was waiting.`
+
+## `take_action`, in order
+1. `endLapsedAction`. A take of this process carrying the standing action out → refused (same sentence as above).
+2. `checkHisWord` on `companionDb.heardSince(userId, preparedAt)` (no rows for a lapsed action, so the check answers the lapse). A refusal: `companionDb.noteRefusal` keeps its sentence as the row's `answer`, the action STAYS on his panel, and the answer is that sentence. A refusal that opens `That is not a line he spoke after the card went up.` adds ` His newest spoken line since then is logged as "<text>"; if that is what he meant, pass it to take_action exactly so.`
+3. `carryOut(userId, id, …)` holds the id in this process; `claimAction` writes `said`, `said_at`, `said_log_id` on the row, only while it has no outcome and no claim. A false → refused `That action is no longer waiting for his word: it has ended, or another call is carrying it out. Look at his panel, and prepare it again if he still wants it.`
+4. `fireAction` (MAN-9173) with the record of his word: `RelayedPress { account: { id: userId, name: users.username }, saidAt: line.at, words: line.text, press: line.id, token }`; `token` = the pinned ask's lock token for an Accept, else `null`. `words` is the log's text, never her argument.
+5. `endAction` with the door's `outcome` and `answer` (`said`, `said_at`, `said_log_id` again); a `system` line on her panel; `setPending(null)` only when the pending action is still this one.
+6. Answers `Done on his word: <DONE_VERB> <spoken>[ (it was already so)]. <door's line>`; a refused door is an error `Not done: <door's line>`.
+
+The `system` line: `On your word: <DONE_VERB> <spoken>.[ It was already so.][ <Source> said: <line>]`; refused `Not done, on your word: <say>.[ <Source> said: <line>]`. `Source` is `The dispatcher` for queue, hide, show, rework, answer, recut, stop, resume and kick; `The runner` for `resume_run`; `open` and `close_followup` have none: a success says nothing after the full stop (`On your word: opened Kaylee eyes.`), and only a refusal quotes the door's line bare (`Not done, on your word: Open Kaylee eyes. No page of his holds the floor.`).
+
+## `cancel_action`
+`withdrawStandingAction`, the function his × (`DELETE /action`, `companionService.cancelAction`, MAN-9059) calls: one ending for both doors.
+| found | row ends | answer |
+|---|---|---|
+| nothing standing | – | `Nothing was waiting for his word.` |
+| a take carrying it out | untouched | refused (same sentence as above) |
+| past `expiresAt` | `expired` | `It had lapsed at <HH:MM>; it is off his panel and nothing was done.` |
+| else | `cancelled` | `Took it off his panel: <say>. Nothing was done.` |
+
+## The words of an action — `hands/action-prompts.ts` (strings only)
+| action | `SAY_VERB` (what he says first) | `DONE_VERB` |
+|---|---|---|
+| `queue` | Queue | queued |
+| `hide` | Hide | hid |
+| `show` | Show | showed |
+| `rework` | Rework | reworked |
+| `answer` | Send the answers to | sent the answers to |
+| `recut` | Re-cut | re-cut |
+| `stop` | Stop | stopped |
+| `resume` | Resume | resumed |
+| `kick` | Kick | kicked |
+| `resume_run` | Resume the run | resumed the run |
+| `open` | Open | opened |
+| `close_followup` | Close the follow-up on | closed the follow-up on |
+- `say` = `<SAY_VERB> <target.spoken>` (`sayOf`). Each verb holds one of the action's own words (`ACTION_WORDS`, MAN-9171), so saying `say` aloud always passes the word check.
+- `acceptPrompt(ask)` = `ask.header`, blank line, `ask.question` (the whole census); `questionsPrompt(ask)` = each question numbered, its options under it as `   - <option>`; `acceptHead(ask, delivers)` = `the prompt reads "<census's first block>"` plus `, and it delivers: <first sentence of delivers>`.
+- `firstSentence(text)` strips `* _ ` # >`, at most 220 characters.
+
+## Rows and frames
+| event | `companion_actions` | `pending_json` | frame |
+|---|---|---|---|
+| prepare | row opened, no outcome | set | `companion_pending` |
+| a newer prepare | the older ends `replaced` | replaced | `companion_pending` |
+| refused take | `answer` = the sentence; no outcome | stays | none |
+| take | claimed, then ends with the door's outcome | NULL | `companion_pending` null, `companion_log` (the system line) |
+| `cancel_action`, his × | `cancelled` (`expired` past its time) | NULL | `companion_pending` null |
+| Clear | `cancelled`, kept; a claimed row is spared and the take ends it | NULL | `companion_cleared` |
+
+## Ending — `hands/action-end.ts`
+Exports `isCarryingOut`, `carryOut`, `withdrawStandingAction`, `endLapsedAction`. Consumers: `hands-tools.ts` (all three tools) and `companion.service.ts` (`cancelAction`, his ×). The one place an action leaves her state without being taken.
+- NOTHING TIMES A LAPSE OUT. An action is past its time when `expiresAt` has gone by; the next prepare, take or cancel that meets it ends it `expired` and takes it off his panel. The page hides the card at a deadline it sets once (`useActionLapse`, MAN-9062). why: this house reacts to events, never to a timer.
+- A TAKE IN FLIGHT IS NOBODY ELSE'S TO END. While a door is out the action is held twice: in this process (`carryOut` keeps its id per account) and on its row (`claimAction` writes the firing line; `endAction` ends a claimed row only for a call naming that line). A withdrawal, a lapse, a newer prepare and a Clear leave it; the take ends it with the door's own outcome.
+- AN ORPHAN: a claimed row (`said_log_id` set, no outcome) that no take of this process is carrying out (its server restarted, or its take failed after the door). The next prepare, take or cancel ends it `refused` with `The server stopped while this was being carried out, so it may have gone through; check before preparing it again.` and clears the pending action if it is that one. why: the same word is never fired twice.
+- A withdrawal ends the row before the state clears, and the state clears even when the row was already ended (a Clear got there first), so a page is never left drawing an action no row waits on.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts
+
+## MAN-9175 — server/modules/git — readGitStatus and readGitFileDiff (git-status.service.ts): the git panel's status and per-file diff as services, the barrel's readers, the helpers under them
+
+The git panel's status and per-file diff are two services in `server/modules/git/git-status.service.ts`; `git.routes.ts` keeps its own parsing and answers and calls them. The companion's `read_git` (MAN-9158) reads a project's uncommitted work through the same two, so a read there and the panel agree.
+
+Both take an ABSOLUTE project path the caller already resolved (the routes: `getActualProjectPath(projectId)` → `projectsDb` + `validateProjectPath`; `read_git`: `resolveProject`). Neither checks that it belongs to a registered project; a relative path would be taken against the server's own working directory.
+
+## Barrel — `server/modules/git/index.ts`
+| Export | Consumer |
+|---|---|
+| `createGitModule` | the server entrypoint |
+| `readGitStatus(projectPath)`, `readGitFileDiff(projectPath, file)` | `git.routes.ts` (`/status`, `/diff`) and the companion's `read_git` |
+| `getRepositoryRootPath(projectPath)` | `read_git`: `git status` paths are relative to the REPOSITORY ROOT, which is not the project folder when the project is a subfolder, so the tool joins them to this root to judge a file against the deny rule on its real path |
+| `readHeadFileSize(repositoryRootPath, repositoryRelativePath)` | `read_git`: the size of a DELETED file's blob in HEAD (`git cat-file -s HEAD:<path>`, header only) before `readGitFileDiff` reads it whole; `null` when HEAD holds none (no commits, or not in HEAD) |
+
+## `readGitStatus(projectPath)`
+- Answers `{ branch, hasCommits, modified, added, deleted, untracked, staged }` (path lists; `git status --porcelain=v1 -z` through `parseGitStatusOutput`, `git-parsing.service.ts`).
+- A directory outside any repository is an expected state, ANSWERED: `{ notGitRepository: true, details }`, the sentence that tells the user how to start one. Every other failure throws.
+- `GET /api/git/status?project=<id>`: no `project` → 400 `{ error: 'Project id is required' }`; a repository → the report; no repository → `{ error: 'Not a git repository', details, notGitRepository: true }`; a failure → `{ error: 'Git operation failed', details: 'Failed to get git status: <message>', notGitRepository: false }` with status 200.
+
+## `readGitFileDiff(projectPath, file)`
+- Answers the diff text, git's file headers stripped (`stripDiffHeaders`: every line of the diff, before or after the first `@@`, that opens with `diff --git`, `index `, `new file mode`, `deleted file mode`, `---` or `+++` is dropped; so a removed line whose text opens `-- ` (diff text `--- …`), a removed `---` rule and an added `++i;` (`+++i;`) are missing from the answer, for the git panel and for `read_git` alike). `file` is mapped by `resolveRepositoryFilePath` (project-relative, repository-relative or a bare name) to the repository root and the path git knows.
+- An UNTRACKED file: its whole content as additions (`--- /dev/null`, `+++ b/<path>`, `@@ -0,0 +1,<n> @@`, each line `+`); a directory: `Directory: <path>\n(Cannot show diff for directories)`.
+- A DELETED file: HEAD's content (`git show HEAD:<path>`) as deletions.
+- Any other: `git diff -- <path>`; when empty, `git diff --cached -- <path>`.
+- Throws on every failure, a directory outside any repository included (`validateGitRepository`).
+- `GET /api/git/diff?project=<id>&file=<path>`: either missing → 400 `{ error: 'Project id and file path are required' }`; else `{ diff }`; a failure → `{ error: <message> }` with status 200.
+
+## Helpers
+- `git-command.service.ts` `spawnAsync(command, args, options)`: `cross-spawn`, no shell; resolves `{ stdout, stderr }` on exit 0, else rejects with an `Error` carrying `code`, `stdout`, `stderr` (`GitCommandFailure`).
+- `git-repository.service.ts`: `validateGitRepository` (an `AppError` coded `NOT_A_GIT_REPOSITORY` when outside any work tree), `getCurrentBranchName`, `repositoryHasCommits`, `getRepositoryRootPath`, `readHeadFileSize`, `resolveRepositoryFilePath`.
+
+## Proof
+`.verify/git-status-service.mjs` (read it for its run line). The git panel on :5183 shows a project's status and a file's diff as before.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/git/git-command.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/git/git-repository.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/git/git-status.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/git/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/git-status-service.mjs

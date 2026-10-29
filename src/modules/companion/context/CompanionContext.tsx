@@ -5,7 +5,7 @@ import { useCompanionFab } from '@/modules/companion/hooks/useCompanionFab';
 import { useCompanionVoice } from '@/modules/companion/hooks/useCompanionVoice';
 import { useTalkBinding } from '@/modules/companion/hooks/useTalkBinding';
 import { useTalkPress } from '@/modules/companion/hooks/useTalkPress';
-import { isCompanionPicture, reduceCompanion } from '@/modules/companion/utils/companionReducer';
+import { isCompanionPicture, isOpenTarget, reduceCompanion } from '@/modules/companion/utils/companionReducer';
 import { api, refusalSentence } from '@/shared/api';
 import type { CompanionFrame, CompanionOpenTarget, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
@@ -40,11 +40,13 @@ type CompanionContextValue = {
   sendDraft: (mode: 'turn' | 'steer') => Promise<string>;
   clearDraft: () => Promise<void>;
   /**
-   * His × on the card of the action waiting for his word: the action comes off his panel, withdrawn. On the server's 2xx the
-   * page folds `companion_pending: null` itself, so the card does not stay up while its own frame is in flight; a refusal
-   * rejects with the server's sentence, which the card shows.
+   * His × on the card of the action `actionId`, the one the card shows: the action comes off his panel, withdrawn. On the
+   * server's 2xx the page folds the withdrawal itself, so the card does not stay up while its own frame is in flight, and
+   * only while the page still holds `actionId` (a newer prepare that arrived while the call was out is not erased). A refusal
+   * rejects with the server's sentence, or with an EMPTY message when it sent none or never answered, so the card says its
+   * own plain line instead of a status or a transport error.
    */
-  cancelAction: () => Promise<void>;
+  cancelAction: (actionId: string) => Promise<void>;
   dismissNote: (id: number) => Promise<void>;
   /** Stops her own turn. */
   interrupt: () => Promise<void>;
@@ -135,8 +137,10 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  * every page does note a chat open (`recentSend`), which is what the button's look reads, and a card's or a page's open is
  * noted by no one.
  *
- * HIS × ON THE ACTION CARD is `cancelAction`: the server's `DELETE /api/companion/action`, and on its 2xx the page folds
- * `companion_pending: null` itself, as `editDraft` folds its answer, so the card never stays up while its frame is in flight.
+ * HIS × ON THE ACTION CARD is `cancelAction(actionId)`: the server's `DELETE /api/companion/action`, and on its 2xx the page
+ * clears that action from its picture itself, as `editDraft` folds its answer, so the card never stays up while its frame is in
+ * flight. The request names no action, so the server withdraws whichever one stands when it is handled: an action that replaced
+ * the card meanwhile is withdrawn with it (the page's echo skips it, and the route's `companion_pending: null` frame removes it).
  *
  * THE PAGE'S ONE TALK PRESS lives here: `useTalkPress` is called once, and `useTalkBinding` beside it binds the account's
  * `talkBinding` (from the picture's settings, so a re-bind on any page reaches every page by its settings frame) to that press.
@@ -270,7 +274,8 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
     const frame = event as unknown as CompanionFrame;
     if (frame.kind === 'companion_open') {
       const { target } = frame;
-      if (!target) return;
+      // A target of a kind this build does not know, or cut short of its name or id, is not acted on.
+      if (!isOpenTarget(target)) return;
       // Every page notes a chat open, floor or not: her activity is the account's, so the button on every page follows the
       // open. The window's end is a deadline this frame sets, not a clock that checks.
       if (target.kind === 'chat') {
@@ -341,11 +346,15 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
     await ensureOk(await api.companion.clearDraft());
   }, []);
 
-  // The server answers 204 whether or not an action was standing, so the fold is always true to it: nothing waits now.
-  const cancelAction = useCallback(async () => {
-    await ensureOk(await api.companion.cancelAction());
-    fold({ kind: 'companion_pending', pending: null });
-  }, [fold]);
+  // The server answers 204 whether or not an action was standing. The page's own echo of it is conditional on the action the
+  // card showed. The route names no action: it withdraws whichever one stands, and its frame (sent in the same tick) is the
+  // guarantee, so a prepare that crossed the call is withdrawn by that frame (nothing fires; the safe direction).
+  const cancelAction = useCallback(async (actionId: string) => {
+    const response = await api.companion.cancelAction().catch(() => null);
+    if (response === null) throw new Error('');
+    if (!response.ok) throw new Error((await refusalSentence(response)) ?? '');
+    setPicture((held) => (held?.pending?.id === actionId ? { ...held, pending: null } : held));
+  }, []);
 
   const dismissNote = useCallback(async (id: number) => {
     await ensureOk(await api.companion.dismissNote(id));

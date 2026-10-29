@@ -358,7 +358,7 @@ The Cerberus module as a running API process sees it: what `server/index.ts` cal
 | file | owns |
 |---|---|
 | `index.ts` | the barrel: `createCerberusModule`, `wardenLinks`, `nodeSessions`, `hintChanged`; nothing else leaves the directory |
-| `cerberus.module.ts` | `createCerberusModule({ supervised })` → `{ router, start(): Promise<void>, soleDuties(), stop() }` |
+| `cerberus.module.ts` | `createCerberusModule({ supervised })` → `{ router, start(): Promise<void>, soleDuties(), stop(), overview() }`; `overview()` is `buildOverview(readInputs())`, what `GET /api/cerberus/overview` answers, which the entrypoint hands the companion's house (MAN-9142) |
 | `self-checks.service.ts` | `startSelfChecks(getGateway)`, `stopSelfChecks()` |
 | `store-prune.service.ts` | `startDailyPrune()`, `stopDailyPrune()` |
 

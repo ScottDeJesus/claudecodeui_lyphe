@@ -26,7 +26,8 @@ export function resolveAppUrl(url: string, host: string): string {
  * A row's address with a path on it: `http://{host}:8005` + `/#page=p1&block=b2` -> `http://10.0.0.5:8005/#page=p1&block=b2`.
  *
  * The path is read as an address of its own (path, query, fragment) and laid over the row's: the row's own path stays in front
- * of it (an app registered under `/hub/` gets `/hub/<path>`), and its trailing slash is not doubled. An address that will not
+ * of it (an app registered under `/hub/` gets `/hub/<path>`), and its trailing slash is not doubled. The row's own query
+ * (`?token=…`) and fragment stay unless the path brings one of its own, which then replaces it. An address that will not
  * parse is joined as plain text, which is what the drawer does with it too — the frame gets what the registry holds.
  */
 export function appAddressAt(url: string, host: string, path: string): string {
@@ -35,8 +36,8 @@ export function appAddressAt(url: string, host: string, path: string): string {
     const address = new URL(resolved);
     const extra = new URL(path, 'http://path.invalid');
     address.pathname = address.pathname.replace(/\/+$/, '') + extra.pathname;
-    address.search = extra.search;
-    address.hash = extra.hash;
+    if (extra.search !== '') address.search = extra.search;
+    if (extra.hash !== '') address.hash = extra.hash;
     return address.toString();
   } catch {
     return resolved + path;

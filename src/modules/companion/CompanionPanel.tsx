@@ -255,6 +255,8 @@ export function CompanionPanel() {
   const presence = useCompanionPresence();
   // The page's own set of chats with a turn running: Send steer shows while the draft's target is in it, because only then is there a turn to fold into.
   const busySessionIds = useBusySessionIdSet();
+  // The action on the card he sees: the × withdraws that one, whatever has been prepared since the press.
+  const pendingId = picture?.pending?.id ?? null;
   const target = picture?.draft?.target;
   const targetWorking = target?.kind === 'session' && busySessionIds.has(target.session.sessionId);
 
@@ -277,8 +279,8 @@ export function CompanionPanel() {
       onSendDraft={async (mode) => { await sendDraft(mode); }}
       onClearDraft={clearDraft}
       onDismissNote={dismissNote}
-      // His × on the action card: the provider calls the server and folds the withdrawal, so the card goes at once.
-      onWithdraw={cancelAction}
+      // His × on the action card: the provider calls the server and clears this action from the picture, so the card goes at once.
+      onWithdraw={pendingId === null ? undefined : () => cancelAction(pendingId)}
       talk={talk}
       voice={voice}
     />

@@ -1,4 +1,4 @@
-import type { CompanionFrame, CompanionLogEntry, CompanionNote, CompanionPicture } from '@/shared/companion-types';
+import type { CompanionFrame, CompanionLogEntry, CompanionNote, CompanionOpenTarget, CompanionPicture } from '@/shared/companion-types';
 
 /**
  * How a page folds what Kaylee tells it into the picture it holds: `reduceCompanion(picture, frame)` is the whole of it.
@@ -84,6 +84,25 @@ export function isCompanionPicture(value: unknown): value is CompanionPicture {
     && orNull(isWalk)(value.walk)
     && Array.isArray(value.notes) && value.notes.every(isNote)
     && Array.isArray(value.log) && value.log.every(isEntry);
+}
+
+/** A name or an id the open lands on is a word: an empty one would put `?runner=` or `#page=` on the page's address. */
+const isWord = (value: unknown): value is string => isText(value) && value.trim() !== '';
+
+/**
+ * Whether the target of a `companion_open` is one this page can act on: a chat with its session id, a card with its plan, a
+ * page with its id (and a block id that is a word or `null`). A target of a kind this build does not know, or one cut short
+ * of its field, is not acted on, the same as a frame of an unknown kind. Consumed by this module's CompanionProvider, which
+ * hands the host only targets that pass it.
+ */
+export function isOpenTarget(value: unknown): value is CompanionOpenTarget {
+  if (!isRecord(value)) return false;
+  switch (value.kind) {
+    case 'chat': return isWord(value.sessionId);
+    case 'card': return isWord(value.plan);
+    case 'page': return isWord(value.pageId) && (value.blockId === null || isWord(value.blockId));
+    default: return false;
+  }
 }
 
 // ---------------------------

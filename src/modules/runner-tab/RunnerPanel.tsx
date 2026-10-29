@@ -180,14 +180,17 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
     const root = panelRef.current;
     if (root !== null) {
       // The arc comes off the lane's own drawn plan (`useDispatcherPlans`), never parsed out of a
-      // selector: a name no drawn plan carries falls to the loose arm, finds nothing, and says so by
-      // drawing nothing. `CSS.escape` because a plan name is a word from the store, and a wall is
+      // selector: a name no drawn plan carries falls to the loose arm and, failing that, to an epic's deck of that name
+      // below; one that is neither finds nothing, and says so by drawing nothing. `CSS.escape` because a plan name is a word from the store, and a wall is
       // not the place to find out what a `"` in it does.
       const arc = plans.find((plan) => plan.name === revealPlan)?.arc ?? null;
+      const deckOf = (name: string) => `[data-dispatch-arc][data-arc-name="${CSS.escape(name)}"]`;
       const target = arc !== null
-        ? `[data-dispatch-arc][data-arc-name="${CSS.escape(arc)}"]`
+        ? deckOf(arc)
         : `[data-runner-loose-plans] [data-dispatcher-card][data-plan-name="${CSS.escape(revealPlan)}"]`;
-      const found = root.querySelector(target);
+      // A name no drawn plan carries may be an EPIC's own (Kaylee's open of an epic names the arc, bare or as `<name>.arc`):
+      // it lands on that deck. A name that is neither still finds nothing and says so by drawing nothing.
+      const found = root.querySelector(target) ?? (arc === null ? root.querySelector(deckOf(revealPlan.replace(/\.arc$/, ''))) : null);
       found?.scrollIntoView({ block: 'start' });
       // The deck's top is at the top of the pane, and on a phone the epic's own header above the plan's card
       // pushes the card's foot past the window: the card, not the deck, is what the landing is for, so the

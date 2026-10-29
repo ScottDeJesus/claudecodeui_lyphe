@@ -11,7 +11,9 @@ import { firstLine } from './dispatcher-ask.transport.js';
  * THE ANSWER IS HIS, WORD FOR WORD, and it goes through the dispatcher's own doors and no other. THERE ARE THREE
  * DOORS: the plan's card and the phone's push, where he presses, and Kaylee, who carries his SPOKEN word for that
  * specific card with kaylee--press's record of it — who spoke, when, and what he said (`relayRecord`) — which the
- * dispatcher's door checks and lands as a `relayed` line beside the act.
+ * dispatcher's door checks and lands as a `relayed` line beside the act. That door is kaylee--press's, and it has not landed
+ * in the dispatcher: `dispatcher accept --by` takes `cli`, `app:card` and `app:phone` and no verb takes `--relay`, so until it
+ * does Kaylee's Accept and her `tell`s are refused with the binary's `usage:` line (MAN-9152 §"Doors that exist today").
  *
  * - `accept` — Queue runs `dispatcher accept --lock <token> --by app:<door> <plans…>` and the plans join the
  *   queue, starting when their turn comes; Hide is the same with `--hidden`, approved and held out of the

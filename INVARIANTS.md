@@ -18049,3 +18049,458 @@ measured 2026-10-28 by chain chain-kaylee--eyes--hands-20261028-145101-2e0a, fin
 probe-key: d0da0d17efcbefed391ea7421bc3f0f6c4c0b744
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-recipe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/carried-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-recipes.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh
+
+## INV-10093 — probe — An open of an epic (and of a card the In flight face does not draw) lands the Roadmap tab with nothing in view and no word, while the row and the report say the tab shows that card
+
+An open of an epic (and of a card the In flight face does not draw) lands the Roadmap tab with nothing in view and no word, while the row and the report say the tab shows that card
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES as H } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const s = await openConsole({ preferences: { ...H, uiPreferences: { ...H.uiPreferences, voiceEnabled: false } } });
+const { page } = s;
+await page.addInitScript(() => { const N = window.WebSocket; window.__s = []; window.WebSocket = new Proxy(N, { construct(t, a) { const k = new t(...a); window.__s.push(k); return k; } }); });
+await page.reload({ waitUntil: 'networkidle' });
+await page.locator(':is(button[data-companion-door], [data-companion-fab] > .vv-fab):visible').first().click();
+await page.locator('[data-companion-panel]').waitFor({ state: 'visible' });
+await page.waitForFunction(() => !document.querySelector('[data-companion-panel] [data-companion-log="loading"]'), null, { timeout: 30000 });
+const id = await page.evaluate(() => sessionStorage.getItem('companion-client-id'));
+const send = (f) => page.evaluate((x) => window.__s.filter((e) => e.readyState === 1).at(-1).dispatchEvent(new MessageEvent('message', { data: JSON.stringify(x) })), f);
+await page.locator('[data-companion-panel] button[aria-label^="Close"]').click();
+await page.setViewportSize({ width: 1440, height: 500 });
+const reset = () => page.evaluate(() => { document.querySelectorAll('*').forEach((e) => { if (e.scrollTop > 0) e.scrollTop = 0; }); });
+const decks = () => page.evaluate(() => [...document.querySelectorAll('[data-dispatch-arc]')].map((d) => [d.getAttribute('data-arc-name'), Math.round(d.getBoundingClientRect().top)]));
+await send({ kind: 'companion_open', floor: id, target: { kind: 'card', plan: 'kaylee--eyes' } });
+await page.waitForTimeout(2500); await reset(); await page.waitForTimeout(500);
+const before = await decks();
+const last = before.at(-1);
+await send({ kind: 'companion_open', floor: id, target: { kind: 'card', plan: last[0] } });
+await page.waitForTimeout(2500);
+const after = (await decks()).find((d) => d[0] === last[0]);
+console.log(`epic-open: epic=${last[0]} deckTop before=${last[1]} after=${after?.[1]} viewport=500 moved=${after?.[1] !== last[1]}`);
+await s.browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /tmp && node "$1"
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+# expect: today "epic-open: … moved=false" (the epic's deck stays where it was, below the fold); cured: moved=true
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--card-fill-20261028-164541-4cae, finding M1, MEDIUM
+probe-key: 842f1616c058a074397b6cdd594863bac4c4b2e1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-card-live.mjs
+
+## INV-10094 — probe — `appAddressAt` drops the registered address's own query
+
+`appAddressAt` drops the registered address's own query
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/a.mts" <<'EOF'
+import { appAddressAt } from '/home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/resolveAppUrl.ts';
+console.log('row-query: ' + appAddressAt('http://{host}:8005/?token=abc', '127.0.0.1', '/#page=p1'));
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && npx tsx "$1"
+EOF
+bash "$D/p.sh" "$D/a.mts"
+# expect: today "row-query: http://127.0.0.1:8005/#page=p1" (the row's ?token=abc is gone); cured: the address still carries token=abc
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--card-fill-20261028-164541-4cae, finding L1, LOW
+probe-key: fe864f4a9382cf27d4fb8df307008e5948b36624
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-card-live.mjs
+
+## INV-10095 — probe — The × refusal's plain wording is unreachable; the docs and the report say otherwise
+
+The × refusal's plain wording is unreachable; the docs and the report say otherwise
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES as H } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const s = await openConsole({ preferences: { ...H, uiPreferences: { ...H.uiPreferences, voiceEnabled: false } } });
+const { page } = s;
+await page.addInitScript(() => { const N = window.WebSocket; window.__s = []; window.WebSocket = new Proxy(N, { construct(t, a) { const k = new t(...a); window.__s.push(k); return k; } }); });
+await page.reload({ waitUntil: 'networkidle' });
+await page.locator(':is(button[data-companion-door], [data-companion-fab] > .vv-fab):visible').first().click();
+await page.locator('[data-companion-panel]').waitFor({ state: 'visible' });
+await page.waitForFunction(() => !document.querySelector('[data-companion-panel] [data-companion-log="loading"]'), null, { timeout: 30000 });
+const id = await page.evaluate(() => sessionStorage.getItem('companion-client-id'));
+const send = (f) => page.evaluate((x) => window.__s.filter((e) => e.readyState === 1).at(-1).dispatchEvent(new MessageEvent('message', { data: JSON.stringify(x) })), f);
+const pend = (id, say) => ({ id, action: "queue", target: { kind: "card", name: "probe-eyes-accept", spoken: "Probe eyes accept", arc: null }, prompt: "x\n\nRun it? · lock:0", carried: [], say, preparedAt: new Date(Date.now() - 1000).toISOString(), expiresAt: new Date(Date.now() + 120000).toISOString() });
+await send({ kind: 'companion_pending', pending: pend('p3', 'Queue probe eyes accept') });
+await page.locator('[data-companion-action]').waitFor();
+const btn = page.locator('[data-companion-action] button[aria-label="Withdraw"]');
+const said = async (fulfil) => { await page.route('**/api/companion/action', fulfil); await btn.click(); await page.waitForTimeout(600); const t = await page.locator('[data-companion-action] [role="alert"]').innerText().catch(() => null); await page.unroute('**/api/companion/action'); return t && t.replace(/\s+/g, ' '); };
+const a = await said((r) => r.fulfill({ status: 500, contentType: 'text/plain', body: 'boom' }));
+const b = await said((r) => r.abort());
+console.log('withdraw-refusal: no-sentence-500="' + a + '" network-failure="' + b + '"');
+await s.browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /tmp && node "$1"
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+# expect: today no-sentence-500="▲ Not withdrawn: Request failed (500)" and network-failure="▲ Not withdrawn: Failed to fetch"; cured: both read "▲ Not withdrawn. Try again."
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--card-fill-20261028-164541-4cae, finding L2, LOW
+probe-key: e7b54fc09ec78572cdf5e42b106dfbc0c41b9239
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-card-live.mjs
+
+## INV-10096 — probe — A late 204 for his × erases a newer action
+
+A late 204 for his × erases a newer action
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES as H } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const s = await openConsole({ preferences: { ...H, uiPreferences: { ...H.uiPreferences, voiceEnabled: false } } });
+const { page } = s;
+await page.addInitScript(() => { const N = window.WebSocket; window.__s = []; window.WebSocket = new Proxy(N, { construct(t, a) { const k = new t(...a); window.__s.push(k); return k; } }); });
+await page.reload({ waitUntil: 'networkidle' });
+await page.locator(':is(button[data-companion-door], [data-companion-fab] > .vv-fab):visible').first().click();
+await page.locator('[data-companion-panel]').waitFor({ state: 'visible' });
+await page.waitForFunction(() => !document.querySelector('[data-companion-panel] [data-companion-log="loading"]'), null, { timeout: 30000 });
+const id = await page.evaluate(() => sessionStorage.getItem('companion-client-id'));
+const send = (f) => page.evaluate((x) => window.__s.filter((e) => e.readyState === 1).at(-1).dispatchEvent(new MessageEvent('message', { data: JSON.stringify(x) })), f);
+const pend = (id, say) => ({ id, action: "queue", target: { kind: "card", name: "probe-eyes-accept", spoken: "Probe eyes accept", arc: null }, prompt: "x\n\nRun it? · lock:0", carried: [], say, preparedAt: new Date(Date.now() - 1000).toISOString(), expiresAt: new Date(Date.now() + 120000).toISOString() });
+await send({ kind: 'companion_pending', pending: pend('A', 'Queue A') });
+await page.locator('[data-companion-action]').waitFor();
+let release; const gate = new Promise((r) => { release = r; });
+await page.route('**/api/companion/action', async (route) => { await gate; await route.fulfill({ status: 204 }); });
+await page.locator('[data-companion-action] button[aria-label="Withdraw"]').click();
+await page.waitForTimeout(200);
+await send({ kind: 'companion_pending', pending: pend('B', 'Queue B') });
+await page.waitForTimeout(200); release(); await page.waitForTimeout(800);
+console.log('late-204: cards drawn after A\'s late 204 while B stands = ' + (await page.locator('[data-companion-action]').count()));
+await s.browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /tmp && node "$1"
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+# expect: today "cards drawn after A's late 204 while B stands = 0"; cured: 1
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--card-fill-20261028-164541-4cae, finding L3, LOW
+probe-key: 260fdcb0bb09378350349c06478331bc21e53fe1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-card-live.mjs
+
+## INV-10097 — probe — The provider and the host trust the shape of a `companion_open`
+
+The provider and the host trust the shape of a `companion_open`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES as H } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const s = await openConsole({ preferences: { ...H, uiPreferences: { ...H.uiPreferences, voiceEnabled: false } } });
+const { page } = s;
+await page.addInitScript(() => { const N = window.WebSocket; window.__s = []; window.WebSocket = new Proxy(N, { construct(t, a) { const k = new t(...a); window.__s.push(k); return k; } }); });
+await page.reload({ waitUntil: 'networkidle' });
+await page.locator(':is(button[data-companion-door], [data-companion-fab] > .vv-fab):visible').first().click();
+await page.locator('[data-companion-panel]').waitFor({ state: 'visible' });
+await page.waitForFunction(() => !document.querySelector('[data-companion-panel] [data-companion-log="loading"]'), null, { timeout: 30000 });
+const id = await page.evaluate(() => sessionStorage.getItem('companion-client-id'));
+const send = (f) => page.evaluate((x) => window.__s.filter((e) => e.readyState === 1).at(-1).dispatchEvent(new MessageEvent('message', { data: JSON.stringify(x) })), f);
+await page.locator('[data-companion-panel] button[aria-label^="Close"]').click();
+await page.evaluate(() => { window.__n = []; const o = history.replaceState.bind(history); history.replaceState = (a, b, u) => { window.__n.push(String(u)); return o(a, b, u); }; });
+await send({ kind: 'companion_open', floor: id, target: { kind: 'page' } });
+await page.waitForTimeout(1500);
+const src = await page.locator('iframe[data-pane-side]').first().getAttribute('src').catch(() => null);
+await send({ kind: 'companion_open', floor: id, target: { kind: 'card' } });
+await page.waitForTimeout(1200);
+console.log('malformed-open: page-without-pageId pane src=' + src + '; card-without-plan navigations=' + JSON.stringify(await page.evaluate(() => window.__n)));
+await s.browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /tmp && node "$1"
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+# expect: today "pane src=http://127.0.0.1:8005/#page=undefined" and navigations=["/?runner=undefined","/"]; cured: "pane src=null" and navigations=[]
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--card-fill-20261028-164541-4cae, finding L4, LOW
+probe-key: 7d2ec24c02d94dfd8d946aabb9b5247838cd2075
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-card-live.mjs
+
+## INV-10098 — probe — The probe's card leg waits for a live plan that is this very build
+
+The probe's card leg waits for a live plan that is this very build
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+printf 'leg-5 fixture: plan kaylee--eyes state = '
+~/.claude/scripts/dispatcher status --json 2>/dev/null | jq -r '[.plans[]? | select(.name=="kaylee--eyes") | .state] | if length==0 then "absent" else .[0] end'
+printf 'literal in the probe: '; grep -c 'data-plan-name="kaylee--eyes"' .verify/companion-card-live.mjs
+EOF
+bash "$D/p.sh"
+# expect: today "leg-5 fixture: plan kaylee--eyes state = loaded" and "literal in the probe: 2"; once the plan ships or is hidden the state prints another word or "absent" and leg 5 of companion-card-live.mjs times out
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--card-fill-20261028-164541-4cae, finding L5, LOW
+probe-key: 3d290bb79c53e1ca4d63096195df0fa49d8a6da5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-card-live.mjs
+
+## INV-10099 — server/modules/companion/hands — edits that break it: only a spoken press fires, the pin is what is fired, one ending, no timer, no fake word in the live store
+
+Detail: MAN-9174 (protocol), MAN-9171 (the check), MAN-9172 (recipes), MAN-9173 (doors).
+
+| rule | why |
+|---|---|
+| Only a SPOKEN press fires an action or travels as a carried line: `checkHisWord` and `resolveCarriedLines` read rows of `role: 'operator'` and `via: 'spoken'`. A new input path writes its own `via`, never `spoken` | ruling 3: a typed line is not his word |
+| `take_action` compares `said` to rows of her log and fires nothing on `said` alone; `RelayedPress.words` and `press` are the row's `text` and `id`, never her argument | she cannot write his word |
+| Words that travel (Rework notes, an answer round, rulings) are looked up in the log at prepare (`resolveCarriedLines`); a string of hers is never sent in his name | nothing he did not say reaches a designer or a runner |
+| The take fires the PIN (`pending.pin`) taken at prepare, never what the house holds now; the ask book refuses a prompt that changed (MAN-8494) | he heard that prompt read back |
+| The pin never reaches a page: `withoutPin` names the wire's fields one by one. A field added to `CompanionStoredPending` is sent only when put on the wire on purpose | the ask carries the lock token the dispatcher guards an answer by |
+| Every action goes through prepare and take, `open` and `close_followup` included | ruling 3: "each one said back to me before it fires" |
+| An action leaves her state only through `action-end.ts`; a take claims its row (`claimAction`) and holds its id (`carryOut`) before the door runs | a withdrawal, a lapse or a Clear in that window must not end an action a door is running |
+| A claimed row no take of this process carries ends `refused` with `may have gone through`, never `cancelled` or re-fired | the same word is never fired twice |
+| No timer ends a lapse: the next prepare, take or cancel does, and the page hides the card at the deadline it sets once | events, never a watchdog |
+| A target no line of his can name is refused at prepare (`canBeNamed`). Editing `ACTION_WORDS`, the not-significant words or the negators re-runs `.verify/kaylee-action-word.mjs` first | a card that can only lapse is a dead end on his panel |
+| A door never throws: a missing pin, a refused order and a thrown error each answer `refused` with a sentence that says what to do | `take_action` has decided the word was his; the house's answer is the news |
+| A showing that fires a dispatcher verb or a resume runs on a scratch server over a copied auth database and a scratch `DISPATCHER_HOME` (`.verify/kaylee-eyes-scratch.sh`); no relayed record is written to the live store by a builder | kaylee--press: no fake operator quote in the live store |
+| A fixture clip is written once, only when its file is absent, one `gemini-3.8-flash-lite-tts` call each (`.verify/kaylee-clip.mjs`); no probe loops a press | the Gemini budget |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/
+
+## INV-10100 — probe — MAN-9175 says `stripDiffHeaders` strips "everything before the first `@@`"; it also drops body lines of the diff
+
+MAN-9175 says `stripDiffHeaders` strips "everything before the first `@@`"; it also drops body lines of the diff
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+W=$(dirname "$0")
+cat > "$W/p.mjs" <<'JS'
+import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+const dir = process.argv[2];
+const src = fs.readFileSync('server/modules/git/git-status.service.ts', 'utf8');
+const m = /function stripDiffHeaders\(diff: string\): string \{[\s\S]*?\n\}\n/.exec(src);
+if (!m) { console.log('stripDiffHeaders: not in git-status.service.ts'); process.exit(0); }
+const fn = new Function(m[0].replace('(diff: string): string', '(diff)').replace('const filteredLines: string[] = []', 'const filteredLines = []') + '; return stripDiffHeaders;')();
+fs.writeFileSync(dir + '/a.sql', 'keep\n-- sql comment\nkeep\n');
+fs.writeFileSync(dir + '/b.sql', 'keep\nkeep\n++i;\n');
+let raw = '';
+try { execFileSync('git', ['diff', '--no-index', '--', 'a.sql', 'b.sql'], { cwd: dir, encoding: 'utf8' }); } catch (e) { raw = e.stdout; }
+const body = (t) => t.split('\n').filter((l) => /^[-+]/.test(l) && !/^(---|\+\+\+) [ab]\//.test(l));
+console.log('git diff changed lines:', JSON.stringify(body(raw)));
+console.log('after stripDiffHeaders:', JSON.stringify(body(fn(raw))));
+JS
+node "$W/p.mjs" "$W"
+echo -n 'MAN-9175 says: '; ~/.claude/scripts/docstore get MAN-9175 --text | grep -o 'stripDiffHeaders`: [^)]*' | head -1
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) rm -f "$D/p.sh" "$D/p.mjs" "$D/a.sql" "$D/b.sql"; rmdir "$D";; esac
+# expect: git diff changed lines ["--- sql comment","+++i;"] and after stripDiffHeaders [] while MAN-9175 still says "everything before the first `@@`"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--docs-20261028-180050-140e, finding M1, MEDIUM
+probe-key: 8d50457de54a2d27fb0aaa5221fc1705ae421a3c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/git/git-command.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/git/git-repository.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/git/git-status.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/git/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/git-status-service.mjs
+
+## INV-10101 — probe — Four plan-touched hook files list no `MAN-` row under `docstore govern`; their rows describe them but do not govern them
+
+Four plan-touched hook files list no `MAN-` row under `docstore govern`; their rows describe them but do not govern them
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+for f in useShowApplication useBackToWorkspace; do
+  echo -n "$f MAN rows: "; ~/.claude/scripts/docstore govern "$PWD/src/modules/app-switcher/hooks/$f.ts" --limit 80 --text | grep -c '^MAN-'
+done
+for f in useActionLapse useWithdraw; do
+  echo -n "$f MAN rows: "; ~/.claude/scripts/docstore govern "$PWD/src/modules/companion/hooks/$f.ts" --limit 80 --text | grep -c '^MAN-'
+done
+echo -n 'MAN-9009 body names useShowApplication.ts: '; ~/.claude/scripts/docstore get MAN-9009 --text | grep -c 'hooks/useShowApplication.ts'
+echo -n 'MAN-9062 body names useWithdraw.ts: '; ~/.claude/scripts/docstore get MAN-9062 --text | grep -c 'hooks/useWithdraw.ts'
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) rm -f "$D/p.sh"; rmdir "$D";; esac
+# expect: all four hooks print "MAN rows: 0" while the two bodies print 1 each; cured when each hook prints 1 or more
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--docs-20261028-180050-140e, finding M2, MEDIUM
+probe-key: c39fe6bb83994f5a9b45e6a7eeb6b40e5e4eed5d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useBackToWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useShowApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/registryRequests.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionActionCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useActionLapse.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useWithdraw.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-action-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+
+## INV-10102 — probe — MAN-9174: "`open` and `close_followup` have none and quote the line bare" holds for a refusal only
+
+MAN-9174: "`open` and `close_followup` have none and quote the line bare" holds for a refusal only
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+W=$(dirname "$0")
+cat > "$W/p.mts" <<'TS'
+import fs from 'node:fs';
+import { DONE_VERB } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts';
+const src = fs.readFileSync('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts', 'utf8');
+const source = /const SOURCE[^=]*= (\{[\s\S]*?\n\});/.exec(src);
+const fn = /function systemLine\([^)]*\): string \{([\s\S]*?)\n\}\n/.exec(src);
+if (!source || !fn) { console.log('systemLine/SOURCE: not in hands-tools.ts'); process.exit(0); }
+const systemLine = new Function('DONE_VERB', 'SOURCE', 'standing', 'outcome', 'said', fn[1]);
+const SOURCE = new Function('return ' + source[1])();
+const standing = { action: 'open', target: { spoken: 'Kaylee eyes' }, say: 'Open Kaylee eyes' };
+console.log('open took   :', JSON.stringify(systemLine(DONE_VERB, SOURCE, standing, 'took', 'Kaylee eyes is up on the screen he is using.')));
+console.log('open refused:', JSON.stringify(systemLine(DONE_VERB, SOURCE, standing, 'refused', 'No page of his holds the floor.')));
+TS
+TSX_TSCONFIG_PATH=server/tsconfig.json npx tsx "$W/p.mts"
+echo -n 'MAN-9174 says: '; ~/.claude/scripts/docstore get MAN-9174 --text | grep -o '`open` and `close_followup` have none[^.]*' | head -1
+EOF
+bash "$D/p.sh" 2>&1 | cut -c1-260; case "$D" in /tmp/athena-probe.*) rm -f "$D/p.sh" "$D/p.mts"; rmdir "$D";; esac
+# expect: open took "On your word: opened Kaylee eyes." (no door sentence); open refused carries it; the row says they "quote the line bare"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--docs-20261028-180050-140e, finding L1, LOW
+probe-key: c7c7c36de09157dd6d7fd467747d9c5c40a3c736
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts
+
+## INV-10103 — probe — MAN-9148 / MAN-9149 (card phase's hunks): "a newer prepare that crossed the call is kept" is true of the page's echo, not of the house
+
+MAN-9148 / MAN-9149 (card phase's hunks): "a newer prepare that crossed the call is kept" is true of the page's echo, not of the house
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo -n 'DELETE /action route reads an action id (params/query/body): '
+sed -n '/router.delete(/,/^  );/p' server/modules/companion/companion.routes.ts | awk "/'\/action'/{f=1} f" | sed -n 1,8p | grep -c -E 'params|query|body|actionId'
+echo -n 'service.cancelAction takes an id: '; grep -n 'cancelAction(userId' server/modules/companion/companion.service.ts | head -1
+echo -n 'MAN-9148 says: '; ~/.claude/scripts/docstore get MAN-9148 --text | grep -o '(a newer prepare that crossed the call is kept)' | head -1
+EOF
+bash "$D/p.sh" 2>&1 | cut -c1-260; case "$D" in /tmp/athena-probe.*) rm -f "$D/p.sh"; rmdir "$D";; esac
+# expect: route reads an id: 0; cancelAction(userId: number): void; the row still says a crossed prepare "is kept"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--docs-20261028-180050-140e, finding L2, LOW
+probe-key: 47f9eed67abb3dcc3182a6ce703ac7dd2ff71ac9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/CompanionHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx
+
+## INV-10104 — probe — The answer service's head says the dispatcher lands the `relayed` line today; the report says the heads agree with the rows
+
+The answer service's head says the dispatcher lands the `relayed` line today; the report says the heads agree with the rows
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo -n 'dispatcher accept takes --relay or app:kaylee (count): '
+env -u CLAUDE_CODE_SESSION_ID ~/.claude/scripts/dispatcher accept --help 2>&1 | grep -c -e '--relay' -e 'app:kaylee'
+echo -n 'answer-service head claims the door lands a relayed line: '
+grep -c 'dispatcher.s door checks and lands as a `relayed` line' server/modules/dispatcher/dispatcher-answer.service.ts
+echo -n 'MAN-8494 says Kaylee Accept is refused today: '
+~/.claude/scripts/docstore get MAN-8494 --text | grep -c -i -E 'usage:|until kaylee--press|refused with the binary'
+EOF
+bash "$D/p.sh" 2>&1 | cut -c1-260; case "$D" in /tmp/athena-probe.*) rm -f "$D/p.sh"; rmdir "$D";; esac
+# expect: 0 (the dispatcher takes neither) / 1 (the head claims it) / 0 (MAN-8494 silent); cured when the second and third lines say what refuses until kaylee--press lands, or the first is above 0
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--docs-20261028-180050-140e, finding L3, LOW
+probe-key: bfdfd8618745ef50b3999b86aa5e7c7ae2a2efc1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/provider.registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions.service.ts
+
+## INV-10105 — probe — BLOCKING (a dependency, not a defect in the nine files): the queue and the answers round still cannot reach `took`
+
+BLOCKING (a dependency, not a defect in the nine files): the queue and the answers round still cannot reach `took`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOS'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "mentions of --relay in dispatcher accept --help: $(dispatcher accept --help 2>&1 | grep -c -- '--relay')"
+dispatcher status kaylee--press 2>&1 | head -1 | cut -c1-110
+EOS
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf -- "$D" ;; esac
+# expect: mentions of --relay: 0 and the plan reads "approved … hidden" (cured when --relay is listed)
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--whole-20261028-183122-7c1b, finding B1, BLOCKING
+probe-key: c7f8d7bab3ffd2be1a1c12dd51ffd74ed554fd7d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-clips.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-whole.mjs
+
+## INV-10106 — probe — A press is heard twice when the first is not right (builder-declared departure; the fix-pass left it to the operator)
+
+A press is heard twice when the first is not right (builder-declared departure; the fix-pass left it to the operator)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOS'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+grep -n "attempt === 2" .verify/kaylee-eyes-whole.mjs | cut -c1-100 || echo "no second hearing in the probe"
+EOS
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf -- "$D" ;; esac
+# expect: line 164 holds `attempt === 2` (the second hearing); "no second hearing in the probe" once it is removed
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--whole-20261028-183122-7c1b, finding L7, LOW
+probe-key: 04b0a519ef327381355dd46f5036518975e3c006
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-clips.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-whole.mjs
+
+## INV-10107 — probe — NEW (LOW): the replay probe that shows the check of his word cannot tell the L3 fix from its absence
+
+NEW (LOW): the replay probe that shows the check of his word cannot tell the L3 fix from its absence
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOS'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "replay cases that exercise the verb-beside-the-name rule: $(grep -c -i 'probe eyes accept\|queue queue drying\.' .verify/kaylee-action-word.mjs || true)"
+EOS
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf -- "$D" ;; esac
+# expect: replay cases that exercise the verb-beside-the-name rule: 0 (cured when it prints 1 or more)
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--whole-20261028-183122-7c1b, finding L8, LOW
+probe-key: 44e032704729c3d14cfa76b853d4fda772033be7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-clips.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-whole.mjs
+
+## INV-10108 — probe — NEW (LOW): MAN-9173, the row that governs the whole probe, does not carry the three changes the fix-pass made to it
+
+NEW (LOW): MAN-9173, the row that governs the whole probe, does not carry the three changes the fix-pass made to it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOS'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "MAN-9173 mentions of companion-voice: $(docstore get MAN-9173 --text 2>&1 | grep -c 'companion-voice' || true)"
+EOS
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf -- "$D" ;; esac
+# expect: MAN-9173 mentions of companion-voice: 0 (cured when it prints 1 or more)
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--whole-20261028-183122-7c1b, finding L9, LOW
+probe-key: 535667b5111d8aec2708892a1b2da280db47f711
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-clips.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-whole.mjs

@@ -16,6 +16,11 @@ import type { CompanionActionKind, CompanionActionTarget, CompanionPendingAction
  *     action's own (the card "Epic queue" under a queue) names nothing either, because the one word would serve as the verb and as
  *     the name and a bare "Queue." would fire it. `canBeNamed` tells the prepare which targets these are, and it must not put one on
  *     the panel; `checkHisWord` refuses one that got there anyway, in words that say so.
+ *   - THE VERB IS NOT THE NAME. When a name holds a word of the action's own beside others (the card "Probe eyes accept" under a queue,
+ *     `accept` being a queue word), the words of the name he used are taken out of his line, one for one, and the action's word must
+ *     stand in what is left: "Queue probe eyes accept." fires, the bare name and "Open probe eyes accept." do not, and a name that is the
+ *     verb as well ("Queue queue drying") is ordered by saying the verb once more. A misheard "cue probe eyes accept" names the card
+ *     and says no verb of its own, so it is refused.
  *   - THE READ-BACK. A sentence of hers that names the target stands in the log after the card went up and before his line.
  *   - AN ORDER, NOT A NO OR A QUESTION. The match is a bag of words, so "Don't queue Kaylee's eyes." holds the name and the verb. A line
  *     that ends in `?`, opens with a question word, or holds a negator is refused (`takesItBack`); a plain order is never refused, so
@@ -146,11 +151,34 @@ function holdsRun(words: readonly string[], run: readonly string[]): boolean {
 
 /**
  * True when his words hold one of the action's words as a word of their own: "restart" does not hold "start", and "pull it up" does not
- * hold "pull up". Consumed by `checkHisWord` below, and shown on its own by `.verify/kaylee-action-word.mjs`.
+ * hold "pull up". The plain predicate over the whole line; `checkHisWord` asks the stricter one below, with the target's name set aside.
+ * Shown on its own by `.verify/kaylee-action-word.mjs`.
  */
 export function holdsActionWord(said: string, action: CompanionActionKind): boolean {
   const words = wordsOf(said);
   return ACTION_WORDS[action].some((entry) => holdsRun(words, wordsOf(entry)));
+}
+
+/**
+ * Whether his words say the action's word BESIDES the target's name: for each name of the target that his words cover, its significant
+ * words are taken out of his line one occurrence each, and the action's word must stand in what is left; the name he used most fully
+ * decides (the shortest remainder), so the check fails closed. Consumed by `checkHisWord` below, check 6.
+ */
+function holdsActionWordBesidesName(said: string, target: CompanionActionTarget, action: CompanionActionKind): boolean {
+  const heard = wordsOf(said);
+  let remainder: string[] | null = null;
+  for (const name of namesOf(target)) {
+    const needed = significantWordsOf(name);
+    const left = [...heard];
+    const covered = needed.length > 0 && needed.every((word) => {
+      const at = left.indexOf(word);
+      if (at === -1) return false;
+      left.splice(at, 1);
+      return true;
+    });
+    if (covered && (remainder === null || left.length < remainder.length)) remainder = left;
+  }
+  return remainder !== null && ACTION_WORDS[action].some((entry) => holdsRun(remainder, wordsOf(entry)));
 }
 
 /** Words that turn an order into a refusal: `dont`, `cant` and the rest are "don't" and "can't" with the apostrophe dropped (`wordsOf`). */
@@ -195,7 +223,8 @@ const refusal = (sentence: string): { ok: false; sentence: string } => ({ ok: fa
  *      a line he says again after her read-back is the one that counts;
  *   4. no sentence of hers naming the target stands between `preparedAt` and that line;
  *   5. `said` does not name the target;
- *   6. `said` holds none of the action's words, or is a no or a question and not an order (`takesItBack`).
+ *   6. `said` holds none of the action's words besides the target's name (`holdsActionWordBesidesName`), or is a no or a question and not
+ *      an order (`takesItBack`).
  *
  * A spoken line equal to `said` but logged before the prepare is refused with check 3's sentence, as is a typed one: neither is a line
  * he spoke after the card went up. Each refusal says what to do. `pending` takes `null` so the caller hands over whatever her state
@@ -236,7 +265,7 @@ export function checkHisWord(input: {
   if (!readBack) return refusal(`You have not read it back to him yet. Say it back first: ${pending.say}.`);
 
   if (!namesTarget(said, pending.target, pending.action)) return refusal(`His words do not name ${pending.target.spoken}.`);
-  if (!holdsActionWord(said, pending.action)) return refusal(`His words do not say ${ACTION_WORDS[pending.action][0]}.`);
+  if (!holdsActionWordBesidesName(said, pending.target, pending.action)) return refusal(`His words do not say ${ACTION_WORDS[pending.action][0]}.`);
   if (takesItBack(said, pending.target)) return refusal(`That is a no or a question, not an order. He must say the order itself, aloud: ${pending.say}.`);
 
   return { ok: true, line: { id: firing.id, at: firing.at, text: firing.text } };
