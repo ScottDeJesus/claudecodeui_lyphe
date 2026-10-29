@@ -228,9 +228,10 @@ export function WidgetFrame({
         fill={filling}
       />
     );
-    // `openUrl` is the address itself: an embed that refuses to be framed, or that a browser blocks
-    // as mixed content, shows nothing and cannot say so — so the way out to the real page is the
-    // one action this kind must always carry. See `EmbedUrlFrame`'s header.
+    // `openUrl` is the address itself: an embed that refuses to be framed shows nothing and cannot say
+    // so, and a plain-http address in an https page shows a card that points at this very link — so
+    // the way out to the real page is the one action this kind must always carry. See
+    // `EmbedUrlFrame`'s header.
     //
     // It is the RESOLVED address, not the written one, and for exactly the reason the frame's `src`
     // is: this link is followed by the reader's own browser. Handing a phone `http://127.0.0.1:8005`

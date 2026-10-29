@@ -4,8 +4,10 @@ import type { CompanionActionKind, CompanionActionTarget, CompanionPendingAction
  * THE CHECK OF HIS WORD: the pure judgment `take_action` makes before anything in the house moves. No I/O, no clock of its own and no
  * import but the contract's types, so it is shown by replaying rows from her log (`.verify/kaylee-action-word.mjs`) and by nothing else.
  *
- * Ruling 3, his words: "only on my explicit spoken word for that specific card, never on her own judgment, and never from a bare yes".
- * The rules that keep it so, each one a way to fail closed:
+ * Ruling 3, his words, as he re-ruled it on 2026-10-29: "only on my explicit spoken word for that specific card, never on her own
+ * judgment"; "My 'yes' should count. When the action on the panel is the only one and I say yes, that is my word for it"; and for the
+ * harmless ones (open, close_followup) "no read-back and no second yes: she prepares, says one sentence, and my first word of
+ * assent fires it" (`ACTION_TIER`). The rules that keep it so, each one a way to fail closed:
  *
  *   - HIS WORD IS A PRESS. Only a line of his talk button counts: a log row with role `operator` and via `spoken`. A typed line neither
  *     fires an action nor stands in as one, and the empty press (logged as `''`) names nothing.
@@ -21,8 +23,22 @@ import type { CompanionActionKind, CompanionActionTarget, CompanionPendingAction
  *     stand in what is left: "Queue probe eyes accept." fires, the bare name and "Open probe eyes accept." do not, and a name that is the
  *     verb as well ("Queue queue drying") is ordered by saying the verb once more. A misheard "cue probe eyes accept" names the card
  *     and says no verb of its own, so it is refused.
- *   - THE READ-BACK. A sentence of hers that names the target stands in the log after the card went up and before his line. For her
- *     memory, whose house name is the common word "memory", the sentence must also hold the action's word or say "your memory".
+ *   - TWO TIERS. A FULL action (the eleven that move work or memory) takes the whole ceremony: a sentence of hers that names the target stands
+ *     in the log after the card went up, in ANY of her turns, and before his line (for her memory, whose house name is the common word
+ *     "memory", it must also hold the action's word or say "your memory"). A LIGHT action takes none: his first word fires it, and so
+ *     does the request that led to the prepare, his last line before it (spoken, within `REQUEST_LEAD_MS`, naming the target).
+ *   - HIS WORD IS EITHER a line that names the target and holds the action's word, or an ASSENT (`isAssent`): a yes word (yes, yeah, yep,
+ *     yup, sure, okay, ok, alright, correct, "go ahead", "do it", "fire it", "send it", "please do", "that's right") carried by nothing but
+ *     "please", "it", "that" and "now" ("Yes.", "Sure, go ahead.", "Do it now."). Anything more ("Go on.", "Okay, so.", "Yes, queue it.")
+ *     is no bare assent; the last goes through the name-and-verb checks as a named order. For a LIGHT action the action's own word
+ *     beside "it"/"that"/"this" is a yes too ("Open it."); for a FULL one it never is ("Forget it.", "Stop it.", "Cut it."). The panel
+ *     holds one action, so a yes is for it; a question mark ("Yes?") still takes it back.
+ *   - A BARE YES UNDER A FULL ACTION is bound to the read-back it answers: it counts only as his FIRST spoken line after her NEWEST
+ *     read-back of the target, with no spoken line of his after it. A named order keeps the newest-line rule.
+ *   - THE HEAD OF A LONG TITLE. A spoken name with a tail ("Technician intake form for the scheduler — skills, certifications, …") is also
+ *     named by all the significant words of its head, when the head holds two or more; a trailing prepositional phrase of the head
+ *     ("for the scheduler") is optional while two significant words remain without it ("open the technician intake form"). The full name
+ *     still names it. Nobody says a tail.
  *   - AN ORDER, NOT A NO OR A QUESTION. The match is a bag of words, so "Don't queue Kaylee's eyes." holds the name and the verb. A line
  *     that ends in `?`, opens with a question word, or holds a negator is refused (`takesItBack`); a plain order is never refused, so
  *     the cure for a false refusal is to say the order again. A word that is part of the target's own name is not read as a negator.
@@ -34,8 +50,8 @@ import type { CompanionActionKind, CompanionActionTarget, CompanionPendingAction
  *
  * KNOWN LIMIT, SIBLINGS: the check holds ONE target and cannot see the cards beside it, so a line that names a shorter-named sibling's
  * words fires the pending card whose name those words cover ("Queue kaylee eyes." fires a pending card `kaylee`; a card `restorly--chat`
- * is covered by "restorly" alone, `chat` being a filler word). What holds the line is the full name in the card's `say` and in her
- * read-back, which he hears before he speaks; this file adds nothing to it.
+ * is covered by "restorly" alone, `chat` being a filler word). What holds the line is the full name in the card's `say` and, for a FULL
+ * action, in her read-back, which he hears before he speaks; this file adds nothing to it.
  *
  * A press's logged text is the cleaned transcript (the transcription drops filler sounds and repeated words), and `take_action`
  * carries it verbatim, so the match against `said` is on the text as logged, trimmed with its whitespace folded.
@@ -61,6 +77,23 @@ export const ACTION_WORDS: Readonly<Record<CompanionActionKind, readonly string[
   close_followup: ['close', 'done', 'tick', 'check off'],
   clear_memory: ['clear', 'wipe', 'erase', 'empty', 'forget everything'],
 };
+
+/** How much ceremony an action takes: `light` fires on his first word, `full` is read back to him first. */
+export type ActionTier = 'light' | 'full';
+
+/**
+ * THE TWO TIERS, his ruling of 2026-10-29: an open (a card, run, page or chat on his screen) and a follow-up ticked off are
+ * harmless, so they take no read-back and no second yes. A Show is not, though it looks it: it un-hides a held, approved card back into the queue, so it
+ * keeps the full ceremony (read-back, then his word), and the ten others keep it too. The one table: the
+ * check below, the prepare's answer (`action-prompts.ts`), her prompt and the `said` description of `take_action` all read it.
+ */
+export const ACTION_TIER: Readonly<Record<CompanionActionKind, ActionTier>> = {
+  queue: 'full', hide: 'full', show: 'full', rework: 'full', answer: 'full', recut: 'full', stop: 'full', resume: 'full', kick: 'full',
+  resume_run: 'full', open: 'light', close_followup: 'light', clear_memory: 'full',
+};
+
+/** The actions of one tier, in `CompanionActionKind` order. Consumed by her prompt (`session/companion-prompt.ts`) and `hands-tools.ts`. */
+export const actionsOfTier = (tier: ActionTier): CompanionActionKind[] => (Object.keys(ACTION_TIER) as CompanionActionKind[]).filter((action) => ACTION_TIER[action] === tier);
 
 /** Words that carry no name: articles, the kinds of thing a target can be, and the ways he is polite or points. Never required of his line. */
 const NOT_SIGNIFICANT: ReadonlySet<string> = new Set([
@@ -124,15 +157,58 @@ function namesOf(target: CompanionActionTarget): string[] {
   }
 }
 
+/** What cuts a long title from its detail: the first of these in a spoken name ends its head. */
+const TAIL_SPLITTERS = [' — ', ' – ', ': ', ' ('] as const;
+
+/** The head of a spoken name that has a tail, when the head holds at least two significant words; else `null`. */
+function headOf(spoken: string): string | null {
+  const cuts = TAIL_SPLITTERS.map((splitter) => spoken.indexOf(splitter)).filter((at) => at > 0);
+  if (cuts.length === 0) return null;
+  const head = spoken.slice(0, Math.min(...cuts));
+  return significantWordsOf(head).length >= 2 ? head : null;
+}
+
+/** Where a trailing prepositional phrase of a head opens: the whitespace or comma before one of these words. */
+const TAIL_PREPOSITION = /[\s,;]+(?:for|of|to|on|in|at|with|from|by|about|under)(?=[\s,;.]|$)/gi;
+
 /**
- * True when every significant word of the target's `spoken`, or of its house name read as words, is among his words. Given the
+ * The head less its trailing prepositional phrase ("Technician intake form" of "Technician intake form for the scheduler"): cut at the
+ * first preposition that leaves two or more significant words; else `null`, and the phrase is required.
+ */
+function shortHeadOf(head: string): string | null {
+  for (const match of head.matchAll(TAIL_PREPOSITION)) {
+    const short = head.slice(0, match.index).trim();
+    if (significantWordsOf(short).length >= 2) return short;
+  }
+  return null;
+}
+
+/** `namesOf`, plus the head of a long spoken name and that head less its trailing phrase: the names he may say the target by. */
+function sayableNamesOf(target: CompanionActionTarget): string[] {
+  const head = headOf(target.spoken);
+  if (head === null) return namesOf(target);
+  const short = shortHeadOf(head);
+  return [...namesOf(target), head, ...(short === null ? [] : [short])];
+}
+
+/**
+ * The shortest name the check takes for the target: the head less its trailing phrase, else the head, else `spoken`. What the prepare's
+ * answer tells her to listen for, so she never asks him for a title the server takes shorter. Consumed by `action-prompts.ts` (`nextStepFor`).
+ */
+export function shortNameOf(target: CompanionActionTarget): string {
+  const head = headOf(target.spoken);
+  return head === null ? target.spoken : (shortHeadOf(head) ?? head);
+}
+
+/**
+ * True when every significant word of the target's `spoken`, or of its house name read as words, or of the head of a long `spoken`, is among his words. Given the
  * `action`, a name made only of that action's own words names nothing (see the header). Bag-of-words by design: it holds ONE target and
  * cannot see its siblings, so a shorter-named card is covered by the longer name's words (the header's KNOWN LIMIT). Consumed by
  * `checkHisWord` below, which asks it of her read-back and of his line, and shown on its own by `.verify/kaylee-action-word.mjs`.
  */
 export function namesTarget(said: string, target: CompanionActionTarget, action?: CompanionActionKind): boolean {
   const heard = new Set(wordsOf(said));
-  return namesOf(target).some((name) => {
+  return sayableNamesOf(target).some((name) => {
     const needed = significantWordsOf(name, action);
     return needed.length > 0 && needed.every((word) => heard.has(word));
   });
@@ -175,7 +251,7 @@ export function holdsActionWord(said: string, action: CompanionActionKind): bool
 function holdsActionWordBesidesName(said: string, target: CompanionActionTarget, action: CompanionActionKind): boolean {
   const heard = wordsOf(said);
   let remainder: string[] | null = null;
-  for (const name of namesOf(target)) {
+  for (const name of sayableNamesOf(target)) {
     const needed = significantWordsOf(name);
     const left = [...heard];
     const covered = needed.length > 0 && needed.every((word) => {
@@ -217,17 +293,62 @@ function opensWithActionWord(said: string, action: CompanionActionKind): boolean
 }
 
 /**
- * Whether the line is a no or a question and so no order: it ends in `?`, opens with a question word, or holds a negator; and, for the
- * actions in `ORDERED_VERB_FIRST`, does not open with the action's word. The target's own name words are set aside first, so a card called
- * "No more polling" or "Do not disturb" can still be ordered. A heuristic by design, and a closed one: it can refuse a plain order that
- * happens to say "no" ("Queue it, no problem"), never accept a refusal.
+ * Whether the line is a no or a question and so no order: it ends in `?`, opens with a question word, or holds a negator. The target's own
+ * name words are set aside first, so a card called "No more polling" or "Do not disturb" can still be ordered. A heuristic by design, and a
+ * closed one: it can refuse a plain order that happens to say "no" ("Queue it, no problem"), never accept a refusal. An `assent` is made of
+ * yes words and four carriers, so it holds no negator and "Do it." is no question: only its `?` is read.
  */
-function takesItBack(said: string, target: CompanionActionTarget, action: CompanionActionKind): boolean {
+function takesItBack(said: string, target: CompanionActionTarget, assent: boolean): boolean {
   if (said.trim().endsWith('?')) return true;
-  if (ORDERED_VERB_FIRST.has(action) && !opensWithActionWord(said, action)) return true;
+  if (assent) return false;
   const nameWords = new Set(namesOf(target).flatMap(wordsOf));
   const words = wordsOf(said).filter((word) => !nameWords.has(word));
   return words.some((word) => NEGATORS.has(word)) || (words.length > 0 && QUESTION_OPENERS.has(words[0]));
+}
+
+/** Whether the line is no order for an action in `ORDERED_VERB_FIRST`: it does not open with the action's word. Every other action is ordered by the bag of words. */
+const isNoVerbFirstOrder = (said: string, action: CompanionActionKind): boolean => ORDERED_VERB_FIRST.has(action) && !opensWithActionWord(said, action);
+
+/** The runs of words that are his yes (`wordsOf` forms: "that's right" is `thats right`), longest first so "please do" is read whole. */
+const YES_RUNS: ReadonlyArray<readonly string[]> = [
+  ['that', 'is', 'right'], ['thats', 'right'], ['go', 'ahead'], ['please', 'do'], ['do', 'it'], ['fire', 'it'], ['send', 'it'],
+  ['yes'], ['yeah'], ['yep'], ['yup'], ['sure'], ['okay'], ['ok'], ['alright'], ['correct'],
+];
+
+/** The words that may stand beside a yes without being more than a yes. */
+const YES_CARRIERS: ReadonlySet<string> = new Set(['please', 'it', 'that', 'now']);
+
+/**
+ * Whether the line is his yes to the pending action, and so his word for it with no name said: a yes run (`YES_RUNS`) carried by nothing
+ * but "please", "it", "that" and "now". For a LIGHT action the action's own word beside "it"/"that"/"this" is a yes too ("Open it.",
+ * "Close it.", "Yes, open it."); for a FULL one it never is, so "Forget it.", "Stop it.", "Pause it." and "Cut it." (what he says
+ * to decline) fire nothing. "Yes.", "Sure, go ahead." and "Do it now." are assents; "Go on.", "Okay, so.", "Yes, queue it.", "Hey." and
+ * "Please." are not. The `?` of "Yes?" is judged by `takesItBack`, not here. Consumed by `checkHisWord` below, and shown on its own by
+ * `.verify/kaylee-action-word.mjs`.
+ */
+export function isAssent(said: string, action: CompanionActionKind): boolean {
+  const own = ACTION_TIER[action] === 'light' ? ownWordsOf(action) : new Set<string>();
+  const words = wordsOf(said);
+  let saidYes = false;
+  let ownWord = false;
+  let points = false;
+  for (let at = 0; at < words.length;) {
+    const run = YES_RUNS.find((candidate) => candidate.every((word, offset) => words[at + offset] === word));
+    if (run !== undefined) {
+      saidYes = true;
+      at += run.length;
+      continue;
+    }
+    const word = words[at];
+    if (YES_CARRIERS.has(word) || own.has(word) || (own.size > 0 && word === 'this')) {
+      ownWord ||= own.has(word);
+      points ||= word === 'it' || word === 'that' || word === 'this';
+      at += 1;
+      continue;
+    }
+    return false;
+  }
+  return saidYes || (ownWord && points);
 }
 
 /**
@@ -254,32 +375,47 @@ function clockOf(stamp: string): string {
 
 const refusal = (sentence: string): { ok: false; sentence: string } => ({ ok: false, sentence });
 
+/** How long before the prepare a request of his still counts for a LIGHT action: the turn that answers a press may read a few things before it prepares. */
+const REQUEST_LEAD_MS = 2 * 60_000;
+
+type Heard = { id: number; at: string; role: 'operator' | 'kaylee'; via: 'typed' | 'spoken' | null; text: string };
+
+/** The newest of `rows` (the greatest log id), or `null` for none. */
+const newestOf = (rows: readonly Heard[]): Heard | null => rows.reduce<Heard | null>((newest, row) => (newest === null || row.id > newest.id ? row : newest), null);
+
 /**
- * The checks of `take_action`, in order, on rows from her log (`heardSince`'s, oldest first): his line, or the one sentence that refuses.
+ * The checks of `take_action`, in order, on rows from her log (`heardSince`'s, oldest first; for a LIGHT action also his last line before the
+ * prepare, `heardBefore`'s): his line, or the one sentence that refuses.
  *
  *   1. nothing is pending (`pending` is `null`), or what is pending can be named by no line of his (`canBeNamed`);
  *   2. it lapsed: `now` is past `expiresAt`;
- *   3. no line he SPOKE after `preparedAt`, and at or before `expiresAt`, equals `said`. The firing line is the newest such line, so
- *      a line he says again after her read-back is the one that counts;
- *   4. no sentence of hers reading the target back (`readsBack`) stands between `preparedAt` and that line;
- *   5. `said` does not name the target;
- *   6. `said` holds none of the action's words besides the target's name (`holdsActionWordBesidesName`), or is a no or a question and not
- *      an order (`takesItBack`).
+ *   3. his word is not found. It is the newest line he SPOKE after `preparedAt`, and at or before `expiresAt`, equal to `said`; for a LIGHT
+ *      action with no such line, the request that led to the prepare: his last line of any kind before it, spoken, no more than
+ *      `REQUEST_LEAD_MS` earlier, equal to `said`, with no line of his since. The refusal points at his newest spoken line only when the
+ *      check would take it passed as `said`, and says so for a request that is too old or that a later line of his took back;
+ *   4. FULL actions only: no sentence of hers reading the target back (`readsBack`) stands between `preparedAt` and that line. One that
+ *      stands only AFTER it is its own sentence ("He asked before you read it back"), which also names a line of his spoken since. A bare
+ *      yes (`isAssent`) must also be his FIRST spoken line after her NEWEST read-back with none of his after it, else it is refused;
+ *   5. a no or a question (`takesItBack`), and a line that is no assent and does not name the target;
+ *   6. a line that is no assent and holds none of the action's words besides the target's name (`holdsActionWordBesidesName`) or, for
+ *      `clear_memory`, does not open with its word. An assent (`isAssent`) is his word for the one action on the panel and needs neither.
+ *      The request before the prepare is never an assent: it must name the target.
  *
- * A spoken line equal to `said` but logged before the prepare is refused with check 3's sentence, as is a typed one: neither is a line
- * he spoke after the card went up. Each refusal says what to do. `pending` takes `null` so the caller hands over whatever her state
- * holds and check 1 is made here, in the one place the sentences live. Consumed by `hands-tools.ts` (`take_action`).
+ * A spoken line equal to `said` but logged before the prepare is refused with check 3's sentence, as is a typed one, unless it is a LIGHT
+ * action's request. Each refusal says what to do. `pending` takes `null` so the caller hands over whatever her state holds and check 1 is
+ * made here, in the one place the sentences live. Consumed by `hands-tools.ts` (`take_action`).
  */
 export function checkHisWord(input: {
   pending: Pick<CompanionPendingAction, 'action' | 'target' | 'preparedAt' | 'expiresAt' | 'say'> | null;
   said: string;
   now: string;
-  lines: Array<{ id: number; at: string; role: 'operator' | 'kaylee'; via: 'typed' | 'spoken' | null; text: string }>;
+  lines: Heard[];
 }): { ok: true; line: { id: number; at: string; text: string } } | { ok: false; sentence: string } {
   const { pending, said, now, lines } = input;
   if (!pending) return refusal('Nothing is waiting for his word; prepare it first.');
-  if (!canBeNamed(pending.target, pending.action)) {
-    return refusal(`No line of his can fire this: "${pending.target.spoken}" has no word of its own that is not the action itself or a filler word. Cancel it and tell him it cannot be done by voice.`);
+  const { action, target } = pending;
+  if (!canBeNamed(target, action)) {
+    return refusal(`No line of his can fire this: "${target.spoken}" has no word of its own that is not the action itself or a filler word. Cancel it and tell him it cannot be done by voice.`);
   }
 
   const preparedMs = Date.parse(pending.preparedAt);
@@ -290,23 +426,61 @@ export function checkHisWord(input: {
   // A blank `said` equals the empty press's `''` once folded; it must name no line.
   const wanted = foldedText(said);
   const afterThePrepare = (stamp: string): boolean => Date.parse(stamp) > preparedMs;
-  const spokenLines: typeof lines = wanted === ''
-    ? []
-    : lines.filter((row) =>
-      row.role === 'operator'
-      && row.via === 'spoken'
-      && afterThePrepare(row.at)
-      && Date.parse(row.at) <= expiresMs
-      && foldedText(row.text) === wanted);
-  const firing = spokenLines.reduce<(typeof lines)[number] | null>((newest, row) => (newest === null || row.id > newest.id ? row : newest), null);
-  if (firing === null) return refusal(`That is not a line he spoke after the card went up. He must say it aloud: ${pending.say}.`);
+  const isHisSpokenSaid = (row: Heard): boolean => wanted !== '' && row.role === 'operator' && row.via === 'spoken' && foldedText(row.text) === wanted;
+  const light = ACTION_TIER[action] === 'light';
 
-  const readBack = lines.some((row) => row.role === 'kaylee' && row.id < firing.id && afterThePrepare(row.at) && readsBack(row.text, pending.target, pending.action));
-  if (!readBack) return refusal(`You have not read it back to him yet. Say it back first: ${pending.say}.`);
+  const spokenAfter = newestOf(lines.filter((row) => isHisSpokenSaid(row) && afterThePrepare(row.at) && Date.parse(row.at) <= expiresMs));
+  // The request that led to the prepare is his LAST line of any kind before it, and he has said nothing since: a newer line of his, typed
+  // or spoken, before or after the prepare ("wait, no"), is his newer word, and the press no longer stands for the card.
+  const spokeSince = lines.some((row) => row.role === 'operator' && afterThePrepare(row.at));
+  const lastOfHisBefore = light ? newestOf(lines.filter((row) => row.role === 'operator' && Date.parse(row.at) <= preparedMs)) : null;
+  const standingRequest = lastOfHisBefore !== null && lastOfHisBefore.via === 'spoken' && !spokeSince && Date.parse(lastOfHisBefore.at) >= preparedMs - REQUEST_LEAD_MS ? lastOfHisBefore : null;
+  const request = spokenAfter === null && standingRequest !== null && isHisSpokenSaid(standingRequest) ? standingRequest : null;
+  const firing = spokenAfter ?? request;
+  if (firing === null) {
+    // The pointer names only a line this check would take if she passed it, so the call it invites is never refused the same way.
+    const newestSpoken = newestOf(lines.filter((row) => row.role === 'operator' && row.via === 'spoken' && afterThePrepare(row.at) && Date.parse(row.at) <= expiresMs));
+    const pass = (row: Heard, which: string): string => ` His newest spoken line ${which} is logged as "${row.text}"; if that is what he meant, pass it to take_action exactly so.`;
+    const pointer = newestSpoken !== null
+      ? pass(newestSpoken, 'since then')
+      : standingRequest !== null
+        ? pass(standingRequest, 'from just before the card went up')
+        : lastOfHisBefore?.via === 'spoken' ? ' His last spoken line came before the card went up and can no longer stand for it; he must say it again.' : '';
+    return refusal(`That is not a line he spoke after the card went up. He must say it aloud: ${pending.say}.${pointer}`);
+  }
 
-  if (!namesTarget(said, pending.target, pending.action)) return refusal(`His words do not name ${pending.target.spoken}.`);
-  if (!holdsActionWordBesidesName(said, pending.target, pending.action)) return refusal(`His words do not say ${ACTION_WORDS[pending.action][0]}.`);
-  if (takesItBack(said, pending.target, pending.action)) return refusal(`That is a no or a question, not an order. He must say the order itself, aloud: ${pending.say}.`);
+  const assent = request === null && isAssent(said, action);
+  if (!light) {
+    const readsItBack = (row: Heard): boolean => row.role === 'kaylee' && afterThePrepare(row.at) && readsBack(row.text, target, action);
+    const readBacks = lines.filter(readsItBack);
+    // His line came before a read-back of hers: say so, and name the line of his spoken since that read-back, if any.
+    const askedBefore = (readBack: Heard): string => {
+      const since = newestOf(lines.filter((row) => row.role === 'operator' && row.via === 'spoken' && row.id > readBack.id));
+      const spokenSince = since === null ? '' : ` He has spoken since: his newest line is logged as "${since.text}"; if that is his yes, pass it to take_action exactly so.`;
+      return `He asked before you read it back. Read it back, then pass what he says next.${spokenSince}`;
+    };
+    if (!readBacks.some((row) => row.id < firing.id)) {
+      const later = readBacks.find((row) => row.id > firing.id);
+      return refusal(later === undefined ? `You have not read it back to him yet. Say it back first: ${pending.say}.` : askedBefore(later));
+    }
+    // A bare yes answers the read-back it follows: not any yes in the five minutes, and not one he has spoken past.
+    const newestReadBack = assent ? newestOf(readBacks) : null;
+    if (newestReadBack !== null) {
+      if (newestReadBack.id > firing.id) return refusal(askedBefore(newestReadBack));
+      const spokenAfterReadBack = lines.filter((row) => row.role === 'operator' && row.via === 'spoken' && row.id > newestReadBack.id);
+      if (spokenAfterReadBack.length !== 1 || spokenAfterReadBack[0].id !== firing.id) {
+        return refusal('A bare yes counts only as his first spoken line after your newest read-back, with none of his after it. Read it back again, then pass what he says next.');
+      }
+    }
+  }
+
+  const notAnOrder = `That is a no or a question, not an order. He must say the order itself, aloud: ${pending.say}.`;
+  if (takesItBack(said, target, assent)) return refusal(notAnOrder);
+  if (!assent) {
+    if (!namesTarget(said, target, action)) return refusal(`His words do not name ${target.spoken}.`);
+    if (!holdsActionWordBesidesName(said, target, action)) return refusal(`His words do not say ${ACTION_WORDS[action][0]}.`);
+    if (isNoVerbFirstOrder(said, action)) return refusal(notAnOrder);
+  }
 
   return { ok: true, line: { id: firing.id, at: firing.at, text: firing.text } };
 }

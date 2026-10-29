@@ -946,7 +946,7 @@ is written as well as where it is drawn — so a stored value can never put a pa
 cannot reach its edge. The left pane is the same element whether or not a right one exists, so
 opening or closing the second pane never remounts what the first is showing.
 
-**A pane is an iframe and nothing else** — no title bar, no close button, no watchdog:
+**A pane is an iframe and nothing else** — no title bar, no close button, no watchdog (the one exception is below: an address the browser would block):
 
 ```tsx
 <iframe src={resolved} title={app.name} data-pane-side={side} referrerPolicy="no-referrer"
@@ -961,7 +961,17 @@ opening or closing the second pane never remounts what the first is showing.
   which is the whole premise of the framing grant below. These are the operator's own applications
   on the operator's own host, not untrusted embeds.
 - **`data-pane-side`** is `left` or `right`, passed by the layer. It is how `useFrontPane` tells
-  which frame holds focus; see MAN-491.
+  which frame holds focus (or, for the card below, which card's button does, read at `focusin`);
+  see MAN-491.
+- **A plain-http address inside an https page is not framed.** The browser blocks it as mixed
+  content without a word, which would leave a blank pane; `AppPane` is where every way of putting an
+  application up passes through (a row, dual screen, the companion's `showApplication`, a project
+  link), so it checks the resolved address against the page's protocol (`isBlockedAsMixedContent`)
+  and draws an `EmptyState` card in place of the frame — what the application is, why it is not
+  drawn, and an **Open in a new tab** action that is the same `window.open(…, '_blank', 'noopener')`
+  as above. An https address, a loopback address (a browser draws that one from an https page), and
+  any address on a page opened over plain http, is framed as before. A row that is this app itself
+  never reaches a pane (it opens a tab).
 - **Reload** bumps a per-pane counter used in the frame's React key, which remounts the element.
   **Open in a new tab** is `window.open(resolved, '_blank', 'noopener')`. Both, and **Close**, are
   acts of `useSwitcherActions` on the FRONT pane, not controls on the frame.
@@ -991,6 +1001,9 @@ setting here:
 - **Any other row** opens in a pane and shows whatever its own headers allow. An application that
   refuses framing paints a blank pane; that is its answer, and the row's menu still offers Open in a
   new tab.
+- **A plain-http row, while this app is open over https,** is not framed at all: the browser blocks
+  it as mixed content, so the pane says so and offers Open in a new tab. A row with an https address
+  (an https door in front of the application) or a loopback one is framed as usual.
 
 ## MAN-490 — The kit the switcher is built on
 section: applications/012 The kit the switcher is built on
@@ -1118,7 +1131,7 @@ section: applications/013 The switcher's own files/002 `hooks/useFrontPane.ts`
 
 | File | What |
 |---|---|
-| `hooks/useFrontPane.ts` | `useFrontPane(panes, setPanes)` → `{ frontSide, closePane }`, mounted by the provider. `frontSide` is the side whose frame last took focus (default `left`). What the hook returns is the side READ as in front: a side whose slot is empty reads as `left` in the very render that emptied it (a survivor is always left), so no reader sees a one-commit "nothing up"; an effect then resets the stored side to `left`. `closePane(side)` empties one slot and moves a survivor left. |
+| `hooks/useFrontPane.ts` | `useFrontPane(panes, setPanes)` → `{ frontSide, closePane }`, mounted by the provider. `frontSide` is the side whose frame last took focus (default `left`); for an address the browser would block, the pane is a card in the page's own document (`AppPane`, MAN-488), so the side is the one whose card holds focus. It is read from `activeElement.closest('[data-pane-side]')` at three moments: the window's `blur` (focus left the page for a frame), a capture-phase `pointerdown` (the reader's next press in the page names the frame they last used), and `focusin` (a press or a Tab into a card, read after focus has moved). What the hook returns is the side READ as in front: a side whose slot is empty reads as `left` in the very render that emptied it (a survivor is always left), so no reader sees a one-commit "nothing up"; an effect then resets the stored side to `left`. `closePane(side)` empties one slot and moves a survivor left. |
 | `hooks/useCurrentApplication.ts` | `useCurrentApplication()` → `CurrentApplication` (`{ app, src }`) of `frontSide`'s slot, or null when nothing is up or the registry lacks the row. Memoised on `app` and `src`. |
 | `hooks/useSwitcherActions.ts` | `useSwitcherActions(chatDoor)` → the five `SwitcherAction`s in order: Chat, Applications, Reload, Close, Open in a new tab (keys `chat`, `applications`, `reload`, `close`, `open-in-tab`; printed "Chat", or "Collapse chat" while the chat floats, "Apps", "Reload app", "Close app", "Open in tab": `applications.actChat` … `actOpenInTab`). Chat and Applications are always enabled; the other three are `disabled` while nothing is up and act on `frontSide`. Open in a new tab is `window.open(src, '_blank', 'noopener')`. `chatDoor` comes from the caller: only project-workspace knows which conversation an application brings; `AppSwitcherFab` and `ProjectCommandPalette` each call it with the one door `WorkspaceFrame` hands them, so the radial (which leaves out the `disabled` ones) and the palette's Applications group (MAN-7483, which greys them) draw from one list. |
 | `hooks/useShowApplication.ts` | `useShowApplication()` → `(appId, path) => void`, a barrel verb. Finds the registry row, resolves it for this page's host and lays `path` on it (`appAddressAt`: the row's own path stays in front, a trailing slash is not doubled), and calls the context's `putUp`. The module's second reader of the page's address, at its open site. A row the registry lacks, or one that is this very app (never framed), puts nothing up and logs why. Its one consumer is project-workspace's `CompanionHost`: ArchPulse at `/#page=<id>[&block=<id>]`; ArchPulse resolves a fragment change on `hashchange`, so a moved pane lands on the page without a reload. |

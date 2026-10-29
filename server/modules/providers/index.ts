@@ -15,6 +15,13 @@ export { readClaudeCommandCatalog } from './list/claude/claude-command-catalog.j
 // Claude CLI's own catalog ("Sonnet 5.5"), so a label names the generation the CLI runs and goes stale with no release.
 export { readClaudeModelsDefinition } from './list/claude/claude-model-catalog.js';
 
+// CLAUDE_MODEL_VALUE_BY_ALIAS, ClaudeModelAlias, readAccountDefaultModelAlias: used by the companion module's
+// `send_to_session` / `create_session`: their `model` offers the house's model names (the table's keys) and carries the value
+// a chat runs on (the table's value); left out for a new chat, the chat runs on the account's default model.
+export { CLAUDE_MODEL_VALUE_BY_ALIAS } from './list/claude/claude-model-options.js';
+export type { ClaudeModelAlias } from './list/claude/claude-model-options.js';
+export { readAccountDefaultModelAlias } from './list/claude/claude-account-default-model.js';
+
 // buildClaudeToolPermissionEntry: used by the companion module's `answer_session`, which answers "always" with the
 // entry the runtime's grammar matcher accepts for the ask — the same string the chat page's "Allow and remember" writes.
 export { buildClaudeToolPermissionEntry } from './list/claude/claude-tool-permission-entry.js';

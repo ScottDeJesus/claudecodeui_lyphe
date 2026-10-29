@@ -18261,7 +18261,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-card-live.mjs
 
 ## INV-10099 — server/modules/companion/hands — edits that break it: only a spoken press fires, the pin is what is fired, one ending, no timer, no fake word in the live store
 
-Detail: MAN-9174 (protocol), MAN-9171 (the check), MAN-9172 (recipes), MAN-9173 (doors).
+Detail: MAN-9174 (protocol), MAN-9171 (the check), MAN-9204 (the words it reads), MAN-9172 (recipes), MAN-9173 (doors), MAN-9203 (what the prepare tells her).
 
 | rule | why |
 |---|---|
@@ -18270,12 +18270,15 @@ Detail: MAN-9174 (protocol), MAN-9171 (the check), MAN-9172 (recipes), MAN-9173 
 | Words that travel (Rework notes, an answer round, rulings) are looked up in the log at prepare (`resolveCarriedLines`); a string of hers is never sent in his name | nothing he did not say reaches a designer or a runner |
 | The take fires the PIN (`pending.pin`) taken at prepare, never what the house holds now; the ask book refuses a prompt that changed (MAN-8494) | he heard that prompt read back |
 | The pin never reaches a page: `withoutPin` names the wire's fields one by one. A field added to `CompanionStoredPending` is sent only when put on the wire on purpose | the ask carries the lock token the dispatcher guards an answer by |
-| Every action goes through prepare and take, `open`, `close_followup` and `clear_memory` included | ruling 3: "each one said back to me before it fires" |
-| `clear_memory` is ordered only by a line that opens with its word (`ORDERED_VERB_FIRST`), and a sentence of hers reads it back only when it holds an action word or says "your memory" (`readsBack`). Drop either and a remark about her memory empties it | the word "memory" is the whole name and "clear" and "empty" are adjectives: "My memory is clear." holds both as a bag of words (MAN-9171, MAN-9194) |
+| Every action goes through prepare and take, `open` and `close_followup` included | ruling 3: "only on my explicit spoken word for that specific card, never on her own judgment" |
+| `ACTION_TIER` is the one tier table. Only `open` and `close_followup` are LIGHT; the eleven others, `show` among them, are FULL and fire only after a read-back of hers that names the target, in any of her turns since the prepare (check 4). Her prompt, `nextStepFor` and `take_action`'s `said` description read the table; none restates the lists | the operator, 2026-10-29: "The light tier is open and close_followup only." `show` is `dispatcher unhide`: it puts a held, approved card back in the queue |
+| A bare yes (`isAssent`) is a yes run carried by `please`, `it`, `that`, `now` and nothing else; the action's own word beside `it` counts for LIGHT only. Under a FULL action it counts only as his first spoken line after her newest read-back, with none of his after it. "Forget it.", "Stop it.", "Pause it.", "Cut it." and "Kick it." fire nothing | they are what he says to decline a clear or a stop; a stray yes to something else is not his word for this action (MAN-9171) |
+| The request that led to a prepare fires a LIGHT action only when it is his last line of any kind before the prepare, spoken, at most 2 minutes old (`REQUEST_LEAD_MS`), with nothing of his since, naming the target, and no `companion_actions` row holds it as `said_log_id` (`heardBefore`) | a newer line takes it back; one word never fires twice |
+| A named order for `clear_memory` fires only when its line opens with the action's word (`ORDERED_VERB_FIRST`); the one line that fires it without the word is the bare yes bound as above. A sentence of hers reads it back only when it holds an action word or says "your memory" (`readsBack`). Drop any of the three and a remark about her memory empties it | the word "memory" is the whole name and "clear" and "empty" are adjectives: "My memory is clear." holds both as a bag of words (MAN-9171, MAN-9204, MAN-9194) |
 | An action leaves her state only through `action-end.ts`; a take claims its row (`claimAction`) and holds its id (`carryOut`) before the door runs | a withdrawal, a lapse or a Clear in that window must not end an action a door is running |
 | A claimed row no take of this process carries ends `refused` with `may have gone through`, never `cancelled` or re-fired | the same word is never fired twice |
 | No timer ends a lapse: the next prepare, take or cancel does, and the page hides the card at the deadline it sets once | events, never a watchdog |
-| A target no line of his can name is refused at prepare (`canBeNamed`). Editing `ACTION_WORDS`, the not-significant words or the negators re-runs `.verify/kaylee-action-word.mjs` first | a card that can only lapse is a dead end on his panel |
+| A target no line of his can name is refused at prepare (`canBeNamed`). Editing `ACTION_WORDS`, `ACTION_TIER`, the not-significant words, the yes runs or the negators re-runs `.verify/kaylee-action-word.mjs` first | a card that can only lapse is a dead end on his panel |
 | A door never throws: a missing pin, a refused order and a thrown error each answer `refused` with a sentence that says what to do | `take_action` has decided the word was his; the house's answer is the news |
 | A showing that fires a dispatcher verb or a resume runs on a scratch server over a copied auth database and a scratch `DISPATCHER_HOME` (`.verify/kaylee-eyes-scratch.sh`); no relayed record is written to the live store by a builder | kaylee--press: no fake operator quote in the live store |
 | A fixture clip is written once, only when its file is absent, one `gemini-3.8-flash-lite-tts` call each (`.verify/kaylee-clip.mjs`); no probe loops a press | the Gemini budget |
@@ -19013,3 +19016,109 @@ measured 2026-10-29 by chain chain-kaylee-memory-first-remember-20261029-090331-
 probe-key: 9bad140c915340264e786e845c2601c8ca4705b5
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-bank-door.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-bank-db.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-verbs.mjs, /home/lyphe/.claude/docstore/schema/007_kaylee_repo.sql
+
+## INV-10174 — probe — `.verify/companion-send.mjs`, the sender's standing showing, still stages the borrowing this build deleted, and its `create` leg would run a Fable/Opus turn
+
+`.verify/companion-send.mjs`, the sender's standing showing, still stages the borrowing this build deleted, and its `create` leg would run a Fable/Opus turn
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/kaylee-chat-model/athena-probes/focus-borrow.sh
+echo "[probe exit $?]"
+# expect: `the door was handed model="fable" effort=undefined` (focus chat haiku/max) and `.verify/companion-send.mjs still asserts the borrowing: true` while the defect stands; # cured when the last line reads false (the leg names Haiku and asserts it)
+```
+
+measured 2026-10-29 by chain chain-kaylee-chat-model-20261029-111712-78ce, finding M1, MEDIUM
+probe-key: de89efb04131a18533a88163515c921c8edee0a5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-send.mjs
+
+## INV-10175 — probe — `.verify/kaylee-model-choice.mjs` says the hosts it starts are ended before it exits; nothing in it ends one
+
+`.verify/kaylee-model-choice.mjs` says the hosts it starts are ended before it exits; nothing in it ends one
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && echo "header promises the hosts are ended: $(grep -c 'hosts the run started are ended before it exits' .verify/kaylee-model-choice.mjs) | lines in the file that end one: $(grep -c -E 'kill-session|killSession|\.abort\(|process\.kill|abortChatRun|closeHost|stopHost' .verify/kaylee-model-choice.mjs)"
+echo "[probe exit $?]"
+# expect: `header promises the hosts are ended: 1 | lines in the file that end one: 0` while the defect stands; cured when the second number is above 0 or the first is 0
+```
+
+measured 2026-10-29 by chain chain-kaylee-chat-model-20261029-111712-78ce, finding L1, LOW
+probe-key: 80105e164474f3aaa763e00b4c98423b4655983c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-model-choice.mjs
+
+## INV-10176 — probe — her tool text types facts that the house reads live: "Opus 5.5", "Fable 5.1", "the account default"
+
+her tool text types facts that the house reads live: "Opus 5.5", "Fable 5.1", "the account default"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && echo "generation numbers typed into her tool text: $(grep -c -E 'Opus 5\.5|Fable 5\.1' server/modules/companion/tools/draft-tools.ts) | the fallback list's reason for never typing one: $(grep -c 'cannot know and the CLI moves under it' server/modules/providers/list/claude/claude-model-options.ts)"
+echo "[probe exit $?]"
+# expect: `generation numbers typed into her tool text: 1 | the fallback list's reason for never typing one: 1` while the defect stands; cured when the first number is 0
+```
+
+measured 2026-10-29 by chain chain-kaylee-chat-model-20261029-111712-78ce, finding L2, LOW
+probe-key: 5f838af2cb601ee7a996f5bcef33e8fcb92b4971
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/draft-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/send-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-account-default-model.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-send.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-model-choice.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-whole.mjs
+
+## INV-10177 — probe — a press inside a plain-http card does not make that pane the front one; the palette, opened by keyboard, then acts on the other application
+
+a press inside a plain-http card does not make that pane the front one; the palette, opened by keyboard, then acts on the other application
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /tmp || exit 1
+timeout 170 node /home/lyphe/.claude/state/pipeline-reviews/https-embeds/athena-probes/front-pane.mjs 2>&1 | tail -4
+EOF
+bash "$D/p.sh"
+echo "[probe exit $?]"
+# expect: `after a press inside the RIGHT frame: front right`, `after a press inside the LEFT card: front right` and `palette "Open in a new tab" opened: https://eis1.tail8717cd.ts.net:8007/`; cured, the second reads `front left` and the tab is Cerberus's `http://eis1.tail8717cd.ts.net:8001/dashboard`
+```
+
+measured 2026-10-29 by chain chain-https-embeds-20261029-113010-159e, finding M1, MEDIUM
+probe-key: 81dca57f694875679efd425184c57c0dbfbcb43e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.env.example, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-10178 — probe — the documentation lives only in files the store exports; the rows that are the authority carry none of it, and tonight's export removes it
+
+the documentation lives only in files the store exports; the rows that are the authority carry none of it, and tonight's export removes it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+python3 -I /home/lyphe/.claude/state/pipeline-reviews/https-embeds/athena-probes/docs-drift.py
+EOF
+bash "$D/p.sh"
+echo "[probe exit $?]"
+# expect: line 1 is the export header, then four lines reading `file section names the change: True; the row (the authority) names it: False`; cured, the last clause is True on all four
+```
+
+measured 2026-10-29 by chain chain-https-embeds-20261029-113010-159e, finding M2, MEDIUM
+probe-key: e779325fca0f5033119ae3eb3791cb2d0eac2a16
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.env.example, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-10179 — probe — a literal loopback registry row, or a loopback embed on a loopback page, becomes a card where the browser draws the frame
+
+a literal loopback registry row, or a loopback embed on a loopback page, becomes a card where the browser draws the frame
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+P=/home/lyphe/.claude/state/pipeline-reviews/https-embeds/athena-probes
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+node "$P/loopback-frame.mjs"
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$P/loopback-predicate.mts"
+EOF
+bash "$D/p.sh"
+echo "[probe exit $?]"
+# expect: browser lines `frame drawn (load fired)` for 127.0.0.1 and localhost and `blocked (no load in 6 s)` for the tailnet host; predicate lines `blocked=true` for all three; cured, the two loopback predicate lines read `blocked=false`
+```
+
+measured 2026-10-29 by chain chain-https-embeds-20261029-113010-159e, finding L1, LOW
+probe-key: 389984bf29b3c550a9838fd2575d17972c9ac5de
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.env.example, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts

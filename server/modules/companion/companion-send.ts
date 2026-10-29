@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import { projectsDb, relayedSendsDb, sessionsDb } from '@/modules/database/index.js';
-import { diagnoseProjectFolder, sessionsService } from '@/modules/providers/index.js';
+import { diagnoseProjectFolder, readAccountDefaultModelAlias, sessionsService } from '@/modules/providers/index.js';
+import type { ClaudeModelAlias } from '@/modules/providers/index.js';
 import { broadcastSessionUpserted, chatRunRegistry, runDetachedChatTurn, steerChatRun } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import type { CompanionDraft, CompanionOpenTarget, CompanionSessionRef } from '@/shared/companion-types.js';
@@ -23,6 +24,11 @@ import { sendOptionsFor, type ChatSendOptions } from './tools/send-options.js';
  *
  * WHAT A SEND IS. It runs as if he had typed it in that chat's composer: the chat's own model, effort and permission
  * mode, his tool rules read now, the chat's name as the notification's summary (`sendOptionsFor`).
+ *   - THE MODEL is hers to choose: `model` on the request (one of the house's names) replaces the chat's own for this turn,
+ *     and the turn records it as the chat's from then on. Left out, an existing chat keeps its own and a NEW chat runs on the
+ *     account's default model (`readAccountDefaultModelAlias`) — named outright, because a turn sent with no model runs on the
+ *     runtime's own default (opus), not the account's. A new chat borrows nothing from the chat she was last on. A model
+ *     cannot ride a brief folded into a running turn, so a send that names one to a working chat is refused before anything goes;
  *   - a chat that is IDLE gets a turn, through `runDetachedChatTurn` (the scheduled messages' door). Its `beforeRun`
  *     hook writes the echo onto the run's stream before the provider starts; this verb waits only for the run to have
  *     STARTED (the hook ran, or the door refused), never for the turn;
@@ -57,6 +63,8 @@ export type DraftSendRequest = {
   chat?: CompanionSessionRef;
   /** The new chat the caller says the draft starts (`create_session`): the draft must be for a new chat in that project. */
   newChat?: { projectPath: string; title: string };
+  /** The model she chose for the turn (`send_to_session`, `create_session`). Left out: an existing chat keeps its own, a new chat runs on the account's default. */
+  model?: ClaudeModelAlias;
 };
 
 /** What `sendDraft` answers: `started` (a turn), `folded` (into the running turn) or `refused`, with the sentence to say or to show. Consumed by `tools/draft-tools.ts` and `companion.service.ts`. */
@@ -149,7 +157,7 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
     deps.openOnFloor({ kind: 'chat', sessionId: chat.sessionId });
   }
 
-  async function sendToChat(chat: CompanionSessionRef, draft: CompanionDraft, words: string, mode: 'turn' | 'steer'): Promise<DraftSendOutcome> {
+  async function sendToChat(chat: CompanionSessionRef, draft: CompanionDraft, words: string, mode: 'turn' | 'steer', model: ClaudeModelAlias | undefined): Promise<DraftSendOutcome> {
     const row = sessionsDb.getSessionById(chat.sessionId);
     if (!row || row.isArchived) {
       return refused(`"${chat.name}" is no longer a chat he has (it was archived or deleted), so nothing was sent. Tell him, and ask which chat the brief is for.`);
@@ -158,8 +166,16 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
     const name = row.custom_name?.trim() || chat.name;
     const current: CompanionSessionRef = { ...chat, name };
 
+    // The house's model names are Claude's: another provider's chat cannot run on one, and a send never goes out on another model than she named.
+    if (model !== undefined && provider !== 'claude') {
+      return refused(`"${name}" is a ${provider} chat, and the model names are Claude's, so nothing was sent. The draft is still on his screen; send it without model.`);
+    }
     // A chat with a turn running takes the brief into it, whichever mode was asked.
     if (chatRunRegistry.isProcessing(chat.sessionId)) {
+      // A brief folded into a running turn cannot carry a model, and sending it on the chat's own model while she believes it went on hers is the silent send this refuses.
+      if (model !== undefined) {
+        return refused(`"${name}" is mid-turn, so the brief would fold into that turn, and a running turn cannot change its model: it keeps the one it has. Nothing was sent and the draft is still on his screen. Send it again without model to fold it in, or wait for the turn to end and send it with the model.`);
+      }
       const folded = await steerChatRun(chat.sessionId, words, echoOf(chat.sessionId, provider, words), { runtime });
       if (folded === 'folded') {
         recordRelayed(chat.sessionId, 'steer', words);
@@ -170,15 +186,16 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
       }
     }
 
-    const started = await startTurn(chat.sessionId, provider, words, sendOptionsFor(userId, chat.sessionId, provider));
+    const started = await startTurn(chat.sessionId, provider, words, sendOptionsFor(userId, chat.sessionId, provider, { model }));
     if (!started.started) {
       return refused(`"${name}" did not take the brief${started.error ? `: ${started.error}` : ''} The draft is still on his screen; send it again in a moment.`);
     }
     afterSend(current, draft);
-    return { outcome: 'started', sentence: mode === 'steer' ? `${name} was not working, so the brief started a new turn there.` : `Started a new turn in ${name}.` };
+    const onModel = model === undefined ? '' : `, on ${model}`;
+    return { outcome: 'started', sentence: mode === 'steer' ? `${name} was not working, so the brief started a new turn there${onModel}.` : `Started a new turn in ${name}${onModel}.` };
   }
 
-  async function sendToNewChat(target: { projectPath: string; projectName: string }, draft: CompanionDraft, words: string, title: string | null): Promise<DraftSendOutcome> {
+  async function sendToNewChat(target: { projectPath: string; projectName: string }, draft: CompanionDraft, words: string, title: string | null, chosen: ClaudeModelAlias | undefined): Promise<DraftSendOutcome> {
     // A project whose folder is gone would take the first message and have the launch refused after the send's hook has run:
     // "started" for a chat that cannot. The test is the run's own pre-flight, skipped as it is skipped for a node's project
     // (its folder lives on the node), and it runs before anything is made so a refusal leaves no chat and keeps the draft.
@@ -195,15 +212,17 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
       console.error('[Companion] a new chat was made but could not be announced', { sessionId: created.sessionId, error });
     });
 
-    // A chat made just now has no choices of its own: it borrows the focus chat's model and the latest permission mode.
-    const options = sendOptionsFor(userId, null, 'claude', { focusSessionId: store.readState().focus?.sessionId ?? null, name: title ?? created.sessionName });
+    // A chat made just now has no choices of its own: the model she chose, else the account's default (named here, not left to the
+    // runtime, whose own default is opus), and the latest permission mode. Nothing is borrowed from the chat she was last on.
+    const model = chosen ?? (await readAccountDefaultModelAlias()) ?? undefined;
+    const options = sendOptionsFor(userId, null, 'claude', { model, newChatName: title ?? created.sessionName });
     const started = await startTurn(created.sessionId, 'claude', words, options);
     if (!started.started) {
       return refused(`The chat was made in ${target.projectName} but its first message did not start${started.error ? `: ${started.error}` : '.'} The draft is still on his screen.`);
     }
     const name = title ?? created.sessionName;
     afterSend({ sessionId: created.sessionId, name, project: target.projectName }, draft);
-    return { outcome: 'started', sentence: `Started a new chat "${name}" in ${target.projectName}.` };
+    return { outcome: 'started', sentence: `Started a new chat "${name}" in ${target.projectName}${model === undefined ? '' : `, on ${model}`}.` };
   }
 
   // The draft goes out once: she calls tools in parallel and two pages can press Send, and a second call that read the
@@ -228,8 +247,8 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
     }
 
     return target.kind === 'session'
-      ? sendToChat(target.session, draft, words, request.mode)
-      : sendToNewChat(target, draft, words, request.newChat?.title ?? null);
+      ? sendToChat(target.session, draft, words, request.mode, request.model)
+      : sendToNewChat(target, draft, words, request.newChat?.title ?? null, request.model);
   }
 
   return async function sendDraft(request) {

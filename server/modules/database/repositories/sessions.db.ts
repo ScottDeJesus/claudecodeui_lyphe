@@ -528,27 +528,6 @@ export const sessionsDb = {
     return row?.permission_mode ?? null;
   },
 
-  /**
-   * The model and effort of the most recently active session that has a model recorded, or `null` when no
-   * session does. Read by the companion's send for a NEW chat that has no focus chat to take its choice from: a
-   * chat with none recorded runs on the catalog's default, which is not what he has been working with. Ordered like
-   * `latestPermissionMode`, for the same reason. `provider` narrows it to that provider's chats: a model id is a
-   * provider's own word, and a Codex model handed to a Claude chat fails its first turn.
-   */
-  latestModelChoice(provider?: string): { model: string; effort: string | null } | null {
-    const db = getConnection();
-    const row = db
-      .prepare(
-        `SELECT model, effort FROM sessions
-         WHERE model IS NOT NULL AND model <> '' AND (? IS NULL OR provider = ?)
-         ORDER BY julianday(COALESCE(updated_at, created_at)) DESC, rowid DESC
-         LIMIT 1`
-      )
-      .get(provider ?? null, provider ?? null) as { model: string; effort: string | null } | undefined;
-
-    return row ?? null;
-  },
-
   updateSessionCustomName(sessionId: string, customName: string): void {
     const db = getConnection();
     db.prepare(

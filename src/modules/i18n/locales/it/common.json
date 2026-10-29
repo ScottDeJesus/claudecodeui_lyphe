@@ -381,7 +381,8 @@
       "choose": "Scegli una pagina…",
       "custom": "Digita un indirizzo…",
       "open": "Apri la pagina in una nuova scheda",
-      "rejected": "Non è un indirizzo http:// o https://"
+      "rejected": "Non è un indirizzo http:// o https://",
+      "plainHttpBlocked": "Questa pagina è servita in http semplice, e un browser non mostra una pagina http dentro questa app finché è aperta in https. Usa il link Apri per vederla in una scheda a parte."
     },
     "notes": {
       "title": "Note"
@@ -467,7 +468,9 @@
     },
     "appearanceLight": "Aspetto chiaro",
     "appearanceDark": "Aspetto scuro",
-    "divider": "Ridimensiona le applicazioni"
+    "divider": "Ridimensiona le applicazioni",
+    "mixedContentTitle": "Questa app non può essere mostrata qui",
+    "mixedContentMessage": "{{name}} è servita in http semplice, e un browser non mostra una pagina http dentro questa app finché è aperta in https."
   },
   "chatHost": {
     "panelLabel": "Chat flottante",

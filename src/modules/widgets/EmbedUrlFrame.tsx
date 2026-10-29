@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { WidgetErrorCard } from '@/modules/widgets/WidgetErrorCard';
 import { isForeignOrigin } from '@/modules/widgets/docspaceOrigin';
 import { resolveEmbedUrl } from '@/modules/widgets/embedUrl';
 import type { EmbedUrlRef } from '@/shared/types';
+import { isBlockedAsMixedContent } from '@/shared/utils';
 
 /**
  * The THIRD fence: any address at all, drawn in a frame in the transcript.
@@ -38,10 +40,12 @@ import type { EmbedUrlRef } from '@/shared/types';
  * an address onto whatever host reached this page, which is the same trick `resolveDocSpaceOrigin`
  * plays for the same reason.
  *
- * MIXED CONTENT IS THE OTHER SILENT FAILURE and it has the same answer: an `http://` address inside
- * a page served over `https://` is blocked by the browser before this element sees anything. The
- * app cannot fix that from here — it is the browser's rule, correctly applied — and the link out is
- * again what rescues the reader.
+ * MIXED CONTENT IS THE OTHER SILENT FAILURE, and the one that can be told apart before it happens:
+ * an `http://` address inside a page served over `https://` is blocked by the browser before this
+ * element sees anything, and both schemes are known here before the element exists. So no frame is
+ * drawn for it — a card that says why stands in its place, and the link out in the header (which
+ * wraps this component in both homes) is what carries the reader to the page. A blank frame says
+ * nothing; the browser's rule is correct and the card is how this app answers it.
  */
 
 /**
@@ -92,6 +96,7 @@ export function EmbedUrlFrame({
   framed,
   fill,
 }: EmbedUrlRef & { framed?: boolean; fill?: boolean }) {
+  const { t } = useTranslation();
   // A LOOPBACK ADDRESS IS REWRITTEN ONTO THE READER'S OWN HOST before anything else looks at it.
   // The frame's `src` is resolved by the reader's browser, so `127.0.0.1` names the READER'S machine
   // — right only when they are sitting at the box, and an empty frame on the phone over Tailscale,
@@ -114,6 +119,13 @@ export function EmbedUrlFrame({
 
   if (!foreign) {
     return <WidgetErrorCard reason="an embedded address must not be this app's own origin" />;
+  }
+
+  // A plain-http address cannot be framed by an https page: the browser blocks it silently and the
+  // card would be a blank rectangle. The page's own protocol is read here, not at module load,
+  // because it is a fact about the tab this element is in.
+  if (isBlockedAsMixedContent(src, window.location.protocol)) {
+    return <WidgetErrorCard reason={t('gutters.embed.plainHttpBlocked')} />;
   }
 
   return (

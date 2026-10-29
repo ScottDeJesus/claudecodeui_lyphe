@@ -380,7 +380,8 @@
       "choose": "Bir sayfa seç…",
       "custom": "Adres yaz…",
       "open": "Sayfayı yeni sekmede aç",
-      "rejected": "Bu bir http:// veya https:// adresi değil"
+      "rejected": "Bu bir http:// veya https:// adresi değil",
+      "plainHttpBlocked": "Bu sayfa düz http ile sunuluyor ve bu uygulama https üzerinden açıkken tarayıcı bir http sayfasını uygulamanın içinde göstermez. Kendi sekmesinde görmek için Aç bağlantısını kullanın."
     },
     "notes": {
       "title": "Notlar"
@@ -466,7 +467,9 @@
     },
     "appearanceLight": "Açık görünüm",
     "appearanceDark": "Koyu görünüm",
-    "divider": "Uygulamaları yeniden boyutlandır"
+    "divider": "Uygulamaları yeniden boyutlandır",
+    "mixedContentTitle": "Bu uygulama burada gösterilemiyor",
+    "mixedContentMessage": "{{name}} düz http ile sunuluyor ve bu uygulama https üzerinden açıkken tarayıcı bir http sayfasını uygulamanın içinde göstermez."
   },
   "chatHost": {
     "panelLabel": "Yüzen sohbet",

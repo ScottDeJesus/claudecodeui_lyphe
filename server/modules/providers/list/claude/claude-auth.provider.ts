@@ -7,7 +7,7 @@ import { commandRuns } from '@/modules/providers/shared/auth/command-runs.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import type { IProviderAuth } from '@/shared/interfaces.js';
 import type { ProviderAuthStatus } from '@/shared/types.js';
-import { readObjectRecord, readOptionalString } from '@/shared/utils.js';
+import { claudeConfigDir, readObjectRecord, readOptionalString } from '@/shared/utils.js';
 
 type ClaudeCredentialsStatus = {
   authenticated: boolean;
@@ -19,9 +19,6 @@ type ClaudeCredentialsStatus = {
 const hasErrorCode = (error: unknown, code: string): boolean => (
   error instanceof Error && 'code' in error && error.code === code
 );
-
-/** Where Claude Code keeps its settings and login: `CLAUDE_CONFIG_DIR` when set, else `~/.claude`. */
-const claudeConfigDir = (): string => process.env.CLAUDE_CONFIG_DIR?.trim() || path.join(os.homedir(), '.claude');
 
 /**
  * The account door names the identity in `~/.claude.json` and assumes the default config dir. With

@@ -1,6 +1,7 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 
+import { CLAUDE_MODEL_VALUE_BY_ALIAS, type ClaudeModelAlias } from '@/modules/providers/index.js';
 import type { CompanionDraftTarget, CompanionNote, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
 import { guardedToolResult, textResult, type ToolTextResult } from '@/shared/tool-text-result.js';
 
@@ -24,6 +25,10 @@ import { resolveChat, resolveProject } from './house-reads.js';
  * So the draft is replaced whole, never patched, and he sees the very words that will go. The sending itself is
  * `deps.sendDraft` (`companion-send.ts`), the same verb as the panel's Send: these two tools only name what they
  * mean to send and say what happened. A mismatch is refused, and the refusal names the draft.
+ *
+ * THE MODEL is hers to choose when she opens a chat or sends a turn: the optional `model` of both is one of the house's
+ * names (the keys of the provider's alias table, never a list of its own). Left out, a new chat runs on the account's default
+ * and an existing chat keeps its own; what the sender does with it is `companion-send.ts`'s.
  *
  * THE WALK'S CURSOR lives in the store, because her conversation's hold on it does not survive her own compaction or a turn
  * to another chat: `walk` carries the cursor, the store holds it, and `<state>` restates it after a compaction.
@@ -62,6 +67,18 @@ const sentText = z
   .min(1)
   .refine((text) => characterCount(text) <= DRAFT_TEXT_MAX, `The text is over ${DRAFT_TEXT_MAX} characters; the draft cannot be that long.`)
   .describe('The draft\'s text exactly as update_draft last stored it. A text that differs from the draft is refused, and the refusal shows the draft.');
+
+/** The house's model names, the keys of the alias table the pickers' stored values come from: the choices of `model`. */
+const MODEL_NAMES = Object.keys(CLAUDE_MODEL_VALUE_BY_ALIAS) as [ClaudeModelAlias, ...ClaudeModelAlias[]];
+
+/**
+ * What each model name is for, in her terms: the rule the operator ruled (doers on opus, judgment work on the stronger model).
+ * Families only, never a generation or which family the account default is: the CLI moves a generation under a list written
+ * here (the picker's fallback rows say the same) and the operator moves his default, so the text names the role and nothing
+ * a release or a setting can make false.
+ */
+const MODEL_CHOICES =
+  'opus: for doers, the chats that execute your detailed briefs (fixes, checks, page edits). fable: the stronger model, for judgment work (design, review, whole-flow reasoning). sonnet. haiku: when he names it, as for a probe.';
 
 /** Where `update_draft` was asked to aim, resolved: the target to store, the chat it names (none for a new chat) and how the answer names it. */
 type DraftAim = { target: CompanionDraftTarget; chat: CompanionSessionRef | null; label: string };
@@ -214,12 +231,12 @@ const answerSend = (deps: CompanionToolDeps, sent: { outcome: string; sentence: 
  * `send_to_session`: sends the draft to the chat she names, as `mode` asks. The draft must be for that chat and the
  * text must equal it; a chat that is working takes the brief into its running turn whichever mode was asked.
  */
-function sendToSession(deps: CompanionToolDeps, args: { session: string; text: string; mode: 'turn' | 'steer' }): Promise<ToolTextResult> {
+function sendToSession(deps: CompanionToolDeps, args: { session: string; text: string; mode: 'turn' | 'steer'; model?: ClaudeModelAlias }): Promise<ToolTextResult> {
   return guardedToolResult('send_to_session', 'send the brief', async () => {
     const found = resolveChat(args.session);
     if (!found.ok) return deps.refuse(found.sentence);
     const { chat } = found;
-    return deps.withActivity('drafting', chat, null, async () => answerSend(deps, await deps.sendDraft({ mode: args.mode, text: args.text, chat })));
+    return deps.withActivity('drafting', chat, null, async () => answerSend(deps, await deps.sendDraft({ mode: args.mode, text: args.text, chat, model: args.model })));
   });
 }
 
@@ -227,12 +244,12 @@ function sendToSession(deps: CompanionToolDeps, args: { session: string; text: s
  * `create_session`: starts a new chat in `project` with the draft as its first message, named `title`. The draft must be
  * for a new chat in that project and the text must equal it. The new chat becomes her focus and opens on his screen.
  */
-function createSession(deps: CompanionToolDeps, args: { project: string; text: string; title: string }): Promise<ToolTextResult> {
+function createSession(deps: CompanionToolDeps, args: { project: string; text: string; title: string; model?: ClaudeModelAlias }): Promise<ToolTextResult> {
   return guardedToolResult('create_session', 'start the chat', async () => {
     const found = resolveProject(args.project);
     if (!found.ok) return deps.refuse(found.sentence);
     const newChat = { projectPath: found.project.path, title: args.title };
-    return deps.withActivity('drafting', null, null, async () => answerSend(deps, await deps.sendDraft({ mode: 'turn', text: args.text, newChat })));
+    return deps.withActivity('drafting', null, null, async () => answerSend(deps, await deps.sendDraft({ mode: 'turn', text: args.text, newChat, model: args.model })));
   });
 }
 
@@ -301,6 +318,10 @@ export function draftTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
         session: z.string().trim().min(1).max(200).describe('The chat the draft is for, by its id or its whole name. The draft must be addressed to it.'),
         text: sentText,
         mode: z.enum(['turn', 'steer']).describe('turn starts a turn; steer folds the brief into the turn the chat is running now. A chat that is working takes it as a steer whichever you say; a steer to an idle chat starts a turn.'),
+        model: z
+          .enum(MODEL_NAMES)
+          .optional()
+          .describe(`The model this turn runs on. ${MODEL_CHOICES} Left out, the chat keeps the model it has. Given, the turn runs on it and the chat keeps it from then on. A chat that is working cannot take one, since the brief folds into the turn it is running: the send is refused and nothing goes out, so send without model or wait for the turn to end.`),
       },
       (args) => sendToSession(deps, args)
     ),
@@ -317,6 +338,10 @@ export function draftTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
           .max(CHAT_TITLE_MAX)
           .regex(/^[^\r\n\u2028\u2029]+$/, 'A title is one line: no line break.')
           .describe(`The new chat's name in his list: a few words, up to ${CHAT_TITLE_MAX} characters.`),
+        model: z
+          .enum(MODEL_NAMES)
+          .optional()
+          .describe(`The model the new chat runs on, and keeps from then on. ${MODEL_CHOICES} Left out, the new chat runs on the account default.`),
       },
       (args) => createSession(deps, args)
     ),

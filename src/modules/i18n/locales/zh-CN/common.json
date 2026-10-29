@@ -379,7 +379,8 @@
       "choose": "选择页面…",
       "custom": "输入地址…",
       "open": "在新标签页中打开页面",
-      "rejected": "这不是 http:// 或 https:// 地址"
+      "rejected": "这不是 http:// 或 https:// 地址",
+      "plainHttpBlocked": "此页面通过未加密的 http 提供，而本应用通过 https 打开时，浏览器不会在应用内显示 http 页面。请使用“打开”链接在单独的标签页中查看。"
     },
     "notes": {
       "title": "笔记"
@@ -463,7 +464,9 @@
     },
     "appearanceLight": "浅色外观",
     "appearanceDark": "深色外观",
-    "divider": "调整应用大小"
+    "divider": "调整应用大小",
+    "mixedContentTitle": "此应用无法在此处显示",
+    "mixedContentMessage": "{{name}} 通过未加密的 http 提供，而本应用通过 https 打开时，浏览器不会在应用内显示 http 页面。"
   },
   "chatHost": {
     "panelLabel": "悬浮聊天",

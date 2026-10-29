@@ -14,23 +14,25 @@ import type { CompanionToolDeps } from '../tools/companion-tools.js';
 
 import { carryOut, endLapsedAction, isCarryingOut, withdrawStandingAction } from './action-end.js';
 import { fireAction } from './action-doors.js';
-import { clockOf, doneOf, NO_FLOOR, SAY_VERB } from './action-prompts.js';
+import { clockOf, doneOf, nextStepFor, NO_FLOOR, SAY_VERB } from './action-prompts.js';
 import { prepareRecipe, type PrepareInput } from './action-recipe.js';
-import { ACTION_WORDS, checkHisWord } from './action-word.js';
+import { ACTION_TIER, actionsOfTier, checkHisWord } from './action-word.js';
 
 /**
  * Her hands: `prepare_action`, `take_action` and `cancel_action`. She may do anything in the house he asks for, and none of it on
- * her own judgment (ruling 3: "only on my explicit spoken word for that specific card, never on her own judgment, and never from a
- * bare yes"; "each one said back to me before it fires"). The SERVER holds that line, in two steps:
+ * her own judgment (ruling 3, re-ruled 2026-10-29: "only on my explicit spoken word for that specific card, never on her own judgment";
+ * "My 'yes' should count"). Two actions are harmless (open, close_followup: `ACTION_TIER`) and fire on his first word, with no
+ * read-back; the eleven others keep "the full read-back-then-word ceremony". The SERVER holds that line, in two steps:
  *
  *   1. `prepare_action` resolves the target, checks the action can be done now, PINS what it acts on (`action-recipe.ts`), checks
  *      that every line it carries is one of his spoken lines of the last 30 minutes, records the action in `companion_actions` and
- *      puts it on her panel as the ONE pending action (`store.setPending`), replacing one already standing. It answers what she
- *      reads back and the words he must say. It lapses five minutes on.
- *   2. She says it back. Only then, `take_action(said)` fires it, and only when `checkHisWord` (`action-word.ts`) answers ok on
- *      the rows of her log since the prepare: his line was SPOKEN after the card went up, she read it back to him first, it names the
- *      target and says the action's word, and it is an order. Otherwise it is refused with the sentence that says what is missing
- *      and the action stays on his panel, its row keeping that sentence as its `answer`. `cancel_action` takes it down.
+ *      puts it on her panel as the ONE pending action (`store.setPending`), replacing one already standing. It answers what she does
+ *      next, by tier (`nextStepFor`), and the words that fire it. It lapses five minutes on.
+ *   2. `take_action(said)` fires it, only when `checkHisWord` (`action-word.ts`) answers ok on the rows of her log since the prepare: his
+ *      line was SPOKEN, it is his yes or it names the target and says the action's word, and it is an order; and for a FULL action she
+ *      read it back to him first. A LIGHT action also fires on the request that led to the prepare, his last line before it
+ *      (`heardBefore`). Otherwise it is refused with the sentence that says what is missing and the action stays on his panel, its row
+ *      keeping that sentence as its `answer`. `cancel_action` takes it down.
  *
  * A take fires through the house's own door (`action-doors.ts`) carrying kaylee--press's record of his word: who, when, what he
  * said, which press of his it was. It CLAIMS the action's row first (the firing line is written on it), and from then to the end
@@ -57,9 +59,6 @@ const SOURCE: Readonly<Partial<Record<CompanionActionKind, string>>> = {
 
 /** The refusal while a take is carrying the action out: another prepare, take or cancel waits for its answer. */
 const BEING_CARRIED_OUT = 'The action on his panel is being carried out now; wait for its answer.';
-
-/** The opening of `checkHisWord`'s refusal of a line that is not one he spoke after the card went up; the take adds the line that is closest to it. */
-const NOT_HIS_LINE = 'That is not a line he spoke after the card went up.';
 
 /** Whether a take of this process is carrying out the action that stands on his panel (after settling a lapse and any orphan). */
 function standingIsOut(deps: CompanionToolDeps): boolean {
@@ -109,12 +108,10 @@ function prepareAction(deps: CompanionToolDeps, input: PrepareInput): Promise<To
     }
 
     const { action, target, say } = pending;
-    const first = ACTION_WORDS[action][0];
     const replacing = replaced === null ? '' : ` That replaced "${replaced.say}", which was waiting.`;
     return textResult(
-      `On his panel, waiting for his word: ${SAY_VERB[action].toLowerCase()} ${target.spoken}. Read it back to him: ${readBack} `
-      + `It fires only when he says aloud "${say}", or words of his own naming ${target.spoken} and saying ${first}. `
-      + `It lapses at ${clockOf(pending.expiresAt)}.${replacing}`,
+      `On his panel, waiting for his word: ${SAY_VERB[action].toLowerCase()} ${target.spoken}. ${nextStepFor(action, target, say, readBack)} `
+      + `A line he typed never fires it. It lapses at ${clockOf(pending.expiresAt)}.${replacing}`,
     );
   });
 }
@@ -142,13 +139,15 @@ function systemLine(standing: CompanionStoredPending, outcome: 'took' | 'already
 }
 
 /**
- * A refusal of a line that is not one he spoke after the card went up, with his newest spoken line since then added: if she passed it
- * a little differently from how it is logged (a lower-cased word, a dropped full stop), this is the text to pass.
+ * The rows of her log the check of his word reads for the standing action: every line since the prepare and, for a LIGHT action, his last
+ * line before it, the request that led to the prepare (`heardBefore`: null once an action has fired on it). A FULL action reads none of
+ * the lines before its prepare.
  */
-function withNewestSpokenLine(sentence: string, lines: ReadonlyArray<{ role: string; via: string | null; text: string }>): string {
-  if (!sentence.startsWith(NOT_HIS_LINE)) return sentence;
-  const newest = lines.filter((row) => row.role === 'operator' && row.via === 'spoken').at(-1);
-  return newest === undefined ? sentence : `${sentence} His newest spoken line since then is logged as "${newest.text}"; if that is what he meant, pass it to take_action exactly so.`;
+function heardForAction(userId: number, standing: CompanionStoredPending): ReturnType<typeof companionDb.heardSince> {
+  const since = companionDb.heardSince(userId, standing.preparedAt);
+  if (ACTION_TIER[standing.action] !== 'light') return since;
+  const request = companionDb.heardBefore(userId, standing.preparedAt);
+  return request === null ? since : [request, ...since];
 }
 
 function takeAction(deps: CompanionToolDeps, said: string): Promise<ToolTextResult> {
@@ -158,12 +157,12 @@ function takeAction(deps: CompanionToolDeps, said: string): Promise<ToolTextResu
     const standing = lapsed ?? deps.store.readState().pending;
     if (lapsed === null && standing !== null && isCarryingOut(deps.userId, standing.id)) return deps.refuse(BEING_CARRIED_OUT);
     // A lapsed action reads no lines: the check answers the lapse first, with the sentence that says when.
-    const lines = standing === null || lapsed !== null ? [] : companionDb.heardSince(deps.userId, standing.preparedAt);
+    const lines = standing === null || lapsed !== null ? [] : heardForAction(deps.userId, standing);
     const verdict = checkHisWord({ pending: standing, said, now: new Date(nowMs).toISOString(), lines });
     if (!verdict.ok) {
       // The row says why his line did not fire it, as her answer does.
       if (standing !== null && lapsed === null) companionDb.noteRefusal(deps.userId, standing.id, verdict.sentence);
-      return deps.refuse(withNewestSpokenLine(verdict.sentence, lines));
+      return deps.refuse(verdict.sentence);
     }
     // `checkHisWord` refuses a take with nothing pending, so a pass here means an action stands; the check is for the type.
     if (standing === null) throw new Error('The check of his word passed a take with nothing pending.');
@@ -202,6 +201,13 @@ function cancelAction(deps: CompanionToolDeps): Promise<ToolTextResult> {
   });
 }
 
+/**
+ * The `said` field of `take_action`, in the prompt's register: his newest spoken line, as logged. For the eleven FULL actions it follows your
+ * read-back and is his yes or the line that names the card and says the action; for the LIGHT ones (open, close_followup) it may also
+ * be the request he made just before you prepared.
+ */
+const SAID_DESCRIPTION = `His newest spoken line, exactly as logged: his yes ("Yes.", "Go ahead.") or a line that names the card on his panel and says the action. For ${actionsOfTier('full').join(', ')}, say it back to him in plain words first and pass the line he says after that. For ${actionsOfTier('light').join(', ')} no read-back is needed: pass the request he made just before you prepared, or his first spoken yes. Never a line you wrote and never a line he typed. The server checks the line and refuses what does not count, so when he spoke a line that names the card and plausibly says the action (a transcript may hear "queue" as "cue"), pass it as logged rather than asking him to say it again.`;
+
 /** One line of his, carried: the field the two arrays of lines share. */
 const spokenLines = z.array(z.string().trim().min(1).max(8000)).min(1).max(20);
 
@@ -225,7 +231,7 @@ export function handsTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
     tool(
       'take_action',
       toolLine('take_action'),
-      { said: z.string().trim().min(1).max(8000).describe('His spoken line that names the action on his panel, exactly as logged, after you read it back to him. Never a line you wrote and never a line he typed. The server checks the line against the card and refuses what does not count, so when he spoke a line that names the card and plausibly says the action (a transcript may hear "queue" as "cue"), pass it as logged rather than asking him to say it again.') },
+      { said: z.string().trim().min(1).max(8000).describe(SAID_DESCRIPTION) },
       (args) => takeAction(deps, args.said),
     ),
     tool('cancel_action', toolLine('cancel_action'), {}, () => cancelAction(deps)),

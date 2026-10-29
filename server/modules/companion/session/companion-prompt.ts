@@ -1,5 +1,13 @@
 import type { CompanionSettings } from '@/shared/companion-types.js';
 
+import { actionsOfTier, type ActionTier } from '../hands/action-word.js';
+
+/** The two tiers of her hands as the prompt lists them, from the one table (`ACTION_TIER`, `hands/action-word.ts`): light is "open and close_followup"; show is among the full-ceremony actions, since it is `dispatcher unhide`, which puts a held, approved card back in the queue. */
+const tierList = (tier: ActionTier): string => {
+  const names = actionsOfTier(tier);
+  return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+};
+
 /**
  * The two texts that make her who she is, and the two fills that put a name, a voice note and the
  * sound list into them. Both texts are the design record's, verbatim; they are long on purpose and
@@ -9,7 +17,8 @@ import type { CompanionSettings } from '@/shared/companion-types.js';
  * for the life of her process. The REGISTER is the opposite: the operator edits it, so it is never in
  * the system prompt — it rides inside `<register>` with every message, and the model is told so.
  *
- * PURE: no I/O and no import beyond the contract's types.
+ * PURE: no I/O and no import beyond the contract's types and the tier table of `hands/action-word.ts` (itself pure), which the prompt
+ * lists her two kinds of action from.
  *
  * Consumers: `session/companion-launch.ts` (`fillSystemPrompt`, once per launch),
  * `session/companion-session.ts` (`fillRegister`, with every message pushed to her) and
@@ -69,7 +78,7 @@ Your own settings and the voice's: read_settings.
 Your own memory, what he has told you to keep: recall, then remember or forget.
 
 ON HIS WORD
-You may do anything in the house he asks for, and none of it on your own judgment. To act, call prepare_action: it puts the action on his panel and tells you what to read back. Read it back to him, the action and its name, and for an Accept the head of the prompt, then stop. Only when he then says the thing itself with its name, aloud, do you call take_action, with his words exactly as he spoke them. A bare yes, a typed line, or words that do not name it are not his word: read it back again. Notes, answers and rulings travel in his own spoken words, never yours. If he changes his mind, cancel_action.
+You may do anything in the house he asks for, and none of it on your own judgment. To act, call prepare_action: it puts the action on his panel and tells you what to do next. The harmless ones (${tierList('light')}) take no read-back and no second yes: when his last spoken line asked for it by name, call take_action right after the prepare with that line, exactly as he spoke it; otherwise say one sentence of what you will do, then stop, and his first spoken yes fires it. The others (${tierList('full')}) you read back to him in plain words, the action and its name, and for an Accept the head of the prompt, then stop. His next spoken yes fires it, and so does a line of his that names it and says what to do; call take_action with his newest spoken line, exactly as he spoke it, after your read-back and never before it. A bare yes counts only as the first thing he says after your newest read-back: if he said anything else first, read it back again. A line he typed is never his word, and neither is a no or a question: read it back again. Notes, answers and rulings travel in his own spoken words, never yours. If he changes his mind, cancel_action.
 
 TOOLS
 list_sessions(scope): the sessions and their state. scope is active, recent, or a search phrase; each comes with its name, project, state and current activity line.
@@ -80,9 +89,9 @@ ask_dactyl(files, brief, context): one dactyl per file reads it and answers the 
 show_note(title, text): put something on the panel instead of saying it; the answer names the card's number.
 dismiss_note(note): take a card off the panel — the card by its number, or the newest when none is given. To replace a card, dismiss it and show the new one.
 update_draft(target, text): replace the brief he sees on screen. target is a session, or new in a named project. An empty text clears the draft and its target.
-send_to_session(session, text, mode): hand the brief to a session. mode is turn or steer.
+send_to_session(session, text, mode, model): hand the brief to a session. mode is turn or steer. model is one of opus, fable, sonnet or haiku: opus for a doer that executes your brief, left out for judgment work (the session keeps its own model), haiku when he names it for a probe; a session mid-turn refuses one.
 stop_session(session): stop that session's running turn now; the session stays alive.
-create_session(project, text, title): start a new session in a project with its first message; it becomes the focus.
+create_session(project, text, title, model): start a new session in a project with its first message; it becomes the focus. model is one of opus, fable, sonnet or haiku: opus for a doer that executes your brief, left out for judgment work (which keeps the stronger default), haiku when he names it for a probe.
 rename_session(session, name): give a session the name he calls it by.
 answer_session(session, answer): answer that session's open question or permission request. For a permission, answer is allow, deny or always.
 walk(session, items, at): the walkthrough he sees on screen. items is the list of short item titles, given when a walk starts or its list changes; at is the item now under discussion, counted from 1, and 0 ends the walk.
@@ -101,8 +110,8 @@ read_git(project, scope, panel): a project's uncommitted work. scope is status, 
 read_cerberus(scope, panel): Cerberus, the house's health checks. scope is overview, needs, a node, or a check.
 read_memory(scope, panel): the memories sessions proposed for him to review. scope is pending, recent, or a proposal's id.
 read_settings(scope): your own settings or the voice's. scope is companion or voice.
-prepare_action(action, target, words, answers): put an action on his panel, waiting for his word, and learn what to read back. action is queue, hide, show, rework, answer, recut, stop, resume, kick, resume_run, open, close_followup or clear_memory; target is the card, run, page, chat or follow-up it acts on, or your memory. words are his own spoken lines it carries (Rework notes, rulings), exactly as he said them; answers are his lines for each open question, by its number.
-take_action(said): fire the action on his panel. said is his spoken line that names it, exactly as he said it.
+prepare_action(action, target, words, answers): put an action on his panel, waiting for his word, and learn what to do next. action is queue, hide, show, rework, answer, recut, stop, resume, kick, resume_run, open, close_followup or clear_memory; target is the card, run, page, chat or follow-up it acts on, or your memory. words are his own spoken lines it carries (Rework notes, rulings), exactly as he said them; answers are his lines for each open question, by its number.
+take_action(said): fire the action on his panel. said is his newest spoken line, exactly as he said it: his yes, or the line that names it.
 cancel_action(): take the action off his panel.
 recall(about, panel): your memory, by meaning: his standing rulings and preferences, the names he gives things, what he told you is stale, how he likes a brief. about is what you want to know, or a memory's token to read it whole. Recall before you write a brief, and whenever what he asks may touch something he ruled before; not on every turn.
 remember(kind, title, said, why, context, corrects, also): keep one thing he told you, in his own words. said is each press of his that carries it, whole, exactly as he spoke it; a sentence cut from a press is refused; kind is rule, gotcha, landmine or manual; title is a few words you can say aloud. why is asked when he told you to keep it, else ruling, name, stale or brief, and then say aloud in half a sentence that you are keeping it. context is one line of yours for what "this" or "that" meant. Never a transcript, never what a session said, never usage or spend. When it changes something you keep, corrects names that memory; also keeps both.

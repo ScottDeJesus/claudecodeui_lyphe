@@ -185,7 +185,7 @@ The Claude picker's options, names, descriptions and effort levels come from the
 - **When it runs.** Once per installed CLI version, keyed on `readInstalledCliVersion()`, the `cli-version` module's one cached reading; the catalog never runs a `--version` of its own. The answer is kept at `~/.cloudcli/claude-model-catalog.json` beside the version it was read on (`CLOUDCLI_CLAUDE_MODEL_CATALOG_PATH` redirects it), so the dev server's handovers load it instead of respawning the CLI. A reading with no version ("not heard") is served whatever is kept under a real version and never spawns the CLI or replaces that record; only a CLI never named by path, with nothing keyed, is read once per process. `getSupportedModels` also sits on the send path (effort validation), so a caller waits at most 3 s for a read in flight and is otherwise served what is already known.
 - **The open tab.** The picker asked for its list once, at mount, so a CLI update left an open tab on the old list until the page was reloaded (2026-10-08: the CLI served Haiku 5.5 and the catalog file named it within seconds, while a tab listed only Haiku 4.5). `src/modules/chat/hooks/useReloadModelsOnCliChange.ts` re-reads `GET /api/providers/<provider>/models` for every provider when `useCliVersion().installed` moves from one version string to another — the app's one reading of the installed CLI, so it adds no poll. The first reading (null to a string) is not a move, and a null is "not heard". The answer is laid over the previous catalog (`{ ...previous, ...next }`), so a provider whose answer is unusable (a JSON error body) keeps its last good list.
 - **When the read fails.** The server serves the last good catalog on disk, whatever version it came from. With none, it serves `CLAUDE_FALLBACK_MODELS`, whose rows are named by family alone ("Opus", "Sonnet") and state no generation. One `[Claude models]` log line says which. A failed version is asked again after 10 minutes.
-- **What is offered** (`list/claude/claude-model-options.ts`). One row per family, the newest: the family's alias entry where the catalog has one, else its newest pinned id (Fable: its value is the id it runs, with or without the `[1m]` context suffix). `default` and the older pinned versions are dropped. A new family appears on its own, in the catalog's order. Ultracode is added exactly where the catalog's effort levels include `xhigh`. Values stay the ones stored sessions hold (`opus[1m]`, `fable`, `sonnet[1m]`, `haiku`), so every stored selection still matches an option.
+- **What is offered** (`list/claude/claude-model-options.ts`). One row per family, the newest: the family's alias entry where the catalog has one, else its newest pinned id (Fable: its value is the id it runs, with or without the `[1m]` context suffix). `default` and the older pinned versions are dropped. A new family appears on its own, in the catalog's order. Ultracode is added exactly where the catalog's effort levels include `xhigh`. Values stay the ones stored sessions hold (`opus[1m]`, `fable`, `sonnet[1m]`, `haiku`), so every stored selection still matches an option. They come from the exported table `CLAUDE_MODEL_VALUE_BY_ALIAS`, which the companion's `model` choice also reads (MAN-9201).
 - **Names carry the version.** The CLI words a name one of two ways: with the version in it ("Haiku 4.5"), or by family alone ("Opus") with the version opening the description ("Opus 5.5 · Best for everyday, complex tasks"). A name with a version is shown as the CLI gives it. A name with none, whose description opens with that name, a version (`5`, `5.5`, `4.8`) and ` · `, is shown as `<name> <version>` ("Opus 5.5") over the description that follows the separator, so the menu does not say the version twice. That name is the option's `label` and the `LABELS_BY_MODEL_ID` entry, so the menu, the composer chip and chat captions all read it, and it stays right with each release. Everything else stays as the catalog says it: a description that opens with another name ("Default (recommended)" over "Sonnet 5.5 · …") or a notice ("Newer version available · …"), an entry with no description, and the no-catalog fallback. The composer's model rows show the name only; the description is in the API's answer.
 - **Stored ids.** The definition carries `LABELS_BY_MODEL_ID`, the picker's name for every concrete id the catalog lists. `mergeProviderModels` passes it through, and `src/modules/chat/utils/modelLabels.ts` reads it before its own generation-parsing fallback, which names only ids the catalog does not list. So `claude-sonnet-5-5` reads "Sonnet 5.5"; `claude-sonnet-5`, which the 2.1.310 catalog does not list, reads "Sonnet 5" from the fallback (the family plus the id's own version).
 - **Proof.** `.verify/probe-claude-catalog-picker.mjs [run-name]` prints the API's answer (each option's label and description, `LABELS_BY_MODEL_ID`) and, from the DOM, the chip and every row of the open menu, desktop and phone, dark and light, with the console errors and failed responses; it writes the four screenshots and a JSON report to `.verify/out/<run-name>-*`. `.verify/probe-opus-55-selector.mjs` covers stored-turn captions and the resumed-session chip.
@@ -1030,9 +1030,45 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/service
 ## Read — `sessionsDb.latestPermissionMode(provider?)`
 - The most recent NON-NULL `permission_mode`, ordered by `julianday(COALESCE(updated_at, created_at)) DESC, rowid DESC`. why `julianday`: `updated_at` is written in two spellings (SQLite's `CURRENT_TIMESTAMP` and the watcher's ISO), which do not sort as text.
 - `provider` narrows it to that provider's chats: a mode is a provider's own word. `null` when no chat has one.
-- Caller: `tools/send-options.ts` (`sendOptionsFor`) for a NEW chat. For an existing chat the send reads that row's own `permission_mode` and leaves the option out when it holds none (MAN-9072 §Options). `latestModelChoice(provider?)` is its sibling for model and effort.
+- Caller: `tools/send-options.ts` (`sendOptionsFor`) for a NEW chat. For an existing chat the send reads that row's own `permission_mode` and leaves the option out when it holds none (MAN-9072 §Options).
 
 ## Proof
 `.verify/companion-permission-mode.mjs`: a scratch chat in `PROBE_PROJECT`, on Haiku through the composer's own chip; `sqlite3 -readonly` shows `permission_mode` NULL before the first send and the composer's mode after one typed send (Enter); the chat is deleted at the end. `.verify/companion-storage.ts` runs `latestPermissionMode` before and after a session is given one.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-models.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts
+
+## MAN-9201 — Claude model names — CLAUDE_MODEL_VALUE_BY_ALIAS, readAccountDefaultModelAlias and what a turn with no model runs on
+
+The house's model names and the account's default model. Code: `list/claude/claude-model-options.ts`, `list/claude/claude-account-default-model.ts`, exported through `providers/index.ts`.
+
+## `CLAUDE_MODEL_VALUE_BY_ALIAS` and `ClaudeModelAlias`
+| name (key) | value a chat runs on and stores |
+|---|---|
+| `opus` | `opus[1m]` |
+| `fable` | `fable` |
+| `sonnet` | `sonnet[1m]` |
+| `haiku` | `haiku` |
+- ONE table. The picker's rows (`buildClaudeModelsDefinition`, `fallbackOption`) take their stored value from it (MAN-7405); the companion offers its keys as the choices of `model` and `sendOptionsFor` maps the key to the value (MAN-9072 §`model`).
+- `ClaudeModelAlias` is `keyof typeof CLAUDE_MODEL_VALUE_BY_ALIAS`. `server/modules/companion` imports the table, the type and the reader from the barrel only.
+- A family the table does not name is offered under the catalog's own value.
+
+## What a turn with no model runs on
+- `claude-runtime.provider.js`: `sdkOptions.model = options.model || CLAUDE_DEFAULT_MODEL` (`opus[1m]`). A turn sent with no `model` runs on `opus[1m]`, NOT on the CLI's account default.
+- A caller that means "the account default" names it with `readAccountDefaultModelAlias()`.
+
+## `readAccountDefaultModelAlias(): Promise<ClaudeModelAlias | null>`
+- Reads `model` from `<claudeConfigDir()>/settings.json` on every call; nothing is kept, so a hand edit of the setting is followed by the next chat opened.
+- Reads the FAMILY out of the string: lowercased, split on non-alphanumerics, the first table key among the words. `claude-fable-5-1[1m]` → `fable`; `sonnet[1m]` → `sonnet`. The generation is never kept, so the chat is stored as `fable` like every chat on that family.
+| setting | answer | logged |
+|---|---|---|
+| file absent, `model` missing or blank | `null` | no |
+| file unreadable or not JSON | `null` | `[Claude] the account default model could not be read from its settings` with the path |
+| `model` names no table family (`default`, another name) | `null` | `[Claude] the account default model names a family the house has no name for…` |
+- `null` → the caller sends no model and `opus[1m]` runs.
+- Consumer: `companion-send.ts` `sendToNewChat`, for a new chat whose `model` she left out (MAN-9072).
+- `claudeConfigDir()` (`server/shared/utils.ts`): `CLAUDE_CONFIG_DIR` trimmed when set, else `~/.claude`. Callers: this reader and `claude-auth.provider.ts`.
+
+## Proof
+`.verify/kaylee-model-choice.mjs` section 2: the real settings give `fable`; alias, pinned id and `[1m]` forms read down; `default`, empty, absent and non-JSON give `null`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-account-default-model.ts

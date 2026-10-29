@@ -748,3 +748,33 @@ export function sameRect(a: DOMRect | null, b: DOMRect | null): boolean {
   if (a === null || b === null) return a === b;
   return a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
 }
+
+// ---------------------------
+
+//----------------- A FRAME THE BROWSER WILL NOT DRAW ------------
+
+/**
+ * Whether a browser blocks `address` as mixed content when a page opened at `pageProtocol` frames it: a plain-`http:` address
+ * inside an `https:` page. The browser blocks it silently, so the frame is a blank rectangle with nothing for the page to
+ * read, and the only honest answer is to know it BEFORE the frame is rendered and say so instead.
+ *
+ * The scheme is read by PARSING the address, never by matching a prefix (case and leading whitespace defeat a prefix test).
+ * An address that does not parse answers false: it is a malformed address rather than a blocked one, and the frame's own
+ * load shows that. A LOOPBACK host answers false too: a browser treats `localhost`, `*.localhost`, `127.0.0.0/8` and `::1`
+ * as potentially trustworthy, so it draws that frame from an https page and a card would be wrong about it. Pass
+ * `window.location.protocol` as `pageProtocol`; it is an argument so the rule can be run under `tsx`.
+ *
+ * Used by the widgets module's `EmbedUrlFrame` (the transcript's embed card and the Embed gutter widget) and the
+ * app-switcher module's `AppPane`: each swaps its iframe for a card with a link out when this is true.
+ */
+export function isBlockedAsMixedContent(address: string, pageProtocol: string): boolean {
+  if (pageProtocol !== 'https:') return false;
+  try {
+    const { protocol, hostname } = new URL(address);
+    if (protocol !== 'http:') return false;
+    const isLoopback = hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '[::1]' || /^127\.\d+\.\d+\.\d+$/.test(hostname);
+    return !isLoopback;
+  } catch {
+    return false;
+  }
+}

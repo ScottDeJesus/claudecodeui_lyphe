@@ -50,20 +50,31 @@ const ULTRACODE_EFFORT_OPTION = {
 export const CLAUDE_DEFAULT_MODEL = 'opus[1m]';
 
 /**
- * The value the composer sends for each family that sessions already hold one for.
+ * The house's model names: what a person says (the family) and the value a chat runs on and stores.
  *
  * Stored sessions and every browser's saved selection carry these exact strings, and an option under
  * any other value would leave each of them matching nothing. Each is an alias the CLI resolves, so
  * none names a generation and none goes stale when a release moves its family. The `[1m]` suffix
  * changes nothing for the current generation, which is natively 1M; it stays because it is what
  * those stored selections say. A family missing here is offered under the catalog's own value.
+ *
+ * consumers: this file's picker rows, and (through the providers barrel) the companion module — `tools/draft-tools.ts`
+ * offers the keys as the choices of `send_to_session` / `create_session`'s `model`, `tools/send-options.ts` turns the key she
+ * chose into the value a send carries — so the names she is offered and the values a chat stores are one table.
  */
-const STORED_VALUE_BY_FAMILY: Readonly<Record<string, string>> = {
+export const CLAUDE_MODEL_VALUE_BY_ALIAS = {
   opus: 'opus[1m]',
   fable: 'fable',
   sonnet: 'sonnet[1m]',
   haiku: 'haiku',
-};
+} as const;
+
+/** One of the house's model names (a key of `CLAUDE_MODEL_VALUE_BY_ALIAS`). Consumed by the companion module's `draft-tools.ts`, `companion-send.ts` and `send-options.ts`. */
+export type ClaudeModelAlias = keyof typeof CLAUDE_MODEL_VALUE_BY_ALIAS;
+
+/** The stored value of a family the table names, else undefined: the catalog's families are any string, the table's keys are the names a person says. */
+const storedValueOf = (family: string): string | undefined =>
+  Object.hasOwn(CLAUDE_MODEL_VALUE_BY_ALIAS, family) ? CLAUDE_MODEL_VALUE_BY_ALIAS[family as ClaudeModelAlias] : undefined;
 
 /**
  * Catalog values that name a POLICY rather than a model: "the recommended one", "the best one". Refused
@@ -190,7 +201,7 @@ export function buildClaudeModelsDefinition(catalog: readonly unknown[]): Provid
   }
 
   const options: ProviderModelOption[] = [...newestByFamily].map(([family, { entry, shown }]) => ({
-    value: STORED_VALUE_BY_FAMILY[family] ?? entry.value,
+    value: storedValueOf(family) ?? entry.value,
     label: shown.label,
     ...(shown.description ? { description: shown.description } : {}),
     ...effortFor(entry.supportsEffort ? entry.supportedEffortLevels ?? [] : []),
@@ -208,9 +219,9 @@ export function buildClaudeModelsDefinition(catalog: readonly unknown[]): Provid
 const FALLBACK_EFFORT_LEVELS: readonly EffortLevel[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 
 /** One fallback row: the family's stored value, named by the family alone. */
-function fallbackOption(family: string, levels: readonly EffortLevel[]): ProviderModelOption {
+function fallbackOption(family: ClaudeModelAlias, levels: readonly EffortLevel[]): ProviderModelOption {
   return {
-    value: STORED_VALUE_BY_FAMILY[family],
+    value: CLAUDE_MODEL_VALUE_BY_ALIAS[family],
     label: family.charAt(0).toUpperCase() + family.slice(1),
     ...effortFor(levels),
   };

@@ -1597,6 +1597,16 @@ export function expandHome(value: string): string {
 }
 
 /**
+ * Where Claude Code keeps its settings and login: `CLAUDE_CONFIG_DIR` when set, else `~/.claude`.
+ *
+ * Consumers: `claude-auth.provider.ts` (where the login's credentials live) and
+ * `claude-account-default-model.ts` (the user settings' `model`, the account's default).
+ */
+export function claudeConfigDir(): string {
+  return process.env.CLAUDE_CONFIG_DIR?.trim() || path.join(os.homedir(), '.claude');
+}
+
+/**
  * Where the launcher keeps its launch directories, unless the operator moved it.
  *
  * Consumers: the dispatch-souls module (its poll and its running-launchers read) and the providers

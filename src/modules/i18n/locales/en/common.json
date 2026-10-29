@@ -1719,7 +1719,8 @@
       "choose": "Choose a page…",
       "custom": "Type an address…",
       "open": "Open the page in a new tab",
-      "rejected": "That is not an http:// or https:// address"
+      "rejected": "That is not an http:// or https:// address",
+      "plainHttpBlocked": "This page is plain http, and a browser will not draw a plain-http page inside this app while it is open over https. Use the Open link to see it in its own tab."
     },
     "notes": {
       "title": "Notes"
@@ -3177,7 +3178,9 @@
     },
     "appearanceLight": "Light appearance",
     "appearanceDark": "Dark appearance",
-    "divider": "Resize applications"
+    "divider": "Resize applications",
+    "mixedContentTitle": "This app can't be shown here",
+    "mixedContentMessage": "{{name}} is served over plain http, and a browser will not draw a plain-http page inside this app while it is open over https."
   },
   "chatHost": {
     "panelLabel": "Floating chat",

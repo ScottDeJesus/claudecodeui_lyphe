@@ -5046,10 +5046,16 @@ loopback host onto whatever hostname reached this page — the same trick `resol
 plays, for the same reason — leaving the scheme, port, path and query alone. The one exception is a
 reader who is themself on loopback, where the address already means what it says. A non-loopback
 host is never second-guessed. The address the model SHOULD write is `CLOUDCLI_PUBLIC_HOST`, when
-the operator has set one — the surface prompt names it verbatim (`use this host's address <host>
-for anything running here`); unset, the prompt instead tells the model to use whatever LAN or VPN
-address (or hostname) this host is reached on, since none is named. Either way the rewrite above is
-the net under that, not a substitute for it.
+the operator has set one — the surface prompt names it (`use this host's address <host> for anything
+running here`, or `for anything else running here use this host's address <host> with the service's
+own port` once a DocSpace address is named, below); unset, the prompt instead tells the model to use
+whatever LAN or VPN address (or hostname) this host is reached on, since none is named. For DocSpace
+the address is `VITE_DOCSPACE_EMBED_ORIGIN`, which the server reads at start (`surface-signal.ts`,
+accepted as the client accepts it: an absolute `http:`/`https:` URL, else ignored with a warning) and
+names to the model as DocSpace's address, so an embed of a DocSpace page carries it even where a tool
+result gave the page an `http://…:8005` link. The hint ends by telling the model to prefer an https
+address wherever one exists. Either way the rewrite above is the net under that, not a substitute
+for it.
 
 **The origin gate is the DocSpace kind's, unchanged.** `EMBED_SANDBOX` is the same
 `allow-scripts allow-same-origin allow-forms`, for the same reason and under the same condition:
@@ -5072,15 +5078,21 @@ otherwise sit at the host's 24-pixel floor, reading as a thin empty line rather 
 The fence body carries the number instead. This is also why the kind mounts no host at all: there
 is no `ready` to wait for, no theme to post, and no topic to answer.
 
-**Two silent failures, one answer.** An address that refuses to be framed — `X-Frame-Options`,
+**Two ways an embed shows nothing.** An address that refuses to be framed — `X-Frame-Options`,
 `frame-ancestors`, which is most of the public web — still fires `load` on the element, and the
 document is cross-origin, so nothing in this page can tell a refusal from a blank page from a
-perfectly rendered one. A `http://` address inside a page served over `https://` is blocked by the
-browser before the element sees anything, for the same undetectable-from-here reason. So there is
-deliberately NO ready timeout on this kind: a timer would be a coin toss dressed as a diagnosis.
-What the card carries instead is the address itself as an `a[data-embed-open]` `Open page` link,
-which is why `openUrl` on this kind is not a convenience — it is the reader's only recourse when
-the frame shows nothing.
+perfectly rendered one. So there is deliberately NO ready timeout on this kind: a timer would be a
+coin toss dressed as a diagnosis. What the card carries instead is the address itself as an
+`a[data-embed-open]` `Open page` link, which is why `openUrl` on this kind is not a convenience — it
+is the reader's only recourse when the frame shows nothing.
+
+The second CAN be told apart in advance, so it is: a `http://` address inside a page served
+over `https://` is blocked by the browser before the element sees anything, but both schemes are
+known to `EmbedUrlFrame` before the iframe exists. When `isBlockedAsMixedContent` says so, no frame
+is drawn — a `WidgetErrorCard` says that a plain-http page cannot be framed while this app is open
+over https and points at the `Open page` link, which the header draws around it (in the transcript
+card and in the Embed widget alike). A loopback host is the exception: a browser draws that frame
+from an https page, so it is left to draw.
 
 `EmbedUrlFrame` is keyed on the fence body alone by `WidgetFrame` (its two neighbours' keys also carry the host window), so a
 changed address arrives as a NEW element rather than as a reassigned `src`: the frame navigates
@@ -5278,10 +5290,11 @@ section: 07-live-widgets/013 Gotchas
 - **The height is the height, not a `min-height`.** A widget that shrinks must shrink the element
   around it, which a minimum would prevent.
 - **`loading="lazy"` is deliberately absent.** A lazy frame subscribes late.
-- **An embed that renders nothing is indistinguishable from one that rendered.** `X-Frame-Options`,
-  `frame-ancestors` and mixed-content blocking all fire `load` on the element and leave a
-  cross-origin document nothing here can read. Do not add a timeout to guess at it — the `Open page`
-  link is the honest answer. See §"The embed kind".
+- **An embed that renders nothing is indistinguishable from one that rendered.** `X-Frame-Options`
+  and `frame-ancestors` both fire `load` on the element and leave a cross-origin document nothing
+  here can read. Do not add a timeout to guess at it — the `Open page` link is the honest answer.
+  (A plain-http address in an https page is not this case: it is known before the frame exists and
+  draws a card instead.) See §"The embed kind".
 - **The token list is not sized to what a widget happens to use.** It is also the payload of the
   `theme` message, so trimming it silently narrows what a widget can restyle itself with.
 - **Any sandboxed frame on this page raises one `SecurityError: Failed to read the 'serviceWorker'

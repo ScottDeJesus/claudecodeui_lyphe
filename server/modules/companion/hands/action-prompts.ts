@@ -1,5 +1,7 @@
-import type { CompanionActionKind } from '@/shared/companion-types.js';
+import type { CompanionActionKind, CompanionActionTarget } from '@/shared/companion-types.js';
 import type { DispatcherAsk } from '@/shared/types.js';
+
+import { ACTION_TIER, ACTION_WORDS, shortNameOf } from './action-word.js';
 
 /**
  * THE WORDS OF AN ACTION: what he says to fire it, what it is called in the past tense on his panel, and the texts the card and
@@ -12,6 +14,7 @@ import type { DispatcherAsk } from '@/shared/types.js';
  *
  * Consumers: `action-recipe.ts` (the prepare), `hands-tools.ts` (the answers to her) and `action-doors.ts` (the answers and
  * the briefs a door carries).
+ * `nextStepFor` is the one text that tells her, per tier (`ACTION_TIER`, `action-word.ts`), what to do after a prepare.
  */
 
 /** What he says first: the action as a command, followed by the target's `spoken` name. Consumed by `sayOf`, and by the prepare's answer ("waiting for his word: queue …"). */
@@ -59,6 +62,26 @@ export const sayOf = (action: CompanionActionKind, spoken: string): string => `$
  * acted on ("cleared her memory"), so nothing follows it. Consumed by `hands-tools.ts` (the panel's system line and her answer).
  */
 export const doneOf = (action: CompanionActionKind, spoken: string): string => (action === 'clear_memory' ? DONE_VERB[action] : `${DONE_VERB[action]} ${spoken}`);
+
+/**
+ * What the prepare's answer tells her to do next, by the action's tier. A LIGHT action (open, close_followup) has no read-back to
+ * wait on: she fires it now with his request when his last spoken line asked for it, else says one sentence and fires on his first
+ * spoken yes. A FULL action is read back to him in plain words, and his next spoken yes, or his line naming it, fires it. `readBack` is the
+ * recipe's sentence, `say` the full order. The name she is told to listen for is the shortest the check takes (`shortNameOf`), never a long
+ * title it takes shorter. Consumed by `hands-tools.ts` (the prepare's answer).
+ */
+export function nextStepFor(action: CompanionActionKind, target: CompanionActionTarget, say: string, readBack: string): string {
+  const first = ACTION_WORDS[action][0];
+  const spoken = shortNameOf(target);
+  const ordering = `words of his own naming ${spoken} and saying ${first}, or "${say}"`;
+  if (ACTION_TIER[action] === 'light') {
+    return `It is harmless, so nothing is read back first. If his last spoken line asked for it (it names ${spoken} and says ${first}), call take_action now with that line exactly as logged. `
+      + `If it did not, say one sentence of what it does (${readBack}) and stop: his first spoken yes fires it, and so do ${ordering}; you pass that line.`;
+  }
+  return `Read it back to him in plain words, then stop: ${readBack} His next spoken yes fires it, and so do ${ordering}. `
+    + 'Then call take_action with his newest spoken line, exactly as logged; a line that came before your read-back is not his answer to it, '
+    + 'and a bare yes counts only as the first thing he says after your newest read-back: if he said anything else first, read it back again.';
+}
 
 /** A stamp's local HH:MM, as the prepare's answer says when an action lapses; a stamp that does not parse is "an unknown time". Consumed by `hands-tools.ts`. */
 export function clockOf(stamp: string): string {
