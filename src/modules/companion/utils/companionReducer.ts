@@ -18,10 +18,12 @@ import type { CompanionFrame, CompanionLogEntry, CompanionNote, CompanionPicture
  * the panel draws from before it replaces anything, and a picture read from the server is checked the same way
  * (`isCompanionPicture`); a read that fails the check is a failed read, never a picture.
  *
- * `companion_cleared` empties what Clear empties on the server — the log, the notes, the draft, the walk, the focus, her
- * activity and the turn — so the panel is bare at once; the provider also reads the picture again, which is the server's
- * own word on the rest. `companion_open_chat` changes nothing here: it is an order to the page whose client id it names,
- * which the provider carries out.
+ * `companion_pending` replaces the one action waiting for his word (`null` when it was taken, withdrawn, replaced or
+ * lapsed on the server), and a frame cut short of the fields the action card draws from is left alone like any other.
+ * `companion_cleared` empties what Clear empties on the server — the log, the notes, the draft, the pending action, the
+ * walk, the focus, her activity and the turn — so the panel is bare at once; the provider also reads the picture again,
+ * which is the server's own word on the rest. `companion_open` changes nothing here: it is an order to the page whose
+ * client id it names, which the provider carries out.
  */
 
 /** How many log entries a page keeps: the newest, as `GET /api/companion` carries. The server stores more; the panel draws no more than this. */
@@ -51,6 +53,17 @@ const isActivity = (value: unknown): value is CompanionPicture['activity'] =>
   && orNull(Array.isArray)(value.files)
   && orNull((walk) => isRecord(walk) && isNumber(walk.at) && isNumber(walk.total))(value.walk);
 const isDraft = (value: unknown): boolean => isRecord(value) && isText(value.text) && isRecord(value.target);
+/** The action card draws `say`, `expiresAt` and the target's words, and walks `carried[].lines`, so a payload without them is refused rather than drawn. */
+const isPending = (value: unknown): boolean =>
+  isRecord(value)
+  && isText(value.id)
+  && isText(value.action)
+  && isText(value.say)
+  && isText(value.preparedAt)
+  && isText(value.expiresAt)
+  && isRecord(value.target)
+  && Array.isArray(value.carried)
+  && value.carried.every((group) => isRecord(group) && Array.isArray(group.lines));
 const isWalk = (value: unknown): boolean => isRecord(value) && isSessionRef(value.session) && Array.isArray(value.items) && isNumber(value.at);
 
 /**
@@ -67,6 +80,7 @@ export function isCompanionPicture(value: unknown): value is CompanionPicture {
     && orNull(isText)(value.floor)
     && orNull(isSessionRef)(value.focus)
     && orNull(isDraft)(value.draft)
+    && orNull(isPending)(value.pending)
     && orNull(isWalk)(value.walk)
     && Array.isArray(value.notes) && value.notes.every(isNote)
     && Array.isArray(value.log) && value.log.every(isEntry);
@@ -120,6 +134,8 @@ export function reduceCompanion(picture: CompanionPicture, frame: CompanionFrame
       return orNull(isSessionRef)(frame.focus) ? { ...picture, focus: frame.focus } : picture;
     case 'companion_draft':
       return orNull(isDraft)(frame.draft) ? { ...picture, draft: frame.draft } : picture;
+    case 'companion_pending':
+      return orNull(isPending)(frame.pending) ? { ...picture, pending: frame.pending } : picture;
     case 'companion_walk':
       return orNull(isWalk)(frame.walk) ? { ...picture, walk: frame.walk } : picture;
     case 'companion_note': {
@@ -144,13 +160,14 @@ export function reduceCompanion(picture: CompanionPicture, frame: CompanionFrame
         log: [],
         notes: [],
         draft: null,
+        pending: null,
         walk: null,
         focus: null,
         turnId: null,
         activity: { phase: 'idle', session: null, files: null, walk: null },
       };
     default:
-      // `companion_open_chat`, and any kind a newer server sends.
+      // `companion_open`, and any kind a newer server sends.
       return picture;
   }
 }

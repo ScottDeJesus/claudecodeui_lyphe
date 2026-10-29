@@ -4761,11 +4761,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ind
 Kaylee's HTTP door. Transport only: a route reads who asks, checks the SHAPE of the body, calls one service verb (see the service row) and answers. What a verb means is the service's.
 
 ## Wiring
-- `index.ts` exports `createCompanionModule` alone; every other symbol of the folder is private to it.
-- `createCompanionModule({ runtime })` returns `{ router, stop }`: it calls `companionService.attachRuntime(runtime)` BEFORE building the router, so no request reaches a verb with no gateway. `stop` is `companionService.stopAll`.
+- `index.ts` exports `createCompanionModule` and the type `CompanionHouse`; every other symbol of the folder is private to it.
+- `createCompanionModule({ runtime, house })` returns `{ router, resendUnanswered, stop }`: it calls `companionService.attachRuntime(runtime, house)` BEFORE building the router, so no request reaches a verb with no gateway or house. `stop` is `companionService.stopAll` (each session is interrupted `by: 'server'` and closed together). `resendUnanswered` is `companionService.resendUnanswered`, which the entrypoint calls among the sole-server duties (`soleServerDuties` in `server/index.ts`, after the predecessor of a handover is gone): the words of his her last process never answered are said to her again (MAN-9079).
 - `runtime` is the `ProviderRuntimeGateway` the chat socket uses, so an act of hers is the page's own act.
+- `house` is the `CompanionHouse` (MAN-9142): the readers only a module instance holds, which the entrypoint builds from the dispatcher, roadmap, dispatch-souls, Cerberus and heal instances.
 - Building the module launches no process: a conversation starts on an account's first message.
-- Mount: `/api/companion` behind `authenticateToken` (the account is `req.user`). Mounted in `server/index.ts` (`app.use('/api/companion', authenticateToken, companion.router)`).
+- Mount: `/api/companion` behind `authenticateToken` (the account is `req.user`). Mounted in `server/index.ts` (`app.use('/api/companion', authenticateToken, companion.router)`), AFTER `createDispatchSoulsModule`, because the house is built from the instances above it. Nothing catches a request between her mount and theirs.
 - Shutdown: `shutdownRuntimeServices` in `server/index.ts` awaits `companion.stop()` first, raced against 3 s (`Promise.race` with `delay(3_000)`), before `cerberus.stop()` and the rest. why: a CLI that answers nothing is ended by its own 5 s grace, which keeps running, and the shutdown must not sit behind it inside the supervisor's window (INV-9807).
 
 ## Routes (`companion.routes.ts`)
@@ -4777,6 +4778,7 @@ Kaylee's HTTP door. Transport only: a route reads who asks, checks the SHAPE of 
 | `PUT /settings` | JSON object, a partial of the settings | 200 `CompanionSettings` | `saveSettings` |
 | `PUT /draft` | `{ text }` 1–20000 | 200 `CompanionDraft` | `editDraft` |
 | `DELETE /draft` | – | 204 | `clearDraft` |
+| `DELETE /action` | – | 204, whether or not an action was standing: the standing action comes off his panel (its row ends `cancelled`, or `expired` past its `expiresAt`) | `cancelAction` |
 | `DELETE /notes/:id` | `id` matches `/^[1-9]\d{0,14}$/` | 204 | `dismissNote` |
 | `POST /interrupt` | – | 204 | `interrupt` |
 | `POST /clear` | – | 204 | `clear` |
@@ -4831,7 +4833,7 @@ One `CompanionAccount` per CloudCLI account, made on that account's first call (
 
 | Verb | Does |
 |---|---|
-| `attachRuntime(gateway)` | stores the gateway and clears the stopped flag; `createCompanionModule` calls it before any verb. An account made with no gateway throws. |
+| `attachRuntime(gateway, house)` | stores the gateway and the house (MAN-9142) and clears the stopped flag; `createCompanionModule` calls it before any verb. An account made with no gateway or house throws. |
 | `picture(userId)` | `buildPicture` |
 | `takeFloor(userId, client)` | the page holds the floor from now on |
 | `sendText(userId, client, text)` | takes the floor for the typing page, logs the line (`role: 'operator'`, `via: 'typed'`), pushes it to her. 503 `COMPANION_STOPPING` once `stopAll` has run. |
@@ -4841,9 +4843,11 @@ One `CompanionAccount` per CloudCLI account, made on that account's first call (
 | `saveSettings(userId, patch)` | stores, emits `companion_settings` to every page, and on a model change calls `session.setModel`. A switch the CLI refuses or does not answer within `CLI_GRACE_MS` (5 s) is a `system` log line; the save and the stored model stand, and her next wake runs on it. |
 | `editDraft(userId, text)` | replaces the held draft's words, keeps its target; 409 `COMPANION_NO_DRAFT` when none is held |
 | `clearDraft`, `dismissNote` | a note already gone is not an error |
-| `interrupt` | stops her own turn; a Stop with no turn does nothing |
+| `cancelAction(userId)` | his × on the action card (`DELETE /action`): the standing pending action's row in `companion_actions` ends `cancelled` — `expired` when it is already past its `expiresAt` (a lapse found by this verb, never by a timer) — then `store.setPending(null)` sends `companion_pending` null. With none standing it changes nothing and sends nothing |
+| `interrupt` | his Stop: `session.interrupt('operator')` stops her own turn and the words it was answering leave the kept list (MAN-9079); a Stop with no turn does nothing |
 | `clear(userId)` | see Clear |
-| `stopAll()` | sets the stopped flag, then per account `speechCache.end()` and per session `interrupt()` and `close('the server is stopping')`; one failure is logged and does not hold the rest |
+| `stopAll()` | sets the stopped flag, then per account `speechCache.end()` and per session `interrupt('server')` and `close('the server is stopping')`; one failure is logged and does not hold the rest. The words the stopped turn held stay kept for the next process (MAN-9079). |
+| `resendUnanswered()` | for each `companionDb.userIdsWithUnanswered()` user, makes the account if need be and calls `session.resendUnanswered()`: her answer to words of his her last process never answered. Called once by the entrypoint's `soleServerDuties` (`server/index.ts`); one account's failure is logged and is that account's alone |
 | `warm(userId)` | starts her process with nothing pushed (`session.warm()`); the alert feed calls it when a gather window opens. Refused silently once stopped. |
 | `alert(userId, alerts)` | the alerts the alert feed let through: one `alert` log line each (`CompanionAlert.line`), then ONE `pushAlerts` message of their envelopes. A row that cannot be written is logged and costs no push. Refused silently once stopped. |
 | `runFailed(sessionId)` | the alert feed heard `run.failed`/`run.limit`/`api.error`/`login.expired` for this chat, whatever its gates decided: marks the chat for 30 s. why: the runtime raises the failure and then still sends `complete` (exit 0) with NO `error` row, so without the mark a failed run was told twice, `failed` and then "finished". |
@@ -4853,9 +4857,9 @@ One `CompanionAccount` per CloudCLI account, made on that account's first call (
 ### Clear
 0. `speechCache.end()`: every synthesis aborted, every turn unspeakable until the next turn starts (MAN-9111).
 1. `session.clear()` runs SYNCHRONOUSLY: detaches her process and forgets her CLI conversation. why: a message landing mid-clear wakes a fresh conversation, never a resume.
-2. `store.clearAccount()` wipes log, notes, draft, walk, focus; every page empties at once.
+2. `store.clearAccount()` wipes log, notes, draft, pending action, unanswered words, walk, focus; every page empties at once. A standing action's row in `companion_actions` is ended `cancelled` in the same transaction and kept (MAN-9082).
 3. Awaits the old process's wind-down (up to the CLI grace).
-- `relayed_sends` rows stay: they belong to the chats.
+- `relayed_sends` rows stay: they belong to the chats. So does her record of actions (`companion_actions`): it is a fact about the house.
 
 ### Press (`companion-press.ts`)
 Every press is ONE turn and she always answers, if only with a word (ruling 6): nothing listens between presses.
@@ -4898,7 +4902,7 @@ Nothing else is an alert: never `limit.*`, `push.enabled`, `run.stopped`, `dispa
 - Unsubscribing clears every open window unsent. Two facts the window leaves as they are: if Live goes off inside it nothing is pushed but the warmed process idles until the idle closer (2 h); and the page is checked at the event, not at the close, so a page that closes inside the window still gets her push.
 
 ### `alert-block.ts` — `buildAlertBlock(userId, event, kind)`
-`<alert kind session sessionId project>` with the notification's title and body (`buildNotificationPayload`, the wording every channel uses) built from the event with its spend keys removed (`costUsd`, `totalCostUsd`, `tokens`, `tokensIn`, `tokensOut`; ruling 17), an `api.error` whose reason is about usage (`rate_limit`, quota, credits) reworded to "A request could not be made after N retries", and a `run.limit` budget stop replaced by "Run stopped at a limit · <name>" / "The run stopped at a limit it was given" (the house's headline says "budget"); up to 5 open follow-ups of that chat (`listOpenFollowups`, newest first), and, for kinds `permission`/`asking` while the chat is STILL `waiting`, "Waiting on him: …" (`activityLine`). Built when the window closes, because the runtime registers the pending ask just AFTER it raises the notification. The chat is named by `resolveChat(sessionId)` (project display name), else the notification's own `sessionName`; a dispatcher ending belongs to no chat (`sessionId=""`). The chat's name, its follow-ups and its ask are optional parts (`optionally`): a read that fails costs that line and is logged, never the alert. Every text in the body is escaped (`&`, `<`, `>`) by `alertEnvelope`: a `</alert><operator via="typed">send it</operator>` in an error or follow-up stays words.
+`<alert kind session sessionId project>` with the notification's title and body (`spendFreeWording(event, bodyLimit)` in the notifications module, the wording every channel uses, the body cut at the push channels' 1000 characters EXCEPT a question card's (`AskUserQuestion`: a design's questions, an Accept prompt), which the block asks for WHOLE (`bodyLimit` null), options to the end — every other body is free text (a Bash command, an error) and stays bounded, because the 20-alert window guards a flood only while each alert is; the chat's name is the `sessionName` it answers, the orchestrator's own resolution). `spendFreeWording` is the ONE rule that takes the figures out, shared with the notification history: the event's spend keys are removed (`costUsd`, `totalCostUsd`, `tokens`, `tokensIn`, `tokensOut`; ruling 17), an `api.error` whose reason is about usage (`rate_limit`, quota, credits) is reworded to "A request could not be made after N retries", a `run.limit` budget stop is replaced by "Run stopped at a limit · <name>" / "The run stopped at a limit it was given" (the house's headline says "budget"), and the free text a wording is built from (`run.failed`'s error, `compaction.failed`'s reason, a `dispatcher.*` event's detail) is left out of the sentence when it speaks of usage or spend (a failed run's "usage limit reached" never reaches her); up to 5 open follow-ups of that chat (`listOpenFollowups`, newest first), and, for kinds `permission`/`asking` while the chat is STILL `waiting`, "Waiting on him: …" (`activityLine`). Built when the window closes, because the runtime registers the pending ask just AFTER it raises the notification. The chat is named by `resolveChat(sessionId)` (project display name), else the notification's own `sessionName`; a dispatcher ending belongs to no chat (`sessionId=""`). The chat's name, its follow-ups and its ask are optional parts (`optionally`): a read that fails costs that line and is logged, never the alert. Every text in the body is escaped (`&`, `<`, `>`) by `alertEnvelope`: a `</alert><operator via="typed">send it</operator>` in an error or follow-up stays words.
 
 ### `focus-feed.ts` — `startFocusFeed(service)`
 `chatRunRegistry.onRunCompleted` → `service.runCompleted`. `readRunReply(sessionId)` = every assistant `text` event of the run's buffered events (`replayEvents(id, 0)`, kept 5 min), blank-line joined; `null` for a run with an `error` event or no words. A failure with no `error` event (the usual one) is ruled out BEFORE this by `service.runFailed`'s mark. `focusNewsEnvelope`: a reply of ≤ 1,500 characters (code points: an emoji is one) goes in whole; a longer one is written to her scratch folder (`nextScratchFile`) and a dactyl answers `FOCUS_NEWS_BRIEF` about it (the file is pruned after); if the dactyl does not answer, the digest is "(no digest could be made) it opens: …" with the first 600 characters. Starting and working are not pushed: the roster at her next message carries them. No page-connected check, unlike the alerts.
@@ -4916,8 +4920,8 @@ Run the first: `D=$(mktemp -d) && sqlite3 ~/.cloudcli/auth.db ".backup $D/auth.d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-picture.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/focus-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/tool-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-hears-unasked.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-hears-unasked.sh
 
-## MAN-9070 — server/modules/companion — the service verbs, one account's wiring, the picture — `companion-account.ts` — `createCompanionAccount(userId, runtime)`
-section: server/modules/companion — the service verbs, one account's wiring, the picture, the tool registry and deps/002 `companion-account.ts` — `createCompanionAccount(userId, runtime)`
+## MAN-9070 — server/modules/companion — the service verbs, one account's wiring, the picture — `companion-account.ts` — `createCompanionAccount(userId, runtime, house)`
+section: server/modules/companion — the service verbs, one account's wiring, the picture, the tool registry and deps/002 `companion-account.ts` — `createCompanionAccount(userId, runtime, house)`
 
 The one place that says which session callback writes which row and sends which frame.
 | Session callback | Effect |
@@ -4936,9 +4940,9 @@ The one place that says which session callback writes which row and sends which 
 - `CompanionAccount.speechCache` is made here, one per account (MAN-9111); the speech door reads the floor and the sentences through `store` (MAN-9110).
 
 ## `companion-picture.ts` — `buildPicture(account)`
-- Shape: `{ settings, models, process, activity, turnId, focus, draft, walk, notes, log, floor }`; `log` = newest 200 rows (store keeps 400).
+- Shape: `{ settings, models, process, activity, turnId, focus, draft, pending, walk, notes, log, floor }`; `log` = newest 200 rows (store keeps 400). `pending` is the stored pending action WITHOUT its pin (`withoutPin`), or `null`.
 - The catalog is awaited FIRST, everything else read after it in one synchronous run: no frame lands between two fields.
-- Model labels: `COMPANION_MODELS` (`sonnet`, `opus`, `haiku`) matched to `readClaudeModelsDefinition().OPTIONS` by family (`[1m]` suffix ignored); label = the option's `label` as given ("Sonnet 5.5"), else the capitalized family word. why: the catalog has already split the description at ` · `.
+- Model labels: `COMPANION_MODELS` (`sonnet`, `fable`, `opus`, `haiku`) matched to `readClaudeModelsDefinition().OPTIONS` by family (`[1m]` suffix ignored); label = the option's `label` as given ("Sonnet 5.5"), else the capitalized family word. why: the catalog has already split the description at ` · `.
 - A catalog read that fails is logged (`[Companion] the CLI model catalog could not be read`) and the picker shows the family words.
 - `readClaudeModelsDefinition` is exported by `server/modules/providers/index.ts` for this reader.
 
@@ -4946,39 +4950,45 @@ The one place that says which session callback writes which row and sends which 
 | Export | Is |
 |---|---|
 | `COMPANION_MCP_SERVER_NAME` | re-export of `session/companion-launch.ts`; the SDK names a tool `mcp__<name>__<tool>` |
-| `COMPANION_TOOL_NAMES` | the thirteen names, `toolNames()` of `session/companion-prompt.ts`: the lines of the prompt's TOOLS section that open `name(` |
-| `buildCompanionTools(deps)` | `[...sessionTools(), ...readTools(deps), ...draftTools(deps), ...actTools(deps)]`: the thirteen below |
-| `CompanionToolDeps` | what every tool file is handed |
+| `COMPANION_TOOL_NAMES` | the names of her tools, `toolNames()` of `session/companion-prompt.ts`: the lines of the prompt's TOOLS section that open `name(` |
+| `buildCompanionTools(deps)` | `[...sessionTools(), ...readTools(deps), ...draftTools(deps), ...actTools(deps)]`, then the eyes' (`eyes/*-reads.ts`): `roadmapReads`, `runReads`, `docReads`, `alertReads`, `panelReads`, `houseReads` |
+| `CompanionToolDeps` | what every tool file is handed: the account, its store, the runtime gateway, the `house` (MAN-9142: the readers only a module instance holds) and the helpers below |
 | `ToolActivityPhase` | `CompanionPhase` minus `idle`, `thinking` (the turn's own) |
 
 - The session's `init` check (`unexpectedTools`) compares the CLI's tool list against what is built here.
 - `COMPANION_TOOL_NAMES` is the prompt's order (`toolNames()`); `buildCompanionTools` is the file order below. Each tool's description is its prompt line (`toolLine(name)`).
 
-### The thirteen tools
+### The tools
 | tool | file | activity while it runs | focus | row |
 |---|---|---|---|---|
 | `list_sessions`, `list_projects` | `session-tools.ts` | none | none | MAN-9056 |
 | `read_session` | `read-tools.ts` | `reading_session` (the chat) | the chat | MAN-9066 |
 | `list_followups` | `read-tools.ts` | none | none | MAN-9066 |
 | `ask_dactyl` | `read-tools.ts` | `reading_code` (the files) | none | MAN-9066 |
-| `show_note` | `draft-tools.ts` | none | none | MAN-9061 |
+| `show_note`, `dismiss_note` | `draft-tools.ts` | none | none | MAN-9061 |
 | `update_draft` | `draft-tools.ts` | `drafting` (the chat; none for a project target) | the chat, after the write, when the target is a session | MAN-9061 |
 | `walk` | `draft-tools.ts` | `walking` (the chat, `{ at, total }`) | the chat, on every success | MAN-9061 |
 | `send_to_session` | `draft-tools.ts` | `drafting` (the chat) | the chat, after the send | MAN-9072 |
 | `create_session` | `draft-tools.ts` | `drafting` (no chat) | the new chat, after the send | MAN-9072 |
 | `stop_session`, `rename_session`, `answer_session` | `act-tools.ts` | none | the chat, after the act (a renamed chat under its new name) | MAN-9065 |
+| `list_roadmap`, `read_card` | `eyes/roadmap-reads.ts` | none (she stays `thinking`) | none | MAN-9165, MAN-9166 |
+| `list_runs`, `read_run` | `eyes/run-reads.ts` | none (she stays `thinking`) | none | MAN-9162, MAN-9163 |
+| `search_docs`, `read_doc` | `eyes/doc-reads.ts` | none (she stays `thinking`) | none | MAN-9157 |
+| `list_alerts` | `eyes/alert-reads.ts` | none (she stays `thinking`) | none | MAN-9153 |
+| `read_kanban`, `read_heal`, `read_notes`, `read_schedules` | `eyes/panel-reads.ts` | none (she stays `thinking`) | none | MAN-9159, MAN-9160 |
+| `read_git`, `read_cerberus`, `read_memory`, `read_settings` | `eyes/house-reads.ts` | none (she stays `thinking`) | none | MAN-9158 |
 - FOCUS IS INFERRED, never a tool: a tool that names a chat calls `deps.setFocus(chat)`, which writes and announces (`companion_focus`) only when the chat moved or was renamed.
 - THE DRAFT RULE: only the draft is ever sent. `send_to_session` and `create_session` carry the brief's `text`, and it must equal the draft's words; a mismatch is refused naming the draft's target and its first words, and nothing is sent. Both go through `deps.sendDraft` (MAN-9072); so does the panel's Send.
 - A tool never throws: a refusal is `deps.refuse(sentence)` (`isError` text saying what to do next), a handler that throws is logged and answered the same way.
 
-## `tools/tool-deps.ts` — `createToolDeps({ userId, store, runtime, activity })`
+## `tools/tool-deps.ts` — `createToolDeps({ userId, store, runtime, house, activity })`
 | Dep | Does |
 |---|---|
 | `setFocus(chat)` | writes and announces focus only when the chat moved or was renamed; no focus tool exists |
 | `withActivity(phase, chat, files, run)` | sets her activity for as long as `run` takes; a `walking` phase carries `{ at, total }` of the held walk |
-| `openChatOnFloor(sessionId)` | emits `companion_open_chat` `{ sessionId, floor }`; nothing while no page holds the floor |
+| `openOnFloor(target)` | emits `companion_open` `{ target, floor }` (`target` a `CompanionOpenTarget`); nothing while no page holds the floor |
 | `refuse(sentence)` | `isError` text saying what to do next; never a throw |
-| `sendDraft(request)` | the one door the draft goes out by (`createDraftSender` in `companion-send.ts`, built on `setFocus` and `openChatOnFloor`); `send_to_session`, `create_session` and the panel's Send all call it |
+| `sendDraft(request)` | the one door the draft goes out by (`createDraftSender` in `companion-send.ts`, built on `setFocus` and `openOnFloor`); `send_to_session`, `create_session` and the panel's Send all call it |
 
 `withActivity` end rule:
 1. Each running tool's activity is kept in `running`, oldest first.
@@ -4991,7 +5001,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/compani
 ## MAN-9071 — server/modules/companion — the service verbs, one account's wiring, the picture — Probe
 section: server/modules/companion — the service verbs, one account's wiring, the picture, the tool registry and deps/003 Probe
 
-`.verify/companion-module.mjs`: real `createCompanionModule` router on a loopback express app, curl on every request, a real Haiku conversation; 47 checks (settings, message and frames, a `list_sessions` call, picture, refusals, interrupt, clear, live model change, `stop()` mid-turn in 663 ms on 2026-10-26).
+`.verify/companion-module.mjs`: real `createCompanionModule` router on a loopback express app, curl on every request, a real Haiku conversation; 47 checks (the registry: the names her prompt tells are in its order and each is built, each built tool is one she is told of; settings, message and frames, a `list_sessions` call, picture, refusals, interrupt, clear, live model change, `stop()` mid-turn in 663 ms on 2026-10-26).
 ```
 D=$(mktemp -d /tmp/companion-module.XXXXXX) || exit 1
 sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
@@ -5003,16 +5013,17 @@ DATABASE_PATH=$D/auth.db CERBERUS_DB_PATH=$D/cerberus.db TSX_TSCONFIG_PATH=serve
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-picture.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/tool-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
 
-## MAN-9061 — server/modules/companion/tools — update_draft, show_note and walk: the draft she keeps, her note cards and the walkthrough cursor
+## MAN-9061 — server/modules/companion/tools — update_draft, show_note, dismiss_note and walk: the draft she keeps, her note cards and the walkthrough cursor
 
-`draftTools(deps)` (`draft-tools.ts`) returns the SDK `tool()` definitions of `show_note`, `update_draft`, `walk`, `send_to_session` and `create_session`, in that order. The first three write through the account's store, so `companion_note`, `companion_draft` or `companion_walk` reaches his panel when she calls it; the last two send the draft (MAN-9072). None is `readOnlyHint`. This row covers the first three. Each description is `toolLine(name)`; the argument descriptions carry what the prompt's shorthand leaves out (the prompt's `update_draft(target, …)` is the pair `session` / `project`).
+`draftTools(deps)` (`draft-tools.ts`) returns the SDK `tool()` definitions of `show_note`, `dismiss_note`, `update_draft`, `walk`, `send_to_session` and `create_session`, in that order. The first four write through the account's store, so `companion_note`, `companion_note_removed`, `companion_draft` or `companion_walk` reaches his panel when she calls it; the last two send the draft (MAN-9072). None is `readOnlyHint`. This row covers the first four. Each description is `toolLine(name)`; the argument descriptions carry what the prompt's shorthand leaves out (the prompt's `update_draft(target, …)` is the pair `session` / `project`).
 
 Every handler runs inside `guardedToolResult` (`server/shared/tool-text-result.ts`): a throw is logged `[Companion] <tool> could not <doing>` and answered as `isError` text. A refusal is `deps.refuse(sentence)`.
 
-## `update_draft { session?, project?, text 1–20000 }`
-- Exactly one of `session` / `project` (a blank one counts as absent); both or neither is refused with a sentence saying so.
+## `update_draft { session?, project?, text 0–20000 }`
+- AN EMPTY TEXT CLEARS: a text blank after trim is tested FIRST, before any target is looked at, so `session` / `project` are ignored (a clear names no target). With a draft held: `store.setDraft(null)` (`companion_draft` with `draft: null`, the verb the panel's `DELETE /draft` has), focus untouched, no activity, answer `Draft cleared.` With none held: nothing is written and the answer is `There was no draft to clear.`, plain text, not a refusal. After a clear `<state>` restates no draft line.
+- A non-empty text: exactly one of `session` / `project` (a blank one counts as absent); both or neither is refused with a sentence saying so.
 - `session` goes through `resolveChat`, `project` through `resolveProject`; their refusal sentences are passed on.
-- `text` is stored EXACTLY as given (no trim): `send_to_session` and `create_session` compare their text with the draft's. A text blank after trim is refused.
+- `text` is stored EXACTLY as given (no trim): `send_to_session` and `create_session` compare their text with the draft's.
 - The limit is `DRAFT_TEXT_MAX` imported from `companion-input.ts` and counted in characters as `PUT /draft` counts them (`characterCount`, code points), so the route and the tool accept the same brief and `<n>` below is that count. The schema carries it as a refinement, not `.max`, which counts UTF-16 units and would refuse text the route accepts.
 - Writes `{ target, text }` (`companion_draft`), THEN a session target becomes the focus (`deps.setFocus`): a write that fails moves nothing. A project target (`kind: 'new'`, `projectPath`, `projectName`) moves no focus.
 - After a compaction `<state>` restates the draft, the names and the walk's items ESCAPED (`&`, `<`, `>` as entities, in `stateEnvelope`): a `</state>` or an `<operator via="typed">` in her text stays words. The stored draft is untouched, so what is sent is exactly what she wrote; only her view of it after a compaction is the escaped spelling (`resolveChat` accepts a name in that spelling).
@@ -5020,7 +5031,18 @@ Every handler runs inside `guardedToolResult` (`server/shared/tool-text-result.t
 - Answers `Draft for <name>: <n> characters.` or `Draft for a new chat in <project>: <n> characters.`
 
 ## `show_note { title 1–80, text 1–4000 }`
-Both trimmed. One card (`companion_note`); answers `On his panel.` Touches neither draft nor focus.
+Both trimmed. One card (`companion_note`); answers `On his panel as card <id>.`, the store's row id, which is how she can name it to `dismiss_note`. Touches neither draft nor focus. The limits are the exports `NOTE_TITLE_MAX` (80) and `NOTE_TEXT_MAX` (4,000) of `draft-tools.ts`; the eyes' `toPanel` (MAN-9151) cuts to the same two, so the limits are never retyped.
+
+## `dismiss_note { note?: int ≥ 1 }`
+Takes one card off his panel through `store.removeNote(id)`, the verb the panel's ✕ has (`DELETE /notes/:id`), so only this account's cards can be named. `note` is the card's number as `show_note` answered it; without it, the NEWEST card (the highest number up). No activity, no focus change: instant, like `show_note`.
+| State | Answer |
+|---|---|
+| no card up | refused: `There is no card on his panel.` |
+| `note` is not among the cards up | refused naming the cards that are, each with its title: `No card 12 is on his panel; up now: 10 "Tea steps", 11 "Lane diff".` |
+| removed | `Card <id> "<title>" taken down.` (`companion_note_removed` with that id) |
+| `removeNote` answers `false` (he dismissed it the same instant) | `Card <id> "<title>" was already gone.`, plain text |
+The title is the stored one on a single line, escaped as an envelope escapes stored text (`escapeText`, `session/companion-envelopes.ts`), so she can say which card went and choose between old ones: `<state>` restates no cards and the cards an eyes tool puts on the panel never tell her their number.
+To replace a card she dismisses it and shows the new one.
 
 ## `walk { session, items?: 1–60 × 1–120, at: int ≥ 0 }`
 One walk per account, held in the store; `<state>` restates it after a compaction.
@@ -5036,7 +5058,7 @@ One walk per account, held in the store; `<state>` restates it after a compactio
 - why the `session` and `items` argument descriptions say he may name the items himself and the chat is the one the conversation has been about: measured 2026-10-26 on Haiku, with a chat already in her conversation and without them she asked "which session?" and never called `walk` (2 of 2 runs); with them, `walk` at 1, 2, 1, null.
 
 ## Probe
-`.verify/companion-draft-tools.mjs <empty dir under /tmp>`: a probe chat "probe kaylee" made on the live server in `PROBE_PROJECT`, `auth.db` copied after it with `.backup`, the real module on express over the copy, her model set to haiku, then the four typed lines; a direct section calls the tools on the real store for refusals, limits and the cursor. 36 checks on 2026-10-26. Line 1 is typed up to three times until a `companion_draft` frame arrives: Haiku fails it two ways — she passes a part of the name (`"kaylee"` for `probe kaylee`), and, commoner (2 of 4 fresh runs, 2026-10-26), she searches `list_sessions` for "probe kaylee" / "probe" / "kaylee" and never calls `update_draft`, because the probe chat sits in a hidden root that `list_sessions` cannot show while `update_draft` resolves it by its exact name. A turn that never calls the tool is not a defect of the tool.
+`.verify/companion-draft-tools.mjs <empty dir under /tmp>`: a probe chat "probe kaylee" made on the live server in `PROBE_PROJECT`, `auth.db` copied after it with `.backup`, the real module on express over the copy, her model set to haiku, then the four typed lines; a direct section calls the tools on the real store for refusals, limits, the cursor, the clear and `dismiss_note` (the last two added 2026-10-28 and proved on a scratch database, the file not re-run whole). 36 checks on 2026-10-26. Line 1 is typed up to three times until a `companion_draft` frame arrives: Haiku fails it two ways — she passes a part of the name (`"kaylee"` for `probe kaylee`), and, commoner (2 of 4 fresh runs, 2026-10-26), she searches `list_sessions` for "probe kaylee" / "probe" / "kaylee" and never calls `update_draft`, because the probe chat sits in a hidden root that `list_sessions` cannot show while `update_draft` resolves it by its exact name. A turn that never calls the tool is not a defect of the tool.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/draft-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-draft-tools.mjs
 
@@ -5053,6 +5075,7 @@ Three surfaces. Each is a VIEW that draws every state from props and a thin wrap
 | her Settings section | `CompanionSettingsView` (`CompanionSettingsSection.tsx`) | `CompanionSettingsSection`: `useCompanionSettings` fetches `GET /api/companion`, saves `PUT /api/companion/settings`; `useTalkBindingCapture` takes the next key or mouse button when Bind is pressed and saves it as `talkBinding` (MAN-9101) | `VoiceSettingsTab`, after its own sections, voice on or off |
 
 - Parts under the panel: `CompanionHeader` (status line, Stop, close, focus, model `Select`, Live `Switch`, Clear behind a `ConfirmDialog`; given `voice`, a row of its own under them, `CompanionVoiceSwitch`: "Voice on this device", the kit `Switch` closing the row under Clear, a `Volume2` / `VolumeX` glyph following it, the whole row its label), `CompanionLog` (entries newest last; alerts and system lines in their tone; given `speaking`, the one sentence whose `turnId` and `index` both equal `speaking`'s alone wrapped in `[data-companion-speaking-sentence][data-tone=info]`: a band `bg-tone-ink/20` widened by `ring-2 ring-tone-ink/20`, a 2px bar of the full ink in the ring's left edge (`shadow-[-2px_0_0_0] shadow-tone-ink`, the mark's 3:1: 5.3:1 light, 10.3:1 dark against the canvas, where the band alone is 1.32:1 / 1.51:1), `box-decoration-clone`, `forced-colors:underline`; ring and bar are shadows, so no word moves), `CompanionWalkStrip`, `CompanionNotes`, `CompanionDraftCard` (target, editable `TextArea`, Send turn, Send steer, Clear), `CompanionComposer` (`PromptInput`, Enter sends), `CompanionSentence` (her sounds drawn as marks at their offsets), `CompanionSettingsForm` (her name, his name, the register in a monospace `TextArea` with "Restore the original", the delivery note).
+- `CompanionActionCard` (the action waiting for his word, `picture.pending`): in the dock above the draft, keyed by `pending.id`, a `role="region"` named by its head. The head "Waiting for your word" in the warn tone with the Roadmap's amber pulse; the action as a sentence (`companion.action.verb.*`: the verb, then the target's `spoken` in its weight) over the target's kind and house names (a run's whole id, a page's id and block), wrapping to two lines (`line-clamp-2`; the `title` holds the whole line); the prompt, or a follow-up's words, through `QuestionText` (as the Roadmap draws the census) in a well capped at 30cqh, 12cqh beside his lines; his carried lines quoted, each with its 24-hour time, under each question's label, in a well of their own. HIS LINES ARE THE LAST TO GIVE WAY: they travel word for word, so their well has no cap, no scroll and no tab stop and they stand whole at any length; while the card stands the dock has no cap, so the room comes first from the log (down to its 3.5rem floor), then from the notes and the draft's field, and past that the dock scrolls as one region with the sticky foot in sight. The prompt gives way instead: 12cqh beside his lines, and in a round (`answer`) the questions with their options fold behind "The questions, with their options" (kit `Collapsible`, `CardFoldBody`: inert while folded; 24cqh opened), since each question heads his answers to it; a labelled group with no lines is a question he left unanswered, said as "No answer — it goes as “(no answer)”" with ▲ (the hands send one group per question of the round). Groups are keyed by their place. The foot in the tone's wash, "Say: “<say>”" beside the mic and "Aloud, not typed · Lapses at HH:MM" (the clock her prepare answer says it in), is sticky to the dock's bottom edge (`-bottom-1`, a ring of `--surface` masking what passes under it), so in a dock too short for the card (a phone's keyboard up, a phone on its side) the words that fire it, its lapse and a refused Withdraw (said inside the foot) stay in sight. The Withdraw × (`aria-label` "Withdraw") is drawn only given `onWithdraw` (optional on the view and the card; the live `CompanionPanel` passes the provider's `cancelAction`); its hint stands to its left. A press (`hooks/useWithdraw.ts`) calls `onWithdraw()` once: the × is busy while it is out, and a refusal is said inside the foot (`companion.action.withdrawRefused` with the server's sentence, else `withdrawRefusedPlain`); withdrawn, the provider folds `companion_pending: null` and the card goes with it. It stands whole (`shrink-0`). THE LAPSE IS A DEADLINE, NOT A CLOCK (`hooks/useActionLapse.ts`): one `window.setTimeout` to `pending.expiresAt`, set when the card mounts and cleared when it unmounts or the deadline changes (the panel keys the card by `pending.id`, so a new action is a new card); from that moment the card draws nothing, and an action already past its time never draws. A stamp that is not a time sets no timer. The server closes the row itself at the next prepare, take or cancel. A lapsed card alone in the dock closes it (`empty:hidden`). Every word is a `t()` with its English default (`companion.action.*`). Fixtures: `FAKE_PANEL.action*`; `actionRound` is a three-question round at the length he really speaks (his spoken lines average 96 characters), its third question unanswered.
 - Hooks: `useFollowNewest` (the log follows the newest line until he scrolls up; `jumpToNewest`), `useGrowingField` (textarea sized to its words, measured only while drawn), `useCardFloor` (the draft card's `min-height`), `useTalkBinding(binding, toggle)` (below).
 - The talk button's binding (`TalkBinding`, MAN-9086; stored as `CompanionSettings.talkBinding`, MAN-9087):
   - `utils/talkBinding.ts` is the one pure rule, importing nothing but the type. `talkBindingFromEvent(event)` answers `{ binding }`, `{ refusal }` (a sentence that says why) or `null` (a modifier on its own, which starts a chord; a key with no nameable `code`; a mouse button past forward); `matchesTalkBinding(binding, event)` matches a keydown on `code` and all four modifiers exactly, never a `repeat`, and a mousedown on `button`; `isTalkBindingRepeat(binding, event)` is true for the auto-repeat of the bound chord held down; the label is the modifiers in the order Ctrl, Alt, Shift, Meta joined to the key by `+` (`KeyK` → `K`, `Digit1` → `1`; `Space` and `F8` as they are), or `Mouse middle`, `Mouse back`, `Mouse forward`. A change to what may be bound is an edit there (and in the server's `checkTalkBinding`, MAN-9087).
@@ -5063,7 +5086,7 @@ Three surfaces. Each is a VIEW that draws every state from props and a thin wrap
 - Her disc and her rail cell (`CompanionFab.tsx`, `CompanionDock.tsx`): MAN-9125; what they read from the provider: MAN-9129; proof on the live page: MAN-9130.
 - `companion-fake.ts`: fixture pictures (`FAKE_PANEL`, `FAKE_SETTINGS`); only the fixtures import it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionActionCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-action-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
 
 ## MAN-9089 — src/modules/companion — Kaylee's panel, rail door and Settings section: the — The door: an `aria-label`ed rail button, `data-companion-door`, `aria-expanded` = the open state
 section: src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the stance, the status line, the rules and the fixture/001 The door: an `aria-label`ed rail button, `data-companion-door`, `aria-expanded` = the open state
@@ -5104,7 +5127,7 @@ What she is doing is ONE value, `presence` (`CompanionPresence`, `src/shared/typ
 - The panel is `[container-type:size]`: anything placed inside it portals its overlays (a fixed child resolves against the panel). `ConfirmDialog`, menus and toasts already portal.
 - Escape: inside the panel it closes and is claimed (`preventDefault`, window capture phase); outside it is untouched. why: the chat aborts its turn on any unclaimed Escape.
 - Closing from inside returns focus to the first of `DOOR_SELECTOR` (`[data-companion-door], [data-companion-fab] > .vv-fab`: the rail's door, her disc) that `checkVisibility({ visibilityProperty: true })` finds on screen. why: below md the rail's door stands in the closed drawer under `visibility: hidden`, with an `offsetParent` and a refused focus; her disc in its corner takes it. Opening on `(pointer: fine)` focuses her composer; on touch it does not (no keyboard).
-- Height: header and composer stand. Composer field grows to 25% of the panel's height, then scrolls. Log keeps 3.5rem. Dock (walk, notes, draft) is `max-h-[max(55%,23rem)]`, gives way last.
+- Height: header and composer stand. Composer field grows to 25% of the panel's height, then scrolls. Log keeps 3.5rem. Dock (walk, notes, action, draft) is `max-h-[max(55%,23rem)]`, gives way last. While an action card is drawn in it (`has-[[data-companion-action]]:max-h-none`) the dock has no cap of its own and may take every row but the log's floor. why: she has just read the action back and the card is what he reads; at 390×664 (an iPhone's Safari with its bars) 55% scrolled his own answers out of sight. A lapsed card draws nothing, so the cap returns with no word from the page.
 - Dock order of giving way: notes first (floor: first title + ✕ + count), then the draft's field (floor 88px). The dock scrolls only past those floors, the draft card whole inside it.
 - A failed process draws a warn `Banner` under the header (the server's sentence) beside the log's system line.
 - No picture yet draws the waiting row (`[data-companion-log="loading"]`, a `Spinner`). A read that failed draws, in the log's place, `[data-companion-log="failed"]`: a warn `Banner` — `companion.panel.readFailed` ("Couldn't open {{name}}'s conversation: {{reason}}", the reason being `readFailure`, MAN-9083) — with one Try again (`companion.panel.retry`, the `onReread` prop; absent, no button). Try again gives way to the waiting row while the read is out. Proof: `.verify/kaylee-panel-read-failed.mjs`.
@@ -5147,13 +5170,15 @@ node .verify/companion-panel-scaffold.mjs [--states awakeIdle,dense,...] [--evid
 ```
 - Gitignored (`.verify/`): exists on disk only. Live client `:5183`. Exits 1 on any FAIL; zero console errors required.
 - Mounts the three VIEWS on `companion-fake.ts` pictures through `lib/companion-kit.mjs`: panel in the workspace shell's fixed box (`.pwa-status-clear.fixed`), door (`CompanionDoorView`, imported from `CompanionDock.tsx`) in the rail's foot above the Inbox, section in a Settings-modal-width column at `z-9999`. Every press is recorded in `window.__companionKit.events`, none acted on.
-- Photographs 1440×900 and 390×844, light and dark: states `loading asleepEmpty waking awakeIdle thinking readingSession readingCode drafting walking failed longLog draftWorking draftNew walk notes dense closed`, the door lit and unlit, the Settings states.
+- Photographs 1440×900 and 390×844, light and dark: states `loading asleepEmpty waking awakeIdle thinking readingSession readingCode drafting walking failed longLog draftWorking draftNew walk notes dense closed`, the seven action states (`actionQueue actionAnswer actionRound actionRework actionOpen actionClose actionDraft`, spread in from `lib/companion-action-kit.mjs`'s `ACTION_EXPECT`; `actionRound` a three-question round at his real length, its third question unanswered), the door lit and unlit, the Settings states.
+- The action card's checks live in `lib/companion-action-kit.mjs` (`readActionCard`, `actionChecks`, re-exported through `lib/companion-kit.mjs`): its words in light (the head, the sentence, the facts, the well — folded in a round — his lines by group with their HH:MM, "Say: “…”", "Lapses at HH:MM", the Withdraw ×, the dock closing when left empty, a question he left unanswered said as "No answer — it goes as “(no answer)”" under it), and at every width and theme its place (whole in the dock above the composer with the dock not scrolling; above the draft in `actionDraft`; at his real length in `actionRound` the dock may scroll as one region with "Say:" and the lapse in sight), his lines whole in their well (it has no cap and never scrolls), and its words' contrast on their computed ground (≥ 4.5:1; 4.67 the lowest, "Say:" and the lapse on the warn wash in light). `actionsAtPhoneHeight` then mounts every action state at 390×664 (an iPhone's Safari with its bars showing), photographed, with his lines whole and the card whole in sight in the dock — above its draft for `actionDraft`; for `actionRound`, at his real length, the dock scrolls as one region and "Say:" and the lapse stay in sight.
 - Checks: status line per state; the stance and layers above; no sideways scroll; dock ≤ 55% with the draft whole; Escape claimed inside, ignored outside; draft saved before send; refusals keep words; settings limits; Restore asks first; a short panel (`--keyboard-height` 380px, 390×844) with a draft and a 12-line message cuts nothing; the card keeps its bottom padding, re-checked after narrowing to 320px with no render between.
-- 2026-10-28: 275 of 275 checks, zero console errors. The door checks read the fixture's door inside `#companion-door`: below md the live dock draws its own door in the open drawer.
-- The script is 297 lines (ceiling 300): any new check goes in `lib/companion-kit.mjs`.
+- 2026-10-28: 558 of 558 checks with the seven action states and their 390×664 pass, 144 photographs, zero console errors; the unanswered line 4.90:1 in light. The model check lists the fixture's four labels (Fable 5.1 among them since 372b8eb8). The door checks read the fixture's door inside `#companion-door`: below md the live dock draws its own door in the open drawer.
+- The script is 300 lines (the ceiling): any new check goes in `lib/companion-kit.mjs` or `lib/companion-action-kit.mjs`.
+- `.verify/companion-action-card-live.mjs [--evidence <dir>]`: her live panel on :5183 against :3011, signed in as account 1. While `GET /api/companion` answers `pending: null`, no action card is drawn and the dock stands only for a walkthrough, notes or a draft, at 1440×900 and 390×844 in light and dark, nothing scrolls sideways, zero console errors (10 checks).
 - Fragile against a server restart mid-run.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionActionCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-action-card-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-action-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
 
 ## MAN-9065 — server/modules/companion/tools — stop_session, rename_session and answer_session: acting on a chat through the house's own verbs
 
@@ -5212,22 +5237,34 @@ The chat goes through `resolveChat` (an unknown one: its sentence). It becomes h
 | a phrase | the turns whose text holds it (case-insensitive, whitespace folded), each with one turn either side, rendered, then a digest (`phraseDigestBrief`); none: `The transcript of "<name>" does not mention "<phrase>".` |
 - History is `sessionsService.fetchHistory(id, { limit: null })`, grouped by `groupTurns`.
 - A rendered file is the next NUMBERED file of her scratch folder (`0004-last-turn.md`, one past the highest number there, taken in the same tick it is written), then `pruneScratch` keeps the newest 20. The answer ends with the file's path, so a sharper question can go to `ask_dactyl` (her scratch is an allowed root). Its turns carry the CHAT's own numbers (`renderTurnWindow`: `## Turn 8`, the title `10 of 129 turns`), and a gap between non-adjacent windows is marked (`(turns 5 to 7 are not shown here)`).
-- What one dactyl takes is bounded: `newestThatFit` weighs each turn as `dactyl` does (UTF-8 bytes + 7 per line) against 300,000 of its 327,680-byte gate (room for the brief and the title). A window over it keeps the NEWEST turns that fit, and the answer says how many older ones were left out and how to reach them. A turn that is over the budget ALONE is set aside by number ("Turn 10 is more than one reader takes and is left out.") and the older turns are still digested; only when EVERY turn of the window is that long does she get an `isError` that there is nothing to digest. The dactyl's own "Read a range of it yourself" refusal therefore never reaches her.
+- What one dactyl takes is bounded: `newestThatFit` weighs each turn as `dactyl` does (UTF-8 bytes + 7 per line) against 300,000 (`DACTYL_WINDOW_BUDGET`, with `LINE_NUMBER_BYTES` = 7, both exported; the eyes' `wholeOrDigest` weighs a text the same way) of its 327,680-byte gate (room for the brief and the title). A window over it keeps the NEWEST turns that fit, and the answer says how many older ones were left out and how to reach them. A turn that is over the budget ALONE is set aside by number ("Turn 10 is more than one reader takes and is left out.") and the older turns are still digested; only when EVERY turn of the window is that long does she get an `isError` that there is nothing to digest. The dactyl's own "Read a range of it yourself" refusal therefore never reaches her.
 - A chat still running adds "It is still working, so what it has written may grow." to a digest as it does to an inline last turn.
-- The dactyl is stopped with the call: both `read_session` and `ask_dactyl` pass the handler's `extra.signal` to `runDactylRead`, which sends SIGTERM (SIGKILL after 5 s) when it fires and answers "The reader was stopped: the call was cancelled."
+- The dactyl is stopped with the call: both `read_session` and `ask_dactyl` pass the handler's `extra.signal` (`signalOf`, exported; the dactyl-running `eyes/doc-reads.ts`, `roadmap-reads.ts` and `house-reads.ts` import it, `panel-reads.ts` and `run-reads.ts` each hold a private copy of the same function) to `runDactylRead`, which sends SIGTERM (SIGKILL after 5 s) when it fires and answers "The reader was stopped: the call was cancelled."
 - A digest that fails answers the dactyl's own sentence plus the file's path; the render is not lost.
 
-## Turn windows (`transcript-turns.ts`)
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/dactyl-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-read-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-turn-windows.mjs
+
+## MAN-9154 — server/modules/companion/tools — read_session, list_followups and ask_dactyl — Turn windows (`transcript-turns.ts`)
+section: server/modules/companion/tools — read_session, list_followups and ask_dactyl: the scopes, the turn windows and the dactyl path rules/001 Turn windows (`transcript-turns.ts`)
+
 A turn opens at his text message and holds the reply rows after it; a `<task-notification>` row joins the turn it belongs to, labelled, and is no turn of his. A window of turns is chosen in `transcript-turns.ts` and written by `renderTurnWindow`. `renderTurns` (the whole history under its own numbers) has no tool caller; only `.verify/probe-companion-reads.mjs` calls it. The focus feed writes its reply with `nextScratchFile`. A phrase is searched in his words, the reply's words and its tool-call lines — never the file's headings ("He said", "Tool calls"). `.verify/companion-turn-windows.mjs` runs `groupTurns`/`turnsAround` on real strings; it is pure and touches no file.
 
 ## `list_followups { session? }`
-`resolveChat` for a given session (it names a chat but moves neither focus nor activity), through the barrel's `listOpenFollowups`. One line each, newest first: `<chat name> · next|gap · <text>`; the text is `Followup.text` untouched, which is what the Next steps widget shows. A named chat is listed whole, as the widget shows it (up to the service's own ceiling of 200, then "These are the newest 200"). Every chat together are cut at 20 (the service is asked for 21 to know), and the last line then says to name one chat. A chat's name is `chatNameOf` (any chat row, archived or hidden too).
+`resolveChat` for a given session (it names a chat but moves neither focus nor activity), through the barrel's `listOpenFollowups`. One line each, newest first: `<chat name> · next|gap · <text> [<plan>: <step>] · #<id>`; the text is `Followup.text` untouched, which is what the Next steps widget shows, and the id is what `close_followup` takes. Each plan the text names as a whole word (neither side of it a letter, a digit, an underscore or a dash) is followed by its current step, once per plan, in the order the names first stand in the text (`followup-plans.ts`): the Roadmap tab's step words for a feature (`shipped Oct 27`, `building`, `waiting on you: Accept`), the In flight badge for a plan the roadmap does not hold. The plans are the dispatcher picture's and the roadmap's features (a plan the dispatcher dropped a day after it ended is still a roadmap row, and that is the plan a stale follow-up names); a lane that has not landed or whose read throws adds no bracket and the lines are as without it. A named chat is listed whole, as the widget shows it (up to the service's own ceiling of 200, then "These are the newest 200"). Every chat together are cut at 20 (the service is asked for 21 to know), and the last line then says to name one chat. A chat's name is `chatNameOf` (any chat row, archived or hidden too).
 
-## `ask_dactyl { files 1–8, brief 1–4000, context? }`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/dactyl-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-read-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-turn-windows.mjs
+
+## MAN-9155 — server/modules/companion/tools — read_session, list_followups and ask_dactyl — `ask_dactyl { files 1–8, brief 1–4000, context? }`
+section: server/modules/companion/tools — read_session, list_followups and ask_dactyl: the scopes, the turn windows and the dactyl path rules/002 `ask_dactyl { files 1–8, brief 1–4000, context? }`
+
 Every file and the context go through `resolveDactylFiles` (`dactyl-paths.ts`) BEFORE any dactyl starts; one refusal sentence names every file refused, and nothing runs. Her activity is `reading_code` with the real paths. `runDactylRead` runs `dactyl --read <files> --brief - [--context <file>]`; exit 2 or 3 answers its own line as the error; the answer is its stdout (spend lines removed).
-**Path rules.** A file must resolve through `realpath` to a regular file under a visible project's path, `~/.claude` or her scratch, and must not be denied. Denied: any path segment (case-insensitive) that starts with `.env`, `credentials`, `secrets`, `id_rsa` or `.claude.json`; ends in `.env`, `.pem`, `.key`, `.p12`, `.pfx`, `.db`, `.token` or `_history`; holds `.sqlite`; is an SSH key name (`id_dsa*`, `id_ecdsa*`, `id_ed25519*`, or any `id_*` with no extension); is one of `.git-credentials`, `.netrc`, `.npmrc`, `.pgpass`, `.pypirc`, `.htpasswd`, `hosts.yml`, `hosts.yaml`, `.ssh`, `.aws`, `.gnupg`, `.kube`, `.docker`; anything under `~/.claude/state/claude_account`; `~/.claude/.credentials.json`; and, by PLACE, anything in a home dot-folder or dotfile other than `~/.claude` (`~/.cloudcli`, `~/.codex`, `~/.openclaw`, `~/.config`, `~/.vscode-server`, …). The place rule is the cure for the shape the names kept missing: applications keep tokens and keys in `~/.<app>/` under names no list predicts (`auth.json`, `agent-host-token`, `device.json`, `openclaw.json` were all reachable 2026-10-27 after the names were widened once). No registered project lives in a home dot-folder, and `~/.claude` stays whole. The name rules remain a net for the other roots (`/home/lyphe` itself and `/opt` are registered projects): the first widening followed a review that found `~/.git-credentials`, `~/.npmrc`, `~/.pgpass`, `gh/hosts.yml`, a `*.env` file, `secrets.local.json`, `~/.bash_history` and `~/.claude.json` reachable. `id_*` is not blanket (an `id_utils.py` passes) because the key names and the extensionless form are what keys are called, and `.ssh` is denied whole. The name is judged FIRST, whether or not the file exists (a missing `.env` is refused as a `.env`), and the resolved path again, so a link named `notes.txt` that points at a `.env` is refused with `(which is …)`. `~/` is the home folder; a name that is not a full path (`server/shared/prompt-stream.ts`) is looked for under the visible projects — one holder is the file, none or several is a sentence. The files handed to the dactyl are the REAL paths that were judged. The argument description says nothing about secrets on purpose: measured 2026-10-27, with "refused by name" in it Haiku declined the `.env` itself and never called the tool; without it she calls, and the tool's refusal (naming `.env`, "no dactyl was started") is what she relays.
+**Path rules.** A file must resolve through `realpath` to a regular file under a visible project's path, `~/.claude` or her scratch, and must not be denied. Denied: any path segment (case-insensitive) that starts with `.env`, `credentials`, `secrets`, `id_rsa` or `.claude.json`; ends in `.env`, `.pem`, `.key`, `.p12`, `.pfx`, `.db`, `.token` or `_history`; holds `.sqlite`; is an SSH key name (`id_dsa*`, `id_ecdsa*`, `id_ed25519*`, or any `id_*` with no extension); is one of `.git-credentials`, `.netrc`, `.npmrc`, `.pgpass`, `.pypirc`, `.htpasswd`, `hosts.yml`, `hosts.yaml`, `.ssh`, `.aws`, `.gnupg`, `.kube`, `.docker`; anything under `~/.claude/state/claude_account`; `~/.claude/.credentials.json`; and, by PLACE, anything in a home dot-folder or dotfile other than `~/.claude` (`~/.cloudcli`, `~/.codex`, `~/.openclaw`, `~/.config`, `~/.vscode-server`, …). The place rule is the cure for the shape the names kept missing: applications keep tokens and keys in `~/.<app>/` under names no list predicts (`auth.json`, `agent-host-token`, `device.json`, `openclaw.json` were all reachable 2026-10-27 after the names were widened once). No registered project lives in a home dot-folder, and `~/.claude` stays whole. The name rules remain a net for the other roots (`/home/lyphe` itself and `/opt` are registered projects): the first widening followed a review that found `~/.git-credentials`, `~/.npmrc`, `~/.pgpass`, `gh/hosts.yml`, a `*.env` file, `secrets.local.json`, `~/.bash_history` and `~/.claude.json` reachable. `id_*` is not blanket (an `id_utils.py` passes) because the key names and the extensionless form are what keys are called, and `.ssh` is denied whole. The name is judged FIRST, whether or not the file exists (a missing `.env` is refused as a `.env`), and the resolved path again, so a link named `notes.txt` that points at a `.env` is refused with `(which is …)`. `~/` is the home folder; a name that is not a full path (`server/shared/prompt-stream.ts`) is looked for under the visible projects — one holder is the file, none or several is a sentence. The files handed to the dactyl are the REAL paths that were judged. The argument description says nothing about secrets on purpose: measured 2026-10-27, with "refused by name" in it Haiku declined the `.env` itself and never called the tool; without it she calls, and the tool's refusal (naming `.env`, "no dactyl was started") is what she relays. The same rule is exported as the predicate `isDeniedPath(path)` — the name and the real file, whether or not it exists; a relative path is taken against the server's working directory — and `read_git` (`eyes/git-reads.ts`) holds every changed file to it, on the repository root joined with git's path, before reading its diff: a denied one is named "withheld" and never read, so a secret's diff reaches neither her context nor a dactyl (an untracked file's diff is the whole file).
 
-## Probes
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/dactyl-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-read-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-turn-windows.mjs
+
+## MAN-9156 — server/modules/companion/tools — read_session, list_followups and ask_dactyl — Probes
+section: server/modules/companion/tools — read_session, list_followups and ask_dactyl: the scopes, the turn windows and the dactyl path rules/003 Probes
+
 `.verify/companion-read-tools.mjs <empty dir under /tmp>`: two Haiku probe chats in `PROBE_PROJECT` ("probe long": a short turn then 120 lines; "probe kaylee": one short turn and one follow-up through the command door), her panel opened on :5183 on Haiku, the four typed lines with the status words, tool calls and results read from her JSONL, the `dactyl --session-status` hand count around the `.env` line; then every scope and the path-rule matrix called directly on a snapshot of `auth.db`. 57 checks passed on 2026-10-27 before the review fixes added matrix names and changed the long-turn check; it has not been re-run live since. Chats are made just before their first turn and remade (up to 3 times) when the CLI answers "No conversation found": a chat that completes with `provider_session_id` equal to its own id never reached the provider, measured twice right after a server handover; and `resolveChat` then cannot find it (his chats exclude `session_id = provider_session_id`). A long reply is asked as numbered lines: "the word lorem repeated 1500 times" did not finish in 170 s on Haiku. Account 1 (`verve`) is the dev account every live probe types to, so another soul's probe can write into her conversation, draft and model mid-run (measured 2026-10-27: a `send_to_session` to another probe's chat came out of this one's turn); the probe prints CONTAMINATED when an operator line in her log is not its own.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/dactyl-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-read-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-turn-windows.mjs
@@ -5363,7 +5400,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-n
 
 ## MAN-9072 — server/modules/companion — the send: `companion-send.ts` and `tools/send-options.ts`, what a draft checks, runs, records and clears
 
-The one place a draft goes out. Callers: the panel's Send (`POST /draft/send` → `companionService.sendDraft` → `account.sendDraft`), her `send_to_session` and `create_session` (`tools/draft-tools.ts`). The DRAFT is the only thing sent. One sender per account: `createDraftSender({ userId, store, runtime, setFocus, openChatOnFloor })`, built in `tools/tool-deps.ts`.
+The one place a draft goes out. Callers: the panel's Send (`POST /draft/send` → `companionService.sendDraft` → `account.sendDraft`), her `send_to_session` and `create_session` (`tools/draft-tools.ts`). The DRAFT is the only thing sent. One sender per account: `createDraftSender({ userId, store, runtime, setFocus, openOnFloor })`, built in `tools/tool-deps.ts`.
 
 ## Request and answer
 | name | shape |
@@ -5403,7 +5440,7 @@ Refusals 3 to 5 name the draft: its target and its first 160 code points, on one
 
 ## After a send
 - The draft clears only if `draft.updatedAt` is still the one that went: a rewrite made while the send was out is the next brief.
-- The chat becomes her focus (`setFocus`) and the page that holds the floor opens it (`openChatOnFloor`: the `companion_open_chat` frame, to the floor's client id only).
+- The chat becomes her focus (`setFocus`) and the page that holds the floor opens it (`openOnFloor({ kind: 'chat', sessionId })`: the `companion_open` frame, to the floor's client id only).
 
 ## Options — `sendOptionsFor(userId, sessionId, provider, newChat?)` → `ChatSendOptions`
 Read as the chat's own composer would read them. An option the source records none of is LEFT OUT, never defaulted.
@@ -5440,7 +5477,7 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 | `settingSources` | `[]` | nothing on disk widens what she may do |
 | `settings` | `{ autoMemoryEnabled: false }` | the CLI keys auto-memory (`MEMORY.md`, his standing rules) to the git root of the cwd; hers sits inside `~/.claude` |
 | `tools` | `[]` | no built-in tool: no shell, edit or web |
-| `mcpServers` | `{ companion: createSdkMcpServer({ name: 'companion', tools }) }` | her thirteen tools, in-process |
+| `mcpServers` | `{ companion: createSdkMcpServer({ name: 'companion', tools }) }` | her tools (`buildCompanionTools`), in-process |
 | `strictMcpConfig` | `true` | his own MCP servers (`~/.claude.json`) are not loaded |
 | `allowedTools` | each tool's name under `mcp__companion__` | exactly hers, so a tool is never one prompt away |
 | `includePartialMessages` | `true` | text deltas feed the sentence stream |
@@ -5487,7 +5524,7 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 | verb | does |
 |---|---|
 | `push(message)` | queues the message, restarts the idle clock |
-| `interrupt()` | `conversation.interrupt()`, answer within 5 s → `{ stillQueued: string[] }`; silence or a failure → `'unanswered'` (the session then closes the process: a CLI that ignores a Stop would ignore the next message) |
+| `interrupt()` | `conversation.interrupt()`, answer within 5 s → `{ stillQueued: string[] }`; silence or a failure → `'unanswered'` (the session then retires that launch and starts a replacement that resumes the held session id, carrying what was given and what was held: a CLI that ignores a Stop would ignore the next message; MAN-9169) |
 | `close()` | cancels the clock, `queue.end()` (EOF = wind down), waits up to 5 s for the loop, then `conversation.close()` |
 | `kill()` | cancels the clock, ends the queue, `conversation.close()` now |
 - Once ended by us (`close`, `kill`, the idle closer) the launch reports NOTHING more: its messages are drained unheard and `onEnded` fires only for a loop that ended by itself. The queue never ends on its own: why, in the prompt-stream row.
@@ -5506,8 +5543,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 |---|---|
 | `pushOperator(text, via)` / `pushOperatorEmpty()` / `pushAlerts(blocks)` / `pushFocusNews(envelope)` | assemble ONE message, start a turn if she is idle, wake a closed process. `pushAlerts([])` pushes nothing |
 | `warm()` | opens a launch with no message, so the CLI's ~1 s start is spent while a caller waits (the alert feed's gather window). No-op while a launch exists |
+| `resendUnanswered()` | pushes again, each as a fresh message, the words of his that her last process was given and never answered (§His words survive the process). Called by the entrypoint's sole-server duties, never by the session itself |
 | `oweCut(heard: string \| null, interrupted: string \| null)` | the next message opens with `<cut heard interrupted/>` (MAN-9080). Called by the companion's `cut` before it awaits `interrupt()` (MAN-9111). `pushOperator(…, 'spoken')` and `pushOperatorEmpty()` (`<operator via="spoken" heard="nothing"></operator>`, a press that carried no words) are the press door's (`companion-press.ts`, MAN-9059) |
-| `interrupt()` | her Stop: below |
+| `interrupt(by = 'operator')` | a stop of her turn: below. `by` is `'operator'` (his Stop `POST /interrupt`, the voice's cut) or `'server'` (`stopAll`) |
 | `setModel(model)` | `live?.cli.setModel`; MAN-9077 |
 | `clear()` | below |
 | `close(reason)` | `closeProcess`: detach, then `cli.close()` |
@@ -5521,10 +5559,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 | `awake` | the launch's first `init` passed the tool check; log `[Companion] account <id>: started\|resumed session <id> on <model>; the CLI listed N tools, all hers` |
 | `failed` | `fail(launch, sentence)`: tool check, a failed result, a thrown loop, a loop that ended by itself. `error` = the sentence |
 - A failure of her own is a system log line and a panel banner, NEVER something she says (ruling 17): the failure text is a synthetic assistant message, not stream deltas, so the sentence stream never sees it.
-- `fail` kills the launch, forgets `unanswered`, ends the turn `failed`, sets `failed`, writes the system line. The next push launches again.
+- `fail` kills the launch, drops the ledger's given and held messages (a message that makes her fail is not sent again to fail again), ends the turn `failed`, sets `failed`, writes the system line. The next push launches again.
 - A callback that throws is caught by `guarded(label, userId, fn)` (`guarded-callback.ts`): `[Companion] account <id>: the <label> callback threw`; the conversation goes on.
 
-## The loop's events (`readLoopEvent`, pure)
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-events.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/guarded-callback.ts
+
+## MAN-9167 — server/modules/companion/session — her conversation: the process states, the — The loop's events (`readLoopEvent`, pure)
+section: server/modules/companion/session — her conversation: the process states, the loop's events, which result ends a turn, the refused resume, Clear and Stop/001 The loop's events (`readLoopEvent`, pure)
+
 | CLI message | event | session does |
 |---|---|---|
 | `system`/`init` | `init { sessionId, tools, model }` | tool check; store `session_id` when it differs from the held one; first of a launch = `awake` |
@@ -5551,26 +5593,49 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 - At a turn's end: `onTurnEnded(turnId, outcome, error)`, then activity `idle` unless the callback pushed and began the next turn.
 - `THINKING_ACTIVITY` and `IDLE_ACTIVITY` are exported for `companion-account.ts`.
 
-## Stop (`interrupt`)
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-events.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/guarded-callback.ts
+
+## MAN-9168 — server/modules/companion/session — her conversation: the process states, the — His words survive the process (`session/companion-ledger.ts`, `companion-unanswered.ts`)
+section: server/modules/companion/session — her conversation: the process states, the loop's events, which result ends a turn, the refused resume, Clear and Stop/002 His words survive the process (`session/companion-ledger.ts`, `companion-unanswered.ts`)
+
+- The ledger holds every message of ours no `result` has consumed yet: GIVEN (the CLI has it), HELD (pushed while a stop is being answered) and INHERITED (a previous process was given it and never answered). Only his messages (`pushOperator`, `pushOperatorEmpty`) are kept across a process; an alert or a chat's news is the house's.
+- Kept = `companion_state.unanswered_json` (MAN-9082): `[{ uuid, body, via, at, cut? }]`, his RAW text and how it came (`''` with `spoken` = an empty press), never the assembled message (its roster snapshot goes stale; it is assembled again on delivery). `cut` is the `<cut heard interrupted/>` the message opened with (absent when it opened with none): the one part of an assembled message that is not a snapshot, so the message said again opens with it (unless a newer cut is owed). The in-process restate after a stop does not owe it again: the aborted request already carried it. Written through `deps.writeUnanswered` after every change that alters the list, so a message is on disk before the CLI could lose it; read once through `deps.readUnanswered` when the session is made.
+- A message leaves the list when: a `result` with no failure for a turn that was not stopped consumes it (a success that lists no uuid consumes the messages of the turn in flight, `turns.inFlightUuids()`); `fail` drops it; Clear; his own cut or Stop takes the turn it was in (below). It does NOT leave when the process ends: `detach` (idle close, `close`, the server's stop) makes what is kept INHERITED.
+- `resendUnanswered()` pushes each INHERITED entry as a fresh message (new uuid, same body, via and `at`, in order, assembled afresh with the roster and view like any wake). The new push REPLACES its entry, so a restart storm leaves one entry and gets one answer. Journal: `[Companion] account <id>: re-sending <K> message(s) her last process never answered`. A push that throws leaves its entry for the next boot.
+- WHO CALLS IT. The entrypoint's `soleServerDuties()` (`server/index.ts`) → `companion.resendUnanswered()` → `companionService.resendUnanswered()` makes (if need be) the account of each `companionDb.userIdsWithUnanswered()` user and calls the session's. On a handover boot that is the supervisor's `takeover`, after the predecessor is gone: a predecessor still serving may be answering the same words, and two processes on one CLI conversation must not both say them (measured 2026-10-28: a re-send at module build ran a second before the predecessor was retired). So a session never re-sends by itself.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-unanswered.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-events.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/guarded-callback.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs
+
+## MAN-9169 — server/modules/companion/session — her conversation: the process states, the — Stop (`interrupt(by)`)
+section: server/modules/companion/session — her conversation: the process states, the loop's events, which result ends a turn, the refused resume, Clear and Stop/003 Stop (`interrupt(by)`)
+
 1. `turns.stop()` ends the turn `stopped`; none in flight = nothing else happens.
-2. Launch still being built (`!cli.up`) → `closeProcess('stopped before her process was up')`.
-3. `cli.interrupt()`; `'unanswered'` → `closeProcess('her process did not answer the interrupt')`.
-4. Answered → `turns.adopt(stillQueued)`: messages queued behind the stopped turn run as a turn of their own.
+2. Every message the CLI was given is marked with `by` (`ledger.markStopped`): it is the turn being stopped. `by = 'operator'` takes them off the kept list at once (he did not want that answer); `'server'` leaves them kept — a handover is no word of his.
+3. Launch still being built (`!cli.up`) → `closeProcess('stopped before her process was up')`.
+4. From here until the stopped turn's `result` is in (or the launch is gone) a push is HELD: assembled and kept, not given to the CLI (journal: `a message arrived while her turn was being stopped; it is held until the stopped turn has reported`). why: a message that reaches the CLI while it unwinds an interrupt can be folded into the request being aborted, and then nothing answers it.
+5. `cli.interrupt()`. `'unanswered'` → the launch is killed and REPLACED: a new launch resumes the held session id, carrying what was given (less what his stop cut) and what was held. Nothing waits on a CLI that ignores an interrupt.
+6. Answered → `turns.adopt(stillQueued)` (messages queued behind the stopped turn run as a turn of their own; they are unmarked). Then the wait for the result (skipped when no message is left marked): `interrupt()` returns when it is in, or after `CLI_GRACE_MS` (5 s) — a CLI that never reports must not hold his next words for ever — and the held words are given, in order.
+- The stopped turn's result (measured 2026-10-28, live CLI: `error_during_execution`, `is_error: true`, within ~10 ms of the receipt, listing the stopped turn's uuids; a tool in flight is rejected at once) is recognised by listing a MARKED message. It never fails her (`turns.result` is told no failure). Of the messages it lists: marked `operator` → dropped; marked `server`, or not marked (pushed after the stop and folded into the abort) → pushed again as fresh messages (new uuid, assembled afresh), ahead of the held words. Any result while a stop stands ends the hold. The mark is a guess until that result is in: a message the SAME stop marked and the result did NOT list was never part of the aborted request (measured 2026-10-28: a message pushed 6 ms before the cut, `stillQueued` empty, was answered by the CLI as a turn of its own), so it is unmarked, back on the kept list, and adopted by the tracker as a turn of its own (`ledger.strandedBy`, `turns.adopt`). The first result that lists NO uuid while a stop stands is the stopped turn's too: it never fails her, so the words held behind the stop are not lost with it.
+- `stopAll` runs `interrupt('server')` and `close('the server is stopping')` together: the interrupt is the clean cancel (a handover must not hang on a tool call), the close detaches at once, and what was given and unanswered stays kept for the successor.
 
 ## The refused resume
 - Seen as a `result` whose errors match `/No conversation found with session ID/i` (then the iterator throws), or a thrown error matching `/No conversation found/i`.
-- Does: kill the launch; `writeProviderSessionId(null)`; system line `Her memory could not be resumed; she starts fresh`; `assembler.oweState()` (focus, draft, walk went with the conversation); ONE new launch with no `resume`, carrying `unanswered`. Log `[Companion] account <id>: the CLI has no conversation <id>; she starts fresh`.
+- Does: kill the launch; `writeProviderSessionId(null)`; system line `Her memory could not be resumed; she starts fresh`; `assembler.oweState()` (focus, draft, walk went with the conversation); ONE new launch with no `resume`, carrying the ledger's given and held messages (`ledger.carry()`). Log `[Companion] account <id>: the CLI has no conversation <id>; she starts fresh`.
 - A refusal in any other wording is a `failed`; a held id that is not UUID-shaped never gets that far (`resumableSessionId`, MAN-9077).
 
 ## Clear (`clear`)
 1. `writeProviderSessionId(null)` and `assembler.forget()` BEFORE anything is awaited.
-2. `detach('cleared')` takes the launch out of the conversation synchronously and sets `asleep`. why: a push landing during the wind-down is a wake into a fresh conversation, never a resume of the one being cleared.
+2. `detach('cleared')` takes the launch out of the conversation synchronously and sets `asleep`, then `ledger.forgetAll()` (nothing is kept; `companionDb.clearAccount` also NULLs `unanswered_json`). why: a push landing during the wind-down is a wake into a fresh conversation, never a resume of the one being cleared.
 3. A turn in flight is interrupted now; `cli.close()` is awaited.
 4. A push that already woke a new launch is not overwritten.
 The rows go with it: MAN-9059 §Clear.
 
-## Proof
-`.verify/kaylee-session.mjs` (`--pure` for the steps with no model call): stand-in callbacks print each event; steps init, hello, memory, model, resume, refused, stop.
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-events.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/guarded-callback.ts
+
+## MAN-9170 — server/modules/companion/session — her conversation: the process states, the — Proof
+section: server/modules/companion/session — her conversation: the process states, the loop's events, which result ends a turn, the refused resume, Clear and Stop/004 Proof
+
+`.verify/kaylee-session.mjs` (`--pure` for the steps with no model call): stand-in callbacks print each event; steps init, hello, memory, model, resume, refused, stop. `.verify/companion-unanswered.mjs` (no model call; stand-in launcher over a scratch database): the ledger and the hold — his cut, the server's stop, a handover and a restart storm, a failure, a CLI that never reports, a CLI that ignores the interrupt, Clear. `.verify/companion-unanswered-live.mjs handover|press` (Haiku, the dev account): a server handover with a turn in flight; his cut and new words in the same second.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-events.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/guarded-callback.ts
 
@@ -5614,7 +5679,8 @@ Every message to her is assembled at the moment it is pushed (`createMessageAsse
 | `toolLine(name)` | her prompt's own TOOLS line for a tool; it IS the tool's description. Throws when the section has no line |
 | `toolNames()` | the names of the lines that open `name(`, in the section's order = `COMPANION_TOOL_NAMES` |
 - Fills run in ONE pass (`fillSlots`): a value that contains `{name}` is never filled again, `$` in a value is not a replacement pattern, a slot the template invents is left as written, a slot it lacks is not filled.
-- The prompt lists thirteen tools; tools: MAN-9070.
+- The prompt's TOOLS section lists every tool she holds; the registry: MAN-9070.
+- `THE HOUSE, WHEN HE POINTS AT IT` (after WHAT YOU MUST NOT DO, before TOOLS): the rule (call the panel's tool before saying a word about it; every one takes `panel: true`), then one pointer line per panel naming its tool, in the TOOLS section's order. A new eyes tool adds its pointer line and its TOOLS line together: `toolLine` throws on a missing TOOLS line; a pointer line is read only by the probe of its own tool (`.verify/companion-doc-reads.mjs`: DocSpace's; `.verify/companion-run-reads.mjs`: the runs', and that it stands after the roadmap's and before DocSpace's).
 - The sound set is the account's `gemini.soundTags` (shipped default `DEFAULT_SOUND_TAGS`, voice module): one list for the fill and the filter (MAN-9081).
 
 ## Proof
@@ -5663,31 +5729,40 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-wire-contract.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-sentence-replay.mjs
 
-## MAN-9082 — server/modules/companion — storage: the four tables, companionDb, relayedSendsDb, the store's frame per write, the floor and Clear
+## MAN-9082 — server/modules/companion — storage: the five tables, companionDb, relayedSendsDb, the store's frame per write, the floor and Clear
 
-`COMPANION_SCHEMA_SQL` (`server/modules/database/companion-schema.ts`) is exec'd by `runMigrations` beside `FOLLOWUPS_SCHEMA_SQL`. Every statement is `IF NOT EXISTS`: editing a column there changes NOTHING on a database that has the table; a later column needs `addColumnToTableIfNotExists` in `migrations.ts` (as `sessions.permission_mode` does: MAN-9085). Rows → wire shapes and frames: `companion-store.ts`.
+`COMPANION_SCHEMA_SQL` (`server/modules/database/companion-schema.ts`) is exec'd by `runMigrations` beside `FOLLOWUPS_SCHEMA_SQL`. Every statement is `IF NOT EXISTS`: editing a column there changes NOTHING on a database that has the table; a later column needs `addColumnToTableIfNotExists` in `migrations.ts` (as `sessions.permission_mode` does: MAN-9085, and `companion_state.pending_json` through `addCompanionPendingColumn`). Rows → wire shapes and frames: `companion-store.ts`.
 
-## The four tables
+## The five tables
 | table | key | holds | dies with |
 |---|---|---|---|
-| `companion_state` | `user_id` (one row per account) | `provider_session_id` (her CLI conversation; NULL until her first `init` and after Clear), `focus_json` (`CompanionSessionRef`), `draft_json` (`CompanionDraft`), `walk_json` (`CompanionWalk`), `floor` (the client id holding the floor), `updated_at` | the account (`ON DELETE CASCADE`) |
+| `companion_state` | `user_id` (one row per account) | `provider_session_id` (her CLI conversation; NULL until her first `init` and after Clear), `focus_json` (`CompanionSessionRef`), `draft_json` (`CompanionDraft`), `walk_json` (`CompanionWalk`), `pending_json` (the one action waiting for his word, `CompanionPendingAction` plus the server-only `pin`; NULL for none; added by `addCompanionPendingColumn` in `migrations.ts`, not in `companion-schema.ts`), `unanswered_json` (his messages no turn of hers has answered yet, `[{ uuid, body, via, at, cut? }]` oldest first: his RAW text and how it came, never the assembled message; NULL for none; added by `addCompanionUnansweredColumn` in `migrations.ts`, not in `companion-schema.ts`; the session writes it on push and the next process says it to her again, MAN-9079), `floor` (the client id holding the floor), `updated_at` | the account (`ON DELETE CASCADE`) |
 | `companion_log` | `id` AUTOINCREMENT, index `(user_id, id)` | `at`, `role` (`operator` \| `kaylee` \| `alert` \| `system`, CHECK), `via` (`typed` \| `spoken`, CHECK), `turn_id`, `turn_index`, `text`, `mood`, `sounds_json` (NULL for none, never `[]`) | the account |
 | `companion_notes` | `id` AUTOINCREMENT | `at`, `title`, `text` | the account |
 | `relayed_sends` | `id` AUTOINCREMENT, index on `session_id` | `session_id` → `sessions(session_id)`, `via`, `text`, `sent_at`, `message_uuid` (TEXT, NULL; added by `addRelayedSendMessageUuidColumn` in `migrations.ts`, not in `companion-schema.ts`) | the chat (`ON DELETE CASCADE`) |
+| `companion_actions` | `id` TEXT, index `(user_id, prepared_at)` | her record of the actions she prepared for his word, one row each: `action`, `target_json`, `pin_json` (server-only), `prompt`, `carried_json`, `prepared_at`, `expires_at`; once taken `said`, `said_at`, `said_log_id`; once ended `ended_at`, `outcome` (CHECK `took` \| `already` \| `refused` \| `cancelled` \| `replaced` \| `expired`) and `answer`. No `outcome` = still waiting | the account |
 - `AUTOINCREMENT`, never reused: the panel holds a note id it may ask to dismiss and an entry id it has drawn; a number it remembers never names another row.
 - `relayed_sends` hangs on the CHAT because a relayed send is a fact of the chat's history. It survives Clear.
+- `companion_actions` is a fact about the HOUSE (what was done, on whose word, when). Clear never deletes from it; it ends any row with no outcome `cancelled` in its own transaction. An action ends once (`endAction` writes only a row with no outcome), and a lapse is found by the next prepare, take or cancel that meets it and ended `expired` — never by a timer.
 - Merge paths: the three paths in `sessions.db.ts` that delete a watcher's duplicate row (`assignProviderSessionId`, `repointSessionToProviderSession`, `createForkedSession`) move `followups` and do NOT move `relayed_sends`, and need not: the companion records a send only for a chat of her list (`session_id <> provider_session_id`), never for a watcher row. A writer that records sends for any other kind of row must extend those paths first (MAN-9003).
 
-## `companionDb` (`repositories/companion.db.ts`; ROWS in, rows out: snake_case, JSON as text)
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-store.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/companion-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion-actions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/relayed-sends.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-pending.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-frame-tap.mjs
+
+## MAN-9146 — server/modules/companion — storage: the five tables, companionDb — `companionDb` (`repositories/companion.db.ts`; ROWS in, rows out: snake_case, JSON as text)
+section: server/modules/companion — storage: the five tables, companionDb, relayedSendsDb, the store's frame per write, the floor and Clear/001 `companionDb` (`repositories/companion.db.ts`; ROWS in, rows out: snake_case, JSON as text)
+
 | verb | does |
 |---|---|
 | `readState(userId)` | the row or `null` |
-| `writeState(userId, patch)` | upsert of the columns the patch names (`provider_session_id`, `focus_json`, `draft_json`, `walk_json`, `floor`); a key left out or `undefined` is untouched, `null` sets NULL; stamps `updated_at`; answers the row |
+| `writeState(userId, patch)` | upsert of the columns the patch names (`provider_session_id`, `focus_json`, `draft_json`, `walk_json`, `pending_json`, `unanswered_json`, `floor`); a key left out or `undefined` is untouched, `null` sets NULL; stamps `updated_at`; answers the row |
 | `userIdsFocusedOn(sessionId)` | accounts whose `focus_json.sessionId` is the chat, ascending; read from the rows, so an account untouched since boot is found; non-JSON `focus_json` names no one (guard is a `CASE`, not `AND`) |
+| `userIdsWithUnanswered()` | accounts whose `unanswered_json` holds a non-empty list, ascending; what the server finds at boot to know whose Kaylee must be made so she says those messages again (MAN-9079) |
 | `appendLog(userId, entry)` | insert + delete everything beyond the newest `COMPANION_LOG_KEEP` = 400 of the account, one transaction; answers the row with its id |
 | `readLog(userId, limit)` | newest `limit` rows, oldest first; `limit` clamped to 0..400, non-finite = 400 |
 | `addNote`, `listNotes`, `removeNote(userId, id)` | `listNotes` oldest first; `removeNote` is false for another account's id |
-| `clearAccount(userId)` | one transaction: deletes the account's log and notes; resets `provider_session_id`, `focus_json`, `draft_json`, `walk_json` to NULL. `floor` STAYS; `relayed_sends` is never touched; no state row is created for an account with none. Answers `{ logRemoved, notesRemoved, stateReset }` |
+| `heardSince(userId, since)` | his (`operator`) and her (`kaylee`) log lines with `at` after `since`, oldest first, at most 400 (the whole log the account keeps): `{ id, at, role, via, text }`. What `take_action` checks his word against. THROWS when `since` is not a stored stamp (`isStoreStamp`, `server/shared/utils.ts`: fixed-width ISO-8601 UTC with milliseconds that parses as a date; `''` would read as before every line) — pass `pending.preparedAt` through unchanged |
+| `openAction(userId, row)`, `endAction(userId, id, end)`, `listActions(userId, limit)` | the record of actions (`repositories/companion-actions.db.ts`, spread into `companionDb`). `openAction` inserts a row with no outcome and answers it. `endAction` writes `ended_at` (now by default), `outcome` and, when given, `said`, `said_at`, `said_log_id`, `answer` — only to a row with no outcome, and answers whether this call ended it. `listActions` answers the newest `limit` (≤ 1000) by `prepared_at`, newest first |
+| `clearAccount(userId)` | one transaction: ends every `companion_actions` row of the account that has no outcome as `cancelled`; deletes the account's log and notes; resets `provider_session_id`, `focus_json`, `draft_json`, `walk_json`, `pending_json`, `unanswered_json` to NULL. `floor` STAYS; `relayed_sends` and every row of `companion_actions` are kept; no state row is created for an account with none. Answers `{ logRemoved, notesRemoved, stateReset }` |
 Every statement names its account in `WHERE`/`VALUES`: an id of another account reads as no row.
 
 ## `relayedSendsDb` (`repositories/relayed-sends.db.ts`)
@@ -5695,35 +5770,41 @@ Every statement names its account in `WHERE`/`VALUES`: an id of another account 
 - `listForSession(sessionId)`: oldest first.
 - Reader: the history mark (MAN-9084). Writer: `companion-send.ts` (MAN-9072).
 
-## The store (`createCompanionStore(userId)`): one frame per write
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-store.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/companion-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion-actions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/relayed-sends.db.ts
+
+## MAN-9147 — server/modules/companion — storage: the five tables, companionDb — The store (`createCompanionStore(userId)`): one frame per write
+section: server/modules/companion — storage: the five tables, companionDb, relayedSendsDb, the store's frame per write, the floor and Clear/002 The store (`createCompanionStore(userId)`): one frame per write
+
 The write comes first and the frame second, in the same tick; a failed write sends none. Frames reach THIS account's open pages through `sendToUser`, nobody else's.
 | verb | frame |
 |---|---|
 | `setProviderSessionId` | none |
+| `readUnanswered()` / `setUnanswered(list)` | none (`unanswered_json`: a page has no use for it; `[]` stores NULL; a column that is not the shape reads as none, with the warning every JSON column gets) |
 | `setFloor(client)` | `companion_floor { floor }` on EVERY write of a client id, not only a change; a cleared floor (`null`) sends none |
 | `setFocus(ref \| null)` | `companion_focus` |
 | `setDraft(input \| null)`, `setWalk(input \| null)` | `companion_draft`, `companion_walk` (store stamps `updatedAt`; answers what was stored) |
+| `setPending(stored \| null)` | `companion_pending` with the action WITHOUT its `pin` (`withoutPin` in `companion-pending.ts`), or `null`; `pending_json` keeps the pin. Answers what was sent. The picture's `pending` is the same cut |
 | `appendLog(line)` | `companion_sentence` for `role: 'kaylee'`, else `companion_log` |
 | `addNote`, `removeNote(id)` | `companion_note`; `companion_note_removed` only when this account had the note |
-| `emit(frame)` | the frames that are not rows: `companion_turn`, `companion_activity`, `companion_process`, `companion_settings`, `companion_open_chat`, `companion_cleared` |
-| `clearAccount()` | `companionDb.clearAccount`, then `companion_cleared` |
-- A JSON column that does not read as its shape (a hand edit, a later build) is dropped with `[Companion] Dropping <column> of account <id>`: it never throws; the picture still loads.
-- `readState()` → `{ providerSessionId, focus, draft, walk, floor }`.
+| `emit(frame)` | the frames that are not rows: `companion_turn`, `companion_activity`, `companion_process`, `companion_settings`, `companion_open`, `companion_cleared` |
+| `clearAccount()` | `companionDb.clearAccount` (which ends a standing action's row `cancelled`), then `companion_cleared` |
+- A JSON column that does not read as its shape (a hand edit, a later build) is dropped with `[Companion] Dropping <column> of account <id>`: it never throws; the picture still loads. A `pending_json` that does not read as `CompanionStoredPending` (`isStoredPending`) is no pending action. It must carry real stamps — `preparedAt` and `expiresAt` pass `isStoreStamp` (`server/shared/utils.ts`), so a writer stores `new Date().toISOString()` and nothing else — and every row number (a followup target's `id`, a carried line's `logId`, a pin's `followupId`) is a whole number ≥ 1.
+- `readState()` → `{ providerSessionId, focus, draft, pending, walk, floor }`; `pending` carries the pin and is server-only.
 
 ## The floor
 - `companion_state.floor` = the `x-companion-client` id of the page that last typed (`POST /messages`), pressed Send (`POST /draft/send`), pressed her talk button (`POST /press`, taken before the clip is heard) or opened her panel (`POST /floor`).
 - Every write of the floor sends `companion_floor { floor }` to the account's pages (MAN-9086). The page whose client id equals it plays her voice; every other shows the words only (MAN-9113). A page that missed the move (a socket that reconnected) hears it again the next time anyone speaks to her, and reads it in the picture's `floor` when it re-seeds.
 - The speech door answers only the floor page (MAN-9110).
-- `openChatOnFloor(sessionId)` emits `companion_open_chat { sessionId, floor }` only while a floor is held. Every page receives it; only the page whose client id equals `floor` opens the chat (MAN-9083).
+- `openOnFloor(target)` emits `companion_open { target, floor }` only while a floor is held (`target` is a `CompanionOpenTarget`: a chat, a roadmap card or a DocSpace page; a send opens `{ kind: 'chat', sessionId }`). Every page receives it; only the page whose client id equals `floor` acts on it (MAN-9083).
 - The id is minted per tab by the page (`companionClientId()` in `src/shared/utils.ts`: 16 random bytes in hex, kept in `sessionStorage`) and rides every `api.companion.*` call as `x-companion-client`.
 
 ## Clear, in storage terms
-Rows deleted: the account's log, notes, `provider_session_id`, focus, draft, walk. Rows kept: `floor`, `relayed_sends`. Order of the steps: MAN-9059 §Clear.
+Rows deleted: the account's log, notes, `provider_session_id`, focus, draft, pending action, walk. Rows kept: `floor`, `relayed_sends`, `companion_actions` (a standing action's row is ended `cancelled`). Order of the steps: MAN-9059 §Clear.
 
 ## Proof
-`.verify/companion-storage.ts` (against a `.backup` copy of `auth.db`; refuses the live database): 405 appends leave 400 with the first five ids gone; a state round trip; a note added, listed, removed; `clearAccount` keeps the floor and `relayed_sends`; a relayed send; `latestPermissionMode`. `.verify/companion-store.mjs`: the store's frame per write, one account's page and another's silent.
+`.verify/companion-storage.ts` (against a `.backup` copy of `auth.db`; refuses the live database): 405 appends leave 400 with the first five ids gone; a state round trip; a note added, listed, removed; `clearAccount` keeps the floor and `relayed_sends`; a relayed send; `latestPermissionMode`. `.verify/companion-store.mjs`: the store's frame per write (`setPending` among them: no pin on the wire), the record of actions (`endAction` once, `listActions` newest first, `heardSince`), Clear ending a standing action `cancelled` and keeping the record, one account's page and another's silent. `.verify/companion-pending.sh`: the same on a scratch server over a copied database, through `GET /api/companion`, `DELETE /api/companion/action` and `POST /api/companion/clear`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-store.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/companion-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/relayed-sends.db.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-store.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/companion-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/relayed-sends.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-pending.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-frame-tap.mjs
 
 ## MAN-9083 — src/modules/companion — the page's picture: CompanionProvider, the reducer, the floor, api.companion and the wiring into the workspace
 
@@ -5741,10 +5822,14 @@ The views are MAN-9062. This row is the state they draw from and the places the 
 | `CompanionDock` | `WorkspaceRail`'s foot: after `UsageRings`, before the foot views (the Inbox) and Settings (her cell; it draws her door while the disc is out: MAN-9125) |
 | palette row | `ProjectCommandPalette` builds `companionGroup` and passes it to `CommandPalette` (prop `companionGroup`), drawn between the Applications and Navigate groups when actions show and the group has rows. One row: key `companion`, label `t('companion.palette.talk', { name })` ("Talk to Kaylee"), icon `AudioLines`, `run: setOpen(true)`. `name` = `picture?.settings.name`, else `t('companion.defaultName')` |
 | Settings section | `VoiceSettingsTab`, after its voice section, NOT gated by `voiceEnabled`; the section fetches and saves for itself (`useCompanionSettings`: `GET /api/companion`, `PUT /api/companion/settings`) |
-- Opening a chat for her (`onOpenChat`, `CompanionHost.openCompanionChat(sessionId)`): `setActiveTab('chat')`, `navigate('/session/<id>')`, and when an application covers the main region (`useCurrentApplication() !== null`) the chat host's `open()` floats the chat over it. The callback changes identity as applications come and go; the provider reads the newest at the moment a frame arrives.
+- Opening for her (`onOpen(target: CompanionOpenTarget)`, `CompanionHost.openOnThisPage`), called by the provider only for a `companion_open` whose `floor` is this page's client id; `CompanionHost` answers each target. `chat`: `setActiveTab('chat')`, `navigate('/session/<id>')`, and when an application covers the main region (`useCurrentApplication() !== null`) the chat host's `open()` floats the chat over it. `card`: when an application covers the workspace, `useBackToWorkspace()` first; then `setActiveTab('runner')` and `useRevealCard()` (a `navigate` to the current path with `?runner=<plan>`, which `useRunnerLanding` takes and strips; the Roadmap tab's In flight face shows the card). `page`: `useShowApplication()('archpulse', '/#page=<id>' + (blockId ? '&block=<id>' : ''))`, which puts ArchPulse up at the page or, when it is up, moves that pane there (MAN-491). The callback changes identity as applications come and go and the route moves; the provider reads the newest at the moment a frame arrives.
 - Text: `t('companion.*')` in `en/common.json`; the Settings section reads `voiceSettings.companion.*` in `en/settings.json`.
 
-## `useCompanion()` → `CompanionContextValue`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/CompanionHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx
+
+## MAN-9148 — src/modules/companion — the page's picture: CompanionProvider, the reducer, the — `useCompanion()` → `CompanionContextValue`
+section: src/modules/companion — the page's picture: CompanionProvider, the reducer, the floor, api.companion and the wiring into the workspace/001 `useCompanion()` → `CompanionContextValue`
+
 | member | does |
 |---|---|
 | `picture`, `open`, `clientId` | `CompanionPicture \| null` (null until the first read lands); whether her panel is open on THIS page; this page's id |
@@ -5755,7 +5840,8 @@ The views are MAN-9062. This row is the state they draw from and the places the 
 | `editDraft(text)` | `PUT /draft`; the answer is folded in as `companion_draft` |
 | `sendDraft(mode)` | `POST /draft/send`; resolves with the `outcome` (`'started'` \| `'folded'`); rejects with the server's sentence on a refusal |
 | `clearDraft`, `dismissNote(id)`, `interrupt`, `clear` | `DELETE /draft`, `DELETE /notes/:id`, `POST /interrupt`, `POST /clear` |
-| `recentSend` | `string \| null`: the id of the chat she sent a draft to in the last `RECENT_SEND_MS` = 4000 ms (counted from the `companion_open_chat` frame this page heard), else null. `useAvatarTarget` points the button at that chat's composer while it is set |
+| `cancelAction()` | `DELETE /action`: his × on the card of the action waiting for his word. On the 2xx the provider folds `companion_pending: null` itself, as `editDraft` folds its answer, so the card never stays up while its frame is in flight; a refusal rejects with the server's sentence, which the card says at its foot. `CompanionPanel` passes it to the card as `onWithdraw` |
+| `recentSend` | `string \| null`: the id of the chat she opened in the last `RECENT_SEND_MS` = 4000 ms — the chat a send went to, or one she was told to open (counted from the `companion_open` frame for a chat target that this page heard), else null. `useAvatarTarget` points the button at that chat's composer while it is set |
 | `fabPosition`, `moveFab(next)` | where her disc rests (`{ docked: true }` or a point) and its setter, which stores `companion-fab`: from `useCompanionFab()`, called once in the provider (MAN-9129) |
 | `dockRect`, `registerDock(rect)` | the rail cell's rect while on screen, and the cell's report of it (MAN-9129) |
 | `fabAway`, `setFabAway(away)` | a look holds her disc off its seat; set by `CompanionFab`, read by `CompanionDock` (MAN-9129) |
@@ -5766,7 +5852,11 @@ The views are MAN-9062. This row is the state they draw from and the places the 
 - The provider unlocks the page's audio inside `setOpen(true)` and `sendText`, and silences the voice in `interrupt` (before the request) and on a `companion_cleared` frame (MAN-9113).
 - `ensureOk`: a non-2xx answer throws an `Error` whose message is `refusalSentence(response)` (the server's own sentence), else `Request failed (<status>)`.
 
-## `api.companion` (`src/shared/api.ts`; the only place these URLs are written)
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/CompanionHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx
+
+## MAN-9149 — src/modules/companion — the page's picture: CompanionProvider, the reducer, the — `api.companion` (`src/shared/api.ts`; the only place these URLs are written)
+section: src/modules/companion — the page's picture: CompanionProvider, the reducer, the floor, api.companion and the wiring into the workspace/002 `api.companion` (`src/shared/api.ts`; the only place these URLs are written)
+
 | call | route |
 |---|---|
 | `picture()` | `GET /api/companion` |
@@ -5774,6 +5864,7 @@ The views are MAN-9062. This row is the state they draw from and the places the 
 | `floor()` | `POST /api/companion/floor` |
 | `saveSettings(patch)` | `PUT /api/companion/settings` |
 | `editDraft(text)`, `clearDraft()` | `PUT`, `DELETE /api/companion/draft` |
+| `cancelAction()` | `DELETE /api/companion/action`: his × on the card of the action waiting for his word; answers 204 whether or not one was standing. The provider folds `companion_pending: null` on the 2xx, and the frame the route sends folds the same value again |
 | `sendDraft(mode)` | `POST /api/companion/draft/send` |
 | `dismissNote(id)` | `DELETE /api/companion/notes/<id>` |
 | `interrupt()` | `POST /api/companion/interrupt` |
@@ -5788,37 +5879,41 @@ The views are MAN-9062. This row is the state they draw from and the places the 
 2. After that, every `companion_*` frame on the page's one socket is folded by `reduceCompanion(picture, frame)`.
 3. Read again on: the socket's `websocket_reconnected` (frames were missed), a `companion_cleared` frame, the panel opened while `picture === null`, and the panel's Try again (`reread`) while a failed read keeps `picture` null.
 4. A frame that arrives while a read is out is queued and folded over its answer. A read asked for while one is out discards that one and reads again. A `companion_cleared` drops the queue and discards a read in flight.
-5. `companion_open_chat` is not folded: it opens the chat only when `frame.floor === clientId`; every other page of the account ignores it.
+5. `companion_open` is not folded. For a chat target (`target.kind === 'chat'`) every page notes it in `recentSend`; `onOpen(target)` is called, for a chat, a card or a page, only when `frame.floor === clientId`, and every other page of the account does nothing with it. `CompanionHost` answers each target (MAN-9083).
 
-## `reduceCompanion` (`utils/companionReducer.ts`, pure, imports types only)
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/CompanionHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx
+
+## MAN-9150 — src/modules/companion — the page's picture: CompanionProvider, the reducer, the — `reduceCompanion` (`utils/companionReducer.ts`, pure, imports types only)
+section: src/modules/companion — the page's picture: CompanionProvider, the reducer, the floor, api.companion and the wiring into the workspace/003 `reduceCompanion` (`utils/companionReducer.ts`, pure, imports types only)
+
 | frame | does |
 |---|---|
 | `companion_log`, `companion_sentence` | the entry joins `log` by `id`, ascending; a held id changes nothing; only the newest `LOG_KEPT` = 200 stay |
 | `companion_turn` | `started` sets `turnId`; `ended` clears it only when it is the running turn's |
-| `companion_activity`, `_focus`, `_draft`, `_walk`, `_settings`, `_process` | replaces the field |
+| `companion_activity`, `_focus`, `_draft`, `_pending`, `_walk`, `_settings`, `_process` | replaces the field. `pending` is the action waiting for his word or `null`; a payload without the fields the card draws from (`id`, `action`, `say`, `preparedAt`, `expiresAt` text, `target` a record, `carried` groups with `lines`) leaves the picture alone |
 | `companion_floor` | `floor` replaces `picture.floor` when it is text and differs; the same object back otherwise. The voice pull arms on `floor === clientId` (MAN-9113) |
 | `companion_note` / `companion_note_removed` | joins by `id` / removes by `id` |
-| `companion_cleared` | empties `log`, `notes`, `draft`, `walk`, `focus`, `turnId`, sets activity `idle`; `settings`, `process`, `models` and `floor` stay (the provider then reads again) |
+| `companion_cleared` | empties `log`, `notes`, `draft`, `pending`, `walk`, `focus`, `turnId`, sets activity `idle`; `settings`, `process`, `models` and `floor` stay (the provider then reads again) |
 | unknown kind, or a payload the panel cannot read | the SAME object back |
-- Folding a frame twice is harmless (ids and replacement), which is why a read and the socket need no ordering. `isCompanionPicture` requires `floor` to be text or `null`.
+- Folding a frame twice is harmless (ids and replacement), which is why a read and the socket need no ordering. `isCompanionPicture` requires `floor` to be text or `null` and `pending` to be `null` or an action with the fields above.
 
 ## Proof
 - `.verify/companion-lands.mjs` (live :5183 against :3011, Haiku): door, panel over an application, memory across a model switch, a second page of the account, the other account's page, Clear; records every `companion_*` frame to `<evidence>/frames.json`.
 - `.verify/companion-reducer.mjs <frames.json>` (`tsx`): folds the recorded frames over each picture and sets the result beside the next `GET`.
-- `.verify/companion-lands-page.mjs` (no model call): the palette row opens the panel; Settings reads and saves; `companion_open_chat` opens the chat on the named page alone.
+- `.verify/companion-lands-page.mjs` (no model call): the palette row opens the panel; Settings reads and saves; `companion_open` for a chat opens the chat on the named page alone.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/CompanionHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx
 
-## MAN-9086 — server/shared/companion-types.ts — the wire contract: the types, the fourteen frames, who sends each and what the page does
+## MAN-9086 — server/shared/companion-types.ts — the wire contract: the types, the fifteen frames, who sends each and what the page does
 
-`server/shared/companion-types.ts` (group header `//----------------- COMPANION CONTRACTS ------------`) is the one home of every shape Kaylee puts on a wire. A sibling of `shared/types.ts`, as `cerberus-types.ts` is. `src/shared/companion-types.ts` mirrors it field for field and is edited together with it; nothing is server-only.
+`server/shared/companion-types.ts` (group header `//----------------- COMPANION CONTRACTS ------------`) is the one home of every shape Kaylee puts on a wire. A sibling of `shared/types.ts`, as `cerberus-types.ts` is. `src/shared/companion-types.ts` mirrors it field for field and is edited together with it; nothing is server-only. The one thing the server keeps back is the PIN of a pending action (`companion-pending.ts`), which is not in the contract.
 - Mirror check: `diff <(sed -n '/COMPANION CONTRACTS/,$p' server/shared/companion-types.ts | grep -E '^export type') <(sed -n '/COMPANION CONTRACTS/,$p' src/shared/companion-types.ts | grep -E '^export type')` prints nothing.
 - Every time is an ISO-8601 string. JSON is camelCase on every wire, SQL snake_case (`turnId` / `turn_id`).
 
 ## Types
 | type | shape |
 |---|---|
-| `CompanionModel` | `'sonnet' \| 'opus' \| 'haiku'` |
+| `CompanionModel` | `'sonnet' \| 'fable' \| 'opus' \| 'haiku'` |
 | `CompanionSettings` | `name` (1–40, no line break, default `Kaylee`), `operatorName` (1–40), `register` (200–16000, slots `{name}` `{delivery_note}` `{sound_tags}`), `deliveryNote` (0–120, no line break), `model` (default `sonnet`), `live` (default `false`), `talkBinding` (`TalkBinding \| null`, default `null`; `PUT` with `null` unbinds). Storage and defaults: MAN-9087 |
 | `TalkBinding` | the key or mouse button that presses her talk button: `{ kind: 'key', code, ctrl, alt, shift, meta, label }` (`code` is a `KeyboardEvent.code`, 1–40 of `[A-Za-z0-9]`; a function key `F1`–`F24`, or Ctrl, Alt or Meta held with the key) or `{ kind: 'mouse', button: 1 \| 3 \| 4, label }` (middle, back, forward); `label` 1–40, no line break (`F8`, `Ctrl+Space`, `Mouse back`). Server limits: MAN-9087; the page's one rule that accepts, matches and labels a press: MAN-9062 |
 | `CompanionSessionRef` | `{ sessionId, name, project }` |
@@ -5832,7 +5927,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/Co
 | `CompanionNote` | `{ id, at, title, text }` |
 | `CompanionProcess` | `{ state: 'asleep' \| 'waking' \| 'awake' \| 'failed', error: string \| null }` |
 | `CompanionTurnOutcome` | `answered` \| `stopped` \| `failed` |
-| `CompanionPicture` | `{ settings, models: [{ value, label }], process, activity, turnId, focus, draft, walk, notes, log, floor }`; `GET /api/companion`; `log` = newest 200 (MAN-9070) |
+| `CompanionActionKind` | the twelve things she may do on his word: `queue` \| `hide` \| `show` \| `rework` \| `answer` \| `recut` \| `stop` \| `resume` \| `kick` \| `resume_run` \| `open` \| `close_followup` |
+| `CompanionActionTarget` | what an action acts on, by `kind`, each with `spoken` (the name he says it by): `card` `{ name, arc }` (a plan or epic), `run` `{ runId, plan }`, `page` `{ pageId, blockId }`, `chat` `{ sessionId }`, `followup` `{ id, sessionId, text }` |
+| `CompanionCarriedLine` | `{ logId, at, text }`: one of his spoken lines, carried verbatim |
+| `CompanionPendingAction` | the one action waiting for his word: `{ id, action, target, prompt: string \| null, carried: [{ label: string \| null, lines }], say, preparedAt, expiresAt }`. The pin the prepare took (ask and lock token, chain, follow-up, open target) is never part of it |
+| `CompanionOpenTarget` | where an open lands: `{ kind: 'chat', sessionId }` \| `{ kind: 'card', plan }` \| `{ kind: 'page', pageId, blockId }` |
+| `CompanionPicture` | `{ settings, models: [{ value, label }], process, activity, turnId, focus, draft, pending: CompanionPendingAction \| null, walk, notes, log, floor }`; `GET /api/companion`; `log` = newest 200 (MAN-9070) |
 | `CompanionFrame` | the union below |
 
 ## Frames — all carried by the gateway socket `/ws` to the account's open pages (`sendToUser`)
@@ -5843,21 +5943,22 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/Co
 | `companion_turn` | `turnId, state: started \| ended, outcome, error` | the account's turn callbacks | a turn begins / ends; `outcome` and `error` only on `ended` |
 | `companion_activity` | `activity` | `companion-account.ts` `setActivity` | the turn sets `thinking` / `idle`; a tool sets its phase while it runs |
 | `companion_focus` | `focus \| null` | `store.setFocus` | a tool names a chat that is not the focus, or one whose name or project changed. Clear sends `companion_cleared` alone, which empties the focus on the page |
-| `companion_draft` | `draft \| null` | `store.setDraft` | `update_draft`, `PUT`/`DELETE /draft`, a send that clears it |
+| `companion_draft` | `draft \| null` | `store.setDraft` | `update_draft` (an empty text sends it `null`), `PUT`/`DELETE /draft`, a send that clears it |
+| `companion_pending` | `pending \| null` | `store.setPending` | an action is prepared, replaced, taken, withdrawn (`DELETE /action`) or lapsed and found by the next verb. Never carries the pin |
 | `companion_walk` | `walk \| null` | `store.setWalk` | the `walk` tool |
-| `companion_note` / `companion_note_removed` | `note` / `id` | `show_note` / `DELETE /notes/:id` (removed only when the account had it) | |
+| `companion_note` / `companion_note_removed` | `note` / `id` | `show_note` / `dismiss_note` and `DELETE /notes/:id` (removed only when the account had it) | |
 | `companion_settings` | `settings` | `saveSettings` | `PUT /settings` |
 | `companion_process` | `process` | the session's `onProcess` | each state change |
-| `companion_open_chat` | `sessionId, floor` | `openChatOnFloor` | a send or a new chat; none while no page holds the floor. The page whose client id equals `floor` opens the chat (MAN-9083) |
+| `companion_open` | `target: CompanionOpenTarget, floor` | `openOnFloor` | a send or a new chat (`{ kind: 'chat', sessionId }`) or an `open` she was told to make; none while no page holds the floor. The page whose client id equals `floor` acts on it; every page notes a chat open (MAN-9083) |
 | `companion_floor` | `floor` (the client id now holding it) | `store.setFloor` | every write of the floor: a typed line, a press, Send, the panel opened. Sent even when the holder did not change. The page whose client id equals `floor` plays her voice; the others show the text only (MAN-9082, MAN-9113) |
-| `companion_cleared` | none | `store.clearAccount` | Clear |
+| `companion_cleared` | none | `store.clearAccount` | Clear: the log, notes, draft, pending action, walk and focus empty |
 - Writer of each row and frame per callback: MAN-9070. Row → frame per store verb: MAN-9082. What a page does with each: MAN-9083.
 - A frame is a notification of a write already committed: a failed write sends none; a payload JSON cannot carry is logged and sent nowhere (MAN-723).
 - Later phases add types and frame kinds HERE and redefine nothing.
 - Model labels (`CompanionPicture.models`): MAN-9070 §`companion-picture.ts`.
 
 ## Proof
-`.verify/companion-wire-contract.mjs` runs the pure files; `.verify/companion-reducer.mjs` folds recorded frames of a real page over the pictures the server answered.
+`.verify/companion-wire-contract.mjs` runs the pure files (its last section prints the pending action through `isCompanionPicture` and `reduceCompanion`, and the pin's cut); `.verify/companion-reducer.mjs` folds recorded frames of a real page over the pictures the server answered.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/companion-types.ts
 
@@ -6229,6 +6330,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-scaffold.mjs
 | `transcribeSpeech` (= `transcribeWithGemini`) | `companion/companion-press.ts`: every press, whatever the chat's provider says |
 | `synthesizeSentence` | `companion/companion-speech.ts`: one call per sentence a floor page pulls (MAN-9105, MAN-9110) |
 | `readVoiceSettings` | `companion/companion-account.ts`: `readSoundTags`, the account's `gemini.soundTags` read at the start of each turn (the parse) and at each push (the register). Inside the module: `gemini-transcribe.ts`, `gemini-speech.ts`, `voice-provider.ts`, the settings routes |
+| `geminiKeyStatus` | `companion/eyes/house-reads.ts`: `read_settings` says whose Gemini key the voice uses ("a key of yours", "the house's key", "no key") from the status's `source` alone; the key and its `last4` are never read there. Inside the module: `gemini-key.ts`, the settings routes |
 | `DEFAULT_SOUND_TAGS` | `.verify/companion-wire-contract.mjs` (the parse proven against the shipped set). Its one home is `voice-settings.ts`; the companion's filter and her register read the account's list through `readVoiceSettings` (INV-9938) |
 | type `TranscribeAnswer` | `companion-press.ts`: tells a refusal from a failure |
 | type `SpeechAnswer` | `companion/companion-speech.ts`: tells a refusal (`no_key`, `refused`, `failed`) from a stream |
@@ -7244,3 +7346,486 @@ Three looks, tried in this order; the first that applies is the only one tried.
 - On the live page with a real turn (Haiku): MAN-9130.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useAvatarTarget.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/avatarPlacement.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs
+
+## MAN-9142 — server/modules/companion — the house: the readers only a module instance holds, handed in by the entrypoint (`house.ts`)
+
+**Why a house.** The operator's ruling: her reads go through the same server-side readers the panels use. Four of those readers exist ONLY on a module instance (a lane's `whenLanded` picture, a lane's child environment, Cerberus's `readInputs`, the heal module's one service), and none is reachable from a barrel. So the server entrypoint, the composition root, builds `CompanionHouse` from the instances it holds and hands it to `createCompanionModule({ runtime, house })` the way it hands the chat gateway. Nothing reads the house to move her activity: an eyes read runs as `thinking`.
+
+| Handle | Is | Built by |
+|---|---|---|
+| `roadmap()` | the roadmap lane's picture, `watcher.whenLanded(FIRST_READ_WAIT_MS)` (5 s) — the same call its router's `current` makes; `null` before the boot's first landing | `createRoadmapModule().picture` |
+| `dispatcher()` | the dispatcher lane's picture, the same bounded `whenLanded`; the picture is refreshed every 2 s, so a read costs nothing against `dispatcher status --json` (8 MB) | `createDispatcherModule().picture` |
+| `cardText(name)` | `dispatcher show <name>` through the lane's own `commands` and `runDispatcherCommand` (`dispatcher-card-text.service.ts`): `{ ok: true, text }` on exit 0 with text. Else `{ ok: false, sentence }`, the sentence from: the dispatcher's first stdout line (an unknown name answers its own `no plan <name>`), else the last stderr line (the exception); a timeout, a spawn failure or an output past the buffer gets OUR sentence (a partial document's first line must not pose as the dispatcher's); exit 0 with no text is "printed nothing". A name that is no plan or arc name (a leading dash would be a flag) never reaches the dispatcher and is answered `no plan <name>`. `HouseText` is `DispatcherCardText` | `createDispatcherModule().cardText` |
+| `launches()` | the dispatch-souls lane's launches behind `whenLanded` (5 s); the lane's reading is synchronous and seeded at construction, so it answers at once — `null` is the shared lane type's, never a case this lane meets | `createDispatchSoulsModule().launches` |
+| `cerberus()` | `buildOverview(readInputs())`, what `GET /api/cerberus/overview` answers | `createCerberusModule().overview` |
+| `heal` | `Pick<HealService, …>` of its `summary` and `kind` — the heal module's one service, so the worker's binary keeps its one rule (`HEAL_REFLEX_BIN`) | `createHealModule().service` |
+
+**Write doors:** `createDispatcherModule().relay(order)` and `createDispatchSoulsModule().resumeRun(order)` carry her acts on his spoken word (MAN-9152). `CompanionHouse` holds neither yet.
+
+**Plumbing, one argument at a time:** `createCompanionModule({ runtime, house })` → `companionService.attachRuntime(gateway, house)` → `createCompanionAccount(userId, runtime, house)` → `createToolDeps({ …, house })` → `CompanionToolDeps.house`. An account made before both are attached throws (a verb called early is refused, as it was for the gateway alone).
+
+**Order in `server/index.ts`:** she is built and mounted AFTER `createDispatchSoulsModule` (the last of the five). `shutdownRuntimeServices` still stops her first.
+
+**Probes** that build her tools by hand pass `.verify/lib/probe-house.mjs`'s stand-in house.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/house.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-card-text.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/dispatch-souls.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/heal/heal.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.module.ts
+
+## MAN-9151 — server/modules/companion/eyes — eyes-answer.ts and panel-words.ts: the seam every eyes read answers through, and the table of the panels' English
+
+Every eyes read (`eyes/*-reads.ts`: roadmap, runs, docs, alerts, panels, house) answers through `eyes-answer.ts`, and says the panels' words through `panel-words.ts`. Both take strings, never records, so no renderer can dump usage or spend into an answer (ruling 1). Her context holds nothing of the house until she looks (ruling 2).
+
+## `eyes-answer.ts`
+| Export | Does |
+|---|---|
+| `LIST_MAX` 20 | most lines a list answers; runs pass 15 and pages 10 as their own `max` |
+| `INLINE_MAX_CHARACTERS` 2,000 | an answer this long or shorter is handed whole |
+| `NO_SPEND` | ends every dactyl brief: `Say nothing of cost, tokens, usage or spend.` |
+| `cappedLines(lines, max = LIST_MAX)` | first `max` lines, then `moreLine(<k>)` when any were cut; `[]` answers `''`; `max` not a whole number ≥ 1 throws `RangeError` |
+| `moreLine(left)` | `And <left> more; give a phrase to narrow.`; also written by a list whose total is counted without every line held (a Kanban lane is read one page at a time) |
+| `answerRead(deps, { panel, title, text, label, brief, intro }, signal?)` | the one ending of a read that answers a body of text: `panel` → `toPanel` of `intro` and `text` WHOLE, never through a dactyl; else `wholeOrDigest`. One function so no read can hand `toPanel` a digest |
+| `wholeOrDigest(deps, { text, label, brief, intro }, signal?)` | see below |
+| `toPanel(deps, title, answer)` | `answer.isError` returns untouched, no card; else one `deps.store.addNote` card, answer `On his panel: <title>.` |
+| `whenWords(iso, now?)` | the box's local clock, English only: `today 14:02`, `yesterday 19:34`, `Oct 26`, `Dec 31, 2025` (year when not `now`'s); a bare `YYYY-MM-DD` is the date; a non-stamp is `at an unknown time` |
+| `doorWords(by)` | who pressed |
+
+### `wholeOrDigest`
+1. `characterCount(text)` ≤ 2,000 (code points): answer is `intro` then `text`, empty parts dropped.
+2. Else `text` with a closing newline is weighed as `newestThatFit` weighs a turn: UTF-8 bytes + `LINE_NUMBER_BYTES` per line, against `DACTYL_WINDOW_BUDGET` (`tools/transcript-turns.ts`, MAN-9066). Over it: `deps.refuse(` `That is more than one reader takes at once. Give a phrase or a narrower scope…` `)`; NO file written, NO dactyl started (the dactyl's own refusal speaks of tokens, and `ask_dactyl` on the file would meet the same gate).
+3. Else the next numbered file of her scratch folder, `0007-<labelWord>.md`, is written and `pruneScratch` keeps the newest 20.
+4. One dactyl (`runDactylRead`, Claude, never Gemini) digests that file under `brief` + `NO_SPEND`; its `L<n>` are lines of the file.
+5. Answer is `intro`, the digest, `The full text is rendered at <file>; ask_dactyl can read that file for a sharper question.`
+6. A failed dactyl, or an empty digest, is `deps.refuse(<its sentence> <that same last line>)`: the render is kept.
+- `labelWord`: lower case letters and digits, one dash between runs, cut at 40 characters (`ENAMETOOLONG` otherwise), no trailing dash, never empty (`read`).
+- A panel read hands `toPanel` the WHOLE text (`textResult(text)`) through `answerRead`, never a `wholeOrDigest` answer: that would spend a dactyl and put her scratch path on his panel.
+
+### `toPanel`
+- Title: whitespace folded, trimmed, empty is `From the house`, cut at `NOTE_TITLE_MAX` (80) ending `…`.
+- Text: cut at `NOTE_TEXT_MAX` (4,000) ending `… narrow it to see the rest`. Both are the exports of `tools/draft-tools.ts` (MAN-9061); cutting never splits a character.
+
+### `doorWords(by)`
+| `by` | Answer |
+|---|---|
+| `app:card`, `app:panel`, or either followed by whitespace and more (`app:card · Accept when cut, pressed <ISO>`) | `on the card` |
+| `app:phone` | `on your phone` |
+| `app:kaylee` | `through Kaylee on your word` |
+| `cli` | `at the terminal` |
+| a UUID-shaped session id | `in a chat` |
+| blank, `null` or `undefined` | `by an unknown door` |
+| anything else, as written | `by <as written>`: the arc's `arc's Accept (judgment)` reads `by arc's Accept (judgment)` |
+A caller phrasing an approval (`approved <when> <doorWords>`) adds no `by` of its own. The lookup is a `Map`: a name like `constructor` finds nothing.
+
+## `panel-words.ts`
+- `PANEL_WORDS`: the locale's strings by key, copied verbatim from `src/modules/i18n/locales/en/common.json`: `roadmap.word.*`, `roadmap.step.*`, `roadmap.epicWord.*`, `dispatcher.status.*`, `dispatcher.phase.*` and the one key `dispatcher.settling` (a run that has ended and is not yet settled; `phaseWord.ts` picks it). English only. The table and the locale are edited together.
+- `fillWords(template, slots)`: fills `{{slot}}` by a replacer function (`$&` in a title stays text); a slot the template names and `slots` lacks throws, so a `{{title}}` never reaches her.
+- `FEATURE_WORD_KEYS` / `EPIC_WORD_KEYS`: word → key; equal to `ROADMAP_FEATURE_WORD_KEYS` / `ROADMAP_EPIC_WORD_KEYS` of `src/shared/constants.ts`.
+- `featureWord`, `epicWord`, `planStatusWord` (a status the table lacks is said as the dispatcher has it), `phaseWords` (`stalled !== null` → stalled; else running with `busy` → running, running idle → settling; `done`; else not started).
+- `stepWords(step, { waitingOn?, shippedOn? })`: `waiting` names `waitingOn`, none reads `waiting on another feature`; `shipped` names `shippedOn`, none reads `shipped`; a step the table lacks is said as the dispatcher's word. Agent runtime is never added to the shipped phrase (ruling 1; the client adds it).
+- `shortDate(stamp, now?)`: `Oct 27`, with the year when not `now`'s year; `null` for a non-stamp.
+- `parseStamp(stamp)`: only the house's shape: `YYYY-MM-DD`, optionally `T` or a space, a time and a zone. The calendar day must exist (`2026-02-31` is `null`, never March). A bare day is that day on the box's clock, not midnight UTC. Epoch seconds, a bare number and a month name are `null`; a caller converts first.
+- why `read_card` fills `shippedOn` with `shortDate(feature.shipped_at)`, never `whenWords`: a stamp of `2026-10-28T02:34:45Z` is the evening of the 27th here, so `whenWords` says `yesterday 19:34` on the 28th, while the panels say `Oct 27`.
+
+## Probes
+| Probe | Run | Proves |
+|---|---|---|
+| `.verify/companion-panel-words.mjs` | `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-panel-words.mjs` | prints one line per key whose string differs or one side lacks, and per word whose key differs from the client's two tables; prints NOTHING when equal. No server, no model |
+| `.verify/companion-eyes-answer.mjs` | same, file swapped | runs `cappedLines`, `wholeOrDigest` (600 and 6,000 characters), `toPanel` on a stub store, `whenWords` at a fixed `now`, `doorWords`. The 6,000-character case makes ONE Claude dactyl call and writes ONE file to `~/.claude/state/companion/1/scratch` |
+Run both before editing either file's strings.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-eyes-answer.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-words.mjs
+
+## MAN-9153 — server/modules/notifications — the notification history: `startNotificationHistory`, `listNotificationHistory`, `spendFreeWording`, and Kaylee's `list_alerts`
+
+ALERTS HAD NO HISTORY ANYWHERE: the orchestrator pushes and forgets, the Inbox holds what waits and not what was said, and Kaylee's own alert rows exist only while Live is on and a page is open. The notification history is the memory, and `list_alerts` is its first reader.
+
+**What is kept.** `notification_history` (`server/modules/database/notification-history-schema.ts`, exec'd by `runMigrations` beside the companion's script): one row per event the notification orchestrator was handed — `at` (when it was heard, ISO), `code`, `kind`, `severity`, `title`, `body`, `session_id` (the chat, a plain id with no foreign key: the history outlives a deleted chat), `plan` (`event.meta.plan` when it is a string; for the dispatcher's own codes, whose endings, pauses and relaunches carry no `plan` and no chat, the `meta.sessionName` they name their card by). It hangs on `users` (`ON DELETE CASCADE`): a notification belongs to the account the orchestrator was called for. `notificationHistoryDb.record(userId, row)` inserts and prunes past the account's newest 300 in one transaction; `list(userId, limit)` answers newest first, its limit held to 1–300 (a non-finite one asks for all that is kept).
+
+**Where it is written.** `startNotificationHistory()` (`services/notification-history.service.ts`) subscribes with `onNotification` — the listener seam hears every event the orchestrator is handed, normalized, BEFORE any push preference or dedupe (MAN-613) — so it rides the orchestrator's own call and nothing polls. It keeps what a push gate would drop: a `background` kind that is off for pushes, an event the 20-second push dedupe swallowed, the usage family. An ask told AGAIN is one row: every server boot re-raises the asks still open (each boot is a new push, and the dev server restarts on every save), so an event of kind `action_required` that repeats one the account already holds — same code, chat, plan, title and body — replaces it (`record(…, { replaceRepeat })`, one transaction): the row moves to the front with the time it was told last, and the 300 rows are not spent on repeats. Every other kind is kept as it happens. The entrypoint starts it after `listen` and calls its unsubscribe in `shutdownRuntimeServices`. A write that fails is one journal line (`[Notifications] the history could not keep …`) and never costs the push: the seam guards every listener, and this one catches its own fault too. The write is deferred one turn of the event loop (`setImmediate`, with the stamp taken at hearing), because the seam runs listeners to completion BEFORE the push is built and sent, and a write waiting on another connection's lock (SQLite's 5 s busy wait) would otherwise hold the push back that long.
+
+**The wording kept has every figure taken out.** `spendFreeWording(event, bodyLimit?)` (`services/notification-spend-free.service.ts`, exported by the barrel, beside `buildNotificationPayload` in the orchestrator) is the ONE rule: the event's spend keys are removed before the wording is built (`costUsd`, `totalCostUsd`, `tokens`, `tokensIn`, `tokensOut`), an `api.error` whose reason is about usage is reworded, a `run.limit` budget stop is "Run stopped at a limit" / "The run stopped at a limit it was given", and the free text a wording is built from — `run.failed`'s error, `compaction.failed`'s reason, a `dispatcher.*` event's detail — is left out of the sentence when it speaks of usage or spend (`USAGE_OR_SPEND_TEXT`: the CLI's own "usage limit reached" is a failed run's error; the wording reads whole without it). It answers `{ title, body, sessionName }`; the body is cut at the push cap unless `bodyLimit` is `null` (whole) or a number. Two callers: the history (what is stored) and the companion's `buildAlertBlock` (what she is pushed). A raw copy would put cost in her context (ruling 1: never usage or spend).
+
+**`list_alerts(scope, panel)`** (`server/modules/companion/eyes/alert-reads.ts`, one read-only tool of the eyes; its description is her prompt's own line). It reads `listNotificationHistory(userId, 300)` and never lists the usage family (`NEVER_LISTED`: `limit.*`, `usage.*`, `push.enabled`, and `dispatcher.limit_paused`, whose headline is "Claude usage limit").
+- `recent`: the newest 20, `<when> · <kind in words> · <chat or plan> · <title>`, then "And <k> more; give a phrase to narrow." The kind words are the alert feed's six where the code has one (`ALERT_KIND_BY_CODE`: feature finished, background work landed, asking, permission, failed, stuck), else the event's own kind. The chat is its sidebar name (`chatNameOf`); an event of no chat, or of a chat that is gone or has no name of its own (the sidebar's fallback, `UNTITLED_CHAT`), names its plan; one of neither is "the house".
+- `waiting` (the Inbox now, each section through its own reader): "Memory: <n> proposals waiting (read_memory)" from `listMemoryCandidates({ status: 'pending' })`; "Heal: <n> live (read_heal)" from `house.heal.summary()`'s `live` (a summary that answers no count says "Heal: could not be read just now (read_heal)", never a zero); "Roadmap: <n> asks waiting on you (list_roadmap waiting)" from `house.dispatcher()`'s open asks, one per ask (identity `asked.id-asked.at`, because an arc's lock rides on every plan it names; a hidden plan's ask is not counted), each ask then one line (`<card> · waiting on your Accept` or `<n> questions open`). A section whose reader fails says so and costs nothing else.
+- anything else is a phrase: every word of it in the event's code, title, body, chat or plan, case-insensitive.
+- `panel: true` puts the whole answer on his panel as a note. The tool moves neither her focus nor her activity (a read runs as `thinking`).
+
+**Proof.** After a boot, a probe chat's Haiku turn in `PROBE_PROJECT` ends: `sqlite3 -readonly ~/.cloudcli/auth.db "select code, title from notification_history order by id desc limit 3"` shows its `run.stopped` row (`node .verify/notification-history-live.mjs`). `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-alert-reads.mjs` types "What did the house tell me today?" and "What's waiting in my inbox?" to account 1's Kaylee on haiku and reads her tool calls back from her CLI transcript: `list_alerts` `recent` and `waiting`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/alert-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notification-history-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notification-history.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-history.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-listeners.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-spend-free.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-alert-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notification-history-live.mjs
+
+## MAN-9157 — server/modules/companion/eyes — search_docs and read_doc: DocSpace pages for her, the client and the renderer
+
+`docReads(deps)` (`eyes/doc-reads.ts`) returns the SDK `tool()` definitions of `search_docs` and `read_doc`, in that order; `buildCompanionTools` places them after `runReads` and before `alertReads`. Both carry `readOnlyHint`, take `panel`, run inside `guardedToolResult`, and take their description from `toolLine(name)`. Neither names a chat: no focus, no activity (she stays `thinking`). A refusal is `deps.refuse(sentence)`. No usage or spend is in any answer.
+
+## `search_docs { phrase 1–200, panel? }`
+- `searchPages(phrase, 500)`; `SEARCH_ASKED` = 500 so the tail can count what the 10 shown leave out.
+- Answer: the first 10 pages, one line each: `<title> · <folder or "no folder"> · page <id> · <k> blocks match` (`1 block matches`; `0 blocks match` for a page hit on its description or tags alone), then `And <k> more; give a phrase to narrow.`.
+- 500 pages back: the tail reads `At least <k> more; give a phrase to narrow.` (the count is a floor).
+- No hit: `No DocSpace page holds "<phrase>".`
+- `panel: true`: the list goes to his panel as the note `DocSpace: <phrase>`.
+
+## `read_doc { page 1–300, scope 1–200, panel? }`
+`page` goes through `resolvePage`; `scope` is trimmed, `outline` and `whole` match without regard to case.
+| scope | answers |
+|---|---|
+| `outline` | `"<title>" · <folder> · page <id>, N blocks:`, an `About: <description>` line (cut at 300 characters; none when the page has no description), then one line per block, 30 at most then `And <k> more…`: `<n>. <type> · <title, or first 8 words, or (no text)> · block <id> · <characters>`. A page with no blocks answers its heading `has no blocks.` and the About line |
+| `whole` | `pageText`: `# <title>`, `## About this page` (the description), then `## <n>. <type> · block <id>` per block. 2,000 characters or fewer: handed over; more: a dactyl digest under `WHOLE_BRIEF` (`wholeOrDigest`, `eyes-answer.ts`) |
+| a block's id on the page | that block's section, whole or digested under `BLOCK_BRIEF`; the id is compared exactly |
+| a `blk-…` id the page lacks | refusal: `has no block <id>; read_doc with scope outline lists its blocks.` |
+| anything else: a phrase | the parts holding it, case-insensitive: the description (as `About this page`) and each block, introduced `N of M parts hold "<phrase>"`; whole or digested under `phraseBrief`. None: `<heading> does not mention "<phrase>".` A phrase only in the title holds no part |
+- Any scope but `outline` on a page with no blocks answers the no-blocks sentence.
+- `panel: true` puts the WHOLE text on his panel (never a digest), titled `<title>`, `<title> · outline`, `<title> · block <n>` or `<title> · <phrase>`.
+
+## `resolvePage(ref)` (`docspace-client.ts`) — the one way to open a page by id or exact title
+1. `ref` trimmed. When it matches `PAGE_ID` (letters, digits, `._:-`, 1–200, never only dots) the id is read first; a 404 falls through to the title.
+2. The title is compared with case folded and runs of whitespace one space, over `listPages()`.
+| Outcome | Sentence |
+|---|---|
+| none | `No DocSpace page has the id or the title "<ref>"; search_docs with a few of its words finds it.` |
+| several | `N DocSpace pages are titled "<ref>": <folder or "no folder"> · page <id>; … Name one by its id.` (5 named, then `, and k more`) |
+| listed, then gone | `The DocSpace page "<ref>" was just removed.` |
+
+## `docspace-client.ts` — the calls
+- `ARCHPULSE_URL` (env, default `http://127.0.0.1:8005`, no trailing slash). Every call is bounded at 15 s, body included. Nothing throws.
+- Every answer is `{ ok: true, value }` or `{ ok: false, sentence }`.
+| Call | Request | Value |
+|---|---|---|
+| `searchPages(q, limit)` | ArchPulse's MCP `search_pages`: `POST /api/mcp`, one JSON-RPC `tools/call`, no handshake | `DocHit[]`: id, title, folder, `matchedBlocks` |
+| `readPage(id)` | `GET /api/docspace/pages/:id` (id URL-encoded) | `DocPage` (id, title, folder, `description`, blocks), or `null` for a 404, which is an answer |
+| `listPages()` | `GET /api/docspace/pages`: every page whole, megabytes | `DocTitle[]` (id, title, folder); read only to find a title |
+- A call that did not complete, a status other than 200 (a 404 for `readPage` apart), or a body not in DocSpace's shape: `DID_NOT_ANSWER` + why, i.e. `DocSpace (ArchPulse on :8005) did not answer: <why>.` The `:8005` is written in the constant, not taken from `ARCHPULSE_URL`.
+- ArchPulse's own search refusals come back as plain text with `isError`, or as a JSON-RPC `error`; both become the did-not-answer sentence.
+- `doc-reads.ts` tells that sentence from a plain not-found by its `DID_NOT_ANSWER` prefix and appends `Tell him DocSpace is not answering; do not guess at what a page says.`
+
+## `doc-render.ts` — what a block gives as text (PURE)
+- A block is its title, then `description`, `content`, `message`, `code`; then list items (`- <text>`, a checklist item `- [x] ` or `- [ ] `); then table rows (column names first, cells in column order joined ` | `, a list-valued cell joined by `, `).
+- Typed blocks, in their own fields:
+| type | renders |
+|---|---|
+| `docstore_view` | `view <view> of <package>` |
+| `question_prompt` | question, notes, each option (`label — subtext`), explanation |
+| `decision_matrix` | context; each option with its verdict, `pros:` and `cons:`; summary |
+| `sop_runbook` | each step `<n>. <title>: <instructions>`, `run: <command>`, `expect: <output>` |
+- Any other type with none of these fields (a canvas, `page_link`) renders as its title alone; `page_link` labels are not rendered.
+- `descriptionOf(page)` drops the `> ` blockquote marker of the page's description.
+
+## Probe — `.verify/companion-doc-reads.mjs` (38 checks)
+```
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-doc-reads.mjs
+```
+- Runs against the REAL ArchPulse (:8005) and the REAL dev server (:3011), and types one message to account 1's Kaylee on `haiku`: it needs both up.
+- Spends Claude (three dactyl runs, one Haiku turn); makes no Gemini call.
+- Sections: the client (search, id, title in another case, a title two pages share, a name none has, ArchPulse not answering); the tools called directly; the prompt's two TOOLS lines; the live turn, read back from her CLI transcript.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/docspace-client.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-doc-reads.mjs
+
+## MAN-9158 — server/modules/companion/eyes — house-reads.ts: read_git, read_cerberus, read_memory and read_settings, her eyes on the rest of the house
+
+`houseReads(deps)` (`eyes/house-reads.ts`) returns the SDK `tool()` definitions of `read_git`, `read_cerberus`, `read_memory` and `read_settings`, in that order, after `panelReads` in `buildCompanionTools`. All four carry `readOnlyHint`; each description is `toolLine(name)`; each handler runs inside `guardedToolResult`. Like every eyes read they take a scope, answer one line per item (capped by `cappedLines`), hand an answer past 2,000 characters to a dactyl under a fixed brief (`answerRead` → `wholeOrDigest`, `NO_SPEND` appended), take `panel: true` (not `read_settings`) to put the WHOLE answer on his panel (`toPanel`), and move neither her focus nor her activity (no `setFocus`, no `withActivity`: a read runs as `thinking`). Nothing is ever written to his settings. No renderer reads a cost, a token count, a cap or a pacer window (ruling 1), and `read_cerberus` drops the USAGE FAMILY of checks before any scope reads (`withoutUsageChecks` in `cerberus-lines.ts`): a check whose key, label or service label says spend, spent, cost, billing or budget, or says usage of a vendor or model (live: `eis1/shadow-connector/gemini_usage`, "Gemini and DeepSeek spend is normal", whose value is dollars). `clipLine` masks credentials, not money, so the family is cut from the overview's needs, the muted list and every service's checks — a node, a check's exact path and a phrase never reach it. The header's `need you` and `muted` counts lose the checks taken out of those two lists, so the header and the lists agree in every answer (a day when the spend check is the only one that needs him reads "0 need you" and "Nothing needs you", never "1 need you" over an empty list); the other counts stay the tab's own. "Disk usage" is not in the family; "WorkCenter token" is a credential's expiry, not usage, and is read.
+
+| tool | reader | scopes (case-insensitive keywords) | caps |
+|---|---|---|---|
+| `read_git { project, scope, panel? }` | `resolveProject(project)`, then the git panel's own `readGitStatus` / `readGitFileDiff` (git barrel) — `git-reads.ts` | `status`: `On <branch>: <n> modified, <n> added, <n> deleted, <n> untracked, <n> staged.` then `<state> <path>` per changed file (a staged one ends ` · staged`). `diff`: each changed file's diff, digested. Anything else: ONE changed file by its path, the end of it, or a piece of it (equal path, else folder-boundary tail, else substring; several fit → refused with each named) | 30 files. A folder that is no repository says so |
+| `read_cerberus { scope, panel? }` | `deps.house.cerberus()` — the tab's own overview (`cerberus-lines.ts`) | `overview`: `<checks> checks: <passing> passing, <needsYou> need you, <muted> muted, <nodes> nodes; last result <when>.`, then what needs him and any node not reporting. `needs`: all of it. A node id: its services (a passing check is counted, not listed) and every check that is not passing. A check `<node>/<service>/<check>`: status, value, last result, since, the mute, and its SERVICE's recent minutes (`cells`). Else a phrase over check paths, labels, service labels and values | overview 10 needs; a check's value cut at 600 characters, a list line at 70 (overview) or 160 |
+| `read_memory { scope, panel? }` | `listMemoryCandidates`, `getMemoryCandidate` (memory-intake barrel) — `memory-lines.ts` | `pending`: `<target> · <title> · from <chat> · proposal <id>`. `recent`: reviewed in 7 days, with the verdict (`<target> · <title> · approved yesterday 09:10 · proposal <id>`). A proposal id (`mc-136`, or `136`): it whole. Else a phrase over id, title, target and project | 15 lines. A proposal no chat recorded (spill sweeps) is "from an unrecorded chat" |
+| `read_settings { scope }` | `readCompanionSettings`, `modelOptions` (the picker's label), the voice barrel's `readVoiceSettings` and `geminiKeyStatus` — `settings-lines.ts` | `companion`: her name, his name, her model's label, Live, delivery note, talk button's label, register's length and whether it is the original. `voice`: the chat mic's provider, the transcription and speech models, her voice, her sounds, and whose Gemini key is in use: "a key of yours", "the house's key" or "no key" | none needed (under 1,000 characters). Any other scope: refused, saying `companion` or `voice` |
+
+## A secret's diff never reaches her
+Every changed file is held to the dactyl deny rule (`isDeniedPath` in `tools/dactyl-paths.ts`: the same `deniedBy` `judgeFile` applies, to the name as written AND to the real file, whether or not it exists) BEFORE its diff is read — for `diff` and for a path scope alike. `git status` paths are relative to the REPOSITORY ROOT, so the rule is judged on the root (`getRepositoryRootPath`, exported from the git barrel for this) joined with git's path; a project that is a SUBFOLDER of its repository would otherwise judge a file above it on a path that does not exist, and the real-path half and the place half of the rule could not fire. A path scope is judged against the root and the project folder both. A denied file is NAMED ("withheld") and never read; a path scope on one is refused with a sentence that says so. This matters most for an untracked file, whose diff IS the whole file. Only files `git status` lists are ever read: a scope is matched against them and never opened as a path of its own. A diff with a NUL byte is "a binary file" and not shown. THE RESIDUAL: the name rule is a net, as `ask_dactyl`'s is. A credential-looking value inside a diff of an ORDINARY file (a named secret `token = …`, a `Bearer` value, a vendor key's own prefix such as `AIza…`) is replaced by `<masked>` before the diff is cut (`maskCredentials`, so a legitimate `token: string` line reads `<masked>` too); a secret in no recognisable shape, in an ordinary file, still reaches her. A file name is folded to one line wherever it is shown (`shownPath`), so a name holding a line break cannot forge a line. `read_settings` never reads `GeminiKeyStatus.last4`; the key's `source` is all that leaves `settings-lines.ts`.
+
+## Sizes
+A status list is cut at 30 files. `diff` renders each file at an equal share of about 30,000 characters (1,000–6,000 each, `diffShareFor`) — a hundred kilobytes of hunks to answer fifteen lines took the dactyl past its three-minute bound; a single file asked for by its path keeps up to 40,000. A file of 2,000,000 bytes or more (`READ_MAX_BYTES`) that the panel's reader would read WHOLE into the server's memory is not asked for (a 100 MB untracked log cost 288 MB of peak): an untracked or added file is sized on disk, a deleted file's blob in HEAD is sized by `readHeadFileSize` (the git barrel; `git cat-file -s`, the object's header only), and the section says its size and to open it in the git panel. A MODIFIED file runs `git diff`, whose output is the hunks, so a large tracked document with a one-line change is read as that line. The whole read is bounded (`GIT_READ_BOUND_MS`, 60 s, or her stop, whichever is first) and answers "Git did not answer…" — a race, not a kill, since the panel's `readGitStatus` and `readGitFileDiff` take no signal: a stuck git child runs on until it ends. A registered project whose folder is gone says so in its own sentence. A dactyl digest takes 35 s or more on a loaded box, so the tool descriptions say `status` and `overview` are where to start.
+
+## Shared parts it uses
+`answerRead`, `cappedLines`, `whenWords`, `wholeOrDigest` (`eyes-answer.ts`, MAN-9151); `clipLine`, `counted` (`line-words.ts`: credential-looking values are masked before a stored text is cut); `signalOf` (`tools/read-tools.ts`); `modelOptions` (`companion-picture.ts`, exported for the label); `CERBERUS_STATUS_WORDS` is the locale's `cerberus.status.*` verbatim and the probe compares them.
+
+## Probe
+`bash .verify/companion-eyes-house.sh` — copies the live `auth.db` and `cerberus.db` into one `mktemp -d` (which also holds the probe's scratch git repository, `EYES_SCRATCH`; the .sh removes the whole directory by its literal prefix), runs `.verify/companion-eyes-house.mjs` through the four tool definitions (arguments parsed by their zod schemas) on a scratch git repository holding a `.env` with a fake key and a link to it, on this repository, the real Cerberus overview, the real memory proposals and the settings, and removes the copies. It plays account 999, a number no account holds, so the digests it renders land in that account's scratch folder and not the live Kaylee's (the regular files are unlinked at the end). 43 checks, about five minutes (three dactyl calls). The live showing is `node .verify/companion-eyes-ask.mjs "What's uncommitted in claudecodeui_lyphe?" "Does anything in Cerberus need me?" "Any memories waiting for me?" "What voice do you speak in?"` on :3011 with her on `haiku`: she called `read_git status`, `read_cerberus needs`, `read_memory pending` and `read_settings voice`, and none of her sentences carried cost, token or spend. A server file saved during that run hands the dev server over and stops her turn in flight — do not edit `server/` while it runs.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/cerberus-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/git-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/git-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/house-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/memory-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/settings-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-eyes-house.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-eyes-house.sh
+
+## MAN-9159 — server/modules/companion/eyes — panel-reads.ts: read_kanban, read_heal, read_notes and read_schedules, her eyes on four panels; read_kanban
+
+`panelReads(deps)` (`eyes/panel-reads.ts`) returns the SDK `tool()` definitions of `read_kanban`, `read_heal`, `read_notes` and `read_schedules`, in that order, after `alertReads` and before `houseReads` in `buildCompanionTools`. Each carries `readOnlyHint`; its description is `toolLine(name)`; its handler runs inside `guardedToolResult` with the call's `AbortSignal` (`signalOf`, private to `panel-reads.ts`; `tools/read-tools.ts` keeps its own copy). Each reads through the reader its panel uses, never a second copy of the data. Like every eyes read: a scope, one line per item, an answer past 2,000 characters digested by a dactyl, no `setFocus`, no `withActivity` (a read runs as `thinking`), never a cost, token count or cap (ruling 1).
+
+Arguments: `scope` (trimmed, 1–200 characters); `read_kanban` also `board` (≤200); all four `panel`. `panel: true` hands `toPanel` the WHOLE text through `answerRead` (`eyes-answer.ts`, MAN-9151): no dactyl, no scratch path on his panel.
+
+## The four tools
+| tool | reader | scopes (case-insensitive) | file |
+|---|---|---|---|
+| `read_kanban { scope, board?, panel? }` | `kanbanBoardsService` (`listBoards`, `laneCounts`), `kanbanCardsService` (`listLaneCards`, `getCard`) | `board`, a lane, a card id, a title or phrase | `kanban-reads.ts`, `kanban-lines.ts` — below |
+| `read_heal { scope, panel? }` | `deps.house.heal` (`summary()`, `kind(kind)`; MAN-9142) | `summary`, `cycles`, else a friction kind | `heal-reads.ts` |
+| `read_notes { scope, panel? }` | `notesService.list(userId)` and `.get(userId, id)` from the notes barrel; the signed-in account's notes alone, no write | `list`, a note id (UUID), a title or phrase | `notes-reads.ts` |
+| `read_schedules { scope, panel? }` | `readRegistry(userId)` from the schedules barrel: `{ jobs, lastSync }`, the registry's cron rows plus the account's pending scheduled prompts | `list`, `drift`, a job name, or a phrase | `schedule-reads.ts` |
+The words every one of them says its lines in (`maskCredentials`, `clipLine`, `fitLines`, `linesThatFit`, `counted`, `epochWords`): `line-words.ts`, MAN-9161. The other three tools: MAN-9160.
+
+## `read_kanban`
+- Board: `board` is an id or whole name; else the one board whose name holds it; two or more fit → refused naming them; none → refused naming all. No `board`: the board with the most cards not done (`openCardCount`: every lane but done); the heading then adds `(the board with the most cards still open)` when more than one board exists. No boards at all: refused `He has no Kanban board yet.`
+- `board`: `Board <name>: not ready N · todo N · questions N · active N · done N.`, then `<lane> (<total>):` for questions, active, todo in that order (an empty lane is left out), up to 5 cards each, then `And <k> more; give a phrase to narrow.` (`moreLine`). The three lanes are ONE answer on ONE budget (2,000 characters, so it is never digested and the counts line is never dropped): every lane is promised its first card; the header, `LANE_FRAME_CHARACTERS` (100) per lane and those first cards come off; the rest is shared lane by lane in reading order through `linesThatFit`. A lane with long cards shows fewer than 5.
+- A lane: `laneNamed` — her five words `not ready`, `todo`, `questions`, `active`, `done`, and the Kanban tab's titles `backlog`, `to do`, `open questions`, `in progress` (→ `not_ready`, `todo`, `questions`, `active`; `_` and `-` read as a space). The prompt line lists only the five words; the tab's titles are tolerated, not advertised. Answer: `<lane> on <board>, <n> cards:` then the first 20 cards through `fitLines` with the lane's `total`; empty → `No cards are in <lane> on <board>.`
+- A card id (`c-<n>`): `getCard`; a 404 → refused `No card has the id …`.
+- Else a title or phrase: up to 10 pages of 200 cards (`SEARCH_PAGES_MAX`) are read, so a board past 2,000 cards is searched in its first 2,000. An exact title wins; else every card whose title or any tag holds the phrase, newest `updatedAt` first. None → `No card on <board> has "<phrase>" in its title or tags. The lanes are not ready, todo, questions, active and done.` (`LANE_WORDS_LINE`). One → the card whole. Several → `<n> cards on <board> fit "<phrase>":` and lines.
+- A card line: `<title ≤60> · <lane> · <priority> · <first 2 tags, +n> · card <id>` (`no tags` when none).
+- A card whole (`cardFacts`): title, `<lane> · <priority> priority · <tags> · card <id>`, `Checklist: d of t done.` or `No checklist.`, up to 5 open questions with up to 6 options each (`And k more.`) or `No open questions.`, `Approved <when>.` or `Not approved.`; then `Description:` and the description (credentials masked; empty → `(no description)`), whole when ≤2,000 characters, else a dactyl digest under `CARD_BRIEF`.
+- NEVER a card's `buildTokens` or a detail's four counters: no function in `kanban-lines.ts` reads them.
+
+## Probe — `.verify/companion-panel-reads.mjs`
+`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-panel-reads.mjs [--digest] [--user=<id>]` — prints the four descriptions, then each tool's text on the LIVE data for the scopes her prompt names (handlers called through their definitions, arguments parsed by their zod schemas), and the count of `cost|token|spend` words in every answer (a card's or note's own text may carry them; the renderers add none). Read-only: the database is `query_only`, `store.addNote` is a recorder, the heal worker is asked through its `--status` and `--kind` doors only.
+- `--digest` adds `read_heal tool-error`, the one read certain to reach the real dactyl (one Claude call, its digest written to the scratch folder of the account read).
+- `--user` defaults to 1, the probe account; `--user=2` is his, for reads that stay whole, never with `--digest`.
+- Live showing, 2026-10-28 on :3011 (account 1, her on `haiku`): "What is on the Kanban board?" → `read_kanban board`; "How is the heal list?" → `read_heal summary`; "Is any schedule drifting?" → `read_schedules drift`; a fixture note → `read_notes list` and `read_notes "harbor light"`. `grep -c -i -E "cost|token|spend"` over her 19 sentences: 0.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-reads.mjs
+
+## MAN-9160 — server/modules/companion/eyes — panel-reads.ts: read_heal, read_notes and read_schedules
+
+The three reads of the family in MAN-9159 (`panelReads(deps)`: the tool table, the arguments, the probe). Each answers through `answerRead` (MAN-9151) with a dactyl brief of its own, and says its lines with `line-words.ts` (MAN-9161).
+
+## `read_heal` — `heal-reads.ts`
+- `summary`: `Heal list: N live friction rows; K of them filed since <the last heal ended <when> | the running heal began | no heal has run yet>.`, `Largest kinds: <kind> N, …` (the 10 with most live rows; `No kind has a live row.`), and the heals with status `running`: `<kind> · started <when> · fired by <a cycle | the door as written | an unknown door> · heal <id>` (`No heal is open.`).
+- `cycles`: the newest 5 by `started_at`: `<when> · pressed|scheduled · <stage> · gathered g, ignored i, healed h · ended <when> · <end_reason>` (`judging`, `healing`, `closing` read `open, <stage>`; none → `The heal list has run no cycle yet.`).
+- A kind: must match `^[a-z0-9][a-z0-9_.:-]{0,79}$` (never a leading dash, so never an option), else refused. It is LOWER-CASED before it goes to the worker, which matches kinds exactly. The worker answers its newest rows (200 at most, ignored ones too) — a window on the kind, never its count, so it is never set beside the summary's live figure. The newest 60 (`KIND_ROWS`) are rendered, one line each: `<when> · <tool|source|unknown>[ · ignored] · <detail ≤240>`, under `The ledger's newest N rows of kind X (a live, b ignored)` + `; the newest 60 are read` when N > 60 + `, newest first:`. No rows → `The heal list holds no friction rows of kind X. read_heal summary names the kinds that have some.` why 60: 2026-10-28 a dactyl took 70 s on 200 rows.
+- A worker `{ ok: false }` → refused `The heal list could not be read: <its message>. Say so, and try again in a moment.`
+- NEVER `spend_today`, `spend_reserved`, `switches.daily_cap`, a cycle's `spent`, a heal's `cost_usd` or tokens: each heal and cycle is said by the keys the file names and no other, so a key the worker adds later reaches her only when the file asks for it.
+
+## `read_notes` — `notes-reads.ts`
+- `list`: `<n> notes, newest first:` then `<title ≤70> · <first 8 words, … when more, ≤80> · updated <when>` per note, sorted by `updatedAt` descending, through `fitLines`. No notes → `He has no notes.`
+- A UUID (`NOTE_ID`): `get`; a 404 → refused `He has no note with the id …`.
+- Else the exact title, else every note whose title or text holds the phrase. None → `No note holds "<scope>" in its title or text. read_notes list shows his notes.` One → whole: `<title> · updated <when>`, then the text (`(no text)` when empty), whole when ≤2,000 characters, else a dactyl digest under `NOTE_BRIEF`. Several → `<n> notes fit "<scope>":` and lines.
+- A note is his own writing and goes over uncut except for credentials (`maskCredentials` on its title and text; `clipLine` on a list line): one of his notes opens with a Google API key.
+- 2026-10-28: account 1 holds 0 notes; his nine are account 2's. A showing of `read_notes` on account 1 needs a fixture note, deleted after.
+
+## `read_schedules` — `schedule-reads.ts`
+- Every answer carries the registry's sync: `The registry last synced <when>[ and that sync failed].` or `The registry has never synced.`
+- `list`: `<n> tracked jobs. <sync>` then `<name ≤60> · <schedule text> · <state> · last <when | last run not seen>[ · next <when>]` (`next` only for a scheduled prompt). States: `ok`, `failed`, `missing`, `unchecked` (`unknown`), `pending`, `sent`, `cancelled`. None → `No job is tracked. <sync>`
+- `drift`: each job whose drift is not `none`: `<name> · <newly adopted | gone from the box | changed>[ · <detail ≤300>]`. None → `No schedule is drifting: every tracked job agrees with the box. <sync>`
+- Else the exact job name, else every job whose name, purpose, command or tags hold the phrase. None → `No tracked job has "<scope>" in its name, purpose, command or tags. read_schedules list shows them all.` One → `<name> · <schedule> · <state>`, `Purpose:`, `Command:` (≤300), `Output:` (the log with the owner's home as `~`, else `the journal` for a cron line or `a chat session` for a prompt), `Last run:`, `Next:` (prompt), `Drift:`; digested under `JOB_BRIEF` past 2,000 characters. Several → lines.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/heal-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/notes-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/schedule-reads.ts
+
+## MAN-9161 — server/modules/companion/eyes — line-words.ts: the credential mask and the list budget every panel read says its lines with
+
+Strings in, strings out, no I/O. Consumers: the panel reads (MAN-9159) and `house-reads.ts` (MAN-9158).
+
+| export | does |
+|---|---|
+| `maskCredentials(text)` | replaces with `<masked>`, lines and spacing kept: a named secret's value (`password`, `passwd`, `passphrase`, `secret`, `api key`, `access key`, `private key`, `token` and up to 40 name characters, then `=` or `:`; the name stays), a `Bearer`/`Basic` value of 16+ characters, a vendor key (`sk-` or `sk_`, `ghp`, `gho`, `xox[abp]`, `AIza`, then 16+ of `[-_A-Za-z0-9]`). A word that merely starts `sk` (`skipped_bad_master_id`, `sketch-keeper`) is left. A text matching none passes as it is |
+| `clipLine(text, max)` | `maskCredentials`, whitespace folded to one space, trimmed, cut at `max` characters (as a person counts) ending `…`; `max` ≥ 2. Masked BEFORE the cut, so a cut never leaves half a secret |
+| `epochWords(seconds)` | the heal worker's epoch SECONDS as `whenWords`; not a positive finite number → `at an unknown time` |
+| `counted(n, noun)` | `1 note`, `3 notes` |
+| `fitLines(lines, { total?, max? })` | a list kept whole: the first lines that fit `max` (20) AND `LIST_LINES_BUDGET` (2,000 less 250 for the heading and closing line, each line +1 for its break), the first always shown, then `moreLine(total − shown)`; `total` when the caller holds only a page |
+| `linesThatFit(lines, max, budget)` | how many lines that is. An answer of SEVERAL lists hands each list what the lists before it left (`boardOverview`); `fitLines` once per list can add up past 2,000 and send the answer to a dactyl |
+
+- Why a text is masked: a heal row's detail, a cron command, a note and a card description are stored text and can carry the line a credential rode in on. What reaches her is read aloud and quoted. Callers that hand a stored text over WHOLE (a note, a card description) call `maskCredentials` themselves; a line goes through `clipLine`.
+- why a list stays whole: 2026-10-28 a 20-line list ran about 2,000 characters; every lane read went to a dactyl, took 10–12 s and dropped each card's priority and tags. Dactyl digests are for text reads only: a card description, a note, a job, a heal kind's rows.
+- Reuse `answerRead` (MAN-9151), `fitLines`, `clipLine` and `maskCredentials` in any new eyes read.
+- A second masker, `maskCredentials` in `server/modules/cerberus/diagnosis/diagnosis-text.ts` (six patterns, edited with the warden's `maskSecrets`), is not exported and shares no code with this one.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/line-words.ts
+
+## MAN-9162 — server/modules/companion/eyes — run-reads.ts: list_runs and read_run, her eyes on the runs; list_runs, the state words and the probe
+
+`runReads(deps)` (`eyes/run-reads.ts`) returns the SDK `tool()` definitions of `list_runs` and `read_run`, in that order, after `roadmapReads` and before `docReads` in `buildCompanionTools`. Both carry `readOnlyHint`, take `panel`, run inside `guardedToolResult`, and take their description from `toolLine(name)`; `read_run` hands the call's `AbortSignal` (`signalOf`) to its dactyl. Neither names a chat of her sessions: no `setFocus`, no `withActivity` (a read runs as `thinking`). A refusal is `deps.refuse(sentence)`. No answer carries cost, tokens, provider, runtime or a usage window (ruling 1; INV-10059). `read_run` is MAN-9163; the launcher's reads behind both are MAN-9164.
+
+A RUN is one of two things:
+| kind | is | id |
+|---|---|---|
+| dispatcher run | the chain of one task (`phase.chain_id`) of a plan in the dispatcher's picture | the chain id |
+| chat run | a chain or a soul a chat launched by hand (souls lane, `dispatcher_work` false) | a chain's chain id; a soul no chain holds, its launch id |
+
+## `list_runs { scope 1–200, panel? }` — `run-list.ts`
+| scope (case-insensitive) | holds |
+|---|---|
+| `running` | state kind `running` |
+| `recent` | not running, ended within 24 h |
+| `failed` | state kind `bad` or `waiting`, ended within 7 days |
+| anything else | a phrase, matched as a substring over: dispatcher run — plan name, plan title, task key, task title, agent, slug; chat run — chat name, agent, the whole brief |
+
+- Lines: dispatcher `<plan title> › <task title, ≤70 chars> · <state> · <when> · run <chain id>`; chat `<chat name> › <agent> "<first 6 words of the brief>" · <state> · <when> · run <id>`. `<when>` = `since <moment>` while running, else the moment it ended. The plan title is the roadmap feature's title (`planTitles(house.roadmap())`), else the plan's name.
+- Order: running first, then newest `at` first; cap `RUNS_MAX` = 15 through `cappedLines` (the rest named by count). `panel: true` puts the whole list on his panel (`toPanel`).
+- Sources, each read once per call: `house.dispatcher()` (a `done` phase is read only for `recent` and a phrase, and dropped when it finished over 7 days ago), `house.roadmap()` (titles), `house.launches()`.
+- A source not read yet this boot (`null`) puts a note line first: `The dispatcher's runs have not been read yet this boot; only the chats' runs are listed.` / `The chats' runs have not been read yet this boot; only the dispatcher's runs are listed.` With a note and no lines the answer is `Nothing among the runs that could be read yet; ask again in a moment for the rest.` and claims nothing about the whole.
+- A dispatcher run reads `readChainRun(chain_id, { summaryOnly: true })`; a chain with no record is left out.
+- A chat's chain is ONE run: the lane has one row per launch, so `readChainsHoldingLaunches(ids, now − 6 h − 60 s)` maps each hand launch to the chain whose record lists it; a launch no chain holds is a soul alone. The lane keeps an ended launch 6 h, so `recent` and `failed` hold a chat's runs for the last 6 h and the plans' tasks for the whole span (the scope's schema text and the none sentences say so).
+- Chat name: `chatNameOf` of the app row `sessionsDb.resolveAppSessionId(launched_by)`; no stamp = `a run no chat launched`; a deleted chat = `a chat that is gone`.
+- Empty scope, no note: `running` — `Nothing is running right now: no plan task and no chat run is out.`; `recent` — `No run ended in the last 24 hours (a chat's own runs are kept for six hours).`; `failed` — the same with `ended badly` and 7 days; a phrase — `No run matches "<phrase>"; list_runs recent shows the latest.`
+- `momentWords(seconds)`: `whenWords` of the time, `at an unknown time` for `null` or a time no date can be made of. One torn record never costs the list.
+
+## State words — `run-state.ts`
+| record | words | kind |
+|---|---|---|
+| chain `done`, `nothing-changed` | `done` | done |
+| chain `ruling` | `stopped for your ruling` | waiting |
+| chain `dead` with `stopped.by` | `stopped` | bad |
+| chain `dead` without it; any other status word | `failed at <failed_stage, else stage, else the start>` | bad |
+| chain `running`, walker alive OR record written < 90 s ago | by the current stage: `athena*`, `iris*`, `review*` → `in review`; `fix*` → `fixing`; `prometheus*` → `writing the docs`; else `building` | running |
+| chain `running`, walker gone AND not written for 90 s | `failed at <stage>` | bad |
+| soul `running` | the same words by its role | running |
+| soul `completed` / `stopped` | `done` / `stopped` | done / bad |
+| soul `failed` | `failed at <role, else the start>` | bad |
+
+## Probe
+`.verify/companion-run-reads.mjs` runs on a `.backup` copy of `auth.db` under `/tmp` and refuses any other `DATABASE_PATH`:
+```
+D=$(mktemp -d /tmp/companion-run-reads.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+DATABASE_PATH=$D/auth.db TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-run-reads.mjs          # parts 1–4
+DATABASE_PATH=$D/auth.db TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-run-reads.mjs --live   # + part 5
+```
+1 the launcher's reads; 2 the tools called directly (every `list_runs` scope, the `read_run` forms, refusals, `panel: true`; digests run through one dactyl each, no Gemini); 3 her prompt's pointer line and TOOLS lines; 4 a scan of every answer for cost, tokens, provider, a paid vendor, `wall <n>s` or the pacer's windows; 5 (`--live`) two typed questions to account 1's Kaylee on `haiku` on :3011, her tool calls read back from her CLI transcript. Prints `<n> of <m> checks passed.`, exits 1 on a FAIL. A server file saved during `--live` hands the dev server over and stops her turn in flight.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-state.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-run-reads.mjs
+
+## MAN-9163 — server/modules/companion/eyes — run-reads.ts: read_run — the resolution of a run, its four scopes and the scrubs
+
+`read_run { run 1–300, scope 1–100, panel? }` (`eyes/run-reads.ts`, MAN-9162). Scope is judged first: `result`, `failure`, `findings`, `log` (`RUN_SCOPES`, case-insensitive); any other is refused naming the four. Then `resolveRun`, then `readRunScope`.
+
+## Resolution — `resolveRun(house, reference)` → `{ ok: true, run } | { ok: false, sentence }`
+`run` = `ResolvedRun { kind: 'chain'|'soul', id, plan, task: { key, title }|null, chatSessionId }`: `plan` the dispatcher plan of a task's chain, `chatSessionId` the APP id of the chat that launched a hand run (chat still existing), else `null`.
+1. An id, tried first. `readChainRun` (summary only), else `readSoulRun`; both hold the id to `SAFE_RECORD_ID`, so a phrase with a space or a path is never an id. A task's chain id that the dispatcher's picture holds resolves with `plan` and `task` set EVEN WHEN its files are gone: the read then answers that they are cleared.
+2. `<plan> <task>`, or `<plan title> › <task title>` as the list prints it. Plan: by name or roadmap title, folded (lower case, punctuation = one space), the longest name wins. Task, among ALL the plan's tasks: key or title exactly, else a part of title or key (≥ 3 characters), else its 1-based number. Words are tried as said, then with the filler words (`the a of task phase run for in on`) cut at both ends. No task words: the plan's only task with a run, else its one task with a run that is not done, else refused naming them.
+
+| case | answer |
+|---|---|
+| task has no `chain_id` | refused: `The task <key> of <plan> (<title>) has no run yet: it is <status>.` Never another task's run |
+| several tasks fit | refused naming ≤ 8 as `key (title)` |
+| none fits | refused naming the plan's tasks |
+| no plan named | refused: call `list_runs` for the id |
+| `house.dispatcher()` is `null` | refused: not read yet this boot, ask again |
+| record gone at read time | `The files of <id> have been cleared from disk, so there is nothing left to read of it; call list_runs for the runs there are.` |
+- A consumer that needs a run's files checks for them: an `ok` chain may have none.
+
+## The scopes — `readRunScope(deps, run, scope, panel, signal)`
+| scope | chain | soul alone |
+|---|---|---|
+| `result` | head, scrubbed `report.md`, then the newest `builder` stage's `result.md` (else the newest stage that has one), digested | head, its `result.md` digested; none: `It has left no result file yet.` |
+| `failure` | done: `It did not fail.`; running: `It has not failed; it is still going.`; else `Status`, `Cause` (scrubbed), `Failed stage`, then that stage's `result.md` digested, else the end of the walker log | the same by state, then `Status`, `Cause`, its `result.md` |
+| `findings` | head and the report's `gates:` line, then the newest review file (newest stage with `findings`, else a `paths:` entry under `/pipeline-reviews/`) and the newest fix-pass `result.md` that came AFTER that review stage, digested | `A soul alone has no review file; …` |
+| `log` | head, a line per stage `<name> · attempt <n> · <status> · <verdict, else —> · <moment, else not started>` (`waiting` reads `running`), then the last 80 lines of `walker.out`, digested | head, its transcript (`readSoulTranscript`: its text and one `→ <tool call>` line per tool; thinking left out), digested |
+- Heads: chain `Run <slug> — <plan> › <task title, ≤80>: <state>, out since <moment> | last moved <moment>.`; soul `Soul <agent> (<role>): <state>, out since | ended <moment>. It was handed: <brief>`.
+- `findings` with no fix pass after the review: the intro says `no fix pass has reported on it`; a fix pass from an earlier round is never offered as having closed it. No review file: `No review file is on record: no review stage has answered.`
+- A digest = `wholeOrDigest` (`eyes-answer.ts`, MAN-9151): ≤ 2,000 characters whole, longer by ONE dactyl under the scope's fixed brief (`NO_SPEND` appended), cited as `L<n>`. A digest that cannot be had is told as a line and the facts before it stand. `panel: true`: the parts are joined whole into one note (`toPanel`), no dactyl.
+- A stage's `result.md` or review path is read only through `readRunDocument` (MAN-9164).
+
+## Scrubs — `run-scrub.ts`
+| function | text | cuts |
+|---|---|---|
+| `scrubReport` | the report, the walker tail | lines opening `cost:`; lines matching `usage limit`, `rate limit`, `resets <digit>`; the provider off `built:  <agent> on <provider>`; `— wall <n>s past cap <n>s`; ` after <n>s` (`after 3 retries` stays); an `also:` line past 240 characters |
+| `scrubDocument` | a `result.md`, a review file | lines opening `cost:` |
+| `scrubCause` | a failed run's cause | a usage-limit cause → `it hit a limit and was not relaunched`; `wall <n>s past cap <n>s` → `it ran past its time cap` |
+| `clipText(text, max)` | a title, a head | folds to one line, cuts to `max` characters with `…` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scrub.ts
+
+## MAN-9164 — server/modules/dispatch-souls — run-reads.service.ts and run-document.service.ts: a run read back from the launcher's own records, for the companion's run reads
+
+What the companion's `list_runs` and `read_run` (MAN-9162, MAN-9163) ask the launcher's files. All five reads are exported from the `dispatch-souls` barrel (`index.ts`, with `readSoulTranscript` and the types `ChainRun`, `ChainRunStage`, `SoulRun`). They read files and write none; nothing throws, and a record absent or torn answers `null`. Roots: `dispatchSoulsStateDir()` for the launches and `chainsRootBeside(...)` for the chains, so a scratch `DISPATCH_SOULS_STATE_DIR` moves every read.
+
+| export | answers |
+|---|---|
+| `readChainRun(chainId, { summaryOnly? })` | `ChainRun \| null`: `chain.json`'s `status`, `stage`, `cause`, `failed_stage`, `slug`, `agent`, `stopped_by` (`stopped.by` of a `dead` chain), times, `stages` (`name`, `launch`, `attempt`, `status`, `verdict`, `at`, `ended_at`, `text`, `findings`; no cost, tokens or provider), `walker_alive`; `report.md` with its `cost:` lines cut; the `paths:` line's paths (`~/` expanded); the last 80 lines of `walker.out` (reads its last 128 KB), `cost:` cut |
+| `readSoulRun(launchId)` | `SoulRun \| null`: the spec's agent, role, brief line, `launched_by`, the state `classifyLaunch` gives it with no age cap, status, cause, times, `result_path` |
+| `readChainsHoldingLaunches(ids, notOlderThanMs)` | `Map<launchId, chainId>` over chain records written since; a soul no chain holds is absent |
+| `readRunDocument(file)` | the text of an absolute `.md` regular file ≤ 2 MB inside the souls root or the `pipeline-reviews` directory beside it (links resolved), else `null` |
+
+- `summaryOnly` skips `report.md` and `walker.out`: `report` `null`, `paths` `[]`, `walker_tail` `''`, every other field as it is (`walker_alive` still computed). Anything that lists many chains passes it.
+- Times are epoch SECONDS; a field that is no finite number, or no date (`new Date(s * 1000)` invalid), is `null` (`secondsOf`).
+- Every id is held to `SAFE_RECORD_ID` (exported by `chain-record.transport.ts`, INV-6335) BEFORE a path is joined; a path out of a record's JSON is read only through `readRunDocument`.
+- `readChainRun` is never `plan-runner chain --status`: that verb adopts a dead walker's stage, which is a write.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-document.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-reads.service.ts
+
+## MAN-9165 — server/modules/companion/eyes — roadmap-reads.ts: list_roadmap and read_card, her eyes on the roadmap; the tools, resolveCard and the probes
+
+`roadmapReads(deps)` (`eyes/roadmap-reads.ts`) returns the SDK `tool()` definitions of `list_roadmap` and `read_card`, in that order, after `actTools` and before `runReads` in `buildCompanionTools`. Both carry `readOnlyHint`, take `panel`, run inside `guardedToolResult`, and take their description from `toolLine(name)`. Neither names a chat: no `setFocus`, no `withActivity` (a read runs as `thinking`). A refusal is `deps.refuse(sentence)`. `read_card` hands the call's `AbortSignal` (`signalOf`) to its dactyl. No answer says a cost, token count, paid vendor, runtime or the pacer (ruling 1; every digest brief forbids it). The cards, their lines and the `read_card` scopes are MAN-9166.
+
+Reads (each once per call): `house.roadmap()` (`RoadmapPicture`), `house.dispatcher()` (`DispatcherPicture`), `house.cardText(name)` (`dispatcher show <name>`, `design` and a phrase only).
+| lane not landed | `list_roadmap` | `read_card` |
+|---|---|---|
+| roadmap `null` | `The roadmap has not been read yet; ask again in a moment.` | same |
+| dispatcher `null`, roadmap read | reads the roadmap alone | `The dispatcher has not been read yet; ask again in a moment.` |
+
+## `list_roadmap { scope 1–200, panel? }`
+| scope (case-insensitive) | holds |
+|---|---|
+| `waiting` | features with `waiting_on_you` set. none: `Nothing on the roadmap is waiting on him.` |
+| `active` | features whose word (roadmap word, else unplaced word) is `designing` or `in flight`. none: `Nothing on the roadmap is being designed or built.` |
+| `recent` | features with `shipped_at` in the last `RECENT_DAYS` = 7 days, newest first. none: `Nothing shipped in the last 7 days.` |
+| `epics` | every epic: In progress first, then Not started, then the rest (`epicRank`; the cap hides finished ones). none: `The roadmap holds no epics.` |
+| anything else | a phrase over name, title and goal (`holds`), epics first. none: `Nothing on the roadmap matches "<phrase>".` |
+- Cards come from `buildCardBook(roadmap, null)`: the roadmap's rows alone, a plan only the dispatcher knows is not listed. Line = `cardLine` (MAN-9166).
+- Cap: `fitLines(lines)` = 20 lines within 2,000 characters, then how many were left out. `panel: true` puts every line on his panel (`toPanel`, title `Roadmap: <scope>`).
+
+## `read_card { card 1–300, scope 1–200, panel? }`
+| scope (case-insensitive) | source | answer |
+|---|---|---|
+| `summary` | the two pictures' rows | whole |
+| `prompt` | rows | whole; digested only when the census is over 2,000 characters (`PROMPT_BRIEF`) |
+| `questions`, `phases`, `history` | rows | whole |
+| `design` | `house.cardText`, spend cut by `designText` | a dactyl digest (`DESIGN_BRIEF`, ≤15 lines, `L<n>` cites) |
+| anything else | `house.cardText`, `paragraphsAround(text, phrase)` | a dactyl digest (`phraseBrief`, ≤12 lines); no paragraph holds it: `The design of <card> does not mention <phrase>.` |
+- `cardText` not ok: `The dispatcher has no text for <card>: <sentence>.`
+- `finish(deps, reading, panel, signal)`: no `brief` ⇒ the answer is `intro` + `text` whole; `panel: true` puts `reading.panel ?? reading.text` on his panel. A `brief` ⇒ `answerRead` (whole under 2,000 characters, else digested).
+
+## `resolveCard(ref, roadmap, dispatcher)` → `{ ok: true; card: Card } | { ok: false; sentence }`
+Exported; its only caller today is `read_card`. Both pictures `null` ⇒ `The roadmap has not been read yet; ask again in a moment.`; one `null` ⇒ the other is all there is.
+| step | matches | on several |
+|---|---|---|
+| 1 name | `ref` without `.arc`, case-insensitive. A bare name is a plan's, an epic's only when no plan has it; `name.arc` is an epic's alone | |
+| 2 title | `norm(title) === norm(ref)` | refusal |
+| 3 contains | `norm(name)` or `norm(title)` contains `norm(ref)`, `ref` ≥ 3 characters | refusal |
+- Several fits: `"<ref>" fits <n> cards: <name (title), …first 10>, and <k> more; name one.` (`FITS_NAMED` = 10; an epic is named `<name>.arc`). None: `No card is named <ref>; list_roadmap with a phrase finds it.`
+
+## Probes
+| Probe | Run | Proves |
+|---|---|---|
+| `.verify/companion-roadmap-reads.mjs` | `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-roadmap-reads.mjs` | the real roadmap and dispatcher lanes (`createRoadmapModule`, `createDispatcherModule`, polls only): every `list_roadmap` scope, `read_card` scopes on a shipped card, a live card, an epic and an Accept card, `resolveCard` forms, refusals, one dactyl digest (Claude, one file in account 1's scratch), `stepBrackets` on three texts, `panel: true` into a stub store; prints `PASS`/`FAIL` lines. Against the live `auth.db` the lanes log "no such column"/"no such table" noise when the database lags the schema; nothing is written |
+| `.verify/companion-roadmap-reads-fixtures.mjs` | same, file swapped | hand-made pictures through the real handlers: Accept prompt, questions round, hidden plan, held plan, stall, wait on an unfinished plan, a `relayed` event, an unplaced scratch plan, the lane-not-landed refusals. No lane, database or model |
+| `.verify/companion-eyes-ask.mjs` | `node .verify/companion-eyes-ask.mjs "<question>" … [--lines=N]` | sets account 1's model to `haiku`, types each question through `POST /api/companion/messages` on the running dev server (:3011), waits for `companion_turn` ended on `/ws`, prints her tool calls with inputs, the first `--lines` (default 6) of each answer and her sentences, read from her CLI transcript. Account 2 is never touched. The dev supervisor restarts :3011 on a `server/` save and a turn in flight stops (`503 COMPANION_STOPPING`): do not edit `server/` while it runs |
+- 2026-10-28: asked "Is kaylee--avatar still waiting on Queue?" she answered from `list_roadmap <phrase>` (its line already says `Shipped: shipped Oct 27`), not `read_card`; the `scope` description names `read_card` for one card in full and did not change her choice.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/roadmap-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-eyes-ask.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-roadmap-reads-fixtures.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-roadmap-reads.mjs
+
+## MAN-9166 — server/modules/companion/eyes — card-lines.ts and card-scopes.ts: the card book, a card's lines and the read_card scopes; followup-plans.ts: the step beside a follow-up
+
+Strings and rows in, strings out, no I/O. The tools that use them are MAN-9165. No function reads a cost, token count, paid vendor, runtime or the pacer field of a row (ruling 1). Every word is the panels' (`panel-words.ts`, MAN-9151).
+
+## `card-lines.ts` — the card book
+| Export | Is |
+|---|---|
+| `Card` | `{ kind: 'plan' \| 'arc', name, title, spoken, arc, epicTitle, feature, unplacedWord, epic, plan, dispatcherArc }` |
+| `buildCardBook(roadmap, dispatcher)` → `CardBook` | `{ cards, plans, rows }`; either picture may be `null`, the book then holds what the other knows |
+| `norm(text)` | lower case, apostrophes dropped, every other run of non-letters/non-digits one space |
+| `holds(text, phrase)` | case-insensitive substring, else `norm` substring; an empty phrase holds nothing |
+| `stateWords(card, book)` | feature `<Word>: <step words>` (`Shipped: shipped Oct 27`); unplaced: its word; plan the roadmap lacks: the In flight badge; epic: its word |
+| `planStepWords(name, book)` | one plan's step words alone (feature: step words; unplaced: its word; dispatcher-only: badge); `null` for a name the book lacks |
+| `cardLine(card, book)` | feature `<title> · <name> · <Word>: <step words> · epic <epic title>`, plus ` · <done> of <n> tasks` while in flight; epic `epicLine`; a card with no roadmap row says what the dispatcher says |
+| `epicLine(card)` | `<title> · <name> · <epic word> · <shipped> of <n> features shipped`, plus ` · <k> waiting on you` |
+| `headOf`, `approvedWords`, `waitsOnWords`, `stallWords`, `askWords`, `openAsk`, `taskRows` | the pieces the lines and scopes share |
+- One card per name: roadmap rows first in the roadmap's order, then plans/arcs only the dispatcher holds. A shipped feature stays a roadmap row for good; the dispatcher drops a finished plan a day after it ends, so a card shipped earlier has no `plan`. A scratch store's plan is a dispatcher row alone or an `unplaced` roadmap row (name, title, word).
+- `spoken` = the title when it is ≤ 6 words, else the name with dashes read as spaces.
+- A `waiting` step names the first `waits_on` feature that has not shipped (`firstUnshipped`); `shipped` names `shortDate(shipped_at)`, never `whenWords` (MAN-9151).
+- `taskRows`: the dispatcher plan's phases (they carry `chain_id` and the stall), else the roadmap's tasks; a title is cut to `TASK_TITLE_MAX` = 140 characters (`clipLine`, which masks credentials). An epic has none.
+- `openAsk(card, book)`: a plan's own `asking`; an epic's = the ask of one of its plans that names that plan as the one asking; else `null`.
+- File is 296 lines: the next addition goes in a sibling.
+
+## `card-scopes.ts` — the `read_card` scopes without dispatcher text
+`Reading` = `{ title, intro, text, label, brief: string \| null, panel? }`; `brief` null = always whole, `panel` = the longer text his panel holds when `text` was cut to the inline limit.
+| Export | Scope | Answer |
+|---|---|---|
+| `summaryReading` | `summary` | plan: heading, then `<Word>: <step words> · approved <when> <door> · <done> of <n> tasks`, `Epic:`, `Waits on:`, `In flight face:` (hidden since / held for its Start), `Stalled:`, `Running:`, `Open:`. Epic: its line, `In flight face:`, `Open:`, then each feature's `cardLine` (`cappedLines`) |
+| `promptReading` | `prompt` | the open Accept prompt (`header`, `question`, `Answers: <labels>`); question over `INLINE_MAX_CHARACTERS` = 2,000 ⇒ header and answers stay in the intro, the census alone carries `PROMPT_BRIEF`. None: `No Accept prompt is open on <card>.` + a pointer to `questions` when those are open + `It was approved …` / `It has not been approved.` (an epic: `<k> of its <n> features are approved.`) |
+| `questionsReading` | `questions` | numbered questions, options verbatim; none: `No questions are open on <card>.` |
+| `phasesReading` | `phases` | `<k>. <title> — <phase words>` + ` · run <chain id>`, first `TASKS_MAX` = 30. Cut to 2,000 characters ⇒ the closing line reads `And <k> more tasks; panel: true puts the list on his panel.` (`…the first <N>…` when the note cannot hold all); `panel` is the lines fitted to `NOTE_TEXT_MAX` (4,000) closing `And <k> more tasks.`. An epic: `… is an epic and has no tasks of its own; read one of its features: …` |
+| `historyReading` | `history` | the plan's lifecycle events newest first, first `EVENTS_MAX` = 20, `<when> · <words>` (`added`, `promoted`, `hidden`, `shown`, `paused`, `resumed`, `complete`, `design loaded`, `tasks loaded`, `asked for his answers/Accept`, `approved <door>`, `relayed` = the event's detail clipped to 400 or `carried on his word by Kaylee`), then `Its tasks so far: <n> launched, <n> done, <n> declined.`; every other kind is unsaid |
+| `designText(text)` | `design`, phrase | the dispatcher's `show` text without spend: header segments after the first (split on ` — `) matching `SPEND_SEGMENT` (dollars, `<n>M in/out`, `cache)`, `working`, `token`, `cost`) are cut; a `model:` line within the first `HEADER_LINES` = 8 lines is cut (it names the paid vendor) |
+| `paragraphsAround(text, phrase)` | phrase | paragraphs (blank-line separated) that hold the phrase plus one either side, touching windows joined, a gap marked `[…]`; `null` when none |
+- `history` of a card with no dispatcher log is told from the roadmap's dates (`added`, `promoted`, `approved`, `complete`): a plan the dispatcher dropped says `The dispatcher no longer keeps a log for <card>; these are the dates the roadmap holds:`; an `idea`/`proposed` feature `<card> is not a plan yet and has no log; the roadmap holds for <card>:`; an epic `An epic keeps no log of its own; …` and is `complete` only while its word says so.
+- File is 292 lines: the next addition goes in a sibling.
+
+## `tools/followup-plans.ts` — `stepBrackets(house, texts)` → `string[]`
+- One entry per text, same order: `' [<plan>: <step words>]'` for each plan the text names, else `''`. The line they go on is `list_followups` in MAN-9154.
+- A name counts only as a whole word: the character either side is not `[A-Za-z0-9_-]` (`wholeWordAt`), so `kaylee--eyes` is never found in `kaylee--eyes-two`. Each name once, in the order first standing in the text. Names = the cards of kind `plan` in `buildCardBook(roadmap, dispatcher)`; step = `planStepWords`.
+- A lane that has not landed adds nothing; a lane whose read throws is logged once per call (`[Companion] list_followups could not read the <roadmap|dispatcher> picture for the plan steps`) and counts as not landed. Both `null` ⇒ every entry `''`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/card-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/card-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/followup-plans.ts

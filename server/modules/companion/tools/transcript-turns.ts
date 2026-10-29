@@ -131,10 +131,12 @@ export function numberTurns(all: Turn[], picked: Turn[]): NumberedTurn[] {
 /**
  * What one dactyl takes of a file, as `dactyl` weighs it (`refuse.PROMPT_MAX_BYTES`, 320 KiB): its UTF-8 bytes plus
  * 7 bytes of line number on every line. The budget here is under that gate with room for the brief and for the title and
- * gap lines, so a render that fits this is never refused for size. Consumer: `newestThatFit`.
+ * gap lines, so a render that fits this is never refused for size. Consumers: `newestThatFit` here and `eyes/eyes-answer.ts`
+ * (`wholeOrDigest`), which weighs a text the same way before it renders one to her scratch.
  */
-const DACTYL_WINDOW_BUDGET = 300_000;
-const LINE_NUMBER_BYTES = 7;
+export const DACTYL_WINDOW_BUDGET = 300_000;
+/** The bytes the dactyl adds to every line it is handed (its line number). Consumers: `newestThatFit` here and `eyes/eyes-answer.ts`. */
+export const LINE_NUMBER_BYTES = 7;
 
 /**
  * The newest turns of `picked` that one dactyl can read together, and the turns too long for any reader. Turns are

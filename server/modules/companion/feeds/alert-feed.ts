@@ -38,8 +38,10 @@ import { buildAlertBlock, type CompanionAlert } from './alert-block.js';
  * Notification code → the kind an `<alert>` carries. THE MAP, and the whole of the list: a code that is not here
  * is not an alert. Never `limit.*` (usage), `push.enabled`, `run.stopped`, nor the dispatcher's pause and relaunch
  * codes — ruling 17, never a word about usage or spend, and a stop is a stop, not news.
+ * Consumed by this feed's own listener and by `eyes/alert-reads.ts`, whose `list_alerts` says a kept event's kind in the
+ * same six words where its code has one here.
  */
-const ALERT_KIND_BY_CODE: ReadonlyMap<string, CompanionAlertKind> = new Map<string, CompanionAlertKind>([
+export const ALERT_KIND_BY_CODE: ReadonlyMap<string, CompanionAlertKind> = new Map<string, CompanionAlertKind>([
   ['dispatcher.finished', 'feature finished'],
   ['dispatcher.epic_finished', 'feature finished'],
   ['run.background_completed', 'background work landed'],

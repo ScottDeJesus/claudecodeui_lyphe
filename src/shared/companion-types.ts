@@ -150,7 +150,7 @@ export type CompanionLogEntry = {
 
 /**
  * A card she put on the panel with `show_note` instead of saying it aloud: a `title` and its `text`.
- * `id` is the store's row id, and a note stays until the operator dismisses it. Announced by
+ * `id` is the store's row id, and a note stays until the operator dismisses it or she takes it down with `dismiss_note`. Announced by
  * `companion_note` and withdrawn by `companion_note_removed`.
  */
 export type CompanionNote = { id: number; at: string; title: string; text: string };
@@ -169,12 +169,74 @@ export type CompanionProcess = { state: 'asleep' | 'waking' | 'awake' | 'failed'
 export type CompanionTurnOutcome = 'answered' | 'stopped' | 'failed';
 
 /**
+ * The twelve things she may do in the house, each only on his word and never on her own judgment. The
+ * dispatcher's own: `queue`, `hide` and `rework` answer a plan's open Accept prompt (`hide` and `rework`
+ * also act on a card with none open), `answer` sends his answers to an open questions round, and `show`,
+ * `recut`, `stop`, `resume` and `kick` act on a card. `resume_run` resumes a chain that is not running,
+ * with his rulings. `open` brings a card, run, page or chat up on his screen. `close_followup` ticks one
+ * of his follow-ups off. Carried by `CompanionPendingAction.action`.
+ */
+export type CompanionActionKind = 'queue' | 'hide' | 'show' | 'rework' | 'answer' | 'recut' | 'stop' | 'resume' | 'kick' | 'resume_run' | 'open' | 'close_followup';
+
+/**
+ * What an action acts on, told apart by `kind`. `spoken` is the name he says it by: the card draws it and
+ * the check of his word reads it. A `card` is a plan or an epic by the dispatcher's name (`arc` the epic a
+ * plan belongs to, `null` for an epic or a plan with none); a `run` is a chain id or a soul launch id
+ * (`plan` the plan a chain builds, `null` for a soul's); a `page` is a DocSpace page (`blockId` the block
+ * an open lands on, `null` for the page); a `chat` is an app session id; a `followup` is one of his
+ * follow-ups, `id` its number, `sessionId` the chat it belongs to and `text` its words as the card shows
+ * them. Carried by `CompanionPendingAction.target`.
+ */
+export type CompanionActionTarget =
+  | { kind: 'card'; name: string; spoken: string; arc: string | null }       // a plan or an epic, by the dispatcher's name
+  | { kind: 'run'; runId: string; plan: string | null; spoken: string }      // a chain id or a soul launch id
+  | { kind: 'page'; pageId: string; blockId: string | null; spoken: string }
+  | { kind: 'chat'; sessionId: string; spoken: string }
+  | { kind: 'followup'; id: number; sessionId: string; spoken: string; text: string };
+
+/**
+ * One of his spoken lines, carried verbatim into an action: its `logId` in her log, its `at` time and its
+ * `text` exactly as he said it. Notes, rulings and answers travel only this way — never in her words, and
+ * never from a line he typed. Carried by `CompanionPendingAction.carried`.
+ */
+export type CompanionCarriedLine = { logId: number; at: string; text: string };
+
+/**
+ * The one action waiting for his word, as her panel's card draws it. `id` names the action (its row in
+ * the house's record of her actions); `prompt` is the Accept census, or the open questions with their
+ * options, as the card shows them (`null` when the action has none); `carried` is his own spoken lines it
+ * carries — notes or rulings under a `null` label, or one group per question with the question as its
+ * `label` — each line verbatim; `say` is what he says aloud to fire it ("Queue Kaylee's eyes"); `preparedAt`
+ * is when it went on his panel and `expiresAt` when it lapses (five minutes on). Held in her state beside
+ * the draft and announced by `companion_pending`. What the prepare pinned (the ask and its lock token, the
+ * chain, the follow-up) is the server's alone and is never part of this shape.
+ */
+export type CompanionPendingAction = {
+  id: string;
+  action: CompanionActionKind;
+  target: CompanionActionTarget;
+  prompt: string | null;                                        // the Accept census, or the questions with their options, as the card shows them
+  carried: Array<{ label: string | null; lines: CompanionCarriedLine[] }>;  // notes or rulings (label null), or one group per question (label = the question)
+  say: string;                                                  // what he says to fire it: "Queue Kaylee's eyes"
+  preparedAt: string;
+  expiresAt: string;
+};
+
+/**
+ * Where an open lands, on the page that holds the floor: a `chat` by its app session id, a roadmap `card`
+ * by its plan's name, or a DocSpace `page` (and `blockId`, `null` for the page itself). Carried by
+ * `companion_open`.
+ */
+export type CompanionOpenTarget = { kind: 'chat'; sessionId: string } | { kind: 'card'; plan: string } | { kind: 'page'; pageId: string; blockId: string | null };
+
+/**
  * The whole of her as a page reads it with `GET /api/companion`: the `settings`, the models the
  * picker offers (`value` and its `label`, taken from the installed CLI's catalog), the `process`, the
  * current `activity`, the `turnId` of a running turn (`null` when none), the `focus` chat, the
- * `draft`, the `walk`, the `notes`, the newest 200 `log` entries (newest last) and the `floor` — the
- * client id of the page that holds the floor, `null` for none. Every later change reaches the page as
- * a `CompanionFrame`, and a page that missed some reads the picture again.
+ * `draft`, the `pending` action waiting for his word (`null` for none), the `walk`, the `notes`, the
+ * newest 200 `log` entries (newest last) and the `floor` — the client id of the page that holds the
+ * floor, `null` for none. Every later change reaches the page as a `CompanionFrame`, and a page that
+ * missed some reads the picture again.
  */
 export type CompanionPicture = {
   settings: CompanionSettings;
@@ -184,6 +246,7 @@ export type CompanionPicture = {
   turnId: string | null;
   focus: CompanionSessionRef | null;
   draft: CompanionDraft | null;
+  pending: CompanionPendingAction | null;
   walk: CompanionWalk | null;
   notes: CompanionNote[];
   log: CompanionLogEntry[];
@@ -195,14 +258,16 @@ export type CompanionPicture = {
  * every open socket of the account. `companion_log` is a whole new log line and `companion_sentence`
  * one sentence of her turn as it is said; `companion_turn` marks a turn `started` or `ended` (the
  * `outcome` and `error` are set on `ended` only, `null` otherwise); `companion_activity`,
- * `companion_focus`, `companion_draft`, `companion_walk` and `companion_process` each carry the new
- * value of the matching picture field (`null` clears the focus, draft or walk); `companion_note` adds
- * a card and `companion_note_removed` withdraws one by `id`; `companion_settings` carries the new
- * settings; `companion_open_chat` tells the page whose client id equals `floor` to open the chat
- * `sessionId`; `companion_floor` says the floor moved: `floor` is the client id of the page that holds it
- * now, so the page whose own id equals it may play her voice and every other page shows the text only
- * (sent on every write of the floor, whether or not the holder changed); `companion_cleared` says the
- * account's log and notes were cleared, with her memory, and the panel empties.
+ * `companion_focus`, `companion_draft`, `companion_pending`, `companion_walk` and `companion_process` each
+ * carry the new value of the matching picture field (`null` clears the focus, draft, pending action or
+ * walk); `companion_note` adds a card and `companion_note_removed` withdraws one by `id`;
+ * `companion_settings` carries the new settings; `companion_open` tells the page whose client id equals
+ * `floor` to bring `target` up (a chat, a roadmap card or a DocSpace page), for every open she makes,
+ * the open of the chat a send went to included (`target.kind === 'chat'`); `companion_floor` says the
+ * floor moved: `floor` is the client id of the page that holds it now, so the page whose own id equals it
+ * may play her voice and every other page shows the text only (sent on every write of the floor, whether
+ * or not the holder changed); `companion_cleared` says the account's log, notes and pending action were
+ * cleared, with her memory, and the panel empties.
  */
 export type CompanionFrame =
   | { kind: 'companion_log'; entry: CompanionLogEntry }
@@ -211,11 +276,12 @@ export type CompanionFrame =
   | { kind: 'companion_activity'; activity: CompanionActivity }
   | { kind: 'companion_focus'; focus: CompanionSessionRef | null }
   | { kind: 'companion_draft'; draft: CompanionDraft | null }
+  | { kind: 'companion_pending'; pending: CompanionPendingAction | null }
   | { kind: 'companion_walk'; walk: CompanionWalk | null }
   | { kind: 'companion_note'; note: CompanionNote }
   | { kind: 'companion_note_removed'; id: number }
   | { kind: 'companion_settings'; settings: CompanionSettings }
   | { kind: 'companion_process'; process: CompanionProcess }
-  | { kind: 'companion_open_chat'; sessionId: string; floor: string }
+  | { kind: 'companion_open'; target: CompanionOpenTarget; floor: string }
   | { kind: 'companion_floor'; floor: string }
   | { kind: 'companion_cleared' };

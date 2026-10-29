@@ -95,7 +95,9 @@ const INERT_WHILE_CLOSED = { inert: '', 'aria-hidden': true } as unknown as HTML
  * verbatim, and `inert="false"` would be an inert element all the same, which is why the value is
  * `''` and not a boolean.
  *
- * Used by `PlanCard` and `DeckFrame` — every card that folds.
+ * Used by every fold whose hidden body holds words or controls: the dispatcher's `PlanCard`, `DeckFrame` and
+ * `OverrideFold`, the Cerberus sheet's `DiagnosisPanel`, and the companion's `CompanionActionCard` (a round's
+ * questions, folded behind one press).
  */
 export function CardFoldBody({ children, className }: { children: ReactNode; className?: string }) {
   const { open } = useCollapsible();

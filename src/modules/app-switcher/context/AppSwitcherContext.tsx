@@ -9,7 +9,7 @@ import {
   readAppSwitcherRecord,
   writeAppSwitcherRecord,
 } from '@/modules/app-switcher/utils/appSwitcherStorage';
-import { EMPTY_SLOT, loneAppOnTheLeft } from '@/modules/app-switcher/utils/paneSlots';
+import { EMPTY_SLOT, loneAppOnTheLeft, placeApplication } from '@/modules/app-switcher/utils/paneSlots';
 import type { AppEntry, RegistryRow } from '@/shared/app-types';
 import type { DockPress, PaneSide, PaneSlot, ProjectChoice } from '@/shared/types';
 import type { DockableFabPosition } from '@/shared/ui';
@@ -46,6 +46,12 @@ type AppSwitcherValue = {
   drawerOpen: boolean;
   /** Puts an app up in the side the next choice fills, or takes it down wherever it is already up. */
   open: (appId: string, src: string) => void;
+  /**
+   * Puts an app up at an address and never takes it down: where `open` would put it, or — when it is already up — in the half
+   * it holds, moved to `src` (the frame keeps its place and navigates; a fragment-only change is the page's own `hashchange`).
+   * The same `src` it already holds remounts the frame, so the address lands even where the reader has navigated away from it.
+   */
+  putUp: (appId: string, src: string) => void;
   /** Clears both panes: the way back to the workspace. */
   close: () => void;
   toggleDual: (next: boolean) => void;
@@ -172,9 +178,20 @@ export function AppSwitcherProvider({ children, projects }: { children: ReactNod
       if (current.right.appId === appId) return loneAppOnTheLeft({ ...current, right: EMPTY_SLOT });
       // A choice aimed at the right half with the left half empty lands in the LEFT half instead:
       // nothing is to the right of nothing, and a lone app is drawn filling the layer. See
-      // `loneAppOnTheLeft`.
-      const fill: PaneSide = current.left.appId === null ? 'left' : side;
-      return { ...current, [fill]: { appId, src, reloadNonce: current[fill].reloadNonce } };
+      // `placeApplication` and `loneAppOnTheLeft`.
+      return placeApplication(current, appId, src, side);
+    });
+  }, [dual, nextSide]);
+
+  const putUp = useCallback((appId: string, src: string) => {
+    const side: PaneSide = dual ? nextSide : 'left';
+    setPanes((current) => {
+      const held = (['left', 'right'] as const).find((half) => current[half].appId === appId);
+      if (held === undefined) return placeApplication(current, appId, src, side);
+      const slot = current[held];
+      // The same address again is not a move React could see: the frame would stay wherever the reader's own clicks took
+      // it. Its nonce bumps, which remounts the frame at the address.
+      return { ...current, [held]: slot.src === src ? { ...slot, reloadNonce: slot.reloadNonce + 1 } : { ...slot, src } };
     });
   }, [dual, nextSide]);
 
@@ -293,6 +310,7 @@ export function AppSwitcherProvider({ children, projects }: { children: ReactNod
       nextSide,
       drawerOpen: drawerOpenValue,
       open,
+      putUp,
       close,
       toggleDual,
       openInDualScreen,
@@ -311,7 +329,7 @@ export function AppSwitcherProvider({ children, projects }: { children: ReactNod
     }),
     [
       apps, rows, selfPorts, icons, registryError, registryRead, refresh, projects, panes, dual, ratio, fabPosition, dockRect,
-      nextSide, drawerOpenValue, open, close, toggleDual, openInDualScreen, setRatio, reload, frontSide,
+      nextSide, drawerOpenValue, open, putUp, close, toggleDual, openInDualScreen, setRatio, reload, frontSide,
       closePane, moveFab, registerDock, dockBadgeHidden, dockPress, chooseSide, setDrawerOpen,
     ],
   );

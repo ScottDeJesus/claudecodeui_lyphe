@@ -7,7 +7,7 @@ import { useTalkBinding } from '@/modules/companion/hooks/useTalkBinding';
 import { useTalkPress } from '@/modules/companion/hooks/useTalkPress';
 import { isCompanionPicture, reduceCompanion } from '@/modules/companion/utils/companionReducer';
 import { api, refusalSentence } from '@/shared/api';
-import type { CompanionFrame, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
+import type { CompanionFrame, CompanionOpenTarget, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { CompanionVoice, TalkPress } from '@/shared/types';
 import type { DockableFabPosition } from '@/shared/ui';
@@ -39,6 +39,12 @@ type CompanionContextValue = {
    */
   sendDraft: (mode: 'turn' | 'steer') => Promise<string>;
   clearDraft: () => Promise<void>;
+  /**
+   * His × on the card of the action waiting for his word: the action comes off his panel, withdrawn. On the server's 2xx the
+   * page folds `companion_pending: null` itself, so the card does not stay up while its own frame is in flight; a refusal
+   * rejects with the server's sentence, which the card shows.
+   */
+  cancelAction: () => Promise<void>;
   dismissNote: (id: number) => Promise<void>;
   /** Stops her own turn. */
   interrupt: () => Promise<void>;
@@ -58,8 +64,9 @@ type CompanionContextValue = {
    */
   voice: CompanionVoice;
   /**
-   * The id of the chat she sent a draft to in the last four seconds (counted from the `companion_open_chat` frame this page
-   * heard), else null. `useAvatarTarget` points the button at that chat's composer while it is set.
+   * The id of the chat she opened in the last four seconds — the chat a send went to, or one she was told to open (counted from
+   * the `companion_open` frame for a chat target that this page heard) — else null. `useAvatarTarget` points the button at that chat's
+   * composer while it is set.
    */
   recentSend: string | null;
   /**
@@ -109,7 +116,7 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
 /**
  * Used by the project-workspace module's shell, which holds it above the whole workspace, so her disc, her cell in the rail, her panel and the command palette's
  * "Talk to Kaylee" share one picture. She is box-wide, tied to no chat, route or project: the one thing she asks of the page
- * is to open a chat, and she does it through `onOpenChat`, which the composition root answers with its own navigation.
+ * is to open a chat, a card or a page, and she does it through `onOpen`, which the composition root answers with its own navigation.
  *
  * THE PICTURE IS SEEDED, THEN KEPT. It is read once with `GET /api/companion` and from then on folded, frame by frame, from
  * the one socket (`companion_*` frames) through the pure reducer. It is read again whenever the frames can no longer be
@@ -122,9 +129,14 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  * lands, so a frame the answer predates is not lost; the reducer folds a frame twice without harm. A clear is the exception:
  * it drops the queue and discards a read that was out, because the read that follows it is the one that counts.
  *
- * A chat is opened only on a `companion_open_chat` whose `floor` is this page's client id. Every other page of the account
- * hears the frame too and does not open it, so she opens a chat where he is, not on every screen he has open; every page
- * does note the send (`recentSend`), which is what the button's look reads.
+ * AN OPEN IS ANSWERED ONLY BY THE PAGE THAT HOLDS THE FLOOR. `companion_open` carries a target (a chat, a card or a page) and
+ * the `floor` it is addressed to; `onOpen(target)` is called only when that is this page's client id. Every other page of the
+ * account hears the frame too and does nothing with it, so she opens a thing where he is, not on every screen he has open;
+ * every page does note a chat open (`recentSend`), which is what the button's look reads, and a card's or a page's open is
+ * noted by no one.
+ *
+ * HIS × ON THE ACTION CARD is `cancelAction`: the server's `DELETE /api/companion/action`, and on its 2xx the page folds
+ * `companion_pending: null` itself, as `editDraft` folds its answer, so the card never stays up while its frame is in flight.
  *
  * THE PAGE'S ONE TALK PRESS lives here: `useTalkPress` is called once, and `useTalkBinding` beside it binds the account's
  * `talkBinding` (from the picture's settings, so a re-bind on any page reaches every page by its settings frame) to that press.
@@ -134,7 +146,7 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  * the picture's `floor` is this page's client id. The press is handed the voice, so it can cut her off. The player is unlocked in
  * the first gesture: opening her panel, typing to her, or a talk press. A Stop and a Clear silence the page's voice as well as her turn.
  */
-export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessionId: string) => void; children: ReactNode }) {
+export function CompanionProvider({ onOpen, children }: { onOpen: (target: CompanionOpenTarget) => void; children: ReactNode }) {
   const { subscribe } = useWebSocket();
   // The picture this page draws. State, not a ref: the panel, the door and the palette all render from it.
   const [picture, setPicture] = useState<CompanionPicture | null>(null);
@@ -166,12 +178,12 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   const queuedRef = useRef<CompanionFrame[]>([]);
   // False once the provider unmounted: a read that lands then sets nothing.
   const aliveRef = useRef(false);
-  // The latest `onOpenChat`, read when a frame arrives, so a new callback each render does not resubscribe the socket.
-  const onOpenChatRef = useRef(onOpenChat);
+  // The latest `onOpen`, read when a frame arrives, so a new callback each render does not resubscribe the socket.
+  const onOpenRef = useRef(onOpen);
 
   useEffect(() => {
-    onOpenChatRef.current = onOpenChat;
-  }, [onOpenChat]);
+    onOpenRef.current = onOpen;
+  }, [onOpen]);
 
   const seed = useCallback(async () => {
     if (seedingRef.current) {
@@ -256,14 +268,18 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
     }
     if (!isCompanionFrame(event)) return;
     const frame = event as unknown as CompanionFrame;
-    if (frame.kind === 'companion_open_chat') {
-      // Every page notes the send, floor or not: her activity is the account's and the button on every page follows it, so the
-      // button on every page follows the send too. Only the floor's page opens the chat. The window's end is a deadline this
-      // frame sets, not a clock that checks.
-      setRecentSend(frame.sessionId);
-      window.clearTimeout(recentSendTimerRef.current);
-      recentSendTimerRef.current = window.setTimeout(() => setRecentSend(null), RECENT_SEND_MS);
-      if (frame.floor === clientId) onOpenChatRef.current(frame.sessionId);
+    if (frame.kind === 'companion_open') {
+      const { target } = frame;
+      if (!target) return;
+      // Every page notes a chat open, floor or not: her activity is the account's, so the button on every page follows the
+      // open. The window's end is a deadline this frame sets, not a clock that checks.
+      if (target.kind === 'chat') {
+        setRecentSend(target.sessionId);
+        window.clearTimeout(recentSendTimerRef.current);
+        recentSendTimerRef.current = window.setTimeout(() => setRecentSend(null), RECENT_SEND_MS);
+      }
+      // Only the page that holds the floor acts: the host answers each target.
+      if (frame.floor === clientId) onOpenRef.current(target);
       return;
     }
     fold(frame);
@@ -314,7 +330,7 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   }, [fold]);
 
   // A send answers only what happened; the draft clears and the chat opens by their own frames (`companion_draft`,
-  // `companion_open_chat`), in the same tick as the send.
+  // `companion_open`), in the same tick as the send.
   const sendDraft = useCallback(async (mode: 'turn' | 'steer'): Promise<string> => {
     const response = await ensureOk(await api.companion.sendDraft(mode));
     const sent = await response.json().catch(() => null);
@@ -324,6 +340,12 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   const clearDraft = useCallback(async () => {
     await ensureOk(await api.companion.clearDraft());
   }, []);
+
+  // The server answers 204 whether or not an action was standing, so the fold is always true to it: nothing waits now.
+  const cancelAction = useCallback(async () => {
+    await ensureOk(await api.companion.cancelAction());
+    fold({ kind: 'companion_pending', pending: null });
+  }, [fold]);
 
   const dismissNote = useCallback(async (id: number) => {
     await ensureOk(await api.companion.dismissNote(id));
@@ -342,11 +364,11 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   const value = useMemo<CompanionContextValue>(
     () => ({
       picture, readFailure: picture === null ? readFailure : null, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft,
-      clearDraft, dismissNote, interrupt, clear, talk,
+      clearDraft, cancelAction, dismissNote, interrupt, clear, talk,
       voice: speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
     }),
     [
-      picture, readFailure, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear,
+      picture, readFailure, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, interrupt, clear,
       talk, speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level,
     ],
   );

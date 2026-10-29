@@ -7,6 +7,7 @@ import type { DraftSender } from './companion-send.js';
 import { createSpeechCache, type SpeechCache } from './companion-speech-cache.js';
 import { createCompanionStore, type CompanionStore } from './companion-store.js';
 import { readCompanionSettings } from './companion-settings.js';
+import type { CompanionHouse } from './house.js';
 import { createCompanionSession } from './session/companion-session.js';
 import type { CompanionSession } from './session/companion-session-types.js';
 import { IDLE_ACTIVITY } from './session/companion-turns.js';
@@ -25,6 +26,11 @@ import { createToolDeps } from './tools/tool-deps.js';
  *   - a line of the system's → a `system` log line.
  * And the readers a message is assembled from at push time: his settings, her focus, draft and walk, the roster,
  * the chat on his screen and the sounds she may make (the voice settings' sound-tag list).
+ *
+ * THE HOUSE (`house.ts`) is handed in by the server entrypoint through `companion.module.ts` and the service, and passes
+ * through here untouched to the tools as `CompanionToolDeps.house`: the readers only a module instance holds (the
+ * roadmap and dispatcher pictures, a card's text, the souls lane's launches, Cerberus's overview, the heal service).
+ * Nothing in the account reads it; only the tools do.
  *
  * ACTIVITY has two writers, the turn and the tools, and they must not undo each other: `tools/tool-deps.ts` says how.
  * It is HELD here, in one place both write through, so the picture can say what she is doing.
@@ -59,8 +65,11 @@ function viewedChat(userId: number): { sessionId: string; name: string } | null 
   return chat.ok ? { sessionId, name: chat.chat.name } : null;
 }
 
-/** Consumed by `companion.service.ts`: one call per account, on the account's first use. Nothing is launched: she is asleep until a message is pushed. */
-export function createCompanionAccount(userId: number, runtime: ProviderRuntimeGateway): CompanionAccount {
+/**
+ * Consumed by `companion.service.ts`: one call per account, on the account's first use. Nothing is launched: she is asleep until a message is pushed.
+ * `runtime` and `house` are the entrypoint's, passed through to the tools (`CompanionToolDeps.runtime` and `.house`).
+ */
+export function createCompanionAccount(userId: number, runtime: ProviderRuntimeGateway, house: CompanionHouse): CompanionAccount {
   const store = createCompanionStore(userId);
   const speechCache = createSpeechCache();
   let activity: CompanionActivity = IDLE_ACTIVITY;
@@ -70,7 +79,7 @@ export function createCompanionAccount(userId: number, runtime: ProviderRuntimeG
     store.emit({ kind: 'companion_activity', activity: next });
   };
 
-  const toolDeps = createToolDeps({ userId, store, runtime, activity: { current: () => activity, set: setActivity } });
+  const toolDeps = createToolDeps({ userId, store, runtime, house, activity: { current: () => activity, set: setActivity } });
 
   const session = createCompanionSession({
     userId,
@@ -83,6 +92,9 @@ export function createCompanionAccount(userId: number, runtime: ProviderRuntimeG
     readSoundTags: () => readVoiceSettings(userId).gemini.soundTags,
     readProviderSessionId: () => store.readState().providerSessionId,
     writeProviderSessionId: (id) => store.setProviderSessionId(id),
+    // His words no turn has answered: the next process says them to her again (`session/companion-ledger.ts`). No frame goes to a page.
+    readUnanswered: () => store.readUnanswered(),
+    writeUnanswered: (unanswered) => store.setUnanswered(unanswered),
     onSentence: (sentence) => {
       store.appendLog({ role: 'kaylee', text: sentence.display, turnId: sentence.turnId, index: sentence.index, mood: sentence.mood, sounds: sentence.sounds });
     },

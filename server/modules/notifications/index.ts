@@ -1,6 +1,4 @@
 export {
-  // Used by notification tests and delivery workflows to create channel payloads.
-  buildNotificationPayload,
   // Used by provider runtimes and Settings to create normalized notification events.
   createNotificationEvent,
   // Used by provider runtimes and Settings to deliver events through enabled channels.
@@ -14,6 +12,18 @@ export {
 } from '@/modules/notifications/services/notification-orchestrator.service.js';
 // Used by callers outside this module that show an event's wording: the one headline and body per code.
 export { buildNotificationText } from '@/modules/notifications/services/notification-copy.service.js';
+// spendFreeWording: used by the companion module's alert block, which tells her what the house said as it lands.
+// The title and body of an event with every cost, token and usage figure taken out — the one rule, beside
+// `buildNotificationPayload`, so no wording that reaches her can carry a cost.
+export { spendFreeWording } from '@/modules/notifications/services/notification-spend-free.service.js';
+export type { SpendFreeWording } from '@/modules/notifications/services/notification-spend-free.service.js';
+// startNotificationHistory: used by the server entrypoint, which starts the house's notification history after `listen`
+// and calls the unsubscribe it answers on shutdown. listNotificationHistory: used by the companion module's `list_alerts`,
+// which reads what the house told him lately.
+export {
+  listNotificationHistory,
+  startNotificationHistory,
+} from '@/modules/notifications/services/notification-history.service.js';
 export {
   registerDesktopNotificationClient,
   sendDesktopNotification,

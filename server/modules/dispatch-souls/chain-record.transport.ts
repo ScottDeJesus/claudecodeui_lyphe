@@ -41,8 +41,11 @@ const WALKER_ARGV = 'chain-run';
  * slug, which is as long as the operator wrote it. A stage's launch id comes out of JSON and is
  * joined onto a path, so it is held to this shape before it goes anywhere near one; the shape has
  * no `.` and no separator, so `..` and an absolute path both fail it.
+ *
+ * Exported for `run-reads.service.ts`, which holds the id of a run the companion was asked to read
+ * to this same fence before it joins the id onto a record root.
  */
-const SAFE_RECORD_ID = /^[A-Za-z0-9_-]+$/;
+export const SAFE_RECORD_ID = /^[A-Za-z0-9_-]+$/;
 
 /**
  * Where the chain records are, derived from where the launch directories are: both are children of

@@ -13,3 +13,11 @@ export type { RunningLauncher } from './running-launchers.service.js';
 // leave out the ones that are the dispatcher's epic work — the stamp is the chat the epic was
 // started from, so it cannot tell them from the chat's own.
 export { isDispatcherWork, readDispatcherChainLaunchIds } from './dispatcher-work.service.js';
+// readChainRun, readSoulRun, readChainsHoldingLaunches, readRunDocument and readSoulTranscript: used by the companion's
+// run reads (`eyes/run-*.ts`), which tell Kaylee what a run did from its own record: a chain's status, stages, report
+// (cost line cut), paths and walker tail, a soul's state and result path, which chain holds a chat's launch, a run's
+// result or review file, and a soul alone's transcript for the `log` scope. All read the launcher's files and write none.
+export { readRunDocument } from './run-document.service.js';
+export { readChainRun, readChainsHoldingLaunches, readSoulRun } from './run-reads.service.js';
+export type { ChainRun, ChainRunStage, SoulRun } from './run-reads.service.js';
+export { readSoulTranscript } from './soul-transcript.service.js';

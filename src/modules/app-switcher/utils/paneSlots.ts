@@ -21,3 +21,21 @@ export function loneAppOnTheLeft(panes: Record<PaneSide, PaneSlot>): Record<Pane
   if (panes.left.appId !== null || panes.right.appId === null) return panes;
   return { left: panes.right, right: EMPTY_SLOT };
 }
+
+/**
+ * Puts an application into a half: the side the caller aims at, except that nothing is to the right of nothing, so with the
+ * left half empty it fills the LEFT one (see `loneAppOnTheLeft`). The slot keeps its reload nonce, so the frame is the same
+ * frame the half already had.
+ *
+ * Used by the switcher's context, by `open` (once it has found the app is not already up) and by `putUp`, so the rule for
+ * where a new application lands is written once.
+ */
+export function placeApplication(
+  panes: Record<PaneSide, PaneSlot>,
+  appId: string,
+  src: string,
+  aim: PaneSide,
+): Record<PaneSide, PaneSlot> {
+  const fill: PaneSide = panes.left.appId === null ? 'left' : aim;
+  return { ...panes, [fill]: { appId, src, reloadNonce: panes[fill].reloadNonce } };
+}

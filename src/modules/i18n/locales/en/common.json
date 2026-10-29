@@ -1748,6 +1748,9 @@
     "empty": "Nothing open in this chat.",
     "doneFold": "Done ({{n}})",
     "doneWhen": "Done {{when}}",
+    "doneWhenFeatureFinished": "Done {{when}} when feature {{feature}} finished",
+    "doneWhenTaskFinished": "Done {{when}} when task {{task}} of feature {{feature}} finished",
+    "doneWhenEpicFinished": "Done {{when}} when epic {{epic}} finished",
     "reading": "Reading this chat's list…",
     "unreachable": "Could not read this chat's list",
     "retry": "Try again",
@@ -3319,6 +3322,51 @@
       "sendRefusedPlain": "Not sent. Try again.",
       "saveRefused": "Your edit wasn't saved: {{reason}}",
       "saveRefusedPlain": "Your edit wasn't saved. It is still here."
+    },
+    "action": {
+      "waiting": "Waiting for your word",
+      "verb": {
+        "queue": "Queue <target/>",
+        "hide": "Hide <target/>",
+        "show": "Show <target/>",
+        "rework": "Rework <target/>",
+        "answer": "Send the answers to <target/>",
+        "recut": "Re-cut <target/>",
+        "stop": "Stop <target/>",
+        "resume": "Resume <target/>",
+        "kick": "Kick <target/>",
+        "resumeRun": "Resume the run <target/>",
+        "open": "Open <target/>",
+        "closeFollowup": "Close the follow-up on <target/>"
+      },
+      "kind": {
+        "feature": "Feature",
+        "epic": "Epic",
+        "run": "Run",
+        "page": "DocSpace page",
+        "chat": "Chat",
+        "followup": "Follow-up #{{id}}"
+      },
+      "inEpic": "epic {{epic}}",
+      "atBlock": "block {{block}}",
+      "prompt": "The prompt",
+      "followup": "The follow-up",
+      "questions": "The questions, with their options",
+      "noAnswer": "No answer — it goes as “(no answer)”",
+      "carried": {
+        "rework": "Your notes · sent word for word",
+        "answer": "Your answers · sent word for word",
+        "resumeRun": "Your rulings · sent word for word",
+        "other": "Your words · sent word for word"
+      },
+      "quoted": "“{{text}}”",
+      "say": "Say:",
+      "aloud": "Aloud, not typed",
+      "lapses": "Lapses at {{time}}",
+      "withdraw": "Withdraw",
+      "withdrawHint": "Withdraw: {{name}} won't do it",
+      "withdrawRefused": "Not withdrawn: {{reason}}",
+      "withdrawRefusedPlain": "Not withdrawn. Try again."
     },
     "composer": {
       "placeholder": "Message {{name}}…",

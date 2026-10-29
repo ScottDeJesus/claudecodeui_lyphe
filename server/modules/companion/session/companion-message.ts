@@ -44,6 +44,8 @@ type MessageAssembler = {
   oweState(): void;
   /** He cut her off: the next message opens with `<cut>`, naming the last sentence he heard to its end and the one playing at the press (`null` for none). A later cut replaces one no message has carried yet. */
   oweCut(heard: string | null, interrupted: string | null): void;
+  /** The cut the next message will open with (`''` for no such sentence), or `null` when none is owed. Read before `assemble`, which carries it. */
+  owedCut(): { heard: string; interrupted: string } | null;
   /** The text of one message: the owed parts, the roster and view when due, `body`, and the register. */
   assemble(body: string, woke: boolean): string;
   /** Her conversation was cleared: nothing is owed and nothing is remembered as sent. */
@@ -65,6 +67,7 @@ export function createMessageAssembler(readers: MessageReaders, now: () => Date 
     oweCut(heard, interrupted) {
       cutOwed = { heard: heard ?? '', interrupted: interrupted ?? '' };
     },
+    owedCut: () => cutOwed,
     assemble(body, woke) {
       // Everything is READ first and the bookkeeping committed last: a reader that throws leaves the owed
       // state and cut owed and the roster unsent, so the next message carries what this one never did.

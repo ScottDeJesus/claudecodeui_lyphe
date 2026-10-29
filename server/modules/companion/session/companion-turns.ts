@@ -61,6 +61,8 @@ export type TurnSink = {
 type TurnTracker = {
   /** The id of the turn in flight; `null` while she is idle. */
   readonly turnId: string | null;
+  /** The messages the turn in flight holds, in the order they were admitted; none while she is idle. What a result that lists nothing consumed. */
+  inFlightUuids(): string[];
   /** A message with this uuid was pushed: it joins the turn in flight, or starts one. */
   admit(uuid: string): void;
   /** One streamed delta of her speech. */
@@ -125,6 +127,7 @@ export function createTurnTracker(sink: TurnSink, readSoundTags: () => readonly 
     get turnId() {
       return current?.id ?? null;
     },
+    inFlightUuids: () => (current === null ? [] : [...owners].filter(([, owner]) => owner === current).map(([uuid]) => uuid)),
     admit(uuid) {
       owners.set(uuid, current ?? begin());
     },

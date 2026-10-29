@@ -2399,7 +2399,8 @@ export type NoteInput = { title: string; description: string };
 //----------------- FOLLOWUPS ------------
 // The followups lane's wire shapes, produced by `server/modules/followups/` and mirrored field-for-field in
 // `src/shared/types.ts` § FOLLOWUPS. The frame that says a chat's items have moved is `FollowupsChangedEvent` above.
-/** One item a chat keeps open for the person: a `next` step (a question put, an offer waiting, a step put off) or a known `gap` (something untested, unhandled or risky that was left). `state` is `open` until it is settled; `closedBy` says who settled it — the chat's own command or the person ticking it in the widget — and is `null` while open. All stamps are ISO-8601 UTC with milliseconds; `doneAt` is `null` while open. The chat and the account it belongs to never ride the item: the reader asked for them by chat. */
+// `FollowupCompletionPlan` is the one shape here that never leaves the server, so it has no client mirror.
+/** One item a chat keeps open for the person: a `next` step (a question put, an offer waiting, a step put off) or a known `gap` (something untested, unhandled or risky that was left). `state` is `open` until it is settled; `closedBy` says who settled it — the chat's own command (`chat`), the person ticking it in the widget (`user`), or the house itself (`completion`: it closed the item when the feature, task or epic it named finished, which `closedFor` names — `<feature>`, `<feature>/<task key>` or `epic:<epic>`) — and is `null` while open. `closedFor` is `null` unless `closedBy` is `completion`. All stamps are ISO-8601 UTC with milliseconds; `doneAt` is `null` while open (on a `completion` it is the stamp of the finish). The chat and the account it belongs to never ride the item: the reader asked for them by chat. */
 export type Followup = {
   id: number;
   kind: 'next' | 'gap';
@@ -2408,10 +2409,15 @@ export type Followup = {
   createdAt: string;
   updatedAt: string;
   doneAt: string | null;
-  closedBy: 'chat' | 'user' | null;
+  closedBy: 'chat' | 'user' | 'completion' | null;
+  closedFor: string | null;
 };
 /** What the chat's `add` takes for each line it files: the kind and the line, before the service judges the line. */
 export type FollowupInput = { kind: 'next' | 'gap'; text: string };
+/** The part of a dispatcher plan the followups lane reads to close the items that named it: the plan's `name`, its `completed_at` stamp (`null` while it is still walking), and each phase's `key`, `status` and `done_at` stamp. Server-only, and deliberately narrower than `DispatcherPlan` so the lane does not depend on the dispatcher's whole picture; a `DispatcherPlan[]` is assignable to `FollowupCompletionPlan[]`. The stamps are the dispatcher's own (ISO-8601 UTC, seconds); the rule compares them by `Date.parse`. */
+export type FollowupCompletionPlan = { name: string; completed_at: string | null; phases: Array<{ key: string; status: string; done_at: string | null }> };
+/** The part of a dispatcher arc (an epic) the followups lane reads to close the items that named it: the arc's `name`, its `status`, its `completed_at` stamp and the names of its `plans`. Server-only like `FollowupCompletionPlan`, and narrower than `DispatcherArc`; a `DispatcherArc[]` is assignable to `FollowupCompletionArc[]`. An epic counts as finished when `status` is `complete`, and it finished at the LATEST stamp among its own `completed_at` and its plans' (found by name in the `FollowupCompletionPlan[]` beside it): its own stamp is written once and never moved, so it predates the finish of an epic that was judged after it, and of one that completed, took on new plans and completed again (it reads `live` meanwhile, keeping the old stamp), and an epic the roadmap made carries no stamp at all. The stamps are the dispatcher's own (ISO-8601 UTC, seconds); the rule compares them by `Date.parse`. */
+export type FollowupCompletionArc = { name: string; status: string; completed_at: string | null; plans: string[] };
 
 // ---------------------------
 //----------------- CLI VERSION CONTRACTS ------------

@@ -1702,3 +1702,21 @@ export function humanizeTokens(n: number): string {
 export function errorReason(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
+
+// ---------------------------
+//----------------- STORED TIMESTAMP UTILITIES ------------
+
+/** The shape `new Date().toISOString()` writes: UTC, milliseconds, fixed width, so two of them compare correctly as text. */
+const STORE_STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+/**
+ * Whether `value` is a stamp the way the stores keep every time: a fixed-width ISO-8601 UTC instant with milliseconds that is also a
+ * real date. A text comparison of two such stamps is a comparison in time, which a bare `isText` cannot promise (`''`, `'banana'` and
+ * `'2026'` are text); a check that reads "after `since`" or "past `expiresAt`" must refuse anything else rather than fail open.
+ *
+ * Consumed by the companion module (`companion-pending.ts`, which refuses a stored action whose stamps are not this) and the companion
+ * repository (`companion.db.ts`, whose `heardSince` refuses a `since` that is not this).
+ */
+export function isStoreStamp(value: unknown): value is string {
+  return typeof value === 'string' && STORE_STAMP.test(value) && Number.isFinite(Date.parse(value));
+}

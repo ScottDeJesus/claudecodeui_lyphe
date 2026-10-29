@@ -26,7 +26,8 @@ const OUTPUT_MAX_BUFFER = 1024 * 1024;
 /** How much of the dispatcher's own line a failure carries: a refusal names the cause in one line. */
 const FAILURE_LINE_CHARS = 200;
 
-type CommandDependencies = {
+// Used by `dispatcher-relay.service.ts`, which runs Kaylee's verbs with the lane's own command.
+export type CommandDependencies = {
   /** The dispatcher's entry point, absolute. */
   bin: string;
   /** Wall-clock ceiling for one command. */

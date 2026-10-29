@@ -1,22 +1,24 @@
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
-import type { CompanionActivity, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
+import type { CompanionActivity, CompanionOpenTarget, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
 import { textResult } from '@/shared/tool-text-result.js';
 
 import { createDraftSender } from '../companion-send.js';
 import type { CompanionStore } from '../companion-store.js';
+import type { CompanionHouse } from '../house.js';
 import { THINKING_ACTIVITY } from '../session/companion-turns.js';
 
 import type { CompanionToolDeps } from './companion-tools.js';
 
 /**
  * The helpers the harness hands every tool file (`CompanionToolDeps`), so each tool behaves the same way
- * without doing the work itself:
+ * without doing the work itself (`house` rides beside them: the readers only a module instance holds, handed in by
+ * the entrypoint and passed through untouched, `house.ts`):
  *   - `setFocus`: a tool that names a chat makes it her FOCUS — inferred here, never a tool of its own. The
  *     focus is rewritten, and announced to the pages, only when the chat moved or was renamed;
  *   - `withActivity`: while a tool runs her activity is the tool's (what the panel's status line says), and
  *     when it ends she is `thinking` again (or back at a parallel tool still running);
- *   - `openChatOnFloor`: "the app focuses that chat" is told to the page that holds the floor ALONE
- *     (`companion_open_chat` carries its client id; every other page ignores it), and to nobody while no page
+ *   - `openOnFloor`: "the app brings that chat, card or page up" is told to the page that holds the floor ALONE
+ *     (`companion_open` carries its client id; every other page ignores it), and to nobody while no page
  *     holds the floor;
  *   - `refuse`: a refusal is `isError` text that says what to do next, never a throw;
  *   - `sendDraft`: the one door the draft goes out by (`companion-send.ts`), built on the two helpers above.
@@ -46,30 +48,32 @@ const placeOf = (walk: CompanionWalk | null): CompanionActivity['walk'] => (walk
 const sameRef = (a: CompanionSessionRef, b: CompanionSessionRef | null): boolean =>
   b !== null && a.sessionId === b.sessionId && a.name === b.name && a.project === b.project;
 
-/** Consumed by `companion-account.ts`: one call per account, with that account's store, the gateway and its activity holder. */
+/** Consumed by `companion-account.ts`: one call per account, with that account's store, the gateway, the entrypoint's house and its activity holder. */
 export function createToolDeps(input: {
   userId: number;
   store: CompanionStore;
   runtime: ProviderRuntimeGateway;
+  house: CompanionHouse;
   activity: ActivityHolder;
 }): CompanionToolDeps {
-  const { userId, store, runtime, activity } = input;
+  const { userId, store, runtime, house, activity } = input;
   // The activities of the tools still running, oldest first: what the status line goes back to when the one standing ends.
   const running: CompanionActivity[] = [];
   const setFocus = (chat: CompanionSessionRef): void => {
     if (!sameRef(chat, store.readState().focus)) store.setFocus(chat);
   };
-  const openChatOnFloor = (sessionId: string): void => {
+  const openOnFloor = (target: CompanionOpenTarget): void => {
     const { floor } = store.readState();
-    if (floor !== null) store.emit({ kind: 'companion_open_chat', sessionId, floor });
+    if (floor !== null) store.emit({ kind: 'companion_open', target, floor });
   };
   return {
     userId,
     store,
     runtime,
+    house,
     setFocus,
-    openChatOnFloor,
-    sendDraft: createDraftSender({ userId, store, runtime, setFocus, openChatOnFloor }),
+    openOnFloor,
+    sendDraft: createDraftSender({ userId, store, runtime, setFocus, openOnFloor }),
     async withActivity(phase, chat, files, run) {
       const mine: CompanionActivity = { phase, session: chat, files, walk: phase === 'walking' ? placeOf(store.readState().walk) : null };
       running.push(mine);

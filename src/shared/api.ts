@@ -856,6 +856,9 @@ export const api = {
     saveSettings: (patch: Partial<CompanionSettings> | { register: null }) => put('/api/companion/settings', patch, companionOptions()),
     editDraft: (text: string) => put('/api/companion/draft', { text }, companionOptions()),
     clearDraft: () => del('/api/companion/draft', undefined, companionOptions()),
+    // His × on the card of the action waiting for his word: it comes off his panel, withdrawn. Answers 204 whether or not one was standing;
+    // the provider folds `companion_pending: null` on the 2xx, and the frame the route sends folds the same value again.
+    cancelAction: () => del('/api/companion/action', undefined, companionOptions()),
     // Sends the draft as it stands. Answers `{ outcome: 'started' | 'folded' }`; a refused send is a 409 carrying the reason.
     sendDraft: (mode: 'turn' | 'steer') => post('/api/companion/draft/send', { mode }, companionOptions()),
     dismissNote: (id: number) => del(`/api/companion/notes/${id}`, undefined, companionOptions()),

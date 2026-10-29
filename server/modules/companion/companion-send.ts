@@ -4,7 +4,7 @@ import { projectsDb, relayedSendsDb, sessionsDb } from '@/modules/database/index
 import { diagnoseProjectFolder, sessionsService } from '@/modules/providers/index.js';
 import { broadcastSessionUpserted, chatRunRegistry, runDetachedChatTurn, steerChatRun } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
-import type { CompanionDraft, CompanionSessionRef } from '@/shared/companion-types.js';
+import type { CompanionDraft, CompanionOpenTarget, CompanionSessionRef } from '@/shared/companion-types.js';
 import type { LLMProvider, NormalizedMessage } from '@/shared/types.js';
 import { createNormalizedMessage } from '@/shared/utils.js';
 import { oneLine } from '@/shared/tool-call-hint.js';
@@ -92,7 +92,7 @@ type SenderDeps = {
   store: CompanionStore;
   runtime: ProviderRuntimeGateway;
   setFocus(chat: CompanionSessionRef): void;
-  openChatOnFloor(sessionId: string): void;
+  openOnFloor(target: CompanionOpenTarget): void;
 };
 
 /** Consumed by `tools/tool-deps.ts`: one sender per account. */
@@ -146,7 +146,7 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
   function afterSend(chat: CompanionSessionRef, sent: CompanionDraft): void {
     if (store.readState().draft?.updatedAt === sent.updatedAt) store.setDraft(null);
     deps.setFocus(chat);
-    deps.openChatOnFloor(chat.sessionId);
+    deps.openOnFloor({ kind: 'chat', sessionId: chat.sessionId });
   }
 
   async function sendToChat(chat: CompanionSessionRef, draft: CompanionDraft, words: string, mode: 'turn' | 'steer'): Promise<DraftSendOutcome> {

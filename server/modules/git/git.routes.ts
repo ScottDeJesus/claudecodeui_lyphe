@@ -6,64 +6,33 @@ import express from 'express';
 import type { ProviderRunFunction } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
-// cross-spawn: drop-in spawn with Windows .cmd/PATHEXT resolution.
-import { parseGitLogWithStats, parseGitStatusOutput } from './git-parsing.service.js';
+import { parseGitLogWithStats } from './git-parsing.service.js';
 import { deleteLocalBranch, readLastPushedAt } from './git-branch.service.js';
+import { spawnAsync } from './git-command.service.js';
+import {
+  getCurrentBranchName,
+  getRepositoryRootPath,
+  repositoryHasCommits,
+  resolveRepositoryFilePath,
+  validateGitRepository,
+} from './git-repository.service.js';
+import { readGitFileDiff, readGitStatus } from './git-status.service.js';
 
 type GitRouterDependencies = {
   fileSystem: typeof import('node:fs/promises');
-  spawnProcess: typeof import('cross-spawn').default;
   resolveProjectPathById(projectId: string): string | null;
   queryClaude: ProviderRunFunction;
   queryCursor: ProviderRunFunction;
 };
 
-/** Creates Git routes around explicit repository, filesystem, subprocess, and AI adapters. */
+/** Creates Git routes around explicit repository, filesystem, and AI adapters; git commands run through git-command.service.ts. */
 export function createGitRouter(dependencies: GitRouterDependencies): express.Router {
 const fs = dependencies.fileSystem;
-const spawn = dependencies.spawnProcess;
 const projectsDb = { getProjectPathById: dependencies.resolveProjectPathById };
 const queryClaudeSDK = dependencies.queryClaude;
 const spawnCursor = dependencies.queryCursor;
 const router = express.Router();
 const COMMIT_DIFF_CHARACTER_LIMIT = 500_000;
-
-function spawnAsync(command, args, options = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      ...options,
-      shell: false,
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-
-    child.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    child.on('error', (error) => {
-      reject(error);
-    });
-
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve({ stdout, stderr });
-        return;
-      }
-
-      const error = new Error(`Command failed: ${command} ${args.join(' ')}`);
-      error.code = code;
-      error.stdout = stdout;
-      error.stderr = stderr;
-      reject(error);
-    });
-  });
-}
 
 // Input validation helpers (defense-in-depth)
 function validateCommitRef(commit) {
@@ -79,22 +48,6 @@ function validateBranchName(branch) {
     throw new Error('Invalid branch name');
   }
   return branch;
-}
-
-function validateFilePath(file, projectPath) {
-  if (!file || file.includes('\0')) {
-    throw new Error('Invalid file path');
-  }
-  // Prevent path traversal: resolve the file relative to the project root
-  // and ensure the result stays within the project directory
-  if (projectPath) {
-    const resolved = path.resolve(projectPath, file);
-    const normalizedRoot = path.resolve(projectPath) + path.sep;
-    if (!resolved.startsWith(normalizedRoot) && resolved !== path.resolve(projectPath)) {
-      throw new Error('Invalid file path: path traversal detected');
-    }
-  }
-  return file;
 }
 
 function validateRemoteName(remote) {
@@ -137,197 +90,6 @@ async function getActualProjectPath(projectId) {
   return validateProjectPath(projectPath);
 }
 
-// Helper function to strip git diff headers
-function stripDiffHeaders(diff) {
-  if (!diff) return '';
-
-  const lines = diff.split('\n');
-  const filteredLines = [];
-  let startIncluding = false;
-
-  for (const line of lines) {
-    // Skip all header lines including diff --git, index, file mode, and --- / +++ file paths
-    if (line.startsWith('diff --git') ||
-        line.startsWith('index ') ||
-        line.startsWith('new file mode') ||
-        line.startsWith('deleted file mode') ||
-        line.startsWith('---') ||
-        line.startsWith('+++')) {
-      continue;
-    }
-
-    // Start including lines from @@ hunk headers onwards
-    if (line.startsWith('@@') || startIncluding) {
-      startIncluding = true;
-      filteredLines.push(line);
-    }
-  }
-
-  return filteredLines.join('\n');
-}
-
-// Helper function to validate git repository
-async function validateGitRepository(projectPath) {
-  try {
-    // Check if directory exists
-    await fs.access(projectPath);
-  } catch {
-    throw new Error(`Project path not found: ${projectPath}`);
-  }
-
-  try {
-    // Allow any directory that is inside a work tree (repo root or nested folder).
-    const { stdout: insideWorkTreeOutput } = await spawnAsync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: projectPath });
-    const isInsideWorkTree = insideWorkTreeOutput.trim() === 'true';
-    if (!isInsideWorkTree) {
-      throw new AppError('Not a git repository', {
-        code: 'NOT_A_GIT_REPOSITORY',
-        statusCode: 400,
-      });
-    }
-
-    // Ensure git can resolve the repository root for this directory.
-    await spawnAsync('git', ['rev-parse', '--show-toplevel'], { cwd: projectPath });
-  } catch (error) {
-    if (
-      error instanceof AppError
-      && error.code === 'NOT_A_GIT_REPOSITORY'
-    ) {
-      throw error;
-    }
-
-    if (/not a git repository/i.test(getGitErrorDetails(error))) {
-      throw new AppError('Not a git repository. Initialize a git repository with "git init" to use source control features.', {
-        code: 'NOT_A_GIT_REPOSITORY',
-        statusCode: 400,
-      });
-    }
-
-    throw error;
-  }
-}
-
-function getGitErrorDetails(error) {
-  return `${error?.message || ''} ${error?.stderr || ''} ${error?.stdout || ''}`;
-}
-
-function isMissingHeadRevisionError(error) {
-  const errorDetails = getGitErrorDetails(error).toLowerCase();
-  return errorDetails.includes('unknown revision')
-    || errorDetails.includes('ambiguous argument')
-    || errorDetails.includes('needed a single revision')
-    || errorDetails.includes('bad revision');
-}
-
-async function getCurrentBranchName(projectPath) {
-  try {
-    // symbolic-ref works even when the repository has no commits.
-    const { stdout } = await spawnAsync('git', ['symbolic-ref', '--short', 'HEAD'], { cwd: projectPath });
-    const branchName = stdout.trim();
-    if (branchName) {
-      return branchName;
-    }
-  } catch (error) {
-    // Fall back to rev-parse for detached HEAD and older git edge cases.
-  }
-
-  const { stdout } = await spawnAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: projectPath });
-  return stdout.trim();
-}
-
-async function repositoryHasCommits(projectPath) {
-  try {
-    await spawnAsync('git', ['rev-parse', '--verify', 'HEAD'], { cwd: projectPath });
-    return true;
-  } catch (error) {
-    if (isMissingHeadRevisionError(error)) {
-      return false;
-    }
-    throw error;
-  }
-}
-
-async function getRepositoryRootPath(projectPath) {
-  const { stdout } = await spawnAsync('git', ['rev-parse', '--show-toplevel'], { cwd: projectPath });
-  return stdout.trim();
-}
-
-function normalizeRepositoryRelativeFilePath(filePath) {
-  return String(filePath)
-    .replace(/\\/g, '/')
-    .replace(/^\.\/+/, '')
-    .replace(/^\/+/, '')
-    .trim();
-}
-
-function parseStatusFilePaths(statusOutput) {
-  return statusOutput
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .filter((line) => line.trim())
-    .map((line) => {
-      const statusPath = line.substring(3);
-      const renamedFilePath = statusPath.split(' -> ')[1];
-      return normalizeRepositoryRelativeFilePath(renamedFilePath || statusPath);
-    })
-    .filter(Boolean);
-}
-
-function buildFilePathCandidates(projectPath, repositoryRootPath, filePath) {
-  const normalizedFilePath = normalizeRepositoryRelativeFilePath(filePath);
-  const projectRelativePath = normalizeRepositoryRelativeFilePath(path.relative(repositoryRootPath, projectPath));
-  const candidates = [normalizedFilePath];
-
-  if (
-    projectRelativePath
-    && projectRelativePath !== '.'
-    && !normalizedFilePath.startsWith(`${projectRelativePath}/`)
-  ) {
-    candidates.push(`${projectRelativePath}/${normalizedFilePath}`);
-  }
-
-  return Array.from(new Set(candidates.filter(Boolean)));
-}
-
-async function resolveRepositoryFilePath(projectPath, filePath) {
-  validateFilePath(filePath);
-
-  const repositoryRootPath = await getRepositoryRootPath(projectPath);
-  const candidateFilePaths = buildFilePathCandidates(projectPath, repositoryRootPath, filePath);
-
-  for (const candidateFilePath of candidateFilePaths) {
-    const { stdout } = await spawnAsync('git', ['status', '--porcelain', '--', candidateFilePath], { cwd: repositoryRootPath });
-    if (stdout.trim()) {
-      return {
-        repositoryRootPath,
-        repositoryRelativeFilePath: candidateFilePath,
-      };
-    }
-  }
-
-  // If the caller sent a bare filename (e.g. "hello.ts"), recover it from changed files.
-  const normalizedFilePath = normalizeRepositoryRelativeFilePath(filePath);
-  if (!normalizedFilePath.includes('/')) {
-    const { stdout: repositoryStatusOutput } = await spawnAsync('git', ['status', '--porcelain'], { cwd: repositoryRootPath });
-    const changedFilePaths = parseStatusFilePaths(repositoryStatusOutput);
-    const suffixMatches = changedFilePaths.filter(
-      (changedFilePath) => changedFilePath === normalizedFilePath || changedFilePath.endsWith(`/${normalizedFilePath}`),
-    );
-
-    if (suffixMatches.length === 1) {
-      return {
-        repositoryRootPath,
-        repositoryRelativeFilePath: suffixMatches[0],
-      };
-    }
-  }
-
-  return {
-    repositoryRootPath,
-    repositoryRelativeFilePath: candidateFilePaths[0],
-  };
-}
-
 // Get Git status for a project; parsing is isolated in git-parsing.service.ts.
 router.get('/status', async (req, res) => {
   const { project } = req.query;
@@ -338,37 +100,24 @@ router.get('/status', async (req, res) => {
 
   try {
     const projectPath = await getActualProjectPath(project);
+    const status = await readGitStatus(projectPath);
 
-    // Validate git repository
-    await validateGitRepository(projectPath);
-
-    const branch = await getCurrentBranchName(projectPath);
-    const hasCommits = await repositoryHasCommits(projectPath);
-
-    const { stdout: statusOutput } = await spawnAsync('git', ['status', '--porcelain=v1', '-z'], { cwd: projectPath });
-    const { modified, added, deleted, untracked, staged } = parseGitStatusOutput(statusOutput);
-
-    res.json({
-      branch,
-      hasCommits,
-      modified,
-      added,
-      deleted,
-      untracked,
-      staged
-    });
-  } catch (error) {
-    // Case-insensitive so "Not a git repository..." from validateGitRepository
-    // matches; `notGitRepository` lets the UI offer a one-click `git init`.
-    const isNotGitRepository = error instanceof AppError && error.code === 'NOT_A_GIT_REPOSITORY';
-    // A project without a repository is an expected state, not a failure.
-    if (!isNotGitRepository) {
-      console.error('Git status error:', error);
+    if ('notGitRepository' in status) {
+      // A project without a repository is an expected state, not a failure.
+      return res.json({
+        error: 'Not a git repository',
+        details: status.details,
+        notGitRepository: true
+      });
     }
+
+    res.json(status);
+  } catch (error) {
+    console.error('Git status error:', error);
     res.json({
-      error: isNotGitRepository ? 'Not a git repository' : 'Git operation failed',
-      details: isNotGitRepository ? error.message : `Failed to get git status: ${error.message}`,
-      notGitRepository: isNotGitRepository
+      error: 'Git operation failed',
+      details: `Failed to get git status: ${error.message}`,
+      notGitRepository: false
     });
   }
 });
@@ -417,71 +166,7 @@ router.get('/diff', async (req, res) => {
 
   try {
     const projectPath = await getActualProjectPath(project);
-    
-    // Validate git repository
-    await validateGitRepository(projectPath);
-
-    const {
-      repositoryRootPath,
-      repositoryRelativeFilePath,
-    } = await resolveRepositoryFilePath(projectPath, file);
-
-    // Check if file is untracked or deleted
-    const { stdout: statusOutput } = await spawnAsync(
-      'git',
-      ['status', '--porcelain', '--', repositoryRelativeFilePath],
-      { cwd: repositoryRootPath },
-    );
-    const isUntracked = statusOutput.startsWith('??');
-    const isDeleted = statusOutput.trim().startsWith('D ') || statusOutput.trim().startsWith(' D');
-
-    let diff;
-    if (isUntracked) {
-      // For untracked files, show the entire file content as additions
-      const filePath = path.join(repositoryRootPath, repositoryRelativeFilePath);
-      const stats = await fs.stat(filePath);
-
-      if (stats.isDirectory()) {
-        // For directories, show a simple message
-        diff = `Directory: ${repositoryRelativeFilePath}\n(Cannot show diff for directories)`;
-      } else {
-        const fileContent = await fs.readFile(filePath, 'utf-8');
-        const lines = fileContent.split('\n');
-        diff = `--- /dev/null\n+++ b/${repositoryRelativeFilePath}\n@@ -0,0 +1,${lines.length} @@\n` +
-               lines.map(line => `+${line}`).join('\n');
-      }
-    } else if (isDeleted) {
-      // For deleted files, show the entire file content from HEAD as deletions
-      const { stdout: fileContent } = await spawnAsync(
-        'git',
-        ['show', `HEAD:${repositoryRelativeFilePath}`],
-        { cwd: repositoryRootPath },
-      );
-      const lines = fileContent.split('\n');
-      diff = `--- a/${repositoryRelativeFilePath}\n+++ /dev/null\n@@ -1,${lines.length} +0,0 @@\n` +
-             lines.map(line => `-${line}`).join('\n');
-    } else {
-      // Get diff for tracked files
-      // First check for unstaged changes (working tree vs index)
-      const { stdout: unstagedDiff } = await spawnAsync(
-        'git',
-        ['diff', '--', repositoryRelativeFilePath],
-        { cwd: repositoryRootPath },
-      );
-
-      if (unstagedDiff) {
-        // Show unstaged changes if they exist
-        diff = stripDiffHeaders(unstagedDiff);
-      } else {
-        // If no unstaged changes, check for staged changes (index vs HEAD)
-        const { stdout: stagedDiff } = await spawnAsync(
-          'git',
-          ['diff', '--cached', '--', repositoryRelativeFilePath],
-          { cwd: repositoryRootPath },
-        );
-        diff = stripDiffHeaders(stagedDiff) || '';
-      }
-    }
+    const diff = await readGitFileDiff(projectPath, file);
 
     res.json({ diff });
   } catch (error) {

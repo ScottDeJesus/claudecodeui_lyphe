@@ -1,7 +1,7 @@
 import type { Router } from 'express';
 
 import { getCerberusConnection } from '@/modules/database/index.js';
-import type { CerberusGatewayState, CerberusReadInputs } from '@/shared/cerberus-types.js';
+import type { CerberusGatewayState, CerberusOverview, CerberusReadInputs } from '@/shared/cerberus-types.js';
 
 import { startAutoRun } from './auto-run.js';
 import { registerCatalogHandlers } from './catalog.service.js';
@@ -10,6 +10,7 @@ import { loadCenterKey } from './center-key.js';
 import { seedHub } from './definitions.service.js';
 import { registerDiagnosisService, stopDiagnoses } from './diagnosis/diagnosis.service.js';
 import { ingest } from './ingest.service.js';
+import { buildOverview } from './read-model/overview.js';
 import { registerRunsService } from './runs.service.js';
 import { startSelfChecks, stopSelfChecks } from './self-checks.service.js';
 import { startDailyPrune, stopDailyPrune } from './store-prune.service.js';
@@ -71,11 +72,16 @@ function isApiOwnPort(listen: string): boolean {
   return target !== null && target.port === Number.parseInt(process.env.SERVER_PORT || '3001', 10);
 }
 
+/**
+ * `overview()` is the Cerberus tab's overview — `buildOverview(readInputs())`, what `GET /api/cerberus/overview` answers —
+ * read straight from the module's own inputs. The entrypoint passes it on to the companion's house (`CompanionHouse.cerberus`).
+ */
 export function createCerberusModule(dependencies: { supervised: boolean }): {
   router: Router;
   start: () => Promise<void>;
   soleDuties: () => void;
   stop: () => void;
+  overview: () => CerberusOverview;
 } {
   const { supervised } = dependencies;
 
@@ -158,5 +164,6 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
       stopDailyPrune();
       gateway?.stop();
     },
+    overview: () => buildOverview(readInputs()),
   };
 }

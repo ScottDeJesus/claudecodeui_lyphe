@@ -7,16 +7,21 @@ import type {
   CompanionFrame,
   CompanionLogEntry,
   CompanionNote,
+  CompanionPendingAction,
   CompanionSessionRef,
   CompanionSound,
   CompanionWalk,
 } from '@/shared/companion-types.js';
 import { isList, isRecord, isText, isWholeFrom } from '@/shared/document-fields.js';
 
+import { isStoredPending, withoutPin } from './companion-pending.js';
+import type { CompanionStoredPending } from './companion-pending.js';
+import { isUnansweredList, type UnansweredMessage } from './companion-unanswered.js';
+
 /**
  * Her record of one account — state, log and notes — over `companionDb`, which speaks in rows.
  * This file maps a row to the wire contract (`CompanionSessionRef`, `CompanionDraft`,
- * `CompanionWalk`, `CompanionLogEntry`, `CompanionNote`) and back, and does the one thing a bare
+ * `CompanionPendingAction`, `CompanionWalk`, `CompanionLogEntry`, `CompanionNote`) and back, and does the one thing a bare
  * repository cannot: every write goes to THIS account's pages as the matching `companion_*` frame,
  * through `sendToUser`, and to no other account's (the floor's, `companion_floor`, included). The page folds frames into its picture, so a
  * write that sent none would leave it stale.
@@ -24,8 +29,13 @@ import { isList, isRecord, isText, isWholeFrom } from '@/shared/document-fields.
  * The store is made for one account and closes over its id, so a call cannot reach another
  * account's rows or pages. The write comes first and the frame second, in the same tick: a failed
  * write sends nothing, and two writes reach a page in the order they were made. The frames of
- * things that are not rows (a turn, her activity, her process, the settings, the open-chat order,
+ * things that are not rows (a turn, her activity, her process, the settings, the open order,
  * the clear) go through `emit`.
+ *
+ * THE PENDING ACTION is held here WITH its pin (`CompanionStoredPending`, `companion-pending.ts`): what the prepare pinned is
+ * the server's alone, so `setPending` writes the whole of it to `pending_json` and sends the action WITHOUT the pin, and the
+ * picture is built the same way. Her record of actions (`companion_actions`) is a fact about the house and is not this store's
+ * to wipe: Clear ends a standing action's row `cancelled` (in the repository's own transaction; a row a take is carrying out is left for the take) and never deletes it.
  *
  * A JSON column that does not read as its shape (a hand edit, a later build's shape) is dropped
  * with a warning that names the account and column, never thrown: the picture must still load.
@@ -36,12 +46,15 @@ import { isList, isRecord, isText, isWholeFrom } from '@/shared/document-fields.
 
 /**
  * What `readState` answers: every column of the account's state row as the contract's shapes, `null`
- * for a column that holds nothing. Consumed by `companion.service.ts` (the picture, the resume id, `<state>`).
+ * for a column that holds nothing. `pending` is the stored action WITH its pin (a value that does not
+ * read as one is none): server-only, so anything that reaches a page goes through `withoutPin`.
+ * Consumed by `companion.service.ts` (the picture, the resume id, `<state>`).
  */
 export type CompanionStoredState = {
   providerSessionId: string | null;
   focus: CompanionSessionRef | null;
   draft: CompanionDraft | null;
+  pending: CompanionStoredPending | null;
   walk: CompanionWalk | null;
   floor: string | null;
 };
@@ -79,7 +92,7 @@ export type CompanionEmittedFrame = Extract<
       | 'companion_activity'
       | 'companion_process'
       | 'companion_settings'
-      | 'companion_open_chat'
+      | 'companion_open'
       | 'companion_cleared';
   }
 >;
@@ -92,12 +105,18 @@ export type CompanionStore = {
   readState(): CompanionStoredState;
   /** Her CLI conversation, `null` after Clear. No frame: a page has no use for it. */
   setProviderSessionId(providerSessionId: string | null): void;
+  /** His messages no turn of hers has answered yet, oldest first (an empty column, or one that is not that shape, is none). */
+  readUnanswered(): UnansweredMessage[];
+  /** Replaces the list (`[]` stores none). No frame: it is the next process's, not a page's. */
+  setUnanswered(unanswered: readonly UnansweredMessage[]): void;
   /** The client id holding the floor. `companion_floor` for a client id, on every write (a page learns the rest with the picture); a cleared floor (`null`) sends nothing. */
   setFloor(floor: string | null): void;
   /** `companion_focus`. */
   setFocus(focus: CompanionSessionRef | null): void;
   /** `companion_draft`, with the stored draft (stamped now) or `null`. Answers what was stored. */
   setDraft(draft: CompanionDraftInput | null): CompanionDraft | null;
+  /** `companion_pending`, with the action WITHOUT its pin, or `null`. Writes `pending_json` with the pin. Answers what was sent. Her record of actions (`companion_actions`) is the caller's. */
+  setPending(next: CompanionStoredPending | null): CompanionPendingAction | null;
   /** `companion_walk`, with the stored walk (stamped now) or `null`. Answers what was stored. */
   setWalk(walk: CompanionWalkInput | null): CompanionWalk | null;
   /** `companion_sentence` for her own sentences (`role: 'kaylee'`), `companion_log` for every other line. Answers the stored line. */
@@ -112,7 +131,7 @@ export type CompanionStore = {
   /** `companion_note_removed`, only when this account had the note. Answers whether it did. */
   removeNote(id: number): boolean;
   emit(frame: CompanionEmittedFrame): void;
-  /** Deletes the log and notes, empties the state, then `companion_cleared`. */
+  /** Deletes the log and notes, empties the state (a standing action's row in `companion_actions` ends `cancelled`, and stays; one a take is carrying out is the take's to end), then `companion_cleared`. */
   clearAccount(): void;
 };
 
@@ -161,6 +180,7 @@ function toStoredState(userId: number, row: CompanionStateRow | null): Companion
     providerSessionId: row?.provider_session_id ?? null,
     focus: readJsonColumn(userId, 'focus_json', row?.focus_json ?? null, isSessionRef),
     draft: readJsonColumn(userId, 'draft_json', row?.draft_json ?? null, isDraft),
+    pending: readJsonColumn(userId, 'pending_json', row?.pending_json ?? null, isStoredPending),
     walk: readJsonColumn(userId, 'walk_json', row?.walk_json ?? null, isWalk),
     floor: row?.floor ?? null,
   };
@@ -199,6 +219,12 @@ export function createCompanionStore(userId: number): CompanionStore {
       companionDb.writeState(userId, { provider_session_id: providerSessionId });
     },
 
+    readUnanswered: () => readJsonColumn(userId, 'unanswered_json', companionDb.readState(userId)?.unanswered_json ?? null, isUnansweredList) ?? [],
+
+    setUnanswered(unanswered) {
+      companionDb.writeState(userId, { unanswered_json: unanswered.length === 0 ? null : JSON.stringify(unanswered) });
+    },
+
     setFloor(floor) {
       companionDb.writeState(userId, { floor });
       // Every write, not only a change: a page that missed the move (a socket that reconnected) hears it again the next time anyone speaks to her.
@@ -215,6 +241,13 @@ export function createCompanionStore(userId: number): CompanionStore {
       companionDb.writeState(userId, { draft_json: draft && JSON.stringify(draft) });
       send({ kind: 'companion_draft', draft });
       return draft;
+    },
+
+    setPending(next) {
+      companionDb.writeState(userId, { pending_json: next === null ? null : JSON.stringify(next) });
+      const pending = next === null ? null : withoutPin(next);
+      send({ kind: 'companion_pending', pending });
+      return pending;
     },
 
     setWalk(input) {

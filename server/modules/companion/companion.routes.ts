@@ -36,7 +36,7 @@ import type { CompanionService } from './companion.service.js';
  *
  * AN ANSWER IS THE THING ITSELF, not wrapped: `GET /` answers the picture, `PUT /settings` the settings and
  * `PUT /draft` the draft, so a page folds them straight into what it holds. A write that has nothing to
- * say answers 204.
+ * say answers 204 — `DELETE /draft` and `DELETE /action` (his × on the card of the action waiting for his word) among them.
  *
  * THE PRESS DOOR, `POST /press`, is the one multipart route: the clip as `audio` and the page's own clock for it as
  * `durationMs`. It answers 202 `{ text }` — what he said as heard, `''` for the empty press — or the 409/502 of a
@@ -251,6 +251,16 @@ export function createCompanionRoutes(service: CompanionService): Router {
     asyncHandler(async (request: Request, response: Response) => {
       readClientId(request);
       service.clearDraft(readAuthenticatedUserId(request));
+      response.status(204).end();
+    }),
+  );
+
+  // His × on the action card: the action waiting for his word comes off his panel, withdrawn. 204 whether or not one was standing.
+  router.delete(
+    '/action',
+    asyncHandler(async (request: Request, response: Response) => {
+      readClientId(request);
+      service.cancelAction(readAuthenticatedUserId(request));
       response.status(204).end();
     }),
   );

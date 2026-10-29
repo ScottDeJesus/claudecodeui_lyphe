@@ -88,8 +88,8 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
   const choices: ProjectChoice[] = useAppSwitcher().projects;
   const icon = icons[app.id];
 
-  // THE MODULE'S ONE PLACE THAT READS THE PAGE'S OWN ADDRESS, and both readings happen here because
-  // this is the open site. `{host}` is substituted where the viewer is, which is what lets one
+  // THE MODULE'S FIRST PLACE THAT READS THE PAGE'S OWN ADDRESS (`useShowApplication` is the second), and both
+  // readings happen here because this is the open site. `{host}` is substituted where the viewer is, which is what lets one
   // registry serve loopback, LAN and Tailscale at once; and the port set is what recognises the
   // CloudCLI row as this app even when the tab was opened on the other one of the app's own two ports.
   const url = resolveAppUrl(app.url, window.location.hostname);

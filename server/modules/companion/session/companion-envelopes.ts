@@ -33,8 +33,11 @@ import { oneLine } from '@/shared/tool-call-hint.js';
  */
 export type CompanionAlertKind = 'feature finished' | 'background work landed' | 'asking' | 'permission' | 'failed' | 'stuck';
 
-/** `&`, `<` and `>` made safe inside a body; `&` first so the others are not escaped twice. */
-function escapeText(value: string): string {
+/**
+ * `&`, `<` and `>` made safe inside a body; `&` first so the others are not escaped twice. Consumed here, and by
+ * `tools/draft-tools.ts`, which echoes a stored card title in `dismiss_note`'s answers the way an envelope echoes stored text.
+ */
+export function escapeText(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 

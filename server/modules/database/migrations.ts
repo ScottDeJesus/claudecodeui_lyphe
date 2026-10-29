@@ -23,6 +23,7 @@ import { FOLLOWUPS_SCHEMA_SQL } from '@/modules/database/followups-schema.js';
 import { KANBAN_SCHEMA_SQL } from '@/modules/database/kanban-schema.js';
 import { MEMORY_SCHEMA_SQL } from '@/modules/database/memory-schema.js';
 import { NOTES_SCHEMA_SQL } from '@/modules/database/notes-schema.js';
+import { NOTIFICATION_HISTORY_SCHEMA_SQL } from '@/modules/database/notification-history-schema.js';
 import { migrateProvenanceColumnToLegacyId } from '@/modules/database/migrations-legacy-id.js';
 
 const SQLITE_UUID_SQL = `
@@ -599,6 +600,40 @@ const addRelayedSendMessageUuidColumn = (db: Database): void => {
 };
 
 /**
+ * Adds `followups.closed_for`: what finished and closed the item — `<feature>`, `<feature>/<task key>` or `epic:<epic>`.
+ *
+ * `followups-schema.ts` carries the column for a fresh database; a database that already has the table gets it here.
+ * NULL for every item closed by a person, a chat, or not at all.
+ */
+const addFollowupsClosedForColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'followups').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'followups', columnNames, 'closed_for', 'TEXT');
+};
+
+/**
+ * Adds `companion_state.pending_json`: the one action Kaylee has prepared and he has not yet spoken for,
+ * as the wire's `CompanionPendingAction` plus the server-only `pin` the prepare took (the ask and its lock
+ * token, the chain, the follow-up, the open's target). NULL for none, which is every row before this column.
+ */
+const addCompanionPendingColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'pending_json', 'TEXT');
+};
+
+/**
+ * Adds `companion_state.unanswered_json`: the messages of his that no turn of Kaylee's has answered yet, as a list of
+ * `{ uuid, body, via, at }` (his raw words and how they came), written when one is pushed and read by the next process, which
+ * says them to her again. NULL for none, which is every row before this column.
+ */
+const addCompanionUnansweredColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'unanswered_json', 'TEXT');
+};
+
+/**
  * Adds the `permission_mode` column that records the permission mode a session last ran under.
  *
  * Recorded beside `model` and `effort` on every send, so a send the companion relays can run in
@@ -756,11 +791,17 @@ export const runMigrations = (db: Database) => {
     // The followups table: a chat's own next steps and known gaps. It references `sessions` (its
     // cascade is what removes a deleted chat's items) and `users`, both of which exist by here.
     db.exec(FOLLOWUPS_SCHEMA_SQL);
-    // The companion's tables: Kaylee's per-account state, exchange and cards (each cascading from
-    // `users`), and the briefs she has relayed into chats (cascading from `sessions`, which exists
-    // by here with its `permission_mode` column).
+    addFollowupsClosedForColumn(db);
+    // The companion's tables: Kaylee's per-account state, exchange, cards and record of actions (each
+    // cascading from `users`), and the briefs she has relayed into chats (cascading from `sessions`,
+    // which exists by here with its `permission_mode` column).
     db.exec(COMPANION_SCHEMA_SQL);
     addRelayedSendMessageUuidColumn(db);
+    addCompanionPendingColumn(db);
+    addCompanionUnansweredColumn(db);
+    // What the house told each account, kept: one row per notification the orchestrator was handed, written at
+    // the listener seam. It references `users` alone, so it sits beside the companion's script, which reads it.
+    db.exec(NOTIFICATION_HISTORY_SCHEMA_SQL);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');

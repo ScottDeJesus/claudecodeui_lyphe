@@ -145,7 +145,10 @@ function broadcastNotesChanged(): void {
   });
 }
 
-/** The notes lane's verbs, as one instance. Both route files are handed this and call it verbatim. */
+/**
+ * The notes lane's verbs, as one instance. Both route files are handed this and call it verbatim, and the companion's `read_notes`
+ * (`companion/eyes/notes-reads.ts`, through the barrel) calls its two reads, `list` and `get`, and no write.
+ */
 export const notesService = {
   /** Every note of one account, newest first — the repository's order, passed through unmapped. */
   list(userId: number): Note[] {

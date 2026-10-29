@@ -110,17 +110,25 @@ export { memoryCandidatesDb } from '@/modules/database/repositories/memory-candi
 // Used by the followups module; `sessions.db.ts` moves a merged chat's items itself.
 export { followupsDb } from '@/modules/database/repositories/followups.db.js';
 export type { FollowupKind, FollowupRow } from '@/modules/database/repositories/followups.db.js';
-// The companion's own tables: Kaylee's per-account state, exchange (the newest 400 rows) and note cards, as rows —
-// snake_case columns, JSON columns as text. Used by the companion module's store, which maps them to the wire contract.
+// The companion's own tables: Kaylee's per-account state, exchange (the newest 400 rows), note cards and record of the
+// actions she prepared for his word, as rows — snake_case columns, JSON columns as text. Used by the companion module's
+// store, which maps them to the wire contract.
 export { companionDb } from '@/modules/database/repositories/companion.db.js';
 export type {
   CompanionClearResult,
+  CompanionHeardRow,
   CompanionLogInput,
   CompanionLogRow,
   CompanionNoteRow,
   CompanionStatePatch,
   CompanionStateRow,
 } from '@/modules/database/repositories/companion.db.js';
+export type {
+  CompanionActionEnd,
+  CompanionActionOpening,
+  CompanionActionOutcome,
+  CompanionActionRow,
+} from '@/modules/database/repositories/companion-actions.db.js';
 // Every brief Kaylee has relayed into a chat, keyed on the chat so it survives her Clear. Used by the companion
 // module to record a send and by Providers to mark the matching user messages "Through Kaylee" in history.
 export { relayedSendsDb } from '@/modules/database/repositories/relayed-sends.db.js';
@@ -131,6 +139,10 @@ export { notesDb } from '@/modules/database/repositories/notes.db.js';
 export type { NoteRow } from '@/modules/database/repositories/notes.db.js';
 export { notificationChannelEndpointsDb } from '@/modules/database/repositories/notification-channel-endpoints.js';
 export { notificationPreferencesDb } from '@/modules/database/repositories/notification-preferences.js';
+// notificationHistoryDb: what the house told each account, the newest 300 rows of it — written and read by the
+// notifications module's history service (`startNotificationHistory`, `listNotificationHistory`).
+export { notificationHistoryDb } from '@/modules/database/repositories/notification-history.db.js';
+export type { NotificationHistoryInput, NotificationHistoryRow } from '@/modules/database/repositories/notification-history.db.js';
 // providerModelsDb: used by Providers to persist user-managed custom model rows.
 export { providerModelsDb } from '@/modules/database/repositories/provider-models.js';
 // projectsDb: used by Projects, Worktrees, Git, WebSocket, and notification modules to persist and resolve project records.

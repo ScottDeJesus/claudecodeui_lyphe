@@ -79,20 +79,6 @@ probe-key: 97ead18614765315f7387937ac19f5cc982cfe5f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs
 
-## INV-5697 — probe — After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no lane bell (`DispatcherAskBell`, MAN-7540)
-
-After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no lane bell (`DispatcherAskBell`, MAN-7540)
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/plan-prompt-in-chat/athena-probes/rework_key.sh
-expect: `same prompt key: false` (today: `first ask: token 634745e991 asked {'id': 8 …}` / `re-cut ask: token 634745e991 asked {'id': 11 …}` / `same prompt key: true | re-cut prompt suppressed by the phone push memory: true`)
-```
-
-measured 2026-09-28 by chain chain-plan-prompt-in-chat-20260928-183429-267d, finding M1, MEDIUM
-probe-key: 74af5a4f5ee80876547473078c98d616f0b65148
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-reads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raise.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/ask.py, /home/lyphe/.claude/hooks/dispatcher/cmd/ask.py, /home/lyphe/.claude/hooks/dispatcher/owed.py, /home/lyphe/.claude/hooks/dispatcher_stop_planners.py, /home/lyphe/.claude/hooks/dispatcher_stop.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/epic/SKILL.md, /home/lyphe/.claude/skills/feature/SKILL.md
-
 ## INV-5698 — probe — Two servers can both record the same landing's ask; the raise service claims the second hears `nothing`
 
 Two servers can both record the same landing's ask; the raise service claims the second hears `nothing`
@@ -120,34 +106,6 @@ measured 2026-09-28 by chain chain-plan-prompt-in-chat-20260928-183429-267d, fin
 probe-key: fe6d7103d88f1c1ee9fa2ec5dd75af2c64bd3197
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raise.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/ask.py, /home/lyphe/.claude/hooks/dispatcher/cmd/ask.py, /home/lyphe/.claude/hooks/dispatcher/owed.py, /home/lyphe/.claude/hooks/dispatcher_stop_planners.py, /home/lyphe/.claude/hooks/dispatcher_stop.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/epic/SKILL.md, /home/lyphe/.claude/skills/feature/SKILL.md
-
-## INV-5709 — probe — Every replay of a spent-out, genuine ntfy token costs a full store read, uncapped, on a public route
-
-Every replay of a spent-out, genuine ntfy token costs a full store read, uncapped, on a public route
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/plan-ask-survives-restart/athena-probes/stale_token_flood.sh
-expect: `store reads for 40 taps of ONE stale token:` at most 2 and `one more tap of the same token afterwards, extra store reads: 0` (today: 40 and 1)
-```
-
-measured 2026-09-28 by chain chain-plan-ask-survives-restart-20260928-202000-d5a0, finding M1, MEDIUM
-probe-key: dbe8f63b937a83ceb33b5a3bb9141a8707744f69
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-names.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
-
-## INV-5710 — probe — `answer()`'s settle chain has no catch, and the server has no `unhandledRejection` handler
-
-`answer()`'s settle chain has no catch, and the server has no `unhandledRejection` handler
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/plan-ask-survives-restart/athena-probes/settle_throw.sh
-expect: `still alive after the settle chain threw` and `process exit code 0` (today: `process exit code 1` and the thrown `SqliteError: database is locked` trace)
-```
-
-measured 2026-09-28 by chain chain-plan-ask-survives-restart-20260928-202000-d5a0, finding L1, LOW
-probe-key: 0a2314ada3ac501357c89a2d38bf3c95d1f8b3ca
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-names.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## INV-5712 — probe — The durable ask name is unique per record, not per ask over time
 
@@ -1239,6 +1197,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs
 - The souls root comes only from `dispatchSoulsStateDir()` (`server/shared/utils.ts`); never re-read `DISPATCH_SOULS_STATE_DIR` or hardcode the default.
 - Ownership is the `launched_by` stamp on `spec.json`, minus the dispatcher's own launches; a chain is owned by every session stamped on any of its stages that is not the dispatcher's.
 - A planner outing or phase chain is stamped with the plan's session — the chat the plan was started from, which launched none of it — and lights nothing: both readings skip what `isDispatcherWork` calls the dispatcher's (the mark, the `planner` role, a stage of an `until_pass` chain), over one `readDispatcherChainLaunchIds` pass per call (INV-7062).
+- `SAFE_RECORD_ID` is exported: `run-reads.service.ts` (`readChainRun`, `readSoulRun`, MAN-9164) holds every id it joins onto the souls or chains root to it, and takes `chainsRootBeside` and `readChainRecord`'s `walkerAlive` (the `isWalkerAlive` test) from the transport. A drift in either rule moves Kaylee's `read_run` too: a looser launcher id is unreadable there, a weaker walker test reads a corpse as running.
 - A chain started with no session to name carries no stamp and lights nothing (follow-up: stamp `launched_by` in `chain_state.blank()`, a `chain.json` schema change).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts
@@ -14471,7 +14430,8 @@ export const reply = (id: string, text: string, code?: [string, string, object])
   chatRunRegistry.completeRun(id, { exitCode: 0 });
 };
 export const pushed = () => (fs.existsSync(process.env.STUB_LOG!) ? fs.readFileSync(process.env.STUB_LOG!, 'utf8').split('\n').filter((l) => l.includes('"type":"user"')).map((l) => JSON.parse(l.replace(/^\[[\d:.]+\] \S+ /, '')).message.content as string) : []);
-export const companion = createCompanionModule({ runtime: providerRuntimeService });
+// The probe never asks the house a question, so an empty one stands in (the real house is built by server/index.ts from the lane instances).
+export const companion = createCompanionModule({ runtime: providerRuntimeService, house: {} as never });
 EOF
 cat > "$D/d.mts" <<'EOF'
 import { DB, N, A, sleep, page, chat, ev, notify, live, focus, reply, pushed, companion, chatRunRegistry } from './kit.mts';
@@ -14539,7 +14499,8 @@ export const reply = (id: string, text: string, code?: [string, string, object])
   chatRunRegistry.completeRun(id, { exitCode: 0 });
 };
 export const pushed = () => (fs.existsSync(process.env.STUB_LOG!) ? fs.readFileSync(process.env.STUB_LOG!, 'utf8').split('\n').filter((l) => l.includes('"type":"user"')).map((l) => JSON.parse(l.replace(/^\[[\d:.]+\] \S+ /, '')).message.content as string) : []);
-export const companion = createCompanionModule({ runtime: providerRuntimeService });
+// The probe never asks the house a question, so an empty one stands in (the real house is built by server/index.ts from the lane instances).
+export const companion = createCompanionModule({ runtime: providerRuntimeService, house: {} as never });
 EOF
 cat > "$D/d.mts" <<'EOF'
 import { DB, N, A, sleep, page, chat, ev, notify, live, focus, reply, pushed, companion, chatRunRegistry } from './kit.mts';
@@ -14608,7 +14569,8 @@ export const reply = (id: string, text: string, code?: [string, string, object])
   chatRunRegistry.completeRun(id, { exitCode: 0 });
 };
 export const pushed = () => (fs.existsSync(process.env.STUB_LOG!) ? fs.readFileSync(process.env.STUB_LOG!, 'utf8').split('\n').filter((l) => l.includes('"type":"user"')).map((l) => JSON.parse(l.replace(/^\[[\d:.]+\] \S+ /, '')).message.content as string) : []);
-export const companion = createCompanionModule({ runtime: providerRuntimeService });
+// The probe never asks the house a question, so an empty one stands in (the real house is built by server/index.ts from the lane instances).
+export const companion = createCompanionModule({ runtime: providerRuntimeService, house: {} as never });
 EOF
 cat > "$D/d.mts" <<'EOF'
 import { DB, N, A, sleep, page, chat, ev, notify, live, focus, reply, pushed, companion, chatRunRegistry } from './kit.mts';
@@ -14678,7 +14640,8 @@ export const reply = (id: string, text: string, code?: [string, string, object])
   chatRunRegistry.completeRun(id, { exitCode: 0 });
 };
 export const pushed = () => (fs.existsSync(process.env.STUB_LOG!) ? fs.readFileSync(process.env.STUB_LOG!, 'utf8').split('\n').filter((l) => l.includes('"type":"user"')).map((l) => JSON.parse(l.replace(/^\[[\d:.]+\] \S+ /, '')).message.content as string) : []);
-export const companion = createCompanionModule({ runtime: providerRuntimeService });
+// The probe never asks the house a question, so an empty one stands in (the real house is built by server/index.ts from the lane instances).
+export const companion = createCompanionModule({ runtime: providerRuntimeService, house: {} as never });
 EOF
 cat > "$D/d.mts" <<'EOF'
 import { DB, N, A, sleep, page, chat, ev, notify, live, focus, reply, pushed, companion, chatRunRegistry } from './kit.mts';
@@ -14746,7 +14709,8 @@ export const reply = (id: string, text: string, code?: [string, string, object])
   chatRunRegistry.completeRun(id, { exitCode: 0 });
 };
 export const pushed = () => (fs.existsSync(process.env.STUB_LOG!) ? fs.readFileSync(process.env.STUB_LOG!, 'utf8').split('\n').filter((l) => l.includes('"type":"user"')).map((l) => JSON.parse(l.replace(/^\[[\d:.]+\] \S+ /, '')).message.content as string) : []);
-export const companion = createCompanionModule({ runtime: providerRuntimeService });
+// The probe never asks the house a question, so an empty one stands in (the real house is built by server/index.ts from the lane instances).
+export const companion = createCompanionModule({ runtime: providerRuntimeService, house: {} as never });
 EOF
 cat > "$D/d.mts" <<'EOF'
 import { DB, N, A, sleep, page, chat, ev, notify, live, focus, reply, pushed, companion, chatRunRegistry } from './kit.mts';
@@ -14814,7 +14778,8 @@ export const reply = (id: string, text: string, code?: [string, string, object])
   chatRunRegistry.completeRun(id, { exitCode: 0 });
 };
 export const pushed = () => (fs.existsSync(process.env.STUB_LOG!) ? fs.readFileSync(process.env.STUB_LOG!, 'utf8').split('\n').filter((l) => l.includes('"type":"user"')).map((l) => JSON.parse(l.replace(/^\[[\d:.]+\] \S+ /, '')).message.content as string) : []);
-export const companion = createCompanionModule({ runtime: providerRuntimeService });
+// The probe never asks the house a question, so an empty one stands in (the real house is built by server/index.ts from the lane instances).
+export const companion = createCompanionModule({ runtime: providerRuntimeService, house: {} as never });
 EOF
 cat > "$D/d.mts" <<'EOF'
 import { DB, N, A, sleep, page, chat, ev, notify, live, focus, reply, pushed, companion, chatRunRegistry } from './kit.mts';
@@ -16450,3 +16415,1637 @@ measured 2026-10-28 by chain chain-kaylee--judgment--whole-20261028-015935-2804,
 probe-key: 0408ac1297d9bf9e2c7b3e9cd8ba07d48ef06194
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/watch.mjs
+
+## INV-10029 — probe — LOW — the router's doc comment now points at the wrong file
+
+LOW — the router's doc comment now points at the wrong file
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "run through git-status.service.ts" server/modules/git/git.routes.ts || echo none
+# expect: one hit at line 28 while the comment is wrong; `none` once it is corrected
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--git-reads-20261028-113245-1d37, finding L1, LOW
+probe-key: 72b65587b47c69e0cee21bdd7f7e4babf982b1f8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/git/git-status.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/git-status-service.mjs
+
+## INV-10030 — probe — LOW — the showing script saves bodies only, so a changed HTTP status would pass `diff -r`
+
+LOW — the showing script saves bodies only, so a changed HTTP status would pass `diff -r`
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && sed -n '/^async function rawBody/,/^}/p' .verify/git-status-service.mjs | grep -c 'status' || true
+# expect: 0 while the helper keeps no HTTP status; 1 or more once it saves it
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--git-reads-20261028-113245-1d37, finding L2, LOW
+probe-key: ea5c8bf27e76c747a043deaef34ba5d61b5aee45
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/git/git-status.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/git-status-service.mjs
+
+## INV-10031 — probe — F1 — MEDIUM — a text past what one dactyl takes is answered with the dactyl's own size refusal, which says "tokens" and gives advice she cannot follow
+
+F1 — MEDIUM — a text past what one dactyl takes is answered with the dactyl's own size refusal, which says "tokens" and gives advice she cannot follow
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+R=/home/lyphe/.claude/claudecodeui_lyphe
+mkdir -p "$D/home/.claude/scripts" || exit 1
+cp /home/lyphe/.claude/scripts/dactyl "$D/home/.claude/scripts/dactyl" || exit 1
+cat > "$D/t.mts" <<'INNER'
+import { textResult } from '@/shared/tool-text-result.js';
+const E: any = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts');
+const deps: any = { userId: 1, refuse: (s: string) => textResult(s, true), store: { addNote: () => ({ id: 1 }) } };
+// an eyes answer of 425 KB (a wide git diff, a long log): the real dactyl refuses a file this size before it reads it, so no model is called
+const text = Array.from({ length: 6000 }, (_, i) => `line ${i} ${'x'.repeat(60)}`).join('\n');
+const r = await E.wholeOrDigest(deps, { text, label: 'findings', brief: 'List every finding.', intro: 'Findings:' });
+const a: string = r.content[0].text;
+console.log(`text ${Buffer.byteLength(text)} bytes; isError=${r.isError ?? false}`);
+console.log(`her answer says tokens: ${/token/i.test(a) ? 'yes' : 'no'}; says "Read a range of it yourself": ${/Read a range of it yourself/i.test(a) ? 'yes' : 'no'}`);
+console.log(a.replace(/\/tmp\/athena-probe\.[A-Za-z0-9]+\/home/g, '<home>'));
+process.exit(0);
+INNER
+( cd "$R" && HOME="$D/home" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/t.mts" 2>&1 | grep -v '^Database\|ExperimentalWarning' )
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today `her answer says tokens: yes; says "Read a range of it yourself": yes` — the dactyl's own size refusal ("about 80K tokens … Read a range of it yourself") is the answer, with a pointer to ask_dactyl that would meet the same gate; cured: no such words in her answer, a sentence that tells her to narrow the scope
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--eyes-20261028-113245-6159, finding 1, MEDIUM
+probe-key: 0053cc20a049545802a5a30616945f702fad8fd5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/draft-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-eyes-answer.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-words.mjs
+
+## INV-10032 — probe — F2 — LOW — `doorWords` says "in a chat" for 22 of the 146 approved plans, none of them approved in a chat; it throws on a missing value
+
+F2 — LOW — `doorWords` says "in a chat" for 22 of the 146 approved plans, none of them approved in a chat; it throws on a missing value
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+R=/home/lyphe/.claude/claudecodeui_lyphe
+# the distinct approved_by values of the live dispatcher store that are no door name and no session id (read-only)
+sqlite3 -readonly -json /home/lyphe/.claude/state/dispatcher/dispatcher.db "select approved_by as by, count(*) as n from plans where approved_by is not null and approved_by not in ('app:card','app:phone','app:kaylee','cli') and approved_by not glob '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-*' group by 1 order by 2 desc" > "$D/by.json" || exit 1
+cat > "$D/t.mts" <<'INNER'
+import { readFileSync } from 'node:fs';
+const E: any = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts');
+const rows: Array<{ by: string; n: number }> = JSON.parse(readFileSync(process.argv[2], 'utf8') || '[]');
+for (const row of rows) console.log(`${row.n} plans  approved_by=${JSON.stringify(row.by.slice(0, 48))}  ->  ${JSON.stringify(E.doorWords(row.by))}`);
+for (const odd of [null, undefined]) { try { console.log(`doorWords(${odd}) -> ${JSON.stringify(E.doorWords(odd as any))}`); } catch (e) { console.log(`doorWords(${odd}) THREW ${String(e).slice(0, 60)}`); } }
+process.exit(0);
+INNER
+( cd "$R" && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$D/t.mts" "$D/by.json" 2>&1 | grep -v '^Database\|ExperimentalWarning' )
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today every non-door value reads "in a chat" (`arc's Accept (judgment)`, `app:panel`, `app:card · Accept when cut, pressed …`: 22 of the 146 approved plans) and doorWords(null) THREW; cured: those read as what they are (the card, the arc's own judgment) and only a session id reads "in a chat"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--eyes-20261028-113245-6159, finding 1#2, LOW
+probe-key: 9ba29439e8adbd6f7daad71d92f1dce83a7b007e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/draft-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-eyes-answer.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-words.mjs
+
+## INV-10033 — probe — F3 — LOW — a long `label` makes `wholeOrDigest` throw `ENAMETOOLONG`
+
+F3 — LOW — a long `label` makes `wholeOrDigest` throw `ENAMETOOLONG`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+R=/home/lyphe/.claude/claudecodeui_lyphe
+mkdir -p "$D/home/.claude/scripts" || exit 1
+printf '#!/bin/bash\ncat > /dev/null\necho "STUB-DIGEST L1"\n' > "$D/home/.claude/scripts/dactyl"
+chmod +x "$D/home/.claude/scripts/dactyl"
+cat > "$D/t.mts" <<'INNER'
+import { textResult } from '@/shared/tool-text-result.js';
+const E: any = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts');
+const deps: any = { userId: 1, refuse: (s: string) => textResult(s, true), store: { addNote: () => ({ id: 1 }) } };
+const text = 'line\n'.repeat(500);
+for (const label of ['findings', 'x'.repeat(240), `read-card-${'a phrase he said '.repeat(15)}`]) {
+  try { const r = await E.wholeOrDigest(deps, { text, label, brief: 'What does this say?', intro: 'I:' }); console.log(`label of ${label.length} characters -> answered, isError=${r.isError ?? false}`); }
+  catch (e) { console.log(`label of ${label.length} characters -> THREW ${String(e).slice(0, 70)}`); }
+}
+process.exit(0);
+INNER
+( cd "$R" && HOME="$D/home" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$D/t.mts" 2>&1 | grep -v '^Database\|ExperimentalWarning' )
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today the 'findings' and 240-character labels answer and the 265-character label THREW ENAMETOOLONG (a scratch file name past 255 bytes); cured: all three answer
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--eyes-20261028-113245-6159, finding 2, LOW
+probe-key: a9c3fec728deaedd801c187e612c3565db474cd2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/draft-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-eyes-answer.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-words.mjs
+
+## INV-10034 — probe — F4 — LOW — `whenWords` states a confident wrong day for strings V8 makes a date of
+
+F4 — LOW — `whenWords` states a confident wrong day for strings V8 makes a date of
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+R=/home/lyphe/.claude/claudecodeui_lyphe
+cat > "$D/t.mts" <<'INNER'
+const E: any = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts');
+const now = new Date('2026-10-30T18:00:00Z');
+// strings no house store writes, which V8's Date nevertheless turns into a day; a stamp that is not one should read "at an unknown time"
+for (const s of ['1', '12', '2026', 'Oct 27', '2026-02-31', '2026-13-45T00:00:00Z', '1793160562.886']) console.log(`${JSON.stringify(s).padEnd(24)} -> ${JSON.stringify(E.whenWords(s, now))}`);
+process.exit(0);
+INNER
+( cd "$R" && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$D/t.mts" 2>&1 | grep -v '^Database\|ExperimentalWarning' )
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today "1" -> "Jan 1, 2001", "2026" -> "Dec 31, 2025", "Oct 27" -> "Oct 27, 2001", "2026-02-31" -> "Mar 3" (a confident wrong day), while "2026-13-45T00:00:00Z" and "1793160562.886" read "at an unknown time"; cured: all seven read "at an unknown time"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--eyes-20261028-113245-6159, finding 3, LOW
+probe-key: a145f56cf9c9d05abe7814709398a0537bf88db0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/draft-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-eyes-answer.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-words.mjs
+
+## INV-10039 — probe — LOW — `isStoredPending` accepts a stamp that is not a stamp, and a read of it is fail-open
+
+LOW — `isStoredPending` accepts a stamp that is not a stamp, and a read of it is fail-open
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/work.db'" || exit 1
+cat > "$D/p.mts" <<'TS'
+import { isStoredPending } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts';
+import { companionDb, initializeDatabase } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts';
+await initializeDatabase();
+const ok = { id: 'a1', action: 'queue', target: { kind: 'card', name: 'n', spoken: 's', arc: null }, prompt: null, carried: [], say: 'Queue n', preparedAt: '2026-10-28T19:00:00.000Z', expiresAt: '2026-10-28T19:05:00.000Z', pin: {} };
+console.log('a real stamp pair reads as an action:', isStoredPending(ok));
+console.log("preparedAt '' reads as an action:", isStoredPending({ ...ok, preparedAt: '' }));
+console.log("expiresAt 'banana' reads as an action:", isStoredPending({ ...ok, expiresAt: 'banana' }));
+console.log('Date.parse of that expiresAt, the number a lapse test compares:', Date.parse('banana'));
+console.log("heardSince(1, '') lines answered (the whole log is 'after' it):", companionDb.heardSince(1, '').length);
+console.log("heardSince(1, a real stamp past the newest line) lines answered:", companionDb.heardSince(1, '2099-01-01T00:00:00.000Z').length);
+TS
+DATABASE_PATH="$D/work.db" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mts" 2>&1 | grep -E "^(a real|preparedAt|expiresAt|Date.parse|heardSince)"
+EOF
+bash "$D/p.sh" "$D"
+rm -f "$D/p.sh" "$D/p.mts" "$D/work.db" "$D/work.db-shm" "$D/work.db-wal"; rmdir "$D" 2>/dev/null || true
+# expect: line 1 true, then "preparedAt '' reads as an action: true" and "expiresAt 'banana' reads as an action: true", NaN, and heardSince(1, '') answers every operator/kaylee line of the log (60 on the live copy of 2026-10-28) while the defect stands; after a cure the two bad-stamp lines print false (and heardSince on '' answers none or throws)
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--wire-20261028-113244-14a9, finding L1, LOW
+probe-key: 502e57dfb30339a18ef9b237b2d7cc9a7c7a406f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion-actions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-pending.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-frame-tap.mjs
+
+## INV-10040 — probe — LOW — the two split rows keep the old title: "storage: the four tables"
+
+LOW — the two split rows keep the old title: "storage: the four tables"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+for t in MAN-9082 MAN-9146 MAN-9147; do
+  docstore get "$t" | jq -r --arg t "$t" '"\($t) title says four tables: \(.row.title | test("four tables")) | says five tables: \(.row.title | test("five tables"))"'
+done
+grep -c 'storage: the four tables' /home/lyphe/.claude/claudecodeui_lyphe/MANUAL.md
+EOF
+bash "$D/p.sh"
+rm -f "$D/p.sh"; rmdir "$D" 2>/dev/null || true
+# expect: MAN-9082 "four tables: false | five tables: true"; MAN-9146 and MAN-9147 "four tables: true" and "five tables: false" and the grep count 4 while the defect stands; after the cure both children say five and the count is 0
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--wire-20261028-113244-14a9, finding L2, LOW
+probe-key: d59550e721dbd59a4d9decd4e1ba3041ddf3d127
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion-actions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-pending.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-frame-tap.mjs
+
+## INV-10041 — probe — LOW — the two new files and the two new probes have no row that governs them
+
+LOW — the two new files and the two new probes have no row that governs them
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+for t in MAN-9146 MAN-9147 MAN-9082 MAN-9070 MAN-9086; do
+  docstore get "$t" | jq -r --arg t "$t" '"\($t) governs: companion-actions.db.ts=\([.row.governs[] | select(endswith("companion-actions.db.ts"))] | length) companion-pending.ts=\([.row.governs[] | select(endswith("companion-pending.ts"))] | length)"'
+done
+EOF
+bash "$D/p.sh"
+rm -f "$D/p.sh"; rmdir "$D" 2>/dev/null || true
+# expect: every row prints companion-actions.db.ts=0 companion-pending.ts=0 while the defect stands; after the cure at least one row prints 1 for each file
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--wire-20261028-113244-14a9, finding L3, LOW
+probe-key: 9d124c6269316369d87fa0e75a46dc26bac1f1b1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion-actions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-pending.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-frame-tap.mjs
+
+## INV-10042 — probe — MEDIUM — the history keeps every re-raised ask, so `recent` is 20 identical lines and the 300 rows are spent on repeats
+
+MEDIUM — the history keeps every re-raised ask, so `recent` is 20 identical lines and the 300 rows are spent on repeats
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'PSH'
+sqlite3 -readonly ~/.cloudcli/auth.db "select count(*) as rows_kept, count(distinct code||title||body||ifnull(session_id,'')||ifnull(plan,'')) as distinct_events from notification_history where user_id = 1 and code = 'permission.required'"
+sqlite3 -readonly ~/.cloudcli/auth.db "select substr(title,1,40) as title, count(*) as times from notification_history where user_id = 1 group by title order by times desc limit 2"
+PSH
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+# expect: the first line is `<rows_kept>|<distinct_events>`; defect stands while rows_kept is far above distinct_events (live now: 20|1, the same Accept title 20 times); cured when repeated asks no longer fill the table (rows_kept close to distinct_events)
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--alerts-20261028-120913-0381, finding M1, MEDIUM
+probe-key: 029d91aa28bc0d8cba2e61ec307e60cd33e97805
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/alert-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notification-history-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notification-history.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-history.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-listeners.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-spend-free.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-alert-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notification-history-live.mjs
+
+## INV-10043 — probe — LOW — a dispatcher ending's `<chat or plan>` column reads "the house": `plan` is read from `meta.plan`, which endings do not carry
+
+LOW — a dispatcher ending's `<chat or plan>` column reads "the house": `plan` is read from `meta.plan`, which endings do not carry
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cat > "$D/p.mts" <<'PMTS'
+const { initializeDatabase } = await import('@/modules/database/index.js');
+await initializeDatabase();
+const N = await import('@/modules/notifications/index.js');
+const { alertReads } = await import('@/modules/companion/eyes/alert-reads.js');
+const { getConnection } = await import('@/modules/database/connection.js');
+getConnection().exec('delete from notification_history');
+N.startNotificationHistory();
+N.notifyUserIfEnabled({ userId: 1, event: N.createNotificationEvent({ provider: 'claude', kind: 'success', code: 'dispatcher.finished', sessionId: null, severity: 'info', meta: { sessionName: 'kaylee--eyes', phases: 7, done: 7, costUsd: 6.29 } }) });
+const deps: any = { userId: 1, store: {}, runtime: {}, house: {}, setFocus() {}, withActivity: (_p: any, _c: any, _f: any, run: any) => run(), openOnFloor() {}, refuse: (s: string) => ({ content: [{ type: 'text', text: s }], isError: true }) };
+const out: any = await (alertReads(deps)[0] as any).handler({ scope: 'recent' }, {});
+const line: string = out.content[0].text;
+console.log('line:', line);
+console.log('about column:', line.split(' · ')[2] ?? 'none');
+process.exit(0);
+PMTS
+cat > "$D/p.sh" <<'PSH'
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$1/auth.db" CERBERUS_DB_PATH="$1/c.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$1/p.mts" 2>&1 | grep -a -v '^Database'
+PSH
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+# expect: the `about column:` line prints `the house` while the defect stands; it prints `kaylee--eyes` once a dispatcher ending's plan is kept
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--alerts-20261028-120913-0381, finding L1, LOW
+probe-key: 291aa084e7799c1ece5d4a255e3563c5df9be76e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/alert-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notification-history-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notification-history.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-history.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-listeners.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-spend-free.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-alert-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notification-history-live.mjs
+
+## INV-10044 — probe — LOW — a deleted (or unnamed) chat's row reads "Untitled Session" even when its plan and its own title carry the name
+
+LOW — a deleted (or unnamed) chat's row reads "Untitled Session" even when its plan and its own title carry the name
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cat > "$D/p.mts" <<'PMTS'
+const { initializeDatabase } = await import('@/modules/database/index.js');
+await initializeDatabase();
+const N = await import('@/modules/notifications/index.js');
+const { alertReads } = await import('@/modules/companion/eyes/alert-reads.js');
+const { getConnection } = await import('@/modules/database/connection.js');
+getConnection().exec('delete from notification_history');
+N.startNotificationHistory();
+N.notifyUserIfEnabled({ userId: 1, event: N.createNotificationEvent({ provider: 'claude', kind: 'action_required', code: 'permission.required', sessionId: 'a-chat-since-deleted', severity: 'warning', meta: { plan: 'kaylee--eyes', askKind: 'accept', sessionName: 'Build the eyes' } }) });
+const deps: any = { userId: 1, store: {}, runtime: {}, house: {}, setFocus() {}, withActivity: (_p: any, _c: any, _f: any, run: any) => run(), openOnFloor() {}, refuse: (s: string) => ({ content: [{ type: 'text', text: s }], isError: true }) };
+const out: any = await (alertReads(deps)[0] as any).handler({ scope: 'recent' }, {});
+const line: string = out.content[0].text;
+console.log('line:', line);
+console.log('about column:', line.split(' · ')[2] ?? 'none');
+process.exit(0);
+PMTS
+cat > "$D/p.sh" <<'PSH'
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$1/auth.db" CERBERUS_DB_PATH="$1/c.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$1/p.mts" 2>&1 | grep -a -v '^Database'
+PSH
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+# expect: the `about column:` line prints `Untitled Session` while the defect stands; it names the plan or the chat's own name once the reader falls back on what the row stored
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--alerts-20261028-120913-0381, finding L2, LOW
+probe-key: dafbf5415ced33835af0dd302ef552f67e08a628
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/alert-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notification-history-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notification-history.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-history.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-listeners.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-spend-free.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-alert-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notification-history-live.mjs
+
+## INV-10045 — probe — LOW — `Heal: 0 live` for a summary that did not answer a count
+
+LOW — `Heal: 0 live` for a summary that did not answer a count
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cat > "$D/p.mts" <<'PMTS'
+const { initializeDatabase } = await import('@/modules/database/index.js');
+await initializeDatabase();
+const { alertReads } = await import('@/modules/companion/eyes/alert-reads.js');
+const run = async (value: unknown) => {
+  const deps: any = { userId: 1, store: {}, runtime: {}, house: { dispatcher: async () => ({ plans: [] }), heal: { summary: async () => ({ ok: true, value }) } }, setFocus() {}, withActivity: (_p: any, _c: any, _f: any, r: any) => r(), openOnFloor() {}, refuse: (s: string) => ({ content: [{ type: 'text', text: s }], isError: true }) };
+  const out: any = await (alertReads(deps)[0] as any).handler({ scope: 'waiting' }, {});
+  return out.content[0].text.split('\n').find((l: string) => l.startsWith('Heal')) ?? 'no Heal line';
+};
+console.log('summary without a live count ->', await run({}));
+console.log('summary with live as text    ->', await run({ live: '364' }));
+console.log('summary with live 364        ->', await run({ live: 364 }));
+process.exit(0);
+PMTS
+cat > "$D/p.sh" <<'PSH'
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$1/auth.db" CERBERUS_DB_PATH="$1/c.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$1/p.mts" 2>&1 | grep -a -v '^Database'
+PSH
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+# expect: the first two lines print `Heal: 0 live (read_heal)` while the defect stands and `Heal: could not be read just now (read_heal)` once they refuse a missing count; the third line prints `Heal: 364 live (read_heal)` either way
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--alerts-20261028-120913-0381, finding L3, LOW
+probe-key: 43a5d62f2ae99cd3c52e6758ca3222004c772cde
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/alert-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notification-history-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notification-history.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-history.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-listeners.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-spend-free.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-alert-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notification-history-live.mjs
+
+## INV-10046 — probe — LOW — the history's synchronous write holds the push back for the SQLite busy wait when another connection holds the write lock
+
+LOW — the history's synchronous write holds the push back for the SQLite busy wait when another connection holds the write lock
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cat > "$D/p.mts" <<'PMTS'
+import { execFile } from 'node:child_process';
+const { initializeDatabase, notificationPreferencesDb } = await import('@/modules/database/index.js');
+await initializeDatabase();
+const N = await import('@/modules/notifications/index.js');
+const { registerDesktopNotificationClient } = await import('@/modules/notifications/services/desktop-notification-clients.service.js');
+const arrived: number[] = [];
+registerDesktopNotificationClient({ userId: 1, deviceId: 'athena-probe', ws: { readyState: 1, OPEN: 1, send: () => arrived.push(Date.now()) } as never });
+const prefs = notificationPreferencesDb.getPreferences(1);
+notificationPreferencesDb.updateNotificationPreferences(1, { ...prefs, channels: { ...prefs.channels, desktop: true, ntfy: false, webPush: false } });
+console.error = () => {};
+N.startNotificationHistory();
+const holder = execFile('python3', ['-c', 'import sqlite3,time,sys\nc=sqlite3.connect(sys.argv[1],isolation_level=None)\nc.execute("BEGIN IMMEDIATE")\nprint("locked",flush=True)\ntime.sleep(8)\nc.execute("ROLLBACK")', process.env.DATABASE_PATH!]);
+await new Promise((resolve) => holder.stdout!.once('data', resolve));
+const t0 = Date.now();
+N.notifyUserIfEnabled({ userId: 1, event: N.createNotificationEvent({ provider: 'claude', kind: 'stop', code: 'run.stopped', sessionId: null, severity: 'info', meta: {} }) });
+console.log(`desktop push arrived ${arrived.length ? arrived[0] - t0 : 'never'} ms after the notification was raised (another connection held the write lock for 8 s)`);
+process.exit(0);
+PMTS
+cat > "$D/p.sh" <<'PSH'
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$1/auth.db" CERBERUS_DB_PATH="$1/c.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$1/p.mts" 2>&1 | grep -a -v '^Database'
+PSH
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+# expect: prints about 5,000 ms (5,007 measured) while the history writes ahead of the push; prints a few ms once the push goes first
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--alerts-20261028-120913-0381, finding L4, LOW
+probe-key: 2a2e3f3abc6c188acc0ad75c8f0cd6bccb8761fb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/alert-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notification-history-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notification-history.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-history.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-listeners.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-spend-free.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-alert-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notification-history-live.mjs
+
+## INV-10047 — probe — LOW — `notificationHistoryDb.list` throws `datatype mismatch` for a limit that is NaN, 2^63, 1e21, Infinity or missing
+
+LOW — `notificationHistoryDb.list` throws `datatype mismatch` for a limit that is NaN, 2^63, 1e21, Infinity or missing
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cat > "$D/p.mts" <<'PMTS'
+const { initializeDatabase, notificationHistoryDb } = await import('@/modules/database/index.js');
+await initializeDatabase();
+for (const limit of [3, Number.NaN, 2 ** 63, 1e21, Number.POSITIVE_INFINITY]) {
+  try { console.log(`list(1, ${limit}) -> ${notificationHistoryDb.list(1, limit).length} rows`); } catch (error) { console.log(`list(1, ${limit}) -> threw ${(error as Error).message}`); }
+}
+process.exit(0);
+PMTS
+cat > "$D/p.sh" <<'PSH'
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$1/auth.db" CERBERUS_DB_PATH="$1/c.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$1/p.mts" 2>&1 | grep -a -v '^Database'
+PSH
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+# expect: the NaN, 2^63, 1e21 and Infinity lines print `threw datatype mismatch` while the defect stands and a row count once the limit is clamped; `list(1, 3)` answers either way
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--alerts-20261028-120913-0381, finding L5, LOW
+probe-key: ba98e6b8e82c850a7fe8cc316c3af729dc5f3e15
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/alert-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notification-history-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notification-history.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-history.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-listeners.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-spend-free.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-alert-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notification-history-live.mjs
+
+## INV-10048 — probe — LOW — the stored wording keeps usage and spend words from free text; the header and MAN-9153 say "every figure taken out"
+
+LOW — the stored wording keeps usage and spend words from free text; the header and MAN-9153 say "every figure taken out"
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cat > "$D/p.mts" <<'PMTS'
+const { initializeDatabase } = await import('@/modules/database/index.js');
+await initializeDatabase();
+const N = await import('@/modules/notifications/index.js');
+const { getConnection } = await import('@/modules/database/connection.js');
+const { alertReads } = await import('@/modules/companion/eyes/alert-reads.js');
+const db = getConnection();
+db.exec('delete from notification_history');
+N.startNotificationHistory();
+const raise = (code: string, kind: string, meta: Record<string, unknown>) => N.notifyUserIfEnabled({ userId: 1, event: N.createNotificationEvent({ provider: 'claude', kind, code, sessionId: null, severity: 'info', meta }) });
+raise('run.failed', 'error', { error: 'Claude AI usage limit reached|1793000000' });
+raise('dispatcher.paused', 'info', { sessionName: 'some-plan', phases: 4, done: 1, detail: 'budget spent: $5.00 of the $5.00 cap' });
+console.log('bodies stored:');
+console.log(db.prepare('select code, body from notification_history order by id').all().map((r: any) => `  ${r.code}: ${r.body}`).join('\n'));
+const deps: any = { userId: 1, store: {}, runtime: {}, house: {}, setFocus() {}, withActivity: (_p: any, _c: any, _f: any, r: any) => r(), openOnFloor() {}, refuse: (s: string) => ({ content: [{ type: 'text', text: s }], isError: true }) };
+const out: any = await (alertReads(deps)[0] as any).handler({ scope: 'budget spent' }, {});
+console.log('list_alerts "budget spent" finds:', out.content[0].text.split('\n')[0]);
+process.exit(0);
+PMTS
+cat > "$D/p.sh" <<'PSH'
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$1/auth.db" CERBERUS_DB_PATH="$1/c.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$1/p.mts" 2>&1 | grep -a -v '^Database'
+PSH
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+# expect: the stored `run.failed` body prints the usage sentence and the `dispatcher.paused` body prints `budget spent: $5.00 …` while the defect stands; they carry neither once the free text of those two codes is cleaned or left out of the body
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--alerts-20261028-120913-0381, finding L6, LOW
+probe-key: 614fbecdbac9b53c5ee966f6a910ee39a4d158d1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/alert-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notification-history-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notification-history.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-history.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-listeners.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-spend-free.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-alert-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notification-history-live.mjs
+
+## INV-10049 — probe — . A database block's array-valued cells (multi-select columns) render as empty cells
+
+. A database block's array-valued cells (multi-select columns) render as empty cells
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$D/x.mts" <<'TS'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes';
+const { readPage } = await import(`${R}/docspace-client.ts`);
+const { blockSection } = await import(`${R}/doc-render.ts`);
+const page: any = await readPage('page-1790095604801-004-iomcs1');
+if (!page.ok || !page.value) { console.log('page unreadable or gone:', JSON.stringify(page).slice(0, 120)); process.exit(0); }
+const index = page.value.blocks.findIndex((b: any) => b.id === 'blk-1790095640853-01i-j4pf6l');
+if (index === -1) { console.log('block gone'); process.exit(0); }
+const block = page.value.blocks[index];
+const columns = block.data.columns.map((c: any) => c.id);
+const row = block.data.rows.find((r: any) => String(r.cells[columns[0]]).startsWith('Olive Hill'));
+if (!row) { console.log('row gone'); process.exit(0); }
+const stored = [row.cells[columns[2]], row.cells[columns[3]]];
+const line = blockSection(block, index + 1).split('\n').find((l: string) => l.startsWith('Olive Hill')) ?? '';
+const shown = line.split(' | ').slice(2, 4);
+console.log('stored Coverages and Broker cells:', JSON.stringify(stored));
+console.log('the same two cells in the render :', JSON.stringify(shown));
+process.exit(0);
+TS
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/x.mts" 2>&1 | grep -v ExperimentalWarning
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: stored `[["GL","Endorsement","WC","Auto"],["Marsh","Foundation RP"]]` and rendered `["",""]` while the defect stands; cured when the render shows the items (e.g. `GL, Endorsement, WC, Auto`). `page unreadable or gone` / `block gone` / `row gone` means the page changed: re-find a multi-select block.
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--doc-reads-20261028-120912-0bb2, finding M1, MEDIUM
+probe-key: ff55181fa5111aa2f43aef143c3559bb1dac277e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/docspace-client.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-doc-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
+
+## INV-10050 — probe — . The page's own description is discarded, so half the house reads as titles alone
+
+. The page's own description is discarded, so half the house reads as titles alone
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$D/x.mts" <<'TS'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes';
+const { readPage } = await import(`${R}/docspace-client.ts`);
+const { pageText } = await import(`${R}/doc-render.ts`);
+const raw: any = await (await fetch('http://127.0.0.1:8005/api/docspace/pages')).json();
+const docs = raw.items.map((i: any) => i.doc);
+const described = docs.filter((d: any) => typeof d.description === 'string' && d.description.trim() !== '');
+console.log(`pages with a page-level description: ${described.length} of ${docs.length}`);
+const stored = docs.find((d: any) => d.id === 'page-docstore-shadow-connector-core-billing-engine');
+const page: any = await readPage('page-docstore-shadow-connector-core-billing-engine');
+if (!stored || !page.ok || !page.value) { console.log('probe page gone'); process.exit(0); }
+console.log('stored description:', JSON.stringify(stored.description));
+console.log('its text reaches read_doc whole:', pageText(page.value).includes(stored.description.replace(/^>\s*/, '').slice(0, 30)));
+process.exit(0);
+TS
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/x.mts" 2>&1 | grep -v ExperimentalWarning
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: `pages with a page-level description: 507 of 527` (or near) and `its text reaches read_doc whole: false` while the defect stands; cured when it prints `true`. `probe page gone` means ArchPulse dropped that page: pick another `page-docstore-*`.
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--doc-reads-20261028-120912-0bb2, finding M2, MEDIUM
+probe-key: 23d8b4687c10bb4b18a687aead6af859a81dd2c8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/docspace-client.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-doc-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
+
+## INV-10051 — probe — . `search_docs` says "the title matches" when the title does not hold the phrase
+
+. `search_docs` says "the title matches" when the title does not hold the phrase
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$D/x.mts" <<'TS'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes';
+const { docReads } = await import(`${R}/doc-reads.ts`);
+const deps: any = { userId: 1, refuse: (s: string) => ({ content: [{ type: 'text', text: s }], isError: true }), store: { addNote: () => ({ id: 1 }) } };
+const tools: any = Object.fromEntries(docReads(deps).map((t: any) => [t.name, t]));
+const ask = async (name: string, args: object) => (await tools[name].handler(args, {})).content[0].text as string;
+const phrase = 'voice';
+const lines = (await ask('search_docs', { phrase })).split('\n').filter((l) => l.includes('the title matches'));
+const wrong = lines.filter((l) => !l.split(' · ')[0].toLowerCase().includes(phrase));
+console.log(`search_docs "${phrase}": ${lines.length} lines say "the title matches"; the title holds the phrase in ${lines.length - wrong.length} of them`);
+for (const l of wrong.slice(0, 2)) console.log('  e.g.', l);
+process.exit(0);
+TS
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/x.mts" 2>&1 | grep -v ExperimentalWarning
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: `7 lines say "the title matches"; the title holds the phrase in 0 of them` while the defect stands (the count of lines may move as the house does); cured when no line claims the title for a page whose title lacks the phrase (`0 lines` or `holds the phrase in N of N`).
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--doc-reads-20261028-120912-0bb2, finding M3, MEDIUM
+probe-key: d09094c7029a8494542f160f938573932ede67de
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/docspace-client.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-doc-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
+
+## INV-10052 — probe — . A page `search_docs` credits with matching blocks is "not mentioned" when `read_doc` is given the same words
+
+. A page `search_docs` credits with matching blocks is "not mentioned" when `read_doc` is given the same words
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$D/x.mts" <<'TS'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes';
+const { docReads } = await import(`${R}/doc-reads.ts`);
+const deps: any = { userId: 1, refuse: (s: string) => ({ content: [{ type: 'text', text: s }], isError: true }), store: { addNote: () => ({ id: 1 }) } };
+const tools: any = Object.fromEntries(docReads(deps).map((t: any) => [t.name, t]));
+const ask = async (name: string, args: object) => (await tools[name].handler(args, {})).content[0].text as string;
+const page = 'page-docstore-shadow-connector-core-billing-engine';
+const hit = (await ask('search_docs', { phrase: 'billing_engine' })).split('\n').find((l) => l.includes(page));
+console.log('search_docs "billing_engine" says :', hit ?? '(page not named)');
+console.log('read_doc scope "billing_engine"   :', (await ask('read_doc', { page, scope: 'billing_engine' })).replace(/\n/g, ' ⏎ '));
+process.exit(0);
+TS
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/x.mts" 2>&1 | grep -v ExperimentalWarning
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: `… · 2 blocks match` from the search and `does not mention "billing_engine"` from the read while the defect stands; cured when the read shows what the search matched. `(page not named)` means the search no longer names the page.
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--doc-reads-20261028-120912-0bb2, finding L1, LOW
+probe-key: b7428113aa19ef58cc627fa41739af83386f4c2f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/docspace-client.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-doc-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
+
+## INV-10053 — probe — . `decision_matrix`, `sop_runbook` and `question_prompt` blocks render as their title; the outline's length says so (the report names this)
+
+. `decision_matrix`, `sop_runbook` and `question_prompt` blocks render as their title; the outline's length says so (the report names this)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$D/x.mts" <<'TS'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes';
+const { readPage } = await import(`${R}/docspace-client.ts`);
+const { outlineLine } = await import(`${R}/doc-render.ts`);
+const wanted = [['page-1791491287356-004-95uyvt', 'blk-1791491287356-002-n5j9dz', 'steps'], ['page-1789333303121-000-wdht5t', 'blk-1789333303121-006-qmd56c', 'options'], ['page-1789056598634-000-u7kg13', 'blk-1789056598634-002-nc813r', 'options']];
+for (const [pid, bid, field] of wanted) {
+  const page: any = await readPage(pid);
+  const at = page.ok && page.value ? page.value.blocks.findIndex((b: any) => b.id === bid) : -1;
+  if (at === -1) { console.log(bid, 'gone'); continue; }
+  const block = page.value.blocks[at];
+  console.log(`${block.type}: outline says "${outlineLine(block, at + 1).split(' · ').at(-1)}" characters; its data.${field} holds ${JSON.stringify(block.data[field]).length}`);
+}
+process.exit(0);
+TS
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/x.mts" 2>&1 | grep -v ExperimentalWarning
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: `sop_runbook: outline says "77" … data.steps holds 1702`, `decision_matrix: … "42" … 1754`, `question_prompt: … "35" … 580` while the defect stands; cured when the outline's number is of the order of the field's. `gone` for a block means the page changed.
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--doc-reads-20261028-120912-0bb2, finding L2, LOW
+probe-key: 986e7efe39c0a56f399a7669fa5cb2edc1bea77d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/docspace-client.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-doc-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
+
+## INV-10054 — probe — . "And 490 more" understates once a phrase is held by 500 pages
+
+. "And 490 more" understates once a phrase is held by 500 pages
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$D/x.mts" <<'TS'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes';
+const { docReads } = await import(`${R}/doc-reads.ts`);
+const deps: any = { userId: 1, refuse: (s: string) => ({ content: [{ type: 'text', text: s }], isError: true }), store: { addNote: () => ({ id: 1 }) } };
+const search: any = docReads(deps).find((t: any) => t.name === 'search_docs');
+const tail = ((await search.handler({ phrase: 'e' }, {})).content[0].text as string).split('\n').at(-1);
+const ask = async (limit: number) => JSON.parse((await (await fetch('http://127.0.0.1:8005/api/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'search_pages', arguments: { q: 'e', limit } } }) })).json()).result.content[0].text).pages.length as number;
+const total = ((await (await fetch('http://127.0.0.1:8005/api/docspace/pages')).json()) as any).items.length;
+console.log(`search_docs "e" closes: "${tail}"`);
+console.log(`ArchPulse hands back ${await ask(100000)} pages for limit 100000 (its ceiling, 500) while the house holds ${total}`);
+process.exit(0);
+TS
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/x.mts" 2>&1 | grep -v ExperimentalWarning
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: `closes: "And 490 more; give a phrase to narrow."` and `ArchPulse hands back 500 pages … while the house holds 527` while the defect stands; cured when the tail says it is a floor (e.g. `At least 490 more`) whenever 500 came back.
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--doc-reads-20261028-120912-0bb2, finding L3, LOW
+probe-key: 6e400dd23725b86203f9f11e02115d1dc13c0806
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/doc-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/docspace-client.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-doc-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
+
+## INV-10055 — probe — MEDIUM — the `board` scope's three lane previews are each fitted to 1,750 characters, so together they pass the 2,000-character line and the whole overview goes to a dactyl that drops its counts
+
+MEDIUM — the `board` scope's three lane previews are each fitted to 1,750 characters, so together they pass the 2,000-character line and the whole overview goes to a dactyl that drops its counts
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# Probe M1: the `board` scope's lane previews, each fitted to its own 1,750-character budget, add up past the 2,000 the answer may be whole at.
+# Runs on a scratch copy of the Kanban data; panel:true hands back the WHOLE text (no dactyl, no Gemini).
+D=$(cd "$(dirname "$0")" && pwd)
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+sqlite3 "$D/auth.db" "
+update kanban_cards set status='questions' where id in (select id from kanban_cards where board_id='b-90' and status='not_ready' and archived=0 order by length(title) desc limit 5);
+update kanban_cards set status='active' where id in (select id from kanban_cards where board_id='b-90' and status='not_ready' and archived=0 order by length(title) desc limit 5);
+insert or ignore into kanban_card_tags select id,'a-needs-operator-decision' from kanban_cards where board_id='b-90' and status in ('questions','active','todo');
+insert or ignore into kanban_card_tags select id,'b-go-live-precondition' from kanban_cards where board_id='b-90' and status in ('questions','active','todo');"
+cat > "$D/call.mts" <<'EOT'
+import { z } from 'zod';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/';
+await (await import(R + 'database/index.ts')).initializeDatabase();
+const { panelReads } = await import(R + 'companion/eyes/panel-reads.ts');
+const notes: Array<{ title: string; text: string }> = [];
+const deps: any = { userId: 1, store: { addNote: (n: any) => { notes.push(n); return { id: 1 }; } }, runtime: {}, house: {}, refuse: (s: string) => ({ content: [{ type: 'text', text: s }], isError: true }) };
+const t: any = panelReads(deps).find((d: any) => d.name === 'read_kanban');
+await t.handler(z.object(t.inputSchema).parse({ scope: 'board', panel: true }), {});
+const text = notes[0]?.text ?? '';
+console.log(`whole board overview = ${[...text].length} characters; inline limit 2000; carries the lane counts line: ${/not ready \d+ · todo \d+/.test(text)}`);
+process.exit(0);
+EOT
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$D/auth.db" CERBERUS_DB_PATH="$D/cerberus.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/call.mts" 2>&1 | grep -v -E '^Database|ExperimentalWarning'
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--panel-reads-20261028-120913-ffa8, finding M1, MEDIUM
+probe-key: 2343152dc28f0c72948f4f2cae87e80efe008b53
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/heal-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/line-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/notes-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/schedule-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-reads.mjs
+
+## INV-10056 — probe — LOW — the panel's lane names ("Backlog", "In Progress", "Open questions") are not lanes to her tool, and the miss says nothing of the lanes
+
+LOW — the panel's lane names ("Backlog", "In Progress", "Open questions") are not lanes to her tool, and the miss says nothing of the lanes
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# Probe L1: the Kanban tab names its lanes Backlog / To Do / Open questions / In Progress / Done; her tool takes not ready / todo / questions / active / done.
+D=$(cd "$(dirname "$0")" && pwd)
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cat > "$D/call.mts" <<'EOT'
+import { z } from 'zod';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/';
+await (await import(R + 'database/index.ts')).initializeDatabase();
+const { panelReads } = await import(R + 'companion/eyes/panel-reads.ts');
+const deps: any = { userId: 1, store: { addNote: () => ({ id: 1 }) }, runtime: {}, house: {}, refuse: (s: string) => ({ content: [{ type: 'text', text: s }], isError: true }) };
+const t: any = panelReads(deps).find((d: any) => d.name === 'read_kanban');
+for (const scope of ['backlog', 'in progress', 'open questions', 'not ready']) {
+  const r = await t.handler(z.object(t.inputSchema).parse({ scope }), {});
+  console.log(`${scope.padEnd(15)} -> ${r.content[0].text.split('\n')[0].slice(0, 110)}`);
+}
+process.exit(0);
+EOT
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$D/auth.db" CERBERUS_DB_PATH="$D/cerberus.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/call.mts" 2>&1 | grep -v -E '^Database|ExperimentalWarning'
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--panel-reads-20261028-120913-ffa8, finding L1, LOW
+probe-key: 91a17299401fbcabf2c6c39c85a1fd70f40eea73
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/heal-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/line-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/notes-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/schedule-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-reads.mjs
+
+## INV-10057 — probe — LOW — `maskCredentials` takes any word that starts `sk` and runs 16 more word characters for a vendor key, so plan slugs and identifiers are read out as `<masked>`
+
+LOW — `maskCredentials` takes any word that starts `sk` and runs 16 more word characters for a vendor key, so plan slugs and identifiers are read out as `<masked>`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# Probe L2: `maskCredentials` replaces any word starting `sk` with 16 or more word characters after it.
+D=$(cd "$(dirname "$0")" && pwd)
+cat > "$D/mask.mts" <<'EOT'
+const { maskCredentials } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/line-words.ts');
+for (const s of ['malformed-customer-log-is-skipped-and-never-takes-a-job', 'skipDangerousModePermissionPrompt', 'day-one-sketch-from-panos--checks', 'sk-proj-abcdefghijklmnop1234']) {
+  console.log(`${s}  ->  ${maskCredentials(s)}`);
+}
+process.exit(0);
+EOT
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/mask.mts" 2>&1 | grep -v -E '^Database|ExperimentalWarning'
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--panel-reads-20261028-120913-ffa8, finding L2, LOW
+probe-key: 0200aebef06c1382200ac56707e3f420aca50964
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/heal-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/line-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/notes-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/schedule-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-reads.mjs
+
+## INV-10058 — probe — LOW — `read_heal`'s kind branch counts the worker's 200-row window as the kind's rows, and takes the kind's case as typed
+
+LOW — `read_heal`'s kind branch counts the worker's 200-row window as the kind's rows, and takes the kind's case as typed
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# Probe L3: read_heal's kind branch — the count it opens with, and a kind spelled with capitals. panel:true hands back the whole text (no dactyl).
+D=$(cd "$(dirname "$0")" && pwd)
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+echo "worker: tool-result rows in its window = $(~/.claude/scripts/heal-reflex --kind tool-result | jq '.items|length') | summary says live = $(~/.claude/scripts/heal-reflex --status | jq '[.kinds[]|select(.kind=="tool-result")|.live][0]') | tool-error rows in window = $(~/.claude/scripts/heal-reflex --kind tool-error | jq '.items|length')"
+cat > "$D/call.mts" <<'EOT'
+import { z } from 'zod';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/';
+await (await import(R + 'database/index.ts')).initializeDatabase();
+const { panelReads } = await import(R + 'companion/eyes/panel-reads.ts');
+const { createHealService } = await import(R + 'heal/index.ts');
+const notes: Array<{ title: string; text: string }> = [];
+const deps: any = { userId: 1, store: { addNote: (n: any) => { notes.push(n); return { id: 1 }; } }, runtime: {}, house: { heal: createHealService({ bin: process.env.HOME + '/.claude/scripts/heal-reflex' }) }, refuse: (s: string) => ({ content: [{ type: 'text', text: s }], isError: true }) };
+const t: any = panelReads(deps).find((d: any) => d.name === 'read_heal');
+const ask = async (scope: string, panel: boolean) => t.handler(z.object(t.inputSchema).parse({ scope, panel }), {});
+await ask('tool-result', true);
+console.log('read_heal tool-result (panel, no dactyl) opens: ' + (notes[0]?.text ?? '').split('\n')[0]);
+const r = await ask('Tool-Error', false);
+console.log('read_heal Tool-Error says: ' + r.content[0].text.split('\n')[0]);
+process.exit(0);
+EOT
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$D/auth.db" CERBERUS_DB_PATH="$D/cerberus.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/call.mts" 2>&1 | grep -v -E '^Database|ExperimentalWarning'
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--panel-reads-20261028-120913-ffa8, finding L3, LOW
+probe-key: 64bb4132b3d6af5dd0a7b6616d9146e76274338c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/heal-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/kanban-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/line-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/notes-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/schedule-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-reads.mjs
+
+## INV-10059 — server/modules/companion/eyes — a run read carries no cost, provider, runtime or usage window, reads records and never --status
+
+Detail: MAN-9162, MAN-9163, MAN-9164.
+
+| rule | why |
+|---|---|
+| A figure of spend, a provider, a runtime or a usage window is cut in TWO places: `readChainRun` cuts the `cost:` lines of `report.md` and `walker.out`; `run-scrub.ts` (`scrubReport`, `scrubDocument`, `scrubCause`) cuts the rest of every text a `read_run` scope hands over. A new figure the runner writes into a report, a stage flag or a cause is cut in `run-scrub.ts` in the same change | operator ruling 1: never usage or spend. `wall 3604s past cap 3600s` and `after 60s` reached her until cut |
+| No text from the launcher reaches `answerOf` (digest or panel note) unscrubbed | a digest repeats what it is given |
+| `ChainRunStage`, `ChainRun` and `SoulRun` carry no `cost_usd`, `tokens*` or `provider`; a field added to one is checked against ruling 1 first | a field copied is a field she can say |
+| A run is read from the launcher's records (`readChainRun`, `readSoulRun`), never from `plan-runner chain --status` | `--status` adopts a dead walker's stage: a read that writes |
+| A path named in a record's JSON (a stage's `text`, `findings`, the report's `paths:`) is opened only through `readRunDocument` | a path out of JSON is never joined onto a read unchecked |
+| A read that lists many chains passes `summaryOnly` | hundreds of records in one synchronous pass; `report.md` and `walker.out` are two more files each |
+| `.verify/companion-run-reads.mjs` part 4 scans every answer for spend words; widen it with the scrub | a cut with no scan is unproven |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scrub.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-document.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-reads.service.ts
+
+## INV-10060 — probe — Runtime ("wall 3604s past cap 3600s") reaches her whole, in `result`, `log` and `failure` of a chain and in `failure` of a soul; the intent says runtime is never said
+
+Runtime ("wall 3604s past cap 3600s") reaches her whole, in `result`, `log` and `failure` of a chain and in `failure` of a soul; the intent says runtime is never said
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'END_OF_PROBE'
+D=$(mktemp -d /tmp/athena-probe-p1.XXXXXX) || exit 1
+cat > "$D/p.mts" <<'TS'
+const s: any = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scrub.ts');
+const flag = '  flags:  stage builder: ended timeout — wall 3604s past cap 3600s — relaunched once after 60s';
+console.log('report keeps wall seconds:', /wall \d+s/.test(s.scrubReport(flag)), '| soul cause keeps wall seconds:', /wall \d+s/.test(s.scrubCause('wall 3601s past cap 3600s')));
+process.exit(0);
+TS
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mts" 2>&1 | grep -v Experimental
+cd /tmp; case "$D" in /tmp/athena-probe-p1.??????) rm -r "$D";; esac
+END_OF_PROBE
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: report keeps wall seconds: false | soul cause keeps wall seconds: false
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--run-reads-20261028-120912-daa6, finding M1, MEDIUM
+probe-key: 8fddccc07a35ce5c4063f8b020a75cf4971ea0fc
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scrub.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-state.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-reads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-run-reads.mjs
+
+## INV-10061 — probe — A task that has not launched, named by its exact key, silently reads ANOTHER task's run
+
+A task that has not launched, named by its exact key, silently reads ANOTHER task's run
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'END_OF_PROBE'
+D=$(mktemp -d /tmp/athena-probe-p2.XXXXXX) || exit 1
+mkdir -p "$D/dispatch-souls" "$D/dispatch-chains"
+cat > "$D/p.mts" <<'TS'
+const { resolveRun } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts');
+const phase = (key: string, title: string, chain: string | null) => ({ key, title, status: chain ? 'running' : 'not started', chain_id: chain, position: 1 });
+const picture: any = { plans: [{ name: 'myplan', phases: [phase('alpha', 'Her eyes on the docs and the page', 'chain-myplan--alpha-20261028-100000-aaaa'), phase('docs', 'The docs say what landed', null)] }] };
+const house: any = { dispatcher: async () => picture, roadmap: async () => null };
+const r: any = await resolveRun(house, 'myplan docs');
+console.log('myplan docs =>', r.ok ? 'RUN ' + r.run.task?.key + ' (' + r.run.id + ')' : 'REFUSED: ' + r.sentence.slice(0, 150));
+process.exit(0);
+TS
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$D/auth.db" DISPATCH_SOULS_STATE_DIR="$D/dispatch-souls" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mts" 2>&1 | grep -v 'Experimental\|^Migrated\|^  from\|^  to\|^}'
+cd /tmp; case "$D" in /tmp/athena-probe-p2.??????) rm -r "$D";; esac
+END_OF_PROBE
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: myplan docs => a refusal that says the docs task has not run yet (never "RUN alpha")
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--run-reads-20261028-120912-daa6, finding M2, MEDIUM
+probe-key: da54461b1a66bc4c9d273896e9c7ec1569ee2fb5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scrub.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-state.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-reads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-run-reads.mjs
+
+## INV-10062 — probe — A task whose key is a filler word cannot be named by its key (`regression-cases--runner run`); "the run-reads task" fails the same way
+
+A task whose key is a filler word cannot be named by its key (`regression-cases--runner run`); "the run-reads task" fails the same way
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'END_OF_PROBE'
+D=$(mktemp -d /tmp/athena-probe-p3.XXXXXX) || exit 1
+mkdir -p "$D/dispatch-souls" "$D/dispatch-chains"
+cat > "$D/p.mts" <<'TS'
+const { resolveRun } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts');
+const phase = (key: string, title: string, chain: string | null) => ({ key, title, status: 'done', chain_id: chain, position: 1 });
+const picture: any = { plans: [{ name: 'myplan', phases: [phase('run', 'Running: run.py spawns each case', 'chain-myplan--run-20261028-100000-bbbb'), phase('files', 'The suite files', 'chain-myplan--files-20261028-100000-cccc')] }] };
+const house: any = { dispatcher: async () => picture, roadmap: async () => null };
+const r: any = await resolveRun(house, 'myplan run');
+console.log('myplan run =>', r.ok ? 'RUN ' + r.run.task?.key : 'REFUSED: ' + r.sentence.slice(0, 100));
+process.exit(0);
+TS
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$D/auth.db" DISPATCH_SOULS_STATE_DIR="$D/dispatch-souls" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mts" 2>&1 | grep -v 'Experimental\|^Migrated\|^  from\|^  to\|^}'
+cd /tmp; case "$D" in /tmp/athena-probe-p3.??????) rm -r "$D";; esac
+END_OF_PROBE
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: myplan run => RUN run
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--run-reads-20261028-120912-daa6, finding L1, LOW
+probe-key: c796824d67537802be38c33bd25a5f3833b0417b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scrub.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-state.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-reads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-run-reads.mjs
+
+## INV-10063 — probe — The run id that `read_card phases` prints for a task whose chain record is pruned answers with a wrong refusal
+
+The run id that `read_card phases` prints for a task whose chain record is pruned answers with a wrong refusal
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'END_OF_PROBE'
+D=$(mktemp -d /tmp/athena-probe-p4.XXXXXX) || exit 1
+mkdir -p "$D/dispatch-souls" "$D/dispatch-chains"
+cat > "$D/p.mts" <<'TS'
+const { resolveRun } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts');
+const phase = (key: string, title: string, chain: string | null) => ({ key, title, status: 'done', chain_id: chain, position: 1 });
+const picture: any = { plans: [{ name: 'myplan', phases: [phase('files', 'The suite files', 'chain-myplan--files-20261028-100000-cccc')] }] };
+const house: any = { dispatcher: async () => picture, roadmap: async () => null };
+const r: any = await resolveRun(house, 'chain-myplan--files-20261028-100000-cccc');
+console.log('a task\'s own chain id, record not on disk =>', r.ok ? 'RUN ' + r.run.id : 'REFUSED: ' + r.sentence.slice(0, 120));
+process.exit(0);
+TS
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$D/auth.db" DISPATCH_SOULS_STATE_DIR="$D/dispatch-souls" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mts" 2>&1 | grep -v 'Experimental\|^Migrated\|^  from\|^  to\|^}'
+cd /tmp; case "$D" in /tmp/athena-probe-p4.??????) rm -r "$D";; esac
+END_OF_PROBE
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: a task's own chain id, record not on disk => a sentence that says the record is no longer kept (never "has no task with a run named")
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--run-reads-20261028-120912-daa6, finding L2, LOW
+probe-key: 32a115d5a6b5c1a386d1cc5bda8af61241fd9d15
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scrub.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-state.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-reads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-run-reads.mjs
+
+## INV-10064 — probe — `recent` and `failed` say "No run ended … in the last 24 hours / 7 days" over a window the chat half does not have
+
+`recent` and `failed` say "No run ended … in the last 24 hours / 7 days" over a window the chat half does not have
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'END_OF_PROBE'
+D=$(mktemp -d /tmp/athena-probe-p5.XXXXXX) || exit 1
+mkdir -p "$D/dispatch-souls" "$D/dispatch-chains/chain-hand-20261028-020000-aaaa"
+cat > "$D/dispatch-chains/chain-hand-20261028-020000-aaaa/chain.json" <<'JSON'
+{"id":"chain-hand-20261028-020000-aaaa","slug":"hand","agent":"hephaestus","status":"dead","stage":"builder","cause":"stage builder failed twice","failed_stage":"builder","started_at":1,"ended_at":1,"updated_at":1,"stages":[]}
+JSON
+python3 -c "
+import json,time,sys
+p=sys.argv[1]; r=json.load(open(p)); t=time.time()-10*3600; r['started_at']=t-600; r['ended_at']=t; r['updated_at']=t; json.dump(r,open(p,'w'))
+" "$D/dispatch-chains/chain-hand-20261028-020000-aaaa/chain.json"
+cat > "$D/p.mts" <<'TS'
+const { runLines, runScopeOf } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts');
+// A chat's chain that failed 10 hours ago is on disk; the souls lane keeps an ended launch six hours, so it holds none of its launches.
+const house: any = { dispatcher: async () => ({ plans: [] }), roadmap: async () => null, launches: async () => [] };
+for (const scope of ['failed', 'recent']) {
+  const r = await runLines(house, runScopeOf(scope), Date.now() / 1000);
+  console.log(scope, '=>', r.lines.length, 'lines |', r.lines.length === 0 ? r.none : r.lines[0]);
+}
+process.exit(0);
+TS
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$D/auth.db" DISPATCH_SOULS_STATE_DIR="$D/dispatch-souls" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mts" 2>&1 | grep -v 'Experimental\|^Migrated\|^  from\|^  to\|^}'
+cd /tmp; case "$D" in /tmp/athena-probe-p5.??????) rm -r "$D";; esac
+END_OF_PROBE
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: failed => 1 lines | … failed at builder … (a chain that failed 10 hours ago is listed), or a none sentence that names the six-hour limit of chat runs
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--run-reads-20261028-120912-daa6, finding L3, LOW
+probe-key: 151ddeb082e620e9fc323f9d5958b466a88f2787
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scrub.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-state.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-reads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-run-reads.mjs
+
+## INV-10065 — probe — With the dispatcher not read yet, `list_runs running` says "Nothing is running right now: no plan task and no chat run is out" right under the note that it did not read the dispatcher
+
+With the dispatcher not read yet, `list_runs running` says "Nothing is running right now: no plan task and no chat run is out" right under the note that it did not read the dispatcher
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'END_OF_PROBE'
+D=$(mktemp -d /tmp/athena-probe-p6.XXXXXX) || exit 1
+mkdir -p "$D/dispatch-souls" "$D/dispatch-chains"
+cat > "$D/p.mts" <<'TS'
+const { runLines, runScopeOf } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts');
+// The dispatcher's picture has not landed this boot (`house.dispatcher()` answers null); the souls lane is read and holds nothing out.
+const house: any = { dispatcher: async () => null, roadmap: async () => null, launches: async () => [] };
+const r = await runLines(house, runScopeOf('running'), Date.now() / 1000);
+console.log('what list_runs prints:');
+console.log([...r.notes, r.lines.length === 0 ? r.none : r.lines.join('\n')].join('\n'));
+process.exit(0);
+TS
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$D/auth.db" DISPATCH_SOULS_STATE_DIR="$D/dispatch-souls" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mts" 2>&1 | grep -v 'Experimental\|^Migrated\|^  from\|^  to\|^}'
+cd /tmp; case "$D" in /tmp/athena-probe-p6.??????) rm -r "$D";; esac
+END_OF_PROBE
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: the output holds the note that the dispatcher was not read and no sentence saying that no plan task is running
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--run-reads-20261028-120912-daa6, finding L4, LOW
+probe-key: 097162c43e7caf93afb34f9babed0bdf24c6d69e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scrub.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-state.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-reads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-run-reads.mjs
+
+## INV-10066 — probe — One record with an out-of-range timestamp makes `list_runs` refuse for every run (and `read_run` of that one)
+
+One record with an out-of-range timestamp makes `list_runs` refuse for every run (and `read_run` of that one)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'END_OF_PROBE'
+D=$(mktemp -d /tmp/athena-probe-p7.XXXXXX) || exit 1
+mkdir -p "$D/dispatch-souls" "$D/dispatch-chains/chain-big-20261028-100000-aaaa" "$D/dispatch-chains/chain-ok-20261028-100000-bbbb"
+cat > "$D/dispatch-chains/chain-big-20261028-100000-aaaa/chain.json" <<'JSON'
+{"id":"chain-big-20261028-100000-aaaa","slug":"big","agent":"hephaestus","status":"done","stage":"prometheus","cause":"","started_at":1e20,"ended_at":1e20,"updated_at":1e20,"stages":[]}
+JSON
+cat > "$D/dispatch-chains/chain-ok-20261028-100000-bbbb/chain.json" <<'JSON'
+{"id":"chain-ok-20261028-100000-bbbb","slug":"ok","agent":"hephaestus","status":"done","stage":"prometheus","cause":"","started_at":1793200000,"ended_at":1793200900,"updated_at":1793200900,"stages":[]}
+JSON
+cat > "$D/p.mts" <<'TS'
+const { runLines, runScopeOf } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts');
+// One plan, two tasks: one whose record holds a finite but out-of-range timestamp, one that is sound.
+const phase = (key: string, chain: string) => ({ key, title: key, status: 'done', chain_id: chain, position: 1, done_at: new Date().toISOString() });
+const picture: any = { plans: [{ name: 'myplan', phases: [phase('big', 'chain-big-20261028-100000-aaaa'), phase('ok', 'chain-ok-20261028-100000-bbbb')] }] };
+const house: any = { dispatcher: async () => picture, roadmap: async () => null, launches: async () => [] };
+try {
+  const r = await runLines(house, runScopeOf('myplan'), Date.now() / 1000);
+  console.log('list answered', r.lines.length, 'lines; the sound run listed:', r.lines.some((line) => line.includes('chain-ok-')));
+} catch (error: any) {
+  console.log('list_runs threw for every run:', error?.name, error?.message);
+}
+process.exit(0);
+TS
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$D/auth.db" DISPATCH_SOULS_STATE_DIR="$D/dispatch-souls" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mts" 2>&1 | grep -v 'Experimental\|^Migrated\|^  from\|^  to\|^}'
+cd /tmp; case "$D" in /tmp/athena-probe-p7.??????) rm -r "$D";; esac
+END_OF_PROBE
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: list answered 1 lines; the sound run listed: true
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--run-reads-20261028-120912-daa6, finding L5, LOW
+probe-key: 72314e7addd2ea7250340e6bb7f891e273b7c788
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scrub.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-state.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-reads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-run-reads.mjs
+
+## INV-10067 — probe — `findings` appends the newest fix pass even when the newest review came after it, so the digest is asked whether a fix pass closed findings it never saw
+
+`findings` appends the newest fix pass even when the newest review came after it, so the digest is asked whether a fix pass closed findings it never saw
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'END_OF_PROBE'
+D=$(mktemp -d /tmp/athena-probe-p8.XXXXXX) || exit 1
+S="$D/state"; mkdir -p "$S/dispatch-souls/dispatch-hephaestus-x1" "$S/dispatch-chains/chain-fp-20261028-100000-aaaa" "$S/pipeline-reviews/fp"
+printf '# Athena 1\nVERDICT: FAIL — B:0 H:1 M:0 L:0\nH1 — the thing\n' > "$S/pipeline-reviews/fp/fp-athena-1.md"
+printf '# Athena 2\nVERDICT: FAIL — B:0 H:0 M:1 L:0\nM1 — a NEW finding of round two, nobody has fixed it\n' > "$S/pipeline-reviews/fp/fp-athena-2.md"
+printf 'FIX PASS ROUND ONE: closed H1.\n' > "$S/dispatch-souls/dispatch-hephaestus-x1/result.md"
+cat > "$S/dispatch-chains/chain-fp-20261028-100000-aaaa/chain.json" <<JSON
+{"id":"chain-fp-20261028-100000-aaaa","slug":"fp","agent":"hephaestus","status":"done","stage":"prometheus","cause":"","started_at":1793200000,"ended_at":1793200900,"updated_at":1793200900,
+ "stages":[{"name":"athena-1","attempt":1,"status":"done","findings":"$S/pipeline-reviews/fp/fp-athena-1.md"},
+           {"name":"fix-pass","attempt":1,"status":"done","text":"$S/dispatch-souls/dispatch-hephaestus-x1/result.md"},
+           {"name":"athena-2","attempt":1,"status":"done","findings":"$S/pipeline-reviews/fp/fp-athena-2.md"},
+           {"name":"prometheus","attempt":1,"status":"done"}]}
+JSON
+cat > "$D/p.mts" <<'TS'
+const { readRunScope } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scopes.ts');
+const notes: Array<{ title: string; text: string }> = [];
+const deps: any = { userId: 1, store: { addNote: (n: any) => { notes.push(n); return n; } }, refuse: (s: string) => ({ isError: true, content: [{ type: 'text', text: s }] }) };
+// panel: true hands over the whole text a dactyl would be given for `findings`, with no model call.
+await readRunScope(deps, { kind: 'chain', id: 'chain-fp-20261028-100000-aaaa', plan: null, task: null, chatSessionId: null }, 'findings', true, undefined);
+console.log((notes[0]?.text ?? 'NO NOTE').split('\n').filter((line) => /^# |^M1|^FIX PASS/.test(line)).join('\n'));
+process.exit(0);
+TS
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$D/auth.db" DISPATCH_SOULS_STATE_DIR="$S/dispatch-souls" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mts" 2>&1 | grep -v 'Experimental\|^Migrated\|^  from\|^  to\|^}'
+cd /tmp; case "$D" in /tmp/athena-probe-p8.??????) rm -r "$D";; esac
+END_OF_PROBE
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: the output has no "FIX PASS ROUND ONE" line under the athena-2 review (no fix pass is appended, or it is labelled as an earlier round's)
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--run-reads-20261028-120912-daa6, finding L6, LOW
+probe-key: 9c024c6fafdd43185959772b9358a1aa5b68e6bf
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scrub.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-state.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-reads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-run-reads.mjs
+
+## INV-10068 — probe — `recent` and every phrase scope stop the server's event loop for ~120 ms
+
+`recent` and every phrase scope stop the server's event loop for ~120 ms
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'END_OF_PROBE'
+D=$(mktemp -d /tmp/athena-probe-p9.XXXXXX) || exit 1
+cat > "$D/p.mts" <<'TS'
+import fs from 'node:fs';
+const m: any = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/index.ts');
+const dir = `${process.env.HOME}/.claude/state/dispatch-chains`;
+const ids = fs.readdirSync(dir);
+m.readChainRun(ids[0]);
+const t0 = performance.now();
+let n = 0;
+for (const id of ids) if (m.readChainRun(id) !== null) n += 1;
+const readAll = performance.now() - t0;
+const t1 = performance.now();
+for (const id of ids) fs.readFileSync(`${dir}/${id}/chain.json`, 'utf8');
+const jsonOnly = performance.now() - t1;
+// list_runs `recent` and every phrase scope read every chain on disk in one synchronous loop: that is the time the server's event loop stands still.
+console.log(`${n} chains: readChainRun x all = ${Math.round(readAll)} ms, chain.json alone = ${Math.round(jsonOnly)} ms`);
+process.exit(0);
+TS
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mts" 2>&1 | grep -v 'Experimental\|^Migrated\|^  from\|^  to\|^}'
+cd /tmp; case "$D" in /tmp/athena-probe-p9.??????) rm -r "$D";; esac
+END_OF_PROBE
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: readChainRun x all stays under 40 ms for the chains on disk (the list reads only what its lines print)
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--run-reads-20261028-120912-daa6, finding L7, LOW
+probe-key: 240b4278994cb830bb06f94efcacd3d9a410b06b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-resolve.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-scrub.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-state.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-reads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-run-reads.mjs
+
+## INV-10069 — probe — A server restart does not push an open ask again, and a carry in flight keeps the ask's name in the durable record
+
+A successor process that boots while an answer's carry is out finds the ask's name in the durable record (`dispatcher_asks_raised`) and pushes nothing; the name is forgotten only when the ask is over or its answer is refused.
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/kaylee-card-alert-once/athena-probes/storm.sh 2>&1 | grep -E "record while the carry|successor booting"
+expect: `pushes caused by a successor booting during the carry: 0` and `record while the carry is in flight` naming the ask's key (before the fix: `1` and `{}`)
+```
+
+measured 2026-10-28 by chain chain-kaylee-card-alert-once-20261028-132957-b3a6, finding M-1, MEDIUM
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raised-asks.service.ts
+
+## INV-10070 — probe — A push that reached nobody is not recorded as made, so the next process pushes the ask again
+
+The composition root's push answers whether it reached at least one user, and the asks book records the ask's name only then; a push that threw for every user (a locked database in a restart storm) or had no user to go to leaves the ask unrecorded.
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/kaylee-card-alert-once/athena-probes/record.sh 2>&1 | grep -E "^boot [12]"
+expect: `record holds the name=false` on boot 1, or `pushes: 1` on boot 2 (before the fix: `record holds the name=true` and `pushes: 0`)
+```
+
+measured 2026-10-28 by chain chain-kaylee-card-alert-once-20261028-132957-b3a6, finding L-2, LOW
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts
+
+## INV-10071 — probe — After a Rework, the re-cut's fresh Accept prompt is a new ask: a new key, one push, and a boot after it pushes nothing
+
+A re-cut after a Rework carries a new `asked` event, so `keyOf` names it differently: the durable record never swallows it.
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/kaylee-card-alert-once/athena-probes/recut.sh 2>&1 | grep -E "re-cut key differs|pushes in total"
+expect: `re-cut key differs: true` and both `pushes in total` lines at `2` (one push for the first ask, one for the re-cut, none for a boot after it)
+```
+
+measured 2026-10-28 by chain chain-kaylee-card-alert-once-20261028-132957-b3a6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-names.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raised-asks.service.ts
+
+## INV-10072 — probe — MEDIUM — an answer's carry forgets the name FIRST: a successor that boots while the verb is running pushes the ask the operator is answering, and puts its name back in the record
+
+MEDIUM — an answer's carry forgets the name FIRST: a successor that boots while the verb is running pushes the ask the operator is answering, and puts its name back in the record
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/kaylee-card-alert-once/athena-probes/storm.sh 2>&1 | grep -E "record while the carry|fresh read taken|successor booting|answer outcome"
+# expect: `pushes caused by a successor booting during the carry: 0` and `record while the carry is in flight` still naming the ask's key (today: `1` and `{}`)
+```
+
+measured 2026-10-28 by chain chain-kaylee-card-alert-once-20261028-132957-b3a6, finding M1, MEDIUM
+probe-key: 0665ffe0e752f5a5bada94c814e8eb7166d03f89
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raised-asks.service.ts
+
+## INV-10073 — probe — LOW — the new REQUIRED dependency broke the pinned probes' harness, and the rows the hook serves first for the book are all dead
+
+LOW — the new REQUIRED dependency broke the pinned probes' harness, and the rows the hook serves first for the book are all dead
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/plan-ask-survives-restart/athena-probes/settle_throw.sh 2>&1 | grep -c "reading 'prune'"
+# expect: `1` while the pinned harness lacks `raisedMemory` (cured: `0`, the row refreshed or retired)
+```
+
+measured 2026-10-28 by chain chain-kaylee-card-alert-once-20261028-132957-b3a6, finding L1, LOW
+probe-key: cc912ff1b152fda7314573384382fbd4185349a5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raised-asks.service.ts
+
+## INV-10074 — probe — LOW — a push that FAILED inside the push door is recorded as pushed, so the ask is never retried; the "never a lost one" claim does not hold
+
+LOW — a push that FAILED inside the push door is recorded as pushed, so the ask is never retried; the "never a lost one" claim does not hold
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/kaylee-card-alert-once/athena-probes/record.sh 2>&1 | grep -E "^boot [12]"
+# expect: `record holds the name=false` on boot 1, or `pushes: 1` on boot 2 (today: `record holds the name=true` and `pushes: 0`)
+```
+
+measured 2026-10-28 by chain chain-kaylee-card-alert-once-20261028-132957-b3a6, finding L2, LOW
+probe-key: 789d16899ec4b62d6ebcb6fac35b3c4c1751b45e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raised-asks.service.ts
+
+## INV-10075 — probe — LOW — a whitespace slip on a line the change did not need, and a header sentence that overstates `prune`
+
+LOW — a whitespace slip on a line the change did not need, and a header sentence that overstates `prune`
+
+```probe
+grep -c "const observe =(" /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts
+# expect: `1` today; `0` once the space is back
+```
+
+measured 2026-10-28 by chain chain-kaylee-card-alert-once-20261028-132957-b3a6, finding L3, LOW
+probe-key: bfc3383bc3fc9c0a5c5720bd0a0a817099d25b66
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raised-asks.service.ts
+
+## INV-10076 — probe — MEDIUM — an epic with no `completed_at` finishes silently: 29 of 37 finished epics, including every roadmap-made one, can never close an item
+
+MEDIUM — an epic with no `completed_at` finishes silently: 29 of 37 finished epics, including every roadmap-made one, can never close an item
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF2'
+const kit = await import("/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs");
+const { API, withDb, sleep } = kit;
+const login = await (await fetch(`${API}/api/auth/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "verve", password: "verve-dev-2026" }) })).json();
+const H = { authorization: `Bearer ${login.token}`, "content-type": "application/json" };
+const frame = await (await fetch(`${API}/api/dispatcher/plans`, { headers: H })).json();
+const arc = frame.arcs.find((a) => a.status === "complete" && a.completed_at === null && a.plans.length > 0) ?? null;
+if (!arc) { console.log("the server's picture holds no complete epic without a stamp today: this probe cannot answer"); process.exit(0); }
+const plan = frame.plans.find((p) => arc.plans.includes(p.name) && p.completed_at);
+const made = await (await fetch(`${API}/api/providers/sessions`, { method: "POST", headers: H, body: JSON.stringify({ provider: "claude", projectPath: "/tmp/cloudcli-probe-chat", initialMessage: "" }) })).json();
+const chat = made.data.sessionId;
+const filed = new Date(Date.parse(plan.completed_at) - 3600e3).toISOString();
+const add = (text) => withDb((db) => Number(db.prepare("insert into followups (session_id,user_id,kind,text,state,created_at,updated_at) values (?,?,?,?,?,?,?)").run(chat, 1, "next", text, "open", filed, filed).lastInsertRowid), { write: true });
+try {
+  const epicItem = add(`athena probe: press Queue on ${arc.name}`);
+  const featureItem = add(`athena probe: press Queue on ${plan.name}`);
+  await sleep(8000);
+  const row = (id) => withDb((db) => db.prepare("select state, closed_for from followups where id = ?").get(id));
+  console.log(`epic ${arc.name}: status ${arc.status}, completed_at ${arc.completed_at}, its plan ${plan.name} finished ${plan.completed_at}`);
+  console.log("item naming the finished EPIC, filed an hour before its plan finished ->", JSON.stringify(row(epicItem)));
+  console.log("item naming the finished FEATURE, filed at the same time          ->", JSON.stringify(row(featureItem)));
+} finally {
+  await fetch(`${API}/api/providers/sessions/${encodeURIComponent(chat)}?force=true`, { method: "DELETE", headers: H });
+  console.log("scratch chat rows left:", withDb((db) => db.prepare("select count(*) as n from followups where session_id = ?").get(chat).n));
+}
+EOF2
+printf 'node "$1/p.mjs"\n' > "$D/p.sh"
+timeout 100 bash "$D/p.sh" "$D" 2>&1 | tail -5
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: while the defect stands, the EPIC item reads {"state":"open","closed_for":null} and the FEATURE item {"state":"done","closed_for":"<plan>"}; cured, the EPIC item reads {"state":"done","closed_for":"epic:<name>"}. `cannot answer` means no unstamped complete epic is in the lane's frame today (the lane keeps a plan 24 h after it finishes).
+```
+
+measured 2026-10-28 by chain chain-kaylee-followups-epics-20261028-132957-e46b, finding M1, MEDIUM
+probe-key: 4b63c99a20610bbe21f1392cdaf4938a72fe7672
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-10077 — probe — MEDIUM — a stamped epic is judged against its FIRST stamp, which predates its real finish by 1.3 to 44.7 hours (and by days for a re-finished epic)
+
+MEDIUM — a stamped epic is judged against its FIRST stamp, which predates its real finish by 1.3 to 44.7 hours (and by days for a re-finished epic)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/q.mts" <<'TS'
+import { execFileSync } from 'node:child_process';
+import { closuresForArc } from '@/modules/followups/followups-completion-rule.service.js';
+const doc = JSON.parse(execFileSync(`${process.env.HOME}/.claude/scripts/dispatcher`, ['status', '--json'], { encoding: 'utf8', maxBuffer: 1 << 26 }));
+const finish = new Map<string, string>(doc.plans.filter((p: any) => p.completed_at).map((p: any) => [p.name, p.completed_at]));
+const rows: string[] = [];
+for (const arc of doc.arcs.filter((a: any) => a.status === 'complete' && a.completed_at)) {
+  const last = arc.plans.map((n: string) => finish.get(n) ?? '').sort().pop() ?? '';
+  const hours = ((Date.parse(last) - Date.parse(arc.completed_at)) / 3600e3).toFixed(1);
+  const filed = new Date(Date.parse(arc.completed_at) + 60e3).toISOString(); // one minute after the stamp, while the last plan still walked
+  const closed = closuresForArc(arc, [{ id: 1, text: `press Queue on ${arc.name}`, updated_at: filed }]).length;
+  rows.push(`${arc.name.padEnd(40)} stamp ${arc.completed_at} | last plan finished +${hours} h | item filed 1 min after the stamp closes at the epic's finish: ${closed === 1}`);
+}
+console.log(rows.length ? rows.join('\n') : 'no complete, stamped epic in the dispatcher document today');
+const k = doc.arcs.find((a: any) => a.name === 'kaylee');
+if (k) {
+  const asComplete = { name: k.name, status: 'complete', completed_at: k.completed_at };
+  const filed = '2026-10-28T10:00:00.000Z';
+  console.log(`kaylee (${k.status} now, stamp ${k.completed_at}) read as complete after eyes lands: item filed ${filed} "the kaylee epic: check the eyes" closes: ${closuresForArc(asComplete, [{ id: 2, text: 'the kaylee epic: check the eyes', updated_at: filed }]).length === 1}`);
+}
+process.exit(0);
+TS
+cat > "$D/p.sh" <<'EOF'
+D=$(cd "$(dirname "$0")" && pwd)
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/q.mts" 2>&1 | head -20
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: while the defect stands, every line ends `closes at the epic's finish: false` with a `+h` gap above 1, and the kaylee line ends `closes: false`; cured (finish time = the epic's latest plan stamp), every line ends `true`
+```
+
+measured 2026-10-28 by chain chain-kaylee-followups-epics-20261028-132957-e46b, finding M2, MEDIUM
+probe-key: a4e30247f839be9cf36ca575a192d1fabfe6823f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-10078 — probe — LOW — a fault in the middle of `closeForCompletions` keeps rows closed and tells nobody (the arcs loop adds a second place for it)
+
+LOW — a fault in the middle of `closeForCompletions` keeps rows closed and tells nobody (the arcs loop adds a second place for it)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/q.mts" <<'TS'
+const m = await import('@/modules/database/index.js'); await m.initializeDatabase();
+const { followupsService } = await import('@/modules/followups/followups.service.js');
+const { followupsDb } = await import('@/modules/database/index.js');
+const { connectedClients, WS_OPEN_STATE } = await import('@/modules/websocket/index.js');
+const { getConnection } = await import('@/modules/database/connection.js');
+const db = getConnection();
+const sess = db.prepare("select session_id from sessions limit 1").get() as any;
+const ins = db.prepare("insert into followups (session_id,user_id,kind,text,state,created_at,updated_at) values (?,?,?,?,?,?,?)");
+const t = '2026-10-01T00:00:00.000Z';
+const a = Number(ins.run(sess.session_id, 1, 'next', 'athena probe: press Queue on feat-one', 'open', t, t).lastInsertRowid);
+const b = Number(ins.run(sess.session_id, 1, 'next', 'athena probe: press Queue on epic-two', 'open', t, t).lastInsertRowid);
+const frames: string[] = [];
+connectedClients.add({ readyState: WS_OPEN_STATE, send: (s: string) => frames.push(s) } as never);
+const real = followupsDb.closeForCompletion.bind(followupsDb);
+let calls = 0;
+(followupsDb as any).closeForCompletion = (...args: Parameters<typeof real>) => { calls += 1; if (calls === 2) throw new Error('database is locked'); return real(...args); };
+const logs: string[] = []; const log = console.log; console.log = (...x: unknown[]) => logs.push(x.join(' '));
+let thrown = 'none';
+try {
+  followupsService.closeForCompletions(
+    [{ name: 'feat-one', completed_at: '2026-10-10T00:00:00Z', phases: [] }],
+    [{ name: 'epic-two', status: 'complete', completed_at: '2026-10-10T00:00:00Z' }],
+  );
+} catch (e) { thrown = (e as Error).message; }
+console.log = log;
+const state = (id: number) => (db.prepare('select state, closed_for from followups where id = ?').get(id) as any);
+console.log('threw:', thrown);
+console.log('feature item in the database:', JSON.stringify(state(a)), '| epic item:', JSON.stringify(state(b)));
+console.log('followups_changed frames sent to open sockets:', frames.length, '| "[Followups] closed" log lines:', logs.filter((l) => l.startsWith('[Followups] closed')).length);
+process.exit(0);
+TS
+cat > "$D/p.sh" <<'EOF'
+D=$(cd "$(dirname "$0")" && pwd)
+sqlite3 ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/q.mts" 2>&1 | grep -a -v '^Database' | head -6
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: `feature item … "state":"done"` beside `frames sent to open sockets: 0 | "[Followups] closed" log lines: 0` while the defect stands; cured, at least 1 frame and 1 log line
+```
+
+measured 2026-10-28 by chain chain-kaylee-followups-epics-20261028-132957-e46b, finding L1, LOW
+probe-key: 26d87f9ab48c30af7a81a149b6f0067d35791096
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-10079 — probe — LOW — the report's measurements and the doc comments describe the dispatcher's document, not the frame the closer reads
+
+LOW — the report's measurements and the doc comments describe the dispatcher's document, not the frame the closer reads
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TOKEN=$(curl -s -X POST http://127.0.0.1:3011/api/auth/login -H 'content-type: application/json' -d '{"username":"verve","password":"verve-dev-2026"}' | jq -r '.token // empty')
+[ -n "$TOKEN" ] || { echo "dev server on :3011 not answering"; exit 0; }
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3011/api/dispatcher/plans > "$1/lane.json"
+~/.claude/scripts/dispatcher status --json > "$1/doc.json" 2>/dev/null
+echo "dispatcher status --json : $(jq '.arcs|length' "$1/doc.json") arcs, $(jq '[.arcs[]|select(.status=="complete" and .completed_at!=null)]|length' "$1/doc.json") complete+stamped | $(jq '.plans|length' "$1/doc.json") plans"
+echo "the lane's frame (closer): $(jq '.arcs|length' "$1/lane.json") arcs, $(jq '[.arcs[]|select(.status=="complete" and .completed_at!=null)]|length' "$1/lane.json") complete+stamped | $(jq '.plans|length' "$1/lane.json") plans"
+echo "types.ts / rule header call an unstamped complete epic 'older': $(grep -c 'an older one can read' server/shared/types.ts)/$(grep -c 'an older epic reads' server/modules/followups/followups-completion-rule.service.ts)"
+echo "complete epics with no stamp, created after 2026-10-15: $(jq '[.arcs[]|select(.status=="complete" and .completed_at==null and .created_at>"2026-10-15")]|length' "$1/doc.json")"
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: today the document line reads `60 arcs, 8 complete+stamped | 147 plans`, the frame line `3 arcs, 0 complete+stamped | 9 plans`, the "older" counts `1/1` and the last line `5`; cured when the wording stops calling an unstamped epic "older" (counts 0/0)
+```
+
+measured 2026-10-28 by chain chain-kaylee-followups-epics-20261028-132957-e46b, finding L2, LOW
+probe-key: 4bcc593d3c83c4652f33c89ba58bf653ea48842a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-10080 — probe — MEDIUM — words pushed shortly BEFORE his cut are answered by the CLI and then swallowed: she goes quiet (order 2 of the press race)
+
+MEDIUM — words pushed shortly BEFORE his cut are answered by the CLI and then swallowed: she goes quiet (order 2 of the press race)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee-words-survive-interrupt/athena-probes/kwsi-probe.mjs s1
+echo "[probe exit $?]"
+# expect: `sentences she delivered after the cut = []` and `stored list = []` while the defect stands (the stand-in replays the measured CLI sequence above); cured: `["Kiwi."]` delivered
+```
+
+measured 2026-10-28 by chain chain-kaylee-words-survive-interrupt-20261028-132949-58fd, finding M1, MEDIUM
+probe-key: 8f56c5d6ad98b8579163426212b13baac5b7456f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-unanswered.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session.mjs
+
+## INV-10081 — probe — LOW — a stopped result that carries a failure and lists no uuid fails her and destroys the HELD words
+
+LOW — a stopped result that carries a failure and lists no uuid fails her and destroys the HELD words
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee-words-survive-interrupt/athena-probes/kwsi-probe.mjs s2
+echo "[probe exit $?]"
+# expect: `process=failed | B ever pushed to a CLI=false | stored list = [] | system lines=1` while the defect stands; cured: B pushed to a CLI (or kept stored) with the process not failed
+```
+
+measured 2026-10-28 by chain chain-kaylee-words-survive-interrupt-20261028-132949-58fd, finding L1, LOW
+probe-key: 8548699a79583d54945028757e4657c896ff82f1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-unanswered.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session.mjs
+
+## INV-10082 — probe — LOW — a non-failing result with no uuid list leaves the entry stored for good, so every later boot answers it again (unverified on the real CLI)
+
+LOW — a non-failing result with no uuid list leaves the entry stored for good, so every later boot answers it again (unverified on the real CLI)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee-words-survive-interrupt/athena-probes/kwsi-probe.mjs s8
+echo "[probe exit $?]"
+# expect: `stored list after the answer = ["plain words"]` while the defect stands; cured: `[]`
+```
+
+measured 2026-10-28 by chain chain-kaylee-words-survive-interrupt-20261028-132949-58fd, finding L2, LOW
+probe-key: 2cc1800a8432316bdb096ebd9cb24f3464d40530
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-unanswered.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session.mjs
+
+## INV-10083 — probe — LOW — MAN-9077 still says the session CLOSES the process when the CLI ignores an interrupt (healed means deleted)
+
+LOW — MAN-9077 still says the session CLOSES the process when the CLI ignores an interrupt (healed means deleted)
+
+```probe
+docstore get MAN-9077 --text | grep -c 'the session then closes the process'
+echo "[probe exit $?]"
+# expect: 1 while it stands; 0 once the row says the launch is replaced and its unanswered/held words carried
+```
+
+measured 2026-10-28 by chain chain-kaylee-words-survive-interrupt-20261028-132949-58fd, finding L3, LOW
+probe-key: 084b6e199530a222bb15909a4bd503f1004e739d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-unanswered.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session.mjs
+
+## INV-10084 — probe — LOW (builder-acknowledged) — a re-sent message has lost the `<cut>` it carried
+
+LOW (builder-acknowledged) — a re-sent message has lost the `<cut>` it carried
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee-words-survive-interrupt/athena-probes/kwsi-probe.mjs ordercut
+echo "[probe exit $?]"
+# expect: `message carried <cut>: true | the same words re-sent after a handover carry <cut>: false` while it stands
+```
+
+measured 2026-10-28 by chain chain-kaylee-words-survive-interrupt-20261028-132949-58fd, finding L4, LOW
+probe-key: 6298abf9079d40d90e3bae2e0d31bca4e5dbe350
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-unanswered.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session.mjs
+
+## INV-10085 — probe — His × (or Clear) during a take ends the row `cancelled` for an order the door ran
+
+His × (or Clear) during a take ends the row `cancelled` for an order the door ran
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+MODE=x-during-take TSX_TSCONFIG_PATH=server/tsconfig.json env -u CLAUDE_CODE_SESSION_ID node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee--eyes--hands/athena-1-probes.mts 2>&1 | tail -2
+EOF
+bash "$D/p.sh"; rm -f -- "$D/p.sh"; rmdir -- "$D"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--hands-20261028-145101-2e0a, finding M1, MEDIUM
+probe-key: 497c2eea6475d434d6e3ccf664cffb0e8958c994
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-recipe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/carried-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-recipes.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh
+
+## INV-10086 — probe — A prepare that starts before a take and ends after it replaces the action being fired and orphans its own row
+
+A prepare that starts before a take and ends after it replaces the action being fired and orphans its own row
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+MODE=prepare-races-take TSX_TSCONFIG_PATH=server/tsconfig.json env -u CLAUDE_CODE_SESSION_ID node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee--eyes--hands/athena-1-probes.mts 2>&1 | tail -2
+EOF
+bash "$D/p.sh"; rm -f -- "$D/p.sh"; rmdir -- "$D"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--hands-20261028-145101-2e0a, finding M2, MEDIUM
+probe-key: cf63ad37e13edc71855d4aa52d8a20d1ce03954f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-recipe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/carried-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-recipes.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh
+
+## INV-10087 — probe — `words` given to an `answer` are accepted and silently dropped
+
+`words` given to an `answer` are accepted and silently dropped
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+MODE=words-on-answer TSX_TSCONFIG_PATH=server/tsconfig.json env -u CLAUDE_CODE_SESSION_ID node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee--eyes--hands/athena-1-probes.mts 2>&1 | tail -2
+EOF
+bash "$D/p.sh"; rm -f -- "$D/p.sh"; rmdir -- "$D"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--hands-20261028-145101-2e0a, finding L1, LOW
+probe-key: e1dcc9545d59c27d4a5713f93a16bcb017e84244
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-recipe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/carried-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-recipes.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh
+
+## INV-10088 — probe — An answer to the later of two questions with the same text lands under the earlier one
+
+An answer to the later of two questions with the same text lands under the earlier one
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+MODE=duplicate-question-text TSX_TSCONFIG_PATH=server/tsconfig.json env -u CLAUDE_CODE_SESSION_ID node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee--eyes--hands/athena-1-probes.mts 2>&1 | tail -2
+EOF
+bash "$D/p.sh"; rm -f -- "$D/p.sh"; rmdir -- "$D"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--hands-20261028-145101-2e0a, finding L2, LOW
+probe-key: fd8ac2b7916ac15a3c2c5aaaebd38f8672ea4f1f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-recipe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/carried-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-recipes.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh
+
+## INV-10089 — probe — A refused word-check leaves its row empty, and the report does not reconcile the intent's two lines
+
+A refused word-check leaves its row empty, and the report does not reconcile the intent's two lines
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+MODE=refusal-leaves-row-silent TSX_TSCONFIG_PATH=server/tsconfig.json env -u CLAUDE_CODE_SESSION_ID node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee--eyes--hands/athena-1-probes.mts 2>&1 | tail -2
+EOF
+bash "$D/p.sh"; rm -f -- "$D/p.sh"; rmdir -- "$D"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--hands-20261028-145101-2e0a, finding L3, LOW
+probe-key: 8b7e219fe4f218ac8292ed04e0e40b41443a563a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-recipe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/carried-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-recipes.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh
+
+## INV-10090 — probe — "Fired once" is held in memory only; a restart with the door out lets the same action fire again
+
+"Fired once" is held in memory only; a restart with the door out lets the same action fire again
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+MODE=restart-while-door-out TSX_TSCONFIG_PATH=server/tsconfig.json env -u CLAUDE_CODE_SESSION_ID node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee--eyes--hands/athena-1-probes.mts 2>&1 | tail -2
+EOF
+bash "$D/p.sh"; rm -f -- "$D/p.sh"; rmdir -- "$D"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--hands-20261028-145101-2e0a, finding L4, LOW
+probe-key: 706b897f5af3e5e5b244c177f5c1431a7af196dc
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-recipe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/carried-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-recipes.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh
+
+## INV-10091 — probe — A line he said but she passed differently is refused with a sentence that sends her back to him
+
+A line he said but she passed differently is refused with a sentence that sends her back to him
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+MODE=near-miss-refusal TSX_TSCONFIG_PATH=server/tsconfig.json env -u CLAUDE_CODE_SESSION_ID node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee--eyes--hands/athena-1-probes.mts 2>&1 | tail -2
+EOF
+bash "$D/p.sh"; rm -f -- "$D/p.sh"; rmdir -- "$D"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--hands-20261028-145101-2e0a, finding L5, LOW
+probe-key: f8268fd4aa7ad921505eda2b92762bf785cf1fcc
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-recipe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/carried-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-recipes.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh
+
+## INV-10092 — probe — The first showing's check 2 asserts a word the transcriber often gets wrong
+
+The first showing's check 2 asserts a word the transcriber often gets wrong
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -n 'relayed.*words' .verify/kaylee-eyes-hands.mjs | cut -c1-150
+node -e 'const e = "relayed|{\"by\":\"app:kaylee\",\"words\":\"cue probe eyes accept\"}"; console.log("check 2 matches a cue transcript:", /^relayed\|.*"words":"[^"]*[Qq]ueue/m.test(e));'
+EOF
+bash "$D/p.sh"; rm -f -- "$D/p.sh"; rmdir -- "$D"
+```
+
+measured 2026-10-28 by chain chain-kaylee--eyes--hands-20261028-145101-2e0a, finding L6, LOW
+probe-key: d0da0d17efcbefed391ea7421bc3f0f6c4c0b744
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-recipe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/carried-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-recipes.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh

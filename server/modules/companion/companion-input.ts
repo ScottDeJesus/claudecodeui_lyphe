@@ -5,8 +5,9 @@ import { AppError } from '@/shared/utils.js';
 
 /**
  * What a page may send her, and the one 400 every refusal is. The limits are the plan's interface 9 (`text`
- * 1-8000 for a typed message) and `update_draft`'s own (1-20000), written once here so the routes and her tools
- * cannot disagree about how long a brief may be. A refusal is `COMPANION_INPUT_INVALID` with a sentence that
+ * 1-8000 for a typed message) and the draft's own (at most 20000, `DRAFT_TEXT_MAX`: `PUT /draft` refuses a blank one, while
+ * `update_draft` takes an empty text as a clear), written once here so the routes and her tools cannot disagree about how
+ * long a brief may be. A refusal is `COMPANION_INPUT_INVALID` with a sentence that
  * names the field and its limit, which is all the panel shows.
  *
  * The reader of the page's client id is here as well: every route reads the `x-companion-client` header, because the

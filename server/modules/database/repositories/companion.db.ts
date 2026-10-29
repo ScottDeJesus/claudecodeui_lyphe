@@ -1,9 +1,13 @@
 import { getConnection } from '@/modules/database/connection.js';
+import { companionActionsDb } from '@/modules/database/repositories/companion-actions.db.js';
+import { isStoreStamp } from '@/shared/utils.js';
 
 /**
  * `companion_state`, `companion_log` and `companion_notes`, as row-level statements — the three
- * tables of Kaylee's per-account side. The fourth table of her schema, `relayed_sends`, hangs on
- * a chat rather than an account and has its own repository (`relayed-sends.db.ts`).
+ * tables of Kaylee's per-account side — and, through the spread at the end of `companionDb`, the
+ * verbs of her record of actions (`companion_actions`, written in `companion-actions.db.ts`). The
+ * fifth table of her schema, `relayed_sends`, hangs on a chat rather than an account and has its
+ * own repository (`relayed-sends.db.ts`).
  *
  * This file speaks in ROWS: snake_case columns, JSON columns as the text they are stored as.
  * Mapping a row to the wire contract (`server/shared/companion-types.ts`) — parsing the JSON,
@@ -36,6 +40,10 @@ export type CompanionStateRow = {
   draft_json: string | null;
   /** `CompanionWalk` as JSON text, or NULL. */
   walk_json: string | null;
+  /** The pending action with its server-only pin as JSON text, or NULL. */
+  pending_json: string | null;
+  /** His messages no turn of hers has answered yet (`UnansweredMessage[]`) as JSON text, or NULL for none. */
+  unanswered_json: string | null;
   /** The client id holding the floor. Survives Clear. */
   floor: string | null;
   updated_at: string;
@@ -83,6 +91,15 @@ export type CompanionNoteRow = {
   text: string;
 };
 
+/** One log line as the check of his word reads it: who said it, how and when, with its words. Only his lines (`operator`) and hers (`kaylee`) are ever read this way. */
+export type CompanionHeardRow = {
+  id: number;
+  at: string;
+  role: 'operator' | 'kaylee';
+  via: 'typed' | 'spoken' | null;
+  text: string;
+};
+
 /** What `clearAccount` removed and whether a state row was there to reset. */
 export type CompanionClearResult = {
   logRemoved: number;
@@ -91,7 +108,7 @@ export type CompanionClearResult = {
 };
 
 /** Every state column the table holds besides the key: what a read returns and `writeState` may name. */
-const STATE_PATCH_COLUMNS = ['provider_session_id', 'focus_json', 'draft_json', 'walk_json', 'floor'] as const;
+const STATE_PATCH_COLUMNS = ['provider_session_id', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor'] as const;
 
 const STATE_COLUMNS = `user_id, ${STATE_PATCH_COLUMNS.join(', ')}, updated_at`;
 const LOG_COLUMNS = 'id, user_id, at, role, via, turn_id, turn_index, text, mood, sounds_json';
@@ -121,6 +138,19 @@ export const companionDb = {
          ORDER BY user_id`
       )
       .all(sessionId) as Array<{ user_id: number }>;
+
+    return rows.map((row) => row.user_id);
+  },
+
+  /**
+   * The accounts whose last process left a message of his unanswered, ascending: what the server finds at boot to know
+   * whose Kaylee must be made now, so she says those messages to her again without a page asking for her. A column that
+   * holds an empty list names no one.
+   */
+  userIdsWithUnanswered(): number[] {
+    const rows = getConnection()
+      .prepare(`SELECT user_id FROM companion_state WHERE unanswered_json IS NOT NULL AND unanswered_json <> '[]' ORDER BY user_id`)
+      .all() as Array<{ user_id: number }>;
 
     return rows.map((row) => row.user_id);
   },
@@ -224,6 +254,25 @@ export const companionDb = {
     return row ?? null;
   },
 
+  /**
+   * His lines and hers (`operator` and `kaylee` rows) logged after `since`, oldest first, at most `COMPANION_LOG_KEEP` —
+   * the whole of what the log keeps for the account, which is the most a check of his word can need. `since` is an
+   * ISO-8601 stamp; the stamps are fixed-width UTC, so the comparison is a text comparison and a line logged in the very
+   * millisecond of `since` is not after it. A `since` that is not such a stamp (`''` would be "before every line") throws:
+   * a check that reads "after the card went up" must not fail open. The panel's own lines (`alert`, `system`) are not his
+   * words and are never read.
+   */
+  heardSince(userId: number, since: string): CompanionHeardRow[] {
+    if (!isStoreStamp(since)) throw new Error(`heardSince needs a stored stamp (ISO-8601 UTC with milliseconds), not ${JSON.stringify(since)}.`);
+    return getConnection()
+      .prepare(
+        `SELECT id, at, role, via, text FROM companion_log
+         WHERE user_id = ? AND role IN ('operator', 'kaylee') AND at > ?
+         ORDER BY id LIMIT ?`
+      )
+      .all(userId, since, COMPANION_LOG_KEEP) as CompanionHeardRow[];
+  },
+
   /** Inserts one card for the account, stamped now, and answers the row as stored. */
   addNote(userId: number, note: { title: string; text: string }): CompanionNoteRow {
     const row = getConnection()
@@ -255,27 +304,37 @@ export const companionDb = {
   },
 
   /**
-   * Clear: deletes the account's log and cards and empties its state's conversation, focus, draft
-   * and walkthrough — in one transaction. `floor` stays (which client holds the floor is no part
-   * of her memory), and `relayed_sends` is never touched: those rows are facts about chats. No
-   * state row is created when the account has none.
+   * Clear: deletes the account's log and cards and empties its state's conversation, focus, draft,
+   * pending action, unanswered messages and walkthrough — in one transaction. `floor` stays (which client holds the floor
+   * is no part of her memory), and `relayed_sends` and `companion_actions` are never deleted from:
+   * those rows are facts about chats and about the house. The one write Clear makes to
+   * `companion_actions` is to END any row with no outcome yet as `cancelled`, in the same
+   * transaction and before the state loses its `pending_json` — found by the row's own empty outcome rather than through
+   * the column about to be emptied, so a `pending_json` that no longer parses cannot strand its row. A row a take has claimed
+   * (`claimAction`: its firing line is written) is spared: its door is out, and the take ends it with the door's own outcome.
+   * No state row is created when the account has none.
    */
   clearAccount(userId: number): CompanionClearResult {
     const db = getConnection();
 
     return db.transaction(() => {
+      const clearedAt = new Date().toISOString();
+      db.prepare(`UPDATE companion_actions SET ended_at = ?, outcome = 'cancelled' WHERE user_id = ? AND outcome IS NULL AND said_log_id IS NULL`).run(clearedAt, userId);
       const logRemoved = db.prepare('DELETE FROM companion_log WHERE user_id = ?').run(userId).changes;
       const notesRemoved = db.prepare('DELETE FROM companion_notes WHERE user_id = ?').run(userId).changes;
       const stateReset =
         db
           .prepare(
             `UPDATE companion_state
-             SET provider_session_id = NULL, focus_json = NULL, draft_json = NULL, walk_json = NULL, updated_at = ?
+             SET provider_session_id = NULL, focus_json = NULL, draft_json = NULL, walk_json = NULL, pending_json = NULL, unanswered_json = NULL, updated_at = ?
              WHERE user_id = ?`
           )
-          .run(new Date().toISOString(), userId).changes > 0;
+          .run(clearedAt, userId).changes > 0;
 
       return { logRemoved, notesRemoved, stateReset };
     })();
   },
+
+  // Her record of actions (`openAction`, `endAction`, `listActions`): the same object, so the companion reads one repository.
+  ...companionActionsDb,
 };

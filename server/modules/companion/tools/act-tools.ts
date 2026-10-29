@@ -36,7 +36,7 @@ import { listHisChats, resolveChat } from './house-reads.js';
  *
  * Each description is her prompt's own line for the tool (`toolLine`).
  *
- * Consumer: `tools/companion-tools.ts`, which adds these three to the thirteen it builds.
+ * Consumer: `tools/companion-tools.ts`, which adds these three to the tools it builds.
  */
 
 /** The longest name she may give a chat: the sidebar shows a title, not a sentence. */

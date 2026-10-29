@@ -8,9 +8,9 @@
  * read the page's address itself it would stop being provable, and the only proof left would be
  * somebody clicking through a UI.
  *
- * The caller passes the page's own hostname and origin, read at the open site — the drawer's rows,
- * the module's one reader of the page's address. The app already builds URLs from the page this way
- * (`src/modules/widgets/docspaceOrigin.ts`).
+ * The caller passes the page's own hostname and origin, read at an open site — the drawer's rows and
+ * `useShowApplication`, the module's two readers of the page's address. The app already builds URLs
+ * from the page this way (`src/modules/widgets/docspaceOrigin.ts`).
  */
 
 /** `http://{host}:8004` + `10.0.0.5` -> `http://10.0.0.5:8004`. Case-insensitive. */
@@ -20,6 +20,27 @@ export function resolveAppUrl(url: string, host: string): string {
   // the placeholder twice must have both resolved. A non-global replace would leave the second
   // one in the src, which the browser reads as a host called `{host}`.
   return url.replace(/\{host\}/gi, host);
+}
+
+/**
+ * A row's address with a path on it: `http://{host}:8005` + `/#page=p1&block=b2` -> `http://10.0.0.5:8005/#page=p1&block=b2`.
+ *
+ * The path is read as an address of its own (path, query, fragment) and laid over the row's: the row's own path stays in front
+ * of it (an app registered under `/hub/` gets `/hub/<path>`), and its trailing slash is not doubled. An address that will not
+ * parse is joined as plain text, which is what the drawer does with it too — the frame gets what the registry holds.
+ */
+export function appAddressAt(url: string, host: string, path: string): string {
+  const resolved = resolveAppUrl(url, host);
+  try {
+    const address = new URL(resolved);
+    const extra = new URL(path, 'http://path.invalid');
+    address.pathname = address.pathname.replace(/\/+$/, '') + extra.pathname;
+    address.search = extra.search;
+    address.hash = extra.hash;
+    return address.toString();
+  } catch {
+    return resolved + path;
+  }
 }
 
 /**

@@ -24,12 +24,13 @@ import { companionQueryOptions } from './companion-launch.js';
 /**
  * How long the CLI is given to answer an interrupt or a model switch, or to exit after the end of its input,
  * before it is killed (an interrupt, an exit) or the switch is reported as not made (the panel's save must
- * come back, whatever her CLI is doing).
+ * come back, whatever her CLI is doing). Consumed by `companion-session.ts` too: the same grace bounds the wait for the
+ * result of a turn it has stopped, so a CLI that never reports one cannot hold his next words for ever.
  */
-const CLI_GRACE_MS = 5_000;
+export const CLI_GRACE_MS = 5_000;
 
-/** What `work` answers, or `undefined` once `ms` have passed; the timer never outlives the wait. */
-async function answeredWithin<T>(work: Promise<T>, ms: number): Promise<T | undefined> {
+/** What `work` answers, or `undefined` once `ms` have passed; the timer never outlives the wait. Consumed here and by `companion-session.ts` (the wait for a stopped turn's result). */
+export async function answeredWithin<T>(work: Promise<T>, ms: number): Promise<T | undefined> {
   let timer: NodeJS.Timeout | undefined;
   try {
     return await Promise.race([work, new Promise<undefined>((resolve) => (timer = setTimeout(() => resolve(undefined), ms)))]);
@@ -44,8 +45,9 @@ async function answeredWithin<T>(work: Promise<T>, ms: number): Promise<T | unde
  * carries and `resume` the CLI session to continue (`null` for a fresh conversation). `onMessage` hears
  * every message of the loop, `onEnded` the way a loop that ended BY ITSELF ended (`null` for a clean
  * end, else what it threw) and `onIdleClose` the idle closer's decision, which the owner carries out.
+ * Consumed by `companion-session-types.ts`, whose `launch` dep is a function of it (a stand-in launcher replaces the real one).
  */
-type CompanionCliLaunch = {
+export type CompanionCliLaunch = {
   userId: number;
   initial: SDKUserMessage[];
   resume: string | null;

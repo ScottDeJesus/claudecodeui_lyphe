@@ -630,3 +630,144 @@ expect: 1 on every line — a 0 is a key in one list only (the client sends patc
 ```
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/chatPermissions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-permissions-stale-page.mjs
+
+## INV-10035 — probe — MEDIUM — a person's untick of a completion-closed follow-up is undone by the next picture (seconds)
+
+MEDIUM — a person's untick of a completion-closed follow-up is undone by the next picture (seconds)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF2'
+import { execFileSync } from "node:child_process";
+const kit = await import("/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs");
+const { API, withDb, sleep } = kit;
+const plans = JSON.parse(execFileSync(`${process.env.HOME}/.claude/scripts/dispatcher`, ["status", "--json"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })).plans;
+const done = plans.filter((p) => p.completed_at).sort((a, b) => Date.parse(b.completed_at) - Date.parse(a.completed_at))[0];
+if (!done || Date.now() - Date.parse(done.completed_at) > 23 * 3600 * 1000) { console.log("no feature finished in the last 23 h is on the lane: this probe cannot answer today"); process.exit(0); }
+const login = await (await fetch(`${API}/api/auth/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "verve", password: "verve-dev-2026" }) })).json();
+const H = { authorization: `Bearer ${login.token}`, "content-type": "application/json" };
+const made = await (await fetch(`${API}/api/providers/sessions`, { method: "POST", headers: H, body: JSON.stringify({ provider: "claude", projectPath: "/tmp/cloudcli-probe-chat", initialMessage: "" }) })).json();
+const chat = made.data.sessionId;
+const stateOf = (id) => withDb((db) => db.prepare("select state, closed_by, closed_for from followups where id = ?").get(id));
+const waitDone = async (ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (stateOf(id).state === "done") return Date.now() - t0; await sleep(250); } return null; };
+let id;
+try {
+  const filed = new Date(Date.parse(done.completed_at) - 3600 * 1000).toISOString();
+  id = withDb((db) => Number(db.prepare("insert into followups (session_id,user_id,kind,text,state,created_at,updated_at) values (?,?,?,?,?,?,?)").run(chat, 1, "next", `athena probe: press Queue on ${done.name}`, "open", filed, filed).lastInsertRowid), { write: true });
+  const first = await waitDone(15000);
+  console.log(`1. feature ${done.name}: an item filed an hour before it finished was closed by the house after`, first === null ? "NEVER (15 s)" : `${first} ms`);
+  const res = await fetch(`${API}/api/followups/${id}`, { method: "PATCH", headers: H, body: JSON.stringify({ state: "open" }) });
+  const body = await res.json();
+  console.log("2. widget untick -> HTTP", res.status, JSON.stringify({ state: body.data?.state, closedBy: body.data?.closedBy, closedFor: body.data?.closedFor }));
+  const back = await waitDone(15000);
+  console.log("3. after the untick the house closed it again after", back === null ? "NEVER (15 s): the untick held" : `${back} ms`);
+} finally {
+  await fetch(`${API}/api/providers/sessions/${encodeURIComponent(chat)}?force=true`, { method: "DELETE", headers: H });
+  console.log("scratch chat rows left:", withDb((db) => db.prepare("select count(*) as n from followups where session_id = ?").get(chat).n));
+}
+EOF2
+printf 'node "$1/p.mjs"\n' > "$D/p.sh"
+timeout 100 bash "$D/p.sh" "$D" 2>&1 | tail -8
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: line 3 reads `closed it again after <n> ms` while the defect stands; cured when it reads `NEVER (15 s): the untick held`. `no feature finished in the last 23 h…` means nothing is on the lane to test against today.
+```
+
+measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding M1, MEDIUM
+probe-key: 4f7c74eb691241a84aeb62e24d17cf2d1d8e3a05
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
+
+## INV-10036 — probe — MEDIUM — "whole" was applied to every alert kind, and the cap that bounded a Bash command or an error text for her is gone with nothing downstream to replace it
+
+MEDIUM — "whole" was applied to every alert kind, and the cap that bounded a Bash command or an error text for her is gone with nothing downstream to replace it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/q.mts" <<'TS'
+const m = await import('@/modules/database/index.js'); await m.initializeDatabase();
+const { buildNotificationText } = await import('@/modules/notifications/index.js');
+const { buildAlertBlock } = await import('@/modules/companion/feeds/alert-block.js');
+const ev = (code: string, meta: object) => ({ userId: 1, kind: 'action_required', code, provider: 'claude', sessionId: null, dedupeKey: 'x', meta }) as any;
+const bash = ev('permission.required', { toolName: 'Bash', toolInput: { command: 'python3 - <<EOF\n' + 'print("x")\n'.repeat(6000) + 'EOF' } });
+const failed = ev('run.failed', { error: 'Error: ' + 'frame\n'.repeat(50000) });
+for (const [label, e, kind] of [['Bash command 66 KB', bash, 'permission'], ['run.failed error 300 KB', failed, 'failed']] as const)
+  console.log(`F2 ${label}: push body ${buildNotificationText(e).body.length} | her envelope ${buildAlertBlock(1, e, kind).envelope.length}`);
+process.exit(0);
+TS
+cat > "$D/p.sh" <<'EOF'
+D=$1
+: > "$D/auth.db"
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+DATABASE_PATH=$D/auth.db TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/q.mts" 2>&1 | grep -E '^F2|Error' | head -5
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `push body 1000 | her envelope 66108` and `… 300089` while the defect stands; cured when her envelope is bounded (a few thousand) for both
+```
+
+measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding M2, MEDIUM
+probe-key: 7ee59977ab23e7f5d956d650accdc2fe42f9485e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
+
+## INV-10037 — probe — LOW — `FollowupRow` throws on an item that has no `closedFor`, so a new client against an older server loses the widget
+
+LOW — `FollowupRow` throws on an item that has no `closedFor`, so a new client against an older server loses the widget
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF2'
+const L = "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib";
+const { openConsole } = await import(`${L}/console.mjs`);
+const sc = await import(`${L}/scratch-chat.mjs`);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole({ appUrl: "http://127.0.0.1:5184", viewport: { width: 1920, height: 1080 } });
+const id = await sc.createScratchChat(s);
+const now = new Date().toISOString();
+const open = { id: 9001, kind: "next", text: "athena probe item", state: "open", createdAt: now, updatedAt: now, doneAt: null, closedBy: null };
+try {
+  for (const [label, data] of [["open item WITH closedFor:null", [{ ...open, closedFor: null }]], ["open item WITHOUT closedFor", [open]]]) {
+    s.errors.length = 0;
+    await s.page.route("**/api/followups?*", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true, data }) }));
+    await s.page.goto(`http://127.0.0.1:5184/session/${id}`, { waitUntil: "networkidle" });
+    await sleep(3000);
+    const text = (await s.page.locator('[data-widget="followups"]').first().innerText().catch(() => "n/a")).replace(/\n+/g, " | ").slice(0, 90);
+    const typeErr = s.errors.filter((e) => /TypeError/.test(e)).map((e) => e.slice(0, 100));
+    console.log(`${label}: widget = ${JSON.stringify(text)} ${JSON.stringify(typeErr.slice(0, 1))}`);
+    await s.page.unroute("**/api/followups?*");
+  }
+} finally {
+  await sc.deleteScratchChat(s, id);
+  await s.browser.close();
+}
+EOF2
+printf 'node "$1/p.mjs"\n' > "$D/p.sh"
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: the first line shows the widget with the item; while the defect stands the second shows `Something went wrong` and `TypeError: Cannot read properties of undefined (reading 'indexOf')`; cured, the two lines match
+```
+
+measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding L1, LOW
+probe-key: 13bf554839279545c4f20b438a282cd82143c3c7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
+
+## INV-10038 — probe — LOW — MAN-9145, born from this phase's split of MAN-9003, still says nothing calls `listOpenFollowups`
+
+LOW — MAN-9145, born from this phase's split of MAN-9003, still says nothing calls `listOpenFollowups`
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "MAN-9145 lines saying nothing calls it: $(docstore get MAN-9145 --text | grep -c 'nothing in .server/. calls')"
+echo "server files outside followups/ that call it: $(grep -rln 'listOpenFollowups(' server --include=*.ts | grep -vc '^server/modules/followups')"
+echo "[probe exit $?]"
+# expect: `1` and `2` while the sentence stands; cured when the first is 0
+```
+
+measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding L2, LOW
+probe-key: d8c99da807c52e6a873ddd3787d7f406bc83e86c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx

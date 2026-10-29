@@ -675,7 +675,7 @@ let companionClientIdInMemory: string | null = null;
 /**
  * The name Kaylee knows THIS page by: minted on first use and kept in the tab's sessionStorage, so a reload keeps it and a
  * second tab gets its own. It rides every companion call as `x-companion-client`, and the page that last typed to her or
- * opened her panel holds the floor — the one page a `companion_open_chat` frame is addressed to.
+ * opened her panel holds the floor — the one page a `companion_open` frame is addressed to.
  *
  * Minted with `crypto.getRandomValues`, not `randomUUID`: the app is reached over plain HTTP on a tailnet address, which is
  * not a secure context, and `randomUUID` does not exist there. Used by `api.companion` (the header) and the companion

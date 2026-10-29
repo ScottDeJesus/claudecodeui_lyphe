@@ -2747,7 +2747,7 @@ export type NoteSaveOutcome = 'saved' | 'blocked' | 'failed';
 // The client mirror of `server/shared/types.ts` § FOLLOWUPS, where the same shapes are stated for the
 // wire. A change to either shape belongs in both files at once.
 
-/** One item a chat keeps open for the person: a `next` step (a question put, an offer waiting, a step put off) or a known `gap` (something untested, unhandled or risky that was left). `state` is `open` until it is settled; `closedBy` says who settled it — the chat's own command or the person ticking it in the widget — and is `null` while open. All stamps are ISO-8601 UTC with milliseconds; `doneAt` is `null` while open. The chat and the account it belongs to never ride the item. */
+/** One item a chat keeps open for the person: a `next` step (a question put, an offer waiting, a step put off) or a known `gap` (something untested, unhandled or risky that was left). `state` is `open` until it is settled; `closedBy` says who settled it — the chat's own command (`chat`), the person ticking it in the widget (`user`), or the house itself (`completion`: it closed the item when the feature, task or epic it named finished, which `closedFor` names — `<feature>`, `<feature>/<task key>` or `epic:<epic>`) — and is `null` while open. `closedFor` is `null` unless `closedBy` is `completion`. All stamps are ISO-8601 UTC with milliseconds; `doneAt` is `null` while open (on a `completion` it is the stamp of the finish). The chat and the account it belongs to never ride the item. */
 export type Followup = {
   id: number;
   kind: 'next' | 'gap';
@@ -2756,7 +2756,8 @@ export type Followup = {
   createdAt: string;
   updatedAt: string;
   doneAt: string | null;
-  closedBy: 'chat' | 'user' | null;
+  closedBy: 'chat' | 'user' | 'completion' | null;
+  closedFor: string | null;
 };
 
 /** The frame the server sends to every open socket after a chat's followups moved. It names the chat by its APP session id under `appSessionId` (never `sessionId`, which would raise the chat's unread mark); the widget re-reads when the id is its own chat's. */
