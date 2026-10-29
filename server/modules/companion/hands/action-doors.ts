@@ -5,13 +5,14 @@ import type { CompanionPendingAction } from '@/shared/companion-types.js';
 import type { RelayAnswer, RelayedPress } from '@/shared/relayed-press-types.js';
 
 import type { CompanionStoredPending } from '../companion-pending.js';
+import { accountName, clearMemory } from '../memory/memory-verbs.js';
 import type { CompanionToolDeps } from '../tools/companion-tools.js';
 import { companionScratchDir, nextScratchFile, pruneScratch } from '../tools/transcript-render.js';
 
 import { NO_FLOOR } from './action-prompts.js';
 
 /**
- * THE DOORS: where each of the twelve actions goes when `take_action` fires it, every one the house's own.
+ * THE DOORS: where each of the thirteen actions goes when `take_action` fires it, every one the house's own.
  *
  *   - Queue, Hide and Rework at a prompt, and his answers to a questions round, go through `house.relay` to the dispatcher's ask
  *     book, which answers its own record of the pinned ask (so an ask that changed since he heard it read back is refused);
@@ -19,7 +20,9 @@ import { NO_FLOOR } from './action-prompts.js';
  *     dispatcher's own verbs, through `house.relay`;
  *   - a run resumed with rulings goes through `house.resumeRun`, with his rulings written to her scratch;
  *   - an open is `companion_open` to the page that holds the floor;
- *   - a follow-up closes as his own tick (`closeFollowupForAccount`: `closed_by` is `user`, and `followups_changed` is announced).
+ *   - a follow-up closes as his own tick (`closeFollowupForAccount`: `closed_by` is `user`, and `followups_changed` is announced);
+ *   - her memory is cleared through `clearMemory` (`memory/memory-verbs.ts`), every memory retired through her door with the firing
+ *     line as each one's reason: the docstore's history keeps what was forgotten, with his words beside it.
  *
  * Each dispatcher or runner door carries kaylee--press's record of his word (`RelayedPress`), built by `take_action` from the line
  * that fired it. WHAT THE DESIGNER READS is his lines, verbatim: Rework notes and rulings are his carried lines' texts joined by
@@ -122,6 +125,21 @@ function closeFollowup(deps: CompanionToolDeps, pending: CompanionStoredPending)
   return { outcome: 'took', said: `Follow-up #${id} is ticked off as his own.` };
 }
 
+/** "thing" or "things" after a count, as her sentences say it. */
+const thingsOf = (count: number): string => `${count} ${count === 1 ? 'thing' : 'things'}`;
+
+/**
+ * Her memory cleared on his word: the firing line (from the record of his press) is each retired memory's reason. The bank may
+ * have been emptied between the prepare and the take (a clear in Settings, a forget), which is `already`; a door that stopped part
+ * way is `refused` with the sentence that says how far it got.
+ */
+async function clearHerMemory(deps: CompanionToolDeps, press: RelayedPress): Promise<RelayAnswer> {
+  const cleared = await clearMemory({ kind: 'word', account: accountName(deps.userId), line: { id: press.press, at: press.saidAt, text: press.words } });
+  if (!cleared.ok) return refused(cleared.sentence);
+  if (cleared.forgotten === 0) return { outcome: 'already', said: 'Her memory was already empty.' };
+  return { outcome: 'took', said: `She forgot ${thingsOf(cleared.forgotten)}. The docstore's history keeps them.` };
+}
+
 /**
  * Fires the standing action through its door, with `press` as the record of the word that fired it. Answers the door's outcome and
  * its own first line. Anything a door throws (a spawn that failed, a disk that is full) is a refusal with the reason, never a throw:
@@ -140,6 +158,8 @@ export async function fireAction(deps: CompanionToolDeps, pending: CompanionStor
         return openOnFloor(deps, pending);
       case 'close_followup':
         return closeFollowup(deps, pending);
+      case 'clear_memory':
+        return await clearHerMemory(deps, press);
       default:
         return await relayCardAction(deps, pending, press);
     }

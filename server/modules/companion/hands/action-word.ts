@@ -21,10 +21,13 @@ import type { CompanionActionKind, CompanionActionTarget, CompanionPendingAction
  *     stand in what is left: "Queue probe eyes accept." fires, the bare name and "Open probe eyes accept." do not, and a name that is the
  *     verb as well ("Queue queue drying") is ordered by saying the verb once more. A misheard "cue probe eyes accept" names the card
  *     and says no verb of its own, so it is refused.
- *   - THE READ-BACK. A sentence of hers that names the target stands in the log after the card went up and before his line.
+ *   - THE READ-BACK. A sentence of hers that names the target stands in the log after the card went up and before his line. For her
+ *     memory, whose house name is the common word "memory", the sentence must also hold the action's word or say "your memory".
  *   - AN ORDER, NOT A NO OR A QUESTION. The match is a bag of words, so "Don't queue Kaylee's eyes." holds the name and the verb. A line
  *     that ends in `?`, opens with a question word, or holds a negator is refused (`takesItBack`); a plain order is never refused, so
  *     the cure for a false refusal is to say the order again. A word that is part of the target's own name is not read as a negator.
+ *     The action that retires a whole bank (`clear_memory`) is stricter: only a line that opens with its word is an order, so a statement
+ *     about her memory ("My memory is clear.") never fires it.
  *   - Every time is judged so that a stamp that does not parse fails: each comparison is written as the thing that must hold, never as
  *     the thing that must not, because `NaN` is neither greater nor smaller than anything. The stamps are the store's own (fixed-width
  *     ISO-8601 UTC, which `heardSince` and `pending_json` hold and `isStoreStamp` judges); this file does not re-judge their shape.
@@ -56,6 +59,7 @@ export const ACTION_WORDS: Readonly<Record<CompanionActionKind, readonly string[
   resume_run: ['resume', 'rerun', 're run', 'continue'],
   open: ['open', 'show', 'pull up', 'bring up'],
   close_followup: ['close', 'done', 'tick', 'check off'],
+  clear_memory: ['clear', 'wipe', 'erase', 'empty', 'forget everything'],
 };
 
 /** Words that carry no name: articles, the kinds of thing a target can be, and the ways he is polite or points. Never required of his line. */
@@ -100,7 +104,9 @@ function significantWordsOf(name: string, action?: CompanionActionKind): string[
 
 /**
  * The names a target is known by: what he says it by (`spoken`) and its house name read as words — a card's `name`, a run's `plan`
- * when it has one and else its `runId`, a page's `pageId`. A chat and a follow-up are named by `spoken` alone.
+ * when it has one and else its `runId`, a page's `pageId`, her memory's the one word "memory" (so "Clear my memory." names it as
+ * surely as "Clear your memory."; "your" is the one significant word of `spoken` that "my" is not, and "memory" is the other). A chat
+ * and a follow-up are named by `spoken` alone.
  */
 function namesOf(target: CompanionActionTarget): string[] {
   switch (target.kind) {
@@ -110,6 +116,8 @@ function namesOf(target: CompanionActionTarget): string[] {
       return [target.spoken, target.plan ?? target.runId];
     case 'page':
       return [target.spoken, target.pageId];
+    case 'memory':
+      return [target.spoken, 'memory'];
     case 'chat':
     case 'followup':
       return [target.spoken];
@@ -190,16 +198,48 @@ const NEGATORS: ReadonlySet<string> = new Set([
 /** Words a question opens with ("Should I queue it?"). Only the line's first word is read. */
 const QUESTION_OPENERS: ReadonlySet<string> = new Set(['should', 'can', 'could', 'would', 'do', 'does', 'is', 'are', 'will']);
 
+/** Words that may stand before the verb of an order without making it a statement: "Please clear your memory.", "Okay, go ahead and clear it." */
+const ORDER_LEAD_INS: ReadonlySet<string> = new Set(['please', 'okay', 'ok', 'alright', 'yes', 'yeah', 'yep', 'sure', 'now', 'go', 'ahead', 'and', 'so', 'then', 'just', 'hey']);
+
 /**
- * Whether the line is a no or a question and so no order: it ends in `?`, opens with a question word, or holds a negator. The target's
- * own name words are set aside first, so a card called "No more polling" or "Do not disturb" can still be ordered. A heuristic by design,
- * and a closed one: it can refuse a plain order that happens to say "no" ("Queue it, no problem"), never accept a refusal.
+ * The actions that retire a whole bank at once. Only a line that OPENS with their word (after the lead-ins) is an order for them: `clear` and
+ * `empty` are also adjectives and "memory" is the whole name, so "My memory is clear." and "You could wipe your memory later." hold the
+ * name and the verb as a bag of words and would otherwise fire it.
  */
-function takesItBack(said: string, target: CompanionActionTarget): boolean {
+const ORDERED_VERB_FIRST: ReadonlySet<CompanionActionKind> = new Set(['clear_memory']);
+
+/** Whether the line's first word after the lead-ins is one of the action's words ("Clear your memory." does; "My memory is clear." does not). */
+function opensWithActionWord(said: string, action: CompanionActionKind): boolean {
+  const words = wordsOf(said);
+  const start = words.findIndex((word) => !ORDER_LEAD_INS.has(word));
+  const rest = start === -1 ? [] : words.slice(start);
+  return ACTION_WORDS[action].some((entry) => wordsOf(entry).every((word, at) => rest[at] === word));
+}
+
+/**
+ * Whether the line is a no or a question and so no order: it ends in `?`, opens with a question word, or holds a negator; and, for the
+ * actions in `ORDERED_VERB_FIRST`, does not open with the action's word. The target's own name words are set aside first, so a card called
+ * "No more polling" or "Do not disturb" can still be ordered. A heuristic by design, and a closed one: it can refuse a plain order that
+ * happens to say "no" ("Queue it, no problem"), never accept a refusal.
+ */
+function takesItBack(said: string, target: CompanionActionTarget, action: CompanionActionKind): boolean {
   if (said.trim().endsWith('?')) return true;
+  if (ORDERED_VERB_FIRST.has(action) && !opensWithActionWord(said, action)) return true;
   const nameWords = new Set(namesOf(target).flatMap(wordsOf));
   const words = wordsOf(said).filter((word) => !nameWords.has(word));
   return words.some((word) => NEGATORS.has(word)) || (words.length > 0 && QUESTION_OPENERS.has(words[0]));
+}
+
+/**
+ * Whether a sentence of hers reads the action back: it names the target. Her memory's house name is the common word "memory", so by that
+ * alone a sentence about her memory in passing ("Let me check my memory for that.") would count as the read-back; it counts only beside the
+ * action's word, or by the name he says ("your memory").
+ */
+function readsBack(text: string, target: CompanionActionTarget, action: CompanionActionKind): boolean {
+  if (!namesTarget(text, target, action)) return false;
+  if (target.kind !== 'memory') return true;
+  const heard = new Set(wordsOf(text));
+  return holdsActionWord(text, action) || significantWordsOf(target.spoken, action).every((word) => heard.has(word));
 }
 
 /** A line as the match reads it: trimmed, every run of whitespace one space. */
@@ -221,7 +261,7 @@ const refusal = (sentence: string): { ok: false; sentence: string } => ({ ok: fa
  *   2. it lapsed: `now` is past `expiresAt`;
  *   3. no line he SPOKE after `preparedAt`, and at or before `expiresAt`, equals `said`. The firing line is the newest such line, so
  *      a line he says again after her read-back is the one that counts;
- *   4. no sentence of hers naming the target stands between `preparedAt` and that line;
+ *   4. no sentence of hers reading the target back (`readsBack`) stands between `preparedAt` and that line;
  *   5. `said` does not name the target;
  *   6. `said` holds none of the action's words besides the target's name (`holdsActionWordBesidesName`), or is a no or a question and not
  *      an order (`takesItBack`).
@@ -261,12 +301,12 @@ export function checkHisWord(input: {
   const firing = spokenLines.reduce<(typeof lines)[number] | null>((newest, row) => (newest === null || row.id > newest.id ? row : newest), null);
   if (firing === null) return refusal(`That is not a line he spoke after the card went up. He must say it aloud: ${pending.say}.`);
 
-  const readBack = lines.some((row) => row.role === 'kaylee' && row.id < firing.id && afterThePrepare(row.at) && namesTarget(row.text, pending.target, pending.action));
+  const readBack = lines.some((row) => row.role === 'kaylee' && row.id < firing.id && afterThePrepare(row.at) && readsBack(row.text, pending.target, pending.action));
   if (!readBack) return refusal(`You have not read it back to him yet. Say it back first: ${pending.say}.`);
 
   if (!namesTarget(said, pending.target, pending.action)) return refusal(`His words do not name ${pending.target.spoken}.`);
   if (!holdsActionWordBesidesName(said, pending.target, pending.action)) return refusal(`His words do not say ${ACTION_WORDS[pending.action][0]}.`);
-  if (takesItBack(said, pending.target)) return refusal(`That is a no or a question, not an order. He must say the order itself, aloud: ${pending.say}.`);
+  if (takesItBack(said, pending.target, pending.action)) return refusal(`That is a no or a question, not an order. He must say the order itself, aloud: ${pending.say}.`);
 
   return { ok: true, line: { id: firing.id, at: firing.at, text: firing.text } };
 }

@@ -4,7 +4,9 @@
 // `status --json` and its readers beside it, the roadmap module for `roadmap show --json` — so the
 // module that knows what the fields MEAN does not have to invent a `typeof` test for each one.
 // Consumed by the dispatcher module (through `dispatcher-state.transport.ts`, which re-exports the
-// whole set to its readers) and by the roadmap module's state read. What is different here is the
+// whole set to its readers), by the roadmap module's state read, and by the companion module's readers
+// of the documents it is handed (its tools, eyes, store and the docstore door's client, `memory/bank-door.ts`).
+// What is different here is the
 // direction of a bad field — these REFUSE it by name rather than coercing it to a default, because a
 // body a lane cannot read is a different build of the dispatcher and not a torn file (see the
 // dispatcher state service's head). The refusal sentences name the document that failed, so a journal

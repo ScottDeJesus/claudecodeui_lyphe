@@ -14,7 +14,7 @@ import type { CompanionToolDeps } from '../tools/companion-tools.js';
 
 import { carryOut, endLapsedAction, isCarryingOut, withdrawStandingAction } from './action-end.js';
 import { fireAction } from './action-doors.js';
-import { clockOf, DONE_VERB, NO_FLOOR, SAY_VERB } from './action-prompts.js';
+import { clockOf, doneOf, NO_FLOOR, SAY_VERB } from './action-prompts.js';
 import { prepareRecipe, type PrepareInput } from './action-recipe.js';
 import { ACTION_WORDS, checkHisWord } from './action-word.js';
 
@@ -47,7 +47,7 @@ import { ACTION_WORDS, checkHisWord } from './action-word.js';
 /** How long an action waits for his word. */
 const WAIT_MS = 5 * 60_000;
 
-const ACTIONS = ['queue', 'hide', 'show', 'rework', 'answer', 'recut', 'stop', 'resume', 'kick', 'resume_run', 'open', 'close_followup'] as const satisfies readonly CompanionActionKind[];
+const ACTIONS = ['queue', 'hide', 'show', 'rework', 'answer', 'recut', 'stop', 'resume', 'kick', 'resume_run', 'open', 'close_followup', 'clear_memory'] as const satisfies readonly CompanionActionKind[];
 
 /** Who answers for each action, as the system line quotes it; an open and a close have no sentence worth quoting. */
 const SOURCE: Readonly<Partial<Record<CompanionActionKind, string>>> = {
@@ -138,7 +138,7 @@ function systemLine(standing: CompanionStoredPending, outcome: 'took' | 'already
   // An open and a close have no sentence worth quoting when they went through; when they were refused, the reason is the whole news.
   const quote = said === '' ? '' : source === undefined ? ` ${said}` : ` ${source} said: ${said}`;
   if (outcome === 'refused') return `Not done, on your word: ${standing.say}.${quote}`;
-  return `On your word: ${DONE_VERB[action]} ${target.spoken}.${outcome === 'already' ? ' It was already so.' : ''}${source === undefined ? '' : quote}`;
+  return `On your word: ${doneOf(action, target.spoken)}.${outcome === 'already' ? ' It was already so.' : ''}${source === undefined ? '' : quote}`;
 }
 
 /**
@@ -181,7 +181,7 @@ function takeAction(deps: CompanionToolDeps, said: string): Promise<ToolTextResu
       // Only the card this take fired: a Clear and a prepare after it may have put another on his panel while the door was out.
       if (deps.store.readState().pending?.id === standing.id) deps.store.setPending(null);
       if (answer.outcome === 'refused') return deps.refuse(`Not done: ${answer.said}`);
-      const happened = `${DONE_VERB[standing.action]} ${standing.target.spoken}`;
+      const happened = doneOf(standing.action, standing.target.spoken);
       return textResult(`Done on his word: ${happened}${answer.outcome === 'already' ? ' (it was already so)' : ''}. ${answer.said}`);
     });
   });
@@ -215,8 +215,8 @@ export function handsTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
       'prepare_action',
       toolLine('prepare_action'),
       {
-        action: z.enum(ACTIONS).describe('queue, hide and rework answer an open Accept prompt (hide and rework also act with none open); answer sends his answers to an open questions round; show, recut, stop, resume and kick act on a card; resume_run resumes a stopped chain with his rulings; open brings a card, run, page or chat up on his screen; close_followup ticks off one of his follow-ups.'),
-        target: z.string().trim().min(1).max(300).describe('What it acts on, with every word of the name as he said it, even a word that is also an action ("probe eyes accept" is one card\'s name, though accept is also what queue is called): a card (feature or epic) by its name or title, a run by the id list_runs prints or by its plan and task, a page by its id or title, a chat by its name or id, a follow-up as #<id> from list_followups. When the answer lists several cards the name fits, call again with the full name of the one he meant. For open, write the kind in front ("chat: …") if the name could be more than one.'),
+        action: z.enum(ACTIONS).describe('queue, hide and rework answer an open Accept prompt (hide and rework also act with none open); answer sends his answers to an open questions round; show, recut, stop, resume and kick act on a card; resume_run resumes a stopped chain with his rulings; open brings a card, run, page or chat up on his screen; close_followup ticks off one of his follow-ups; clear_memory forgets every memory you keep.'),
+        target: z.string().trim().min(1).max(300).describe('What it acts on, with every word of the name as he said it, even a word that is also an action ("probe eyes accept" is one card\'s name, though accept is also what queue is called): a card (feature or epic) by its name or title, a run by the id list_runs prints or by its plan and task, a page by its id or title, a chat by its name or id, a follow-up as #<id> from list_followups, your memory as "your memory". When the answer lists several cards the name fits, call again with the full name of the one he meant. For open, write the kind in front ("chat: …") if the name could be more than one.'),
         words: spokenLines.optional().describe('For rework (his notes) and resume_run (his rulings): his own spoken lines, each exactly as he said it in the last 30 minutes. Never your words, never a line he typed.'),
         answers: z.array(z.object({ question: z.number().int().min(1), words: spokenLines })).max(20).optional().describe('For answer: one group per question he answered, by its number from 1, each group his own spoken lines exactly as he said them.'),
       },

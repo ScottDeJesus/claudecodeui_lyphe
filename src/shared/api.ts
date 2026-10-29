@@ -887,6 +887,15 @@ export const api = {
     // at the press (`null` for none). Answers 204 once her turn has been stopped, which can take seconds; her next message opens with `<cut>`.
     cut: (input: { turnId: string; heard: number | null; interrupted: number | null }) =>
       post('/api/companion/cut', input, companionOptions()),
+    // Her memory: the docstore bank of what he told her to keep, which `clear` above never touches. Her bank is the account's and no page's,
+    // so these two name no client. `read` answers `CompanionMemoryReading`: how many memories it holds, or `count: null` with the door's
+    // sentence as `reason` when the bank cannot be read (still a 200), and the id of her DocSpace page. `clear` is his act in Settings: it retires
+    // every memory and answers `{ forgotten }`; a door that stops it is a 502 `COMPANION_MEMORY_UNREACHABLE` carrying the sentence, and some may
+    // have been forgotten before it, so a caller reads again either way. The retires run one by one, so it gets the same ceiling as `clear`.
+    memory: {
+      read: () => get('/api/companion/memory'),
+      clear: () => del('/api/companion/memory', undefined, { timeoutMs: 90_000 }),
+    },
   },
 
   system: {

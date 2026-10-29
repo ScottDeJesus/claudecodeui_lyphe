@@ -6,7 +6,7 @@ import { fillRegister } from './companion-prompt.js';
 /**
  * Every message she is pushed is assembled at the moment it is pushed, in this order, and nothing is
  * pushed silently — whatever she is told reaches her inside a message she answers:
- *   1. `<state>`, owed once after her memory was compacted (the conversation that held the focus, the
+ *   1. `<state>`, owed once after her conversation was compacted (the conversation that held the focus, the
  *      draft and the walk is gone, so they are restated);
  *   2. `<cut>`, owed once after he cut her off (`oweCut`, set by the companion's speech cut);
  *   3. `<sessions>`, on a wake, then only when its text differs from the last one sent;
@@ -40,7 +40,7 @@ export type MessageReaders = {
 
 /** What `createMessageAssembler` answers; the session holds one per account. */
 type MessageAssembler = {
-  /** Her memory was compacted: the next message restates the focus, the draft and the walk. */
+  /** Her conversation was compacted: the next message restates the focus, the draft and the walk. */
   oweState(): void;
   /** He cut her off: the next message opens with `<cut>`, naming the last sentence he heard to its end and the one playing at the press (`null` for none). A later cut replaces one no message has carried yet. */
   oweCut(heard: string | null, interrupted: string | null): void;

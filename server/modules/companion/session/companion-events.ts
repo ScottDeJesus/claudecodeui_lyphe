@@ -25,7 +25,7 @@ import type { SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sd
  * One thing her loop must react to. `init` carries the session id the CLI filed her conversation
  * under, the tools it listed and the model it runs; `text` is a streamed delta of her speech and
  * `block_end` the end of a content block (the sentence stream is flushed there); `compacted` says her
- * memory was summarised; `result` ends a turn — `answered` lists the uuids of our messages it consumed,
+ * conversation was summarised; `result` ends a turn — `answered` lists the uuids of our messages it consumed,
  * `failure` is the sentence for the panel when the turn failed (`null` when it succeeded) and
  * `resumeRefused` is set when the CLI says the conversation she was asked to resume does not exist.
  * Consumed by `companion-session.ts`, which reacts to each.

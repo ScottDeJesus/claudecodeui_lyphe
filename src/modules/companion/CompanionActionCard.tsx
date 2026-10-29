@@ -42,6 +42,7 @@ const ACTION_SENTENCE: Readonly<Record<CompanionActionKind, Words>> = {
   resume_run: { key: 'companion.action.verb.resumeRun', english: 'Resume the run <target/>' },
   open: { key: 'companion.action.verb.open', english: 'Open <target/>' },
   close_followup: { key: 'companion.action.verb.closeFollowup', english: 'Close the follow-up on <target/>' },
+  clear_memory: { key: 'companion.action.verb.clearMemory', english: 'Clear <target/>' },
 };
 
 /** What his carried lines are to the action, said over them; the actions that carry none fall to the last. */
@@ -72,7 +73,7 @@ function hourMinute(iso: string): string {
  * The target's kind and the house's own names for it, beside the name he says: what tells it apart from a card of a like
  * name. A feature names its plan and its epic, an epic its name (the wire marks one `<name>.arc`), a run its plan and its
  * id (two runs of one task differ only at the id's end, so the line wraps rather than cut it), a page its id and the block
- * an open lands on, a follow-up its number.
+ * an open lands on, a follow-up its number, her memory how many things it keeps.
  */
 function targetFacts(target: CompanionActionTarget, t: TFunction): string {
   switch (target.kind) {
@@ -96,6 +97,8 @@ function targetFacts(target: CompanionActionTarget, t: TFunction): string {
       return t('companion.action.kind.chat', 'Chat');
     case 'followup':
       return t('companion.action.kind.followup', { id: target.id, defaultValue: 'Follow-up #{{id}}' });
+    case 'memory':
+      return t('companion.action.kind.memory', { count: target.count, defaultValue_one: 'Your memory, {{count}} thing kept', defaultValue_other: 'Your memory, {{count}} things kept' });
   }
 }
 

@@ -19,8 +19,9 @@ import { isStoreStamp } from '@/shared/utils.js';
  * keeps the newest `COMPANION_LOG_KEEP` rows per account and deletes the rest in the same
  * transaction as the insert, so the table never holds more than that for one account.
  *
- * Consumers: `server/modules/companion/companion-store.ts` — the lane's reader and writer, `readSentence` included — and
- * `companion.service.ts`, which asks `userIdsFocusedOn` which accounts a finished run is news to.
+ * Consumers: `server/modules/companion/companion-store.ts` — the lane's reader and writer, `readSentence` included —
+ * `companion.service.ts`, which asks `userIdsFocusedOn` which accounts a finished run is news to, and
+ * `server/modules/companion/memory/memory-verbs.ts`, which reads and writes `memory_forget_line` through `readState` and `writeState`.
  * Reach it through `@/modules/database/index.js`. Every statement runs on the caller's
  * connection; only `appendLog` and `clearAccount` open a transaction of their own, so each lands
  * whole or not at all.
@@ -46,6 +47,12 @@ export type CompanionStateRow = {
   unanswered_json: string | null;
   /** The client id holding the floor. Survives Clear. */
   floor: string | null;
+  /**
+   * The id of the `companion_log` line of his that the last forget of her memory used, or NULL before any. A forget needs a line with a
+   * greater id, so one word of his forgets at most five memories. Survives Clear: log ids are never reused, so an old value stays a true
+   * lower bound. A log id, never a memory: CloudCLI keeps none. Read and written only by `memory-verbs.ts`.
+   */
+  memory_forget_line: number | null;
   updated_at: string;
 };
 
@@ -108,7 +115,7 @@ export type CompanionClearResult = {
 };
 
 /** Every state column the table holds besides the key: what a read returns and `writeState` may name. */
-const STATE_PATCH_COLUMNS = ['provider_session_id', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor'] as const;
+const STATE_PATCH_COLUMNS = ['provider_session_id', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor', 'memory_forget_line'] as const;
 
 const STATE_COLUMNS = `user_id, ${STATE_PATCH_COLUMNS.join(', ')}, updated_at`;
 const LOG_COLUMNS = 'id, user_id, at, role, via, turn_id, turn_index, text, mood, sounds_json';
@@ -306,7 +313,9 @@ export const companionDb = {
   /**
    * Clear: deletes the account's log and cards and empties its state's conversation, focus, draft,
    * pending action, unanswered messages and walkthrough — in one transaction. `floor` stays (which client holds the floor
-   * is no part of her memory), and `relayed_sends` and `companion_actions` are never deleted from:
+   * is no part of her conversation), and so does `memory_forget_line`: log ids are AUTOINCREMENT and never reused, so the id of the line
+   * the last forget of her memory used stays a true lower bound after the log it named is gone, and a line he says next always has a
+   * greater id. `relayed_sends` and `companion_actions` are never deleted from:
    * those rows are facts about chats and about the house. The one write Clear makes to
    * `companion_actions` is to END any row with no outcome yet as `cancelled`, in the same
    * transaction and before the state loses its `pending_json` — found by the row's own empty outcome rather than through

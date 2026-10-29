@@ -14155,7 +14155,7 @@ Behaviour: MAN-9067. The mark: INV-9787.
 | Drop `await chatNamer.stop()` from `shutdownRuntimeServices` | a Haiku child outlives the server | `stop()` aborts the passes and waits for them |
 | Let `readFirstExchange` take an injected `<system-reminder>` / `<task-notification>` turn, a compaction summary or a `<synthetic>` row | a chat is named from text no one wrote | those rows say nothing of what the chat is about |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/first-exchange.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/sayable-name.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/first-exchange.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/sayable-name.ts
 
 ## INV-9821 — probe — The ask she answers "on her own judgment" is shown to her cut at 60 characters; the page shows the whole input
 
@@ -18270,7 +18270,8 @@ Detail: MAN-9174 (protocol), MAN-9171 (the check), MAN-9172 (recipes), MAN-9173 
 | Words that travel (Rework notes, an answer round, rulings) are looked up in the log at prepare (`resolveCarriedLines`); a string of hers is never sent in his name | nothing he did not say reaches a designer or a runner |
 | The take fires the PIN (`pending.pin`) taken at prepare, never what the house holds now; the ask book refuses a prompt that changed (MAN-8494) | he heard that prompt read back |
 | The pin never reaches a page: `withoutPin` names the wire's fields one by one. A field added to `CompanionStoredPending` is sent only when put on the wire on purpose | the ask carries the lock token the dispatcher guards an answer by |
-| Every action goes through prepare and take, `open` and `close_followup` included | ruling 3: "each one said back to me before it fires" |
+| Every action goes through prepare and take, `open`, `close_followup` and `clear_memory` included | ruling 3: "each one said back to me before it fires" |
+| `clear_memory` is ordered only by a line that opens with its word (`ORDERED_VERB_FIRST`), and a sentence of hers reads it back only when it holds an action word or says "your memory" (`readsBack`). Drop either and a remark about her memory empties it | the word "memory" is the whole name and "clear" and "empty" are adjectives: "My memory is clear." holds both as a bag of words (MAN-9171, MAN-9194) |
 | An action leaves her state only through `action-end.ts`; a take claims its row (`claimAction`) and holds its id (`carryOut`) before the door runs | a withdrawal, a lapse or a Clear in that window must not end an action a door is running |
 | A claimed row no take of this process carries ends `refused` with `may have gone through`, never `cancelled` or re-fired | the same word is never fired twice |
 | No timer ends a lapse: the next prepare, take or cancel does, and the page hides the card at the deadline it sets once | events, never a watchdog |
@@ -18355,16 +18356,16 @@ cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
 W=$(dirname "$0")
 cat > "$W/p.mts" <<'TS'
 import fs from 'node:fs';
-import { DONE_VERB } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts';
+import { DONE_VERB, doneOf } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts';
 const src = fs.readFileSync('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts', 'utf8');
 const source = /const SOURCE[^=]*= (\{[\s\S]*?\n\});/.exec(src);
 const fn = /function systemLine\([^)]*\): string \{([\s\S]*?)\n\}\n/.exec(src);
 if (!source || !fn) { console.log('systemLine/SOURCE: not in hands-tools.ts'); process.exit(0); }
-const systemLine = new Function('DONE_VERB', 'SOURCE', 'standing', 'outcome', 'said', fn[1]);
+const systemLine = new Function('DONE_VERB', 'SOURCE', 'doneOf', 'standing', 'outcome', 'said', fn[1]);
 const SOURCE = new Function('return ' + source[1])();
 const standing = { action: 'open', target: { spoken: 'Kaylee eyes' }, say: 'Open Kaylee eyes' };
-console.log('open took   :', JSON.stringify(systemLine(DONE_VERB, SOURCE, standing, 'took', 'Kaylee eyes is up on the screen he is using.')));
-console.log('open refused:', JSON.stringify(systemLine(DONE_VERB, SOURCE, standing, 'refused', 'No page of his holds the floor.')));
+console.log('open took   :', JSON.stringify(systemLine(DONE_VERB, SOURCE, doneOf, standing, 'took', 'Kaylee eyes is up on the screen he is using.')));
+console.log('open refused:', JSON.stringify(systemLine(DONE_VERB, SOURCE, doneOf, standing, 'refused', 'No page of his holds the floor.')));
 TS
 TSX_TSCONFIG_PATH=server/tsconfig.json npx tsx "$W/p.mts"
 echo -n 'MAN-9174 says: '; ~/.claude/scripts/docstore get MAN-9174 --text | grep -o '`open` and `close_followup` have none[^.]*' | head -1
@@ -18504,3 +18505,468 @@ measured 2026-10-28 by chain chain-kaylee--eyes--whole-20261028-183122-7c1b, fin
 probe-key: 535667b5111d8aec2708892a1b2da280db47f711
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/run-list.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-clips.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-whole.mjs
+
+## INV-10121 — companion/memory/memory-words.ts — `spoken` is a press's transcript, not proof of speech; `SAME_SUBJECT_LOGIT` is a net that falls with the title she picks
+
+Two measured limits of `memory-words.ts`. No sentence, row or prompt line built on it claims past them.
+
+## `spoken` is a press's transcript, not proof of speech
+- `findHisLine` takes `via: 'spoken'`: the log's word for a talk press and whatever the transcriber wrote (`companion-press.ts`).
+- 2026-10-29: two seconds of digital silence (past `EMPTY_PRESS_UNDER_MS`, 400 ms) came back as "No." and would be found as his line.
+- Say "what his press was heard to say"; never "proves he said it". Same footing as `checkHisWord` (`hands/action-word.ts`).
+- Not built: the press door logging a silent clip as empty (`companion-press.ts`, `gemini-transcribe.ts`).
+
+## `SAME_SUBJECT_LOGIT` (1.5) is a net, not a guarantee
+- The score is the reranker's logit on the text `remember` searches with (title, then his words) against the held body. It falls with the title she picks.
+- 2026-10-28, pairs sharing the held title and most words: same memory corrected or restated 3.39 to 9.50; nearest different memory -0.23; unrelated about -11.
+- Cosine cannot stand in: correction 0.74, different memory 0.705; the docstore's near-duplicate line (0.95, `docstore/neardup.py`) catches only a restatement (0.995).
+- 2026-10-29, the correction "Actually, no line limit on briefs, just keep them tight." against the held "Brief length":
+
+| title it was searched under | score |
+| --- | --- |
+| Brief length | 4.25 |
+| four other titles | 2.31, 1.59, 0.40, -0.44 |
+| nearest different memory ("Brief tone") | -0.19 |
+| a terse correction, "Make it five lines instead." | -4.17 |
+
+- So a correction under another title or in other words can score under 1.5 and be kept beside the stale memory.
+- Cure: she says whether the new memory corrects the held one; the score alone does not.
+- A sentence built on the constant never says a correction is always stopped. Re-measure on the title-then-words shape before moving 1.5.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-words.ts
+
+## INV-10122 — companion/memory/memory-words.ts — edits that break it: nothing of hers stands as a quote of his, only a spoken line is his, and the file stays pure
+
+Behaviour: the manual row of `memory-words.ts`. Measured limits: INV-10121.
+
+| Edit | Breaks | Why |
+| --- | --- | --- |
+| Write a memory's body any way but `memoryBody`, or leave her `context` unfolded | a newline in her context starts a forged `He said (…)` line: her words stand as his | `quotesOf` reads every line of that shape as his; ruling 4 |
+| Let `findHisLine` take a typed row, a row of hers or `via: null` | a line he typed becomes a memory of his | his word is a talk press (`role: 'operator'`, `via: 'spoken'`), as in `checkHisWord` |
+| Let a blank `said` through `findHisLine` | the empty press's `''` matches and a memory is made of nothing | the fold of a blank is `''` |
+| Compare the account or the time in `quotesAlike`, or make it compare near | the same words said twice are kept twice, or a different statement is dropped as a twin | exact words only; meaning is `SAME_SUBJECT_LOGIT`'s job |
+| Drop the trim or the `endsWith('”')` test from `quotesOf` | without the trim a CRLF body or a trailing space yields no quote; without the test a long line of `, x): “` runs with no closing mark scans quadratic | the regex rescans from every run |
+| Move `SAME_SUBJECT_LOGIT` without re-measuring | corrections kept beside the stale memory, or different memories refused as a twin | the score is read on title then his words and falls with the title |
+| Cut or limit the body inside `memoryBody` | a quote of his is cut mid-word | it writes what it is given; the limit (`MEMORY_BODY_MAX`) is the caller's |
+| Add an import or any I/O to the file | the probe cannot replay rows alone; the module stops being pure | callers pass the log rows in |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-words.ts
+
+## INV-10133 — probe — . Her prompt still calls her conversation "your memory", the one place the step-3 grep cannot see — LOW
+
+. Her prompt still calls her conversation "your memory", the one place the step-3 grep cannot see — LOW
+
+```probe
+grep -n -o "after your memory of this conversation was compacted" /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts || echo none
+# expect: the phrase prints (the prompt calls her conversation "your memory"); `none` once it says "this conversation"
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--panel-clear-20261029-001409-0634, finding L1, LOW
+probe-key: 57b409fff3d799fdae89914d665c19bb61d58e2a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clear-words.mjs
+
+## INV-10134 — probe — . The new probe's "Cancel … her log is the same" check passes on an empty log whether or not Cancel cleared anything — LOW
+
+. The new probe's "Cancel … her log is the same" check passes on an empty log whether or not Cancel cleared anything — LOW
+
+```probe
+grep -c 'logLength > 0\|logLength >= 1\|logLength !== 0' /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clear-words.mjs || true
+# expect: 0 — nothing asserts her log is non-empty before the dialog opens; a later fix prints 1 or more
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--panel-clear-20261029-001409-0634, finding L2, LOW
+probe-key: 304c32fb01f308c00ef87aa325f88a448a520cfb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clear-words.mjs
+
+## INV-10135 — probe — . A statement about memory fires the whole-bank clear
+
+. A statement about memory fires the whole-bank clear
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+W=$(dirname "$0")
+cat > "$W/p.mts" <<'TS'
+import { checkHisWord } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts';
+const T = Date.parse('2026-10-29T10:00:00.000Z'); const iso = (ms: number) => new Date(ms).toISOString();
+const pending = { action: 'clear_memory', target: { kind: 'memory', spoken: 'your memory', count: 3 }, say: 'Clear your memory', preparedAt: iso(T), expiresAt: iso(T + 300_000) } as any;
+const run = (said: string, readBack = 'Clear your memory? You forget the 3 things you keep. Say it aloud and I will do it.') => checkHisWord({ pending, said, now: iso(T + 60_000), lines: [
+  { id: 101, at: iso(T + 20_000), role: 'kaylee', via: null, text: readBack }, { id: 102, at: iso(T + 40_000), role: 'operator', via: 'spoken', text: said }] as any }).ok;
+let fires = 0;
+for (const s of ['My memory is clear.', 'It would help to clear your memory some day.', 'I wish I could erase my memory of that meeting.', 'Wait, clear your memory in an hour.', 'You could wipe your memory later.', 'My memory is empty on that.']) { const ok = run(s); fires += ok ? 1 : 0; console.log(ok ? 'FIRES  ' : 'refused', JSON.stringify(s)); }
+console.log("control, must refuse:", run("Don't clear your memory.") ? 'FIRES' : 'refused');
+console.log(`statements that fire the clear: ${fires} of 6`);
+TS
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$W/p.mts"
+EOF
+bash "$D/p.sh"
+# expect: "statements that fire the clear: 6 of 6" while the defect stands (0 of 6 once cured), and "control, must refuse: refused" either way
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--clear-on-word-20261029-001408-31c1, finding M1, MEDIUM
+probe-key: 977d9541f130f17cef3d823d4bdac73ea9f6d20e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear.mjs
+
+## INV-10136 — probe — . The hands driver passes only while the live account has never used its hands
+
+. The hands driver passes only while the live account has never used its hands
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+set -u
+R=/home/lyphe/.claude/claudecodeui_lyphe
+T=$(mktemp -d /tmp/athena-pin-run.XXXXXX) || { echo "no scratch"; exit 0; }
+sqlite3 -readonly "$HOME/.cloudcli/auth.db" "VACUUM INTO '$T/seeded.db'" || { echo "no copy"; exit 0; }
+sqlite3 "$T/seeded.db" "INSERT INTO companion_actions (id,user_id,action,target_json,pin_json,prompt,carried_json,prepared_at,expires_at,outcome,ended_at) VALUES ('old1',1,'hide','{}','{}','p','[]','2026-10-20T10:00:00.000Z','2026-10-20T10:05:00.000Z','cancelled','2026-10-20T10:01:00.000Z')"
+sed -e "s#join(homedir(), '.cloudcli', 'auth.db')#'$T/seeded.db'#" \
+    -e "s#'./lib/kaylee-bank-standin.mjs'#'$R/.verify/lib/kaylee-bank-standin.mjs'#" \
+    -e "s#'../server/#'$R/server/#g" \
+    -e "s#/tmp/kaylee-memory-clear-hands-#/tmp/athena-pin-hands-#g" \
+    "$R/.verify/kaylee-memory-clear-hands.mjs" > "$T/h.mjs"
+( cd "$R" && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$T/h.mjs" > "$T/out.txt" 2>&1 )
+grep -E '^FAIL' "$T/out.txt" | cut -c1-110
+echo "FAIL lines: $(grep -c '^FAIL' "$T/out.txt")"
+case "$T" in /tmp/athena-pin-run.*) rm -rf "$T" ;; esac
+EOF
+bash "$D/p.sh"
+# expect: "FAIL lines: 3" while the driver depends on an empty live action table ("FAIL lines: 0" once it scopes its checks to its own rows)
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--clear-on-word-20261029-001408-31c1, finding M2, MEDIUM
+probe-key: 57c9bebef24dce8d658258a3c47ecccee6bb9f8a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear.mjs
+
+## INV-10137 — probe — . Any sentence of hers with the word "memory" counts as the read-back
+
+. Any sentence of hers with the word "memory" counts as the read-back
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+W=$(dirname "$0")
+cat > "$W/p.mts" <<'TS'
+import { checkHisWord } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts';
+const T = Date.parse('2026-10-29T10:00:00.000Z'); const iso = (ms: number) => new Date(ms).toISOString();
+const pending = { action: 'clear_memory', target: { kind: 'memory', spoken: 'your memory', count: 3 }, say: 'Clear your memory', preparedAt: iso(T), expiresAt: iso(T + 300_000) } as any;
+for (const readBack of ['Let me check my memory for that.', 'I keep a memory of that.', 'It is on your panel now.']) {
+  const r = checkHisWord({ pending, said: 'Clear your memory.', now: iso(T + 60_000), lines: [
+    { id: 101, at: iso(T + 20_000), role: 'kaylee', via: null, text: readBack }, { id: 102, at: iso(T + 40_000), role: 'operator', via: 'spoken', text: 'Clear your memory.' }] as any });
+  console.log(r.ok ? 'FIRES  ' : 'refused', 'after her sentence', JSON.stringify(readBack));
+}
+TS
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$W/p.mts"
+EOF
+bash "$D/p.sh"
+# expect: the first two lines read "FIRES" while the defect stands (both "refused" once cured); "It is on your panel now." reads "refused" either way
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--clear-on-word-20261029-001408-31c1, finding L1, LOW
+probe-key: dda9d23ef5b97ccb4f76a098f0b2fe0a30476f56
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear.mjs
+
+## INV-10138 — probe — . A bank that cannot be listed at the take says a bare fragment
+
+. A bank that cannot be listed at the take says a bare fragment
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+W=$(dirname "$0")
+cat > "$W/p.mts" <<'TS'
+import { startStandInDoor } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-bank-standin.mjs';
+const door = await startStandInDoor(); process.env.DOCSTORE_URL = door.url;
+const { clearMemory } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts');
+door.state.made = true; door.state.rows.set('MAN-901', { token: 'MAN-901', title: 'a', body: 'x' });
+door.state.fail.list = { status: 503, error: 'database unreachable' };
+const answer = await clearMemory({ kind: 'word', account: 'scott', line: { id: 9, at: '2026-10-28T19:00:40.000Z', text: 'Clear your memory.' } }) as any;
+console.log(JSON.stringify(answer), '| held', door.state.rows.size);
+console.log('sentence is a whole sentence (capital, full stop):', /^[A-Z].*[.!?]$/.test(answer.sentence ?? ''));
+await door.close(); process.exit(0);
+TS
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$W/p.mts" 2>&1 | grep -v '^\[Companion\]'
+EOF
+bash "$D/p.sh"
+# expect: `{"ok":false,"sentence":"database unreachable"} | held 1` and "sentence is a whole sentence (capital, full stop): false" while the defect stands (true once cured); "held 1" either way
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--clear-on-word-20261029-001408-31c1, finding L2, LOW
+probe-key: cdd852112ce4f20d19619e7cfb299a34a8d35ea3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear.mjs
+
+## INV-10139 — probe — . The scratch driver cannot tell the stand-in from the docstore
+
+. The scratch driver cannot tell the stand-in from the docstore
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "clear driver, health probe lines:    $(grep -c 'api/health' .verify/kaylee-memory-clear.mjs)"
+echo "settings driver, health probe lines: $(grep -c 'api/health' .verify/kaylee-memory-settings.mjs)"
+EOF
+bash "$D/p.sh"
+# expect: "clear driver, health probe lines:    0" while the defect stands (1 once cured); the settings driver reads 1 either way
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--clear-on-word-20261029-001408-31c1, finding L3, LOW
+probe-key: 1a21a83427495bb00c59c458a2be77f3b2bbf24a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear.mjs
+
+## INV-10140 — probe — . The driver's guards and coverage claims run thinner than their words
+
+. The driver's guards and coverage claims run thinner than their words
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "cancel_action calls in the hands driver:"; grep -n "call(cancelTool" .verify/kaylee-memory-clear-hands.mjs | cut -c1-80
+grep -n "^check(.*cancel" .verify/kaylee-memory-clear-hands.mjs || echo "no check( … ) names a cancel"
+EOF
+bash "$D/p.sh"
+# expect: one `call(cancelTool` line (148, after the take) and "no check( … ) names a cancel" while the gap stands
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--clear-on-word-20261029-001408-31c1, finding L4, LOW
+probe-key: bb8b1f4351c348d580e3f48a4565ca32883aeafe
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear.mjs
+
+## INV-10141 — probe — . A pinned probe this diff broke
+
+. A pinned probe this diff broke
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+W=$(dirname "$0")
+docstore get INV-10102 --probe > "$W/old.sh" 2>/dev/null
+echo "ReferenceError lines: $(timeout 90 bash "$W/old.sh" 2>&1 | grep -c 'ReferenceError: doneOf is not defined')"
+EOF
+bash "$D/p.sh"
+# expect: "ReferenceError lines: 1" while the row is stale (0 once repointed or retired)
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--clear-on-word-20261029-001408-31c1, finding L5, LOW
+probe-key: b7653c1ee590261c30b0d6148ba53df0c028159d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear.mjs
+
+## INV-10145 — probe — LOW (a seam with another phase's edit) — the Settings toast's second line is now voiced to her: "Your memory can't be reached just now: …"
+
+LOW (a seam with another phase's edit) — the Settings toast's second line is now voiced to her: "Your memory can't be reached just now: …"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+const m = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts');
+console.log(JSON.stringify(await m.clearMemory({ kind: 'settings', account: 'verve', at: '2026-01-01T00:00:00.000Z' })));
+EOF
+cat > "$D/p.sh" <<EOF
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+DOCSTORE_URL=http://127.0.0.1:9 TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mjs" 2>&1 | tail -1
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) rm -f "$D/p.sh" "$D/p.mjs"; rmdir "$D";; esac
+# expect: {"ok":false,"sentence":"Your memory can't be reached just now: the docstore door at http://127.0.0.1:9 did not answer."} while it stands; cured when the sentence is the bare door sentence
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--card-fill-20261029-001408-9e2d, finding L3, LOW
+probe-key: 7a3ab7d0a768a74e5789c68868833993634f048c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionMemorySettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-settings.mjs
+
+## INV-10146 — probe — (MEDIUM) — the bank maker dies as soon as the docstore carries repo `kaylee`, and a failed `make` leaks a database with no way to find it
+
+(MEDIUM) — the bank maker dies as soon as the docstore carries repo `kaylee`, and a failed `make` leaks a database with no way to find it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+f=/home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-bank-db.sh
+echo "insert into repos guarded (on conflict / not exists): $(grep 'insert into repos' "$f" | grep -c -i -e 'on conflict' -e 'not exists')"
+echo "drop constraint guarded (if exists):                 $(grep 'drop constraint' "$f" | grep -c -i 'if exists')"
+echo "repos-failure branch names a DSN to drop:            $(grep 'repos could not be set' "$f" | grep -c -i -e 'KAYLEE_BANK_DSN' -e 'drop')"
+echo "repos.name is the primary key:                       $(grep -c 'CONSTRAINT repos_pkey PRIMARY KEY (name)' /home/lyphe/.claude/docstore/schema/001_init.sql)"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -r "$D" ;; esac
+# expect: the three guard lines print 0 while the defect stands (each prints 1 or more once the block is guarded and the failure branch names the DSN), and the primary-key line prints 1
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--whole-20261029-005633-5766, finding M1, MEDIUM
+probe-key: 974807aa9d1e80ac2316939c684d490177eef0bd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-bank-db.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-memory-kit.mjs
+
+## INV-10147 — probe — (LOW) — step 3's "a remember she tried was refused as typed" fails when Haiku's first `remember` is refused by the harness
+
+(LOW) — step 3's "a remember she tried was refused as typed" fails when Haiku's first `remember` is refused by the harness
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+pred=$(grep -F "a remember she tried was refused as typed" .verify/kaylee-memory-whole.mjs | sed -E "s/^check\('a remember she tried was refused as typed', (.*)\);\s*$/\1/")
+[ -n "$pred" ] || { echo "predicate not found"; exit 0; }
+node -e '
+const run = (typed) => eval(process.argv[1]);
+const harness = { name: "remember", isError: true, result: "<tool_use_error>InputValidationError: mcp__companion__remember was called with input that could not be parsed as JSON." };
+const refused = { name: "remember", isError: false, result: "That line was typed, not said: only what he says aloud is kept. Ask him to say it." };
+console.log("malformed then retry:", run({ calls: [harness, refused] }) ? "PASS" : "FAIL");
+' "$pred"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -r "$D" ;; esac
+# expect: "malformed then retry: FAIL" while the defect stands, "PASS" once a harness-refused call no longer counts against the product
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--whole-20261029-005633-5766, finding L1, LOW
+probe-key: 631c9f1d5d4e59b1ffe65a90377435b37ad30f73
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-bank-db.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-memory-kit.mjs
+
+## INV-10148 — probe — (LOW) — `drop`'s guard is looser than the sentence that describes it, and the documented path leaves `PGPASSFILE` at a deleted file
+
+(LOW) — `drop`'s guard is looser than the sentence that describes it, and the documented path leaves `PGPASSFILE` at a deleted file
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+mkdir "$D/bin" || exit 1
+printf '#!/bin/sh\necho "STAND-IN psql $*"\n' > "$D/bin/psql"; chmod +x "$D/bin/psql"
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+for n in kaylee_scratch_12_34 kaylee_scratch_1x_2y; do
+  out=$(PATH="$1/bin:$PATH" KAYLEE_BANK_DSN="postgresql://postgres@h:5433/$n" bash .verify/kaylee-memory-bank-db.sh drop 2>&1)
+  printf '%-22s reached drop database: %s | tells him to unset PGPASSFILE: %s\n' "$n" "$(echo "$out" | grep -c 'drop database')" "$(echo "$out" | grep -c 'unset PGPASSFILE')"
+done
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.*) rm -r "$D" ;; esac
+# expect: the digit-only name prints "reached drop database: 1"; "kaylee_scratch_1x_2y" prints 1 while the glob is loose (0 once it is exact); "unset PGPASSFILE" prints 0 on both while the defect stands
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--whole-20261029-005633-5766, finding L2, LOW
+probe-key: db1257753b2c90707419af291d3c9208b1b3ef72
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-bank-db.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-memory-kit.mjs
+
+## INV-10149 — probe — (LOW) — the refusals an operator meets point at no maker
+
+(LOW) — the refusals an operator meets point at no maker
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && env -u KAYLEE_BANK_DSN bash .verify/kaylee-memory-scratch.sh .verify/kaylee-memory-whole.mjs 2>&1 | grep -c 'kaylee-memory-bank-db'; echo "exit ${PIPESTATUS[0]}"
+# expect: "0" and "exit 2" while the sentence names no maker; "1" or more once it says how to make the database
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--whole-20261029-005633-5766, finding L3, LOW
+probe-key: 5b89362de2d854e256675e12627e8778c3a378cb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-bank-db.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-memory-kit.mjs
+
+## INV-10150 — server/modules/companion/memory — edits that break it: the body is his words, the bank is the docstore's alone, one write at a time, only his own act clears it
+
+Behaviour: MAN-9191 (the door, the chain), MAN-9192 (the three tools), MAN-9193 (the guard, the clear), MAN-9183 (the words), MAN-9194 (`clear_memory`). Measured limits of the words: INV-10121. What the words may not do: INV-10122.
+
+| Edit | Breaks | Why |
+|---|---|---|
+| Write a body from anything but `memoryBody` over `findHisLine`'s lines, or let her pass a body or a quote | a memory stands as his word that he did not say | ruling 4 |
+| Store a memory, a body or a copy of one anywhere in CloudCLI | a second copy that drifts from the docstore's | ruling 1: one package of hers, no copy anywhere else |
+| Reach the docstore any way but `bankDoor`, or send a call without `X-Docstore-Door: kaylee` or `actor: 'kaylee'` | the mark stops travelling with her calls (the door's refusal of a mark-less write is not built: MAN-9191 §Open), or `history` stops saying she wrote it | the mark is what kaylee--bank's door will key on; the actor is what `history` records |
+| Run a bank write outside `onBank`, or call `onBank` (or a verb that does) from inside a work | a twin gets in; or every bank write of every account waits for the life of the process | MAN-9191 |
+| Give `clearMemory` a third caller, or put a tool of hers on it | she empties his memory on her own judgment | ruling 4: only his own act |
+| Let one `forget` name over five memories, or take a line no newer than `memory_forget_line` | "forget everything" empties the bank five at a time | the guard |
+| Leave `memory_forget_line` unmoved when a forget stops part way after some retires (`forgetInOrder` writes it on both exits) | the same word forgets five more | one word of his forgets at most five |
+| Reset `memory_forget_line` in `clearAccount`, or put a token in it | an old line forgets again after a Clear; CloudCLI keeps a memory | log ids are never reused; ruling 1 |
+| Read, retire or rewrite a token without `get`'s `mine` | she reads or retires a house row (`MAN-9084`) | her package alone |
+| Send a token-shaped `q` to `search` | the door answers that row whatever its package | `verbs/reflex.py` |
+| Take an empty `search` for "no twin" or "nothing is kept" | a twin of the same words is kept | `search` fails open; `list` and `get` say when the door could not read |
+| Tell her "Not kept" or "Nothing was forgotten" for a call that did not answer | she asks again and a second copy is written | the door finishes a call it was handed |
+| Load her bank at wake, push a memory to her, or poll it | nothing is pulled on her turn; a watchdog | ruling 3; events, never a watchdog |
+| Put usage, spend, a transcript or a session's content in a memory or an answer | cost reaches a place that must not carry it | ruling 2 |
+| Run a showing that writes against the live door (port 8006) or the live server | a fake operator quote in his bank | no fake quote in the live store; `kaylee-memory-scratch.sh` refuses it |
+| Call her conversation "her memory" in a sentence, a system line, a comment or a row | a reader takes it for the bank | "her memory" names the bank alone; her conversation is her conversation (`Her conversation could not be resumed; she starts fresh`) |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-chain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts
+
+## INV-10151 — probe — (MEDIUM) — the door's mark is stated as an enforced guard; nothing in the running docstore implements it
+
+(MEDIUM) — the door's mark is stated as an enforced guard; nothing in the running docstore implements it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+DS=/home/lyphe/.claude/scripts/docstore
+echo "docstore source files naming kaylee: $(grep -rIl -i kaylee /home/lyphe/.claude/docstore 2>/dev/null | grep -v __pycache__ | wc -l)"
+echo "MAN-9191 states the door refuses a mark-less write: $($DS get MAN-9191 --text | grep -c 'without it the door refuses')"
+echo "INV-10150 states the consequence 'the door refuses the write': $($DS get INV-10150 --text | grep -c 'the door refuses the write')"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -f "$D/p.sh"; rmdir "$D";; esac
+# expect: "docstore source files naming kaylee: 0" with both rows counting 1 while the defect stands; cured when the source count is ≥ 1, or both row counts are 0 and §Open says the mark's refusal is not built.
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--docs-20261029-013306-6810, finding M1, MEDIUM
+probe-key: baea326c58c72d9cc96904680aa371d1594c7e34
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-chain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-bank-door.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-bank-standin.mjs
+
+## INV-10152 — probe — (MEDIUM) — a `forget` that stops part way still moves the guard, and the rows say the opposite by omission
+
+(MEDIUM) — a `forget` that stops part way still moves the guard, and the rows say the opposite by omission
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+DS=/home/lyphe/.claude/scripts/docstore
+V=/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts
+echo "code sites that move memory_forget_line: $(grep -c 'memory_forget_line: line.id' $V)"
+echo "code sentence 'may have been forgotten too' on a part-way stop: $(grep -c 'It may have been forgotten too' $V)"
+echo "rows stating a part-way stop moves the guard: $(for t in MAN-9192 MAN-9193 INV-10150; do $DS get $t --text; done | grep -i 'memory_forget_line' | grep -c -i -E 'part way|partial|stopped|stops')"
+echo "MAN-9192 quotes the 'forgotten too' variant: $($DS get MAN-9192 --text | grep -c 'forgotten too')"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -f "$D/p.sh"; rmdir "$D";; esac
+# expect: "2", "1", "0", "0" while the defect stands; cured when the third and fourth lines print ≥ 1.
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--docs-20261029-013306-6810, finding M2, MEDIUM
+probe-key: 0c61556881eca4bf1c00b66621c684ec7832dafb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-chain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-bank-db.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-clear.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-verbs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-whole.mjs
+
+## INV-10153 — probe — (LOW) — MAN-9184 does not quote the refused-clear toast, and says two legs run per viewport that the driver runs at 1440 only
+
+(LOW) — MAN-9184 does not quote the refused-clear toast, and says two legs run per viewport that the driver runs at 1440 only
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+DS=/home/lyphe/.claude/scripts/docstore
+R=/home/lyphe/.claude/claudecodeui_lyphe
+echo "settings.json clearRefused text: $(grep -o '"clearRefused": "[^"]*"' $R/src/modules/i18n/locales/en/settings.json)"
+echo "MAN-9184 quotes it: $($DS get MAN-9184 --text | grep -c "memory wasn't cleared")"
+echo "driver legs marked '1440 only': $(grep -c '1440 only' $R/.verify/kaylee-memory-settings.mjs)"
+echo "MAN-9184 says which legs are 1440 only: $($DS get MAN-9184 --text | grep -c '1440 only')"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -f "$D/p.sh"; rmdir "$D";; esac
+# expect: the text `"{{name}}'s memory wasn't cleared"`, then 0, 2, 0 while the defect stands; cured when the second and fourth lines print ≥ 1.
+```
+
+measured 2026-10-29 by chain chain-kaylee--memory--docs-20261029-013306-6810, finding L1, LOW
+probe-key: a1d288585e8a353a13ec99b8dc080bb1bbf2bb28
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionMemorySettings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionMemorySettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-settings.mjs

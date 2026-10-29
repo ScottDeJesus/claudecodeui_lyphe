@@ -251,7 +251,7 @@ export function CompanionHeader({ name, picture, presence, voice, onModelChange,
           variant="ghost"
           size="sm"
           disabled={!ready}
-          // The panel holds two Clears: this one wipes her memory, the draft card's discards the brief.
+          // The panel holds two Clears: this one wipes her conversation, the draft card's discards the brief.
           aria-label={t('companion.clearLabel', { name })}
           onClick={() => setConfirmingClear(true)}
           className="shrink-0 text-muted-foreground hover:text-foreground [@media(pointer:coarse)]:h-11"

@@ -3266,11 +3266,11 @@
     "stopHint": "Stop {{name}}'s answer",
     "stopRefused": "Her answer didn't stop",
     "clear": "Clear",
-    "clearLabel": "Clear {{name}}'s memory",
-    "clearTitle": "Clear {{name}}'s memory?",
-    "clearMessage": "She forgets this conversation, her notes, the draft and the walkthrough, and starts fresh. Briefs she already sent stay in their chats.",
-    "clearConfirm": "Clear her memory",
-    "clearRefused": "{{name}}'s memory wasn't cleared",
+    "clearLabel": "Clear {{name}}'s conversation",
+    "clearTitle": "Clear {{name}}'s conversation?",
+    "clearMessage": "She forgets this conversation, her notes, the draft and the walkthrough, and starts fresh. What she keeps in her memory stays, and briefs she already sent stay in their chats.",
+    "clearConfirm": "Clear the conversation",
+    "clearRefused": "{{name}}'s conversation wasn't cleared",
     "cancel": "Cancel",
     "log": {
       "label": "Conversation with {{name}}",
@@ -3337,7 +3337,8 @@
         "kick": "Kick <target/>",
         "resumeRun": "Resume the run <target/>",
         "open": "Open <target/>",
-        "closeFollowup": "Close the follow-up on <target/>"
+        "closeFollowup": "Close the follow-up on <target/>",
+        "clearMemory": "Clear <target/>"
       },
       "kind": {
         "feature": "Feature",
@@ -3345,7 +3346,9 @@
         "run": "Run",
         "page": "DocSpace page",
         "chat": "Chat",
-        "followup": "Follow-up #{{id}}"
+        "followup": "Follow-up #{{id}}",
+        "memory_one": "Your memory, {{count}} thing kept",
+        "memory_other": "Your memory, {{count}} things kept"
       },
       "inEpic": "epic {{epic}}",
       "atBlock": "block {{block}}",

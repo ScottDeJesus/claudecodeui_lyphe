@@ -1,5 +1,5 @@
 import type { CompanionActionKind, CompanionActionTarget, CompanionCarriedLine, CompanionOpenTarget, CompanionPendingAction } from '@/shared/companion-types.js';
-import { isList, isRecord, isText, isTextOrNull, isWholeFrom } from '@/shared/document-fields.js';
+import { isCount, isList, isRecord, isText, isTextOrNull, isWholeFrom } from '@/shared/document-fields.js';
 import type { DispatcherAsk } from '@/shared/types.js';
 import { isStoreStamp } from '@/shared/utils.js';
 
@@ -36,7 +36,7 @@ const isRowId = isWholeFrom(1);
 /** Every kind, as a record so that a kind added to the contract fails to compile here until the shape check knows it. */
 const ACTION_KINDS: Record<CompanionActionKind, true> = {
   queue: true, hide: true, show: true, rework: true, answer: true, recut: true,
-  stop: true, resume: true, kick: true, resume_run: true, open: true, close_followup: true,
+  stop: true, resume: true, kick: true, resume_run: true, open: true, close_followup: true, clear_memory: true,
 };
 
 const isActionKind = (value: unknown): value is CompanionActionKind => isText(value) && Object.hasOwn(ACTION_KINDS, value);
@@ -54,6 +54,8 @@ const isTarget = (value: unknown): value is CompanionActionTarget => {
       return isText(value.sessionId);
     case 'followup':
       return isRowId(value.id) && isText(value.sessionId) && isText(value.text);
+    case 'memory':
+      return isCount(value.count);
     default:
       return false;
   }

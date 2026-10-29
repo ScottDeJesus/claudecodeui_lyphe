@@ -27,7 +27,7 @@ import { fillSystemPrompt } from './companion-prompt.js';
  *   - `strictMcpConfig` — the operator's own MCP servers (`~/.claude.json`) are not loaded into her.
  * She differs from the diagnosis agent in four ways, each one a reason she lives longer than a call:
  *   - she PERSISTS: `persistSession` stays on and the CLI session id the caller holds is passed as
- *     `resume`, so her memory outlives the process (the idle closer ends it after two hours of silence);
+ *     `resume`, so her conversation outlives the process (the idle closer ends it after two hours of silence);
  *   - her `cwd` is `~/.claude/state/companion/<user id>`, a hidden project root
  *     (`shared/hidden-project-paths.ts`): her conversation never reaches a project list, and the heal
  *     reads her turns as a program's, never as the operator's correction (INV-4352);

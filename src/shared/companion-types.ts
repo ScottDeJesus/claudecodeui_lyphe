@@ -16,7 +16,7 @@
  * The four Claude models Kaylee can run on, by the alias the CLI takes. Chosen from the panel's
  * picker (`CompanionPicture.models` lists them with their labels) and stored as
  * `CompanionSettings.model`; a change is applied live to her running process without losing her
- * memory.
+ * conversation.
  */
 export type CompanionModel = 'sonnet' | 'fable' | 'opus' | 'haiku';
 
@@ -169,14 +169,15 @@ export type CompanionProcess = { state: 'asleep' | 'waking' | 'awake' | 'failed'
 export type CompanionTurnOutcome = 'answered' | 'stopped' | 'failed';
 
 /**
- * The twelve things she may do in the house, each only on his word and never on her own judgment. The
+ * The thirteen things she may do in the house, each only on his word and never on her own judgment. The
  * dispatcher's own: `queue`, `hide` and `rework` answer a plan's open Accept prompt (`hide` and `rework`
  * also act on a card with none open), `answer` sends his answers to an open questions round, and `show`,
  * `recut`, `stop`, `resume` and `kick` act on a card. `resume_run` resumes a chain that is not running,
  * with his rulings. `open` brings a card, run, page or chat up on his screen. `close_followup` ticks one
- * of his follow-ups off. Carried by `CompanionPendingAction.action`.
+ * of his follow-ups off. `clear_memory` retires every memory of her own bank, which only he can ask of
+ * her, in the words he says aloud. Carried by `CompanionPendingAction.action`.
  */
-export type CompanionActionKind = 'queue' | 'hide' | 'show' | 'rework' | 'answer' | 'recut' | 'stop' | 'resume' | 'kick' | 'resume_run' | 'open' | 'close_followup';
+export type CompanionActionKind = 'queue' | 'hide' | 'show' | 'rework' | 'answer' | 'recut' | 'stop' | 'resume' | 'kick' | 'resume_run' | 'open' | 'close_followup' | 'clear_memory';
 
 /**
  * What an action acts on, told apart by `kind`. `spoken` is the name he says it by: the card draws it and
@@ -185,14 +186,16 @@ export type CompanionActionKind = 'queue' | 'hide' | 'show' | 'rework' | 'answer
  * (`plan` the plan a chain builds, `null` for a soul's); a `page` is a DocSpace page (`blockId` the block
  * an open lands on, `null` for the page); a `chat` is an app session id; a `followup` is one of his
  * follow-ups, `id` its number, `sessionId` the chat it belongs to and `text` its words as the card shows
- * them. Carried by `CompanionPendingAction.target`.
+ * them; a `memory` is her own bank, `spoken` the name he says it by ("your memory") and `count` the
+ * memories it held when the action was prepared. Carried by `CompanionPendingAction.target`.
  */
 export type CompanionActionTarget =
   | { kind: 'card'; name: string; spoken: string; arc: string | null }       // a plan or an epic, by the dispatcher's name
   | { kind: 'run'; runId: string; plan: string | null; spoken: string }      // a chain id or a soul launch id
   | { kind: 'page'; pageId: string; blockId: string | null; spoken: string }
   | { kind: 'chat'; sessionId: string; spoken: string }
-  | { kind: 'followup'; id: number; sessionId: string; spoken: string; text: string };
+  | { kind: 'followup'; id: number; sessionId: string; spoken: string; text: string }
+  | { kind: 'memory'; spoken: string; count: number };
 
 /**
  * One of his spoken lines, carried verbatim into an action: its `logId` in her log, its `at` time and its
@@ -267,7 +270,7 @@ export type CompanionPicture = {
  * floor moved: `floor` is the client id of the page that holds it now, so the page whose own id equals it
  * may play her voice and every other page shows the text only (sent on every write of the floor, whether
  * or not the holder changed); `companion_cleared` says the account's log, notes and pending action were
- * cleared, with her memory, and the panel empties.
+ * cleared, with her conversation, and the panel empties.
  */
 export type CompanionFrame =
   | { kind: 'companion_log'; entry: CompanionLogEntry }
@@ -285,3 +288,6 @@ export type CompanionFrame =
   | { kind: 'companion_open'; target: CompanionOpenTarget; floor: string }
   | { kind: 'companion_floor'; floor: string }
   | { kind: 'companion_cleared' };
+
+/** Her memory as Settings reads it: how many memories it holds (null when the bank cannot be read, `reason` saying why) and the DocSpace page that shows it. */
+export type CompanionMemoryReading = { count: number | null; pageId: string; reason: string | null };

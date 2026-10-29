@@ -623,6 +623,19 @@ const addCompanionPendingColumn = (db: Database): void => {
 };
 
 /**
+ * Adds `companion_state.memory_forget_line`: the id of the `companion_log` line of his that the last `forget` of her memory used, or
+ * NULL before any has. It is how one word of his forgets at most five memories: a forget must be given a line with a greater id,
+ * so "forget everything" cannot empty her bank five at a time. It holds a log id and never a memory (CloudCLI stores none of her
+ * memory, ruling 1). Clear leaves it: log ids are AUTOINCREMENT and never reused, so a value from before a Clear stays a true lower
+ * bound, and a line he says after the Clear always has a greater id.
+ */
+const addCompanionMemoryForgetLineColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'memory_forget_line', 'INTEGER');
+};
+
+/**
  * Adds `companion_state.unanswered_json`: the messages of his that no turn of Kaylee's has answered yet, as a list of
  * `{ uuid, body, via, at }` (his raw words and how they came), written when one is pushed and read by the next process, which
  * says them to her again. NULL for none, which is every row before this column.
@@ -798,6 +811,7 @@ export const runMigrations = (db: Database) => {
     db.exec(COMPANION_SCHEMA_SQL);
     addRelayedSendMessageUuidColumn(db);
     addCompanionPendingColumn(db);
+    addCompanionMemoryForgetLineColumn(db);
     addCompanionUnansweredColumn(db);
     // What the house told each account, kept: one row per notification the orchestrator was handed, written at
     // the listener seam. It references `users` alone, so it sits beside the companion's script, which reads it.

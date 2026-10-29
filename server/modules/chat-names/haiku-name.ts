@@ -7,10 +7,9 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { launchAccountEnv } from '@/modules/providers/index.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
+import { countWords, hasScriptWithoutSpaces, isSayableName } from '@/shared/sayable-name.js';
 import type { ChatFirstExchange } from '@/shared/types.js';
 import { errorReason } from '@/shared/utils.js';
-
-import { countWords, hasScriptWithoutSpaces, isSayableName } from './sayable-name.js';
 
 /**
  * The naming pass's one model call, shaped like the Cerberus summary audit (`cerberus/diagnosis/diagnosis-audit.ts`): a single

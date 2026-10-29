@@ -23,7 +23,7 @@ import type { CompanionHouse } from './house.js';
  * cannot reach another account's rows, pages or conversation. The routes only parse and answer; the verbs decide:
  *   - `sendText` takes the floor for the page that typed, logs his line and pushes it to her;
  *   - `saveSettings` stores the patch, tells every page, and applies a model change to her running process
- *     with her memory kept (`setModel`);
+ *     with her conversation kept (`setModel`);
  *   - `press` is a press of the talk button (`companion-press.ts`): the page takes the floor, the clip is heard, and
  *     his words (or the empty press) are logged and pushed in arrival order; a hearing that fails pushes nothing;
  *   - `sendDraft` is the panel's Send: the draft goes to its target (a turn, or folded into the running one) and the
@@ -134,7 +134,7 @@ function createCompanionService() {
 
     /**
      * Stores `patch`, tells every page the settings as they now read, and applies a model change to her running
-     * process (her memory is kept; a process that is asleep launches on the stored model). A model the CLI
+     * process (her conversation is kept; a process that is asleep launches on the stored model). A model the CLI
      * refuses to switch to is a system line on the panel, never a failed save: the setting IS saved and the
      * next time she wakes she runs on it.
      */

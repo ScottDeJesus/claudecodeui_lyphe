@@ -126,7 +126,7 @@ function longLog(): CompanionLogEntry[] {
     rows.push(she(at - 5, `t-long-${turn}`, 2, 'Want me to read the question out?'));
     if (turn === 2) rows.push(house(at - 120, 'alert', 'Feature finished · Kanban lanes · claudecodeui_lyphe\nLane drag landed. Follow-ups it filed for him: keep the drop zone the full lane height.'));
     if (turn === 5) rows.push(house(at - 90, 'alert', 'Permission · Migration chat · shadow-connector\nWaiting on him: run `npm run migrate` in Bash.'));
-    if (turn === 6) rows.push(house(at - 60, 'system', 'Her memory could not be resumed; she starts fresh.'));
+    if (turn === 6) rows.push(house(at - 60, 'system', 'Her conversation could not be resumed; she starts fresh.'));
   }
   rows.push(he(60, 'and the migration chat?'));
   rows.push(she(55, 't-long-end', 0, 'Three of five tables are copied and checked.', [{ tag: 'short pause', at: 44 }]));
@@ -271,6 +271,17 @@ const CLOSE = prepared(61, {
   target: { kind: 'followup', id: 12, sessionId: KANBAN.sessionId, spoken: 'Retest lane drag on Safari', text: 'Retest lane drag on Safari once the sticky headers land.' },
 });
 
+const CLEAR_LOG = [
+  he(44, 'Get ready to clear your memory.', 'spoken'),
+  she(40, 't-clear', 0, 'Your memory is on your panel to clear: the 3 things you keep.'),
+  she(39, 't-clear', 1, 'Say "Clear your memory".'),
+];
+const CLEAR = prepared(41, {
+  id: 'fx-act-clear', action: 'clear_memory', carried: [], say: 'Clear your memory',
+  prompt: "She forgets the 3 things she keeps. The docstore's history keeps them.",
+  target: { kind: 'memory', spoken: 'your memory', count: 3 },
+});
+
 const IDLE: CompanionActivity = { phase: 'idle', session: null, files: null, walk: null };
 const AWAKE: CompanionProcess = { state: 'awake', error: null };
 const FAILED_SENTENCE = "Kaylee couldn't start: the Claude login on this box has expired. Sign in again from Settings > Account.";
@@ -322,6 +333,7 @@ export const FAKE_PANEL: Record<string, FakePanelState> = {
   actionRework: state({ log: [...HELLO, ...REWORK_LOG], focus: KANBAN, pending: REWORK }),
   actionOpen: state({ log: [...HELLO, ...OPEN_LOG], pending: OPEN }),
   actionClose: state({ log: [...HELLO, ...CLOSE_LOG], pending: CLOSE }),
+  actionClear: state({ log: [...HELLO, ...CLEAR_LOG], pending: CLEAR }),
   // The densest dock an action meets: a round's prompt and his answers above a draft that stays where it was.
   actionDraft: state({ log: [...HELLO, ...ANSWER_LOG], focus: KANBAN, draft: DRAFT_KANBAN, pending: ANSWER }),
 };

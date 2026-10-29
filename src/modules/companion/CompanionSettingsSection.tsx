@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CompanionMemorySettings } from '@/modules/companion/CompanionMemorySettings';
 import { CompanionSettingsForm } from '@/modules/companion/CompanionSettingsForm';
 import { TalkBindingField } from '@/modules/companion/TalkBindingField';
 import { useCompanionSettings } from '@/modules/companion/hooks/useCompanionSettings';
@@ -21,18 +22,25 @@ type CompanionSettingsViewProps = {
    * talks to her comes before who she is. Absent, nothing is drawn for it.
    */
   talkBinding?: ReactNode;
+  /**
+   * Her memory card (CompanionMemorySettings), drawn after the talk button's card and directly above her fields once they
+   * are read. It draws its own card, its waiting row and its warn Banner, so this view only places it. Absent, nothing is
+   * drawn for it.
+   */
+  memory?: ReactNode;
 };
 
 /**
  * Settings > Voice > Companion, drawn: the section title, then the talk button's binding in a card of its own when it is
- * given, then her four fields (CompanionSettingsForm) in the settings tab's own card. Before they are read, a waiting row
- * in that card; a read that failed is a warn Banner with Try again, and no fields, because a field offered over a setting
- * the section cannot see is how a good value gets overwritten.
+ * given, then her memory card when it is given, then her four fields (CompanionSettingsForm) in the settings tab's own
+ * card. Before they are read, a waiting row in that card; a read that failed is a warn Banner with Try again, and no
+ * fields, because a field offered over a setting the section cannot see is how a good value gets overwritten.
  *
  * Exported for this file's CompanionSettingsSection and for `.verify/companion-panel-scaffold.mjs`, which draws each of
- * these states, and `.verify/kaylee-talk-scaffold.mjs`, which draws the talk button's row in its card.
+ * these states, `.verify/kaylee-talk-scaffold.mjs`, which draws the talk button's row in its card, and
+ * `.verify/kaylee-memory-card.mjs`, which draws her memory card in its place.
  */
-export function CompanionSettingsView({ settings, loadFailed, onRetry, onSave, talkBinding }: CompanionSettingsViewProps) {
+export function CompanionSettingsView({ settings, loadFailed, onRetry, onSave, talkBinding, memory }: CompanionSettingsViewProps) {
   const { t } = useTranslation('settings');
 
   let body;
@@ -40,6 +48,7 @@ export function CompanionSettingsView({ settings, loadFailed, onRetry, onSave, t
     body = (
       <>
         {talkBinding && <SettingsCard className="mb-3">{talkBinding}</SettingsCard>}
+        {memory && <div className="mb-3">{memory}</div>}
         <CompanionSettingsForm settings={settings} onSave={onSave} />
       </>
     );
@@ -90,6 +99,7 @@ export function CompanionSettingsSection() {
           onCancel={capture.cancel}
         />
       }
+      memory={settings && <CompanionMemorySettings name={settings.name} />}
     />
   );
 }

@@ -15,8 +15,9 @@ type SettingRowProps = HTMLAttributes<HTMLDivElement> & {
 
 /**
  * One labelled setting and its control: the row every Settings tab, the language picker, the heal
- * panel's settings dialog, the plugin cards and the MCP server rows lay out. Used by the settings,
- * i18n, heal, plugins and mcp modules — every one past the first is what admits it here.
+ * panel's settings dialog, the plugin cards, the MCP server rows, Claude's auto-install row and
+ * Kaylee's Settings section lay out. Used by the settings, i18n, heal, plugins, mcp, claude-updates
+ * and companion modules — every one past the first is what admits it here.
  *
  * THE LAYOUT FOLLOWS THE ROW'S OWN WIDTH, NOT THE VIEWPORT. The row wraps, and the text column
  * holds a floor of 10rem (or the whole row, when the row is narrower than that): the controls sit

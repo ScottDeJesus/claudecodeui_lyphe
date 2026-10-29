@@ -82,7 +82,7 @@ function walkLine(walk: CompanionWalk): string {
 
 /**
  * `<state>`: the focus chat, the draft with its target and the walkthrough, each as one line and
- * only when held. It is owed after her memory is compacted, when the conversation that held these
+ * only when held. It is owed after her conversation is compacted, when the conversation that held these
  * facts is gone. Answers `''` when nothing is held, so the caller sends nothing. Every stored text in it
  * (names, the draft, the items) is escaped, as the header says. Consumed by the companion session.
  */

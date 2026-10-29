@@ -25,7 +25,7 @@ import { resolveChat, resolveProject } from './house-reads.js';
  * `deps.sendDraft` (`companion-send.ts`), the same verb as the panel's Send: these two tools only name what they
  * mean to send and say what happened. A mismatch is refused, and the refusal names the draft.
  *
- * THE WALK'S CURSOR lives in the store, because her memory of it does not survive her own compaction or a turn
+ * THE WALK'S CURSOR lives in the store, because her conversation's hold on it does not survive her own compaction or a turn
  * to another chat: `walk` carries the cursor, the store holds it, and `<state>` restates it after a compaction.
  * One walk per account; a call that would MOVE it by naming another chat without `items` is refused rather
  * than guessed at, while `at` 0 ends the held walk whichever chat is named (its own chat may be gone).

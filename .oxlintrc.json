@@ -95,7 +95,8 @@
           "server/shared/tool-call-hint.ts",
           "server/shared/tool-text-result.ts",
           "server/shared/relayed-press-types.ts",
-          "server/shared/relay-record.ts"
+          "server/shared/relay-record.ts",
+          "server/shared/sayable-name.ts"
         ],
         "mode": "file"
       },

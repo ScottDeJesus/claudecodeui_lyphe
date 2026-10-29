@@ -14,6 +14,7 @@ import { roadmapReads } from '../eyes/roadmap-reads.js';
 import { runReads } from '../eyes/run-reads.js';
 import { handsTools } from '../hands/hands-tools.js';
 import type { CompanionHouse } from '../house.js';
+import { memoryTools } from '../memory/memory-tools.js';
 import { toolNames } from '../session/companion-prompt.js';
 
 import { actTools } from './act-tools.js';
@@ -100,8 +101,8 @@ export type CompanionToolDeps = {
  * `runReads(deps)` (`list_runs`, `read_run`), `docReads(deps)` (`search_docs`, `read_doc`),
  * `alertReads(deps)` (`list_alerts`), `panelReads(deps)` (`read_kanban`, `read_heal`, `read_notes`, `read_schedules`),
  * `houseReads(deps)` (`read_git`, `read_cerberus`, `read_memory`, `read_settings`), and last her hands (`hands/hands-tools.ts`):
- * `handsTools(deps)` (`prepare_action`, `take_action`, `cancel_action`). Consumed by
- * `companion-account.ts`, once per account.
+ * `handsTools(deps)` (`prepare_action`, `take_action`, `cancel_action`), and last her own memory (`memory/memory-tools.ts`):
+ * `memoryTools(deps)` (`recall`, `remember`, `forget`). Consumed by `companion-account.ts`, once per account.
  */
 export function buildCompanionTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<any>> {
   return [
@@ -116,5 +117,6 @@ export function buildCompanionTools(deps: CompanionToolDeps): Array<SdkMcpToolDe
     ...panelReads(deps),
     ...houseReads(deps),
     ...handsTools(deps),
+    ...memoryTools(deps),
   ];
 }

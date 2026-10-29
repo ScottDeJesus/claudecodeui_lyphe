@@ -8,7 +8,7 @@ import type { DispatcherAsk } from '@/shared/types.js';
  *
  * `SAY_VERB` is the verb of `say` ("Queue Kaylee's eyes"), and each is chosen to hold one of the action's own words
  * (`ACTION_WORDS` in `action-word.ts`) so his saying `say` aloud always passes the check of his word. `DONE_VERB` is what the
- * panel's system line says after the act ("On your word: queued Kaylee's eyes.").
+ * panel's system line says after the act ("On your word: queued Kaylee's eyes."); `doneOf` joins it to the target.
  *
  * Consumers: `action-recipe.ts` (the prepare), `hands-tools.ts` (the answers to her) and `action-doors.ts` (the answers and
  * the briefs a door carries).
@@ -28,6 +28,7 @@ export const SAY_VERB: Readonly<Record<CompanionActionKind, string>> = {
   resume_run: 'Resume the run',
   open: 'Open',
   close_followup: 'Close the follow-up on',
+  clear_memory: 'Clear',
 };
 
 /** The action done, for the panel's system line and her answer after a take. Consumed by `hands-tools.ts`. */
@@ -44,6 +45,7 @@ export const DONE_VERB: Readonly<Record<CompanionActionKind, string>> = {
   resume_run: 'resumed the run',
   open: 'opened',
   close_followup: 'closed the follow-up on',
+  clear_memory: 'cleared her memory',
 };
 
 /** The refusal of an open while no page holds the floor: the open is sent to that page alone. Consumed by `hands-tools.ts` (the prepare) and `action-doors.ts` (the take). */
@@ -51,6 +53,12 @@ export const NO_FLOOR = 'No page of his holds the floor; he must open your panel
 
 /** What he says to fire the action on `spoken`: `<Verb> <spoken>`. Consumed by `action-recipe.ts`. */
 export const sayOf = (action: CompanionActionKind, spoken: string): string => `${SAY_VERB[action]} ${spoken}`;
+
+/**
+ * The action done, on its target: "queued Kaylee's eyes". Clearing her memory is the one whose past tense already names what it
+ * acted on ("cleared her memory"), so nothing follows it. Consumed by `hands-tools.ts` (the panel's system line and her answer).
+ */
+export const doneOf = (action: CompanionActionKind, spoken: string): string => (action === 'clear_memory' ? DONE_VERB[action] : `${DONE_VERB[action]} ${spoken}`);
 
 /** A stamp's local HH:MM, as the prepare's answer says when an action lapses; a stamp that does not parse is "an unknown time". Consumed by `hands-tools.ts`. */
 export function clockOf(stamp: string): string {

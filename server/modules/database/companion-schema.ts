@@ -14,13 +14,14 @@
  * prepared and when it lapses, the line of his that fired it (`said`, `said_at`, `said_log_id`),
  * and how it ended (`ended_at`, `outcome`, and `answer`, the door's own sentence). A row with no
  * `outcome` is the action still waiting; an action ends once. It is a fact about the HOUSE — what
- * was done, on whose word, and when — so Clear, which wipes her memory and her pending action,
+ * was done, on whose word, and when — so Clear, which wipes her conversation and her pending action,
  * never deletes it: a pending action Clear finds standing is ended `cancelled` in its row first,
  * so no row is left without an outcome. The pending action itself lives in
  * `companion_state.pending_json`, beside the draft: a column added after the table, by
  * `addCompanionPendingColumn` in `migrations.ts`. So is `companion_state.unanswered_json`, the words of
  * his that no turn of hers has answered yet (`addCompanionUnansweredColumn`): the next process says
- * them to her again.
+ * them to her again. So is `companion_state.memory_forget_line` (`addCompanionMemoryForgetLineColumn`),
+ * the id of the log line of his that the last forget of her memory used; Clear leaves it.
  *
  * WHY `relayed_sends` HANGS ON `sessions`. A relayed send is a fact about a CHAT'S history — "this
  * message came to the chat through Kaylee" — so it follows the chat, keyed on the app session id

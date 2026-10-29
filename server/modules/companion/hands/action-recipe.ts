@@ -3,15 +3,16 @@ import type { DispatcherAsk } from '@/shared/types.js';
 
 import type { CompanionPin } from '../companion-pending.js';
 import { openAsk } from '../eyes/card-lines.js';
+import { bankDoor } from '../memory/bank-door.js';
 import type { CompanionToolDeps } from '../tools/companion-tools.js';
 
-import { canBeNamed } from './action-word.js';
+import { canBeNamed, wordsOf } from './action-word.js';
 import { acceptHead, acceptPrompt, firstSentence, questionsPrompt, sayOf } from './action-prompts.js';
 import { findCard, findChain, findFollowup, findOpenTarget, type CardFound } from './action-targets.js';
 import { inOrderSaid, resolveCarriedLines } from './carried-lines.js';
 
 /**
- * THE RECIPE OF EACH OF THE TWELVE ACTIONS: what it takes, what it checks at prepare, what it pins and what she reads back. The
+ * THE RECIPE OF EACH OF THE THIRTEEN ACTIONS: what it takes, what it checks at prepare, what it pins and what she reads back. The
  * prepare is where an action is fixed to what he is shown: the target is resolved, the action is checked to be doable NOW (an
  * Accept prompt is open, the follow-up is open, the run is stopped), the ask and its lock token or the chain or the follow-up is
  * PINNED, and every line the action carries is checked to be one of his spoken lines of the last 30 minutes. Nothing here moves
@@ -27,6 +28,7 @@ import { inOrderSaid, resolveCarriedLines } from './carried-lines.js';
  *   resume_run            a chain whose record is not `running`, with `words` (his rulings), required: pins `chainId`.
  *   open                  a card, then a run, then a page, then a chat; pins where it lands.
  *   close_followup        `#<id>` of an open follow-up of his: pins `followupId`.
+ *   clear_memory          her own memory, named as such: reads her bank's count, pins nothing and carries nothing.
  *
  * Every pinned `ask` is the dispatcher picture's own `asking` at the moment of the prepare, so the order the door later sends is
  * for the prompt as he heard it read back, and a prompt that changed meanwhile is refused at the door, not carried.
@@ -218,8 +220,27 @@ function prepareClose(deps: CompanionToolDeps, input: PrepareInput): Preparation
   return ready('close_followup', target, { pin: { followupId: target.id }, readBack: `${sayOf('close_followup', target.spoken)}: "${text}"` });
 }
 
+/**
+ * `clear_memory`: her whole bank, which only his spoken word clears. The target must name her memory ("memory", "your memory"), and
+ * the count is read from the bank itself so the card and her read-back say how many she would forget. An empty bank has nothing to
+ * clear, and a door that does not answer is a refusal, not a card that fires into the dark.
+ */
+async function prepareClearMemory(input: PrepareInput): Promise<Preparation> {
+  if (!wordsOf(input.target).includes('memory')) return refuse('clear_memory acts on your memory alone; name it as your memory.');
+  const listed = await bankDoor.list();
+  if (!listed.ok) return refuse(`Your memory can't be reached just now: ${listed.sentence.replace(/[.!?]+$/, '')}.`);
+  const count = listed.value.length;
+  if (count === 0) return refuse('There is nothing to clear.');
+  const target: CompanionActionTarget = { kind: 'memory', spoken: 'your memory', count };
+  const things = `${count} ${count === 1 ? 'thing' : 'things'}`;
+  return ready('clear_memory', target, {
+    prompt: `She forgets the ${things} she keeps. The docstore's history keeps them.`,
+    readBack: `${sayOf('clear_memory', target.spoken)}: you forget the ${things} you keep; the docstore's history keeps them, and the conversation is not touched.`,
+  });
+}
+
 /** The actions that take no `words` (an answer round's lines go in `answers`): given any, the prepare refuses rather than let her believe they travelled. */
-const TAKES_NO_WORDS: ReadonlySet<CompanionActionKind> = new Set(['queue', 'hide', 'show', 'answer', 'recut', 'stop', 'resume', 'kick', 'open', 'close_followup']);
+const TAKES_NO_WORDS: ReadonlySet<CompanionActionKind> = new Set(['queue', 'hide', 'show', 'answer', 'recut', 'stop', 'resume', 'kick', 'open', 'close_followup', 'clear_memory']);
 
 /**
  * The prepare of one action: its target resolved, its checks made, its pin taken and its lines carried, or the sentence that
@@ -240,6 +261,8 @@ export async function prepareRecipe(deps: CompanionToolDeps, input: PrepareInput
     prepared = await prepareOpen(deps, input);
   } else if (action === 'close_followup') {
     prepared = prepareClose(deps, input);
+  } else if (action === 'clear_memory') {
+    prepared = await prepareClearMemory(input);
   } else {
     const found = await findCard(deps.house, input.target);
     if (!found.ok) return refuse(found.sentence);

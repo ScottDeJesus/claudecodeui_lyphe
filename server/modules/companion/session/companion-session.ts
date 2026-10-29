@@ -222,8 +222,8 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       console.warn(`[Companion] account ${userId}: the CLI has no conversation ${resume}; she starts fresh`);
       retire(launch);
       writeProviderSessionId(null);
-      onSystemLine('Her memory could not be resumed; she starts fresh');
-      // Her memory of the focus, the draft and the walk went with the conversation; the next message restates them.
+      onSystemLine('Her conversation could not be resumed; she starts fresh');
+      // The focus, the draft and the walk lived in the conversation that is gone; the next message restates them.
       assembler.oweState();
       startWith(ledger.carry(), null);
       return;
