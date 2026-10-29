@@ -55,7 +55,7 @@ export const MEMORY_BODY_MAX = 2_000;
 export const SAME_SUBJECT_LOGIT = 1.5;
 
 const TYPED_REFUSAL = 'That line was typed, not said: only what he says aloud is kept. Ask him to say it.';
-const ABSENT_REFUSAL = 'That is not a line he said. Give his words exactly as he said them.';
+const ABSENT_REFUSAL = 'That is not a press he said. Give the whole press exactly as he spoke it, start to finish, not a sentence out of it.';
 
 /** The words of each judgment, after "Kept on her own judgment: ". */
 const JUDGMENT: Record<Exclude<KeptWhy, 'asked'>, string> = {
@@ -69,7 +69,9 @@ const JUDGMENT: Record<Exclude<KeptWhy, 'asked'>, string> = {
 const folded = (text: string): string => text.trim().replace(/\s+/g, ' ');
 
 /**
- * His SPOKEN log line whose text equals `said` (whitespace folded), newest first; or the sentence refusing it. Rows are in the log's own
+ * His SPOKEN log line whose text equals `said` (whitespace folded), newest first; or the sentence refusing it. The match is the WHOLE row:
+ * a talk press is logged as one row whose text is the whole transcript (`companion-press.ts`), so `said` is a whole press and a sentence
+ * cut out of one is refused, which is why the refusal and her tool's words say so. Rows are in the log's own
  * shape and any order. When several spoken rows match, the newest (the greatest id) is the line. A matching operator row that was not
  * spoken (typed, or `via` null on an old row) is the typed refusal; no operator row matching is the other refusal, and so is a blank
  * `said`, which would otherwise equal the empty press's `''`. Consumed by `memory-verbs.ts` (remember, forget).

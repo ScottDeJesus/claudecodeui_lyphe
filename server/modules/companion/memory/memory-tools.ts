@@ -40,7 +40,7 @@ export function memoryTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition
       {
         kind: z.enum(['rule', 'gotcha', 'landmine', 'manual']).describe('rule: how he wants things done. gotcha: a trap he named. landmine: something that will hurt if forgotten. manual: a name, a how-to or a fact he gave.'),
         title: z.string().trim().min(1).max(40).describe('A few words you can say aloud, such as "Brief length".'),
-        said: z.array(z.string().trim().min(1).max(2000)).min(1).max(6).describe('The lines he said that carry it, each exactly as he said it. Only lines he spoke are kept; a typed line is refused.'),
+        said: z.array(z.string().trim().min(1).max(2000)).min(1).max(6).describe('Each entry is ONE WHOLE PRESS of his, exactly as he spoke it from start to finish, as your log holds it. A sentence cut out of a longer press is refused: give the press whole, and the memory\'s body is then that whole press. Only presses he spoke are kept; a typed line is refused.'),
         why: z.enum(['asked', 'ruling', 'name', 'stale', 'brief']).describe('asked: he told you to keep it. Else your own judgment: ruling (a standing ruling or preference), name (a name he gives something), stale (something he told you is stale) or brief (how he likes a brief written).'),
         context: z.string().trim().min(1).max(300).optional().describe('One line of yours for what "this" or "that" meant in his words. Leave out when his words stand alone.'),
         corrects: z.string().trim().regex(TOKEN).optional().describe('The token of the memory this one corrects; it is rewritten. Leave out for a new memory.'),
@@ -53,7 +53,7 @@ export function memoryTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition
       toolLine('forget'),
       {
         memories: z.array(z.string().trim().regex(TOKEN)).min(1).max(5).describe('The tokens of the memories to stop keeping, one to five.'),
-        said: z.string().trim().min(1).max(2000).describe('His line that tells you to forget them, exactly as he said it. Each forget needs a new line of his.'),
+        said: z.string().trim().min(1).max(2000).describe('His press that tells you to forget them: ONE WHOLE PRESS, exactly as he spoke it from start to finish, as your log holds it. A sentence cut out of a longer press is refused. Each forget needs a new press of his.'),
       },
       (args) => guardedToolResult('forget', 'forget that', () => forget(deps, args))
     ),

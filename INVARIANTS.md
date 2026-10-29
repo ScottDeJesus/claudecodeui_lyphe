@@ -18544,6 +18544,7 @@ Behaviour: the manual row of `memory-words.ts`. Measured limits: INV-10121.
 | Write a memory's body any way but `memoryBody`, or leave her `context` unfolded | a newline in her context starts a forged `He said (…)` line: her words stand as his | `quotesOf` reads every line of that shape as his; ruling 4 |
 | Let `findHisLine` take a typed row, a row of hers or `via: null` | a line he typed becomes a memory of his | his word is a talk press (`role: 'operator'`, `via: 'spoken'`), as in `checkHisWord` |
 | Let a blank `said` through `findHisLine` | the empty press's `''` matches and a memory is made of nothing | the fold of a blank is `''` |
+| Make `findHisLine` match part of a row, or change what `said` is without the words that teach it (`ABSENT_REFUSAL`, the `said` descriptions of `remember` and `forget` in `memory-tools.ts`, their two lines in `companion-prompt.ts`) | she is told to give a whole press while the matcher takes a sentence, or the reverse; she retries cut sentences against a refusal that does not say why | a talk press is one log row, so `said` is a whole press (MAN-9183) |
 | Compare the account or the time in `quotesAlike`, or make it compare near | the same words said twice are kept twice, or a different statement is dropped as a twin | exact words only; meaning is `SAME_SUBJECT_LOGIT`'s job |
 | Drop the trim or the `endsWith('”')` test from `quotesOf` | without the trim a CRLF body or a trailing space yields no quote; without the test a long line of `, x): “` runs with no closing mark scans quadratic | the regex rescans from every run |
 | Move `SAME_SUBJECT_LOGIT` without re-measuring | corrections kept beside the stale memory, or different memories refused as a twin | the score is read on title then his words and falls with the title |
@@ -18787,29 +18788,6 @@ probe-key: 7a3ab7d0a768a74e5789c68868833993634f048c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionMemorySettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-settings.mjs
 
-## INV-10146 — probe — (MEDIUM) — the bank maker dies as soon as the docstore carries repo `kaylee`, and a failed `make` leaks a database with no way to find it
-
-(MEDIUM) — the bank maker dies as soon as the docstore carries repo `kaylee`, and a failed `make` leaks a database with no way to find it
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-f=/home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-bank-db.sh
-echo "insert into repos guarded (on conflict / not exists): $(grep 'insert into repos' "$f" | grep -c -i -e 'on conflict' -e 'not exists')"
-echo "drop constraint guarded (if exists):                 $(grep 'drop constraint' "$f" | grep -c -i 'if exists')"
-echo "repos-failure branch names a DSN to drop:            $(grep 'repos could not be set' "$f" | grep -c -i -e 'KAYLEE_BANK_DSN' -e 'drop')"
-echo "repos.name is the primary key:                       $(grep -c 'CONSTRAINT repos_pkey PRIMARY KEY (name)' /home/lyphe/.claude/docstore/schema/001_init.sql)"
-EOF
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.*) rm -r "$D" ;; esac
-# expect: the three guard lines print 0 while the defect stands (each prints 1 or more once the block is guarded and the failure branch names the DSN), and the primary-key line prints 1
-```
-
-measured 2026-10-29 by chain chain-kaylee--memory--whole-20261029-005633-5766, finding M1, MEDIUM
-probe-key: 974807aa9d1e80ac2316939c684d490177eef0bd
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-bank-db.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-memory-kit.mjs
-
 ## INV-10147 — probe — (LOW) — step 3's "a remember she tried was refused as typed" fails when Haiku's first `remember` is refused by the harness
 
 (LOW) — step 3's "a remember she tried was refused as typed" fails when Haiku's first `remember` is refused by the harness
@@ -18970,3 +18948,68 @@ measured 2026-10-29 by chain chain-kaylee--memory--docs-20261029-013306-6810, fi
 probe-key: a1d288585e8a353a13ec99b8dc080bb1bbf2bb28
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionMemorySettings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionMemorySettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-settings.mjs
+
+## INV-10163 — probe — LOW — a press over about 1,890 characters can never be kept, and the oversize refusal tells her to cut it
+
+LOW — a press over about 1,890 characters can never be kept, and the oversize refusal tells her to cut it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "one press takes at most: $(grep -o 'MESSAGE_TEXT_MAX = [0-9_]*' server/modules/companion/companion-input.ts)"
+echo "said entries capped at:  $(grep -c 'max(2000)' server/modules/companion/memory/memory-tools.ts) schema lines carry max(2000)"
+echo "body cap:                $(grep -o 'MEMORY_BODY_MAX = [0-9_]*' server/modules/companion/memory/memory-words.ts)"
+echo "oversize-press refusal:  $(grep -c 'carry only the lines that say it' server/modules/companion/memory/memory-verbs.ts) line(s) tell her to cut"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -r "$D" ;; esac
+# expect: MESSAGE_TEXT_MAX = 8000, 2 max(2000) lines, MEMORY_BODY_MAX = 2_000 and 1 refusal line while the gap stands (a press between ~1,890 and 8,000 characters cannot be kept whole)
+```
+
+measured 2026-10-29 by chain chain-kaylee-memory-first-remember-20261029-090331-976c, finding L1, LOW
+probe-key: d99d8435d0716ccecd1a631eb0e42ff58ccfea08
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-bank-door.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-bank-db.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-verbs.mjs, /home/lyphe/.claude/docstore/schema/007_kaylee_repo.sql
+
+## INV-10164 — probe — LOW — from tonight the passes that the builder named as kaylee--bank's reach her bank, and one he did not name publishes it
+
+LOW — from tonight the passes that the builder named as kaylee--bank's reach her bank, and one he did not name publishes it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+docstore pages sync --package kaylee:memory --dry-run 2>&1 | grep -o 'created=[0-9]*' | head -1 || echo none
+docstore check 2>&1 | python3 -c 'import sys,json; f=json.load(sys.stdin)["findings"]; print("check findings on kaylee:memory:", len([x for x in f if x["package"]=="kaylee:memory"]))' || echo none
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -r "$D" ;; esac
+# expect: created=1 and 4 check findings while her package is in the passes (created=0 and 0 once kaylee--bank keeps her repo out)
+```
+
+measured 2026-10-29 by chain chain-kaylee-memory-first-remember-20261029-090331-976c, finding L2, LOW
+probe-key: d43f2125b491144aa056acbf4d783001def71d50
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-bank-door.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-bank-db.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-verbs.mjs, /home/lyphe/.claude/docstore/schema/007_kaylee_repo.sql
+
+## INV-10165 — probe — LOW — the report's flag that the live Kaylee "has the new words only after the server next restarts" is wrong
+
+LOW — the report's flag that the live Kaylee "has the new words only after the server next restarts" is wrong
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+newest=$(stat -c '%Y' server/modules/companion/memory/memory-words.ts server/modules/companion/memory/memory-tools.ts server/modules/companion/session/companion-prompt.ts | sort -n | tail -1)
+pid=$(pgrep -f 'tsx/dist/loader.mjs server/index.ts' | head -1)
+if [ -z "$pid" ]; then echo "server: not running"; else started=$(date -d "$(ps -o lstart= -p "$pid")" +%s); [ "$started" -ge "$newest" ] && echo "server started after the newest words edit: yes" || echo "server started after the newest words edit: no"; fi
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -r "$D" ;; esac
+# expect: "server started after the newest words edit: yes" (the running server loaded the new words); "no" would mean an edit is waiting on a restart
+```
+
+measured 2026-10-29 by chain chain-kaylee-memory-first-remember-20261029-090331-976c, finding L3, LOW
+probe-key: 9bad140c915340264e786e845c2601c8ca4705b5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-bank-door.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-bank-db.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-verbs.mjs, /home/lyphe/.claude/docstore/schema/007_kaylee_repo.sql

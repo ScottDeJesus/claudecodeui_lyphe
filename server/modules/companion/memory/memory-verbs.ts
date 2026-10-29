@@ -205,7 +205,8 @@ async function rememberInOrder(deps: CompanionToolDeps, input: RememberInput): P
   if (!his.ok) return deps.refuse(his.sentence);
 
   const body = memoryBody({ account: accountName(deps.userId), lines: his.lines, why: input.why, context: input.context ?? null });
-  if (characterCount(body) > MEMORY_BODY_MAX) return deps.refuse('Too long to keep whole: carry only the lines that say it.');
+  // One oversize press cannot be shortened (a press is kept whole), so she is told to ask for it again on its own; several presses can drop some.
+  if (characterCount(body) > MEMORY_BODY_MAX) return deps.refuse(his.lines.length > 1 ? 'Too long to keep whole: carry only the presses that say it.' : 'That press is too long to keep whole, and a press is never cut. Ask him to say the point again on its own.');
 
   return input.corrects === undefined ? newMemory(deps, input, his.lines, body) : correction(deps, input, input.corrects, body);
 }

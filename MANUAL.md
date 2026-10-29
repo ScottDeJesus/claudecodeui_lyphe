@@ -5715,7 +5715,7 @@ Every message to her is assembled at the moment it is pushed (`createMessageAsse
 - The prompt's TOOLS section lists every tool she holds; the registry: MAN-9070.
 - `THE HOUSE, WHEN HE POINTS AT IT` (after WHAT YOU MUST NOT DO, before TOOLS): the rule (call the panel's tool before saying a word about it; every one takes `panel: true`), then one pointer line per panel naming its tool, in the TOOLS section's order. A new eyes tool adds its pointer line and its TOOLS line together: `toolLine` throws on a missing TOOLS line; a pointer line is read only by the probe of its own tool (`.verify/companion-doc-reads.mjs`: DocSpace's; `.verify/companion-run-reads.mjs`: the runs', and that it stands after the roadmap's and before DocSpace's).
 - `ON HIS WORD` (after THE HOUSE, before TOOLS): the hands' rule in her words. She does nothing in the house on her own judgment; `prepare_action` puts the action on his panel and tells her what to read back; she reads back the action and its name (for an Accept, the head of the prompt) and stops; only when he then says the thing itself with its name, aloud, she calls `take_action` with his words exactly as he spoke them. A bare yes, a typed line or words that do not name it are not his word; notes, answers and rulings travel in his own spoken words; `cancel_action` when he changes his mind. The server holds the line whatever she says (MAN-9171, INV-10099). Its tools' lines are in TOOLS; `toolLine` throws on a missing one.
-- HER MEMORY in the prompt is three lines and a pointer, and nothing is pushed (ruling 3): the pointer is the LAST line of THE HOUSE, WHEN HE POINTS AT IT (`Your own memory, what he has told you to keep: recall, then remember or forget.`; it names no panel); TOOLS ends with `recall(about, panel)`, `remember(kind, title, said, why, context, corrects, also)` and `forget(memories, said)` after `cancel_action()`. Each is the tool's description (`toolLine`, MAN-9192). `remember`'s line tells her to say aloud in half a sentence that she is keeping it when `why` is not `asked`, and never to keep a transcript, what a session said, or usage or spend (ruling 2). `forget`'s line closes: `Clearing your whole memory is his act alone: in Settings, or prepare_action clear_memory, read back to him.` `prepare_action`'s line lists `clear_memory` and says its target may be "your memory" (MAN-9194).
+- HER MEMORY in the prompt is three lines and a pointer, and nothing is pushed (ruling 3): the pointer is the LAST line of THE HOUSE, WHEN HE POINTS AT IT (`Your own memory, what he has told you to keep: recall, then remember or forget.`; it names no panel); TOOLS ends with `recall(about, panel)`, `remember(kind, title, said, why, context, corrects, also)` and `forget(memories, said)` after `cancel_action()`. Each is the tool's description (`toolLine`, MAN-9192). `remember`'s line says `said` is each press of his that carries it, whole, exactly as he spoke it, and that a sentence cut from a press is refused; `forget`'s line says the same of its one press (MAN-9183). `remember`'s line tells her to say aloud in half a sentence that she is keeping it when `why` is not `asked`, and never to keep a transcript, what a session said, or usage or spend (ruling 2). `forget`'s line closes: `Clearing your whole memory is his act alone: in Settings, or prepare_action clear_memory, read back to him.` `prepare_action`'s line lists `clear_memory` and says its target may be "your memory" (MAN-9194).
 - "Memory" is the bank's word alone in the prompt. The collaborator clause says she keeps hold of what he decided earlier in this conversation (`remember` is a tool's name), and the `<state>` message restates the focus "after this conversation was compacted".
 - The design record is the DocSpace page "Voice companion prompt" (block "System prompt"): the sections and tool lines above are its words, and a change to the prompt's words is made in both.
 - The sound set is the account's `gemini.soundTags` (shipped default `DEFAULT_SOUND_TAGS`, voice module): one list for the fill and the filter (MAN-9081).
@@ -8195,7 +8195,7 @@ RULING 4: a memory is never her paraphrase of him. The server writes the body fr
 ## Exports
 | name | shape | does |
 | --- | --- | --- |
-| `HisLine` | `{ id; at; text }` | one line he said: the log row's id, its own ISO time, its text as the log keeps it |
+| `HisLine` | `{ id; at; text }` | one spoken log row of his, which is one WHOLE PRESS: the row's id, its own ISO time, its text as the log keeps it |
 | `KeptWhy` | `'asked' \| 'ruling' \| 'name' \| 'stale' \| 'brief'` | why she keeps it |
 | `MEMORY_BODY_MAX` | `2_000` | most characters of a body; the caller enforces it |
 | `SAME_SUBJECT_LOGIT` | `1.5` | reranker score at or above which a held memory is about the same thing; a net (INV-10121) |
@@ -8207,7 +8207,7 @@ RULING 4: a memory is never her paraphrase of him. The server writes the body fr
 | `quotesAlike(a, b)` | `boolean` | two bodies quote the same words |
 
 ## `findHisLine`
-`rows` are the log's own shape (`{ id, at, role, via, text }`), any order. Texts are compared trimmed with every run of whitespace one space (`checkHisWord`'s fold).
+`rows` are the log's own shape (`{ id, at, role, via, text }`), any order. Texts are compared trimmed with every run of whitespace one space (`checkHisWord`'s fold). The match is the WHOLE row: a talk press is logged as one row whose text is the whole transcript (`companion-press.ts`), so `said` must be a whole press, and a sentence cut out of a longer press equals no row and gets the absent sentence.
 
 | rows | answer |
 | --- | --- |
@@ -8217,7 +8217,7 @@ RULING 4: a memory is never her paraphrase of him. The server writes the body fr
 | no operator row equal (a line of hers never counts) | the absent sentence |
 
 - Typed sentence: `That line was typed, not said: only what he says aloud is kept. Ask him to say it.`
-- Absent sentence: `That is not a line he said. Give his words exactly as he said them.`
+- Absent sentence: `That is not a press he said. Give the whole press exactly as he spoke it, start to finish, not a sentence out of it.`
 
 ## The body — `memoryBody`
 ```text
@@ -8243,7 +8243,7 @@ Writes what it is given; never truncates. A context holding a newline and a fake
 ## Prove it
 `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-memory-words.mjs` → `All checks passed.` It prints:
 - `memoryBody` for 20 shapes (one line and two, with and without context, `asked` and each judgment; the longest 302 characters);
-- `findHisLine` on spoken, typed and absent texts, a text said twice (newest id in either row order), a line of hers, a blank `said`;
+- `findHisLine` on spoken, typed and absent texts, a text said twice (newest id in either row order), a line of hers, a blank `said`, a whole two-sentence press (found) and one sentence cut from it (the absent sentence);
 - `quotesOf` and `firstQuote` of a written body, a quote holding its own `“` and `”): “`, a fake `He said (…)` line in the context;
 - `quotesAlike` both ways, and the `>= SAME_SUBJECT_LOGIT` decision: 9.5, 8.91, 6.7, 3.39 same; -0.23, -9.37 not;
 - `isSayableName` from `server/shared/sayable-name.ts` on "Live mode", "Brief length" (true), "/git", "Untitled Session" (false).
@@ -8389,8 +8389,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-card.mjs, 
 - Callers: `remember`, `forget`, `clearMemory` (MAN-9192, MAN-9193). Reads (`recall`, the Settings count, the clear recipe's count) do not queue.
 
 ## Open — measured 2026-10-29
-- The door's mark is not built. `grep -rIl -i kaylee ~/.claude/docstore` finds 0 files; `registry.py` records `X-Docstore-Door` only as the `usage` door (`DOORS`) and knows one writer mark, `inbox` (the memory channel). So a call with `kaylee` is read as no mark, a write without it is not refused for lacking it, a write is not held to repo `kaylee` by it, and her repo is not kept out of unscoped reads. Those are kaylee--bank's to build; the client sends the mark and names `package: BANK` regardless.
-- The live door `127.0.0.1:8006`: `list` of `{"package":"kaylee:memory"}` answers 404 `no package kaylee:memory — nearest: …` (the client reads it as an empty bank); `list` of `{"repo":"kaylee"}` answers `unknown repo: 'kaylee'`. The store's repo check lists house, archpulse, cloudcli, shadow-connector and eis-app (`.verify/kaylee-memory-bank-db.sh`), so a first write to her package is refused there until the store's migration adds the repo.
+- The door's mark is not built. `grep -rIl -i kaylee ~/.claude/docstore` finds 1 file, `schema/007_kaylee_repo.sql` (the repo, below); no code. `registry.py` records `X-Docstore-Door` only as the `usage` door (`DOORS`) and knows one writer mark, `inbox` (the memory channel). So a call with `kaylee` is read as no mark, a write without it is not refused for lacking it, a write is not held to repo `kaylee` by it, and her repo is not kept out of unscoped reads: `docstore search "<her words>"` with no package returns her rows (measured 2026-10-29). Those are kaylee--bank's to build; the client sends the mark and names `package: BANK` regardless.
+- Her repo is live: `docstore/schema/007_kaylee_repo.sql` (applied 2026-10-29) widens `repos_name_allowed` to six names and inserts repo `kaylee`, root `/nonexistent/kaylee` (a path that is no folder: `export` skips it, so no `MANUAL.md`, `INVARIANTS.md` or `ATLAS.md` is written for her rows). A first write makes package `kaylee:memory` (`packages.get_or_create` reads `repos` live; no restart needed). `export` and `list --repo kaylee` read `paths.roots()`, cached per process: a door started before the migration needs a restart for those two.
+- The live door `127.0.0.1:8006`: `list` of `{"package":"kaylee:memory"}` and of `{"repo":"kaylee"}` answer her rows. A bank with no package yet answers 404 `no package kaylee:memory — nearest: …` (the client reads it as an empty bank).
+- Nothing keeps repo `kaylee` out of the passes: `docstore/window/pages.py` filters no repo, so `docstore pages sync` makes a DocSpace page of every package holding rows, `kaylee:memory` included (rows whose bodies are his spoken words), and `docstore check` and `atlas --draw` take her too. Keeping her out is kaylee--bank's ruling, not made.
 - The live DocSpace `GET :8005/api/docspace/pages/page-kaylee-memory` answers 404 `not_found`: the Settings link opens a missing page until that page exists.
 
 ## Prove it
@@ -8398,7 +8400,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-card.mjs, 
 | mode | does |
 |---|---|
 | `scratch` | on the docstore's scratch door over a scratch DATABASE only (refuses another): a write as actor `kaylee`, the search finding it by meaning with its score, `get` `mine: true`, `get` of a house row `mine: false`, two `onBank` works in queue order, a retire, the search empty again, that token's `history` actor `kaylee`. Run as `DOCSTORE_DSN=<scratch dsn> ~/.claude/docstore/bin/scratch-door <free port> env TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-bank-door.mjs scratch`; the DSN stands BEFORE `scratch-door`, and the script reads it from the door's `/proc/<pid>/environ` |
-| `live` | writes nothing: `bankDoor.list()`, a scoped search, the raw `POST /api/list {"repo":"kaylee"}` |
+| `live` | writes nothing: `bankDoor.list()`, a scoped search, the raw `POST /api/list {"repo":"kaylee"}`, which must answer 200 rows (the door knows her repo) |
 | `down` | `DOCSTORE_URL=http://127.0.0.1:1`: the did-not-answer sentence for every verb |
 | `wire` | a stand-in door (`.verify/lib/kaylee-bank-standin.mjs`) on a free port: the exact request of each verb and what the client makes of 200, 400, 404 (absent package and any other), 409, 503, non-JSON, a wrong shape and a stall past 10 s. Proves the client only |
 
@@ -8412,6 +8414,8 @@ Ruling 1: one package of hers in the docstore, no copy anywhere else. CloudCLI s
 Ruling 2: never usage or spend. No answer below carries a cost.
 Ruling 3: nothing loaded up front. Nothing is pushed to her; recall is hers to call.
 Ruling 4: a memory is never her paraphrase of him. The SERVER writes the body from his spoken log lines; she writes only the title and, marked as hers, one line of context.
+
+A `said` is ONE WHOLE PRESS: a talk press is one log row holding the whole transcript (`companion-press.ts`), and `findHisLine` matches whole rows (MAN-9183). A sentence cut from a longer press matches no row and is refused; the memory's body quotes the press whole.
 
 ## One bank for both accounts
 - Her bank is one package. Each quote line of a memory names the account it came through, `accountName(userId)` = the CloudCLI username (`scott`, `verve`), else `account <id>`.
@@ -8432,8 +8436,8 @@ Ruling 4: a memory is never her paraphrase of him. The SERVER writes the body fr
 |---|---|
 | `corrects` with `also: true` | `Say one: corrects rewrites that memory, also keeps both.` |
 | title through `isSayableName` (`server/shared/sayable-name.ts`, MAN-9067) | `A title is a few words you can say aloud.` |
-| each `said` through `findHisLine` over `deps.store.readLog(400)` (`COMPANION_LOG_KEEP`, the whole log her store keeps), each line once | `findHisLine`'s sentence: typed, or not a line he said (MAN-9183) |
-| `memoryBody(...)` over `MEMORY_BODY_MAX` (2,000) | `Too long to keep whole: carry only the lines that say it.` |
+| each `said` through `findHisLine` over `deps.store.readLog(400)` (`COMPANION_LOG_KEEP`, the whole log her store keeps), each press once | `findHisLine`'s sentence: typed, or not a press he said (MAN-9183) |
+| `memoryBody(...)` over `MEMORY_BODY_MAX` (2,000) | with several presses: `Too long to keep whole: carry only the presses that say it.`; with one: `That press is too long to keep whole, and a press is never cut. Ask him to say the point again on its own.` |
 | with `corrects`: `get` it | not `mine`: `<token> is not one of your memories.`. Else `write({ token, kind, title, body })`: `Corrected <token> (<title>). It said “<old first quote>”; now it says “<new first quote>”.` |
 | without: `search(title + "\n" + his texts joined by "\n", 3)`; when it finds no row, `list` and `get` of each | a held body quoting the same words (`quotesAlike`): `That is already kept as <token> (<title>).` |
 | a row of the search at or over `SAME_SUBJECT_LOGIT` (1.5), no `also` | `Not kept yet: <token> (<title>) is about the same thing. He said, <when>: “<its first quote>”. If this corrects it, remember again with corrects <token>. If both stand, remember again with also.` |
@@ -8456,9 +8460,9 @@ Ruling 4: a memory is never her paraphrase of him. The SERVER writes the body fr
 | tool | schema (zod) | `readOnlyHint` |
 |---|---|---|
 | `recall` | `about` string trimmed 1–500; `panel` boolean optional | yes |
-| `remember` | `kind` `rule` \| `gotcha` \| `landmine` \| `manual`; `title` string trimmed 1–40; `said` array of strings trimmed 1–2000, 1–6; `why` `asked` \| `ruling` \| `name` \| `stale` \| `brief`; `context` string trimmed 1–300 optional; `corrects` token optional; `also` boolean optional | no |
+| `remember` | `kind` `rule` \| `gotcha` \| `landmine` \| `manual`; `title` string trimmed 1–40; `said` array of strings trimmed 1–2000 (a per-press cap; the longest spoken row measured 752), 1–6; `why` `asked` \| `ruling` \| `name` \| `stale` \| `brief`; `context` string trimmed 1–300 optional; `corrects` token optional; `also` boolean optional | no |
 | `forget` | `memories` array of tokens, 1–5; `said` string trimmed 1–2000 | no |
-- A token is `/^(INV\|MAN)-\d+$/`. The description of each tool is its prompt line (`toolLine(name)`). Each handler runs in `guardedToolResult` (`read your memory`, `keep that`, `forget that`).
+- A token is `/^(INV\|MAN)-\d+$/`. The description of each tool is its prompt line (`toolLine(name)`); the `said` field of `remember` and of `forget` says in its own description that an entry is one whole press as her log holds it and that a sentence cut from a press is refused. Each handler runs in `guardedToolResult` (`read your memory`, `keep that`, `forget that`).
 
 ## Prove it
 - `.verify/kaylee-memory-verbs.mjs`: every sentence above, the bodies sent, the order of calls and the guard, over a copy of `auth.db` and a stand-in door (`.verify/lib/kaylee-bank-standin.mjs`); client side only; no model, no Gemini. `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-memory-verbs.mjs`.
@@ -8496,7 +8500,8 @@ Ruling 4: he clears her whole memory only by his own act. One word of his forget
 - `.verify/kaylee-memory-clear-hands.mjs`: the clear through her hands over a copy of `auth.db` and a stand-in door, client side only; no model. `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-memory-clear-hands.mjs`.
 - On the scratch stack, Haiku on account 1: `.verify/kaylee-memory-clear.mjs` (typed "Get ready to clear your memory." prepares the card; the press "Clear your memory." empties the bank; the scratch store's `history` keeps every row), `.verify/kaylee-memory-whole.mjs` (all of it once: keep, recall, correct, typed refusal, forget, the panel's Clear and a recall after it, the clear on his word, Settings' clear; then the LIVE reading, read only).
 - The scratch stack: `eval "$(bash .verify/kaylee-memory-bank-db.sh make)"`, then `bash .verify/kaylee-memory-scratch.sh .verify/<script>`, then `bash .verify/kaylee-memory-bank-db.sh drop`.
-  - `make` copies the live docstore with `pg_dump` into a scratch database (the `history` and `usage` data left out), moves every repo root under `/tmp`, adds her repo when the copy lacks it, and exports `KAYLEE_BANK_DSN`. The live docstore is never written.
+  - `make` copies the live docstore with `pg_dump` into a scratch database (the `history` and `usage` data left out), moves every repo root under `/tmp` (hers, `/nonexistent/kaylee`, included), exports `KAYLEE_BANK_DSN`, and adds her repo only when the copy lacks it (the live store carries it since migration `007_kaylee_repo.sql`, so a copy of it prints `the copy already carries her repo; nothing was added`; the widening stays guarded for a store from before 007). The live docstore is never written.
+  - The copy carries her LIVE memories (`pg_dump` keeps every row but `history` and `usage`). `kaylee-memory-whole.mjs` and `kaylee-memory-settings.mjs` retire the inherited rows first; `kaylee-memory-tools.mjs` and the card showing read what is there, so their "recall finds nothing" check is not proven against inherited rows.
   - `kaylee-memory-scratch.sh` refuses: no `KAYLEE_BANK_DSN`; a DSN naming `docstore`; a repo root outside `/tmp`; a `DOCSTORE_URL` on the live port 8006. It starts a scratch door (`~/.claude/docstore/bin/scratch-door`), then a scratch CloudCLI server and Vite over a copied auth database (kaylee--eyes' stager), runs the driver, and tears the stack down on exit, TERM, INT and HUP.
   - Exit status: the driver's own; 143, 130 or 129 after a TERM, INT or HUP; 2 when it refuses to start; 1 when Vite's port is busy.
   - Nothing is written to the live store: no fake operator quote is ever written there to prove anything.
