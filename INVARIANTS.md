@@ -1732,9 +1732,9 @@ probe-key: 70a4193179035e6ba9a58b28c4c87a4edae14ac9
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
 
-## INV-6670 — probe — LOW — a cases-door failure leads with `dispatcher list …`, a verb that does not exist, while the same route's field refusals lead with `cases list …`
+## INV-6670 — probe — LOW — a cases-door failure leads with `dispatcher list …`, the wrong door (the failing call is `cases list`), while the same route's field refusals lead with `cases list …`
 
-LOW — a cases-door failure leads with `dispatcher list …`, a verb that does not exist, while the same route's field refusals lead with `cases list …`
+LOW — a cases-door failure leads with `dispatcher list …`, the wrong door (`dispatcher list` is `status` since the verb spelling of MAN-9198; the failing call is `cases list`), while the same route's field refusals lead with `cases list …`
 
 ```probe
 T=$(curl -s -X POST http://127.0.0.1:3011/api/auth/login -H 'Content-Type: application/json' -d '{"username":"verve","password":"verve-dev-2026"}' | jq -r .token); curl -s -H "Authorization: Bearer $T" 'http://127.0.0.1:3011/api/roadmap/cases?feature=no-such-plan' | jq -r '.error // "none"'
