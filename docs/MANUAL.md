@@ -6720,6 +6720,9 @@ section: notifications/004 The ntfy channel/007 What gets pushed, and how loud
 | `dispatcher.finished` · `dispatcher.epic_finished` | 3 | `white_check_mark` |
 | `dispatcher.limit_paused` | 3 | `hourglass_flowing_sand` |
 | `dispatcher.relaunched` | 4 | `warning` |
+| `cerberus.red` (a check red for an hour; one push per tick, MAN-9205) | 5 (urgent: sounds through Do Not Disturb) | `rotating_light` |
+| `cerberus.red.reminder` | 4 | `warning` |
+| `cerberus.recovered` | 3 | `white_check_mark` |
 | `action_required` | 4 (high) | `question` |
 | `error` | 4 | `rotating_light` |
 | `limit.reached`, `limit.out_of_credits` | 4 | `no_entry` |
@@ -13998,11 +14001,11 @@ The credential, the guard, the account of a chat and the link: MAN-8992. The gut
 | --- | --- |
 | `server/modules/database/followups-schema.ts` | `FOLLOWUPS_SCHEMA_SQL`, `IF NOT EXISTS`, exec'd at every boot beside `NOTES_SCHEMA_SQL` (`migrations.ts`) |
 | `server/modules/database/repositories/followups.db.ts` | `followupsDb` (`listForChat`, `listForChatOfUser`, `listOpenOfUser`, `getInChat`, `getOfUser`, `addMany`, `closeInChat`, `setStateForUser`, `listOpenNaming`, `closeForCompletion`, `moveToSession`), `FollowupRow`, `FollowupKind`. `listOpenNaming` and `closeForCompletion` are the one pair that act across every chat and account (the completion closer); every other statement names its chat or account |
-| `server/modules/followups/followups.service.ts` | `followupsService`: the judging, the dedupe, the frame, the companion's read (`listOpenForAccount`) and the completion closer (`closeForCompletions`) |
+| `server/modules/followups/followups.service.ts` | `followupsService`: the judging, the dedupe, the frame, the companion's reads (`listOpenForAccount`, `findForAccount`) and the completion closer (`closeForCompletions`) |
 | `server/modules/followups/followups-completion-rule.service.ts` | `closuresForPlan`, `closuresForArc`, `epicFinishedAt`: the pure rule that says which open items a finished feature, task or epic settles; `CompletionClosure` |
 | `server/modules/followups/followups.routes.ts` | the widget's door (`/api/followups`), `readFollowupId` |
 | `server/modules/followups/followups.command-routes.ts` | the command's door (`/api/followups-cmd`) |
-| `server/modules/followups/followups.module.ts`, `index.ts` | `createFollowupsModule()`: both routers over one service; links `~/.local/bin/followups`. The barrel also exports `listOpenFollowups`, the companion's read, and `closeFollowupsForCompletions`, the dispatcher watcher's call |
+| `server/modules/followups/followups.module.ts`, `index.ts` | `createFollowupsModule()`: both routers over one service; links `~/.local/bin/followups`. The barrel also exports `listOpenFollowups` and `findFollowupForAccount`, the companion's reads, and `closeFollowupsForCompletions`, the dispatcher watcher's call |
 | `bin/followups.mjs` | the command |
 | `server/modules/providers/list/claude/surface-signal.ts` | `FOLLOWUPS_SIGNAL`, the standing instruction |
 | `src/modules/followups/` | `useFollowups` (hooks/), `FollowupsContext` (context/), `FollowupsWidgetBody`, `FollowupRow`, barrel |
@@ -14076,7 +14079,9 @@ There is no delete and no reopen on the chat's door: an item leaves only with it
 
 ## The companion's close
 
-`closeFollowupForAccount(userId, id)` (barrel; `followupsService.setStateForUser(userId, id, 'done')`) is his own tick of one follow-up of his, exactly as the widget's checkbox does it: `closed_by` is `user`, the chat's row is told with `followups_changed`, and an id of another account, or one that is gone, throws the lane's 404. It answers the item as stored. Its consumer is the companion's hands: `close_followup`, fired by `take_action` on his spoken word (MAN-9173); the hands read the open ones through `listOpenFollowups` first, so an item already closed is `already`, never a throw.
+`findFollowupForAccount(userId, id)` (barrel; `followupsService.findForAccount`, over `followupsDb.getOfUser`) answers `{ sessionId, followup }` for one item of THAT account by id, open or closed (`toFollowup`, as the widget reads it), else `null`: another account's id reads as none.
+
+`closeFollowupForAccount(userId, id)` (barrel; `followupsService.setStateForUser(userId, id, 'done')`) is his own tick of one follow-up of his, exactly as the widget's checkbox does it: `closed_by` is `user`, the chat's row is told with `followups_changed`, and an id of another account, or one that is gone, throws the lane's 404. It answers the item as stored. Its consumer is the companion's `close_followup` tool, done the moment he asks (`hands/direct-tools.ts`, MAN-9207): the door (`closeFollowup`, MAN-9173) reads the item through `findFollowupForAccount` first, so an item already closed is `already`, never a throw, and an id that is not his is refused.
 
 ## The frame
 

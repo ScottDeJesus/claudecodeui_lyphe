@@ -1,4 +1,4 @@
-import type { CompanionActionKind, CompanionActionTarget, CompanionCarriedLine, CompanionOpenTarget, CompanionPendingAction } from '@/shared/companion-types.js';
+import type { CompanionActionTarget, CompanionCarriedLine, CompanionCeremonyAction, CompanionOpenTarget, CompanionPendingAction } from '@/shared/companion-types.js';
 import { isCount, isList, isRecord, isText, isTextOrNull, isWholeFrom } from '@/shared/document-fields.js';
 import type { DispatcherAsk } from '@/shared/types.js';
 import { isStoreStamp } from '@/shared/utils.js';
@@ -15,31 +15,40 @@ import { isStoreStamp } from '@/shared/utils.js';
  * `dispatcher_state` already carries; no authority travels with it.) `withoutPin` names the wire's fields one by one instead of dropping `pin` from a copy, so a field added to the stored
  * shape later is never sent until someone puts it on the wire on purpose.
  *
+ * A PENDING ACTION IS ONE OF THE ELEVEN that take the ceremony (`CompanionCeremonyAction`): an open and a close are done at once and
+ * never wait on his panel. `armedFrom` is when its ceremony began: its own `preparedAt`, or, for a prepare that re-armed an action
+ * which lapsed, the first prepare's stamp. The check of his word reads her read-backs and his lines from `armedFrom` and the lapse
+ * from `expiresAt`, so a read-back from before the lapse and his yes since still count. Server-only, like the pin.
+ *
  * Consumer: `companion-store.ts`, which reads `pending_json` through `isStoredPending`, writes it, and puts only `withoutPin`'s
  * result on the picture and on `companion_pending`.
  */
 
 /**
- * What the prepare pinned for the take: `ask` (the Accept or questions prompt, with its lock token) for a queue, hide, rework or
- * answer at a prompt, `chainId` for a resume of a run, `followupId` for a close, `open` for an open, and for an answer round
- * `questions`: the number (from 1) of the question each carried group answers, in group order. Each is absent when the
- * action has no use for it. Consumed by the hands, which write it at prepare and read it at take.
+ * What an action pinned: `ask` (the Accept or questions prompt, with its lock token) for a queue, hide, rework or answer at a
+ * prompt, `chainId` for a resume of a run, and for an answer round `questions`: the number (from 1) of the question each carried group
+ * answers, in group order; the take fires on them. `followupId` and `open` are what the two direct actions (a close, an open) went to,
+ * kept on their rows (`hands/direct-tools.ts`); no pending action carries them. Each is absent when the action has no use for it.
+ * Consumed by the hands, which write it at prepare (or, for the direct two, at the call) and read it at take.
  */
 export type CompanionPin = { ask?: DispatcherAsk; chainId?: string; followupId?: number; open?: CompanionOpenTarget; questions?: number[] };
 
-/** The action as the store holds it: the wire's shape with its pin. Server-only — a page's picture and frames carry `CompanionPendingAction`. */
-export type CompanionStoredPending = CompanionPendingAction & { pin: CompanionPin };
+/**
+ * The action as the store holds it: the wire's shape with its pin and the stamp its ceremony began, and its action one of the
+ * eleven. Server-only — a page's picture and frames carry `CompanionPendingAction`.
+ */
+export type CompanionStoredPending = Omit<CompanionPendingAction, 'action'> & { action: CompanionCeremonyAction; pin: CompanionPin; armedFrom: string };
 
 /** Row and follow-up numbers count from 1 and are whole: 1.5, 0 and -3 name no row. */
 const isRowId = isWholeFrom(1);
 
-/** Every kind, as a record so that a kind added to the contract fails to compile here until the shape check knows it. */
-const ACTION_KINDS: Record<CompanionActionKind, true> = {
+/** Every kind that can wait on his panel, as a record so that one added to the ceremony fails to compile here until the shape check knows it. */
+const ACTION_KINDS: Record<CompanionCeremonyAction, true> = {
   queue: true, hide: true, show: true, rework: true, answer: true, recut: true,
-  stop: true, resume: true, kick: true, resume_run: true, open: true, close_followup: true, clear_memory: true,
+  stop: true, resume: true, kick: true, resume_run: true, clear_memory: true,
 };
 
-const isActionKind = (value: unknown): value is CompanionActionKind => isText(value) && Object.hasOwn(ACTION_KINDS, value);
+const isActionKind = (value: unknown): value is CompanionCeremonyAction => isText(value) && Object.hasOwn(ACTION_KINDS, value);
 
 const isTarget = (value: unknown): value is CompanionActionTarget => {
   if (!isRecord(value) || !isText(value.spoken)) return false;
@@ -88,8 +97,8 @@ const isPin = (value: unknown): value is CompanionPin =>
 
 /**
  * Whether a parsed `pending_json` has every part the take and the card read. Passed to the store's JSON-column reader, so a value
- * that is not this (a hand edit, a later build's shape) reads as no pending action. The two stamps must be real stored stamps
- * (`isStoreStamp`): `heardSince(preparedAt)` and every lapse test hang on them, and an empty or unparseable one would read the whole log as
+ * that is not this (a hand edit, a later build's shape) reads as no pending action. The three stamps must be real stored stamps
+ * (`isStoreStamp`): `heardSince(armedFrom)` and every lapse test hang on them, and an empty or unparseable one would read the whole log as
  * "after the card went up" and make the action never lapse.
  */
 export function isStoredPending(value: unknown): value is CompanionStoredPending {
@@ -103,6 +112,7 @@ export function isStoredPending(value: unknown): value is CompanionStoredPending
     && isText(value.say)
     && isStoreStamp(value.preparedAt)
     && isStoreStamp(value.expiresAt)
+    && isStoreStamp(value.armedFrom)
     && isPin(value.pin);
 }
 

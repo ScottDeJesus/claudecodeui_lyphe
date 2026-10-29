@@ -161,8 +161,8 @@ const SPOKEN = [
 /** A line he said, carried into an action as the log holds it: its row's id, its time, its words. */
 const carriedOf = (entry: CompanionLogEntry): CompanionCarriedLine => ({ logId: entry.id, at: entry.at, text: entry.text });
 
-/** An action prepared `secondsAgo`, lapsing five minutes after it went up. */
-const prepared = (secondsAgo: number, action: Omit<CompanionPendingAction, 'preparedAt' | 'expiresAt'>): CompanionPendingAction => ({ ...action, preparedAt: ago(secondsAgo), expiresAt: ago(secondsAgo - 300) });
+/** An action prepared `secondsAgo`, lapsing thirty minutes after it went up. */
+const prepared = (secondsAgo: number, action: Omit<CompanionPendingAction, 'preparedAt' | 'expiresAt'>): CompanionPendingAction => ({ ...action, preparedAt: ago(secondsAgo), expiresAt: ago(secondsAgo - 1800) });
 
 const card = (name: string, spoken: string): CompanionActionTarget => ({ kind: 'card', name, spoken, arc: 'kanban' });
 

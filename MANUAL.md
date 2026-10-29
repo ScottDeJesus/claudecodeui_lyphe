@@ -4967,7 +4967,7 @@ The one place that says which session callback writes which row and sends which 
 |---|---|
 | `COMPANION_MCP_SERVER_NAME` | re-export of `session/companion-launch.ts`; the SDK names a tool `mcp__<name>__<tool>` |
 | `COMPANION_TOOL_NAMES` | the names of her tools, `toolNames()` of `session/companion-prompt.ts`: the lines of the prompt's TOOLS section that open `name(` |
-| `buildCompanionTools(deps)` | `[...sessionTools(), ...readTools(deps), ...draftTools(deps), ...actTools(deps)]`, then the eyes' (`eyes/*-reads.ts`): `roadmapReads`, `runReads`, `docReads`, `alertReads`, `panelReads`, `houseReads`, then the hands': `handsTools(deps)`, and last her memory's: `memoryTools(deps)` (`memory/memory-tools.ts`) |
+| `buildCompanionTools(deps)` | `[...sessionTools(), ...readTools(deps), ...draftTools(deps), ...actTools(deps)]`, then the eyes' (`eyes/*-reads.ts`): `roadmapReads`, `runReads`, `docReads`, `alertReads`, `panelReads`, `houseReads`, then the hands': `handsTools(deps)` (the three above and `directTools(deps)`: `open`, `close_followup`), and last her memory's: `memoryTools(deps)` (`memory/memory-tools.ts`) |
 | `CompanionToolDeps` | what every tool file is handed: the account, its store, the runtime gateway, the `house` (MAN-9142: the readers only a module instance holds) and the helpers below |
 | `ToolActivityPhase` | `CompanionPhase` minus `idle`, `thinking` (the turn's own) |
 
@@ -4993,7 +4993,8 @@ The one place that says which session callback writes which row and sends which 
 | `list_alerts` | `eyes/alert-reads.ts` | none (she stays `thinking`) | none | MAN-9153 |
 | `read_kanban`, `read_heal`, `read_notes`, `read_schedules` | `eyes/panel-reads.ts` | none (she stays `thinking`) | none | MAN-9159, MAN-9160 |
 | `read_git`, `read_cerberus`, `read_memory`, `read_settings` | `eyes/house-reads.ts` | none (she stays `thinking`) | none | MAN-9158 |
-| `prepare_action`, `take_action`, `cancel_action` | `hands/hands-tools.ts` | none (she stays `thinking`) | none | MAN-9174, MAN-9171, MAN-9172, MAN-9173, MAN-9194 |
+| `prepare_action`, `take_action`, `cancel_action` | `hands/hands-tools.ts` | none (she stays `thinking`) | none | MAN-9174, MAN-9171, MAN-9172, MAN-9173, MAN-9194, MAN-9208 |
+| `open`, `close_followup` | `hands/direct-tools.ts` (handed over by `handsTools`) | none (she stays `thinking`) | none | MAN-9207 |
 | `recall`, `remember`, `forget` | `memory/memory-tools.ts` | none (she stays `thinking`) | none | MAN-9192, MAN-9193 |
 - FOCUS IS INFERRED, never a tool: a tool that names a chat calls `deps.setFocus(chat)`, which writes and announces (`companion_focus`) only when the chat moved or was renamed.
 - THE DRAFT RULE: only the draft is ever sent. `send_to_session` and `create_session` carry the brief's `text`, and it must equal the draft's words; a mismatch is refused naming the draft's target and its first words, and nothing is sent. Both go through `deps.sendDraft` (MAN-9072); so does the panel's Send.
@@ -5724,8 +5725,8 @@ Every message to her is assembled at the moment it is pushed (`createMessageAsse
 - Fills run in ONE pass (`fillSlots`): a value that contains `{name}` is never filled again, `$` in a value is not a replacement pattern, a slot the template invents is left as written, a slot it lacks is not filled.
 - The prompt's TOOLS section lists every tool she holds; the registry: MAN-9070.
 - `THE HOUSE, WHEN HE POINTS AT IT` (after WHAT YOU MUST NOT DO, before TOOLS): the rule (call the panel's tool before saying a word about it; every one takes `panel: true`), then one pointer line per panel naming its tool, in the TOOLS section's order. A new eyes tool adds its pointer line and its TOOLS line together: `toolLine` throws on a missing TOOLS line; a pointer line is read only by the probe of its own tool (`.verify/companion-doc-reads.mjs`: DocSpace's; `.verify/companion-run-reads.mjs`: the runs', and that it stands after the roadmap's and before DocSpace's).
-- `ON HIS WORD` (after THE HOUSE, before TOOLS): the hands' rule in her words. She does nothing in the house on her own judgment; `prepare_action` puts the action on his panel and tells her what to do next. The harmless ones (`open`, `close_followup`: `tierList('light')`) take no read-back and no second yes: she calls `take_action` right after the prepare with his last spoken line when it asked for the thing by name, else says one sentence and stops, and his first spoken yes fires it. The others (`tierList('full')`, from `ACTION_TIER`, MAN-9171) she reads back, the action and its name (for an Accept, the head of the prompt), and stops; his next spoken yes, or a line that names it and says the action, fires it, and she calls `take_action` with his newest spoken line exactly as he spoke it, never before her read-back. A bare yes counts only as the first thing he says after her newest read-back. A typed line, a no or a question is not his word; notes, answers and rulings travel in his own spoken words; `cancel_action` when he changes his mind. The server holds the line whatever she says (MAN-9171, INV-10099). Its tools' lines are in TOOLS; `toolLine` throws on a missing one.
-- HER MEMORY in the prompt is three lines and a pointer, and nothing is pushed (ruling 3): the pointer is the LAST line of THE HOUSE, WHEN HE POINTS AT IT (`Your own memory, what he has told you to keep: recall, then remember or forget.`; it names no panel); TOOLS ends with `recall(about, panel)`, `remember(kind, title, said, why, context, corrects, also)` and `forget(memories, said)` after `cancel_action()`. Each is the tool's description (`toolLine`, MAN-9192). `remember`'s line says `said` is each press of his that carries it, whole, exactly as he spoke it, and that a sentence cut from a press is refused; `forget`'s line says the same of its one press (MAN-9183). `remember`'s line tells her to say aloud in half a sentence that she is keeping it when `why` is not `asked`, and never to keep a transcript, what a session said, or usage or spend (ruling 2). `forget`'s line closes: `Clearing your whole memory is his act alone: in Settings, or prepare_action clear_memory, read back to him.` `prepare_action`'s line lists `clear_memory` and says its target may be "your memory" (MAN-9194).
+- `ON HIS WORD` (after THE HOUSE, before TOOLS): the hands' rule in her words. She does nothing in the house on her own judgment. `open` and `close_followup` are the harmless two and take no ceremony (MAN-9207): the moment he asks for a card, run, page or chat to come up, in any phrasing, a question included ("can you pull up", "show me", "bring up", "open"), she calls `open`; to tick off a follow-up, `close_followup`. A polite question is an order. She says in one sentence what she opened or closed, and asks him a question only when she cannot tell which page or chat he means. The eleven others (queue, hide, show, rework, answer, recut, stop, resume, kick, resume_run and clear_memory, named in the paragraph) she puts on his panel with `prepare_action`, which tells her what to do next: she reads it back, the action and its name (for an Accept, the head of the prompt), and stops; his next spoken yes, or a line that names it and says the action, fires it, and she calls `take_action` with his newest spoken line exactly as he spoke it, never before her read-back. A bare yes counts only as the first thing he says after her newest read-back. For these a typed line, a no or a question is not his word. An action waits thirty minutes. When it lapsed she calls `prepare_action` again with the same action and target: that re-arms it, and a bare yes he said since then still counts, so when his newest spoken line is that yes she passes it to `take_action` at once and does not ask him again; anything else, she reads it back again (MAN-9208). Notes, answers and rulings travel in his own spoken words; `cancel_action` when he changes his mind. The server holds the line whatever she says (MAN-9171, INV-10099). Its tools' lines are in TOOLS; `toolLine` throws on a missing one. The paragraph is plain text: it imports nothing from `hands/`.
+- HER MEMORY in the prompt is three lines and a pointer, and nothing is pushed (ruling 3): the pointer is the LAST line of THE HOUSE, WHEN HE POINTS AT IT (`Your own memory, what he has told you to keep: recall, then remember or forget.`; it names no panel); TOOLS ends with `recall(about, panel)`, `remember(kind, title, said, why, context, corrects, also)` and `forget(memories, said)` after `open(target)` and `close_followup(followup)`, which follow `cancel_action()`. Each is the tool's description (`toolLine`, MAN-9192). `remember`'s line says `said` is each press of his that carries it, whole, exactly as he spoke it, and that a sentence cut from a press is refused; `forget`'s line says the same of its one press (MAN-9183). `remember`'s line tells her to say aloud in half a sentence that she is keeping it when `why` is not `asked`, and never to keep a transcript, what a session said, or usage or spend (ruling 2). `forget`'s line closes: `Clearing your whole memory is his act alone: in Settings, or prepare_action clear_memory, read back to him.` `prepare_action`'s line lists `clear_memory` and says its target may be "your memory" (MAN-9194).
 - "Memory" is the bank's word alone in the prompt. The collaborator clause says she keeps hold of what he decided earlier in this conversation (`remember` is a tool's name), and the `<state>` message restates the focus "after this conversation was compacted".
 - The design record is the DocSpace page "Voice companion prompt" (block "System prompt"): the sections and tool lines above are its words, and a change to the prompt's words is made in both.
 - The sound set is the account's `gemini.soundTags` (shipped default `DEFAULT_SOUND_TAGS`, voice module): one list for the fill and the filter (MAN-9081).
@@ -5808,9 +5809,9 @@ section: server/modules/companion — storage: the five tables, companionDb, rel
 | `appendLog(userId, entry)` | insert + delete everything beyond the newest `COMPANION_LOG_KEEP` = 400 of the account, one transaction; answers the row with its id |
 | `readLog(userId, limit)` | newest `limit` rows, oldest first; `limit` clamped to 0..400, non-finite = 400 |
 | `addNote`, `listNotes`, `removeNote(userId, id)` | `listNotes` oldest first; `removeNote` is false for another account's id |
-| `heardSince(userId, since)` | his (`operator`) and her (`kaylee`) log lines with `at` after `since`, oldest first, at most 400 (the whole log the account keeps): `{ id, at, role, via, text }`. What `take_action` checks his word against (`heardForAction`, MAN-9174). THROWS when `since` is not a stored stamp (`isStoreStamp`, `server/shared/utils.ts`: fixed-width ISO-8601 UTC with milliseconds that parses as a date; `''` would read as before every line) — pass `pending.preparedAt` through unchanged |
-| `heardBefore(userId, before)` | his (`operator`, spoken or typed) last log line with `at` at or before `before`, as `{ id, at, role, via, text }`, else `null`; `null` too once a `companion_actions` row holds that line as its `said_log_id` (one word never fires twice; the next line back is no stand-in). A line logged in the very millisecond of `before` is before it, as `heardSince` counts it. THROWS when `before` is not a stored stamp (`isStoreStamp`). The request that led to a prepare: `heardForAction` (`hands-tools.ts`) reads it for a LIGHT action only, and the check of his word (MAN-9171) judges how far back it may be |
-| `openAction`, `claimAction`, `noteRefusal`, `endAction`, `listActions` | the record of actions (`repositories/companion-actions.db.ts`, spread into `companionDb`). `openAction(userId, row)` inserts a row with no outcome and answers it. `claimAction(userId, id, { said, said_at, said_log_id })` writes the firing line on a row with no outcome and no claim, in ONE statement, so of two takes exactly one wins; answers whether this call did. `noteRefusal(userId, id, sentence)` writes `answer` on a row still waiting (no outcome, unclaimed): the newest refusal of a take. `endAction(userId, id, end)` writes `ended_at` (now by default), `outcome` and, when given, `said`, `said_at`, `said_log_id`, `answer` — only to a row with no outcome, and a CLAIMED row only for a call carrying that claim's `said_log_id`; answers whether this call ended it. `listActions(userId, limit)` answers the newest `limit` (≤ 1000) by `prepared_at`, newest first |
+| `heardSince(userId, since)` | his (`operator`) and her (`kaylee`) log lines with `at` after `since`, oldest first, at most 400 (the whole log the account keeps): `{ id, at, role, via, text }`. What `take_action` checks his word against (`heardSince(userId, pending.armedFrom)`, MAN-9174). THROWS when `since` is not a stored stamp (`isStoreStamp`, `server/shared/utils.ts`: fixed-width ISO-8601 UTC with milliseconds that parses as a date; `''` would read as before every line) — pass `pending.armedFrom` through unchanged |
+| `newestOperatorLine(userId)` | his (`operator`, spoken or typed) newest log line as `{ id, at, role, via, text }`, else `null`. The trigger a direct `open` / `close_followup` row carries as its `said` (`direct-tools.ts`, MAN-9207): a record, never a check |
+| `openAction`, `claimAction`, `noteRefusal`, `endAction`, `newestCeremonyAction`, `listActions` | the record of actions (`repositories/companion-actions.db.ts`, spread into `companionDb`). `openAction(userId, row)` inserts a row with no outcome and answers it; `row.armed_from` is optional (NULL: the ceremony began at `prepared_at`; a re-arm writes the first prepare's stamp, MAN-9208). `newestCeremonyAction(userId)` answers the account's newest row (`prepared_at DESC, rowid DESC`) whose action is not `open` or `close_followup`, else `null`: what `rearmOf` reads. `claimAction(userId, id, { said, said_at, said_log_id })` writes the firing line on a row with no outcome and no claim, in ONE statement, so of two takes exactly one wins; answers whether this call did. `noteRefusal(userId, id, sentence)` writes `answer` on a row still waiting (no outcome, unclaimed): the newest refusal of a take. `endAction(userId, id, end)` writes `ended_at` (now by default), `outcome` and, when given, `said`, `said_at`, `said_log_id`, `answer` — only to a row with no outcome, and a CLAIMED row only for a call carrying that claim's `said_log_id`; answers whether this call ended it. `listActions(userId, limit)` answers the newest `limit` (≤ 1000) by `prepared_at`, newest first |
 | `clearAccount(userId)` | one transaction: ends every `companion_actions` row of the account that has no outcome and no claim as `cancelled` (a row a take has claimed is spared: the take ends it with the door's outcome); deletes the account's log and notes; resets `provider_session_id`, `focus_json`, `draft_json`, `walk_json`, `pending_json`, `unanswered_json` to NULL. `floor` and `memory_forget_line` STAY; `relayed_sends` and every row of `companion_actions` are kept; no state row is created for an account with none. Answers `{ logRemoved, notesRemoved, stateReset }` |
 Every statement names its account in `WHERE`/`VALUES`: an id of another account reads as no row.
 
@@ -5832,12 +5833,12 @@ The write comes first and the frame second, in the same tick; a failed write sen
 | `setFloor(client)` | `companion_floor { floor }` on EVERY write of a client id, not only a change; a cleared floor (`null`) sends none |
 | `setFocus(ref \| null)` | `companion_focus` |
 | `setDraft(input \| null)`, `setWalk(input \| null)` | `companion_draft`, `companion_walk` (store stamps `updatedAt`; answers what was stored) |
-| `setPending(stored \| null)` | `companion_pending` with the action WITHOUT its `pin` (`withoutPin` in `companion-pending.ts`), or `null`; `pending_json` keeps the pin. Answers what was sent. The picture's `pending` is the same cut |
+| `setPending(stored \| null)` | `companion_pending` with the action WITHOUT its `pin` and `armedFrom` (`withoutPin` in `companion-pending.ts`), or `null`; `pending_json` keeps both. Answers what was sent. The picture's `pending` is the same cut |
 | `appendLog(line)` | `companion_sentence` for `role: 'kaylee'`, else `companion_log` |
 | `addNote`, `removeNote(id)` | `companion_note`; `companion_note_removed` only when this account had the note |
 | `emit(frame)` | the frames that are not rows: `companion_turn`, `companion_activity`, `companion_process`, `companion_settings`, `companion_open`, `companion_cleared` |
 | `clearAccount()` | `companionDb.clearAccount` (which ends a standing action's row `cancelled`), then `companion_cleared` |
-- A JSON column that does not read as its shape (a hand edit, a later build) is dropped with `[Companion] Dropping <column> of account <id>`: it never throws; the picture still loads. A `pending_json` that does not read as `CompanionStoredPending` (`isStoredPending`) is no pending action. It must carry real stamps — `preparedAt` and `expiresAt` pass `isStoreStamp` (`server/shared/utils.ts`), so a writer stores `new Date().toISOString()` and nothing else — and every row number (a followup target's `id`, a carried line's `logId`, a pin's `followupId`) is a whole number ≥ 1.
+- A JSON column that does not read as its shape (a hand edit, a later build) is dropped with `[Companion] Dropping <column> of account <id>`: it never throws; the picture still loads. A `pending_json` that does not read as `CompanionStoredPending` (`isStoredPending`) is no pending action. Its `action` must be one of the eleven that wait for his word (`CompanionCeremonyAction`: a stored `open` or `close_followup` is no pending action). It must carry real stamps — `preparedAt`, `expiresAt` and `armedFrom` pass `isStoreStamp` (`server/shared/utils.ts`), so a writer stores `new Date().toISOString()` and nothing else — and every row number (a followup target's `id`, a carried line's `logId`, a pin's `followupId`) is a whole number ≥ 1.
 - `readState()` → `{ providerSessionId, focus, draft, pending, walk, floor }`; `pending` carries the pin and is server-only.
 
 ## The floor
@@ -5978,10 +5979,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/Co
 | `CompanionNote` | `{ id, at, title, text }` |
 | `CompanionProcess` | `{ state: 'asleep' \| 'waking' \| 'awake' \| 'failed', error: string \| null }` |
 | `CompanionTurnOutcome` | `answered` \| `stopped` \| `failed` |
-| `CompanionActionKind` | the thirteen things she may do on his word: `queue` \| `hide` \| `show` \| `rework` \| `answer` \| `recut` \| `stop` \| `resume` \| `kick` \| `resume_run` \| `open` \| `close_followup` \| `clear_memory` |
+| `CompanionActionKind` | the thirteen things she does in the house: `queue` \| `hide` \| `show` \| `rework` \| `answer` \| `recut` \| `stop` \| `resume` \| `kick` \| `resume_run` \| `open` \| `close_followup` \| `clear_memory` |
+| `CompanionCeremonyAction` | `Exclude<CompanionActionKind, 'open' \| 'close_followup'>`: the eleven that wait for his word (MAN-9174); `open` and `close_followup` are done at once (MAN-9207). Typed by the hands, `ACTION_KINDS` and the stored pending (`CompanionStoredPending`) |
 | `CompanionActionTarget` | what an action acts on, by `kind`, each with `spoken` (the name he says it by): `card` `{ name, arc }` (a plan or epic), `run` `{ runId, plan }`, `page` `{ pageId, blockId }`, `chat` `{ sessionId }`, `followup` `{ id, sessionId, text }`, `memory` `{ count }` (her own bank: `spoken` is `your memory`, `count` the memories held when it was prepared; MAN-9194) |
 | `CompanionCarriedLine` | `{ logId, at, text }`: one of his spoken lines, carried verbatim |
-| `CompanionPendingAction` | the one action waiting for his word: `{ id, action, target, prompt: string \| null, carried: [{ label: string \| null, lines }], say, preparedAt, expiresAt }`. The pin the prepare took (ask and lock token, chain, follow-up, open target) is never part of it |
+| `CompanionPendingAction` | the one action waiting for his word: `{ id, action, target, prompt: string \| null, carried: [{ label: string \| null, lines }], say, preparedAt, expiresAt }`. `expiresAt` is `preparedAt` + 30 minutes. The pin the prepare took (ask and lock token, chain) and `armedFrom` (MAN-9208) are never part of it |
 | `CompanionOpenTarget` | where an open lands: `{ kind: 'chat', sessionId }` \| `{ kind: 'card', plan }` \| `{ kind: 'page', pageId, blockId }` |
 | `CompanionPicture` | `{ settings, models: [{ value, label }], process, activity, turnId, focus, draft, pending: CompanionPendingAction \| null, walk, notes, log, floor }`; `GET /api/companion`; `log` = newest 200 (MAN-9070) |
 | `CompanionMemoryReading` | her memory as Settings reads it: `{ count: number \| null, pageId, reason: string \| null }`; `count` is how many memories her bank holds, `null` with `reason` saying why when the bank cannot be read; `pageId` is her DocSpace page, `page-kaylee-memory`. `GET /api/companion/memory` (MAN-9188); drawn by MAN-9184 |
@@ -7521,7 +7523,7 @@ ALERTS HAD NO HISTORY ANYWHERE: the orchestrator pushes and forgets, the Inbox h
 
 **Where it is written.** `startNotificationHistory()` (`services/notification-history.service.ts`) subscribes with `onNotification` — the listener seam hears every event the orchestrator is handed, normalized, BEFORE any push preference or dedupe (MAN-613) — so it rides the orchestrator's own call and nothing polls. It keeps what a push gate would drop: a `background` kind that is off for pushes, an event the 20-second push dedupe swallowed, the usage family. An ask told AGAIN is one row: every server boot re-raises the asks still open (each boot is a new push, and the dev server restarts on every save), so an event of kind `action_required` that repeats one the account already holds — same code, chat, plan, title and body — replaces it (`record(…, { replaceRepeat })`, one transaction): the row moves to the front with the time it was told last, and the 300 rows are not spent on repeats. Every other kind is kept as it happens. The entrypoint starts it after `listen` and calls its unsubscribe in `shutdownRuntimeServices`. A write that fails is one journal line (`[Notifications] the history could not keep …`) and never costs the push: the seam guards every listener, and this one catches its own fault too. The write is deferred one turn of the event loop (`setImmediate`, with the stamp taken at hearing), because the seam runs listeners to completion BEFORE the push is built and sent, and a write waiting on another connection's lock (SQLite's 5 s busy wait) would otherwise hold the push back that long.
 
-**The wording kept has every figure taken out.** `spendFreeWording(event, bodyLimit?)` (`services/notification-spend-free.service.ts`, exported by the barrel, beside `buildNotificationPayload` in the orchestrator) is the ONE rule: the event's spend keys are removed before the wording is built (`costUsd`, `totalCostUsd`, `tokens`, `tokensIn`, `tokensOut`), an `api.error` whose reason is about usage is reworded, a `run.limit` budget stop is "Run stopped at a limit" / "The run stopped at a limit it was given", and the free text a wording is built from — `run.failed`'s error, `compaction.failed`'s reason, a `dispatcher.*` event's detail — is left out of the sentence when it speaks of usage or spend (`USAGE_OR_SPEND_TEXT`: the CLI's own "usage limit reached" is a failed run's error; the wording reads whole without it). It answers `{ title, body, sessionName }`; the body is cut at the push cap unless `bodyLimit` is `null` (whole) or a number. Two callers: the history (what is stored) and the companion's `buildAlertBlock` (what she is pushed). A raw copy would put cost in her context (ruling 1: never usage or spend).
+**The wording kept has every figure taken out.** `spendFreeWording(event, bodyLimit?)` (`services/notification-spend-free.service.ts`, exported by the barrel, beside `buildNotificationPayload` in the orchestrator) is the ONE rule: the event's spend keys are removed before the wording is built (`costUsd`, `totalCostUsd`, `tokens`, `tokensIn`, `tokensOut`), an `api.error` whose reason is about usage is reworded, a `run.limit` budget stop is "Run stopped at a limit" / "The run stopped at a limit it was given", and the free text a wording is built from — `run.failed`'s error, `compaction.failed`'s reason, a `dispatcher.*` event's detail — is left out of the sentence when it speaks of usage or spend (`USAGE_OR_SPEND_TEXT`: the CLI's own "usage limit reached" is a failed run's error; the wording reads whole without it). A `cerberus.*` event (the red watch, MAN-9205) carries its checks in `meta.items`, `meta.reminders` and `meta.recovered`: an item whose `reason` speaks of usage or spend loses the reason, and one whose `label` does is called "A check" (`checksWithoutSpend`). It answers `{ title, body, sessionName }`; the body is cut at the push cap unless `bodyLimit` is `null` (whole) or a number. Two callers: the history (what is stored) and the companion's `buildAlertBlock` (what she is pushed). A raw copy would put cost in her context (ruling 1: never usage or spend).
 
 **`list_alerts(scope, panel)`** (`server/modules/companion/eyes/alert-reads.ts`, one read-only tool of the eyes; its description is her prompt's own line). It reads `listNotificationHistory(userId, 300)` and never lists the usage family (`NEVER_LISTED`: `limit.*`, `usage.*`, `push.enabled`, and `dispatcher.limit_paused`, whose headline is "Claude usage limit").
 - `recent`: the newest 20, `<when> · <kind in words> · <chat or plan> · <title>`, then "And <k> more; give a phrase to narrow." The kind words are the alert feed's six where the code has one (`ALERT_KIND_BY_CODE`: feature finished, background work landed, asking, permission, failed, stuck), else the event's own kind. The chat is its sidebar name (`chatNameOf`); an event of no chat, or of a chat that is gone or has no name of its own (the sidebar's fallback, `UNTITLED_CHAT`), names its plan; one of neither is "the house".
@@ -7910,38 +7912,31 @@ Strings and rows in, strings out, no I/O. The tools that use them are MAN-9165. 
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/card-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/card-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/followup-plans.ts
 
-## MAN-9171 — server/modules/companion/hands — the check of his word (action-word.ts): the tiers, the assent, the checks and their sentences, the read-back, the request before the prepare, the probe
+## MAN-9171 — server/modules/companion/hands — the check of his word (action-word.ts): the assent, the checks and their sentences, the read-back, the probe
 
-`hands/action-word.ts` is the check of his word: the pure judgment `take_action` makes before anything in the house moves (protocol and ruling 3: MAN-9174). No I/O, no clock of its own (the caller passes `now`), no import but the contract's types. The words it judges a line by (action words, the name rule, the head of a long title, the order words): MAN-9204. Shown by replaying rows: `.verify/kaylee-action-word.mjs`.
-
-## The tiers — `ACTION_TIER`, `actionsOfTier(tier)`
-The one table: this check, `nextStepFor` (MAN-9203), her prompt (`tierList`, MAN-9080) and the `said` description of `take_action` read it.
-| tier | actions | his word | her read-back |
-|---|---|---|---|
-| LIGHT | `open`, `close_followup` | a spoken yes after the prepare; a line that names the target and says the action's word; the request that led to the prepare (§Check 3) | none |
-| FULL | `queue`, `hide`, `show`, `rework`, `answer`, `recut`, `stop`, `resume`, `kick`, `resume_run`, `clear_memory` | an assent or a named order, after her read-back | required (§Check 4) |
+`hands/action-word.ts` is the check of his word: the pure judgment `take_action` makes before anything in the house moves (protocol and ruling 3: MAN-9174). It judges the eleven actions that wait for his word (`CompanionCeremonyAction`: every kind but `open` and `close_followup`, which are done at once and never reach it: MAN-9207). No I/O, no clock of its own (the caller passes `now`), no import but the contract's types. The words it judges a line by (action words, the name rule, the head of a long title, the order words): MAN-9204. The lapse and the re-arm that give it `armedFrom`: MAN-9208. Shown by replaying rows: `.verify/kaylee-action-word.mjs`.
 
 ## What counts as his word
 - A PRESS: a log row with `role: 'operator'` and `via: 'spoken'`. A typed line neither fires an action nor is carried; the empty press (`''`) names nothing.
 - A NAMED ORDER: a line that names the target, holds the action's word beside the name and is no no or question (MAN-9204).
-- AN ASSENT, `isAssent(said, action)`: a yes run carried by nothing but `please`, `it`, `that`, `now`. Yes runs: yes, yeah, yep, yup, sure, okay, ok, alright, correct, `go ahead`, `do it`, `fire it`, `send it`, `please do`, `that's right`. It is his word for the one action on the panel: it needs neither the name nor the action's word, and a `?` still refuses it ("Yes?").
+- AN ASSENT, `isAssent(said)`: a yes run carried by nothing but `please`, `it`, `that`, `now`. Yes runs: yes, yeah, yep, yup, sure, okay, ok, alright, correct, `go ahead`, `do it`, `fire it`, `send it`, `please do`, `that's right`. It is his word for the one action on the panel: it needs neither the name nor the action's word, and a `?` still refuses it ("Yes?").
   - Assents: "Yes.", "Sure, go ahead.", "Do it now.", "Yes please.".
-  - LIGHT only: the action's own word beside `it`, `that` or `this` ("Open it.", "Close it.", "Yes, open it.", "Bring it up."). FULL never: "Forget it.", "Stop it.", "Pause it.", "Cut it.", "Kick it.", "Queue it." are not assents and fire nothing. why: they are what he says to decline.
+  - Never assents: the action's own word beside `it`, `that` or `this` ("Forget it.", "Stop it.", "Pause it.", "Cut it.", "Kick it.", "Queue it.", "Open it."). why: they are what he says to decline.
   - Not assents: "Go on.", "Okay, so.", "Yeah, so.", "Yes, but wait.", "Go ahead and do it.", "Hey.", "Please.", "Stop.", "Open.". "Yes, queue it." is no bare assent: it goes through the name and verb checks as a named order.
 - Every time comparison is written as the thing that must hold, so a stamp that does not parse fails. The stamps are the store's own (`isStoreStamp`, `server/shared/utils.ts`).
 - A line is compared trimmed, every run of whitespace one space; a blank `said` matches no line.
 
 ## `checkHisWord({ pending, said, now, lines })`: the checks, in order
-`lines`: rows of her log, oldest first — `heardSince(preparedAt)`'s (his and hers) and, for a LIGHT action, `heardBefore(preparedAt)`'s row first (his last line before the prepare; `heardForAction` in `hands-tools.ts`, MAN-9146). `pending` is the action's `action`, `target`, `preparedAt`, `expiresAt`, `say`, or `null`. The first failing check answers `{ ok: false, sentence }`; none failing answers `{ ok: true, line: { id, at, text } }`.
+`lines`: rows of her log from `heardSince(armedFrom)` (his and hers), oldest first (`hands-tools.ts`, MAN-9146). `pending` is the action's `action`, `target`, `preparedAt`, `armedFrom`, `expiresAt`, `say`, or `null`. `armedFrom` is `preparedAt` for a fresh ceremony and the first prepare's stamp across a re-arm (MAN-9208). The first failing check answers `{ ok: false, sentence }`; none failing answers `{ ok: true, line: { id, at, text } }`.
 | # | fails when | sentence |
 |---|---|---|
 | 1 | `pending` is `null` | `Nothing is waiting for his word; prepare it first.` |
 | 1 | `canBeNamed` is false | `No line of his can fire this: "<spoken>" has no word of its own that is not the action itself or a filler word. Cancel it and tell him it cannot be done by voice.` |
-| 2 | `now` is not at or before `expiresAt` | `It lapsed at <HH:MM>; prepare it again.` |
+| 2 | `now` is not at or before `expiresAt` | `It lapsed at <HH:MM>. Prepare it again: that re-arms it, and his yes since then still counts.` |
 | 3 | no firing line (§Check 3) | `That is not a line he spoke after the card went up. He must say it aloud: <say>.` and the pointer |
-| 4 | FULL: no read-back of hers stands before the firing line | `You have not read it back to him yet. Say it back first: <say>.` |
-| 4 | FULL: a read-back stands only after it (an assent: her NEWEST read-back stands after it) | `He asked before you read it back. Read it back, then pass what he says next.` and, when a spoken line of his follows that read-back, ` He has spoken since: his newest line is logged as "<text>"; if that is his yes, pass it to take_action exactly so.` |
-| 4 | FULL, an assent that is not his first spoken line after her newest read-back, or with a spoken line of his after it | `A bare yes counts only as his first spoken line after your newest read-back, with none of his after it. Read it back again, then pass what he says next.` |
+| 4 | no read-back of hers stands before the firing line | `You have not read it back to him yet. Say it back first: <say>.` |
+| 4 | a read-back stands only after it (an assent: her NEWEST read-back stands after it) | `He asked before you read it back. Read it back, then pass what he says next.` and, when a spoken line of his follows that read-back, ` He has spoken since: his newest line is logged as "<text>"; if that is his yes, pass it to take_action exactly so.` |
+| 4 | an assent that is not his first spoken line after her newest read-back, or with a spoken line of his after it | `A bare yes counts only as his first spoken line after your newest read-back, with none of his after it. Read it back again, then pass what he says next.` |
 | 5 | `takesItBack` (MAN-9204) | `That is a no or a question, not an order. He must say the order itself, aloud: <say>.` |
 | 5 | no assent, and `said` does not name the target | `His words do not name <spoken>.` |
 | 6 | no assent, and `said` holds none of the action's words besides the name | `His words do not say <first action word>.` |
@@ -7951,46 +7946,44 @@ The one table: this check, `nextStepFor` (MAN-9203), her prompt (`tierList`, MAN
 - `take_action` passes `said` as logged. A transcript that heard "queue" as "cue" is passed as logged, not asked again; check 6 then refuses it with its sentence.
 
 ### Check 3 — the firing line
-- The NEWEST spoken line of his after `preparedAt`, at or before `expiresAt`, equal to `said`. A typed line, a line before the prepare and a blank `said` match none.
-- LIGHT only, when there is none: THE REQUEST THAT LED TO THE PREPARE fires, on the take after the prepare, when all hold: it is his last line of any kind before `preparedAt`; spoken; at most 2 minutes before it (`REQUEST_LEAD_MS`); he has said nothing since the prepare (a newer line, typed or spoken, takes it back); it equals `said`; it names the target and says the action's word (it is never an assent); no action row holds it as `said_log_id` (`heardBefore` answers `null` once one does: one word never fires twice).
-- THE POINTER follows the sentence, only for a line the check would take if she passed it:
-  1. his newest spoken line since the prepare: ` His newest spoken line since then is logged as "<text>"; if that is what he meant, pass it to take_action exactly so.`
-  2. LIGHT, a request that still stands: the same with `from just before the card went up` for `since then`.
-  3. LIGHT, his last line before the prepare was spoken but is too old or taken back: ` His last spoken line came before the card went up and can no longer stand for it; he must say it again.`
-  4. else nothing.
+- The NEWEST spoken line of his after `armedFrom`, at or before `expiresAt`, equal to `said`. A typed line, a line before the ceremony began and a blank `said` match none. A request made before the prepare is no word.
+- THE POINTER follows the sentence, only for a line the check would take if she passed it: his newest spoken line since the ceremony began, ` His newest spoken line since then is logged as "<text>"; if that is what he meant, pass it to take_action exactly so.` With no such line, nothing.
 
-### Check 4 — the read-back (FULL only)
-- A READ-BACK (`readsBack`) is a row of hers (`role: 'kaylee'`) after `preparedAt`, in ANY of her turns, that names the target (`namesTarget` with the action). For her memory, whose house name is the common word `memory`, it also holds an action word or says `your memory` ("Let me check my memory for that." is no read-back). The check reads the log, not what she says she did: her sentences are rows of the same log.
-- A named order needs a read-back before its line and keeps the newest-line rule of check 3.
+### Check 4 — the read-back
+- A READ-BACK (`readsBack`) is a row of hers (`role: 'kaylee'`), in ANY of her turns, that names the target (`namesTarget` with the action). For her memory, whose house name is the common word `memory`, it also holds an action word or says `your memory` ("Let me check my memory for that." is no read-back). The check reads the log, not what she says she did: her sentences are rows of the same log.
+- Read from: an ASSENT, `armedFrom` (a re-arm keeps the read-back from before the lapse); a named order, `preparedAt` (this prepare's own stamp: an order is a line of its own and needs a read-back of this prepare, MAN-9208). A fresh ceremony has one stamp.
+- A named order keeps the newest-line rule of check 3.
 - An assent counts only as his FIRST spoken line after her NEWEST read-back, with no spoken line of his after it. Two yes presses after one read-back: the second is refused. why: a stray yes to something else is not his word for this action.
 
 ## Probe
-`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-action-word.mjs` prints each case with its answer and the check that refused it, `UNEXPECTED` and exit 1 when a case answers otherwise. No store, no model. 2026-10-29: 140 cases, 0 unexpected. Run it before editing `ACTION_WORDS`, `ACTION_TIER`, the not-significant list, the yes runs, the negators or checks 3–6.
+`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-action-word.mjs` prints each case with its answer and the check that refused it, `UNEXPECTED` and exit 1 when a case answers otherwise. No store, no model. 2026-10-29: 125 cases, 0 unexpected. Run it before editing `ACTION_WORDS`, the not-significant list, the yes runs, the negators or checks 3–6.
 | case group | shows |
 |---|---|
-| the incident of 2026-10-29 | rows 2055–2064 of `companion_log` as logged: LIGHT `open` with `said` = row 2058 fires; the same rows under `queue` are refused with the "asked before you read it back" sentence, and `queue` with `said` = row 2061 "Yes." fires |
-| LIGHT: the request that led to the prepare | spoken 10 s before fires; the same line typed, a request 3 minutes old, any newer line of his and a `show` (FULL) are refused |
-| FULL: the yes, the decline, the binding | "Yes." after a read-back fires; "Forget it." and "Stop it." fire nothing; a yes before her newest read-back or a second yes is refused |
+| the first incident of 2026-10-29 | rows 2055–2064 of `companion_log` as logged: a `queue` of the page refused with the "asked before you read it back" sentence, and `said` = row 2061 "Yes." fires |
+| the second incident (rows 2149–2155) | the take at the lapse; the re-arm and his `Yes.` of 20:16:07 fires; another spoken line after the yes is refused by the binding; another action or target is a fresh ceremony; a second re-arm counts from the first prepare; an order after the lapse needs a read-back of the re-arm |
+| thirty minutes | a yes at 29 minutes fires; the same yes at 31 lapses; a question ("Can you queue Kaylee's eyes?", "Could you…", "Should I…") is no order, the plain order after it fires |
+| a request before the prepare | his order 10 s before the prepare, a `show` on his request: refused (no word before the ceremony) |
+| the yes after a read-back, the decline, the binding | "Yes." after a read-back fires; "Forget it." and "Stop it." fire nothing; a yes before her newest read-back or a second yes is refused |
 | the pointer; a long title has a head | the pointer said only for a line the check would take; the head rule cases (MAN-9204) |
 | `clear_memory` | named orders and read-backs that fire or are refused, with the check that refuses: "Clear it." at check 5; "My memory is clear." and "You could wipe your memory later." at check 6; a read-back of "Let me check my memory for that." at check 4 |
 | the verb beside the name | MAN-9204's examples, as cases |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-action-word.mjs
 
-## MAN-9172 — server/modules/companion/hands — the recipes (action-recipe.ts, action-targets.ts, carried-lines.ts): what each of the thirteen actions takes, checks and pins at prepare
+## MAN-9172 — server/modules/companion/hands — the recipes (action-recipe.ts, action-targets.ts, carried-lines.ts): what each of the eleven actions takes, checks and pins at prepare; the targets open and close_followup resolve
 
-`hands/action-recipe.ts` (`prepareRecipe(deps, input)`) is what each of the thirteen actions takes and checks at `prepare_action` (protocol: MAN-9174). Nothing here moves anything in the house: it answers a `PreparedAction` for `hands-tools.ts` to put on his panel, or the sentence that refuses and says what to do next. Targets: `hands/action-targets.ts`. His carried lines: `hands/carried-lines.ts`.
+`hands/action-recipe.ts` (`prepareRecipe(deps, input)`) is what each of the eleven actions that wait for his word takes and checks at `prepare_action` (protocol: MAN-9174). `open` and `close_followup` have no recipe: `hands/direct-tools.ts` resolves their targets (§Targets) and runs them at once (MAN-9207). Nothing here moves anything in the house: it answers a `PreparedAction` for `hands-tools.ts` to put on his panel, or the sentence that refuses and says what to do next. Targets: `hands/action-targets.ts`. His carried lines: `hands/carried-lines.ts`.
 
 ## Before any recipe
 | input | refused with |
 |---|---|
-| `words` on queue, hide, show, answer, recut, stop, resume, kick, open, close_followup or clear_memory | `<action> carries no words of his; leave words out.` (`answer`: `answer carries his lines in answers, one group per question; words are not taken. Leave words out.`) |
+| `words` on queue, hide, show, answer, recut, stop, resume, kick or clear_memory | `<action> carries no words of his; leave words out.` (`answer`: `answer carries his lines in answers, one group per question; words are not taken. Leave words out.`) |
 | `answers` on any action but `answer` | `Only answer carries answers; <action> does not. Leave answers out.` |
 | a prepared target for which `canBeNamed(target, action)` is false (MAN-9204) | `No line of his can fire this: "<spoken>" has no word of its own that is not the action itself or a filler word. Tell him it cannot be done by voice.` |
 
-## The thirteen
+## The eleven
 The card actions read the roadmap and dispatcher pictures once (`findCard`, `house.roadmap()` + `house.dispatcher()`); a dispatcher not yet landed → `The dispatcher has not been read yet; ask again in a moment.` The card's open prompt is `openAsk(card, book)` (`eyes/card-lines.ts`): the dispatcher picture's own `asking` for a plan, or for an epic its lead plan's.
-| action | needs | refused when | pins | prompt on the card | her read-back (LIGHT: her one sentence) |
+| action | needs | refused when | pins | prompt on the card | her read-back |
 |---|---|---|---|---|---|
 | `queue` | an open Accept prompt | no prompt: `There is no Accept prompt open on <spoken>. No prompt is open on it; read_card with scope prompt shows what it waits on.`; a questions round: `… It has a questions round open, not an Accept; …` | `ask` | `acceptPrompt` | `Queue <spoken>: <acceptHead>.` |
 | `hide` | an open Accept prompt (Hide approves it and holds it out of the queue), else an approved card | no prompt and: the dispatcher does not hold it; it is already hidden; it is not approved | `ask` at a prompt, else none | `acceptPrompt` at a prompt | at a prompt as `queue`; else `Hide <spoken>: it is approved, so this holds it out of the queue, paused, until he shows it.` |
@@ -7999,11 +7992,10 @@ The card actions read the roadmap and dispatcher pictures once (`findCard`, `hou
 | `answer` | a questions round and `answers` | no round: `No questions round is open on <spoken>; read_card with scope questions shows whether there is one.`; no `answers`; a question number above the round's count; two groups naming one number | `ask` and `questions` (the question number each carried group answers, in group order) | `questionsPrompt` | `Send the answers to <spoken>: question 1, "<line>"; question 2, no answer.` |
 | `recut`, `stop`, `resume`, `kick` | a card the dispatcher holds | not held; finished (`complete`), except `kick` | none | none | `Re-cut <spoken>: this sends its design to be cut into tasks again.` · `Stop …: this pauses it and ends its running work.` · `Resume …: this lets it run again.` · `Kick …: this wakes the dispatcher.` |
 | `resume_run` | `words` (his rulings) and a chain that stopped | no `words`; the run is one soul's launch (`list_runs` shows the chain it belongs to); no record of the chain; status `running`; status `done` or `nothing-changed` | `chainId` | none | `Resume the run <spoken> with his rulings: "<line>" ….` |
-| `open` | a card, a run, a page or a chat | nothing named; the name fits more than one kind | `open` (a `CompanionOpenTarget`) | none | `Open <spoken>: it comes up on the screen he is using.` |
-| `close_followup` | `#<id>` of an open follow-up of his | not `#<id>` (or `follow-up #<id>`): `A follow-up is named by its number, #<id>, as list_followups prints it.`; not among his open ones: `#<id> is not one of his open follow-ups; list_followups shows the ones that are.` | `followupId` | none | `Close the follow-up on <spoken>: "<first sentence>"` |
+
 | `clear_memory` | her bank holding at least one memory, the target naming it (`memory`, `your memory`) | other words: `clear_memory acts on your memory alone; name it as your memory.`; the door cannot list: `Your memory can't be reached just now: <sentence>.`; an empty bank: `There is nothing to clear.` | none | `She forgets the <n> things she keeps. The docstore's history keeps them.` | `Clear your memory: you forget the <n> things you keep; the docstore's history keeps them, and the conversation is not touched.` |
-- A FULL action is read back to him in plain words before his word fires it. `open` and `close_followup` are LIGHT: the last column is the one sentence she says, with no read-back first (`nextStepFor`, MAN-9203; tiers: MAN-9171).
-- `show` is FULL: its door is `dispatcher unhide`, which puts a held, approved card back in the queue.
+- Each is read back to him in plain words before his word fires it (`nextStepFor`, MAN-9203; the check: MAN-9171).
+- `show` keeps the ceremony: its door is `dispatcher unhide`, which puts a held, approved card back in the queue.
 - Every pinned `ask` is the dispatcher picture's own `asking` at the prepare. The door later sends it, and the ask book refuses a prompt that changed meanwhile (MAN-8494).
 - An `answer` carries a group per question of the round: a question he left unanswered gets an empty group, on his card and in her read-back, and `(no answer)` in the brief (MAN-9173).
 
@@ -8015,9 +8007,9 @@ Each resolves through the resolver her eyes use, so a name means one thing wheth
 | `run` | `resolveRun` (MAN-9162): a chain id or launch id, or `<plan> <task>`. `plan` is the dispatcher's, `null` for a chat's run | the chain's slug as words (`kaylee--eyes--hands` is "kaylee eyes hands"), else the plan's name, else the id |
 | `page` | `resolvePage` (MAN-9157): an id or exact title, optionally `#<block id>`; `blockId` is kept only when the page holds a block by that id | the page's title |
 | `chat` | `resolveChat` (MAN-9055): name or id | the chat's name |
-| `followup` | `#<id>` in `listOpenFollowups(userId, null, 200)` | the first five words of its text, trailing punctuation cut |
+| `followup` | `#<id>` by `findFollowupForAccount(userId, id)` (the account's own item, open or closed; another account's id or none is refused: `#<id> is not one of his follow-ups; list_followups shows the open ones.`); not `#<id>` (or `follow-up #<id>`): `A follow-up is named by its number, #<id>, as list_followups prints it.` | the first five words of its text, trailing punctuation cut |
 | `memory` | not resolved: `clear_memory` reads `bankDoor.list()` for `count` (MAN-9194) | `your memory` |
-- `open` tries card, run, page, chat. Writing the kind in front (`chat: kaylee eyes`) tries that kind alone. Several kinds fitting is refused: `"<ref>" fits <n> kinds of thing: <each, named>. Say which by writing the target with its kind in front, for example "<kind>: <ref>".` A kind that did not answer (DocSpace down) is skipped when another fits. None fits: `Nothing of his is named "<ref>": not a card, a run, a page or a chat. list_roadmap, list_runs, search_docs and list_sessions find them.`
+- `open` (the tool, MAN-9207) tries card, run, page, chat. Writing the kind in front (`chat: kaylee eyes`) tries that kind alone. Several kinds fitting is refused: `"<ref>" fits <n> kinds of thing: <each, named>. Say which by writing the target with its kind in front, for example "<kind>: <ref>".` A kind that did not answer (DocSpace down) is skipped when another fits. None fits: `Nothing of his is named "<ref>": not a card, a run, a page or a chat. list_roadmap, list_runs, search_docs and list_sessions find them.`
 - Where an open lands: a card → `{ kind: 'card', plan: <card name> }`; a run of a plan → that plan's card; a chat's run → the chat that launched it (neither: `The run <id> has neither a plan card nor a chat of his to open.`); a page → `{ kind: 'page', pageId, blockId }`; a chat → `{ kind: 'chat', sessionId }`.
 
 ## Carried lines — `carried-lines.ts` (`resolveCarriedLines`)
@@ -8031,7 +8023,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/a
 
 ## MAN-9173 — server/modules/companion/hands — the doors (action-doors.ts): where each action goes, the briefs his lines make, the rulings file
 
-`hands/action-doors.ts` (`fireAction(deps, pending, press)`) is where each of the thirteen actions goes when `take_action` fires it (protocol: MAN-9174). Every door is the house's own. A door never throws: what it cannot do is `refused` with the sentence that says why, and anything a door throws is `console.error('[Companion] <action> on his word did not complete', …)` and `refused` with `the house could not do it just now (<message>)`.
+`hands/action-doors.ts` is where each of the thirteen actions goes. `fireAction(deps, pending, press)` takes the eleven that `take_action` fires (protocol: MAN-9174); `openOnFloor` and `closeFollowup` are the doors of `open` and `close_followup`, which `direct-tools.ts` runs at once (MAN-9207). Every door is the house's own. A door never throws (`throughDoor(label, run)`): what it cannot do is `refused` with the sentence that says why, and anything a door throws is `console.error('[Companion] <action> on his word did not complete', …)` (`… on his request` for the two direct doors) and `refused` with `the house could not do it just now (<message>)`.
 
 ## Where each action goes
 | action | door | order sent |
@@ -8044,12 +8036,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/a
 | `answer` | `house.relay` | `{ verb: 'answers', ask, brief, press }` |
 | `show`, `recut`, `stop`, `resume`, `kick` | `house.relay` | `{ verb: <action>, name, press }` |
 | `resume_run` | `house.resumeRun` | `{ chainId, rulingsFile, press }` |
-| `open` | `deps.openOnFloor(open)` | `companion_open { target, floor }` to the page that holds the floor; answers `took` `<spoken> is up on the screen he is using.` At no floor: refused `No page of his holds the floor; he must open your panel first.` |
-| `close_followup` | `closeFollowupForAccount(userId, id)` (MAN-9145) | his own tick: `took` `Follow-up #<id> is ticked off as his own.`; an id no longer among his open ones is `already`, `Follow-up #<id> was already closed.` |
+| `open` | `openOnFloor(deps, open, spoken)` → `deps.openOnFloor(open)` | `companion_open { target, floor }` to the page that holds the floor; answers `took` `<spoken> is up on the screen he is using.` At no floor: refused `No page of his holds the floor; he must open your panel first.` |
+| `close_followup` | `closeFollowup(deps, id)`: `findFollowupForAccount` (MAN-9145), then `closeFollowupForAccount(userId, id)` | his own tick: `took` `Follow-up #<id> is ticked off as his own.`; one of his that is already closed is `already`, `Follow-up #<id> was already closed.`; an id that is not his is refused `#<id> is not one of his follow-ups.` |
 | `clear_memory` | `clearMemory({ kind: 'word', account, line })` (`memory/memory-verbs.ts`: MAN-9193), the firing line as each retire's reason | `took` `She forgot <n thing(s)>. The docstore's history keeps them.`; an emptied bank is `already`, `Her memory was already empty.`; a door that stopped is `refused` with its sentence. No relay record, no dispatcher: MAN-9194 |
 - `name` is the card target's `name`: the plan's name, or `<name>.arc` for an epic.
 - The lanes' side of `relay` and `resumeRun`, the record they write and what the dispatcher and the runner do with it: MAN-9152 (Accept and answers go to the ask book's third door `kaylee`: MAN-8494). `CompanionHouse` carries both doors (MAN-9142).
-- A pin that is missing answers refused, naming what was lost, `prepare it again`: `that action lost the prompt it was prepared on`, `… the questions …` (also when the pinned question numbers do not match the carried groups), `… the run …`, `… the place it was prepared for`, `… the follow-up …`; `that action names no card` when the target is no card.
+- A pin that is missing answers refused, naming what was lost, `prepare it again`: `that action lost the prompt it was prepared on`, `… the questions …` (also when the pinned question numbers do not match the carried groups), `… the run …`; `that action names no card` when the target is no card. The two direct doors take what they act on as arguments and pin nothing.
 - why the order is built from the PIN and never the picture now: the dispatcher refuses a prompt that changed since he heard it read back (MAN-8494).
 
 ## What the designer and the runner read — his lines, verbatim
@@ -8092,36 +8084,37 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/a
 
 ## MAN-9174 — server/modules/companion/hands — prepare_action, take_action and cancel_action: the protocol, the claim, the lapse and the ending (hands-tools.ts, action-end.ts, action-prompts.ts)
 
-Her hands: `prepare_action`, `take_action`, `cancel_action` (`hands/hands-tools.ts`, `handsTools(deps)`, built by `buildCompanionTools`, MAN-9070). Each description is its prompt line (`toolLine`). None is `readOnlyHint`.
+Her hands for the actions that change the house: `prepare_action`, `take_action`, `cancel_action` (`hands/hands-tools.ts`, `handsTools(deps)`, built by `buildCompanionTools`, MAN-9070). `handsTools` also hands over `open` and `close_followup` (`hands/direct-tools.ts`, MAN-9207), which wait for nothing. Each description is its prompt line (`toolLine`). None is `readOnlyHint`.
 Ruling 3, the operator's: "only on my explicit spoken word for that specific card, never on her own judgment". Re-ruled 2026-10-29:
 - "Make it accept a read-back that names the target in plain words, in any of her turns since the prepare."
-- "For those, no read-back and no second yes: she prepares, says one sentence, and my first word of assent fires it, or let open fire straight from my spoken request with no prepare at all." (Those: `open`, `close_followup`. Built: the spoken request BEFORE the prepare fires on the take after it. `take_action` carries no target, only `said`.)
-- "My 'yes' should count. When the action on the panel is the only one and I say yes, that is my word for it; don't require me to re-say the title."
-- "I meant open, not show. Show is dispatcher unhide and puts a held, approved card back in the queue, so it is not harmless; move show back to the full ceremony (read-back, then his word). The light tier is open and close_followup only."
-The server holds it. Prepare pins what he is shown; take fires only when `checkHisWord` passes on her log (MAN-9171). Recipes: MAN-9172. Doors: MAN-9173. The words of an action: MAN-9203. The thirteenth action, `clear_memory`: MAN-9194. Rules an edit must keep: INV-10099.
+- "My 'yes' should count. When the action on the panel is the only one and I say yes, that is my word for it."
+- "Keep the full ceremony only for the actions that change the house: queue, hide, show, rework, answer, recut, stop, resume, kick, resume_run, clear_memory." `show` is `dispatcher unhide`: it puts a held, approved card back in the queue.
+- `open` and `close_followup`: "no prepare, no yes, no lapse" (MAN-9207).
+- "raise the lapse from five minutes to thirty, and when it does lapse, let her re-arm it and accept my next yes without me having to say the title" (MAN-9208).
+The server holds it. Prepare pins what he is shown; take fires only when `checkHisWord` passes on her log (MAN-9171). Recipes: MAN-9172. Doors: MAN-9173. The words of an action: MAN-9203. `clear_memory`: MAN-9194. Rules an edit must keep: INV-10099.
 
 ## Inputs (zod)
 | tool | field | rule |
 |---|---|---|
-| `prepare_action` | `action` | one of the thirteen `CompanionActionKind` |
+| `prepare_action` | `action` | one of the eleven `CompanionCeremonyAction`. Any other value is refused with `WRONG_ACTION`: `action is one of <the eleven>. To bring something up on his screen call the open tool, and to tick off a follow-up call the close_followup tool: they act at once and are not prepared.` |
 | | `target` | string, trimmed, 1–300; resolved per action (MAN-9172) |
-| | `words` | optional, 1–20 lines of 1–8000; only `rework` and `resume_run` take them (required there) |
-| | `answers` | optional, ≤20 `{ question: int ≥ 1, words: 1–20 lines }`; only `answer` takes them (required there) |
-| `take_action` | `said` | string, trimmed, 1–8000: his newest spoken line, as logged. Its description (`SAID_DESCRIPTION`) is per tier: FULL, the line he says after her read-back; LIGHT, the request he made just before the prepare or his first spoken yes |
+| | `words` | optional, 1–20 lines of 1–8000; `rework` and `resume_run` only (required there) |
+| | `answers` | optional, ≤20 `{ question: int ≥ 1, words: 1–20 lines }`; `answer` only (required there) |
+| `take_action` | `said` | string, trimmed, 1–8000: his newest spoken line, as logged, after her read-back (`SAID_DESCRIPTION`) |
 | `cancel_action` | none | |
 
 ## `prepare_action`, in order
 1. `endLapsedAction` (§Ending below): a standing action past its `expiresAt` ends `expired`. A take of this process carrying the standing action out → refused `The action on his panel is being carried out now; wait for its answer.`
 2. `prepareRecipe` (MAN-9172): the sentence that refuses, or the action with its pin, prompt, carried lines, `say` and read-back.
-3. `open` with `state.floor === null` → refused `No page of his holds the floor; he must open your panel first.` (`NO_FLOOR`).
-4. Step 1 again: the recipe awaited, and a take may have begun.
-5. `id` = `randomUUID()`; `preparedAt` = now; `expiresAt` = `preparedAt` + 5 min (`WAIT_MS`).
-6. `companionDb.openAction` writes the row of `companion_actions` (MAN-9082) with no outcome. A standing action, if any, ends `replaced`. `store.setPending(pending)` writes `pending_json` WITH the pin and sends `companion_pending` WITHOUT it. A `setPending` that throws ends the new row `cancelled`.
-7. Answers: `On his panel, waiting for his word: <SAY_VERB lower-cased> <spoken>. <nextStepFor> A line he typed never fires it. It lapses at <HH:MM>.` and, when one was standing, ` That replaced "<its say>", which was waiting.` `nextStepFor` is the per-tier text of MAN-9203.
+3. Step 1's carrying-out check again: the recipe awaited, and a take may have begun.
+4. `rearmOf` (MAN-9208): the lapsed ceremony this prepare re-arms, else none.
+5. `id` = `randomUUID()`; `preparedAt` = now; `expiresAt` = `preparedAt` + 30 min (`WAIT_MS`); `armedFrom` = the re-armed ceremony's, else `preparedAt`.
+6. `companionDb.openAction` writes the row of `companion_actions` (MAN-9082) with no outcome and `armed_from` (the re-arm's, else NULL). A standing action, if any, ends `replaced`. `store.setPending(pending)` writes `pending_json` WITH the pin and `armedFrom` and sends `companion_pending` WITHOUT them. A `setPending` that throws ends the new row `cancelled`.
+7. Answers: `On his panel, waiting for his word: <SAY_VERB lower-cased> <spoken>. <next step> A line he typed never fires it. It lapses at <HH:MM>.` and, when one was standing, ` That replaced "<its say>", which was waiting.` The next step is `nextStepFor`, or `rearmStepFor` for a re-arm (MAN-9203).
 
 ## `take_action`, in order
 1. `endLapsedAction`. A take of this process carrying the standing action out → refused (same sentence as above).
-2. `checkHisWord` on `heardForAction`: `companionDb.heardSince(userId, preparedAt)` and, for a LIGHT action, `heardBefore(userId, preparedAt)`'s row first (no rows for a lapsed action, so the check answers the lapse). A refusal: `companionDb.noteRefusal` keeps its sentence as the row's `answer`, the action STAYS on his panel, and the answer is that sentence. The pointer at his newest spoken line is part of the check's sentence (MAN-9171 §Check 3).
+2. `checkHisWord` on `companionDb.heardSince(userId, armedFrom)` (no rows for a lapsed action, so the check answers the lapse). A refusal: `companionDb.noteRefusal` keeps its sentence as the row's `answer`, the action STAYS on his panel, and the answer is that sentence. The pointer at his newest spoken line is part of the check's sentence (MAN-9171 §Check 3).
 3. `carryOut(userId, id, …)` holds the id in this process; `claimAction` writes `said`, `said_at`, `said_log_id` on the row, only while it has no outcome and no claim. A false → refused `That action is no longer waiting for his word: it has ended, or another call is carrying it out. Look at his panel, and prepare it again if he still wants it.`
 4. `fireAction` (MAN-9173) with the record of his word: `RelayedPress { account: { id: userId, name: users.username }, saidAt: line.at, words: line.text, press: line.id, token }`; `token` = the pinned ask's lock token for an Accept, else `null`. `words` is the log's text, never her argument.
 5. `endAction` with the door's `outcome` and `answer` (`said`, `said_at`, `said_log_id` again); a `system` line on her panel; `setPending(null)` only when the pending action is still this one.
@@ -8129,7 +8122,7 @@ The server holds it. Prepare pins what he is shown; take fires only when `checkH
 
 `<done>` is `doneOf(action, spoken)` (`action-prompts.ts`): `<DONE_VERB> <spoken>`, except `clear_memory`, whose `DONE_VERB` `cleared her memory` already names its target and stands alone.
 
-The `system` line: `On your word: <done>.[ It was already so.][ <Source> said: <line>]`; refused `Not done, on your word: <say>.[ <Source> said: <line>]`. `Source` is `The dispatcher` for queue, hide, show, rework, answer, recut, stop, resume and kick; `The runner` for `resume_run`; `open`, `close_followup` and `clear_memory` have none: a success says nothing after the full stop (`On your word: opened Kaylee eyes.`), and only a refusal quotes the door's line bare (`Not done, on your word: Open Kaylee eyes. No page of his holds the floor.`).
+The `system` line (`systemLine`, `action-prompts.ts`; a take and the direct tools write it): `On your word: <done>.[ It was already so.][ <Source> said: <line>]`; refused `Not done, on your word: <say>.[ <Source> said: <line>]`. `Source` is `The dispatcher` for queue, hide, show, rework, answer, recut, stop, resume and kick; `The runner` for `resume_run`; `open`, `close_followup` and `clear_memory` have none: a success says nothing after the full stop (`On your word: opened Kaylee eyes.`), and only a refusal quotes the door's line bare.
 
 ## `cancel_action`
 `withdrawStandingAction`, the function his × (`DELETE /action`, `companionService.cancelAction`, MAN-9059) calls: one ending for both doors.
@@ -8140,7 +8133,6 @@ The `system` line: `On your word: <done>.[ It was already so.][ <Source> said: <
 | past `expiresAt` | `expired` | `It had lapsed at <HH:MM>; it is off his panel and nothing was done.` |
 | else | `cancelled` | `Took it off his panel: <say>. Nothing was done.` |
 
-
 ## Rows and frames
 | event | `companion_actions` | `pending_json` | frame |
 |---|---|---|---|
@@ -8148,20 +8140,20 @@ The `system` line: `On your word: <done>.[ It was already so.][ <Source> said: <
 | a newer prepare | the older ends `replaced` | replaced | `companion_pending` |
 | refused take | `answer` = the sentence; no outcome | stays | none |
 | take | claimed, then ends with the door's outcome | NULL | `companion_pending` null, `companion_log` (the system line) |
+| `open`, `close_followup` | opened, claimed and ended in one call (MAN-9207) | untouched | `companion_log` (the system line) |
 | `cancel_action`, his × | `cancelled` (`expired` past its time) | NULL | `companion_pending` null |
 | Clear | `cancelled`, kept; a claimed row is spared and the take ends it | NULL | `companion_cleared` |
 
 ## Ending — `hands/action-end.ts`
-Exports `isCarryingOut`, `carryOut`, `withdrawStandingAction`, `endLapsedAction`. Consumers: `hands-tools.ts` (all three tools) and `companion.service.ts` (`cancelAction`, his ×). The one place an action leaves her state without being taken.
+Exports `isCarryingOut`, `carryOut`, `withdrawStandingAction`, `endLapsedAction`. Consumers: `hands-tools.ts` (all three tools), `direct-tools.ts` (`carryOut`) and `companion.service.ts` (`cancelAction`, his ×). The one place an action leaves her state without being taken.
 - NOTHING TIMES A LAPSE OUT. An action is past its time when `expiresAt` has gone by; the next prepare, take or cancel that meets it ends it `expired` and takes it off his panel. The page hides the card at a deadline it sets once (`useActionLapse`, MAN-9062). why: this house reacts to events, never to a timer.
 - A TAKE IN FLIGHT IS NOBODY ELSE'S TO END. While a door is out the action is held twice: in this process (`carryOut` keeps its id per account) and on its row (`claimAction` writes the firing line; `endAction` ends a claimed row only for a call naming that line). A withdrawal, a lapse, a newer prepare and a Clear leave it; the take ends it with the door's own outcome.
 - AN ORPHAN: a claimed row (`said_log_id` set, no outcome) that no take of this process is carrying out (its server restarted, or its take failed after the door). The next prepare, take or cancel ends it `refused` with `The server stopped while this was being carried out, so it may have gone through; check before preparing it again.` and clears the pending action if it is that one. why: the same word is never fired twice.
 - A withdrawal ends the row before the state clears, and the state clears even when the row was already ended (a Clear got there first), so a page is never left drawing an action no row waits on.
 
 ## Proof
-`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-yes-counts.mjs`: the real three tools over a FRESH scratch database (nothing of `~/.cloudcli/auth.db`), a loopback ArchPulse, the bank stand-in (`lib/kaylee-bank-standin.mjs`) and an `openOnFloor` that records; no model. Exit 1 on a FAIL. 2026-10-29: 21 of 21 PASS.
-- LIGHT `open`: his request before the prepare fires it (`said_log_id` is that row; the same line cannot fire a second open); his first spoken yes fires it; a typed request or a typed "Yes." fires nothing.
-- FULL `clear_memory`: a yes with no read-back, a yes before it, "Yes?" and "Hey." are refused; his yes after her read-back clears both memories.
+`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-yes-counts.mjs`: the real tools over a FRESH scratch database (nothing of `~/.cloudcli/auth.db`), a loopback ArchPulse, the bank stand-in (`lib/kaylee-bank-standin.mjs`) and an `openOnFloor` that records; no model. Exit 1 on a FAIL. 2026-10-29: 43 PASS, 0 FAIL.
+- A–D: `open` and `close_followup` (MAN-9207). E: `clear_memory`: a yes with no read-back, a yes before it, "Yes?" and "Hey." are refused; his yes after her read-back clears both memories. F, F2, F3: the lapse and the re-arm (MAN-9208).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-yes-counts.mjs
 
@@ -8525,13 +8517,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/
 
 ## MAN-9194 — server/modules/companion/hands — the thirteenth action, clear_memory: his words, its recipe, its door, its card
 
-`clear_memory` is the thirteenth action of her hands: it retires every memory of her own bank, on his spoken word, read back first. The protocol is MAN-9174; this row holds what is its own. The check of his word: MAN-9171; the other recipes and doors: MAN-9172, MAN-9173. What it calls: `clearMemory` (MAN-9193).
+`clear_memory` is the last of the eleven actions that wait for his word: it retires every memory of her own bank, on his spoken word, read back first. The protocol is MAN-9174; this row holds what is its own. The check of his word: MAN-9171; the other recipes and doors: MAN-9172, MAN-9173. What it calls: `clearMemory` (MAN-9193).
 
 Ruling 4: he clears her whole memory only by his own act. This is the one tool-side way to it, and a press fires it.
 
 ## The wire
 - `CompanionActionKind` gains `'clear_memory'`; `CompanionActionTarget` gains `{ kind: 'memory'; spoken: string; count: number }`: `spoken` is `your memory`, `count` the memories held when it was prepared. Both in `server/shared/companion-types.ts` and its mirror `src/shared/companion-types.ts` (MAN-9086).
-- `companion-pending.ts` knows the kind (`ACTION_KINDS`) and reads a `memory` target by its `count` (`isCount`).
+- `companion-pending.ts` knows the kind (`ACTION_KINDS`, the eleven of `CompanionCeremonyAction`) and reads a `memory` target by its `count` (`isCount`).
 
 ## His words
 | what | value |
@@ -8540,7 +8532,7 @@ Ruling 4: he clears her whole memory only by his own act. This is the one tool-s
 | `SAY_VERB` | `Clear`; `say` = `Clear your memory` |
 | `DONE_VERB` | `cleared her memory`; `doneOf(action, spoken)` adds no target after it |
 | names the target | `your memory`, or its house name, the word `memory` |
-| ordered by | FULL: read back first (MAN-9171). Then a named order that OPENS with an action word after the lead-ins, or a bare yes (`isAssent`) that is his first spoken line after her newest read-back; a statement holding both words is refused (rules: MAN-9204) |
+| ordered by | read back first (MAN-9171). Then a named order that OPENS with an action word after the lead-ins, or a bare yes (`isAssent`) that is his first spoken line after her newest read-back; a statement holding both words is refused (rules: MAN-9204) |
 
 ## The prepare — `prepareClearMemory` in `action-recipe.ts`, in order
 | check | refused with |
@@ -8564,10 +8556,10 @@ Ruling 4: he clears her whole memory only by his own act. This is the one tool-s
 
 ## The card and the tool
 - `CompanionActionCard` (MAN-9186): the sentence `companion.action.verb.clearMemory`, `Clear <target/>`; the target's kind line `companion.action.kind.memory_one` / `_other`, `Your memory, {{count}} thing kept` / `things kept`. Fixture `FAKE_PANEL.actionClear` (`companion-fake.ts`).
-- `prepare_action` (`hands-tools.ts`): `ACTIONS` includes `clear_memory`; the `action` description ends `clear_memory forgets every memory you keep`; the `target` description gains `your memory as "your memory"`. Her prompt line: MAN-9080.
+- `prepare_action` (`hands-tools.ts`): `ACTIONS` includes `clear_memory`; the `action` description says `clear_memory forgets every memory you keep`; the `target` description gains `your memory as "your memory"`. Her prompt line: MAN-9080.
 
 ## Prove it
-- `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-action-word.mjs`: `checkHisWord` on a `clear_memory` pending. "Clear your memory." fires after a read-back, and so does a bare "Yes." as his first spoken line after her newest read-back; "Clear it." and "Forget it." are refused at check 5 (they name nothing, and an own word beside "it" is no assent under a FULL action).
+- `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-action-word.mjs`: `checkHisWord` on a `clear_memory` pending. "Clear your memory." fires after a read-back, and so does a bare "Yes." as his first spoken line after her newest read-back; "Clear it." and "Forget it." are refused at check 5 (they name nothing, and an own word beside "it" is no assent).
 - `.verify/kaylee-memory-clear-hands.mjs`: `prepare_action`, `take_action` and `cancel_action` for it, every sentence above, over a copy of `auth.db` and a stand-in door; no model.
 - `.verify/kaylee-memory-clear.mjs` (scratch stack, MAN-9193): typed "Get ready to clear your memory." prepares it, the card draws, the press "Clear your memory." empties the bank, and the scratch store's `history` keeps every row.
 
@@ -8631,9 +8623,9 @@ for pid in $(pgrep -A -f 'session-host/host.js'); do case "$pid" in ''|*[!012345
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-model-choice.mjs
 
-## MAN-9203 — server/modules/companion/hands — the words of an action (action-prompts.ts): SAY_VERB, DONE_VERB, what the prepare tells her next per tier, the card's prompt texts
+## MAN-9203 — server/modules/companion/hands — the words of an action (action-prompts.ts): SAY_VERB, DONE_VERB, what the prepare and a re-arm tell her next, the panel line, the card's prompt texts
 
-`hands/action-prompts.ts`: strings in, strings out, no I/O. Consumers: `action-recipe.ts` (the prepare), `hands-tools.ts` (the answers to her), `action-doors.ts` (the answers and the briefs a door carries). Protocol: MAN-9174.
+`hands/action-prompts.ts`: strings in, strings out, no I/O. Consumers: `action-recipe.ts` (the prepare), `hands-tools.ts` and `direct-tools.ts` (the answers to her and the panel's line), `action-doors.ts` (the answers and the briefs a door carries). Protocol: MAN-9174.
 
 ## `SAY_VERB` and `DONE_VERB`
 | action | `SAY_VERB` (what he says first) | `DONE_VERB` |
@@ -8651,17 +8643,20 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-model-choice.mjs
 | `open` | Open | opened |
 | `close_followup` | Close the follow-up on | closed the follow-up on |
 | `clear_memory` | Clear | cleared her memory |
-- `say` = `<SAY_VERB> <target.spoken>` (`sayOf`). Each verb holds one of the action's own words (`ACTION_WORDS`, MAN-9204), so saying `say` aloud always passes the word check.
+- `say` = `<SAY_VERB> <target.spoken>` (`sayOf`). Each of the eleven verbs holds one of the action's own words (`ACTION_WORDS`, MAN-9204), so saying `say` aloud always passes the word check. The `open` and `close_followup` verbs serve the panel's lines alone: no word of his is checked for them.
 - `doneOf(action, spoken)` = `<DONE_VERB> <spoken>`, except `clear_memory`, whose `DONE_VERB` `cleared her memory` already names its target and stands alone.
-- `NO_FLOOR` = `No page of his holds the floor; he must open your panel first.`
+- `NO_FLOOR` = `No page of his holds the floor; he must open your panel first.` (`direct-tools.ts`, `openOnFloor`)
 - `clockOf(stamp)`: the stamp's local `HH:MM`; a stamp that does not parse reads `an unknown time`.
 
-## `nextStepFor(action, target, say, readBack)` — what the prepare tells her next, by tier
-Tier: `ACTION_TIER` (MAN-9171). `<short>` = `shortNameOf(target)` (MAN-9204), the shortest name the check takes, never a longer title. `<first>` = the first of `ACTION_WORDS[action]`. `<read-back>` = the recipe's sentence (MAN-9172). The prepare's answer is `On his panel, waiting for his word: <SAY_VERB lower-cased> <spoken>. <this text> A line he typed never fires it. It lapses at <HH:MM>.` (MAN-9174).
-| tier | text |
-|---|---|
-| LIGHT | `It is harmless, so nothing is read back first. If his last spoken line asked for it (it names <short> and says <first>), call take_action now with that line exactly as logged. If it did not, say one sentence of what it does (<read-back>) and stop: his first spoken yes fires it, and so do words of his own naming <short> and saying <first>, or "<say>"; you pass that line.` |
-| FULL | `Read it back to him in plain words, then stop: <read-back> His next spoken yes fires it, and so do words of his own naming <short> and saying <first>, or "<say>". Then call take_action with his newest spoken line, exactly as logged; a line that came before your read-back is not his answer to it, and a bare yes counts only as the first thing he says after your newest read-back: if he said anything else first, read it back again.` |
+## `nextStepFor(action, target, say, readBack)` — what the prepare tells her next
+`<short>` = `shortNameOf(target)` (MAN-9204), the shortest name the check takes, never a longer title. `<first>` = the first of `ACTION_WORDS[action]`. `<read-back>` = the recipe's sentence (MAN-9172). `<take>` = `Then call take_action with his newest spoken line, exactly as logged; a line that came before your read-back is not his answer to it, and a bare yes counts only as the first thing he says after your newest read-back: if he said anything else first, read it back again.` The prepare's answer is `On his panel, waiting for his word: <SAY_VERB lower-cased> <spoken>. <this text> A line he typed never fires it. It lapses at <HH:MM>.` (MAN-9174).
+`Read it back to him in plain words, then stop: <read-back> His next spoken yes fires it, and so do words of his own naming <short> and saying <first>, or "<say>". <take>`
+
+## `rearmStepFor(action, target, say, readBack, lapsedAt)` — the same, after a re-arm (MAN-9208)
+`Re-armed: it lapsed at <HH:MM of lapsedAt> and this takes its place. Your read-back from before the lapse still stands for a yes he has said since, and for nothing else. If his newest spoken line is a bare yes, call take_action now with his newest spoken line, exactly as logged, and ask him nothing. If it is anything else (an order that names it, other talk) or he has said nothing since, read it back to him again and stop: <read-back> His next spoken yes fires it, and so do words of his own naming <short> and saying <first>, or "<say>". <take>`
+
+## `systemLine(done, outcome, said)` — the panel's line after an action went through its door
+`done` = `{ action, target, say }`; the sentence and its `Source` rule are in MAN-9174 §`take_action`. Consumers: `hands-tools.ts` (a take), `direct-tools.ts` (an open and a close).
 
 ## The card's prompt texts
 - `acceptPrompt(ask)` = `ask.header`, blank line, `ask.question` (the whole census); `questionsPrompt(ask)` = each question numbered, its options under it as `   - <option>`; `acceptHead(ask, delivers)` = `the prompt reads "<census's first block>"` plus `, and it delivers: <first sentence of delivers>`.
@@ -8673,7 +8668,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/a
 
 What `checkHisWord` (MAN-9171) reads his line against, in `hands/action-word.ts`: the action words, the name rule, the head of a long title, the verb beside the name, the order words. Pure functions, shown one by one by `.verify/kaylee-action-word.mjs`.
 
-## `ACTION_WORDS` (the first of each is the one a refusal names and the prepare tells her to listen for)
+## `ACTION_WORDS` (the eleven that wait for his word; the first of each is the one a refusal names and the prepare tells her to listen for)
 | action | words |
 |---|---|
 | `queue` | queue, accept, approve |
@@ -8686,11 +8681,9 @@ What `checkHisWord` (MAN-9171) reads his line against, in `hands/action-word.ts`
 | `resume` | resume, start, unpause |
 | `kick` | kick, wake |
 | `resume_run` | resume, rerun, re run, continue |
-| `open` | open, show, pull up, bring up |
-| `close_followup` | close, done, tick, check off |
 | `clear_memory` | clear, wipe, erase, empty, forget everything |
 - `wordsOf(text)`: NFC, lower case, apostrophes (`' ‘ ’ ʼ`) dropped, every other run of non-letters and non-digits one space; `''` and punctuation are no words.
-- `holdsActionWord(said, action)`: one of the action's words stands in his words as a run, side by side, in order. "restart" does not hold "start"; "pull it up" does not hold "pull up". The plain predicate; the check asks `holdsActionWordBesidesName`.
+- `holdsActionWord(said, action)`: one of the action's words stands in his words as a run, side by side, in order. "restart" does not hold "start"; "re cut" is held as the run `re cut`. The plain predicate; the check asks `holdsActionWordBesidesName`.
 
 ## The name — `namesTarget(said, target, action?)`
 - Every significant word of one of the target's names is among his words, in any order. Names (`namesOf`): its `spoken` and its house name read as words — a card's `name`, a run's `plan` (else its `runId`), a page's `pageId`, her memory's the word `memory` ("Clear my memory." names it as surely as "Clear your memory."); a chat and a follow-up have `spoken` alone. why: "Kaylee's eyes" heard as "Kaylee eyes" must still fire.
@@ -8713,3 +8706,85 @@ What `checkHisWord` (MAN-9171) reads his line against, in `hands/action-word.ts`
 - `clear_memory` (`ORDERED_VERB_FIRST`, `opensWithActionWord`): a NAMED order needs the line's first word after the lead-ins (please, okay, ok, alright, yes, yeah, yep, sure, now, go, ahead, and, so, then, just, hey) to be one of its action words. "Please clear your memory." and "Forget everything in your memory." fire; "My memory is clear." and "You could wipe your memory later." are refused with the no-or-question sentence. why: `clear` and `empty` are adjectives and the name is one common word, so a statement holds both as a bag of words. A bare yes (`isAssent`, MAN-9171) fires it with no word said.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts
+
+## MAN-9207 — server/modules/companion/hands — open and close_followup (direct-tools.ts): done the moment he asks, no pending action, the record, the answers
+
+`hands/direct-tools.ts` (`directTools(deps)`, handed over by `handsTools`; protocol of the other eleven: MAN-9174): `open(target)` and `close_followup(followup)`, the two harmless hands. One call each, run at once. No `prepare_action`, no pending action, no card, no read-back, no check of his word (MAN-9171), no lapse. Neither is `readOnlyHint`; each description is its prompt line (`toolLine`, MAN-9080).
+Ruling 2026-10-29: "no prepare, no yes, no lapse. When I ask for it in any natural phrasing, a question included, Kaylee opens it straight away in one call and says what she opened. A polite question is an order. If she is unsure which page or chat I mean, she asks that, nothing else."
+
+## Inputs (zod)
+| tool | field | rule |
+|---|---|---|
+| `open` | `target` | string, trimmed, 1–300: a card (feature or epic), run, page or chat, by `findOpenTarget` (MAN-9172 §Targets); `chat: …` / `page: …` in front when the name fits more than one kind |
+| `close_followup` | `followup` | string, trimmed, 1–40: `#<id>` as `list_followups` prints it, by `findFollowup` |
+
+## `open`, in order
+1. `findOpenTarget`: not found, or several fit → the resolver's own sentence is the answer (`deps.refuse`); no row written.
+2. `store.readState().floor === null` → refused `No page of his holds the floor; he must open your panel first.` (`NO_FLOOR`); no row written.
+3. `goDirectly` with `openOnFloor(deps, open, target.spoken)` (MAN-9173).
+4. Answers the door's sentence `<spoken> is up on the screen he is using.`; a refused door is the error `Not done: <door's line>`.
+
+## `close_followup`, in order
+1. `findFollowup`: not `#<id>` → `A follow-up is named by its number, #<id>, as list_followups prints it.`; an id that is not his (another account's, or none) → `#<id> is not one of his follow-ups; list_followups shows the open ones.`; no row written. A follow-up of his that is already closed resolves.
+2. `goDirectly` with `closeFollowup(deps, id)` (MAN-9173).
+3. Answers `Closed: "<first sentence of its text, trailing .!? cut>". Follow-up #<id> is ticked off as his own.`; one already closed answers `Follow-up #<id> was already closed.` alone (outcome `already`); a refused door is the error `Not done: <door's line>`.
+
+## `goDirectly` — the record
+A `companion_actions` row (MAN-9082) opened, claimed and ended inside `carryOut` (`action-end.ts`), so an orphan sweep never finds it half done and the next prepare never ends it `refused`.
+| column | value |
+|---|---|
+| `prepared_at`, `expires_at` | both now: nothing waits |
+| `armed_from`, `prompt` | NULL; `carried_json` is `[]` |
+| `pin_json` | `{ open }` or `{ followupId }` |
+| `said`, `said_at`, `said_log_id` | his newest `operator` line, spoken or typed (`companionDb.newestOperatorLine`): the trigger of the record, never a gate. With an empty log (a Clear) the row is not claimed and still ends |
+| `outcome`, `answer` | the door's (`took`, `already`, `refused`) and its sentence |
+- A `system` line goes on her panel (`systemLine`, MAN-9203): `On your word: opened <spoken>.` / `On your word: closed the follow-up on <spoken>.`; a refusal is `Not done, on your word: <say>. <door's line>`.
+- The door runs through `throughDoor` (MAN-9173): it never throws.
+- Neither tool reads or writes `pending_json` or sends `companion_pending`: an action standing on his panel stays there.
+- `newestCeremonyAction` skips these rows (MAN-9208: the re-arm).
+
+## Proof
+`.verify/kaylee-yes-counts.mjs` sections A–D (MAN-9174 §Proof); `.verify/kaylee-eyes-recipes.ts` cases 7–9 and 13 (MAN-9172).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/direct-tools.ts
+
+## MAN-9208 — server/modules/companion/hands — the lapse and the re-arm (action-rearm.ts): thirty minutes, what a prepare inherits, what it never does
+
+`hands/action-rearm.ts` (`rearmOf(userId, prepared)`): asked by `prepare_action` (MAN-9174) before it starts a ceremony of one of the eleven (`CompanionCeremonyAction`). Reads her record of actions only. The caller has already ended a standing lapse (`endLapsedAction`, `action-end.ts`), which is what puts that row here as `expired`.
+Rulings 2026-10-29: "raise the lapse from five minutes to thirty, and when it does lapse, let her re-arm it and accept my next yes without me having to say the title."
+
+## The wait
+- `WAIT_MS` = 30 minutes (`hands-tools.ts`): `expiresAt` = `preparedAt` + 30 min. The page's fixture (`companion-fake.ts`) lapses at the same 30.
+- Nothing times a lapse out: the next prepare, take or cancel ends it `expired` (MAN-9174 §Ending).
+- A stored pending carries `armedFrom` beside `preparedAt` and `expiresAt` (`CompanionStoredPending`, server-only; `isStoredPending` requires all three as store stamps). The row's `armed_from` is NULL for a fresh ceremony.
+
+## `rearmOf` → `{ armedFrom, lapsedAt }` or `null`
+`prepared` = `{ action, target, prompt, carried, pin }` as the recipe fixed them. The lapsed ceremony is `companionDb.newestCeremonyAction(userId)`: the account's newest `companion_actions` row by `prepared_at`, then `rowid`, whose action is not `open` or `close_followup`.
+| condition | answers |
+|---|---|
+| no such row, or its `outcome` is not `expired` | `null`: a fresh ceremony |
+| `action`, `target_json`, `pin_json`, `prompt`, `carried_json` each equal the row's column as written (`JSON.stringify` of the prepared value) | `{ armedFrom: row.armed_from ?? row.prepared_at, lapsedAt: row.expires_at }` |
+| any one differs | `null`: a fresh ceremony |
+- why the comparison is the stored record: his yes answered one read-back. Memories counted again (the `clear_memory` target holds the count), an Accept raised again (the pin's ask and lock token), other notes or answers (`carried`) or another prompt text is another read-back. A difference costs one more yes and never fires one.
+- A re-arm keeps `armedFrom` (a second re-arm still counts from the first prepare), has its own `preparedAt` and a fresh `expiresAt`, and writes `armed_from` on its row.
+- A ceremony of another action or target since the lapse, a take or a cancel is a newer row: the lapse no longer stands.
+- A direct `open` or `close_followup` row is skipped (MAN-9207): it is no ceremony.
+- No outer bound on the age of the lapse.
+
+## What a re-arm carries — `checkHisWord` (MAN-9171)
+| his line | read-back it needs |
+|---|---|
+| a bare yes (`isAssent`) | one of hers after `armedFrom`: the one from before the lapse stands |
+| a named order | one of hers after this prepare (`preparedAt`), as under a fresh ceremony |
+- `take_action` reads the log from `armedFrom` (`companionDb.heardSince(userId, pending.armedFrom)`), so a yes spoken after the lapse and before the re-arm is in view.
+- The binding holds across a re-arm: a bare yes is his first spoken line after her newest read-back, with none of his after it. why: a decline is a spoken line after the read-back, so the old yes cannot fire a card he declined.
+- Her sentences (MAN-9203): the take at a lapse says `It lapsed at <HH:MM>. Prepare it again: that re-arms it, and his yes since then still counts.`; the prepare of a re-arm answers `rearmStepFor`, which tells her to pass his newest spoken line at once when it is a bare yes.
+- A card withdrawn past its `expiresAt` by his × or `cancel_action` ends `expired`, not `cancelled` (MAN-9174 §`cancel_action`), so a prepare after it can re-arm. The binding stops a yes from before his decline; an order needs a read-back of the re-arm.
+
+## The column
+`companion_actions.armed_from TEXT` (`companion-schema.ts`), added by `addCompanionActionArmedFromColumn` (`migrations.ts`), once, when the column is first added: also ends every unclaimed waiting row `cancelled` with `How an action waits for his word changed while this waited; it was taken off his panel and nothing was done.` and sets every `companion_state.pending_json` to NULL. why: a pending stored before it has no `armedFrom` (and may be an `open`, which has no pending action now), and the store would drop it with a warning at every read. A claimed row is left to its take or the orphan sweep (MAN-9174 §Ending).
+
+## Proof
+`.verify/kaylee-action-word.mjs` (MAN-9171): the second incident of 2026-10-29 and the thirty-minute cases. `.verify/kaylee-yes-counts.mjs` sections F, F2, F3 (MAN-9174 §Proof): the lapse, the re-arm and what is no re-arm, over real tools on a scratch database.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-rearm.ts

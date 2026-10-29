@@ -301,4 +301,35 @@ CREATE INDEX ix_results_moves ON results(at)
 
 CREATE INDEX ix_results_keepalives ON results(at) WHERE kind = 'keepalive';
 `,
+
+  // Step 5 (user_version 5 → 6) — the red watch: a check that stays failing or denied for an hour wakes the
+  // operator's phone, and this table is what keeps a restart of the server from waking it again. Additive.
+  `
+-- One row per red incident of one check: opened when the watcher first paged it, closed when the check turned
+-- ok again ('ok'), was muted ('mute') or left the fleet's sight ('gone'). notified_at is the last push that
+-- carried it as a new red, last_reminder_at the last "still red" push; both are the clock of the cadence.
+-- The partial unique index is the guard against two overlapping server processes opening the same incident.
+CREATE TABLE cerberus_red_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    opened_at INTEGER NOT NULL,
+    notified_at INTEGER NOT NULL,
+    last_reminder_at INTEGER,
+    closed_at INTEGER,
+    closed_by TEXT CHECK(closed_by IN ('ok','mute','gone'))
+);
+
+CREATE UNIQUE INDEX ix_red_alerts_open ON cerberus_red_alerts(node, "key") WHERE closed_at IS NULL;
+CREATE INDEX ix_red_alerts_check ON cerberus_red_alerts(node, "key", opened_at);
+`,
+
+  // Step 6 (user_version 6 → 7) — when the red began. The recovery push says how long the check was red, and
+  // `opened_at` is when the watcher paged (an hour or more after the red began), so the beginning is kept on
+  // the row, on center's clock. Step 5 had run on the live store before this was needed, so it is a step and
+  // not an edit of that one; the table held no row. The DEFAULT only satisfies SQLite's rule for a NOT NULL
+  // column added to an existing table: every row the watcher writes names its own.
+  `
+ALTER TABLE cerberus_red_alerts ADD COLUMN red_since INTEGER NOT NULL DEFAULT 0;
+`,
 ];

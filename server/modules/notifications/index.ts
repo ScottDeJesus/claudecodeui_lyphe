@@ -10,6 +10,11 @@ export {
   // Used by provider runtimes to report background work that finished after its turn ended.
   notifyBackgroundWorkCompleted,
 } from '@/modules/notifications/services/notification-orchestrator.service.js';
+// The meta of a Cerberus red-watch event: the checks it names, in the shape its copy reads (`modules/cerberus/red-watch.service.ts`).
+export type {
+  CerberusRedItem,
+  CerberusRedMeta,
+} from '@/modules/notifications/services/cerberus-red-copy.service.js';
 // Used by callers outside this module that show an event's wording: the one headline and body per code.
 export { buildNotificationText } from '@/modules/notifications/services/notification-copy.service.js';
 // spendFreeWording: used by the companion module's alert block, which tells her what the house said as it lands.

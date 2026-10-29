@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 
-import { closeFollowupForAccount, listOpenFollowups } from '@/modules/followups/index.js';
-import type { CompanionPendingAction } from '@/shared/companion-types.js';
+import { closeFollowupForAccount, findFollowupForAccount } from '@/modules/followups/index.js';
+import type { CompanionOpenTarget, CompanionPendingAction } from '@/shared/companion-types.js';
 import type { RelayAnswer, RelayedPress } from '@/shared/relayed-press-types.js';
 
 import type { CompanionStoredPending } from '../companion-pending.js';
@@ -12,15 +12,16 @@ import { companionScratchDir, nextScratchFile, pruneScratch } from '../tools/tra
 import { NO_FLOOR } from './action-prompts.js';
 
 /**
- * THE DOORS: where each of the thirteen actions goes when `take_action` fires it, every one the house's own.
+ * THE DOORS: where each of the thirteen actions goes, every one the house's own. `take_action` fires eleven of them (`fireAction`); the
+ * open and the close have no take, and `open` / `close_followup` (`direct-tools.ts`) go straight to their doors below.
  *
  *   - Queue, Hide and Rework at a prompt, and his answers to a questions round, go through `house.relay` to the dispatcher's ask
  *     book, which answers its own record of the pinned ask (so an ask that changed since he heard it read back is refused);
  *   - Hide or Show of an approved plan, a Rework with no prompt open (a `tell`), a re-cut, a stop, a resume and a kick are the
  *     dispatcher's own verbs, through `house.relay`;
  *   - a run resumed with rulings goes through `house.resumeRun`, with his rulings written to her scratch;
- *   - an open is `companion_open` to the page that holds the floor;
- *   - a follow-up closes as his own tick (`closeFollowupForAccount`: `closed_by` is `user`, and `followups_changed` is announced);
+ *   - an open (`openOnFloor`) is `companion_open` to the page that holds the floor;
+ *   - a follow-up (`closeFollowup`) closes as his own tick (`closeFollowupForAccount`: `closed_by` is `user`, and `followups_changed` is announced);
  *   - her memory is cleared through `clearMemory` (`memory/memory-verbs.ts`), every memory retired through her door with the firing
  *     line as each one's reason: the docstore's history keeps what was forgotten, with his words beside it.
  *
@@ -29,9 +30,9 @@ import { NO_FLOOR } from './action-prompts.js';
  * blank lines in the order he said them; answers are the card's own form, `Q: <question>` then `A: <his lines joined by a space>`,
  * or `A: (no answer)`, one pair per question, joined by blank lines. The record is never written into the brief.
  *
- * A door never throws: what it cannot do is `refused` with the sentence that says why.
+ * A door never throws: what it cannot do is `refused` with the sentence that says why (`throughDoor`).
  *
- * Consumer: `hands-tools.ts` (`take_action`).
+ * Consumers: `hands-tools.ts` (`take_action`) and `direct-tools.ts` (`open`, `close_followup`).
  */
 
 type Carried = CompanionPendingAction['carried'];
@@ -105,22 +106,24 @@ async function relayCardAction(deps: CompanionToolDeps, pending: CompanionStored
   }
 }
 
-/** An open: `companion_open` to the page that holds the floor, answered at once. With no page holding it nothing is sent. */
-function openOnFloor(deps: CompanionToolDeps, pending: CompanionStoredPending): RelayAnswer {
-  const { open } = pending.pin;
-  if (open === undefined) return refused('that open lost the place it was prepared for; prepare it again');
+/**
+ * An open: `companion_open` to the page that holds the floor, answered at once. With no page holding it nothing is sent. `spoken` is
+ * the name the answer says it by. Consumed by `direct-tools.ts` (`open`).
+ */
+export function openOnFloor(deps: CompanionToolDeps, open: CompanionOpenTarget, spoken: string): RelayAnswer {
   if (deps.store.readState().floor === null) return refused(NO_FLOOR);
   deps.openOnFloor(open);
-  return { outcome: 'took', said: `${pending.target.spoken} is up on the screen he is using.` };
+  return { outcome: 'took', said: `${spoken} is up on the screen he is using.` };
 }
 
-/** A follow-up closed as his own tick. One already closed (by him, or by its completion) is `already`; one that is gone is refused. */
-function closeFollowup(deps: CompanionToolDeps, pending: CompanionStoredPending): RelayAnswer {
-  const id = pending.pin.followupId;
-  if (id === undefined) return refused('that action lost the follow-up it was prepared on; prepare it again');
-  if (!listOpenFollowups(deps.userId, null, 200).some(({ followup }) => followup.id === id)) {
-    return { outcome: 'already', said: `Follow-up #${id} was already closed.` };
-  }
+/**
+ * A follow-up closed as his own tick. One already closed (by him, by its chat, or by its completion) is `already`; one that is not his is
+ * refused. Consumed by `direct-tools.ts` (`close_followup`).
+ */
+export function closeFollowup(deps: CompanionToolDeps, id: number): RelayAnswer {
+  const item = findFollowupForAccount(deps.userId, id);
+  if (item === null) return refused(`#${id} is not one of his follow-ups.`);
+  if (item.followup.state !== 'open') return { outcome: 'already', said: `Follow-up #${id} was already closed.` };
   closeFollowupForAccount(deps.userId, id);
   return { outcome: 'took', said: `Follow-up #${id} is ticked off as his own.` };
 }
@@ -141,12 +144,25 @@ async function clearHerMemory(deps: CompanionToolDeps, press: RelayedPress): Pro
 }
 
 /**
- * Fires the standing action through its door, with `press` as the record of the word that fired it. Answers the door's outcome and
- * its own first line. Anything a door throws (a spawn that failed, a disk that is full) is a refusal with the reason, never a throw:
- * `take_action` has already decided the word was his, and what the house did with it is the answer.
+ * Runs a door and answers its outcome. Anything a door throws (a spawn that failed, a disk that is full) is a refusal with the reason,
+ * never a throw: the caller has already decided the word was his or the request clear, and what the house did with it is the answer.
+ * Consumed here (`fireAction`) and by `direct-tools.ts`.
  */
-export async function fireAction(deps: CompanionToolDeps, pending: CompanionStoredPending, press: RelayedPress): Promise<RelayAnswer> {
+export async function throughDoor(label: string, run: () => RelayAnswer | Promise<RelayAnswer>): Promise<RelayAnswer> {
   try {
+    return await run();
+  } catch (error) {
+    console.error(`[Companion] ${label} did not complete`, error);
+    return refused(`the house could not do it just now (${error instanceof Error ? error.message : String(error)})`);
+  }
+}
+
+/**
+ * Fires the standing action through its door, with `press` as the record of the word that fired it. Answers the door's outcome and
+ * its own first line. `take_action` has already decided the word was his, and what the house did with it is the answer.
+ */
+export function fireAction(deps: CompanionToolDeps, pending: CompanionStoredPending, press: RelayedPress): Promise<RelayAnswer> {
+  return throughDoor(`${pending.action} on his word`, async () => {
     switch (pending.action) {
       case 'resume_run': {
         const chainId = pending.pin.chainId;
@@ -154,17 +170,10 @@ export async function fireAction(deps: CompanionToolDeps, pending: CompanionStor
         const rulingsFile = writeRulings(deps.userId, wordsBrief(pending.carried));
         return await deps.house.resumeRun({ chainId, rulingsFile, press });
       }
-      case 'open':
-        return openOnFloor(deps, pending);
-      case 'close_followup':
-        return closeFollowup(deps, pending);
       case 'clear_memory':
         return await clearHerMemory(deps, press);
       default:
         return await relayCardAction(deps, pending, press);
     }
-  } catch (error) {
-    console.error(`[Companion] ${pending.action} on his word did not complete`, error);
-    return refused(`the house could not do it just now (${error instanceof Error ? error.message : String(error)})`);
-  }
+  });
 }

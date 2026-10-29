@@ -121,6 +121,20 @@ export const notificationChannelEndpointsDb = {
     ).all(userId, normalizeRequiredText(channel)) as NotificationChannelEndpointRow[];
   },
 
+  /**
+   * Every user holding at least one enabled endpoint on `channel`, once each, lowest id first — who a
+   * house-wide alert (the Cerberus red watch) is addressed to.
+   */
+  getUserIdsWithEnabledEndpoint(channel: string): number[] {
+    const db = getConnection();
+    const rows = db.prepare(
+      `SELECT DISTINCT user_id FROM notification_channel_endpoints
+       WHERE channel = ? AND enabled = 1
+       ORDER BY user_id`
+    ).all(normalizeRequiredText(channel)) as Array<{ user_id: number }>;
+    return rows.map((row) => row.user_id);
+  },
+
   setEndpointEnabled(userId: number, channel: string, endpointId: string, enabled: boolean): boolean {
     const db = getConnection();
     const result = db.prepare(

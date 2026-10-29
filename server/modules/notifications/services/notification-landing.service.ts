@@ -31,6 +31,11 @@ function encodeOrNull(value: string): string | null {
 
 /** The app path a tap on a push opens: the event's session, or the root — and, for a plan's prompt (a `permission.required` whose `meta.plan` names a plan), `?runner=<plan>`, the Roadmap tab's In flight face on that plan's card. The one place a push's landing is decided.
  *
+ * A Cerberus red-watch push (`provider: 'cerberus'`) belongs to no session, so it lands on the root, `/`. The client
+ * takes no tab from the URL — the workspace reads only `?runner=` and `?roadmap=` (`useRunnerLanding.ts`) and otherwise
+ * opens the tab it last showed — so there is no path that opens the Cerberus tab; when the client learns one, the
+ * `cerberus` landing is decided here, beside the plan's `?runner=`.
+ *
  * Consumed by the notification orchestrator, which puts it on the payload's `data.path` for the
  * service worker and the desktop app, and by the ntfy channel, which appends it to the app URL for
  * the push's click and for the `view` button of an option that takes the operator's note.

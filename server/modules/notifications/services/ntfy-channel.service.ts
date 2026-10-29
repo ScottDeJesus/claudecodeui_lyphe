@@ -72,6 +72,17 @@ const COLLAPSIBLE_CODES = new Set([
   'run.stopped',
 ]);
 
+/**
+ * The Cerberus red watch's codes, by code and ahead of the `kind` rule (all three are `kind: 'error'`, so one
+ * preference gates them): priority 5 sounds through Do Not Disturb, which is the point of the page. NOT in
+ * `COLLAPSIBLE_CODES`: the watcher sends one event per tick, so a flood window could only swallow a page.
+ */
+const RED_WATCH: Record<string, { priority: NtfyMessage['priority']; tags: string[] }> = {
+  'cerberus.red': { priority: 5, tags: ['rotating_light'] },
+  'cerberus.red.reminder': { priority: 4, tags: ['warning'] },
+  'cerberus.recovered': { priority: 3, tags: ['white_check_mark'] },
+};
+
 /** One minute — the summary's own wording ("in the last minute") depends on it. */
 const FLOOD_WINDOW_MS = 60_000;
 
@@ -113,6 +124,7 @@ async function publishSummary(last: SuppressedPush, suppressedCount: number): Pr
 }
 
 function priorityFor(event: ChannelEvent): NtfyMessage['priority'] {
+  if (event.code && Object.hasOwn(RED_WATCH, event.code)) return RED_WATCH[event.code].priority;
   // A plan or an epic ends a few times a day and closes hours of work: its finish is not a chat turn's quiet stop.
   if (
     event.code === 'dispatcher.finished' ||
@@ -135,6 +147,7 @@ function priorityFor(event: ChannelEvent): NtfyMessage['priority'] {
 
 /** ntfy renders a tag that names an emoji as that emoji in front of the title. */
 function tagsFor(event: ChannelEvent): string[] {
+  if (event.code && Object.hasOwn(RED_WATCH, event.code)) return RED_WATCH[event.code].tags;
   // A plan that stopped wanting a hand asks for one; nothing crashed, so it is not the siren a failed run
   // gets — and deliberately NOT in `COLLAPSIBLE_CODES` either: `dispatcher.relaunched` is a phase taken up
   // again, a plan that changed its mind rather than a crash, and its once-only promise is kept by the

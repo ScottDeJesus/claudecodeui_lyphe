@@ -101,7 +101,7 @@ export type CompanionToolDeps = {
  * `runReads(deps)` (`list_runs`, `read_run`), `docReads(deps)` (`search_docs`, `read_doc`),
  * `alertReads(deps)` (`list_alerts`), `panelReads(deps)` (`read_kanban`, `read_heal`, `read_notes`, `read_schedules`),
  * `houseReads(deps)` (`read_git`, `read_cerberus`, `read_memory`, `read_settings`), and last her hands (`hands/hands-tools.ts`):
- * `handsTools(deps)` (`prepare_action`, `take_action`, `cancel_action`), and last her own memory (`memory/memory-tools.ts`):
+ * `handsTools(deps)` (`prepare_action`, `take_action`, `cancel_action`, `open`, `close_followup`), and last her own memory (`memory/memory-tools.ts`):
  * `memoryTools(deps)` (`recall`, `remember`, `forget`). Consumed by `companion-account.ts`, once per account.
  */
 export function buildCompanionTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<any>> {

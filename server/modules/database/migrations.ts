@@ -636,6 +636,28 @@ const addCompanionMemoryForgetLineColumn = (db: Database): void => {
 };
 
 /**
+ * Adds `companion_actions.armed_from`: when the action's ceremony began. A prepare that re-arms an action which lapsed (the same
+ * action on the same target) carries the first prepare's stamp here, so her read-back from before the lapse and his yes since
+ * still count. NULL means the ceremony began at the row's own `prepared_at`, which is every row before this column.
+ *
+ * The same release ends the old ceremony's standing cards, once, with the column: a pending action stored before it has no
+ * `armedFrom` (and may be an `open`, which has no pending action now), so the store would drop it with a warning at every read of the
+ * state. Each such card was a five-minute wait; its row ends `cancelled` with the sentence that says why, and the state forgets it.
+ * A row a take has claimed (a firing line written) is left to the take, or to the next prepare's orphan sweep.
+ */
+const addCompanionActionArmedFromColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_actions').map((column) => column.name);
+  if (columnNames.includes('armed_from')) return;
+
+  addColumnToTableIfNotExists(db, 'companion_actions', columnNames, 'armed_from', 'TEXT');
+  db.prepare(
+    `UPDATE companion_actions SET ended_at = ?, outcome = 'cancelled', answer = ?
+     WHERE outcome IS NULL AND said_log_id IS NULL`
+  ).run(new Date().toISOString(), 'How an action waits for his word changed while this waited; it was taken off his panel and nothing was done.');
+  db.prepare('UPDATE companion_state SET pending_json = NULL WHERE pending_json IS NOT NULL').run();
+};
+
+/**
  * Adds `companion_state.unanswered_json`: the messages of his that no turn of Kaylee's has answered yet, as a list of
  * `{ uuid, body, via, at }` (his raw words and how they came), written when one is pushed and read by the next process, which
  * says them to her again. NULL for none, which is every row before this column.
@@ -813,6 +835,7 @@ export const runMigrations = (db: Database) => {
     addCompanionPendingColumn(db);
     addCompanionMemoryForgetLineColumn(db);
     addCompanionUnansweredColumn(db);
+    addCompanionActionArmedFromColumn(db);
     // What the house told each account, kept: one row per notification the orchestrator was handed, written at
     // the listener seam. It references `users` alone, so it sits beside the companion's script, which reads it.
     db.exec(NOTIFICATION_HISTORY_SCHEMA_SQL);

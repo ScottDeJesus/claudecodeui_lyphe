@@ -1,20 +1,22 @@
-import type { CompanionActionKind, CompanionActionTarget } from '@/shared/companion-types.js';
+import type { CompanionActionKind, CompanionActionTarget, CompanionCeremonyAction } from '@/shared/companion-types.js';
 import type { DispatcherAsk } from '@/shared/types.js';
 
-import { ACTION_TIER, ACTION_WORDS, shortNameOf } from './action-word.js';
+import { ACTION_WORDS, shortNameOf } from './action-word.js';
 
 /**
  * THE WORDS OF AN ACTION: what he says to fire it, what it is called in the past tense on his panel, and the texts the card and
  * her read-back are made of (the prompt as the card draws it, and the head of an Accept she reads aloud). Strings in, strings
  * out; no I/O.
  *
- * `SAY_VERB` is the verb of `say` ("Queue Kaylee's eyes"), and each is chosen to hold one of the action's own words
- * (`ACTION_WORDS` in `action-word.ts`) so his saying `say` aloud always passes the check of his word. `DONE_VERB` is what the
- * panel's system line says after the act ("On your word: queued Kaylee's eyes."); `doneOf` joins it to the target.
+ * `SAY_VERB` is the verb of `say` ("Queue Kaylee's eyes"), and each of the eleven is chosen to hold one of the action's own words
+ * (`ACTION_WORDS` in `action-word.ts`) so his saying `say` aloud always passes the check of his word; the two harmless actions (open,
+ * close_followup) have a verb for the panel's lines alone, since no word of his is checked for them. `DONE_VERB` is what the
+ * panel's system line says after the act ("On your word: queued Kaylee's eyes."); `doneOf` joins it to the target, and `systemLine`
+ * is that line.
  *
- * Consumers: `action-recipe.ts` (the prepare), `hands-tools.ts` (the answers to her) and `action-doors.ts` (the answers and
- * the briefs a door carries).
- * `nextStepFor` is the one text that tells her, per tier (`ACTION_TIER`, `action-word.ts`), what to do after a prepare.
+ * Consumers: `action-recipe.ts` (the prepare), `hands-tools.ts` and `direct-tools.ts` (the answers to her and the panel's line) and
+ * `action-doors.ts` (the answers and the briefs a door carries).
+ * `nextStepFor` and `rearmStepFor` are the texts that tell her what to do after a prepare of one of the eleven.
  */
 
 /** What he says first: the action as a command, followed by the target's `spoken` name. Consumed by `sayOf`, and by the prepare's answer ("waiting for his word: queue …"). */
@@ -34,7 +36,7 @@ export const SAY_VERB: Readonly<Record<CompanionActionKind, string>> = {
   clear_memory: 'Clear',
 };
 
-/** The action done, for the panel's system line and her answer after a take. Consumed by `hands-tools.ts`. */
+/** The action done, for the panel's system line and her answer after a take. Consumed by `doneOf`. */
 export const DONE_VERB: Readonly<Record<CompanionActionKind, string>> = {
   queue: 'queued',
   hide: 'hid',
@@ -51,7 +53,7 @@ export const DONE_VERB: Readonly<Record<CompanionActionKind, string>> = {
   clear_memory: 'cleared her memory',
 };
 
-/** The refusal of an open while no page holds the floor: the open is sent to that page alone. Consumed by `hands-tools.ts` (the prepare) and `action-doors.ts` (the take). */
+/** The refusal of an open while no page holds the floor: the open is sent to that page alone. Consumed by `direct-tools.ts` (before the open's row is written) and `action-doors.ts` (`openOnFloor`). */
 export const NO_FLOOR = 'No page of his holds the floor; he must open your panel first.';
 
 /** What he says to fire the action on `spoken`: `<Verb> <spoken>`. Consumed by `action-recipe.ts`. */
@@ -59,28 +61,36 @@ export const sayOf = (action: CompanionActionKind, spoken: string): string => `$
 
 /**
  * The action done, on its target: "queued Kaylee's eyes". Clearing her memory is the one whose past tense already names what it
- * acted on ("cleared her memory"), so nothing follows it. Consumed by `hands-tools.ts` (the panel's system line and her answer).
+ * acted on ("cleared her memory"), so nothing follows it. Consumed by `hands-tools.ts` (her answer) and `systemLine` below.
  */
 export const doneOf = (action: CompanionActionKind, spoken: string): string => (action === 'clear_memory' ? DONE_VERB[action] : `${DONE_VERB[action]} ${spoken}`);
 
+/** The words of his that fire the action besides a yes: his own naming the target by the shortest name the check takes and saying the action's first word, or the full order. */
+const orderingOf = (action: CompanionCeremonyAction, target: CompanionActionTarget, say: string): string => `words of his own naming ${shortNameOf(target)} and saying ${ACTION_WORDS[action][0]}, or "${say}"`;
+
+/** What she does with his line, and the one binding on a bare yes: both prepare answers end on it. */
+const TAKE_WITH_HIS_LINE = 'Then call take_action with his newest spoken line, exactly as logged; a line that came before your read-back is not his answer to it, '
+  + 'and a bare yes counts only as the first thing he says after your newest read-back: if he said anything else first, read it back again.';
+
 /**
- * What the prepare's answer tells her to do next, by the action's tier. A LIGHT action (open, close_followup) has no read-back to
- * wait on: she fires it now with his request when his last spoken line asked for it, else says one sentence and fires on his first
- * spoken yes. A FULL action is read back to him in plain words, and his next spoken yes, or his line naming it, fires it. `readBack` is the
- * recipe's sentence, `say` the full order. The name she is told to listen for is the shortest the check takes (`shortNameOf`), never a long
- * title it takes shorter. Consumed by `hands-tools.ts` (the prepare's answer).
+ * What the prepare's answer tells her to do next: read it back to him in plain words, then stop. `readBack` is the recipe's sentence,
+ * `say` the full order. The name she is told to listen for is the shortest the check takes (`shortNameOf`), never a long title it takes
+ * shorter. Consumed by `hands-tools.ts` (the prepare's answer).
  */
-export function nextStepFor(action: CompanionActionKind, target: CompanionActionTarget, say: string, readBack: string): string {
-  const first = ACTION_WORDS[action][0];
-  const spoken = shortNameOf(target);
-  const ordering = `words of his own naming ${spoken} and saying ${first}, or "${say}"`;
-  if (ACTION_TIER[action] === 'light') {
-    return `It is harmless, so nothing is read back first. If his last spoken line asked for it (it names ${spoken} and says ${first}), call take_action now with that line exactly as logged. `
-      + `If it did not, say one sentence of what it does (${readBack}) and stop: his first spoken yes fires it, and so do ${ordering}; you pass that line.`;
-  }
-  return `Read it back to him in plain words, then stop: ${readBack} His next spoken yes fires it, and so do ${ordering}. `
-    + 'Then call take_action with his newest spoken line, exactly as logged; a line that came before your read-back is not his answer to it, '
-    + 'and a bare yes counts only as the first thing he says after your newest read-back: if he said anything else first, read it back again.';
+export function nextStepFor(action: CompanionCeremonyAction, target: CompanionActionTarget, say: string, readBack: string): string {
+  return `Read it back to him in plain words, then stop: ${readBack} His next spoken yes fires it, and so do ${orderingOf(action, target, say)}. ${TAKE_WITH_HIS_LINE}`;
+}
+
+/**
+ * What the prepare's answer tells her after a RE-ARM: the same action on the same target had lapsed at `lapsedAt` and this takes its place.
+ * Her read-back from before the lapse still stands for a bare yes he has spoken since, and for nothing else: when his newest spoken line is
+ * such a yes she passes it at once and asks him nothing; an order that names it, other talk, or nothing since, and she reads it back again.
+ * Consumed by `hands-tools.ts` (the prepare's answer).
+ */
+export function rearmStepFor(action: CompanionCeremonyAction, target: CompanionActionTarget, say: string, readBack: string, lapsedAt: string): string {
+  return `Re-armed: it lapsed at ${clockOf(lapsedAt)} and this takes its place. Your read-back from before the lapse still stands for a yes he has said since, and for nothing else. `
+    + `If his newest spoken line is a bare yes, call take_action now with his newest spoken line, exactly as logged, and ask him nothing. `
+    + `If it is anything else (an order that names it, other talk) or he has said nothing since, read it back to him again and stop: ${readBack} His next spoken yes fires it, and so do ${orderingOf(action, target, say)}. ${TAKE_WITH_HIS_LINE}`;
 }
 
 /** A stamp's local HH:MM, as the prepare's answer says when an action lapses; a stamp that does not parse is "an unknown time". Consumed by `hands-tools.ts`. */
@@ -121,4 +131,23 @@ export function acceptHead(ask: Extract<DispatcherAsk, { kind: 'accept' }>, deli
   // The caller closes the head with its own full stop, so the sentence's is taken off.
   const builds = firstSentence(delivers)?.replace(/[.!?]+$/, '') ?? null;
   return builds === null ? `the prompt reads "${census}"` : `the prompt reads "${census}", and it delivers: ${builds}`;
+}
+
+/** Who answers for each of the eleven, as the system line quotes it; an open and a close have no sentence worth quoting. */
+const SOURCE: Readonly<Partial<Record<CompanionActionKind, string>>> = {
+  queue: 'The dispatcher', hide: 'The dispatcher', show: 'The dispatcher', rework: 'The dispatcher', answer: 'The dispatcher',
+  recut: 'The dispatcher', stop: 'The dispatcher', resume: 'The dispatcher', kick: 'The dispatcher', resume_run: 'The runner',
+};
+
+/**
+ * The panel's system line for an action that went through its door, in the words he reads: "On your word: queued Kaylee's eyes. The
+ * dispatcher said: …". Consumed by `hands-tools.ts` (a take) and `direct-tools.ts` (an open and a close).
+ */
+export function systemLine(done: { action: CompanionActionKind; target: CompanionActionTarget; say: string }, outcome: 'took' | 'already' | 'refused', said: string): string {
+  const { action, target } = done;
+  const source = SOURCE[action];
+  // An open and a close have no sentence worth quoting when they went through; when they were refused, the reason is the whole news.
+  const quote = said === '' ? '' : source === undefined ? ` ${said}` : ` ${source} said: ${said}`;
+  if (outcome === 'refused') return `Not done, on your word: ${done.say}.${quote}`;
+  return `On your word: ${doneOf(action, target.spoken)}.${outcome === 'already' ? ' It was already so.' : ''}${source === undefined ? '' : quote}`;
 }

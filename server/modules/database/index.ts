@@ -42,6 +42,11 @@ export type {
   CerberusNodeInsert,
   CerberusNodeRow,
 } from '@/modules/database/repositories/cerberus-nodes.db.js';
+export { cerberusRedAlertsDb } from '@/modules/database/repositories/cerberus-red-alerts.db.js';
+export type {
+  CerberusRedAlertClosedBy,
+  CerberusRedAlertRow,
+} from '@/modules/database/repositories/cerberus-red-alerts.db.js';
 export { cerberusResultsDb } from '@/modules/database/repositories/cerberus-results.db.js';
 export type {
   CerberusLatestResultRow,

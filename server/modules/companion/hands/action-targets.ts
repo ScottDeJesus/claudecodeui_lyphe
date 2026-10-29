@@ -1,5 +1,5 @@
 import { readChainRun } from '@/modules/dispatch-souls/index.js';
-import { listOpenFollowups } from '@/modules/followups/index.js';
+import { findFollowupForAccount } from '@/modules/followups/index.js';
 import type { CompanionActionTarget, CompanionOpenTarget } from '@/shared/companion-types.js';
 
 import { buildCardBook, type Card, type CardBook } from '../eyes/card-lines.js';
@@ -10,7 +10,7 @@ import type { CompanionHouse } from '../house.js';
 import { resolveChat } from '../tools/house-reads.js';
 
 /**
- * WHAT AN ACTION ACTS ON: the resolution of the target string she passes to `prepare_action` into the wire's
+ * WHAT AN ACTION ACTS ON: the resolution of the target string she passes to `prepare_action`, `open` or `close_followup` into the wire's
  * `CompanionActionTarget`, through the same resolvers her eyes use (a card through `resolveCard`, a run through `resolveRun`,
  * a page through `resolvePage`, a chat through `resolveChat`, a follow-up by `#<id>` among his open ones), so a name means one
  * thing whether she reads it or acts on it. A target that is not found, or fits several, is refused with the resolver's own
@@ -23,7 +23,7 @@ import { resolveChat } from '../tools/house-reads.js';
  * `open` takes any of four kinds: it tries a card, then a run, then a page, then a chat, and a name that fits more than one is
  * refused with each named. To say which, the target is written with a kind in front (`chat: kaylee eyes`).
  *
- * Consumer: `action-recipe.ts`.
+ * Consumers: `action-recipe.ts` (the eleven's prepare) and `direct-tools.ts` (`open`, `close_followup`).
  */
 
 /** A resolution: the thing found, or the sentence that refuses and says what to do next. */
@@ -90,14 +90,18 @@ export async function findChain(house: CompanionHouse, ref: string): Promise<Fou
   return { ok: true, value: { target, status: chain.status } };
 }
 
-/** The open follow-up `#<id>` among his, as its target. His number alone is the address (`list_followups` prints it): a word in the text is nothing to match. */
+/**
+ * The follow-up `#<id>` of his, open or closed, as its target. His number alone is the address (`list_followups` prints it): a word in the
+ * text is nothing to match. One already closed resolves too, so the close answers "already closed" instead of sending her to look; an id that
+ * is not his (another account's, or none) is refused.
+ */
 export function findFollowup(userId: number, ref: string): Found<Extract<CompanionActionTarget, { kind: 'followup' }>> {
   const id = /^(?:follow-?up\s*)?#?(\d{1,9})$/i.exec(ref.trim())?.[1];
   if (id === undefined) return refused('A follow-up is named by its number, #<id>, as list_followups prints it.');
-  const open = listOpenFollowups(userId, null, 200).find(({ followup }) => followup.id === Number(id));
-  if (open === undefined) return refused(`#${id} is not one of his open follow-ups; list_followups shows the ones that are.`);
-  const spoken = open.followup.text.split(/\s+/).slice(0, 5).join(' ').replace(/[\s.,;:!?"“”]+$/u, '');
-  return { ok: true, value: { kind: 'followup', id: open.followup.id, sessionId: open.sessionId, spoken, text: open.followup.text } };
+  const item = findFollowupForAccount(userId, Number(id));
+  if (item === null) return refused(`#${id} is not one of his follow-ups; list_followups shows the open ones.`);
+  const spoken = item.followup.text.split(/\s+/).slice(0, 5).join(' ').replace(/[\s.,;:!?"“”]+$/u, '');
+  return { ok: true, value: { kind: 'followup', id: item.followup.id, sessionId: item.sessionId, spoken, text: item.followup.text } };
 }
 
 // ---------------------------

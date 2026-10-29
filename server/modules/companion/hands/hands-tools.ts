@@ -4,7 +4,7 @@ import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod';
 
 import { companionDb, userDb } from '@/modules/database/index.js';
-import type { CompanionActionKind } from '@/shared/companion-types.js';
+import type { CompanionCeremonyAction } from '@/shared/companion-types.js';
 import type { RelayedPress } from '@/shared/relayed-press-types.js';
 import { guardedToolResult, textResult, type ToolTextResult } from '@/shared/tool-text-result.js';
 
@@ -14,25 +14,30 @@ import type { CompanionToolDeps } from '../tools/companion-tools.js';
 
 import { carryOut, endLapsedAction, isCarryingOut, withdrawStandingAction } from './action-end.js';
 import { fireAction } from './action-doors.js';
-import { clockOf, doneOf, nextStepFor, NO_FLOOR, SAY_VERB } from './action-prompts.js';
+import { clockOf, doneOf, nextStepFor, rearmStepFor, SAY_VERB, systemLine } from './action-prompts.js';
 import { prepareRecipe, type PrepareInput } from './action-recipe.js';
-import { ACTION_TIER, actionsOfTier, checkHisWord } from './action-word.js';
+import { rearmOf } from './action-rearm.js';
+import { checkHisWord } from './action-word.js';
+import { directTools } from './direct-tools.js';
 
 /**
- * Her hands: `prepare_action`, `take_action` and `cancel_action`. She may do anything in the house he asks for, and none of it on
- * her own judgment (ruling 3, re-ruled 2026-10-29: "only on my explicit spoken word for that specific card, never on her own judgment";
- * "My 'yes' should count"). Two actions are harmless (open, close_followup: `ACTION_TIER`) and fire on his first word, with no
- * read-back; the eleven others keep "the full read-back-then-word ceremony". The SERVER holds that line, in two steps:
+ * Her hands: `prepare_action`, `take_action` and `cancel_action` for the eleven actions that change the house, and `open` and
+ * `close_followup` (`direct-tools.ts`), which do not wait. The ruling of 2026-10-29: "Keep the full ceremony only for the actions that
+ * change the house: queue, hide, show, rework, answer, recut, stop, resume, kick, resume_run, clear_memory"; "only on my explicit spoken word
+ * for that specific card, never on her own judgment"; "My 'yes' should count". For those eleven "raise the lapse from five minutes to
+ * thirty, and when it does lapse, let her re-arm it and accept my next yes without me having to say the title". The SERVER holds that
+ * line, in two steps:
  *
  *   1. `prepare_action` resolves the target, checks the action can be done now, PINS what it acts on (`action-recipe.ts`), checks
  *      that every line it carries is one of his spoken lines of the last 30 minutes, records the action in `companion_actions` and
  *      puts it on her panel as the ONE pending action (`store.setPending`), replacing one already standing. It answers what she does
- *      next, by tier (`nextStepFor`), and the words that fire it. It lapses five minutes on.
- *   2. `take_action(said)` fires it, only when `checkHisWord` (`action-word.ts`) answers ok on the rows of her log since the prepare: his
- *      line was SPOKEN, it is his yes or it names the target and says the action's word, and it is an order; and for a FULL action she
- *      read it back to him first. A LIGHT action also fires on the request that led to the prepare, his last line before it
- *      (`heardBefore`). Otherwise it is refused with the sentence that says what is missing and the action stays on his panel, its row
- *      keeping that sentence as its `answer`. `cancel_action` takes it down.
+ *      next (`nextStepFor`: read it back, then his word) and the words that fire it. It lapses thirty minutes on. A prepare of the same
+ *      action on the same target as the one that lapsed last RE-ARMS it (`action-rearm.ts`): the new action keeps the first prepare's
+ *      stamp as `armedFrom`, so her read-back from before the lapse and his yes since still count.
+ *   2. `take_action(said)` fires it, only when `checkHisWord` (`action-word.ts`) answers ok on the rows of her log since `armedFrom`: she
+ *      read it back to him, and his line was SPOKEN, is his yes or names the target and says the action's word, and is an order.
+ *      Otherwise it is refused with the sentence that says what is missing and the action stays on his panel, its row keeping that
+ *      sentence as its `answer`. `cancel_action` takes it down.
  *
  * A take fires through the house's own door (`action-doors.ts`) carrying kaylee--press's record of his word: who, when, what he
  * said, which press of his it was. It CLAIMS the action's row first (the firing line is written on it), and from then to the end
@@ -46,16 +51,16 @@ import { ACTION_TIER, actionsOfTier, checkHisWord } from './action-word.js';
  * Consumer: `tools/companion-tools.ts` (`buildCompanionTools`), once per account.
  */
 
-/** How long an action waits for his word. */
-const WAIT_MS = 5 * 60_000;
+/** How long an action waits for his word before it lapses (and a prepare of the same one re-arms it). */
+const WAIT_MS = 30 * 60_000;
 
-const ACTIONS = ['queue', 'hide', 'show', 'rework', 'answer', 'recut', 'stop', 'resume', 'kick', 'resume_run', 'open', 'close_followup', 'clear_memory'] as const satisfies readonly CompanionActionKind[];
+const ACTIONS = ['queue', 'hide', 'show', 'rework', 'answer', 'recut', 'stop', 'resume', 'kick', 'resume_run', 'clear_memory'] as const satisfies readonly CompanionCeremonyAction[];
 
-/** Who answers for each action, as the system line quotes it; an open and a close have no sentence worth quoting. */
-const SOURCE: Readonly<Partial<Record<CompanionActionKind, string>>> = {
-  queue: 'The dispatcher', hide: 'The dispatcher', show: 'The dispatcher', rework: 'The dispatcher', answer: 'The dispatcher',
-  recut: 'The dispatcher', stop: 'The dispatcher', resume: 'The dispatcher', kick: 'The dispatcher', resume_run: 'The runner',
-};
+/**
+ * What the schema says to an `action` that is not one of the eleven: the list, and where the two that need no ceremony went. Her prompt
+ * says it too, but a call that still sends `open` or `close_followup` is told where to go, not only what it may not send.
+ */
+const WRONG_ACTION = `action is one of ${ACTIONS.join(', ')}. To bring something up on his screen call the open tool, and to tick off a follow-up call the close_followup tool: they act at once and are not prepared.`;
 
 /** The refusal while a take is carrying the action out: another prepare, take or cancel waits for its answer. */
 const BEING_CARRIED_OUT = 'The action on his panel is being carried out now; wait for its answer.';
@@ -74,17 +79,20 @@ function prepareAction(deps: CompanionToolDeps, input: PrepareInput): Promise<To
     const result = await prepareRecipe(deps, input);
     if (!result.ok) return deps.refuse(result.sentence);
     const { pin, readBack, ...fields } = result.prepared;
-    if (input.action === 'open' && deps.store.readState().floor === null) return deps.refuse(NO_FLOOR);
     // The recipe awaited: a take may have begun meanwhile, and the action it is carrying out is not this one's to replace. Nothing
     // below awaits, so what is read here is what is replaced.
     if (standingIsOut(deps)) return deps.refuse(BEING_CARRIED_OUT);
 
+    // A lapse found just now was ended above, so it is the newest row if it is the one this prepare re-arms.
+    const rearm = rearmOf(deps.userId, { ...fields, pin });
     const preparedMs = Date.now();
+    const preparedAt = new Date(preparedMs).toISOString();
     const pending: CompanionStoredPending = {
       ...fields,
       id: randomUUID(),
-      preparedAt: new Date(preparedMs).toISOString(),
+      preparedAt,
       expiresAt: new Date(preparedMs + WAIT_MS).toISOString(),
+      armedFrom: rearm?.armedFrom ?? preparedAt,
       pin,
     };
     companionDb.openAction(deps.userId, {
@@ -96,6 +104,7 @@ function prepareAction(deps: CompanionToolDeps, input: PrepareInput): Promise<To
       carried_json: JSON.stringify(pending.carried),
       prepared_at: pending.preparedAt,
       expires_at: pending.expiresAt,
+      armed_from: rearm?.armedFrom ?? null,
     });
     // The newer action replaces the older one on his panel; the older row says so. A lapse found just now was ended above.
     const replaced = deps.store.readState().pending;
@@ -109,8 +118,9 @@ function prepareAction(deps: CompanionToolDeps, input: PrepareInput): Promise<To
 
     const { action, target, say } = pending;
     const replacing = replaced === null ? '' : ` That replaced "${replaced.say}", which was waiting.`;
+    const nextStep = rearm === null ? nextStepFor(action, target, say, readBack) : rearmStepFor(action, target, say, readBack, rearm.lapsedAt);
     return textResult(
-      `On his panel, waiting for his word: ${SAY_VERB[action].toLowerCase()} ${target.spoken}. ${nextStepFor(action, target, say, readBack)} `
+      `On his panel, waiting for his word: ${SAY_VERB[action].toLowerCase()} ${target.spoken}. ${nextStep} `
       + `A line he typed never fires it. It lapses at ${clockOf(pending.expiresAt)}.${replacing}`,
     );
   });
@@ -128,36 +138,15 @@ function pressOf(userId: number, standing: CompanionStoredPending, line: { id: n
   };
 }
 
-/** The panel's system line for an action that went through its door, in the words he reads: "On your word: queued Kaylee's eyes. The dispatcher said: …". */
-function systemLine(standing: CompanionStoredPending, outcome: 'took' | 'already' | 'refused', said: string): string {
-  const { action, target } = standing;
-  const source = SOURCE[action];
-  // An open and a close have no sentence worth quoting when they went through; when they were refused, the reason is the whole news.
-  const quote = said === '' ? '' : source === undefined ? ` ${said}` : ` ${source} said: ${said}`;
-  if (outcome === 'refused') return `Not done, on your word: ${standing.say}.${quote}`;
-  return `On your word: ${doneOf(action, target.spoken)}.${outcome === 'already' ? ' It was already so.' : ''}${source === undefined ? '' : quote}`;
-}
-
-/**
- * The rows of her log the check of his word reads for the standing action: every line since the prepare and, for a LIGHT action, his last
- * line before it, the request that led to the prepare (`heardBefore`: null once an action has fired on it). A FULL action reads none of
- * the lines before its prepare.
- */
-function heardForAction(userId: number, standing: CompanionStoredPending): ReturnType<typeof companionDb.heardSince> {
-  const since = companionDb.heardSince(userId, standing.preparedAt);
-  if (ACTION_TIER[standing.action] !== 'light') return since;
-  const request = companionDb.heardBefore(userId, standing.preparedAt);
-  return request === null ? since : [request, ...since];
-}
-
 function takeAction(deps: CompanionToolDeps, said: string): Promise<ToolTextResult> {
   return guardedToolResult('take_action', 'carry out the action', async () => {
     const nowMs = Date.now();
     const lapsed = endLapsedAction(deps.userId, deps.store, nowMs);
     const standing = lapsed ?? deps.store.readState().pending;
     if (lapsed === null && standing !== null && isCarryingOut(deps.userId, standing.id)) return deps.refuse(BEING_CARRIED_OUT);
-    // A lapsed action reads no lines: the check answers the lapse first, with the sentence that says when.
-    const lines = standing === null || lapsed !== null ? [] : heardForAction(deps.userId, standing);
+    // A lapsed action reads no lines: the check answers the lapse first, with the sentence that says when. A live one reads every line since
+    // its ceremony began, which for a re-arm is the first prepare's stamp: her read-back and his yes from before the lapse stand.
+    const lines = standing === null || lapsed !== null ? [] : companionDb.heardSince(deps.userId, standing.armedFrom);
     const verdict = checkHisWord({ pending: standing, said, now: new Date(nowMs).toISOString(), lines });
     if (!verdict.ok) {
       // The row says why his line did not fire it, as her answer does.
@@ -201,19 +190,15 @@ function cancelAction(deps: CompanionToolDeps): Promise<ToolTextResult> {
   });
 }
 
-/**
- * The `said` field of `take_action`, in the prompt's register: his newest spoken line, as logged. For the eleven FULL actions it follows your
- * read-back and is his yes or the line that names the card and says the action; for the LIGHT ones (open, close_followup) it may also
- * be the request he made just before you prepared.
- */
-const SAID_DESCRIPTION = `His newest spoken line, exactly as logged: his yes ("Yes.", "Go ahead.") or a line that names the card on his panel and says the action. For ${actionsOfTier('full').join(', ')}, say it back to him in plain words first and pass the line he says after that. For ${actionsOfTier('light').join(', ')} no read-back is needed: pass the request he made just before you prepared, or his first spoken yes. Never a line you wrote and never a line he typed. The server checks the line and refuses what does not count, so when he spoke a line that names the card and plausibly says the action (a transcript may hear "queue" as "cue"), pass it as logged rather than asking him to say it again.`;
+/** The `said` field of `take_action`, in the prompt's register: his newest spoken line, as logged, after your read-back. */
+const SAID_DESCRIPTION = `His newest spoken line, exactly as logged: his yes ("Yes.", "Go ahead.") or a line that names the card on his panel and says the action. Say it back to him in plain words first and pass the line he says after that. Never a line you wrote and never a line he typed. The server checks the line and refuses what does not count, so when he spoke a line that names the card and plausibly says the action (a transcript may hear "queue" as "cue"), pass it as logged rather than asking him to say it again.`;
 
 /** One line of his, carried: the field the two arrays of lines share. */
 const spokenLines = z.array(z.string().trim().min(1).max(8000)).min(1).max(20);
 
 /**
- * The definitions of `prepare_action`, `take_action` and `cancel_action` (the order her prompt lists them), built with the SDK's
- * `tool()` and zod. None is read-only. Consumed by `tools/companion-tools.ts` (`buildCompanionTools`), once per account.
+ * The definitions of `prepare_action`, `take_action` and `cancel_action` (the order her prompt lists them) and of `open` and
+ * `close_followup` (`directTools`), built with the SDK's `tool()` and zod. None is read-only. Consumed by `tools/companion-tools.ts` (`buildCompanionTools`), once per account.
  */
 export function handsTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<any>> {
   return [
@@ -221,8 +206,8 @@ export function handsTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
       'prepare_action',
       toolLine('prepare_action'),
       {
-        action: z.enum(ACTIONS).describe('queue, hide and rework answer an open Accept prompt (hide and rework also act with none open); answer sends his answers to an open questions round; show, recut, stop, resume and kick act on a card; resume_run resumes a stopped chain with his rulings; open brings a card, run, page or chat up on his screen; close_followup ticks off one of his follow-ups; clear_memory forgets every memory you keep.'),
-        target: z.string().trim().min(1).max(300).describe('What it acts on, with every word of the name as he said it, even a word that is also an action ("probe eyes accept" is one card\'s name, though accept is also what queue is called): a card (feature or epic) by its name or title, a run by the id list_runs prints or by its plan and task, a page by its id or title, a chat by its name or id, a follow-up as #<id> from list_followups, your memory as "your memory". When the answer lists several cards the name fits, call again with the full name of the one he meant. For open, write the kind in front ("chat: …") if the name could be more than one.'),
+        action: z.enum(ACTIONS, { error: WRONG_ACTION }).describe('queue, hide and rework answer an open Accept prompt (hide and rework also act with none open); answer sends his answers to an open questions round; show, recut, stop, resume and kick act on a card; resume_run resumes a stopped chain with his rulings; clear_memory forgets every memory you keep. Opening something and ticking off a follow-up are not prepared: they are the open and close_followup tools.'),
+        target: z.string().trim().min(1).max(300).describe('What it acts on, with every word of the name as he said it, even a word that is also an action ("probe eyes accept" is one card\'s name, though accept is also what queue is called): a card (feature or epic) by its name or title, a run by the id list_runs prints or by its plan and task, your memory as "your memory". When the answer lists several cards the name fits, call again with the full name of the one he meant.'),
         words: spokenLines.optional().describe('For rework (his notes) and resume_run (his rulings): his own spoken lines, each exactly as he said it in the last 30 minutes. Never your words, never a line he typed.'),
         answers: z.array(z.object({ question: z.number().int().min(1), words: spokenLines })).max(20).optional().describe('For answer: one group per question he answered, by its number from 1, each group his own spoken lines exactly as he said them.'),
       },
@@ -235,5 +220,6 @@ export function handsTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
       (args) => takeAction(deps, args.said),
     ),
     tool('cancel_action', toolLine('cancel_action'), {}, () => cancelAction(deps)),
+    ...directTools(deps),
   ];
 }

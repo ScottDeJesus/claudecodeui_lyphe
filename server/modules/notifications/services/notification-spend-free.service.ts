@@ -14,7 +14,10 @@ import { buildNotificationPayload } from './notification-orchestrator.service.js
  * budget stop's headline and body are replaced ("Run stopped at a limit"), and the free text some wordings are built from — a
  * failed run's own error, a compaction's reason, a dispatcher pause's or relaunch's detail — is left out of the sentence when it
  * speaks of usage or spend (the CLI's own "usage limit reached" is exactly a failed run's error). The rest of every sentence
- * is the house's own.
+ * is the house's own. A Cerberus red-watch event (`cerberus.*`) names fleet checks, and a check's label and its reported
+ * sentence are free text of the same kind ("Gemini and DeepSeek spend is normal", "~$0.77 today"): an item whose reason speaks
+ * of usage or spend loses the reason, and one whose label does is called "A check". The phone's push is not worded here, so it
+ * keeps the whole sentence.
  *
  * Consumers: the companion module's alert block (`buildAlertBlock`, what she is told unasked) and this module's history
  * service (what is kept of each event). Both reach it through the module barrel.
@@ -40,6 +43,24 @@ function freeTextFieldOf(code: string): 'error' | 'reason' | 'detail' | null {
   return code.startsWith('dispatcher.') ? 'detail' : null;
 }
 
+/** The groups of checks a red-watch event carries in its `meta` (`CerberusRedMeta`): the newly red, the reminded, the recovered. */
+const RED_WATCH_GROUPS = ['items', 'reminders', 'recovered'] as const;
+
+/** The label an item is given when its own label speaks of usage or spend. */
+const NEUTRAL_CHECK_LABEL = 'A check';
+
+/** `group`'s items with the free text that speaks of usage or spend taken out (a reason dropped, a label made neutral); anything that is not a list of records is left as it came. */
+function checksWithoutSpend(group: unknown): unknown {
+  if (!Array.isArray(group)) return group;
+  return group.map((item: unknown) => {
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) return item;
+    const clean: Record<string, unknown> = { ...item };
+    if (typeof clean.reason === 'string' && USAGE_OR_SPEND_TEXT.test(clean.reason)) delete clean.reason;
+    if (typeof clean.label === 'string' && USAGE_OR_SPEND_TEXT.test(clean.label)) clean.label = NEUTRAL_CHECK_LABEL;
+    return clean;
+  });
+}
+
 /** The event's `meta` as the wording is built from it: no cost or token figure, no usage reason in an `api.error`, and no free text that speaks of usage or spend. */
 function metaWithoutSpend(event: NotificationEvent): Record<string, unknown> {
   const meta = { ...event.meta };
@@ -50,6 +71,11 @@ function metaWithoutSpend(event: NotificationEvent): Record<string, unknown> {
   const freeTextField = freeTextFieldOf(event.code);
   const freeText = freeTextField === null ? undefined : meta[freeTextField];
   if (freeTextField !== null && typeof freeText === 'string' && USAGE_OR_SPEND_TEXT.test(freeText)) delete meta[freeTextField];
+  if (event.code.startsWith('cerberus.')) {
+    for (const group of RED_WATCH_GROUPS) {
+      if (group in meta) meta[group] = checksWithoutSpend(meta[group]);
+    }
+  }
   return meta;
 }
 

@@ -11,8 +11,11 @@
  * WHAT `companion_actions` KEEPS. One row for each action she prepared: what it was (`action`,
  * `target_json`, the `prompt` and the lines `carried_json` carries), what the prepare pinned
  * (`pin_json`, server-only: the ask and its lock token, the chain, the follow-up), when it was
- * prepared and when it lapses, the line of his that fired it (`said`, `said_at`, `said_log_id`),
- * and how it ended (`ended_at`, `outcome`, and `answer`, the door's own sentence). A row with no
+ * prepared and when it lapses, when its ceremony began (`armed_from`: the first prepare's stamp, which a re-arm after a lapse
+ * carries on; NULL for a row whose ceremony began at its own `prepared_at`), the line of his that fired it (`said`,
+ * `said_at`, `said_log_id`), and how it ended (`ended_at`, `outcome`, and `answer`, the door's own sentence). The two harmless
+ * actions (open, close_followup) have a row too, opened, claimed and ended in one call: `said` is his newest line as the
+ * trigger of the record, and `expires_at` is `prepared_at` because nothing waits. A row with no
  * `outcome` is the action still waiting; an action ends once. It is a fact about the HOUSE — what
  * was done, on whose word, and when — so Clear, which wipes her conversation and her pending action,
  * never deletes it: a pending action Clear finds standing is ended `cancelled` in its row first,
@@ -21,7 +24,8 @@
  * `addCompanionPendingColumn` in `migrations.ts`. So is `companion_state.unanswered_json`, the words of
  * his that no turn of hers has answered yet (`addCompanionUnansweredColumn`): the next process says
  * them to her again. So is `companion_state.memory_forget_line` (`addCompanionMemoryForgetLineColumn`),
- * the id of the log line of his that the last forget of her memory used; Clear leaves it.
+ * the id of the log line of his that the last forget of her memory used; Clear leaves it. And `companion_actions.armed_from`
+ * (`addCompanionActionArmedFromColumn`).
  *
  * WHY `relayed_sends` HANGS ON `sessions`. A relayed send is a fact about a CHAT'S history — "this
  * message came to the chat through Kaylee" — so it follows the chat, keyed on the app session id
@@ -71,7 +75,7 @@ CREATE TABLE IF NOT EXISTS companion_actions (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   action TEXT NOT NULL, target_json TEXT NOT NULL, pin_json TEXT NOT NULL,
   prompt TEXT, carried_json TEXT NOT NULL,
-  prepared_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+  prepared_at TEXT NOT NULL, expires_at TEXT NOT NULL, armed_from TEXT,
   said TEXT, said_at TEXT, said_log_id INTEGER,
   ended_at TEXT,
   outcome TEXT CHECK (outcome IN ('took','already','refused','cancelled','replaced','expired')),

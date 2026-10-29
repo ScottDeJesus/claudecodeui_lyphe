@@ -281,21 +281,15 @@ export const companionDb = {
   },
 
   /**
-   * His last line before `before`, of any kind (`operator` rows, spoken or typed): the request that led to a prepare. `null` when he has
-   * said nothing, and `null` when an action already fired on that very line (`companion_actions.said_log_id`): a word is never fired
-   * twice, and the next line back is no stand-in for it. How far back the line may be is the check of his word's to judge
-   * (`checkHisWord`). A line logged in the very millisecond of `before` is before it, as `heardSince` counts it. `before` must be a stored
-   * stamp, for the reason `heardSince` gives. Consumed by `hands-tools.ts` (`take_action`, for a LIGHT action).
+   * His newest line of any kind (`operator` rows, spoken or typed), or `null` when he has said nothing. The trigger a harmless
+   * action's record carries as its `said` (`open` and `close_followup` are done at once and wait for no word, so the line is the
+   * record's, never a check). Consumed by `hands/direct-tools.ts`.
    */
-  heardBefore(userId: number, before: string): CompanionHeardRow | null {
-    if (!isStoreStamp(before)) throw new Error(`heardBefore needs a stored stamp (ISO-8601 UTC with milliseconds), not ${JSON.stringify(before)}.`);
-    const db = getConnection();
-    const row = db
-      .prepare(`SELECT id, at, role, via, text FROM companion_log WHERE user_id = ? AND role = 'operator' AND at <= ? ORDER BY id DESC LIMIT 1`)
-      .get(userId, before) as CompanionHeardRow | undefined;
-    if (!row) return null;
-    const spent = db.prepare('SELECT 1 FROM companion_actions WHERE user_id = ? AND said_log_id = ? LIMIT 1').get(userId, row.id);
-    return spent ? null : row;
+  newestOperatorLine(userId: number): CompanionHeardRow | null {
+    const row = getConnection()
+      .prepare(`SELECT id, at, role, via, text FROM companion_log WHERE user_id = ? AND role = 'operator' ORDER BY id DESC LIMIT 1`)
+      .get(userId) as CompanionHeardRow | undefined;
+    return row ?? null;
   },
 
   /** Inserts one card for the account, stamped now, and answers the row as stored. */

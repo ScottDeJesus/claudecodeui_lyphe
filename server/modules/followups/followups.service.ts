@@ -220,6 +220,16 @@ export const followupsService = {
   },
 
   /**
+   * One of the account's items by id, open or closed, beside the app session id of its chat; `null` when no item of THIS account carries
+   * the id (another account's reads as none). The companion's `close_followup` reads it to tell an item already closed from an id that is
+   * not his, so the first is answered "already closed" and the second refused.
+   */
+  findForAccount(userId: number, id: number): { sessionId: string; followup: Followup } | null {
+    const row = followupsDb.getOfUser(userId, id);
+    return row === null ? null : { sessionId: row.session_id, followup: toFollowup(row) };
+  },
+
+  /**
    * Files a batch of lines for the chat and answers each line's item in the order given — a line the chat
    * already has open answers the existing item. Whole or nothing: the first refused line throws before a row is written.
    */

@@ -1,3 +1,8 @@
+import {
+  recoveredCopy,
+  redCopy,
+  redReminderCopy,
+} from '@/modules/notifications/services/cerberus-red-copy.service.js';
 import { humanizeTokens } from '@/shared/utils.js';
 
 /**
@@ -309,6 +314,11 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
       body: turns === null ? 'The run stopped at its turn limit' : `The run stopped after ${turns} turns`,
     };
   }],
+  // The Cerberus red watch (`cerberus-red-copy.service.ts` holds the wording): a check red for an hour, still red,
+  // green again. One event per tick, so the meta carries the groups that moved and the copy names them all.
+  ['cerberus.red', ({ meta }) => redCopy(meta)],
+  ['cerberus.red.reminder', ({ meta }) => redReminderCopy(meta)],
+  ['cerberus.recovered', ({ meta }) => recoveredCopy(meta)],
   ['api.error', ({ meta }) => ({
     headline: 'API error',
     body: `${readText(meta.reason) ?? 'unknown'} after ${readNumber(meta.attempts) ?? 0} retries`,

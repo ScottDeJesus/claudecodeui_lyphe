@@ -376,8 +376,9 @@ The Cerberus module as a running API process sees it: what `server/index.ts` cal
 | `start()`: open the store (migrations run), `loadCenterKey()`, `seedHub()`, `wardenLinks.seedFromStore()`, `ingest.seedMemory()` (once per process; `readInputs()` calls it too, only for a `start()` that failed before seeding — an unreadable center key — and a request dialed at the bind waits behind `start()`'s synchronous part), `registerCatalogHandlers()` (the `catalog.ack` handler, before any warden can dial in), `registerRunsService()` (the four `run.*` handlers and the hello reconciliation, MAN-7904), `registerDiagnosisService()` (the `diag.opened` and `diag.result` handlers, the two events that end a session, and the sweep that ends what a restart left running, MAN-7936), `startAutoRun()` (the auto-run rule on `ingest.onChange`; `stop()` unsubscribes it), `registerWardenFileRoutes(listen)` (the enroll script and the release; only for a `CERBERUS_LISTEN` that is not refused), `registerUpdatesService(listen)` (the `update.progress` handler, the hello that ends an update, and `advanceUpdates()` for a batch a restart left half done, MAN-7933), then bind the gateway | yes | |
 | the `/api/cerberus` router: every read and write route | yes | |
 | ingest of a warden's results | the process that holds the warden's link | |
-| `stop()`, in this order: unsubscribe the auto-run rule, end every diagnosis still running (`stopDiagnoses()`: `failed`, "Cerberus restarted while the diagnosis was running, so it was stopped. Ask again."), stop the self-checks, stop the prune, stop the gateway accepting (open links end with the process) | yes | |
+| `stop()`, in this order: unsubscribe the auto-run rule, end every diagnosis still running (`stopDiagnoses()`: `failed`, "Cerberus restarted while the diagnosis was running, so it was stopped. Ask again."), stop the self-checks, stop the red watch, stop the prune, stop the gateway accepting (open links end with the process) | yes | |
 | the three self-checks, every 30 s | | `soleDuties()` |
+| the red watch, every 60 s (first tick one interval after arming): MAN-9205 | | `soleDuties()` |
 | the daily prune | | `soleDuties()` |
 
 why: a second API process on the same store would write a second set of hub rows (`readopt.ts` measured what a duty every process performs costs: nine probe servers retired the operator's chats).
@@ -515,6 +516,12 @@ SQLite uses a partial index only when the query carries its terms: `cerberusResu
 
 All times are epoch milliseconds, except `every`, `timeout`, `cadence`, `stale_after`, `catalog.timeout`, `catalog.limit_per`, `run_output.t` and `diag_steps.t` (seconds).
 
+## Steps 5 and 6 (`user_version` 5 → 6 → 7; the red watch, MAN-9205)
+| Table | Key | Holds |
+|---|---|---|
+| `cerberus_red_alerts` | `id` (autoincrement) | one red incident of one check: `opened_at`, `notified_at`, `last_reminder_at`, `closed_at`, `closed_by IN ('ok','mute','gone')`; the partial unique index `ix_red_alerts_open(node, "key") WHERE closed_at IS NULL` lets a check have one open incident; kept, a closed row is what a re-open is judged against |
+Step 6 adds `red_since` (when the red began, on center's clock): step 5 had already run on the live store when the recovery push needed it, so it is a step of its own.
+
 ## Prove it
 Both probes refuse to run unless `CERBERUS_DB_PATH` and `DATABASE_PATH` start with `/tmp/`:
 ```sh
@@ -536,7 +543,7 @@ Connection and schema: MAN-7805. Reach every repository through `@/modules/datab
 ## Contract (all of them)
 - A repository takes `getCerberusConnection()` inside every method and opens no transaction (but `cerberusUpdatesDb.rolledBackAfterUpdated`, MAN-7957); a multi-statement unit (enrollment, ingest, a definitions write) is the caller's own transaction on that connection.
 - Rows go in and come out as the table stores them: snake_case, epoch-millisecond times, `spec` / `facts` / `data` / `entries` / `one_offs` as JSON text. Parsing and camelCase belong to the caller.
-- Row types are `CerberusNodeRow`, `CerberusEnrollTokenRow`, `CerberusProbeRow`, `CerberusCheckRow`, `CerberusStoredResultRow`, `CerberusMuteRow`, `CerberusCatalogRow`, `CerberusCatalogSetRow`, `CerberusCatalogChangeRow`, `CerberusRunRow`, `CerberusRunInsert`, `CerberusRunLineRow`, `CerberusRunResult`, `CerberusUpdateRow`, `CerberusUpdateInsert`, `CerberusUpdateStepRow`, `CerberusUpdateResult`, `CerberusPauseWindowRow`, `CerberusDiagnosisRow`, `CerberusDiagnosisInsert`, `CerberusDiagnosisEndFields`, `CerberusDiagnosisStatus`, `CerberusDiagnosisStepRow`; the names `CerberusResultRow` and `CerberusMute` are taken by the read model.
+- Row types are `CerberusNodeRow`, `CerberusEnrollTokenRow`, `CerberusProbeRow`, `CerberusCheckRow`, `CerberusStoredResultRow`, `CerberusMuteRow`, `CerberusRedAlertRow` and `CerberusRedAlertClosedBy` (`cerberusRedAlertsDb`, the red watch's incidents: MAN-9205), `CerberusCatalogRow`, `CerberusCatalogSetRow`, `CerberusCatalogChangeRow`, `CerberusRunRow`, `CerberusRunInsert`, `CerberusRunLineRow`, `CerberusRunResult`, `CerberusUpdateRow`, `CerberusUpdateInsert`, `CerberusUpdateStepRow`, `CerberusUpdateResult`, `CerberusPauseWindowRow`, `CerberusDiagnosisRow`, `CerberusDiagnosisInsert`, `CerberusDiagnosisEndFields`, `CerberusDiagnosisStatus`, `CerberusDiagnosisStepRow`; the names `CerberusResultRow` and `CerberusMute` are taken by the read model.
 - A column named `desc`, `key` or `by` is quoted in every statement.
 
 ## `cerberusNodesDb` — `repositories/cerberus-nodes.db.ts`
@@ -1067,6 +1074,7 @@ Design: `design/cerberus/Cerberus Spec.dc.html`. Time is epoch milliseconds on e
 | warden updates, center's half: a batch, the one-at-a-time driver, how an update ends, `paused` laid over a restart, `latestRelease`, `CERBERUS_WARDEN_DIST`; the three routes: MAN-7939 | MAN-7933 | `updates.service.ts`, `update-driver.ts`, `updates.routes.ts`, `warden-release.ts`, `hello-update.ts`, `read-model/update-views.ts`, `.verify/cerberus-updates.sh` |
 | edits that break warden updates | INV-7167 | the same files |
 | edits that break the store | INV-7004 | the same files |
+| the red watch: a check failing or denied for an hour pages the phone; the tick, the incident rules, `cerberus_red_alerts`, the three pushes' words | MAN-9205 | `red-watch.service.ts`, `red-watch-plan.ts`, `repositories/cerberus-red-alerts.db.ts`, `notifications/services/cerberus-red-copy.service.ts` |
 | edits that break the hub and ingest: `start()` before READY, the re-seed at hello, the storage rule, the newest value | INV-7231 | `server/index.ts`, `cerberus.module.ts`, `warden-link.ts`, `ingest.service.ts`, `self-checks.service.ts`, `read-model/check-views.ts`, `read-model/lookup.ts` |
 | the wire contract | MAN-7807 | `server/shared/cerberus-types.ts`, `src/shared/cerberus-types.ts` |
 | the whole system, once: enroll, link, ack on a scratch center; the hub through a live handover | MAN-7804 | `.verify/cerberus-whole.sh`, `.verify/cerberus-whole.mjs`, `.verify/cerberus-whole-live.mjs` |
@@ -1673,3 +1681,45 @@ Three live proofs of the Cerberus whole, run in this order against the dev serve
 - Journal since the first touch. Expected: `re-adopted lines: 3`, `pruned lines: 0`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-judgment-diagnosis.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-judgment-handover.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-judgment-tab.mjs
+
+## MAN-9205 — Cerberus red watch — a check red for an hour pages the phone: the tick, the incident rules, the table, the words
+
+A check that stays `failing` or `denied` for an hour wakes the operator's phone, and a restart of the server never wakes it twice. A 60-second tick in the serving process reads the same overview the tab reads, decides what moved, records it in `cerberus_red_alerts`, and hands the notification orchestrator ONE event per recipient: the ntfy channel publishes it. Nothing in the watch talks to ntfy. Edits that break it: INV-10187.
+
+## Files
+| file | owns |
+|---|---|
+| `server/modules/cerberus/red-watch.service.ts` | `startRedWatch(overview)`, `stopRedWatch()`, `tickRedWatch(overview)`; the timer (armed by `soleDuties()`, `unref`'d, a failed tick logs and loses only that tick); applying a plan to the store in one transaction; the event |
+| `server/modules/cerberus/red-watch-plan.ts` | `planRedWatch(...)`, pure: which checks open an incident, are due a reminder, recovered, or close silently; `RED_AFTER_MS` (1 h), `REMINDER_EVERY_MS` (6 h) |
+| `server/modules/database/repositories/cerberus-red-alerts.db.ts` | `cerberusRedAlertsDb`: `open`, `listOpen`, `lastClosed`, `markNotified`, `markReminded`, `close` |
+| `server/modules/notifications/services/cerberus-red-copy.service.ts` | the wording of the three codes and the `CerberusRedItem` / `CerberusRedMeta` shapes of the event's `meta` |
+| `server/modules/notifications/services/ntfy-channel.service.ts` | priority and tags by code, ahead of the `kind` rule; the three codes are not collapsible |
+| `server/modules/database/repositories/notification-channel-endpoints.ts` | `getUserIdsWithEnabledEndpoint('ntfy')`: who is paged |
+
+## The rules
+| Rule | Detail |
+|---|---|
+| Candidate | a `needsYou` check that is `failing` or `denied` (never `warn`), unmuted, on a node whose link is `reporting`, whose `since` (the warden's clock, brought onto center's with `wardenLinks.clockOffsetMs`) is at least 60 minutes old. One global threshold |
+| Open | a candidate with no open incident gets a row (`opened_at` = `notified_at` = now, `red_since` = when the red began) and is paged. The partial unique index `ix_red_alerts_open` lets only one process open a check |
+| Re-open | an incident that closed `mute` or `gone` was last pushed at `max(notified_at, last_reminder_at)`; a new one for the SAME red opens only 6 h after that, so a mute lifted at minute 20 pages nothing until 6 h past the original page. It is the same red while the check's red began no later than the moment that incident opened; a red that began after it (the check recovered while the mute or the silence hid it) is a new episode and, like a close by `ok`, waits only for its own hour |
+| Remind | an open incident still a candidate, 6 h after its last push → a reminder; the row stays open |
+| Recover | an open incident whose check is `ok` → closed `ok`, one recovery push saying how long it was red (`red_since` to the moment the check turned ok) |
+| Silent close | muted → `mute`; the check left the fleet, or its node is `silent` or `never` → `gone`. No push for either |
+| Left alone | the check `warn`, `unknown`, `paused` (a restart), or red for under an hour since a flap: the incident stays as it is. A flap is not a new incident |
+| One push per tick | everything that opened, was reminded or recovered in a tick is one event per recipient. Code by the strongest group: any opening → `cerberus.red` (ntfy priority 5, `rotating_light`, `requiresUserAction`); only reminders → `cerberus.red.reminder` (4, `warning`); only recoveries → `cerberus.recovered` (3, `white_check_mark`). All three are `kind: 'error'`, so `events.error` gates the watch; `provider: 'cerberus'`, `sessionId: null`, `dedupeKey` `cerberus:red-watch:<now>:<userId>` (the orchestrator's 20-second dedupe is not per user) |
+| Recipients | every user with an enabled `ntfy` endpoint. None: the tick still records its incidents and logs `no enabled ntfy endpoint, nobody paged` |
+| Record, then push | the rows are written before the event is handed over: a process that dies between costs one missed page, where the other order would cost a double page on every restart |
+| First tick | one interval after arming, not at arming: the notification history and the companion's alert feed attach after `listen`, and an event raised earlier is heard by neither (measured on the first page) |
+| History | the notification history keeps each event through `spendFreeWording`, which for a `cerberus.*` event drops an item's reason, and calls its label "A check", when that text speaks of usage or spend (a check such as "Gemini and DeepSeek spend is normal" carries dollar figures); the phone's push keeps the whole sentence |
+| Log | one line per tick that moved something: `[red-watch] opened 8, reminded 0, recovered 0 → pushed to 1 user`; nothing on a quiet tick |
+
+## The words
+`notification-copy.service.ts` routes the three codes to `cerberus-red-copy.service.ts`. A lone check: `<label> on <node> — red for 1 h 02 m` with the reason as the body; several: `8 checks red over an hour on eis1` with a line per check, `<label> — 23 d — <reason cut to one line>`; a reminder is `Still red: <label> on <node> — 7 h`; a recovery `<label> on <node> is green again after 3 h 10 m`. A tick that moved several groups lists all of them under headings. The body is bounded to 900 characters in the copy (lines that do not fit become `+N more`), because `buildNotificationText` keeps 1,000 and the publisher 2,000. A tap lands on `/`: the client reads no tab from the URL (`notification-landing.service.ts`).
+
+## The store
+Migration step 5 creates `cerberus_red_alerts(id, node, "key", opened_at, notified_at, last_reminder_at, closed_at, closed_by IN ('ok','mute','gone'))` and its two indexes; step 6 adds `red_since`. Rows are kept; a closed row is the record a re-open is judged against.
+
+## Prove it
+There is no unit test. Look at the table and the journal: `sqlite3 -readonly ~/.cloudcli/cerberus.db "select node,key,datetime(notified_at/1000,'unixepoch'),closed_by from cerberus_red_alerts"` and `journalctl -u cloudcli-server-dev.service | grep red-watch`. To see what ntfy holds without printing the topic, poll its `…/json?poll=1&since=30m` from a script that reads the topic from `notification_channel_endpoints` and prints only title, priority and tags. A recovery or a mute is exercised on the real function by handing `tickRedWatch` a copy of the live overview with one check changed, against a scratch store (`CERBERUS_DB_PATH` set to a `.backup` copy of the live file) so the serving process's own tick cannot page the table's briefly closed row.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/red-watch-plan.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/red-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-red-alerts.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/cerberus-red-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-spend-free.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts

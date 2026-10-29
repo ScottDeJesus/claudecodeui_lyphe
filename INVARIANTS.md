@@ -18261,7 +18261,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-card-live.mjs
 
 ## INV-10099 — server/modules/companion/hands — edits that break it: only a spoken press fires, the pin is what is fired, one ending, no timer, no fake word in the live store
 
-Detail: MAN-9174 (protocol), MAN-9171 (the check), MAN-9204 (the words it reads), MAN-9172 (recipes), MAN-9173 (doors), MAN-9203 (what the prepare tells her).
+Detail: MAN-9174 (protocol), MAN-9171 (the check), MAN-9204 (the words it reads), MAN-9172 (recipes), MAN-9173 (doors), MAN-9203 (what the prepare tells her), MAN-9207 (`open`, `close_followup`), MAN-9208 (lapse and re-arm).
 
 | rule | why |
 |---|---|
@@ -18269,16 +18269,15 @@ Detail: MAN-9174 (protocol), MAN-9171 (the check), MAN-9204 (the words it reads)
 | `take_action` compares `said` to rows of her log and fires nothing on `said` alone; `RelayedPress.words` and `press` are the row's `text` and `id`, never her argument | she cannot write his word |
 | Words that travel (Rework notes, an answer round, rulings) are looked up in the log at prepare (`resolveCarriedLines`); a string of hers is never sent in his name | nothing he did not say reaches a designer or a runner |
 | The take fires the PIN (`pending.pin`) taken at prepare, never what the house holds now; the ask book refuses a prompt that changed (MAN-8494) | he heard that prompt read back |
-| The pin never reaches a page: `withoutPin` names the wire's fields one by one. A field added to `CompanionStoredPending` is sent only when put on the wire on purpose | the ask carries the lock token the dispatcher guards an answer by |
-| Every action goes through prepare and take, `open` and `close_followup` included | ruling 3: "only on my explicit spoken word for that specific card, never on her own judgment" |
-| `ACTION_TIER` is the one tier table. Only `open` and `close_followup` are LIGHT; the eleven others, `show` among them, are FULL and fire only after a read-back of hers that names the target, in any of her turns since the prepare (check 4). Her prompt, `nextStepFor` and `take_action`'s `said` description read the table; none restates the lists | the operator, 2026-10-29: "The light tier is open and close_followup only." `show` is `dispatcher unhide`: it puts a held, approved card back in the queue |
-| A bare yes (`isAssent`) is a yes run carried by `please`, `it`, `that`, `now` and nothing else; the action's own word beside `it` counts for LIGHT only. Under a FULL action it counts only as his first spoken line after her newest read-back, with none of his after it. "Forget it.", "Stop it.", "Pause it.", "Cut it." and "Kick it." fire nothing | they are what he says to decline a clear or a stop; a stray yes to something else is not his word for this action (MAN-9171) |
-| The request that led to a prepare fires a LIGHT action only when it is his last line of any kind before the prepare, spoken, at most 2 minutes old (`REQUEST_LEAD_MS`), with nothing of his since, naming the target, and no `companion_actions` row holds it as `said_log_id` (`heardBefore`) | a newer line takes it back; one word never fires twice |
+| The pin never reaches a page: `withoutPin` names the wire's fields one by one. A field added to `CompanionStoredPending` (the pin, `armedFrom`) is sent only when put on the wire on purpose | the ask carries the lock token the dispatcher guards an answer by |
+| Every action that changes the house goes through prepare and take: `CompanionCeremonyAction` (the eleven, `show` among them) is the one list, and `ACTIONS` (`hands-tools.ts`), `ACTION_KINDS` (`companion-pending.ts`), `ACTION_WORDS` and the stored pending's `action` are that list. Only `open` and `close_followup` are done at once (`direct-tools.ts`, MAN-9207). Each of the eleven fires only after a read-back of hers that names the target, in any of her turns since the ceremony began (check 4) | ruling 3: "only on my explicit spoken word for that specific card, never on her own judgment"; the operator, 2026-10-29: "Keep the full ceremony only for the actions that change the house". `show` is `dispatcher unhide`: it puts a held, approved card back in the queue |
+| A bare yes (`isAssent`) is a yes run carried by `please`, `it`, `that`, `now` and nothing else; the action's own word beside `it` never counts. It counts only as his first spoken line after her newest read-back, with none of his after it. "Forget it.", "Stop it.", "Pause it.", "Cut it." and "Kick it." fire nothing | they are what he says to decline a clear or a stop; a stray yes to something else is not his word for this action (MAN-9171) |
+| His word is a spoken line after the ceremony began (`armedFrom`) and at or before `expiresAt`: a request before the prepare is no word. A re-arm (`rearmOf`) inherits only a bare yes, read from `armedFrom`; an order needs a read-back after its own prepare. It re-arms only when the action, target, pin, prompt and carried lines each equal the lapsed row's stored column | his yes answered one read-back; a difference costs one more yes and never fires one (MAN-9208) |
 | A named order for `clear_memory` fires only when its line opens with the action's word (`ORDERED_VERB_FIRST`); the one line that fires it without the word is the bare yes bound as above. A sentence of hers reads it back only when it holds an action word or says "your memory" (`readsBack`). Drop any of the three and a remark about her memory empties it | the word "memory" is the whole name and "clear" and "empty" are adjectives: "My memory is clear." holds both as a bag of words (MAN-9171, MAN-9204, MAN-9194) |
 | An action leaves her state only through `action-end.ts`; a take claims its row (`claimAction`) and holds its id (`carryOut`) before the door runs | a withdrawal, a lapse or a Clear in that window must not end an action a door is running |
 | A claimed row no take of this process carries ends `refused` with `may have gone through`, never `cancelled` or re-fired | the same word is never fired twice |
 | No timer ends a lapse: the next prepare, take or cancel does, and the page hides the card at the deadline it sets once | events, never a watchdog |
-| A target no line of his can name is refused at prepare (`canBeNamed`). Editing `ACTION_WORDS`, `ACTION_TIER`, the not-significant words, the yes runs or the negators re-runs `.verify/kaylee-action-word.mjs` first | a card that can only lapse is a dead end on his panel |
+| A target no line of his can name is refused at prepare (`canBeNamed`). Editing `ACTION_WORDS`, the not-significant words, the yes runs or the negators re-runs `.verify/kaylee-action-word.mjs` first | a card that can only lapse is a dead end on his panel |
 | A door never throws: a missing pin, a refused order and a thrown error each answer `refused` with a sentence that says what to do | `take_action` has decided the word was his; the house's answer is the news |
 | A showing that fires a dispatcher verb or a resume runs on a scratch server over a copied auth database and a scratch `DISPATCHER_HOME` (`.verify/kaylee-eyes-scratch.sh`); no relayed record is written to the live store by a builder | kaylee--press: no fake operator quote in the live store |
 | A fixture clip is written once, only when its file is absent, one `gemini-3.8-flash-lite-tts` call each (`.verify/kaylee-clip.mjs`); no probe loops a press | the Gemini budget |
@@ -19122,3 +19121,305 @@ measured 2026-10-29 by chain chain-https-embeds-20261029-113010-159e, finding L1
 probe-key: 389984bf29b3c550a9838fd2575d17972c9ac5de
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.env.example, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-10188 — probe — MEDIUM — a re-arm carries a lapsed ceremony's read-back across any age, so an ORDER line spoken today fires with no read-back of this request
+
+MEDIUM — a re-arm carries a lapsed ceremony's read-back across any age, so an ORDER line spoken today fires with no read-back of this request
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/k.mjs" <<'JS'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe';
+const { startStandInDoor } = await import(`${R}/.verify/lib/kaylee-bank-standin.mjs`);
+const scratch = mkdtempSync('/tmp/athena-probe-db-');
+process.env.DATABASE_PATH = join(scratch, 'auth.db'); writeFileSync(process.env.DATABASE_PATH, '');
+const database = await import(`${R}/server/modules/database/index.ts`); await database.initializeDatabase();
+const { createCompanionStore } = await import(`${R}/server/modules/companion/companion-store.ts`);
+const { handsTools } = await import(`${R}/server/modules/companion/hands/hands-tools.ts`);
+const { bankDoor } = await import(`${R}/server/modules/companion/memory/bank-door.ts`);
+const { memoryBody } = await import(`${R}/server/modules/companion/memory/memory-words.ts`);
+const { textResult } = await import(`${R}/server/shared/tool-text-result.ts`);
+const door = await startStandInDoor(); process.env.DOCSTORE_URL = door.url;
+const USER = Number(database.userDb.createUser('athena-probe', 'x').id);
+const store = createCompanionStore(USER); store.setFloor('p');
+const deps = { userId: USER, store, house: {}, refuse: (s) => textResult(s, true), openOnFloor: () => {} };
+const tools = Object.fromEntries(handsTools(deps).map((d) => [d.name, d]));
+const call = async (n, a) => { const r = await tools[n].handler(a, {}); return { err: r.isError === true, text: r.content.map((b) => b.text ?? '').join(' ') }; };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const said = async (text, via = 'spoken') => { await sleep(8); return store.appendLog({ role: 'operator', via, text }); };
+const hers = async (text) => { await sleep(8); return store.appendLog({ role: 'kaylee', text, turnId: 'p', index: 0 }); };
+const keep = async (t, x) => { const w = await bankDoor.write({ kind: 'rule', title: t, body: memoryBody({ account: 'p', lines: [{ id: 1, at: '2026-10-29T10:00:00.000Z', text: x }], why: 'asked', context: null }) }); if (!w.ok) throw new Error(w.sentence); };
+const c = database.getConnection();
+const shift = (ms) => { for (const r of c.prepare('SELECT id, at FROM companion_log').all()) c.prepare('UPDATE companion_log SET at = ? WHERE id = ?').run(new Date(Date.parse(r.at) - ms).toISOString(), r.id); for (const r of c.prepare('SELECT id, prepared_at, expires_at FROM companion_actions').all()) c.prepare('UPDATE companion_actions SET prepared_at = ?, expires_at = ? WHERE id = ?').run(new Date(Date.parse(r.prepared_at) - ms).toISOString(), new Date(Date.parse(r.expires_at) - ms).toISOString(), r.id); };
+const lapseNow = () => { const s = store.readState().pending; const past = new Date(Date.now() - 1).toISOString(); store.setPending({ ...s, expiresAt: past }); c.prepare('UPDATE companion_actions SET expires_at = ? WHERE id = ?').run(past, s.id); };
+const finish = async () => { await door.close(); database.closeConnection(); if (scratch.startsWith('/tmp/athena-probe-db-')) rmSync(scratch, { recursive: true, force: true }); };
+// ---- scenario: M1
+await keep('Brief length', 'Keep briefs to three lines.'); await keep('Green tea', 'I take my tea green.');
+await said('Get ready to clear your memory.');
+await call('prepare_action', { action: 'clear_memory', target: 'your memory' });
+await hers('Clear your memory? You forget the 2 things you keep. Say yes and I will do it.');
+lapseNow();
+await call('take_action', { said: 'Get ready to clear your memory.' });          // the take finds the lapse: the row ends `expired`
+shift(3 * 86400_000);                                                              // three days go by
+await said('Please clear your memory.');                                           // a fresh request, spoken today
+const prep = await call('prepare_action', { action: 'clear_memory', target: 'your memory' });
+const take = await call('take_action', { said: 'Please clear your memory.' });     // no read-back of this request, no yes
+console.log(`R: prepare re-armed=${/Re-armed/.test(prep.text)} | take ${take.err ? 'REFUSED' : 'FIRED'}: ${take.text.slice(0, 80)} | memories left ${door.state.rows.size}`);
+await finish();
+JS
+cat > "$D/p.sh" <<'SH'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$1/k.mjs" 2>&1 | grep -E '^R:|Error' | head -5
+SH
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today `prepare re-armed=true | take FIRED … | memories left 0`; cured: the take is REFUSED ("You have not read it back to him yet…") and `memories left 2`
+```
+
+measured 2026-10-29 by chain chain-kaylee-hands-harmless-direct-20261029-132203-bb6c, finding M1, MEDIUM
+probe-key: b2e7791c3fc9522156a46e747a13fede31d22e24
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-rearm.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/direct-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts
+
+## INV-10189 — probe — MEDIUM — the re-arm does not bind his old yes to what he heard: the content under it can change and the yes still fires
+
+MEDIUM — the re-arm does not bind his old yes to what he heard: the content under it can change and the yes still fires
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/k.mjs" <<'JS'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe';
+const { startStandInDoor } = await import(`${R}/.verify/lib/kaylee-bank-standin.mjs`);
+const scratch = mkdtempSync('/tmp/athena-probe-db-');
+process.env.DATABASE_PATH = join(scratch, 'auth.db'); writeFileSync(process.env.DATABASE_PATH, '');
+const database = await import(`${R}/server/modules/database/index.ts`); await database.initializeDatabase();
+const { createCompanionStore } = await import(`${R}/server/modules/companion/companion-store.ts`);
+const { handsTools } = await import(`${R}/server/modules/companion/hands/hands-tools.ts`);
+const { bankDoor } = await import(`${R}/server/modules/companion/memory/bank-door.ts`);
+const { memoryBody } = await import(`${R}/server/modules/companion/memory/memory-words.ts`);
+const { textResult } = await import(`${R}/server/shared/tool-text-result.ts`);
+const door = await startStandInDoor(); process.env.DOCSTORE_URL = door.url;
+const USER = Number(database.userDb.createUser('athena-probe', 'x').id);
+const store = createCompanionStore(USER); store.setFloor('p');
+const deps = { userId: USER, store, house: {}, refuse: (s) => textResult(s, true), openOnFloor: () => {} };
+const tools = Object.fromEntries(handsTools(deps).map((d) => [d.name, d]));
+const call = async (n, a) => { const r = await tools[n].handler(a, {}); return { err: r.isError === true, text: r.content.map((b) => b.text ?? '').join(' ') }; };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const said = async (text, via = 'spoken') => { await sleep(8); return store.appendLog({ role: 'operator', via, text }); };
+const hers = async (text) => { await sleep(8); return store.appendLog({ role: 'kaylee', text, turnId: 'p', index: 0 }); };
+const keep = async (t, x) => { const w = await bankDoor.write({ kind: 'rule', title: t, body: memoryBody({ account: 'p', lines: [{ id: 1, at: '2026-10-29T10:00:00.000Z', text: x }], why: 'asked', context: null }) }); if (!w.ok) throw new Error(w.sentence); };
+const c = database.getConnection();
+const shift = (ms) => { for (const r of c.prepare('SELECT id, at FROM companion_log').all()) c.prepare('UPDATE companion_log SET at = ? WHERE id = ?').run(new Date(Date.parse(r.at) - ms).toISOString(), r.id); for (const r of c.prepare('SELECT id, prepared_at, expires_at FROM companion_actions').all()) c.prepare('UPDATE companion_actions SET prepared_at = ?, expires_at = ? WHERE id = ?').run(new Date(Date.parse(r.prepared_at) - ms).toISOString(), new Date(Date.parse(r.expires_at) - ms).toISOString(), r.id); };
+const lapseNow = () => { const s = store.readState().pending; const past = new Date(Date.now() - 1).toISOString(); store.setPending({ ...s, expiresAt: past }); c.prepare('UPDATE companion_actions SET expires_at = ? WHERE id = ?').run(past, s.id); };
+const finish = async () => { await door.close(); database.closeConnection(); if (scratch.startsWith('/tmp/athena-probe-db-')) rmSync(scratch, { recursive: true, force: true }); };
+// ---- scenario: M2
+await keep('Brief length', 'Keep briefs to three lines.'); await keep('Green tea', 'I take my tea green.');
+await said('Get ready to clear your memory.');
+await call('prepare_action', { action: 'clear_memory', target: 'your memory' });
+await hers('Clear your memory? You forget the 2 things you keep. Say yes and I will do it.');   // what he heard: 2 things
+lapseNow();
+await said('Yes.');                                                                 // his yes, to "2 things"
+await call('take_action', { said: 'Yes.' });                                        // the lapse is found; the row ends `expired`
+for (const t of ['Third', 'Fourth', 'Fifth']) await keep(`${t} memory`, `Remember the ${t} thing.`);
+const prep = await call('prepare_action', { action: 'clear_memory', target: 'your memory' });   // re-arm: the bank holds 5 now
+const take = await call('take_action', { said: 'Yes.' });
+console.log(`R: he heard 2 things | re-arm reads back ${/(\d+) things/.exec(prep.text)?.[1] ?? '?'} | take ${take.err ? 'REFUSED' : 'FIRED'}: ${take.text.slice(0, 60)} | memories left ${door.state.rows.size}`);
+await finish();
+JS
+cat > "$D/p.sh" <<'SH'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$1/k.mjs" 2>&1 | grep -E '^R:|Error' | head -5
+SH
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today `he heard 2 things | re-arm reads back 5 | take FIRED … forgot 5 things | memories left 0`; cured: the take is REFUSED and `memories left 5`
+```
+
+measured 2026-10-29 by chain chain-kaylee-hands-harmless-direct-20261029-132203-bb6c, finding M2, MEDIUM
+probe-key: 545af3a38f7419095b24424d376fe203395cc256
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-rearm.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/direct-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts
+
+## INV-10190 — probe — LOW — his decline of a lapsed card is recorded as a lapse, so the declined ceremony stays re-armable
+
+LOW — his decline of a lapsed card is recorded as a lapse, so the declined ceremony stays re-armable
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/k.mjs" <<'JS'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe';
+const { startStandInDoor } = await import(`${R}/.verify/lib/kaylee-bank-standin.mjs`);
+const scratch = mkdtempSync('/tmp/athena-probe-db-');
+process.env.DATABASE_PATH = join(scratch, 'auth.db'); writeFileSync(process.env.DATABASE_PATH, '');
+const database = await import(`${R}/server/modules/database/index.ts`); await database.initializeDatabase();
+const { createCompanionStore } = await import(`${R}/server/modules/companion/companion-store.ts`);
+const { handsTools } = await import(`${R}/server/modules/companion/hands/hands-tools.ts`);
+const { bankDoor } = await import(`${R}/server/modules/companion/memory/bank-door.ts`);
+const { memoryBody } = await import(`${R}/server/modules/companion/memory/memory-words.ts`);
+const { textResult } = await import(`${R}/server/shared/tool-text-result.ts`);
+const door = await startStandInDoor(); process.env.DOCSTORE_URL = door.url;
+const USER = Number(database.userDb.createUser('athena-probe', 'x').id);
+const store = createCompanionStore(USER); store.setFloor('p');
+const deps = { userId: USER, store, house: {}, refuse: (s) => textResult(s, true), openOnFloor: () => {} };
+const tools = Object.fromEntries(handsTools(deps).map((d) => [d.name, d]));
+const call = async (n, a) => { const r = await tools[n].handler(a, {}); return { err: r.isError === true, text: r.content.map((b) => b.text ?? '').join(' ') }; };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const said = async (text, via = 'spoken') => { await sleep(8); return store.appendLog({ role: 'operator', via, text }); };
+const hers = async (text) => { await sleep(8); return store.appendLog({ role: 'kaylee', text, turnId: 'p', index: 0 }); };
+const keep = async (t, x) => { const w = await bankDoor.write({ kind: 'rule', title: t, body: memoryBody({ account: 'p', lines: [{ id: 1, at: '2026-10-29T10:00:00.000Z', text: x }], why: 'asked', context: null }) }); if (!w.ok) throw new Error(w.sentence); };
+const c = database.getConnection();
+const shift = (ms) => { for (const r of c.prepare('SELECT id, at FROM companion_log').all()) c.prepare('UPDATE companion_log SET at = ? WHERE id = ?').run(new Date(Date.parse(r.at) - ms).toISOString(), r.id); for (const r of c.prepare('SELECT id, prepared_at, expires_at FROM companion_actions').all()) c.prepare('UPDATE companion_actions SET prepared_at = ?, expires_at = ? WHERE id = ?').run(new Date(Date.parse(r.prepared_at) - ms).toISOString(), new Date(Date.parse(r.expires_at) - ms).toISOString(), r.id); };
+const lapseNow = () => { const s = store.readState().pending; const past = new Date(Date.now() - 1).toISOString(); store.setPending({ ...s, expiresAt: past }); c.prepare('UPDATE companion_actions SET expires_at = ? WHERE id = ?').run(past, s.id); };
+const finish = async () => { await door.close(); database.closeConnection(); if (scratch.startsWith('/tmp/athena-probe-db-')) rmSync(scratch, { recursive: true, force: true }); };
+// ---- scenario: L1
+await keep('Brief length', 'Keep briefs to three lines.');
+await said('Get ready to clear your memory.');
+await call('prepare_action', { action: 'clear_memory', target: 'your memory' });
+await hers('Clear your memory? You forget the 1 thing you keep. Say yes and I will do it.');
+lapseNow();                                                                         // the thirty minutes run out
+await said('No wait, never mind, leave my memory alone.');                          // he declines ...
+const cancel = await call('cancel_action', {});                                     // ... and she takes it down, as her prompt says
+const row = c.prepare("SELECT outcome FROM companion_actions ORDER BY rowid DESC LIMIT 1").get();
+const prep = await call('prepare_action', { action: 'clear_memory', target: 'your memory' });
+console.log(`R: his decline ended the row '${row.outcome}' (cancel said: ${cancel.text.slice(0, 40)}) | the next prepare re-armed=${/Re-armed/.test(prep.text)}`);
+await finish();
+JS
+cat > "$D/p.sh" <<'SH'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$1/k.mjs" 2>&1 | grep -E '^R:|Error' | head -5
+SH
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today `his decline ended the row 'expired' … the next prepare re-armed=true`; cured: `'cancelled'` and `re-armed=false`
+```
+
+measured 2026-10-29 by chain chain-kaylee-hands-harmless-direct-20261029-132203-bb6c, finding L1, LOW
+probe-key: b6ee9a33b9c7a7d97d47dfa17aa26af1230fa9fb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-rearm.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/direct-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts
+
+## INV-10191 — probe — LOW — the schema's refusal of `prepare_action open` / `close_followup` does not name the direct tool
+
+LOW — the schema's refusal of `prepare_action open` / `close_followup` does not name the direct tool
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/k.mjs" <<'JS'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe';
+const { startStandInDoor } = await import(`${R}/.verify/lib/kaylee-bank-standin.mjs`);
+const scratch = mkdtempSync('/tmp/athena-probe-db-');
+process.env.DATABASE_PATH = join(scratch, 'auth.db'); writeFileSync(process.env.DATABASE_PATH, '');
+const database = await import(`${R}/server/modules/database/index.ts`); await database.initializeDatabase();
+const { createCompanionStore } = await import(`${R}/server/modules/companion/companion-store.ts`);
+const { handsTools } = await import(`${R}/server/modules/companion/hands/hands-tools.ts`);
+const { bankDoor } = await import(`${R}/server/modules/companion/memory/bank-door.ts`);
+const { memoryBody } = await import(`${R}/server/modules/companion/memory/memory-words.ts`);
+const { textResult } = await import(`${R}/server/shared/tool-text-result.ts`);
+const door = await startStandInDoor(); process.env.DOCSTORE_URL = door.url;
+const USER = Number(database.userDb.createUser('athena-probe', 'x').id);
+const store = createCompanionStore(USER); store.setFloor('p');
+const deps = { userId: USER, store, house: {}, refuse: (s) => textResult(s, true), openOnFloor: () => {} };
+const tools = Object.fromEntries(handsTools(deps).map((d) => [d.name, d]));
+const call = async (n, a) => { const r = await tools[n].handler(a, {}); return { err: r.isError === true, text: r.content.map((b) => b.text ?? '').join(' ') }; };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const said = async (text, via = 'spoken') => { await sleep(8); return store.appendLog({ role: 'operator', via, text }); };
+const hers = async (text) => { await sleep(8); return store.appendLog({ role: 'kaylee', text, turnId: 'p', index: 0 }); };
+const keep = async (t, x) => { const w = await bankDoor.write({ kind: 'rule', title: t, body: memoryBody({ account: 'p', lines: [{ id: 1, at: '2026-10-29T10:00:00.000Z', text: x }], why: 'asked', context: null }) }); if (!w.ok) throw new Error(w.sentence); };
+const c = database.getConnection();
+const shift = (ms) => { for (const r of c.prepare('SELECT id, at FROM companion_log').all()) c.prepare('UPDATE companion_log SET at = ? WHERE id = ?').run(new Date(Date.parse(r.at) - ms).toISOString(), r.id); for (const r of c.prepare('SELECT id, prepared_at, expires_at FROM companion_actions').all()) c.prepare('UPDATE companion_actions SET prepared_at = ?, expires_at = ? WHERE id = ?').run(new Date(Date.parse(r.prepared_at) - ms).toISOString(), new Date(Date.parse(r.expires_at) - ms).toISOString(), r.id); };
+const lapseNow = () => { const s = store.readState().pending; const past = new Date(Date.now() - 1).toISOString(); store.setPending({ ...s, expiresAt: past }); c.prepare('UPDATE companion_actions SET expires_at = ? WHERE id = ?').run(past, s.id); };
+const finish = async () => { await door.close(); database.closeConnection(); if (scratch.startsWith('/tmp/athena-probe-db-')) rmSync(scratch, { recursive: true, force: true }); };
+// ---- scenario: L2
+const { createSdkMcpServer } = await import('@anthropic-ai/claude-agent-sdk');
+const { Client } = await import(`${R}/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js`);
+const { InMemoryTransport } = await import(`${R}/node_modules/@modelcontextprotocol/sdk/dist/esm/inMemory.js`);
+const server = createSdkMcpServer({ name: 'kaylee', tools: Object.values(tools) });
+const [ct, st] = InMemoryTransport.createLinkedPair(); await server.instance.connect(st);
+const client = new Client({ name: 'p', version: '1' }); await client.connect(ct);
+const out = await client.callTool({ name: 'prepare_action', arguments: { action: 'open', target: 'the roster' } });
+const text = out.content?.[0]?.text ?? '';
+console.log(`R: prepare_action open → isError=${out.isError === true} | the refusal mentions the open tool at all: ${text.includes("open")} | its last words: ${text.replace(/\s+/g, " ").slice(-90)}`);
+await finish();
+JS
+cat > "$D/p.sh" <<'SH'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$1/k.mjs" 2>&1 | grep -E '^R:|Error' | head -5
+SH
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today `isError=true | the refusal mentions the open tool at all: false`; cured: `true`
+```
+
+measured 2026-10-29 by chain chain-kaylee-hands-harmless-direct-20261029-132203-bb6c, finding L2, LOW
+probe-key: 9ec5f28911bf8e2ea106773eec1e6f854b59fec6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-rearm.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/direct-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts
+
+## INV-10192 — probe — LOW — `close_followup` on an already-closed follow-up is refused, not answered `already`; the `already` branch is reachable only by a race
+
+LOW — `close_followup` on an already-closed follow-up is refused, not answered `already`; the `already` branch is reachable only by a race
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/k.mjs" <<'JS'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe';
+const { startStandInDoor } = await import(`${R}/.verify/lib/kaylee-bank-standin.mjs`);
+const scratch = mkdtempSync('/tmp/athena-probe-db-');
+process.env.DATABASE_PATH = join(scratch, 'auth.db'); writeFileSync(process.env.DATABASE_PATH, '');
+const database = await import(`${R}/server/modules/database/index.ts`); await database.initializeDatabase();
+const { createCompanionStore } = await import(`${R}/server/modules/companion/companion-store.ts`);
+const { handsTools } = await import(`${R}/server/modules/companion/hands/hands-tools.ts`);
+const { bankDoor } = await import(`${R}/server/modules/companion/memory/bank-door.ts`);
+const { memoryBody } = await import(`${R}/server/modules/companion/memory/memory-words.ts`);
+const { textResult } = await import(`${R}/server/shared/tool-text-result.ts`);
+const door = await startStandInDoor(); process.env.DOCSTORE_URL = door.url;
+const USER = Number(database.userDb.createUser('athena-probe', 'x').id);
+const store = createCompanionStore(USER); store.setFloor('p');
+const deps = { userId: USER, store, house: {}, refuse: (s) => textResult(s, true), openOnFloor: () => {} };
+const tools = Object.fromEntries(handsTools(deps).map((d) => [d.name, d]));
+const call = async (n, a) => { const r = await tools[n].handler(a, {}); return { err: r.isError === true, text: r.content.map((b) => b.text ?? '').join(' ') }; };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const said = async (text, via = 'spoken') => { await sleep(8); return store.appendLog({ role: 'operator', via, text }); };
+const hers = async (text) => { await sleep(8); return store.appendLog({ role: 'kaylee', text, turnId: 'p', index: 0 }); };
+const keep = async (t, x) => { const w = await bankDoor.write({ kind: 'rule', title: t, body: memoryBody({ account: 'p', lines: [{ id: 1, at: '2026-10-29T10:00:00.000Z', text: x }], why: 'asked', context: null }) }); if (!w.ok) throw new Error(w.sentence); };
+const c = database.getConnection();
+const shift = (ms) => { for (const r of c.prepare('SELECT id, at FROM companion_log').all()) c.prepare('UPDATE companion_log SET at = ? WHERE id = ?').run(new Date(Date.parse(r.at) - ms).toISOString(), r.id); for (const r of c.prepare('SELECT id, prepared_at, expires_at FROM companion_actions').all()) c.prepare('UPDATE companion_actions SET prepared_at = ?, expires_at = ? WHERE id = ?').run(new Date(Date.parse(r.prepared_at) - ms).toISOString(), new Date(Date.parse(r.expires_at) - ms).toISOString(), r.id); };
+const lapseNow = () => { const s = store.readState().pending; const past = new Date(Date.now() - 1).toISOString(); store.setPending({ ...s, expiresAt: past }); c.prepare('UPDATE companion_actions SET expires_at = ? WHERE id = ?').run(past, s.id); };
+const finish = async () => { await door.close(); database.closeConnection(); if (scratch.startsWith('/tmp/athena-probe-db-')) rmSync(scratch, { recursive: true, force: true }); };
+// ---- scenario: L3
+c.prepare("INSERT INTO sessions (session_id, provider, custom_name) VALUES ('s1', 'claude', 'probe chat')").run();
+const now = new Date().toISOString();
+const done = c.prepare("INSERT INTO followups (session_id, user_id, kind, text, state, created_at, updated_at) VALUES ('s1', ?, 'next', 'Tick off the footer.', 'done', ?, ?) RETURNING id").get(USER, now, now).id;
+await said('Tick off the footer follow-up.');
+const r = await call('close_followup', { followup: `#${done}` });
+console.log(`R: close_followup on a follow-up that is already closed → ${r.err ? 'REFUSED' : 'answered'}: ${r.text.slice(0, 90)} | rows recorded ${c.prepare('SELECT count(*) AS n FROM companion_actions').get().n}`);
+await finish();
+JS
+cat > "$D/p.sh" <<'SH'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$1/k.mjs" 2>&1 | grep -E '^R:|Error' | head -5
+SH
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today `REFUSED: #1 is not one of his open follow-ups … | rows recorded 0`; cured (if the brief stands): `answered: … already closed`
+```
+
+measured 2026-10-29 by chain chain-kaylee-hands-harmless-direct-20261029-132203-bb6c, finding L3, LOW
+probe-key: cc11b17b6604c7370c4f4e8ffe1f7351ceeee597
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-rearm.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/direct-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts

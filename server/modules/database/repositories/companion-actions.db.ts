@@ -31,6 +31,8 @@ export type CompanionActionRow = {
   carried_json: string;
   prepared_at: string;
   expires_at: string;
+  /** When its ceremony began: the first prepare's stamp that a re-arm after a lapse carries on. NULL: it began at `prepared_at`. */
+  armed_from: string | null;
   /** His line that fired it, verbatim, once it was taken. */
   said: string | null;
   said_at: string | null;
@@ -44,11 +46,11 @@ export type CompanionActionRow = {
   answer: string | null;
 };
 
-/** What `openAction` takes: the columns the prepare knows. The account is the call's; the rest of the row starts empty. */
+/** What `openAction` takes: the columns the prepare knows (`armed_from` only for a re-arm). The account is the call's; the rest of the row starts empty. */
 export type CompanionActionOpening = Pick<
   CompanionActionRow,
   'id' | 'action' | 'target_json' | 'pin_json' | 'prompt' | 'carried_json' | 'prepared_at' | 'expires_at'
->;
+> & { armed_from?: string | null };
 
 /**
  * What `endAction` takes: the `outcome`, with `ended_at` defaulting to now. The line that fired the action (`said`,
@@ -67,18 +69,18 @@ export type CompanionActionEnd = {
 const LIST_ACTIONS_MAX = 1000;
 
 const ACTION_COLUMNS =
-  'id, user_id, action, target_json, pin_json, prompt, carried_json, prepared_at, expires_at, said, said_at, said_log_id, ended_at, outcome, answer';
+  'id, user_id, action, target_json, pin_json, prompt, carried_json, prepared_at, expires_at, armed_from, said, said_at, said_log_id, ended_at, outcome, answer';
 
 export const companionActionsDb = {
   /** Records a prepared action for the account, with no outcome yet, and answers the row as stored. */
   openAction(userId: number, row: CompanionActionOpening): CompanionActionRow {
     const stored = getConnection()
       .prepare(
-        `INSERT INTO companion_actions (id, user_id, action, target_json, pin_json, prompt, carried_json, prepared_at, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO companion_actions (id, user_id, action, target_json, pin_json, prompt, carried_json, prepared_at, expires_at, armed_from)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING ${ACTION_COLUMNS}`
       )
-      .get(row.id, userId, row.action, row.target_json, row.pin_json, row.prompt, row.carried_json, row.prepared_at, row.expires_at) as
+      .get(row.id, userId, row.action, row.target_json, row.pin_json, row.prompt, row.carried_json, row.prepared_at, row.expires_at, row.armed_from ?? null) as
       | CompanionActionRow
       | undefined;
 
@@ -142,6 +144,23 @@ export const companionActionsDb = {
       );
 
     return result.changes > 0;
+  },
+
+  /**
+   * The account's newest action that waited for his word: every kind but the two harmless ones (`open`, `close_followup`), which are done
+   * at once and have no ceremony. `null` when it never prepared one. What a prepare asks to know whether it re-arms a lapse
+   * (`hands/action-rearm.ts`).
+   */
+  newestCeremonyAction(userId: number): CompanionActionRow | null {
+    const row = getConnection()
+      .prepare(
+        `SELECT ${ACTION_COLUMNS} FROM companion_actions
+         WHERE user_id = ? AND action NOT IN ('open', 'close_followup')
+         ORDER BY prepared_at DESC, rowid DESC LIMIT 1`
+      )
+      .get(userId) as CompanionActionRow | undefined;
+
+    return row ?? null;
   },
 
   /**

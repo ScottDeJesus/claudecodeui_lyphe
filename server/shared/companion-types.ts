@@ -175,15 +175,24 @@ export type CompanionProcess = { state: 'asleep' | 'waking' | 'awake' | 'failed'
 export type CompanionTurnOutcome = 'answered' | 'stopped' | 'failed';
 
 /**
- * The thirteen things she may do in the house, each only on his word and never on her own judgment. The
- * dispatcher's own: `queue`, `hide` and `rework` answer a plan's open Accept prompt (`hide` and `rework`
- * also act on a card with none open), `answer` sends his answers to an open questions round, and `show`,
- * `recut`, `stop`, `resume` and `kick` act on a card. `resume_run` resumes a chain that is not running,
- * with his rulings. `open` brings a card, run, page or chat up on his screen. `close_followup` ticks one
- * of his follow-ups off. `clear_memory` retires every memory of her own bank, which only he can ask of
- * her, in the words he says aloud. Carried by `CompanionPendingAction.action`.
+ * The thirteen things she does in the house. Eleven change it, and each of those waits for his spoken word, never her
+ * own judgment (`CompanionCeremonyAction`). The dispatcher's own: `queue`, `hide` and `rework` answer a plan's open Accept
+ * prompt (`hide` and `rework` also act on a card with none open), `answer` sends his answers to an open questions round,
+ * and `show`, `recut`, `stop`, `resume` and `kick` act on a card. `resume_run` resumes a chain that is not running, with
+ * his rulings. `clear_memory` retires every memory of her own bank, which only he can ask of her, in the words he says
+ * aloud. The other two are harmless and are done the moment he asks, with no pending action: `open` brings a card,
+ * run, page or chat up on his screen, and `close_followup` ticks one of his follow-ups off. All thirteen are kinds of a row of her
+ * record of actions and verbs of the panel; a pending action holds only the eleven (the server types it so: `CompanionStoredPending`).
  */
 export type CompanionActionKind = 'queue' | 'hide' | 'show' | 'rework' | 'answer' | 'recut' | 'stop' | 'resume' | 'kick' | 'resume_run' | 'open' | 'close_followup' | 'clear_memory';
+
+/**
+ * The eleven actions that change the house and take the whole ceremony: prepared onto his panel, read back to him, fired by his
+ * spoken word, lapsing thirty minutes on. Every kind but the two harmless ones (`open`, `close_followup`), which she does at once.
+ * Used by the hands' words, recipes and doors (`server/modules/companion/hands/`) and by the stored pending action
+ * (`companion-pending.ts`), so no word of the ceremony is kept for an action that has none.
+ */
+export type CompanionCeremonyAction = Exclude<CompanionActionKind, 'open' | 'close_followup'>;
 
 /**
  * What an action acts on, told apart by `kind`. `spoken` is the name he says it by: the card draws it and
@@ -216,7 +225,7 @@ export type CompanionCarriedLine = { logId: number; at: string; text: string };
  * options, as the card shows them (`null` when the action has none); `carried` is his own spoken lines it
  * carries — notes or rulings under a `null` label, or one group per question with the question as its
  * `label` — each line verbatim; `say` is what he says aloud to fire it ("Queue Kaylee's eyes"); `preparedAt`
- * is when it went on his panel and `expiresAt` when it lapses (five minutes on). Held in her state beside
+ * is when it went on his panel and `expiresAt` when it lapses (thirty minutes on). Held in her state beside
  * the draft and announced by `companion_pending`. What the prepare pinned (the ask and its lock token, the
  * chain, the follow-up) is the server's alone and is never part of this shape.
  */
