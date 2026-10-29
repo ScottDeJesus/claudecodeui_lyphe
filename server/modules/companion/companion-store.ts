@@ -52,6 +52,8 @@ import { isUnansweredList, type UnansweredMessage } from './companion-unanswered
  */
 export type CompanionStoredState = {
   providerSessionId: string | null;
+  /** The fingerprint of her tools and prompt when `providerSessionId` began (`session/companion-shape.ts`); `null` for none, and for a conversation begun before it was kept. */
+  sessionShape: string | null;
   focus: CompanionSessionRef | null;
   draft: CompanionDraft | null;
   pending: CompanionStoredPending | null;
@@ -103,8 +105,12 @@ export type CompanionEmittedFrame = Extract<
  */
 export type CompanionStore = {
   readState(): CompanionStoredState;
-  /** Her CLI conversation, `null` after Clear. No frame: a page has no use for it. */
-  setProviderSessionId(providerSessionId: string | null): void;
+  /** Her CLI conversation with the shape of her tools and prompt it began with, written together (`null`, `null` after Clear). No frame: a page has no use for it. */
+  setProviderSession(providerSessionId: string | null, sessionShape: string | null): void;
+  /** The handover her last refused resume left for her first message after the fresh start (`session/companion-handover.ts`), or `null` for none. No frame. */
+  readHandover(): string | null;
+  /** Stores the handover, or `null` to empty it (the launch that was handed the message that carried it is up, Clear). Kept on the row so a crash, or a launch that fails before `init`, does not lose it. No frame. */
+  setHandover(handover: string | null): void;
   /** His messages no turn of hers has answered yet, oldest first (an empty column, or one that is not that shape, is none). */
   readUnanswered(): UnansweredMessage[];
   /** Replaces the list (`[]` stores none). No frame: it is the next process's, not a page's. */
@@ -178,6 +184,7 @@ function readJsonColumn<T>(userId: number, column: string, raw: string | null, i
 function toStoredState(userId: number, row: CompanionStateRow | null): CompanionStoredState {
   return {
     providerSessionId: row?.provider_session_id ?? null,
+    sessionShape: row?.session_shape ?? null,
     focus: readJsonColumn(userId, 'focus_json', row?.focus_json ?? null, isSessionRef),
     draft: readJsonColumn(userId, 'draft_json', row?.draft_json ?? null, isDraft),
     pending: readJsonColumn(userId, 'pending_json', row?.pending_json ?? null, isStoredPending),
@@ -215,8 +222,15 @@ export function createCompanionStore(userId: number): CompanionStore {
   return {
     readState: () => toStoredState(userId, companionDb.readState(userId)),
 
-    setProviderSessionId(providerSessionId) {
-      companionDb.writeState(userId, { provider_session_id: providerSessionId });
+    setProviderSession(providerSessionId, sessionShape) {
+      // One statement: an id never stands with another conversation's shape.
+      companionDb.writeState(userId, { provider_session_id: providerSessionId, session_shape: sessionShape });
+    },
+
+    readHandover: () => companionDb.readState(userId)?.handover ?? null,
+
+    setHandover(handover) {
+      companionDb.writeState(userId, { handover });
     },
 
     readUnanswered: () => readJsonColumn(userId, 'unanswered_json', companionDb.readState(userId)?.unanswered_json ?? null, isUnansweredList) ?? [],

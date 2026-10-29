@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
 import type { UnansweredMessage } from '../companion-unanswered.js';
@@ -45,6 +47,8 @@ export type Sent = {
 type Ledger = {
   /** Records `sent` as given to the CLI; `replacing` is the inherited entry it now stands for. */
   give(sent: Sent, replacing?: UnansweredMessage): void;
+  /** His new words that no launch can carry yet (a wake waiting for a handover): kept as an inherited entry, which the push that says them later replaces (`give`'s `replacing`). Answers the entry. */
+  keep(words: Omit<UnansweredMessage, 'uuid'>): UnansweredMessage;
   /** Records `sent` as withheld until the stopped turn's result is in; `replacing` as for `give`. */
   hold(sent: Sent, replacing?: UnansweredMessage): void;
   /** The held messages, in order, now recorded as given: the caller pushes them to the CLI. */
@@ -109,6 +113,12 @@ export function createLedger(userId: number, initial: readonly UnansweredMessage
       given.set(sent.uuid, sent);
       replaced(replacing);
       persist();
+    },
+    keep(words) {
+      const entry = { uuid: randomUUID(), ...words };
+      inherited = [...inherited, entry];
+      persist();
+      return entry;
     },
     hold(sent, replacing) {
       held.push(sent);

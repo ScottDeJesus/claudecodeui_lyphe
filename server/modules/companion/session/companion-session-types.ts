@@ -5,14 +5,23 @@ import type { CompanionModel, CompanionProcess } from '@/shared/companion-types.
 import type { UnansweredMessage } from '../companion-unanswered.js';
 
 import type { StopSource } from './companion-ledger.js';
+import type { LastWords } from './companion-handover.js';
 import type { MessageReaders } from './companion-message.js';
 import type { CompanionCli, CompanionCliLaunch } from './companion-process.js';
 import type { TurnSink } from './companion-turns.js';
 
 /**
+ * The CLI conversation an account holds: its `id`, and the `shape` (`companion-shape.ts`: her tools and prompt) it began with, which is
+ * `null` for a conversation begun before shapes were kept. Consumed by `companion-session.ts` (resumes only a conversation whose shape
+ * is the launch's own) and by `companion-account.ts`, which reads and writes it through the store.
+ */
+export type HeldSession = { id: string; shape: string | null };
+
+/**
  * Everything one account's session needs from the house, so the session reads nothing itself: the
  * account (`userId` names her working directory), her `tools` (the definitions her MCP server carries;
- * none is valid), the held CLI session id with its writer, the messages of his she has not answered with
+ * none is valid), the held conversation (`HeldSession`: the CLI session id and its shape) with its writer, the handover of one she is made to
+ * drop (`writeHandover`, and the newest exchange the summarizer is not shown, `readLastWords`), the messages of his she has not answered with
  * theirs (`readUnanswered` once, when the session is made: a previous process left them; `writeUnanswered`
  * after every change to the list, so it is on disk before the CLI could lose it), the readers every message is
  * assembled from (`MessageReaders`) and the callbacks that tell the house what she did (`TurnSink`, `onProcess` for the
@@ -24,8 +33,15 @@ export type CompanionSessionDeps = MessageReaders &
   TurnSink & {
     userId: number;
     tools: Array<SdkMcpToolDefinition<any>>;
-    readProviderSessionId(): string | null;
-    writeProviderSessionId(id: string | null): void;
+    readProviderSession(): HeldSession | null;
+    /** Stores the conversation with the shape it begins with, or `null` to forget it (Clear, a conversation that cannot be resumed); id and shape are written together. */
+    writeProviderSession(session: { id: string; shape: string } | null): void;
+    /** Stores the handover of a conversation the refused resume drops, on her row, for the first message after the fresh start (`readHandover`, in `MessageReaders`, reads it from there). */
+    writeHandover(text: string): void;
+    /** Empties the stored handover: the launch that was handed it is up, or Clear. */
+    dropHandover(): void;
+    /** Her newest exchange as her log holds it (`null` when she has said nothing): the summarizer is not shown it, so the handover's instructions carry it. */
+    readLastWords(): LastWords | null;
     readUnanswered(): UnansweredMessage[];
     writeUnanswered(unanswered: UnansweredMessage[]): void;
     launch?(input: CompanionCliLaunch): CompanionCli;
@@ -44,7 +60,7 @@ export type CompanionSessionDeps = MessageReaders &
  * server, in a shutdown) and holds what is pushed until the stopped turn's result is in, so his next words cannot be folded into
  * the aborted request; `setModel` applies a model change to a
  * running process (a closed one launches on the stored model); `clear` interrupts, closes and forgets
- * the held session id; `close` ends the input and the process. `process` is the condition the panel
+ * the held session (its id and its shape); `close` ends the input and the process. `process` is the condition the panel
  * shows and `turnId` the turn in flight (`null` when idle). Consumed by `companion.service.ts` and the voice.
  */
 export type CompanionSession = {

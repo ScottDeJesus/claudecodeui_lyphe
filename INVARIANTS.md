@@ -17830,51 +17830,6 @@ probe-key: 4bcc593d3c83c4652f33c89ba58bf653ea48842a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
-## INV-10080 — probe — MEDIUM — words pushed shortly BEFORE his cut are answered by the CLI and then swallowed: she goes quiet (order 2 of the press race)
-
-MEDIUM — words pushed shortly BEFORE his cut are answered by the CLI and then swallowed: she goes quiet (order 2 of the press race)
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee-words-survive-interrupt/athena-probes/kwsi-probe.mjs s1
-echo "[probe exit $?]"
-# expect: `sentences she delivered after the cut = []` and `stored list = []` while the defect stands (the stand-in replays the measured CLI sequence above); cured: `["Kiwi."]` delivered
-```
-
-measured 2026-10-28 by chain chain-kaylee-words-survive-interrupt-20261028-132949-58fd, finding M1, MEDIUM
-probe-key: 8f56c5d6ad98b8579163426212b13baac5b7456f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-unanswered.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session.mjs
-
-## INV-10081 — probe — LOW — a stopped result that carries a failure and lists no uuid fails her and destroys the HELD words
-
-LOW — a stopped result that carries a failure and lists no uuid fails her and destroys the HELD words
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee-words-survive-interrupt/athena-probes/kwsi-probe.mjs s2
-echo "[probe exit $?]"
-# expect: `process=failed | B ever pushed to a CLI=false | stored list = [] | system lines=1` while the defect stands; cured: B pushed to a CLI (or kept stored) with the process not failed
-```
-
-measured 2026-10-28 by chain chain-kaylee-words-survive-interrupt-20261028-132949-58fd, finding L1, LOW
-probe-key: 8548699a79583d54945028757e4657c896ff82f1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-unanswered.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session.mjs
-
-## INV-10082 — probe — LOW — a non-failing result with no uuid list leaves the entry stored for good, so every later boot answers it again (unverified on the real CLI)
-
-LOW — a non-failing result with no uuid list leaves the entry stored for good, so every later boot answers it again (unverified on the real CLI)
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee-words-survive-interrupt/athena-probes/kwsi-probe.mjs s8
-echo "[probe exit $?]"
-# expect: `stored list after the answer = ["plain words"]` while the defect stands; cured: `[]`
-```
-
-measured 2026-10-28 by chain chain-kaylee-words-survive-interrupt-20261028-132949-58fd, finding L2, LOW
-probe-key: 2cc1800a8432316bdb096ebd9cb24f3464d40530
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-unanswered.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session.mjs
-
 ## INV-10083 — probe — LOW — MAN-9077 still says the session CLOSES the process when the CLI ignores an interrupt (healed means deleted)
 
 LOW — MAN-9077 still says the session CLOSES the process when the CLI ignores an interrupt (healed means deleted)
@@ -17887,21 +17842,6 @@ echo "[probe exit $?]"
 
 measured 2026-10-28 by chain chain-kaylee-words-survive-interrupt-20261028-132949-58fd, finding L3, LOW
 probe-key: 084b6e199530a222bb15909a4bd503f1004e739d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-unanswered.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session.mjs
-
-## INV-10084 — probe — LOW (builder-acknowledged) — a re-sent message has lost the `<cut>` it carried
-
-LOW (builder-acknowledged) — a re-sent message has lost the `<cut>` it carried
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee-words-survive-interrupt/athena-probes/kwsi-probe.mjs ordercut
-echo "[probe exit $?]"
-# expect: `message carried <cut>: true | the same words re-sent after a handover carry <cut>: false` while it stands
-```
-
-measured 2026-10-28 by chain chain-kaylee-words-survive-interrupt-20261028-132949-58fd, finding L4, LOW
-probe-key: 6298abf9079d40d90e3bae2e0d31bca4e5dbe350
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-unanswered.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session.mjs
 
@@ -19423,3 +19363,33 @@ measured 2026-10-29 by chain chain-kaylee-hands-harmless-direct-20261029-132203-
 probe-key: cc11b17b6604c7370c4f4e8ffe1f7351ceeee597
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-rearm.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/direct-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts
+
+## INV-10205 — probe — MEDIUM — a failed fresh launch loses the handover; the panel has already said she starts "with a handover"
+
+MEDIUM — a failed fresh launch loses the handover; the panel has already said she starts "with a handover"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee-fresh-start-handover/athena-probes/lost-on-failed-launch.mjs 2>&1 | grep -E "^(a fresh start|first launch|after the launch|second launch)"
+echo "[probe exit $?]"
+# expect: `second launch exists: true | carries <handover>: false | carries <state>: true` while the defect stands; cured, `carries <handover>: true`
+```
+
+measured 2026-10-29 by chain chain-kaylee-fresh-start-handover-20261029-145748-9b96, finding M1, MEDIUM
+probe-key: 26baffeb91735525a1a8a4f7866f1aef03981e84
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-oneshot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-handover-gate.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-handover.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-refusal.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover.mjs
+
+## INV-10206 — probe — LOW — `.verify/kaylee-handover.mjs` crashes under load at section F: it reads the stand-in's pid file before the stand-in writes it
+
+LOW — `.verify/kaylee-handover.mjs` crashes under load at section F: it reads the stand-in's pid file before the stand-in writes it
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/kaylee-fresh-start-handover/athena-probes/proof-pid-race.sh
+echo "[probe exit $?]"
+# expect: `args tail stdin pid` (pid written last) and the script reading the pid at lines `370 432` right after a count of `.args`; cured when the order puts pid first or the script waits on the pid file
+```
+
+measured 2026-10-29 by chain chain-kaylee-fresh-start-handover-20261029-145748-9b96, finding L1, LOW
+probe-key: 1fa7ba5ecb44bd17b59e4f3f51553b2d439a8444
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover.mjs

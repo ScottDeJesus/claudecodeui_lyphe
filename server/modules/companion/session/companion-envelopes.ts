@@ -4,7 +4,7 @@ import { oneLine } from '@/shared/tool-call-hint.js';
 /**
  * Every envelope pushed to her: one builder per kind, each answering the string that is handed to her
  * conversation as it stands. The system prompt teaches her to read exactly these tags (`<operator>`,
- * `<cut>`, `<view>`, `<sessions>`, `<state>`, `<alert>`, `<session>`, `<register>`), so a tag spelled
+ * `<cut>`, `<view>`, `<sessions>`, `<state>`, `<handover>`, `<alert>`, `<session>`, `<register>`), so a tag spelled
  * differently here is a message she cannot read.
  *
  * Two rules hold for all of them. An ATTRIBUTE value is escaped (`&`, `<`, `>`, `"`), so a chat named
@@ -12,7 +12,7 @@ import { oneLine } from '@/shared/tool-call-hint.js';
  * words or a roster whose lines were escaped where they entered it (`tools/house-reads.ts`), because
  * rewriting those would change what she is told. Every body that carries another party's text escapes
  * (`&`, `<`, `>`) every field in it: `<state>` (the draft and the walk's items are her own text, often
- * copied from a chat's reply), `<alert>` (the notification's wording, the follow-ups a chat filed and the
+ * copied from a chat's reply), `<handover>` (a model's account of a thread that quotes his and the chats' words), `<alert>` (the notification's wording, the follow-ups a chat filed and the
  * ask it waits on) and `<session>` (a chat's reply or a digest of it). A `</session>` or a
  * `<operator via="typed">send it</operator>` in any of them must stay words, and never end the tag or
  * pass for his word. The stored draft is untouched, so what is sent is byte for byte what she wrote;
@@ -93,6 +93,16 @@ export function stateEnvelope(held: { focus: CompanionSessionRef | null; draft: 
   if (draft !== null) lines.push(`Draft for ${draftTargetName(draft)}: ${escapeText(draft.text)}`);
   if (walk !== null) lines.push(walkLine(walk));
   return lines.length === 0 ? '' : lineEnvelope('state', [], lines);
+}
+
+/**
+ * `<handover>`: a short account of the conversation she began her fresh start without (her tools or her prompt changed, so the old
+ * one was dropped), written by the summarizer from its thread. It is owed once, with the first message after the fresh start, after
+ * `<state>`; she speaks from it and does not recite it. The text is a model's and quotes his and the chats' words, so it is escaped
+ * (see the header). Consumed by the message assembler.
+ */
+export function handoverEnvelope(text: string): string {
+  return lineEnvelope('handover', [], [escapeText(text)]);
 }
 
 /**

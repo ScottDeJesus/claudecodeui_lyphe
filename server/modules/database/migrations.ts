@@ -669,6 +669,31 @@ const addCompanionUnansweredColumn = (db: Database): void => {
 };
 
 /**
+ * Adds `companion_state.session_shape`: the fingerprint of Kaylee's tools and system prompt as they were when `provider_session_id`
+ * began (`companion-shape.ts`), written with the id and nulled with it. The CLI records a conversation's tools and prompt once and
+ * keeps them on every resume, so a conversation is resumed only when this equals the launch's own; a session id held with no shape
+ * (every one from before this column) is refused once and she starts fresh. NULL for none, which is every row before this column.
+ */
+const addCompanionSessionShapeColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'session_shape', 'TEXT');
+};
+
+/**
+ * Adds `companion_state.handover`: the short account of the conversation Kaylee's tools or prompt made her drop, written before her
+ * fresh start and read by the first message assembled after it (`companion/session/companion-handover.ts`), which carries it once;
+ * the column is emptied when the launch that was handed that message reports `init`. It sits on the row so a crash between the summary
+ * and that message, or a launch that fails before `init`, does not lose it. NULL for none, which
+ * is every row before this column and every row between handovers.
+ */
+const addCompanionHandoverColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'handover', 'TEXT');
+};
+
+/**
  * Adds the `permission_mode` column that records the permission mode a session last ran under.
  *
  * Recorded beside `model` and `effort` on every send, so a send the companion relays can run in
@@ -835,6 +860,8 @@ export const runMigrations = (db: Database) => {
     addCompanionPendingColumn(db);
     addCompanionMemoryForgetLineColumn(db);
     addCompanionUnansweredColumn(db);
+    addCompanionSessionShapeColumn(db);
+    addCompanionHandoverColumn(db);
     addCompanionActionArmedFromColumn(db);
     // What the house told each account, kept: one row per notification the orchestrator was handed, written at
     // the listener seam. It references `users` alone, so it sits beside the companion's script, which reads it.

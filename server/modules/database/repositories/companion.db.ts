@@ -35,6 +35,10 @@ export type CompanionStateRow = {
   user_id: number;
   /** Her CLI conversation; NULL until her first init and after Clear. */
   provider_session_id: string | null;
+  /** The fingerprint of her tools and prompt when that conversation began (`companion-shape.ts`); written and nulled with `provider_session_id`. NULL for a conversation begun before the column. */
+  session_shape: string | null;
+  /** The handover of the conversation her last refused resume dropped (`companion/session/companion-handover.ts`); the first message after the fresh start carries it once, and the row is emptied when the launch that was handed that message reports `init`. NULL for none. */
+  handover: string | null;
   /** `CompanionSessionRef` as JSON text, or NULL. */
   focus_json: string | null;
   /** `CompanionDraft` as JSON text, or NULL. */
@@ -115,7 +119,7 @@ export type CompanionClearResult = {
 };
 
 /** Every state column the table holds besides the key: what a read returns and `writeState` may name. */
-const STATE_PATCH_COLUMNS = ['provider_session_id', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor', 'memory_forget_line'] as const;
+const STATE_PATCH_COLUMNS = ['provider_session_id', 'session_shape', 'handover', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor', 'memory_forget_line'] as const;
 
 const STATE_COLUMNS = `user_id, ${STATE_PATCH_COLUMNS.join(', ')}, updated_at`;
 const LOG_COLUMNS = 'id, user_id, at, role, via, turn_id, turn_index, text, mood, sounds_json';
@@ -323,7 +327,7 @@ export const companionDb = {
   },
 
   /**
-   * Clear: deletes the account's log and cards and empties its state's conversation, focus, draft,
+   * Clear: deletes the account's log and cards and empties its state's conversation (its id, shape and handover), focus, draft,
    * pending action, unanswered messages and walkthrough — in one transaction. `floor` stays (which client holds the floor
    * is no part of her conversation), and so does `memory_forget_line`: log ids are AUTOINCREMENT and never reused, so the id of the line
    * the last forget of her memory used stays a true lower bound after the log it named is gone, and a line he says next always has a
@@ -347,7 +351,7 @@ export const companionDb = {
         db
           .prepare(
             `UPDATE companion_state
-             SET provider_session_id = NULL, focus_json = NULL, draft_json = NULL, walk_json = NULL, pending_json = NULL, unanswered_json = NULL, updated_at = ?
+             SET provider_session_id = NULL, session_shape = NULL, handover = NULL, focus_json = NULL, draft_json = NULL, walk_json = NULL, pending_json = NULL, unanswered_json = NULL, updated_at = ?
              WHERE user_id = ?`
           )
           .run(clearedAt, userId).changes > 0;

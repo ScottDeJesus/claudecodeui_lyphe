@@ -1,6 +1,6 @@
 import type { CompanionDraft, CompanionSessionRef, CompanionSettings, CompanionWalk } from '@/shared/companion-types.js';
 
-import { cutEnvelope, registerEnvelope, sessionsEnvelope, stateEnvelope, viewEnvelope } from './companion-envelopes.js';
+import { cutEnvelope, handoverEnvelope, registerEnvelope, sessionsEnvelope, stateEnvelope, viewEnvelope } from './companion-envelopes.js';
 import { fillRegister } from './companion-prompt.js';
 
 /**
@@ -8,11 +8,14 @@ import { fillRegister } from './companion-prompt.js';
  * pushed silently — whatever she is told reaches her inside a message she answers:
  *   1. `<state>`, owed once after her conversation was compacted (the conversation that held the focus, the
  *      draft and the walk is gone, so they are restated);
- *   2. `<cut>`, owed once after he cut her off (`oweCut`, set by the companion's speech cut);
- *   3. `<sessions>`, on a wake, then only when its text differs from the last one sent;
- *   4. `<view>`, on the same rule;
- *   5. the body — an `<operator>`, one or more `<alert>`s, or a `<session>`;
- *   6. `<register>`, read from his settings EVERY time: he edits it, so it is never stale. The sounds it lists are
+ *   2. `<handover>`, once after a fresh start that dropped a conversation: the stored account of it (`readHandover`). The row keeps it
+ *      until the launch that was handed the message reports `init` (the session empties it then, `handoverInFlight`/`releaseHandover`);
+ *      meanwhile at most one message carries it, and a launch that ends first leaves it for the next one;
+ *   3. `<cut>`, owed once after he cut her off (`oweCut`, set by the companion's speech cut);
+ *   4. `<sessions>`, on a wake, then only when its text differs from the last one sent;
+ *   5. `<view>`, on the same rule;
+ *   6. the body — an `<operator>`, one or more `<alert>`s, or a `<session>`;
+ *   7. `<register>`, read from his settings EVERY time: he edits it, so it is never stale. The sounds it lists are
  *      the account's sound-tag list, read at the same moment.
  * The roster and the view are compared by their TEXT, not by the envelope: `<sessions at="HH:MM">`
  * carries the clock, which changes every minute whether or not a chat did. A message pushed to a
@@ -24,11 +27,12 @@ import { fillRegister } from './companion-prompt.js';
 
 /**
  * What the assembler reads at push time: his settings (the register is filled from them), the facts
- * `<state>` restates, the roster body, the chat on his screen and the sounds she may make. Each is read when a
+ * `<state>` restates, the roster body, the chat on his screen, the sounds she may make and the handover she is owed. Each is read when a
  * message is assembled and never earlier, so what she is told is how things stand as it reaches her.
  * `readSoundTags` is the account's one sound-tag list: the register teaches exactly the list the parse keeps
- * (the turn tracker reads the same reader when a turn begins). Consumed by `companion-session-types.ts`,
- * whose `CompanionSessionDeps` carries the five.
+ * (the turn tracker reads the same reader when a turn begins). `readHandover` is the stored account of a dropped conversation (`null`
+ * for none), kept on her row until the launch that was handed it is up (`companion-session.ts` empties it). Consumed by
+ * `companion-session-types.ts`, whose `CompanionSessionDeps` carries the six.
  */
 export type MessageReaders = {
   readSettings(): CompanionSettings;
@@ -36,6 +40,7 @@ export type MessageReaders = {
   readRoster(): string;
   readView(): Pick<CompanionSessionRef, 'sessionId' | 'name'> | null;
   readSoundTags(): readonly string[];
+  readHandover(): string | null;
 };
 
 /** What `createMessageAssembler` answers; the session holds one per account. */
@@ -48,6 +53,10 @@ type MessageAssembler = {
   owedCut(): { heard: string; interrupted: string } | null;
   /** The text of one message: the owed parts, the roster and view when due, `body`, and the register. */
   assemble(body: string, woke: boolean): string;
+  /** Is a message that carries the stored handover out with a launch that has not reported `init` yet? */
+  handoverInFlight(): boolean;
+  /** The in-flight handover is no longer in flight: the launch that had it is up (the caller empties the row) or is gone (the row keeps it, and the next message carries it). */
+  releaseHandover(): void;
   /** Her conversation was cleared: nothing is owed and nothing is remembered as sent. */
   forget(): void;
 };
@@ -59,6 +68,8 @@ export function createMessageAssembler(readers: MessageReaders, now: () => Date 
   let cutOwed: { heard: string; interrupted: string } | null = null;
   let lastRoster: string | null = null;
   let lastView: string | null = null;
+  // The stored handover a message has carried to a launch that has not confirmed it: no second message carries the same text meanwhile.
+  let handoverCarried: string | null = null;
 
   return {
     oweState() {
@@ -75,23 +86,33 @@ export function createMessageAssembler(readers: MessageReaders, now: () => Date 
       // `<state>` is empty when nothing is held; an owed state with nothing to say sends nothing.
       const state = stateOwed ? stateEnvelope(readers.readState()) : '';
       if (state !== '') parts.push(state);
+      // Read at every assembly, carried by one message until the launch confirms it: a launch that dies first leaves it for the next one.
+      const stored = readers.readHandover();
+      const handover = stored !== null && stored.trim() !== '' && stored !== handoverCarried ? stored : null;
+      if (handover !== null) parts.push(handoverEnvelope(handover));
       if (cutOwed !== null) parts.push(cutEnvelope(cutOwed.heard, cutOwed.interrupted));
       const roster = readers.readRoster();
       if (woke || roster !== lastRoster) parts.push(sessionsEnvelope(now(), roster));
       const view = viewEnvelope(readers.readView());
       if (woke || view !== lastView) parts.push(view);
       parts.push(body, registerEnvelope(fillRegister(readers.readSettings(), readers.readSoundTags())));
+      if (handover !== null) handoverCarried = handover;
       stateOwed = false;
       cutOwed = null;
       lastRoster = roster;
       lastView = view;
       return parts.join('\n');
     },
+    handoverInFlight: () => handoverCarried !== null,
+    releaseHandover() {
+      handoverCarried = null;
+    },
     forget() {
       stateOwed = false;
       cutOwed = null;
       lastRoster = null;
       lastView = null;
+      handoverCarried = null;
     },
   };
 }

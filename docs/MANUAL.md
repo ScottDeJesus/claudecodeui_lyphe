@@ -13595,6 +13595,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dactyls-
 - Takes the last stdout line as JSON; `model`, `effort`, `why` strings, `ready` boolean, `cli` object `{path, size, mtime_ns, version}` — any field missing or mistyped = `null` whole, logged `summarize --status failed: <cause>`.
 - `null` = "could not ask": never off, never `ready: false`.
 - On while `ready` is false = armed, not broken: chats compact as before until the CLI can serve the summarizer's model.
+- The companion's fresh-start handover (MAN-9211) reads neither the switch nor the readiness cache: it calls the verb itself, and a verb that is not ready (exit 3) is a failed handover.
 
 ## The client
 - `api.settings.customCompactionSwitch()` / `saveCustomCompactionSwitch({ enabled })` (`src/shared/api.ts`), after the Dactyls pair.

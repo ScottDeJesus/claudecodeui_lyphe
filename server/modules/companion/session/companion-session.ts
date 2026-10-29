@@ -9,10 +9,14 @@ import type { UnansweredMessage } from '../companion-unanswered.js';
 import { emptyPressEnvelope, operatorEnvelope } from './companion-envelopes.js';
 import { failureSentence, readLoopEvent, type CompanionLoopEvent } from './companion-events.js';
 import { resumableSessionId, unexpectedTools } from './companion-launch.js';
+import { createHandoverGate } from './companion-handover-gate.js';
 import { createLedger, type Sent, type StopSource } from './companion-ledger.js';
 import { createMessageAssembler } from './companion-message.js';
 import { answeredWithin, CLI_GRACE_MS, launchCompanionCli, type CompanionCli } from './companion-process.js';
+import { fillSystemPrompt } from './companion-prompt.js';
+import { createRefusal } from './companion-refusal.js';
 import type { CompanionSession, CompanionSessionDeps } from './companion-session-types.js';
+import { sessionShapeOf } from './companion-shape.js';
 import { createTurnTracker } from './companion-turns.js';
 import { guarded } from './guarded-callback.js';
 
@@ -24,7 +28,13 @@ import { guarded } from './guarded-callback.js';
  * answer is `companion-ledger.ts`.
  *
  * ASLEEP until a push wakes it (`waking`, then `awake` at the launch's first `init`); her CLI session id is
- * stored at `init` and every later launch passes it as `resume`. A resume the CLI refuses clears the
+ * stored at `init`, with the shape of her tools and prompt the launch had (`companion-shape.ts`), and every later launch passes the id as
+ * `resume` — when the stored shape is the launch's own. The CLI records a conversation's tools and prompt once and keeps them on every
+ * resume, so a conversation begun with other ones would go on with them: a held id with another shape, or with none (it began before
+ * shapes were kept), is not resumed. It is forgotten, one system line says so, the state is owed to her, and she launches fresh (her
+ * memory is the docstore's). When the thread of that conversation is on disk, a HANDOVER of it is written first (`companion-refusal.ts`,
+ * `companion-handover.ts`: the summarizer, up to a bound) and her first message after the fresh start carries it once as `<handover>`;
+ * the wake waits for it, every push behind it parked in order (`companion-handover-gate.ts`). A resume the CLI refuses clears the
  * stored id, writes one system line and launches once more without it, carrying the messages that were
  * waiting. Every other failure sets the process `failed` with a sentence and a system line — her own
  * failures are shown, never spoken (ruling 17) — and the next push launches again. Nothing polls.
@@ -46,8 +56,11 @@ import { guarded } from './guarded-callback.js';
  * Consumers: `companion-account.ts` (one session per account, behind the routes and the feeds) and the voice.
  */
 
-/** One launch and what the conversation has learned of it: whether its first `init` has been seen (the process is up), whether the CLI refused its `resume`, and whether it holds a message yet (a `warm` launch does not). */
-type Launch = { cli: CompanionCli; initSeen: boolean; resumeRefused: boolean; messaged: boolean };
+/** What a launch begins with: the CLI conversation it continues (`null` for a fresh one), the `tools` it is handed and the `shape` of those tools and her prompt, which is stored with the session id its `init` reports. The shape is taken from the very tools the launch gets. */
+type LaunchPlan = { resume: string | null; tools: CompanionSessionDeps['tools']; shape: string };
+
+/** One launch and what the conversation has learned of it: the shape it was launched with, whether its first `init` has been seen (the process is up), whether the CLI refused its `resume`, and whether it holds a message yet (a `warm` launch does not). */
+type Launch = { cli: CompanionCli; shape: string; initSeen: boolean; resumeRefused: boolean; messaged: boolean };
 
 /** A stop whose turn has not yet reported its result: the launch concerned, a promise that settles when the wait is over and the way to settle it. */
 type Stop = { launch: Launch; over: Promise<void>; end(): void };
@@ -62,7 +75,8 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   const launchCli = deps.launch ?? launchCompanionCli;
   const onProcess = guarded('process', userId, deps.onProcess);
   const onSystemLine = guarded('system line', userId, deps.onSystemLine);
-  const writeProviderSessionId = guarded('session id writer', userId, deps.writeProviderSessionId);
+  const writeProviderSession = guarded('session writer', userId, deps.writeProviderSession);
+  const dropHandover = guarded('handover drop', userId, deps.dropHandover);
   const turns = createTurnTracker(
     {
       onSentence: guarded('sentence', userId, deps.onSentence),
@@ -115,8 +129,9 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   function fail(launch: Launch, sentence: string): void {
     console.error(`[Companion] account ${userId}: ${sentence}`);
     retire(launch);
-    // A message that makes her fail must not be sent again to fail again.
+    // A message that makes her fail must not be sent again to fail again; one that carried the handover takes it with it, so the row keeps it for the next.
     ledger.fail();
+    assembler.releaseHandover();
     turns.release('failed', sentence);
     setCondition({ state: 'failed', error: sentence });
     onSystemLine(sentence);
@@ -129,13 +144,26 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       fail(launch, `Her session held tools it should not have (${strangers.join(', ')}), so it was not run.`);
       return;
     }
-    if (deps.readProviderSessionId() !== event.sessionId) writeProviderSessionId(event.sessionId);
+    const held = deps.readProviderSession();
+    if (held?.id !== event.sessionId || held.shape !== launch.shape) writeProviderSession({ id: event.sessionId, shape: launch.shape });
     if (launch.initSeen) return;
     launch.initSeen = true;
+    handoverReceived();
     setCondition({ state: 'awake', error: null });
     console.log(
       `[Companion] account ${userId}: ${launch.cli.resume ? 'resumed' : 'started'} session ${event.sessionId} on ${event.model}; the CLI listed ${event.tools.length} tools, all hers${event.tools.length > 0 ? ` (${event.tools.join(', ')})` : ''}`
     );
+  }
+
+  /**
+   * A launch that is up has been handed the message that carried the handover (`init` is the CLI taking its first one; a message given to a
+   * launch already up counts the same): the row is emptied, so no later message carries it. Until then the row keeps it, and a launch that
+   * fails or is detached first (`releaseHandover`) leaves it for the next message, as `<state>` is.
+   */
+  function handoverReceived(): void {
+    if (!assembler.handoverInFlight()) return;
+    assembler.releaseHandover();
+    dropHandover();
   }
 
   /** The same message under a new uuid, for the CLI that is to be told it again. His words are assembled afresh (the roster and the view in the old message are a snapshot); a message that cannot be goes as it was. */
@@ -158,6 +186,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     if (live === null) return;
     live.cli.push(sent.message);
     live.messaged = true;
+    if (live.initSeen) handoverReceived();
   }
 
   /** The wait is over: `first` (messages to say again) is given to the CLI, then the words held behind the stop, in the order they were pushed. */
@@ -209,9 +238,9 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   }
 
   /** The messages `carried` are the first of a new launch: each joins the turn in flight or starts one. */
-  function startWith(carried: Sent[], resume: string | null): void {
+  function startWith(carried: Sent[], plan: LaunchPlan): void {
     for (const sent of carried) turns.admit(sent.uuid);
-    live = open(carried.map((sent) => sent.message), resume);
+    live = open(carried.map((sent) => sent.message), plan);
   }
 
   /** The launch ended on its own: a refused resume is replaced by a fresh launch, anything else is a failure. */
@@ -221,25 +250,26 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     if (resume !== null && (launch.resumeRefused || (reason !== null && /No conversation found/i.test(reason)))) {
       console.warn(`[Companion] account ${userId}: the CLI has no conversation ${resume}; she starts fresh`);
       retire(launch);
-      writeProviderSessionId(null);
+      writeProviderSession(null);
       onSystemLine('Her conversation could not be resumed; she starts fresh');
       // The focus, the draft and the walk lived in the conversation that is gone; the next message restates them.
       assembler.oweState();
-      startWith(ledger.carry(), null);
+      startWith(ledger.carry(), planWith(null));
       return;
     }
     fail(launch, reason === null ? 'Her process ended without being asked to.' : failureSentence('Her process stopped', reason));
   }
 
   /** Starts a launch with `initial` already queued; she is `waking` until its first `init`. */
-  function open(initial: Array<Sent['message']>, resume: string | null): Launch {
+  function open(initial: Array<Sent['message']>, plan: LaunchPlan): Launch {
     const launch: Launch = {
+      shape: plan.shape,
       cli: launchCli({
         userId,
         initial,
-        resume,
+        resume: plan.resume,
         readSettings: deps.readSettings,
-        tools: deps.tools,
+        tools: plan.tools,
         // A turn in flight is the only busy there is: she has no background task and no watcher.
         isBusy: () => turns.turnId !== null,
         // A launch that has been detached (closed, cleared, replaced) is drained unheard: its late words are nobody's turn.
@@ -272,6 +302,8 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     live = null;
     closeStop();
     ledger.handOff();
+    // What was in the launch is assembled afresh for the next one, so a handover it carried is still owed.
+    assembler.releaseHandover();
     turns.release('stopped', null);
     setCondition({ state: 'asleep', error: null });
     return ending;
@@ -279,16 +311,61 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
 
   /** Ends the input and the process, waits for it to wind down, and leaves her asleep. */
   async function closeProcess(reason: string): Promise<void> {
+    // A handover still being written is stopped with the process: his parked words are in the ledger for the next one.
+    if (gate.abandon() && live === null) setCondition({ state: 'asleep', error: null });
     await detach(reason)?.cli.close();
   }
 
-  /** The CLI conversation a new launch continues: the held id when it is a UUID, else none (she starts fresh, and it is said). */
-  function resumeForLaunch(): string | null {
-    const held = deps.readProviderSessionId();
-    const resume = resumableSessionId(held);
-    if (held !== null && resume === null) console.warn(`[Companion] account ${userId}: the held session id is not a UUID; she starts fresh`);
-    return resume;
+  /** A launch made now that continues `resume`: her tools as they stand, and the shape of those and her system prompt as the launch will fill it with the operator's name. */
+  function planWith(resume: string | null): LaunchPlan {
+    const tools = deps.tools;
+    return { resume, tools, shape: sessionShapeOf(tools, fillSystemPrompt(deps.readSettings().operatorName)) };
   }
+
+  /**
+   * What a new launch begins with. The held conversation is continued only when the shape stored with it is this launch's own AND its id is
+   * a UUID: the CLI records a conversation's tools and prompt once and keeps them on every resume, so a conversation begun with other ones
+   * would go on with them (a parameter added to a tool, a sentence changed in her prompt: dark to her). A held conversation whose shape is
+   * not the launch's (changed, or never kept) is forgotten at once and said once on her panel, whatever its id looks like: a damaged id with
+   * a stale shape is one refusal, one sentence. Her memory is the docstore's and is not touched. A wake that finds such a conversation with a
+   * thread on disk never reaches here before the refusal is carried out WITH its handover (`gate.holding()` in `push`, `warm` and the
+   * replacement after an unanswered Stop); what reaches here is the bare refusal, for a conversation with no thread to hand over.
+   *
+   * EVERY FRESH START OWES THE STATE, not only a refusal: the focus, the draft and the walk lived in a conversation she no longer has. The
+   * debt is also paid here when nothing is held, because a refusal forgets the old id before the fresh launch's `init` and a restart in
+   * between finds no id; with nothing held the owed state is empty and sends nothing. Called before the next message is assembled, so that
+   * message restates it.
+   */
+  function planLaunch(): LaunchPlan {
+    const fresh = planWith(null);
+    const held = deps.readProviderSession();
+    if (held !== null && held.shape !== fresh.shape) {
+      // Reached with no thread to hand over (a wake with one is refused with its handover first, and the id is already forgotten).
+      refusal.bare(held);
+    } else if (held !== null) {
+      const resume = resumableSessionId(held.id);
+      if (resume !== null) return { ...fresh, resume };
+      console.warn(`[Companion] account ${userId}: the held session id is not a UUID; she starts fresh`);
+    }
+    assembler.oweState();
+    return fresh;
+  }
+
+  const refusal = createRefusal(userId, deps, {
+    currentShape: () => planWith(null).shape,
+    forget: () => writeProviderSession(null),
+    say: onSystemLine,
+  });
+
+  /** A wake waits behind the handover being written: `condition` says she is waking; when nothing is left parked and no launch came of it she is asleep again. */
+  const gate = createHandoverGate(userId, {
+    refused: refusal.withThread,
+    settle: refusal.withHandover,
+    onStart: () => setCondition({ state: 'waking', error: null }),
+    onEnd: () => {
+      if (live === null) setCondition({ state: 'asleep', error: null });
+    },
+  });
 
   /** Says to her again what her last process was given and never answered, each as a fresh message that replaces its entry: a restart storm leaves one entry and gets one answer. */
   function resendUnanswered(): void {
@@ -311,10 +388,16 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
    * `replacing` is the stored entry a re-sent message stands for.
    */
   function push(body: string, words: Sent['words'], replacing?: UnansweredMessage): void {
+    // A wake onto a conversation she is about to drop waits for its handover. His words are on disk meanwhile (kept as an inherited entry the replayed push replaces).
+    if (live === null && gate.holding()) {
+      const kept = words !== null && replacing === undefined ? ledger.keep(words) : replacing;
+      gate.park(() => push(body, words, kept));
+      return;
+    }
     // A process started ahead of its first message (`warm`) is woken for that message's sake: it carries the roster and the view like any wake.
     const woke = live === null || !live.messaged;
     // Read and assembled before anything is started, so a reader that throws leaves no half-woken process or turn behind.
-    const resume = live === null ? resumeForLaunch() : null;
+    const plan = live === null ? planLaunch() : null;
     // A message said again opens with the cut it first opened with, unless a newer cut is owed; the cut that rides is kept with his words.
     if (words?.cut !== undefined && assembler.owedCut() === null) assembler.oweCut(words.cut.heard, words.cut.interrupted);
     const cut = words === null ? null : assembler.owedCut();
@@ -334,11 +417,12 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     }
     ledger.give(sent, replacing);
     turns.admit(uuid);
-    if (live === null) {
-      live = open([sent.message], resume);
-    } else {
+    if (plan !== null) {
+      live = open([sent.message], plan);
+    } else if (live !== null) {
       live.cli.push(sent.message);
       live.messaged = true;
+      if (live.initSeen) handoverReceived();
     }
   }
 
@@ -349,7 +433,9 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
 
   /** Starts her process if it is closed, with nothing in it: the idle closer is armed with the launch, so a message that never comes costs a process until the window ends. */
   function warm(): void {
-    if (live === null) live = open([], resumeForLaunch());
+    if (live !== null) return;
+    if (gate.holding()) gate.park(warm);
+    else live = open([], planLaunch());
   }
 
   /** A stop starts: a push is held until the stopped turn's result is in. */
@@ -384,7 +470,8 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       turns.release('stopped', null);
       const carried = ledger.carry();
       if (carried.length === 0) setCondition({ state: 'asleep', error: null });
-      else startWith(carried, resumeForLaunch());
+      else if (gate.holding()) gate.park(() => startWith(carried, planLaunch()));
+      else startWith(carried, planLaunch());
       return;
     }
     // Messages still queued behind the stopped turn run as a turn of their own, and are not part of what was stopped.
@@ -422,7 +509,9 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     async clear() {
       // She forgets before anything is awaited and the old launch is detached at once: a push that lands
       // while it winds down is a wake into a fresh conversation, never a resume of the one being cleared.
-      writeProviderSessionId(null);
+      writeProviderSession(null);
+      dropHandover();
+      gate.abandon();
       assembler.forget();
       const ending = detach('cleared');
       ledger.forgetAll();

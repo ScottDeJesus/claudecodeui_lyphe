@@ -8,6 +8,7 @@ import { createSpeechCache, type SpeechCache } from './companion-speech-cache.js
 import { createCompanionStore, type CompanionStore } from './companion-store.js';
 import { readCompanionSettings } from './companion-settings.js';
 import type { CompanionHouse } from './house.js';
+import { lastWordsOf } from './session/companion-handover.js';
 import { createCompanionSession } from './session/companion-session.js';
 import type { CompanionSession } from './session/companion-session-types.js';
 import { IDLE_ACTIVITY } from './session/companion-turns.js';
@@ -90,8 +91,17 @@ export function createCompanionAccount(userId: number, runtime: ProviderRuntimeG
     readView: () => viewedChat(userId),
     // The voice settings hold the one sound-tag list: the parse of her turns and the register she is taught both read it from here.
     readSoundTags: () => readVoiceSettings(userId).gemini.soundTags,
-    readProviderSessionId: () => store.readState().providerSessionId,
-    writeProviderSessionId: (id) => store.setProviderSessionId(id),
+    readProviderSession: () => {
+      const { providerSessionId, sessionShape } = store.readState();
+      return providerSessionId === null ? null : { id: providerSessionId, shape: sessionShape };
+    },
+    writeProviderSession: (session) => store.setProviderSession(session?.id ?? null, session?.shape ?? null),
+    // The handover of a conversation her refused resume drops: on her row until the launch that was handed the first message after the fresh start (the one that carries it) reports `init`.
+    readHandover: () => store.readHandover(),
+    writeHandover: (text) => store.setHandover(text),
+    dropHandover: () => store.setHandover(null),
+    // The newest exchange of her log: the summarizer of the handover is not shown it. A window of the newest 80 lines holds her last turn and what it answered.
+    readLastWords: () => lastWordsOf(store.readLog(80)),
     // His words no turn has answered: the next process says them to her again (`session/companion-ledger.ts`). No frame goes to a page.
     readUnanswered: () => store.readUnanswered(),
     writeUnanswered: (unanswered) => store.setUnanswered(unanswered),

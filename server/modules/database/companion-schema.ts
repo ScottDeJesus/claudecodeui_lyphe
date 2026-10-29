@@ -23,7 +23,11 @@
  * `companion_state.pending_json`, beside the draft: a column added after the table, by
  * `addCompanionPendingColumn` in `migrations.ts`. So is `companion_state.unanswered_json`, the words of
  * his that no turn of hers has answered yet (`addCompanionUnansweredColumn`): the next process says
- * them to her again. So is `companion_state.memory_forget_line` (`addCompanionMemoryForgetLineColumn`),
+ * them to her again. So is `companion_state.session_shape` (`addCompanionSessionShapeColumn`), the fingerprint of her tools and
+ * prompt as the conversation in `provider_session_id` began with them: written with the id, nulled with it, and compared with the
+ * launch's own before the conversation is resumed. So is `companion_state.handover` (`addCompanionHandoverColumn`), the short account of
+ * the conversation that refusal dropped: written before the fresh start, carried once by the first message after it, then emptied when the launch that was handed that message reports `init`.
+ * So is `companion_state.memory_forget_line` (`addCompanionMemoryForgetLineColumn`),
  * the id of the log line of his that the last forget of her memory used; Clear leaves it. And `companion_actions.armed_from`
  * (`addCompanionActionArmedFromColumn`).
  *

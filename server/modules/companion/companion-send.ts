@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { projectsDb, relayedSendsDb, sessionsDb } from '@/modules/database/index.js';
-import { diagnoseProjectFolder, readAccountDefaultModelAlias, sessionsService } from '@/modules/providers/index.js';
+import { CLAUDE_MODEL_VALUE_BY_ALIAS, diagnoseProjectFolder, readAccountDefaultModelAlias, sessionsService } from '@/modules/providers/index.js';
 import type { ClaudeModelAlias } from '@/modules/providers/index.js';
 import { broadcastSessionUpserted, chatRunRegistry, runDetachedChatTurn, steerChatRun } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
@@ -38,6 +38,9 @@ import { sendOptionsFor, type ChatSendOptions } from './tools/send-options.js';
  *     after it finishes: the sentence says "sent", never that the turn was changed. A fold that finds no turn to fold
  *     into (it ended in the instant between) runs as a turn instead;
  *   - a steer to an idle chat starts a turn. The sentence says which of the two happened.
+ * A STARTED ANSWER ALWAYS NAMES THE MODEL the turn was handed, so what she tells him is what ran: "…, on opus" when she gave it, "…, on
+ * fable, the account default" for a new chat she left it to, "…, on sonnet, its own" for an existing chat that keeps the one it has. A chat
+ * that records no model and was given none names none: the runtime's own default is not known here, and the sentence does not guess it.
  * Every send is recorded in `relayed_sends`, and its echo is a user text row `local_kaylee_<uuid>` marked
  * `spokenVia: 'kaylee'`, which the page swaps for the persisted row (marked again by the history read). A TURN
  * stamps its own uuid on its message (`runDetachedChatTurn`'s `messageUuid`), which the CLI keeps as the transcript
@@ -74,6 +77,19 @@ export type DraftSendOutcome = { outcome: 'started' | 'folded' | 'refused'; sent
 export type DraftSender = (request: DraftSendRequest) => Promise<DraftSendOutcome>;
 
 const refused = (sentence: string): DraftSendOutcome => ({ outcome: 'refused', sentence });
+
+/** Whose choice the model a turn was handed is: hers for this turn, the account's default (a new chat she left it to), or the chat's own stored one. */
+type ModelSource = 'chosen' | 'account default' | 'own';
+
+/**
+ * The clause a started answer ends with, naming `handed` (the model value the run was given, `undefined` for none): the house's name for it
+ * when the table has one (`opus[1m]` is "opus"), the value itself otherwise. Empty when the run was handed none.
+ */
+function modelClause(handed: string | undefined, source: ModelSource): string {
+  if (!handed) return '';
+  const name = Object.entries(CLAUDE_MODEL_VALUE_BY_ALIAS).find(([, value]) => value === handed)?.[0] ?? handed;
+  return source === 'chosen' ? `, on ${name}` : `, on ${name}, ${source === 'own' ? 'its own' : 'the account default'}`;
+}
 
 /** How much of the draft a refusal quotes: enough to tell which draft it is, not the whole brief. */
 const QUOTED_CHARACTERS = 160;
@@ -186,12 +202,13 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
       }
     }
 
-    const started = await startTurn(chat.sessionId, provider, words, sendOptionsFor(userId, chat.sessionId, provider, { model }));
+    const options = sendOptionsFor(userId, chat.sessionId, provider, { model });
+    const started = await startTurn(chat.sessionId, provider, words, options);
     if (!started.started) {
       return refused(`"${name}" did not take the brief${started.error ? `: ${started.error}` : ''} The draft is still on his screen; send it again in a moment.`);
     }
     afterSend(current, draft);
-    const onModel = model === undefined ? '' : `, on ${model}`;
+    const onModel = modelClause(options.model, model === undefined ? 'own' : 'chosen');
     return { outcome: 'started', sentence: mode === 'steer' ? `${name} was not working, so the brief started a new turn there${onModel}.` : `Started a new turn in ${name}${onModel}.` };
   }
 
@@ -222,7 +239,7 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
     }
     const name = title ?? created.sessionName;
     afterSend({ sessionId: created.sessionId, name, project: target.projectName }, draft);
-    return { outcome: 'started', sentence: `Started a new chat "${name}" in ${target.projectName}${model === undefined ? '' : `, on ${model}`}.` };
+    return { outcome: 'started', sentence: `Started a new chat "${name}" in ${target.projectName}${modelClause(options.model, chosen === undefined ? 'account default' : 'chosen')}.` };
   }
 
   // The draft goes out once: she calls tools in parallel and two pages can press Send, and a second call that read the

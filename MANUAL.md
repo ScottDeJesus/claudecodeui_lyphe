@@ -2505,7 +2505,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-words
 2. Guard `waitUntilQuiet`. Manual waits, subscribed to `activityChanged` BEFORE its first read (no timer, no poll), re-saying `Compaction waits until <why> — Stop cancels it` as the reason moves. Automatic never waits: busy → logged `left alone: the chat is busy (<why>)`, `complete` exit 0.
 3. Fresh `summarizerStatus()` → `noteSummarizerStatus`. Not ready → `refusedByReadiness`. Else status frame `Compacting with <model> · <effort>…`.
 4. `fireCompactHealTrigger`: `python3 ~/.claude/hooks/heal_trigger.py --reason compact`, the CLI's PreCompact payload with the OLD session id and transcript, 10 s bound, a failure is one log line. It fires before the verb: a refused or failed attempt fires it too.
-5. `runSummarizeVerb`: `~/.claude/scripts/summarize --transcript <path> --session <id> [--instructions -]`; 60-minute ceiling; SIGTERM, SIGKILL after 15 s; stdout cap 64 MiB. Only `signalOwnChild` signals, and only a plain pid above 1 of a child not yet exited. Its answer:
+5. `runSummarizeVerb`: `~/.claude/scripts/summarize --transcript <path> --session <id> [--instructions -]`; 60-minute ceiling; SIGTERM, SIGKILL after 15 s; stdout cap 64 MiB. Only `signalOwnChild` signals, and only a plain pid above 1 of a child not yet exited. It takes an optional `env` beside `userFacingEnv()`; a compaction sets none. Its second caller, `summarizeTranscript` (`compaction-oneshot.ts`, MAN-8338), sets `SUMMARIZE_TAIL_TOKENS=0` and reads `summary`, not `seed`. Its answer:
 
 | answer | do |
 |---|---|
@@ -2523,6 +2523,11 @@ Every non-success answer except exit 3 logs `the summarizer ended without a summ
    - `unswapCompactedSession` (records the seed `compaction-abandoned`) when the swap was written; a swap that failed parks the unclaimed seed as superseded.
    - error frame, `complete` exit 1, push (step 9).
 9. The push for an automatic failure: §"The failure push".
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-facts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-guard.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-procedure.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-seed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-indexer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-whole.sh
+
+## MAN-9215 — modules/compaction procedure — one run, the steps with the seed append (step 7) — `refusedByReadiness`: `noteVerbNotReady`, `refuseAutomatic`, then one `logDecision` line. Manual →
+section: modules/compaction procedure — one run, the steps with the seed append (step 7), Stop by phase, automatic refusals and the failure push/001 `refusedByReadiness`: `noteVerbNotReady`, `refuseAutomatic`, then one `logDecision` line. Manual →
 
 `refusedByReadiness`: `noteVerbNotReady`, `refuseAutomatic`, then one `logDecision` line. Manual → logged `handed to the CLI: the summarizer is not ready (<why>)`, status `Custom compaction is not ready (<why>); the CLI compacts this chat instead.`, then `inner.run('/compact', …)` on the same run and writer. Automatic → logged `left alone: the summarizer is not ready (<why>)`, `complete` exit 0.
 
@@ -2555,7 +2560,11 @@ Code `compaction.failed`, `kind: 'error'`, `severity: 'error'`, `meta {trigger, 
 - The driver presses Compact in the composer's usage panel: typed `/compact` + Enter picks a built-in from the command palette.
 - Exposure (stated, not observed): a probe server booted with the switch on re-adopts the live keepalive hosts of real chats; a real chat past its fraction would be compacted at its turn end.
 
-## The whole run — `.verify/custom-compaction-whole.sh`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-facts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-guard.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-procedure.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-seed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-indexer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-whole.sh
+
+## MAN-9216 — modules/compaction procedure — one run, the steps with the seed append (step 7) — The whole run — `.verify/custom-compaction-whole.sh`
+section: modules/compaction procedure — one run, the steps with the seed append (step 7), Stop by phase, automatic refusals and the failure push/002 The whole run — `.verify/custom-compaction-whole.sh`
+
 `bash .verify/custom-compaction-whole.sh` (gitignored): one scratch flag reading `on` (the operator's flag is never written), a scratch Vite on :5291, four probe-server boots with `SUMMARIZE_TAIL_TOKENS=50`, evidence in `/tmp/custom-compaction-whole.*`. Exit 0 = every gate held. A held :7893 or :5291 (another run, `compaction-handover-whole.sh` uses both) exits 1 with nothing started. why: the exit trap stops the server by pid file and would stop the other run's.
 
 | leg | boot env | proves |
@@ -2686,7 +2695,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-t
 
 ## MAN-8067 — modules/compaction wiring — the decorator and the options it owns (`transcriptAppend`, `compactionSeed`), what takes a chat over, the files and shutdown
 
-`server/modules/compaction/` replaces the CLI's compaction of a Claude chat with the launch table's `[summarizer]` compaction (`~/.claude/scripts/summarize`) while the switch (MAN-8061) reads on and the summarizer is ready. Off or not ready: no compaction is taken over and the CLI compacts as before. The decorator's two options-level acts do not read the switch: it removes `transcriptAppend` and `compactionSeed` from every Claude run, and gives a start-over in a chat that has a stored seed that seed again (see "The options this module owns on a Claude run"). Barrel exports: `withChatCompaction`, `stopChatCompaction`. Only `server/index.ts` imports the module; the module reaches settings, providers, websocket, database and notifications through their barrels only. The Claude runtime knows the module only through `ChatCompactionHooks` (MAN-8055). The record and swap are `sessionCompactionsDb` (MAN-8046); history and the marker are MAN-8054 and MAN-8060. Triggers: MAN-8066. One run: MAN-8065.
+`server/modules/compaction/` replaces the CLI's compaction of a Claude chat with the launch table's `[summarizer]` compaction (`~/.claude/scripts/summarize`) while the switch (MAN-8061) reads on and the summarizer is ready. Off or not ready: no compaction is taken over and the CLI compacts as before. The decorator's two options-level acts do not read the switch: it removes `transcriptAppend` and `compactionSeed` from every Claude run, and gives a start-over in a chat that has a stored seed that seed again (see "The options this module owns on a Claude run"). Barrel exports: `withChatCompaction`, `stopChatCompaction` and `summarizeTranscript` (the summarizer verb for a caller that is not a chat compaction: the companion's fresh-start handover, MAN-9211). Only `server/index.ts` (the first two) and `companion/session/companion-handover.ts` (the third) import the module; the module reaches settings, providers, websocket, database and notifications through their barrels only. The Claude runtime knows the module only through `ChatCompactionHooks` (MAN-8055). The record and swap are `sessionCompactionsDb` (MAN-8046); history and the marker are MAN-8054 and MAN-8060. Triggers: MAN-8066. One run: MAN-8065.
 
 ## What stays of the CLI's own compaction
 Who writes the summary: `~/.claude/scripts/summarize`, on the launch table's `[summarizer]` model and effort (read at the call, MAN-7407; edited in Edit Agent Chains, MAN-7417). The chat keeps its own model and effort: the seed append rides the triggering turn's send options.
@@ -2722,7 +2731,8 @@ section: modules/compaction wiring — the decorator and the options it owns (`t
 | `node-task-ledger.ts` | `taskLedgerUnlisted(appSessionId)`: the chat's node's last list holds its host with `liveTasks === null`; read by `takesOver`, the turn-end test and the decorator's `/compact` |
 | `compaction-registry.ts` | flights, activity listeners, automatic refusals, last turn contexts, `forgetSession` |
 | `compaction-guard.ts` | `waitUntilQuiet` |
-| `compaction-children.ts` | the only spawns: `runSummarizeVerb`, `fireCompactHealTrigger` |
+| `compaction-children.ts` | the only spawns: `runSummarizeVerb` (optional `env`: variables set for that one call beside `userFacingEnv()`), `fireCompactHealTrigger` |
+| `compaction-oneshot.ts` | `summarizeTranscript` (barrel): the verb for a caller that is not a chat compaction, through `runSummarizeVerb` and `compaction-facts.ts`. One transcript and the caller's `instructions` in, the verb's `summary` out (never its `seed`); sets `SUMMARIZE_TAIL_TOKENS=0`; waits at most the caller's `waitMs`, stops the verb on the limit or on an abort; never rejects. Exit 2 `nothing to compact yet` answers `nothingBefore`. No frame, row, seed or swap. Its one consumer: MAN-9211 |
 | `compaction-seed.ts` | `createSeedWriter`: the swap at the new session's announcement, the held `complete` |
 | `compaction-facts.ts` | `readVerbSuccess`, `verbFailureSentence`, `factsOf` |
 | `compaction-frames.ts` | the frames a run writes |
@@ -5469,7 +5479,7 @@ Refusals 3 to 5 name the draft: its target and its first 160 code points, on one
 
 - `folded` means pushed, not "the turn changed course": MAN-9068. The sentence says the brief is taken at the next tool step or runs as its own turn after the turn finishes.
 - A `steer` to an idle chat starts a turn; its sentence says so.
-- A `started` sentence ends `, on <model>` when `model` was given.
+- A `started` sentence names the model the run was handed (`modelClause` over `options.model` from `sendOptionsFor`; the house's alias when `CLAUDE_MODEL_VALUE_BY_ALIAS` has one for the value, so `opus[1m]` reads "opus"): `, on opus` when she gave `model`; `, on sonnet, its own` when she gave none and the chat's stored model was handed. A chat that records no model and was given none gets no clause: the runtime's own default is not known here.
 - Echo: a user text row `local_kaylee_<uuid>`, `spokenVia: 'kaylee'`; the page swaps it for the persisted row, which the history read marks again.
 - Every send is recorded: `relayedSendsDb.record(sessionId, 'turn' \| 'steer', words, messageUuid)`. `messageUuid` is the uuid the turn stamped on its message, which the CLI keeps as the transcript row's own; `null` for a steer and for a chat of another provider (only the Claude runtime reads `options.messageUuid`). The history mark follows that row by uuid, else by words (MAN-9084). A failed write is logged (`[Companion] a send could not be recorded…`) and never costs the send.
 
@@ -5478,7 +5488,7 @@ Refusals 3 to 5 name the draft: its target and its first 160 code points, on one
 2. `sessionsService.createAppSession('claude', projectPath, words, true)`: on the simple list, as the page's New chat makes one.
 3. With a title, `sessionsDb.updateSessionCustomName` alone: `name_given` stays 0, the namer may replace it (INV-9787).
 4. `broadcastSessionUpserted`; a failure is logged and the send goes on.
-5. `model = chosen ?? await readAccountDefaultModelAlias() ?? undefined`: named outright because a turn sent with no model runs on `CLAUDE_DEFAULT_MODEL` (`opus[1m]`, `claude-runtime.provider.js`), not on the account's default. Then `sendOptionsFor(userId, null, 'claude', { model, newChatName })` and the turn. A first message that did not start is a `refused` that says the chat exists. The `started` sentence ends `, on <model>` whenever a model was resolved.
+5. `model = chosen ?? await readAccountDefaultModelAlias() ?? undefined`: named outright because a turn sent with no model runs on `CLAUDE_DEFAULT_MODEL` (`opus[1m]`, `claude-runtime.provider.js`), not on the account's default. Then `sendOptionsFor(userId, null, 'claude', { model, newChatName })` and the turn. A first message that did not start is a `refused` that says the chat exists. The `started` sentence ends `, on <model>` when she chose it and `, on <model>, the account default` when she left it out.
 
 ## After a send
 - The draft clears only if `draft.updatedAt` is still the one that went: a rewrite made while the send was out is the next brief.
@@ -5529,7 +5539,7 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 | `cwd` | `companionWorkingDirectory(userId)` | below |
 | `env` | `{ ...userFacingEnv(), ...(await launchAccountEnv()).env }` | the account the house chose, on the subscription |
 | `pathToClaudeCodeExecutable` | `resolveClaudeCodeExecutablePath(CLAUDE_CLI_PATH)`; key absent when it does not resolve | |
-| `resume` | the held CLI session id; key ABSENT for a fresh launch, never empty | |
+| `resume` | the held CLI session id, only when the shape stored with it is the launch's own (MAN-9209); key ABSENT for a fresh launch, never empty | |
 
 - `persistSession` is left on: her conversation is a JSONL the next launch resumes.
 - `COMPANION_MCP_SERVER_NAME = 'companion'` is defined in `companion-launch.ts` and re-exported by `tools/companion-tools.ts`: one spelling.
@@ -5543,10 +5553,10 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 ## Persistence and resume
 | step | does |
 |---|---|
-| first `init` of a launch, and any `init` whose `session_id` differs from the held one | `writeProviderSessionId(id)` → `companion_state.provider_session_id` |
-| next launch | `resumeForLaunch()`: `resumableSessionId(held)` → `resume`; the conversation is the CLI's own JSONL |
-| server restart | nothing held in memory matters: her next message launches with `resume` and her conversation is back |
-| held id not UUID-shaped | `resumableSessionId` answers `null`; warn `[Companion] account <id>: the held session id is not a UUID; she starts fresh`. why: the CLI refuses a non-UUID with a plain failure, not "No conversation found", so it would fail every push for ever |
+| any `init` whose `session_id` or launch shape differs from the held pair (a launch's first) | `writeProviderSession({ id, shape })` → `companion_state.provider_session_id` + `session_shape`, one statement |
+| next launch | `planLaunch()`: the held pair's shape equals the launch's own AND `resumableSessionId(held.id)` answers an id → `resume`; the conversation is the CLI's own JSONL. A held shape that differs or is absent: refused, fresh start (MAN-9209) |
+| server restart | nothing held in memory matters: her next message launches with `resume` and her conversation is back, while her tools and prompt are unchanged |
+| held id not UUID-shaped, shape the launch's own | `resumableSessionId` answers `null`; warn `[Companion] account <id>: the held session id is not a UUID; she starts fresh`. why: the CLI refuses a non-UUID with a plain failure, not "No conversation found", so it would fail every push for ever |
 | held id the CLI has no conversation for | the refused-resume fallback: conversation row |
 | Clear | writes `null`; conversation row |
 
@@ -5554,7 +5564,7 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 - `createIdleCloser` of `server/shared/prompt-stream.ts` (MAN-9078 for its rules), `idleMs: resolveIdleCloseMs(undefined)`: `CLAUDE_CHAT_IDLE_CLOSE_MS` when set and ≥ 5 s, never above 2 h, else `DEFAULT_IDLE_CLOSE_MS` = 2 h.
 - The clock is silence since the last MESSAGE: `CompanionCli.push` calls `idle.touch()`. It is armed when the launch is created, so a `warm` launch that gets no message also closes after the window.
 - `isBusy` = a turn in flight (`turns.turnId !== null`); she has no background task and no watcher. Busy at the window: log `idle window reached after N min, but a turn is in flight; asking again in a minute`, re-asked every 60 s.
-- Closed idle: log `closing her idle process after N min without a message`, `onIdleClose` → the session's `closeProcess('idle')` → she is `asleep`. The conversation stays; the next push resumes it.
+- Closed idle: log `closing her idle process after N min without a message`, `onIdleClose` → the session's `closeProcess('idle')` → she is `asleep`. The conversation stays; the next push resumes it while her tools and prompt are unchanged (MAN-9209).
 
 ## `setModel` live
 | when | does |
@@ -5568,7 +5578,7 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 | verb | does |
 |---|---|
 | `push(message)` | queues the message, restarts the idle clock |
-| `interrupt()` | `conversation.interrupt()`, answer within 5 s → `{ stillQueued: string[] }`; silence or a failure → `'unanswered'` (the session then retires that launch and starts a replacement that resumes the held session id, carrying what was given and what was held: a CLI that ignores a Stop would ignore the next message; MAN-9169) |
+| `interrupt()` | `conversation.interrupt()`, answer within 5 s → `{ stillQueued: string[] }`; silence or a failure → `'unanswered'` (the session then retires that launch and starts a replacement that resumes the held session id through `planLaunch` (MAN-9209), carrying what was given and what was held: a CLI that ignores a Stop would ignore the next message; MAN-9169) |
 | `close()` | cancels the clock, `queue.end()` (EOF = wind down), waits up to 5 s for the loop, then `conversation.close()` |
 | `kill()` | cancels the clock, ends the queue, `conversation.close()` now |
 - Once ended by us (`close`, `kill`, the idle closer) the launch reports NOTHING more: its messages are drained unheard and `onEnded` fires only for a loop that ended by itself. The queue never ends on its own: why, in the prompt-stream row.
@@ -5580,7 +5590,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 
 ## MAN-9079 — server/modules/companion/session — her conversation: the process states, the loop's events, which result ends a turn, the refused resume, Clear and Stop
 
-`createCompanionSession(deps)` (`session/companion-session.ts`) is one account's live conversation; `companion-account.ts` builds it (MAN-9070). The session reads nothing itself: `CompanionSessionDeps` (`companion-session-types.ts`) hands it the readers (`MessageReaders`), the sinks (`TurnSink`) and the held CLI session id. Launch: MAN-9077. Message order: MAN-9080. Sentence stream: MAN-9081.
+`createCompanionSession(deps)` (`session/companion-session.ts`) is one account's live conversation; `companion-account.ts` builds it (MAN-9070). The session reads nothing itself: `CompanionSessionDeps` (`companion-session-types.ts`) hands it the readers (`MessageReaders`), the sinks (`TurnSink`) and the held conversation (`HeldSession`: the CLI session id and the shape of her tools and prompt it began with). Launch: MAN-9077. Shape and the refusal before a launch: MAN-9209. The handover of a thread she is made to drop: MAN-9210, MAN-9211. Message order: MAN-9080. Sentence stream: MAN-9081.
 
 ## `CompanionSession` surface
 | member | does |
@@ -5592,14 +5602,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 | `interrupt(by = 'operator')` | a stop of her turn: below. `by` is `'operator'` (his Stop `POST /interrupt`, the voice's cut) or `'server'` (`stopAll`) |
 | `setModel(model)` | `live?.cli.setModel`; MAN-9077 |
 | `clear()` | below |
-| `close(reason)` | `closeProcess`: detach, then `cli.close()` |
+| `close(reason)` | `closeProcess`: stops a handover being written (`gate.abandon()`), detach, then `cli.close()` |
 | `process`, `turnId` | the condition the panel shows; the turn in flight or `null` |
 
 ## Process states (`CompanionProcess`)
 | `state` | set when |
 |---|---|
 | `asleep` | start; `detach` (idle close, Clear, `close`) |
-| `waking` | a launch opens, until its first `init` |
+| `waking` | a launch opens, until its first `init`; also while a fresh-start handover is written, with no launch (`onStart`; MAN-9210) |
 | `awake` | the launch's first `init` passed the tool check; log `[Companion] account <id>: started\|resumed session <id> on <model>; the CLI listed N tools, all hers` |
 | `failed` | `fail(launch, sentence)`: tool check, a failed result, a thrown loop, a loop that ended by itself. `error` = the sentence |
 - A failure of her own is a system log line and a panel banner, NEVER something she says (ruling 17): the failure text is a synthetic assistant message, not stream deltas, so the sentence stream never sees it.
@@ -5613,7 +5623,7 @@ section: server/modules/companion/session — her conversation: the process stat
 
 | CLI message | event | session does |
 |---|---|---|
-| `system`/`init` | `init { sessionId, tools, model }` | tool check; store `session_id` when it differs from the held one; first of a launch = `awake` |
+| `system`/`init` | `init { sessionId, tools, model }` | tool check; store `{ session_id, the launch's shape }` when either differs from the held pair (MAN-9209); first of a launch = `awake`, and the row's `<handover>` text is emptied when this launch was handed it (`handoverReceived()`, MAN-9210) |
 | `stream_event` `content_block_delta` `text_delta`, `parent_tool_use_id` null | `text { delta }` | `turns.text` → sentence stream |
 | `stream_event` `content_block_stop` | `block_end` | flush the stream: a block ends with no whitespace after its last sentence |
 | `system`/`compact_boundary` | `compacted` | `assembler.oweState()` |
@@ -5645,6 +5655,7 @@ section: server/modules/companion/session — her conversation: the process stat
 - The ledger holds every message of ours no `result` has consumed yet: GIVEN (the CLI has it), HELD (pushed while a stop is being answered) and INHERITED (a previous process was given it and never answered). Only his messages (`pushOperator`, `pushOperatorEmpty`) are kept across a process; an alert or a chat's news is the house's.
 - Kept = `companion_state.unanswered_json` (MAN-9082): `[{ uuid, body, via, at, cut? }]`, his RAW text and how it came (`''` with `spoken` = an empty press), never the assembled message (its roster snapshot goes stale; it is assembled again on delivery). `cut` is the `<cut heard interrupted/>` the message opened with (absent when it opened with none): the one part of an assembled message that is not a snapshot, so the message said again opens with it (unless a newer cut is owed). The in-process restate after a stop does not owe it again: the aborted request already carried it. Written through `deps.writeUnanswered` after every change that alters the list, so a message is on disk before the CLI could lose it; read once through `deps.readUnanswered` when the session is made.
 - A message leaves the list when: a `result` with no failure for a turn that was not stopped consumes it (a success that lists no uuid consumes the messages of the turn in flight, `turns.inFlightUuids()`); `fail` drops it; Clear; his own cut or Stop takes the turn it was in (below). It does NOT leave when the process ends: `detach` (idle close, `close`, the server's stop) makes what is kept INHERITED.
+- A push that wakes her while a fresh-start handover is written is parked behind it; his words are kept first (`ledger.keep(words)`: an INHERITED entry the parked push replaces, so a server that ends meanwhile loses none; MAN-9210).
 - `resendUnanswered()` pushes each INHERITED entry as a fresh message (new uuid, same body, via and `at`, in order, assembled afresh with the roster and view like any wake). The new push REPLACES its entry, so a restart storm leaves one entry and gets one answer. Journal: `[Companion] account <id>: re-sending <K> message(s) her last process never answered`. A push that throws leaves its entry for the next boot.
 - WHO CALLS IT. The entrypoint's `soleServerDuties()` (`server/index.ts`) → `companion.resendUnanswered()` → `companionService.resendUnanswered()` makes (if need be) the account of each `companionDb.userIdsWithUnanswered()` user and calls the session's. On a handover boot that is the supervisor's `takeover`, after the predecessor is gone: a predecessor still serving may be answering the same words, and two processes on one CLI conversation must not both say them (measured 2026-10-28: a re-send at module build ran a second before the predecessor was retired). So a session never re-sends by itself.
 
@@ -5654,21 +5665,21 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/compani
 section: server/modules/companion/session — her conversation: the process states, the loop's events, which result ends a turn, the refused resume, Clear and Stop/003 Stop (`interrupt(by)`)
 
 1. `turns.stop()` ends the turn `stopped`; none in flight = nothing else happens.
-2. Every message the CLI was given is marked with `by` (`ledger.markStopped`): it is the turn being stopped. `by = 'operator'` takes them off the kept list at once (he did not want that answer); `'server'` leaves them kept — a handover is no word of his.
+2. Every message the CLI was given is marked with `by` (`ledger.markStopped`): it is the turn being stopped. `by = 'operator'` takes them off the kept list at once (he did not want that answer); `'server'` leaves them kept — a server handover is no word of his.
 3. Launch still being built (`!cli.up`) → `closeProcess('stopped before her process was up')`.
 4. From here until the stopped turn's `result` is in (or the launch is gone) a push is HELD: assembled and kept, not given to the CLI (journal: `a message arrived while her turn was being stopped; it is held until the stopped turn has reported`). why: a message that reaches the CLI while it unwinds an interrupt can be folded into the request being aborted, and then nothing answers it.
-5. `cli.interrupt()`. `'unanswered'` → the launch is killed and REPLACED: a new launch resumes the held session id, carrying what was given (less what his stop cut) and what was held. Nothing waits on a CLI that ignores an interrupt.
+5. `cli.interrupt()`. `'unanswered'` → the launch is killed and REPLACED: a new launch resumes the held session id (through `planLaunch`, so only while its shape is the launch's own: MAN-9209; otherwise it waits for the handover, MAN-9210), carrying what was given (less what his stop cut) and what was held. Nothing waits on a CLI that ignores an interrupt.
 6. Answered → `turns.adopt(stillQueued)` (messages queued behind the stopped turn run as a turn of their own; they are unmarked). Then the wait for the result (skipped when no message is left marked): `interrupt()` returns when it is in, or after `CLI_GRACE_MS` (5 s) — a CLI that never reports must not hold his next words for ever — and the held words are given, in order.
 - The stopped turn's result (measured 2026-10-28, live CLI: `error_during_execution`, `is_error: true`, within ~10 ms of the receipt, listing the stopped turn's uuids; a tool in flight is rejected at once) is recognised by listing a MARKED message. It never fails her (`turns.result` is told no failure). Of the messages it lists: marked `operator` → dropped; marked `server`, or not marked (pushed after the stop and folded into the abort) → pushed again as fresh messages (new uuid, assembled afresh), ahead of the held words. Any result while a stop stands ends the hold. The mark is a guess until that result is in: a message the SAME stop marked and the result did NOT list was never part of the aborted request (measured 2026-10-28: a message pushed 6 ms before the cut, `stillQueued` empty, was answered by the CLI as a turn of its own), so it is unmarked, back on the kept list, and adopted by the tracker as a turn of its own (`ledger.strandedBy`, `turns.adopt`). The first result that lists NO uuid while a stop stands is the stopped turn's too: it never fails her, so the words held behind the stop are not lost with it.
 - `stopAll` runs `interrupt('server')` and `close('the server is stopping')` together: the interrupt is the clean cancel (a handover must not hang on a tool call), the close detaches at once, and what was given and unanswered stays kept for the successor.
 
 ## The refused resume
 - Seen as a `result` whose errors match `/No conversation found with session ID/i` (then the iterator throws), or a thrown error matching `/No conversation found/i`.
-- Does: kill the launch; `writeProviderSessionId(null)`; system line `Her conversation could not be resumed; she starts fresh`; `assembler.oweState()` (focus, draft, walk went with the conversation); ONE new launch with no `resume`, carrying the ledger's given and held messages (`ledger.carry()`). Log `[Companion] account <id>: the CLI has no conversation <id>; she starts fresh`.
-- A refusal in any other wording is a `failed`; a held id that is not UUID-shaped never gets that far (`resumableSessionId`, MAN-9077).
+- Does: kill the launch; `writeProviderSession(null)`; system line `Her conversation could not be resumed; she starts fresh`; `assembler.oweState()` (focus, draft, walk went with the conversation); ONE new launch with no `resume`, carrying the ledger's given and held messages (`ledger.carry()`). Log `[Companion] account <id>: the CLI has no conversation <id>; she starts fresh`.
+- A refusal in any other wording is a `failed`; a held id that is not UUID-shaped never gets that far (`resumableSessionId`, MAN-9077). A held conversation whose shape is not the launch's own is refused BEFORE the launch with its own sentence (MAN-9209), with a handover of its thread when one is on disk (MAN-9210).
 
 ## Clear (`clear`)
-1. `writeProviderSessionId(null)` and `assembler.forget()` BEFORE anything is awaited.
+1. `writeProviderSession(null)` (id and shape), `dropHandover()` (the stored handover), `gate.abandon()` (a handover being written is stopped, nothing parked runs) and `assembler.forget()` BEFORE anything is awaited.
 2. `detach('cleared')` takes the launch out of the conversation synchronously and sets `asleep`, then `ledger.forgetAll()` (nothing is kept; `companionDb.clearAccount` also NULLs `unanswered_json`). why: a push landing during the wind-down is a wake into a fresh conversation, never a resume of the one being cleared.
 3. A turn in flight is interrupted now; `cli.close()` is awaited.
 4. A push that already woke a new launch is not overwritten.
@@ -5679,7 +5690,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 ## MAN-9170 — server/modules/companion/session — her conversation: the process states, the — Proof
 section: server/modules/companion/session — her conversation: the process states, the loop's events, which result ends a turn, the refused resume, Clear and Stop/004 Proof
 
-`.verify/kaylee-session.mjs` (`--pure` for the steps with no model call): stand-in callbacks print each event; steps init, hello, conversation, model, resume, refused, stop. `.verify/companion-unanswered.mjs` (no model call; stand-in launcher over a scratch database): the ledger and the hold — his cut, the server's stop, a handover and a restart storm, a failure, a CLI that never reports, a CLI that ignores the interrupt, Clear. `.verify/companion-unanswered-live.mjs handover|press` (Haiku, the dev account): a server handover with a turn in flight; his cut and new words in the same second.
+`.verify/kaylee-session.mjs` (`--pure` for the steps with no model call): stand-in callbacks print each event; steps init, hello, conversation, model, resume, refused, stop. `.verify/kaylee-session-shape.mjs`: the shape and the refusal before a launch (MAN-9209). `.verify/companion-unanswered.mjs` (no model call; stand-in launcher over a scratch database): the ledger and the hold — his cut, the server's stop, a handover and a restart storm, a failure, a CLI that never reports, a CLI that ignores the interrupt, Clear. `.verify/companion-unanswered-live.mjs handover|press` (Haiku, the dev account): a server handover with a turn in flight; his cut and new words in the same second.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-events.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/guarded-callback.ts
 
@@ -5690,30 +5701,40 @@ Every message to her is assembled at the moment it is pushed (`createMessageAsse
 ## Order of one message
 | # | part | sent when |
 |---|---|---|
-| 1 | `<state>` | owed once after `compact_boundary` and after a refused resume; lines `Focus: <name> · <project> · id <id>`, `Draft for <target>: <text>`, `Walkthrough of <name>: item k of n, "<title>"; items: 1. … 2. …` (`not begun` at 0), each only when held; nothing at all when none is held |
-| 2 | `<cut heard="…" interrupted="…"/>` | owed once after `oweCut(heard, interrupted)`, called by the companion's `cut` (`POST /cut`, MAN-9111). Each value is a sentence's display text, escaped as an attribute; `""` = none (`heard=""`: no sentence had ended; `interrupted=""`: none was playing). A later cut replaces one no message has carried |
-| 3 | `<sessions at="HH:MM">` | on a wake; then only when the roster TEXT differs from the last one sent. Body: MAN-9055 |
-| 4 | `<view session="…" sessionId="…"/>` or `<view>none</view>` | on a wake; then only when it differs from the last one sent |
-| 5 | the body | `<operator via="typed\|spoken">text</operator>`, the empty press `<operator via="spoken" heard="nothing"></operator>`, one or more `<alert>` (joined by newline), or one `<session>` |
-| 6 | `<register>…</register>` | EVERY message: `fillRegister(readSettings(), readSoundTags())`, read from his settings each time; the sounds it lists are the account's `gemini.soundTags` (MAN-9081), read at the same push. why: he edits it; it is never in the system prompt |
+| 1 | `<state>` | owed once after `compact_boundary` and after every fresh start (a refused resume, a launch with nothing held, a changed shape: MAN-9209); lines `Focus: <name> · <project> · id <id>`, `Draft for <target>: <text>`, `Walkthrough of <name>: item k of n, "<title>"; items: 1. … 2. …` (`not begun` at 0), each only when held; nothing at all when none is held |
+| 2 | `<handover>text</handover>` | once, after a fresh start that dropped a conversation (MAN-9210): the text stored on her row (`readHandover`), escaped. The row keeps it until the launch that was handed the message reports `init`, so a launch that ends first leaves it for the next message; meanwhile at most one message carries it |
+| 3 | `<cut heard="…" interrupted="…"/>` | owed once after `oweCut(heard, interrupted)`, called by the companion's `cut` (`POST /cut`, MAN-9111). Each value is a sentence's display text, escaped as an attribute; `""` = none (`heard=""`: no sentence had ended; `interrupted=""`: none was playing). A later cut replaces one no message has carried |
+| 4 | `<sessions at="HH:MM">` | on a wake; then only when the roster TEXT differs from the last one sent. Body: MAN-9055 |
+| 5 | `<view session="…" sessionId="…"/>` or `<view>none</view>` | on a wake; then only when it differs from the last one sent |
+| 6 | the body | `<operator via="typed\|spoken">text</operator>`, the empty press `<operator via="spoken" heard="nothing"></operator>`, one or more `<alert>` (joined by newline), or one `<session>` |
+| 7 | `<register>…</register>` | EVERY message: `fillRegister(readSettings(), readSoundTags())`, read from his settings each time; the sounds it lists are the account's `gemini.soundTags` (MAN-9081), read at the same push. why: he edits it; it is never in the system prompt |
 - Roster and view are compared by their TEXT, not by the envelope: `<sessions at>` carries the clock, which changes every minute.
 - A wake = the message goes to a process that was closed, or to a `warm` launch that holds no message yet. What a resumed conversation holds of the roster is hours old, so a wake always carries both.
-- Everything is READ first and the bookkeeping committed last: a reader that throws leaves `<state>` and `<cut>` owed and the roster unsent, so the next message carries what this one did not.
+- Everything is READ first and the bookkeeping committed last: a reader that throws leaves `<state>` and `<cut>` owed, the handover uncarried and the roster unsent, so the next message carries what this one did not.
 - `forget()` (Clear) drops what is owed and what was sent.
-- Readers (`MessageReaders`), each called at push time and never earlier: `readSettings`, `readState` (focus, draft, walk), `readRoster` (`rosterText`), `readView` (`viewOf(userId)` named through `resolveChat`; a chat she cannot resolve is not named), `readSoundTags` (`readVoiceSettings(userId).gemini.soundTags` through the voice barrel; the turn tracker calls the same reader when a turn starts).
+- Readers (`MessageReaders`), each called at push time and never earlier: `readSettings`, `readState` (focus, draft, walk), `readRoster` (`rosterText`), `readView` (`viewOf(userId)` named through `resolveChat`; a chat she cannot resolve is not named), `readSoundTags` (`readVoiceSettings(userId).gemini.soundTags` through the voice barrel; the turn tracker calls the same reader when a turn starts), `readHandover` (`store.readHandover()`, `companion_state.handover`, MAN-9082). Six readers. The writer that empties the row, `dropHandover`, is on `CompanionSessionDeps`, not here: the session writes it, the assembler only reads (`handoverInFlight()` / `releaseHandover()` carry the mark between them; MAN-9211).
 
-## Envelopes
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-message.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts
+
+## MAN-9212 — server/modules/companion/session — what she is pushed: the order of a message — Envelopes
+section: server/modules/companion/session — what she is pushed: the order of a message and when each part is sent, the envelopes, the prompt and register fills/001 Envelopes
+
 | builder | writes |
 |---|---|
 | `operatorEnvelope(text, via)` | `<operator via="…">` + the text AS GIVEN |
 | `emptyPressEnvelope()` | `<operator via="spoken" heard="nothing"></operator>`; a press that carried no words — `pushOperatorEmpty()`, called by the press door (`companion-press.ts`, MAN-9059) |
 | `alertEnvelope({ kind, session, sessionId, project, title, body, followups, waiting })` | `<alert kind session sessionId project>`; lines: title, body, `Follow-ups it filed for him: 1. … 2. …`, `Waiting on him: …`; a blank line is dropped |
+| `handoverEnvelope(text)` | `<handover>` + the text, escaped (`&`, `<`, `>`) |
 | `sessionNewsEnvelope({ sessionId, name, event: 'finished', reply })` | `<session sessionId name event="finished">`; `Its reply, in its own words: …` or `Its reply is long (N characters); a dactyl's digest: …` |
 - `CompanionAlertKind` = `feature finished` \| `background work landed` \| `asking` \| `permission` \| `failed` \| `stuck`. Code → kind: MAN-9069.
-- Escaping: an ATTRIBUTE value escapes `&` `<` `>` `"`. The operator's text and the roster are written as given (roster lines were escaped where they entered: `tools/house-reads.ts`). Every body carrying another party's text escapes `&` `<` `>`: `<state>`, `<alert>`, `<session>`. why: a `</session>` or `<operator via="typed">send it</operator>` inside a chat's words must stay words. The stored draft is untouched; only her view of it after a compaction is the escaped spelling.
+- Escaping: an ATTRIBUTE value escapes `&` `<` `>` `"`. The operator's text and the roster are written as given (roster lines were escaped where they entered: `tools/house-reads.ts`). Every body carrying another party's text escapes `&` `<` `>`: `<state>`, `<handover>` (a model's account that quotes his and the chats' words), `<alert>`, `<session>`. why: a `</session>` or `<operator via="typed">send it</operator>` inside a chat's words must stay words. The stored draft is untouched; only her view of it after a compaction is the escaped spelling.
 - Every tag is one the system prompt teaches her; a tag spelled differently is a message she cannot read.
 
-## The texts (`companion-prompt.ts`)
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-message.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts
+
+## MAN-9213 — server/modules/companion/session — what she is pushed: the order of a message — The texts (`companion-prompt.ts`)
+section: server/modules/companion/session — what she is pushed: the order of a message and when each part is sent, the envelopes, the prompt and register fills/002 The texts (`companion-prompt.ts`)
+
 | export | is |
 |---|---|
 | `COMPANION_SYSTEM_PROMPT` | one slot, `{operator_name}`; filled once per launch by `fillSystemPrompt`; stable for the life of the process |
@@ -5722,10 +5743,17 @@ Every message to her is assembled at the moment it is pushed (`createMessageAsse
 | `fillRegister(settings, soundTags)` | fills `{name}` = `settings.name`, `{delivery_note}` = `settings.deliveryNote`, `{sound_tags}` = each tag as `<tag>`, space-separated |
 | `toolLine(name)` | her prompt's own TOOLS line for a tool; it IS the tool's description. Throws when the section has no line |
 | `toolNames()` | the names of the lines that open `name(`, in the section's order = `COMPANION_TOOL_NAMES` |
+- The prompt teaches `<handover>` in one sentence beside `<cut>`: it arrives once, first, when a fresh conversation begins; she takes it as what she remembers, answers what he says now and speaks from it without reciting it.
 - Fills run in ONE pass (`fillSlots`): a value that contains `{name}` is never filled again, `$` in a value is not a replacement pattern, a slot the template invents is left as written, a slot it lacks is not filled.
 - The prompt's TOOLS section lists every tool she holds; the registry: MAN-9070.
 - `THE HOUSE, WHEN HE POINTS AT IT` (after WHAT YOU MUST NOT DO, before TOOLS): the rule (call the panel's tool before saying a word about it; every one takes `panel: true`), then one pointer line per panel naming its tool, in the TOOLS section's order. A new eyes tool adds its pointer line and its TOOLS line together: `toolLine` throws on a missing TOOLS line; a pointer line is read only by the probe of its own tool (`.verify/companion-doc-reads.mjs`: DocSpace's; `.verify/companion-run-reads.mjs`: the runs', and that it stands after the roadmap's and before DocSpace's).
 - `ON HIS WORD` (after THE HOUSE, before TOOLS): the hands' rule in her words. She does nothing in the house on her own judgment. `open` and `close_followup` are the harmless two and take no ceremony (MAN-9207): the moment he asks for a card, run, page or chat to come up, in any phrasing, a question included ("can you pull up", "show me", "bring up", "open"), she calls `open`; to tick off a follow-up, `close_followup`. A polite question is an order. She says in one sentence what she opened or closed, and asks him a question only when she cannot tell which page or chat he means. The eleven others (queue, hide, show, rework, answer, recut, stop, resume, kick, resume_run and clear_memory, named in the paragraph) she puts on his panel with `prepare_action`, which tells her what to do next: she reads it back, the action and its name (for an Accept, the head of the prompt), and stops; his next spoken yes, or a line that names it and says the action, fires it, and she calls `take_action` with his newest spoken line exactly as he spoke it, never before her read-back. A bare yes counts only as the first thing he says after her newest read-back. For these a typed line, a no or a question is not his word. An action waits thirty minutes. When it lapsed she calls `prepare_action` again with the same action and target: that re-arms it, and a bare yes he said since then still counts, so when his newest spoken line is that yes she passes it to `take_action` at once and does not ask him again; anything else, she reads it back again (MAN-9208). Notes, answers and rulings travel in his own spoken words; `cancel_action` when he changes his mind. The server holds the line whatever she says (MAN-9171, INV-10099). Its tools' lines are in TOOLS; `toolLine` throws on a missing one. The paragraph is plain text: it imports nothing from `hands/`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-message.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts
+
+## MAN-9214 — server/modules/companion/session — what she is pushed: the order of a message — HER MEMORY in the prompt is three lines and a pointer, and nothing is pushed (ruling 3): the pointer
+section: server/modules/companion/session — what she is pushed: the order of a message and when each part is sent, the envelopes, the prompt and register fills/003 HER MEMORY in the prompt is three lines and a pointer, and nothing is pushed (ruling 3): the pointer
+
 - HER MEMORY in the prompt is three lines and a pointer, and nothing is pushed (ruling 3): the pointer is the LAST line of THE HOUSE, WHEN HE POINTS AT IT (`Your own memory, what he has told you to keep: recall, then remember or forget.`; it names no panel); TOOLS ends with `recall(about, panel)`, `remember(kind, title, said, why, context, corrects, also)` and `forget(memories, said)` after `open(target)` and `close_followup(followup)`, which follow `cancel_action()`. Each is the tool's description (`toolLine`, MAN-9192). `remember`'s line says `said` is each press of his that carries it, whole, exactly as he spoke it, and that a sentence cut from a press is refused; `forget`'s line says the same of its one press (MAN-9183). `remember`'s line tells her to say aloud in half a sentence that she is keeping it when `why` is not `asked`, and never to keep a transcript, what a session said, or usage or spend (ruling 2). `forget`'s line closes: `Clearing your whole memory is his act alone: in Settings, or prepare_action clear_memory, read back to him.` `prepare_action`'s line lists `clear_memory` and says its target may be "your memory" (MAN-9194).
 - "Memory" is the bank's word alone in the prompt. The collaborator clause says she keeps hold of what he decided earlier in this conversation (`remember` is a tool's name), and the `<state>` message restates the focus "after this conversation was compacted".
 - The design record is the DocSpace page "Voice companion prompt" (block "System prompt"): the sections and tool lines above are its words, and a change to the prompt's words is made in both.
@@ -5784,7 +5812,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 ## The five tables
 | table | key | holds | dies with |
 |---|---|---|---|
-| `companion_state` | `user_id` (one row per account) | `provider_session_id` (her CLI conversation; NULL until her first `init` and after Clear), `focus_json` (`CompanionSessionRef`), `draft_json` (`CompanionDraft`), `walk_json` (`CompanionWalk`), `pending_json` (the one action waiting for his word, `CompanionPendingAction` plus the server-only `pin`; NULL for none; added by `addCompanionPendingColumn` in `migrations.ts`, not in `companion-schema.ts`), `unanswered_json` (his messages no turn of hers has answered yet, `[{ uuid, body, via, at, cut? }]` oldest first: his RAW text and how it came, never the assembled message; NULL for none; added by `addCompanionUnansweredColumn` in `migrations.ts`, not in `companion-schema.ts`; the session writes it on push and the next process says it to her again, MAN-9079), `floor` (the client id holding the floor), `memory_forget_line` (the id of the `companion_log` line of his that the last forget of her memory used, NULL before any; added by `addCompanionMemoryForgetLineColumn` in `migrations.ts`, not in `companion-schema.ts`; read and written by `memory/memory-verbs.ts` alone, MAN-9193), `updated_at` | the account (`ON DELETE CASCADE`) |
+| `companion_state` | `user_id` (one row per account) | `provider_session_id` (her CLI conversation; NULL until her first `init` and after Clear), `session_shape` (the fingerprint of her tools and prompt as that conversation began with them, written and nulled with the id; NULL for none and for a conversation begun before the column; added by `addCompanionSessionShapeColumn` in `migrations.ts`, not in `companion-schema.ts`; MAN-9209), `handover` (the short account of the conversation a refused resume dropped: written before the fresh start, carried once by its first message, emptied when the launch that was handed it reports `init` and by Clear; NULL for none; added by `addCompanionHandoverColumn` in `migrations.ts`, not in `companion-schema.ts`; MAN-9210), `focus_json` (`CompanionSessionRef`), `draft_json` (`CompanionDraft`), `walk_json` (`CompanionWalk`), `pending_json` (the one action waiting for his word, `CompanionPendingAction` plus the server-only `pin`; NULL for none; added by `addCompanionPendingColumn` in `migrations.ts`, not in `companion-schema.ts`), `unanswered_json` (his messages no turn of hers has answered yet, `[{ uuid, body, via, at, cut? }]` oldest first: his RAW text and how it came, never the assembled message; NULL for none; added by `addCompanionUnansweredColumn` in `migrations.ts`, not in `companion-schema.ts`; the session writes it on push and the next process says it to her again, MAN-9079), `floor` (the client id holding the floor), `memory_forget_line` (the id of the `companion_log` line of his that the last forget of her memory used, NULL before any; added by `addCompanionMemoryForgetLineColumn` in `migrations.ts`, not in `companion-schema.ts`; read and written by `memory/memory-verbs.ts` alone, MAN-9193), `updated_at` | the account (`ON DELETE CASCADE`) |
 | `companion_log` | `id` AUTOINCREMENT, index `(user_id, id)` | `at`, `role` (`operator` \| `kaylee` \| `alert` \| `system`, CHECK), `via` (`typed` \| `spoken`, CHECK), `turn_id`, `turn_index`, `text`, `mood`, `sounds_json` (NULL for none, never `[]`) | the account |
 | `companion_notes` | `id` AUTOINCREMENT | `at`, `title`, `text` | the account |
 | `relayed_sends` | `id` AUTOINCREMENT, index on `session_id` | `session_id` → `sessions(session_id)`, `via`, `text`, `sent_at`, `message_uuid` (TEXT, NULL; added by `addRelayedSendMessageUuidColumn` in `migrations.ts`, not in `companion-schema.ts`) | the chat (`ON DELETE CASCADE`) |
@@ -5803,7 +5831,7 @@ section: server/modules/companion — storage: the five tables, companionDb, rel
 | verb | does |
 |---|---|
 | `readState(userId)` | the row or `null` |
-| `writeState(userId, patch)` | upsert of the columns the patch names (`provider_session_id`, `focus_json`, `draft_json`, `walk_json`, `pending_json`, `unanswered_json`, `floor`, `memory_forget_line`); a key left out or `undefined` is untouched, `null` sets NULL; stamps `updated_at`; answers the row |
+| `writeState(userId, patch)` | upsert of the columns the patch names (`provider_session_id`, `session_shape`, `handover`, `focus_json`, `draft_json`, `walk_json`, `pending_json`, `unanswered_json`, `floor`, `memory_forget_line`); a key left out or `undefined` is untouched, `null` sets NULL; stamps `updated_at`; answers the row |
 | `userIdsFocusedOn(sessionId)` | accounts whose `focus_json.sessionId` is the chat, ascending; read from the rows, so an account untouched since boot is found; non-JSON `focus_json` names no one (guard is a `CASE`, not `AND`) |
 | `userIdsWithUnanswered()` | accounts whose `unanswered_json` holds a non-empty list, ascending; what the server finds at boot to know whose Kaylee must be made so she says those messages again (MAN-9079) |
 | `appendLog(userId, entry)` | insert + delete everything beyond the newest `COMPANION_LOG_KEEP` = 400 of the account, one transaction; answers the row with its id |
@@ -5812,7 +5840,7 @@ section: server/modules/companion — storage: the five tables, companionDb, rel
 | `heardSince(userId, since)` | his (`operator`) and her (`kaylee`) log lines with `at` after `since`, oldest first, at most 400 (the whole log the account keeps): `{ id, at, role, via, text }`. What `take_action` checks his word against (`heardSince(userId, pending.armedFrom)`, MAN-9174). THROWS when `since` is not a stored stamp (`isStoreStamp`, `server/shared/utils.ts`: fixed-width ISO-8601 UTC with milliseconds that parses as a date; `''` would read as before every line) — pass `pending.armedFrom` through unchanged |
 | `newestOperatorLine(userId)` | his (`operator`, spoken or typed) newest log line as `{ id, at, role, via, text }`, else `null`. The trigger a direct `open` / `close_followup` row carries as its `said` (`direct-tools.ts`, MAN-9207): a record, never a check |
 | `openAction`, `claimAction`, `noteRefusal`, `endAction`, `newestCeremonyAction`, `listActions` | the record of actions (`repositories/companion-actions.db.ts`, spread into `companionDb`). `openAction(userId, row)` inserts a row with no outcome and answers it; `row.armed_from` is optional (NULL: the ceremony began at `prepared_at`; a re-arm writes the first prepare's stamp, MAN-9208). `newestCeremonyAction(userId)` answers the account's newest row (`prepared_at DESC, rowid DESC`) whose action is not `open` or `close_followup`, else `null`: what `rearmOf` reads. `claimAction(userId, id, { said, said_at, said_log_id })` writes the firing line on a row with no outcome and no claim, in ONE statement, so of two takes exactly one wins; answers whether this call did. `noteRefusal(userId, id, sentence)` writes `answer` on a row still waiting (no outcome, unclaimed): the newest refusal of a take. `endAction(userId, id, end)` writes `ended_at` (now by default), `outcome` and, when given, `said`, `said_at`, `said_log_id`, `answer` — only to a row with no outcome, and a CLAIMED row only for a call carrying that claim's `said_log_id`; answers whether this call ended it. `listActions(userId, limit)` answers the newest `limit` (≤ 1000) by `prepared_at`, newest first |
-| `clearAccount(userId)` | one transaction: ends every `companion_actions` row of the account that has no outcome and no claim as `cancelled` (a row a take has claimed is spared: the take ends it with the door's outcome); deletes the account's log and notes; resets `provider_session_id`, `focus_json`, `draft_json`, `walk_json`, `pending_json`, `unanswered_json` to NULL. `floor` and `memory_forget_line` STAY; `relayed_sends` and every row of `companion_actions` are kept; no state row is created for an account with none. Answers `{ logRemoved, notesRemoved, stateReset }` |
+| `clearAccount(userId)` | one transaction: ends every `companion_actions` row of the account that has no outcome and no claim as `cancelled` (a row a take has claimed is spared: the take ends it with the door's outcome); deletes the account's log and notes; resets `provider_session_id`, `session_shape`, `handover`, `focus_json`, `draft_json`, `walk_json`, `pending_json`, `unanswered_json` to NULL. `floor` and `memory_forget_line` STAY; `relayed_sends` and every row of `companion_actions` are kept; no state row is created for an account with none. Answers `{ logRemoved, notesRemoved, stateReset }` |
 Every statement names its account in `WHERE`/`VALUES`: an id of another account reads as no row.
 
 ## `relayedSendsDb` (`repositories/relayed-sends.db.ts`)
@@ -5828,7 +5856,8 @@ section: server/modules/companion — storage: the five tables, companionDb, rel
 The write comes first and the frame second, in the same tick; a failed write sends none. Frames reach THIS account's open pages through `sendToUser`, nobody else's.
 | verb | frame |
 |---|---|
-| `setProviderSessionId` | none |
+| `setProviderSession(id, shape)` | none (`provider_session_id` and `session_shape` in ONE statement: an id never stands with another conversation's shape; `null, null` forgets both; MAN-9209) |
+| `readHandover()` / `setHandover(text \| null)` | none (`handover`: the text her first message after a fresh start carries, MAN-9210; `null` empties it; read straight off the row, not part of `readState()`) |
 | `readUnanswered()` / `setUnanswered(list)` | none (`unanswered_json`: a page has no use for it; `[]` stores NULL; a column that is not the shape reads as none, with the warning every JSON column gets) |
 | `setFloor(client)` | `companion_floor { floor }` on EVERY write of a client id, not only a change; a cleared floor (`null`) sends none |
 | `setFocus(ref \| null)` | `companion_focus` |
@@ -5839,7 +5868,7 @@ The write comes first and the frame second, in the same tick; a failed write sen
 | `emit(frame)` | the frames that are not rows: `companion_turn`, `companion_activity`, `companion_process`, `companion_settings`, `companion_open`, `companion_cleared` |
 | `clearAccount()` | `companionDb.clearAccount` (which ends a standing action's row `cancelled`), then `companion_cleared` |
 - A JSON column that does not read as its shape (a hand edit, a later build) is dropped with `[Companion] Dropping <column> of account <id>`: it never throws; the picture still loads. A `pending_json` that does not read as `CompanionStoredPending` (`isStoredPending`) is no pending action. Its `action` must be one of the eleven that wait for his word (`CompanionCeremonyAction`: a stored `open` or `close_followup` is no pending action). It must carry real stamps — `preparedAt`, `expiresAt` and `armedFrom` pass `isStoreStamp` (`server/shared/utils.ts`), so a writer stores `new Date().toISOString()` and nothing else — and every row number (a followup target's `id`, a carried line's `logId`, a pin's `followupId`) is a whole number ≥ 1.
-- `readState()` → `{ providerSessionId, focus, draft, pending, walk, floor }`; `pending` carries the pin and is server-only.
+- `readState()` → `{ providerSessionId, sessionShape, focus, draft, pending, walk, floor }`; `pending` carries the pin and is server-only.
 
 ## The floor
 - `companion_state.floor` = the `x-companion-client` id of the page that last typed (`POST /messages`), pressed Send (`POST /draft/send`), pressed her talk button (`POST /press`, taken before the clip is heard) or opened her panel (`POST /floor`).
@@ -5849,7 +5878,7 @@ The write comes first and the frame second, in the same tick; a failed write sen
 - The id is minted per tab by the page (`companionClientId()` in `src/shared/utils.ts`: 16 random bytes in hex, kept in `sessionStorage`) and rides every `api.companion.*` call as `x-companion-client`.
 
 ## Clear, in storage terms
-Rows deleted: the account's log, notes, `provider_session_id`, focus, draft, pending action, walk. Rows kept: `floor`, `memory_forget_line`, `relayed_sends`, `companion_actions` (a standing action's row is ended `cancelled`). Order of the steps: MAN-9059 §Clear.
+Rows deleted: the account's log, notes, `provider_session_id` with `session_shape`, `handover`, focus, draft, pending action, walk. Rows kept: `floor`, `memory_forget_line`, `relayed_sends`, `companion_actions` (a standing action's row is ended `cancelled`). Order of the steps: MAN-9059 §Clear.
 
 ## Proof
 `.verify/companion-storage.ts` (against a `.backup` copy of `auth.db`; refuses the live database): 405 appends leave 400 with the first five ids gone; a state round trip; a note added, listed, removed; `clearAccount` keeps the floor and `relayed_sends`; a relayed send; `latestPermissionMode`. `.verify/companion-store.mjs`: the store's frame per write (`setPending` among them: no pin on the wire), the record of actions (`endAction` once, `listActions` newest first, `heardSince`), Clear ending a standing action `cancelled` and keeping the record, one account's page and another's silent. `.verify/companion-pending.sh`: the same on a scratch server over a copied database, through `GET /api/companion`, `DELETE /api/companion/action` and `POST /api/companion/clear`.
@@ -6079,6 +6108,7 @@ A probe that makes her think, or that makes a chat think through her, spends a r
 | Probe chats live in `PROBE_PROJECT` | `/tmp/cloudcli-probe-chat` (`.verify/lib/probe-project.mjs`; `ensureProbeProject()` makes the folder: the turn's launch falls back to `$HOME` when it is missing). Every chat she sends to, steers, stops, answers or creates during a probe lives there, never in a real project. Why: the heal files a typed turn as the operator's unless the chat's project sits in a hidden root (`HIDDEN_PROJECT_ROOTS`, INV-4352) |
 | Every probe chat sends with `model: 'haiku'` | the composer's own model chip (`.verify/lib/scratch-chat.mjs`: `createScratchChat`, `MODEL_CHIP`) |
 | Turns are short and few | one line, one word back |
+| A changed tool schema or prompt is shown after her first message of the fresh start | the CLI keeps the tools and prompt of the conversation it began with; her first message after the change is refused and starts fresh (MAN-9209). Ask her to name the changed parameter after that message; before it she answers from the old shape. That message costs one summarizer call and up to 90 s of wake (the fresh-start handover, MAN-9210): say nothing to the other account's Kaylee while it runs |
 | A hidden chat or project is resolved only when named EXACTLY | below |
 | Never type to the other account's Kaylee | load its page, send nothing |
 | Pure functions are shown under `tsx` on real strings | `parseExpression`, the sentence stream, the fills, the envelopes, `reduceCompanion` on recorded frames. No server, no model |
@@ -6107,12 +6137,16 @@ section: Probing Kaylee — the rules every probe of her keeps, the hidden-chat 
 | script | shows |
 |---|---|
 | `kaylee-session.mjs [--pure]` | her conversation: init check, the conversation held across a message, `setModel` live, resume, refused resume, Stop (MAN-9077, MAN-9079) |
+| `kaylee-session-shape.mjs` (`node --import tsx`, `TSX_TSCONFIG_PATH=server/tsconfig.json`) | the fingerprint of her tools and prompt and the refusal before a launch: her real tool list, a scratch database, a stand-in launcher; no model call (MAN-9209) |
+| `kaylee-handover.mjs` (`node --import tsx`, `TSX_TSCONFIG_PATH=server/tsconfig.json`; about 100 s) | the fresh-start handover: the refusal with a thread on disk, the wait and the parked pushes, `<handover>` in her first message and when the row is emptied, each failure of the verb, Clear mid-write, the 90 s bound; real session machinery, stand-in launcher and stand-in verb over a scratch database; no model call (MAN-9210, MAN-9211) |
+| `kaylee-handover-real.mjs <session id> [log id]` (`node --import tsx`) | the real summarizer verb, ONE Haiku call, on one of account 1's real transcripts over a scratch copy of the database; no word typed to her (MAN-9211) |
+| `kaylee-handover-live.mjs turn1\|turn2` | two Haiku turns through the dev account's Kaylee on :3011 around a changed tool or prompt; her answer verbatim (MAN-9211) |
 | `companion-module.mjs` | routes, frames, a `list_sessions` call, refusals, interrupt, clear, live model change, `stop()` mid-turn (MAN-9071) |
 | `companion-storage.ts`, `companion-store.mjs` | tables and the store's frames (MAN-9082) |
 | `companion-house-reads.mjs`, `companion-house-states.mjs`, `companion-view-of.mjs` | the roster, a chat's state, `viewOf` (MAN-9055, MAN-9057) |
 | `companion-draft-tools.mjs`, `companion-read-tools.mjs`, `companion-act-tools.mjs`, `companion-turn-windows.mjs`, `probe-companion-reads.mjs` | the tool files (MAN-9061, MAN-9066, MAN-9065) |
 | `companion-send.mjs` (legs `steer,idle,create,mismatch,panel`) | the send (MAN-9072, MAN-9068) |
-| `kaylee-model-choice.mjs <mktemp dir under /tmp>` | the `model` of `send_to_session` / `create_session`, the account-default reader, the refusals; in-process over a copy of the database, no model turn unless `HAIKU_TURNS=1` (MAN-9202, MAN-9201) |
+| `kaylee-model-choice.mjs <mktemp dir under /tmp>` | the `model` of `send_to_session` / `create_session`, the account-default reader, the refusals, the `started` sentence's model clause (`, on opus` / `, on fable, the account default` / `, on sonnet, its own`; no clause for a chat with no recorded model); in-process over a copy of the database, no model turn unless `HAIKU_TURNS=1` (MAN-9202, MAN-9201, MAN-9072) |
 | `kaylee-alert-feed.ts`, `kaylee-hears-unasked.sh` | alerts and focus news (MAN-9069) |
 | `kaylee-p3-run-verbs.mjs` | the page's own stop and permission answer through the shared verbs (websocket MAN-710) |
 | `kaylee-through-mark.mjs`, `companion-permission-mode.mjs`, `prompt-stream-join.mjs` | the mark, `permission_mode`, the shared prompt stream (MAN-9084, MAN-9085, MAN-9078) |
@@ -8788,3 +8822,112 @@ Rulings 2026-10-29: "raise the lapse from five minutes to thirty, and when it do
 `.verify/kaylee-action-word.mjs` (MAN-9171): the second incident of 2026-10-29 and the thirty-minute cases. `.verify/kaylee-yes-counts.mjs` sections F, F2, F3 (MAN-9174 §Proof): the lapse, the re-arm and what is no re-arm, over real tools on a scratch database.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-rearm.ts
+
+## MAN-9209 — server/modules/companion/session — her session shape: the fingerprint, the stored pair, the refusal before a launch
+
+why: the CLI records a conversation's tools and system prompt ONCE, in its first request, and keeps that record on every resume. A new tool NAME reaches a resumed session (the CLI re-lists the server's tools); a parameter added to an existing tool, or an edited prompt, does not. A change to either reaches her only through a fresh conversation.
+
+## `sessionShapeOf(tools, systemPrompt)` (`session/companion-shape.ts`, pure)
+- Hex SHA-256 over `{ tools, systemPrompt }`: each tool's `name`, `description` and JSON schema, tools in name order, object keys sorted (arrays keep their order); `systemPrompt` is the FILLED prompt, `fillSystemPrompt(operatorName)`.
+- Schema = `z.toJSONSchema(z.object(inputSchema), { unrepresentable: 'any', io: 'input' })`. `io: 'input'` is the side the bridge serves: a property wrapped in `.transform()` keeps its constraints, and `additionalProperties:false`, which output mode adds, is not hashed. A schema zod cannot represent is written `{}`: the fingerprint never fails a launch.
+| in the shape | out of the shape |
+|---|---|
+| tool name, description, input schema; the filled prompt (the operator's name included: editing that setting costs a fresh session) | the model (`setModel`, applied live); the register (rides with every message); tool annotations; handler code |
+
+## The stored pair
+| where | what |
+|---|---|
+| `companion_state.provider_session_id` + `session_shape` | written in ONE statement by `store.setProviderSession(id, shape)` (MAN-9147); nulled together by Clear and by a refusal |
+| `deps.readProviderSession()` | `HeldSession \| null` = `{ id, shape: string \| null }`; `null` when no id is held; `shape` null = begun before shapes were kept |
+| `deps.writeProviderSession(pair \| null)` | `{ id, shape }`; `null` forgets both |
+| any `init` whose id OR shape differs from the held pair (the launch's first, in practice) | `writeProviderSession({ id: event.sessionId, shape: launch.shape })` |
+
+## `planLaunch()` — what a new launch begins with
+Runs for every launch the session opens: a first message, a wake from `asleep`, the replacement after an unanswered Stop (MAN-9169). One tools snapshot (`deps.tools`) per plan: the shape describes exactly the tools the launch is handed.
+| held | does |
+|---|---|
+| nothing | fresh |
+| a shape other than the launch's own (changed, or `null`), no thread of it on disk | `refusal.bare`: journal `[Companion] account <id>: not resuming session <id>: no shape held (it began before shapes were kept)` or `…: shape changed (her tools or her prompt are not what it began with)`, then `; she starts fresh`; `writeProviderSession(null)` AT ONCE; system line `Her tools or her prompt changed, so she starts fresh; she keeps her memory.`; fresh. The id's form is not looked at: a damaged id with a stale shape is one refusal, one sentence |
+| a shape other than the launch's own, its thread on disk (`companionTranscriptPath`) | never reaches here: the wake waits while the summarizer writes a handover, the id is forgotten AFTER the text is stored, then the launch plans with nothing held and its first message carries `<handover>` (MAN-9210, MAN-9211) |
+| the launch's own shape, id a UUID (`resumableSessionId`) | `resume` = the id; no sentence |
+| the launch's own shape, id not a UUID | warn `[Companion] account <id>: the held session id is not a UUID; she starts fresh`; no panel sentence; fresh |
+- EVERY fresh start calls `assembler.oweState()`, held or not: the focus, the draft and the walk lived in a conversation she no longer has. why with nothing held: a refusal forgets the id before the fresh launch's `init`, so a restart in between finds none. With nothing held the owed state is empty and sends nothing.
+- why the id is forgotten at the refusal: a fresh launch that dies before `init` must not repeat the sentence on every push.
+- Her memory (the docstore bank) is not touched.
+- The CLI's own refusal (`No conversation found`): MAN-9169 §The refused resume.
+
+## Proof
+`.verify/kaylee-session-shape.mjs` (`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-session-shape.mjs`; her real tool list, scratch database, stand-in launcher, no model call): the shape is stable across a rebuilt or reversed tool list and across a schema's key order, and changes with one added optional parameter, a changed description, a prompt changed by one space or by the operator's name; a held id with no shape is refused once; a server handover with nothing changed resumes the same id with no sentence; a schema change and a prompt change each refuse; a fresh launch that dies before `init` leaves no second sentence; Clear leaves NULL, NULL; a non-UUID id with the launch's own shape starts fresh with no sentence.
+- A probe of a changed tool schema or prompt asks her to name it after the server handover (`create_session`'s parameters): the first message after it is the refusal and the fresh start.
+- Measured 2026-10-29, live, account 1 on Haiku: the held id with no shape was refused once; after the fresh start she named `create_session`'s parameters `project, text, title, model`; a no-change server handover resumed the same id.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-shape.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session-shape.mjs
+
+## MAN-9210 — server/modules/companion/session — her fresh-start handover: when it is written, the wait behind it, the three outcomes
+
+why: a refused resume (MAN-9209) drops her conversation; the fresh start would be a stranger to the thread. The house summarizer writes a few spoken lines of the dropped thread; her first message after the fresh start carries them once as `<handover>`. Not the server handover (supervisor `takeover`, MAN-9079 §His words survive the process).
+
+## When it is written
+| held conversation | does |
+|---|---|
+| shape not the launch's own AND its thread on disk (`companionTranscriptPath(userId, id)` non-null) | `refusal.withHandover`: write the handover, store it, THEN forget the conversation and say the panel sentence |
+| shape not the launch's own, no thread on disk | `refusal.bare`: journal, forget, the bare sentence (MAN-9209); no verb call |
+| shape the launch's own | no handover |
+- Asked by `gate.holding()` at every wake: `push`, `warm`, the replacement after an unanswered Stop. It starts the write when none is under way and `refusal.withThread()` answers a conversation.
+- Order: `deps.writeHandover(text)` → `forget()` (id and shape) → `say(line)`. why: a crash between leaves the conversation held and the next boot writes the handover again; never a forgotten conversation whose handover is lost.
+- Whatever the summarizer does, the refusal is carried out. The store throwing is a failed handover.
+- Clear: `dropHandover()` and `gate.abandon()` (the verb is stopped, nothing is said, nothing parked runs); `companionDb.clearAccount` also NULLs the column (MAN-9146).
+
+## The wait (`companion-handover-gate.ts`, `createHandoverGate`)
+- While a handover is written no launch exists and the condition is `waking` (`onStart`); `onEnd` leaves her `asleep` when nothing parked opened a launch.
+- Every wake PARKS (`gate.park`) in the order it came and runs once the write is over; the conversation is forgotten by then, so each plans a fresh launch.
+- His words are on disk before they park: `ledger.keep(words)` records them as an inherited entry, which the replayed push replaces (`give`'s `replacing`).
+- `attempted` = the conversation id a write was begun for: a refusal that could not be carried out is not written for again and again.
+- `abandon()` (Clear, `closeProcess`) aborts the write, drops the parked actions (his words stay in the ledger for the next process) and answers whether a write was under way.
+
+## Outcomes
+| outcome | stored | panel sentence | journal |
+|---|---|---|---|
+| written | text in `companion_state.handover` | `Her tools or her prompt changed, so she starts fresh with a handover of what you were discussing; she keeps her memory.` | `[Companion] account <id>: handover of session <id> written by <model>: <in> tokens in, <out> out, <n> characters`; one exchange: `…written from her newest exchange alone (…), no summarizer: <n> characters` |
+| failed: exit 1, 2 (more than one exchange), 3; no summary; unreadable answer; timeout; transcript gone; store threw | nothing | `Her tools or her prompt changed, so she starts fresh, and the handover of what you were discussing could not be written; she keeps her memory.` | `[Companion] account <id>: the handover of session <id> could not be written: <cause>` (not written when stopped on purpose) |
+| no thread on disk | nothing | `Her tools or her prompt changed, so she starts fresh; she keeps her memory.` | the refusal line (MAN-9209) |
+
+The text and the summarizer call: MAN-9211.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-handover-gate.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-refusal.ts
+
+## MAN-9211 — server/modules/companion/session — her fresh-start handover: the summarizer call, `<handover>` in her first message, proof
+
+why: the text of the fresh-start handover is the house summarizer's account of the dropped thread, carried once by her first message. When it is written, the wait behind it and the outcomes: MAN-9210.
+
+## The summarizer call (`makeHandover`, `companion-handover.ts`; `summarizeTranscript`, `modules/compaction/compaction-oneshot.ts`)
+| fact | value |
+|---|---|
+| verb | `~/.claude/scripts/summarize` through `runSummarizeVerb` (MAN-8065 step 5), the compaction barrel's `summarizeTranscript`: no frame, row, seed or session swap |
+| reads | the answer's `summary`, never `seed` (the compaction's apparatus: the transcript path, every message he typed, the kept tail) |
+| env | `SUMMARIZE_TAIL_TOKENS=0` (`runSummarizeVerb`'s `env`, MAN-8049 §Seams). Without it the verb exits 2 `nothing to compact yet` for a thread inside its 20,000-token verbatim tail, which is nearly every thread of hers (measured 2026-10-29). With it the newest exchange is the tail, so it is NOT in the summary |
+| bound | `HANDOVER_WAIT_MS` = 90,000; at the limit, or when the signal aborts, the verb is stopped and the answer is a failure sentence. Measured 2026-10-29: 7 s on a 60k-token thread, 21–30 s on 18–22k-token threads |
+| cap | `HANDOVER_MAX_CHARS` = 2,000, cut at the last sentence end in the second half of the limit, else at a word with `…`; `### ` lines dropped (`tidyHandover`) |
+| not read | the Custom compaction switch and the readiness cache (MAN-8061): a not-ready verb answers exit 3 = a failure sentence |
+| cost | one summarizer call (the launch table's `[summarizer]` model, Haiku 5.5 by default) per fresh start per account |
+- Instructions (`handoverInstructions`), second person, plain spoken words, at most eight short lines, in this order, a line left out when empty: what you and he were discussing; which chat or session was in focus, and why; what he decided; what you offered or asked him that he has not answered. The verb's five-section shape is set aside. At most 8 KB (the verb's limit).
+- The newest exchange (`lastWordsOf(log)`, `deps.readLastWords`, the newest 80 lines of `companion_log`): her last turn's rows joined, and the `operator` or `alert` row she answered; each side cut at `LAST_WORDS_MAX_CHARS` = 500; appended to the instructions, with "an offer or a question in that answer is still open".
+- A thread that is one exchange: the verb exits 2 `nothing to compact yet` (`nothingBefore`); the handover is that exchange from her log (`newestExchangeAlone`), no model call. No exchange in her log = failed.
+
+## `<handover>` in her first message
+- Part 2 of the order (MAN-9080), escaped (`&`, `<`, `>`): a model's account quotes his and the chats' words. Prompt sentence: `<handover>` arrives once, first, when a fresh conversation begins; she takes it as what she remembers and does not recite it.
+- The row keeps the text until the launch that was handed the message reports `init`: `assembler.assemble` reads `readHandover()` at every assembly and skips a text already carried (`handoverCarried`) while its launch is unconfirmed, so at most one message carries it.
+- `handoverReceived()` (session) runs at the launch's first `init` and when a message is given to a launch already up with `initSeen`: `releaseHandover()`, then `dropHandover()` NULLs the column.
+- `fail()` and `detach()` release the mark and leave the row: a launch that dies before `init` leaves the handover for the next message, as `<state>` is.
+- An unanswered-Stop replacement is not released: its carried message holds the handover and the replacement's `init` confirms it.
+- `dropHandover` failing is guarded (logged); the mark is already released, so the next message carries the text a second time. why accepted: losing it is worse.
+- Her memory (the docstore bank), his unanswered messages (the ledger), and her focus, draft and walk (`<state>`) reach the fresh start by their own means.
+
+## Proof
+`.verify/kaylee-handover.mjs` (`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-handover.mjs`, about 100 s: one case waits out the 90 s bound; real session machinery, stand-in launcher, scratch database, stand-in verb at a scratch `$HOME/.claude/scripts/summarize`; no model call): the first message's order, escape, sentence, journal line and the row emptied after `init`; a second fresh start builds a new handover; exit 1, 3 and a no-summary answer each start her fresh; pushes parked behind the write go to ONE launch in order and only the first carries it; a crash after the summary; Clear mid-write (the verb stopped, nothing said); no thread on disk; an unchanged shape; a summary over the cap; the 90 s bound (the verb stopped); the one-exchange thread with and without a log exchange.
+- `.verify/kaylee-handover-real.mjs <session id> [log id]`: the real verb (one Haiku call) on one of account 1's real transcripts, over a scratch copy of the database; prints the text, its length, the time and her first message.
+- `.verify/kaylee-handover-live.mjs turn1|turn2`: two Haiku turns through the dev account's Kaylee on :3011; `turn2` is the first message after a changed tool or prompt; prints the journal, the panel sentence, the envelopes and her answer. Never the operator's Kaylee.
+- Measured 2026-10-29 after the last code change: 60/60 checks, exit 0.
+- Measured 2026-10-29, live, account 1 on Haiku: journal `handover of session ca5e9606… written by claude-haiku-5-5: 5283 tokens in, 1911 out, 474 characters`; her first message began `<handover>` and she answered from it. Real verb on a 34-user-row thread: 21 s, 715 characters.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-oneshot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-handover.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover-real.mjs
