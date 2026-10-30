@@ -19,6 +19,9 @@ import { getConnection } from '@/modules/database/connection.js';
  *
  * The text is stored TRIMMED, so the history mark (`session-relayed-sends.ts`), which compares a
  * user message's trimmed content with it, matches a brief that was sent with surrounding whitespace.
+ * `message_uuid` is the transcript uuid of the user row the send became, when the send knew it (a turn: the
+ * uuid it stamped on its message); the mark matches such a send by that row, never by its words. NULL for a
+ * steer and for every send recorded before the column.
  *
  * Consumers: `server/modules/companion/` writes a row when `send_to_session` or `create_session`
  * hands a brief to a chat, and `server/modules/providers/services/session-relayed-sends.ts` reads a
@@ -34,20 +37,24 @@ export type RelayedSendRow = {
   via: string;
   text: string;
   sent_at: string;
+  message_uuid: string | null;
 };
 
-const RELAYED_SEND_COLUMNS = 'id, session_id, via, text, sent_at';
+const RELAYED_SEND_COLUMNS = 'id, session_id, via, text, sent_at, message_uuid';
 
 export const relayedSendsDb = {
-  /** Records one relayed brief for the chat — its text trimmed — stamped now, and answers the row as stored. */
-  record(sessionId: string, via: string, text: string): RelayedSendRow {
+  /**
+   * Records one relayed brief for the chat — its text trimmed — stamped now, and answers the row as stored.
+   * `messageUuid` is the uuid the send stamped on its user message, for a send that did (a turn).
+   */
+  record(sessionId: string, via: string, text: string, messageUuid: string | null = null): RelayedSendRow {
     const row = getConnection()
       .prepare(
-        `INSERT INTO relayed_sends (session_id, via, text, sent_at)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO relayed_sends (session_id, via, text, sent_at, message_uuid)
+         VALUES (?, ?, ?, ?, ?)
          RETURNING ${RELAYED_SEND_COLUMNS}`
       )
-      .get(sessionId, via, text.trim(), new Date().toISOString()) as RelayedSendRow | undefined;
+      .get(sessionId, via, text.trim(), new Date().toISOString(), messageUuid) as RelayedSendRow | undefined;
 
     if (!row) throw new Error(`Could not record a relayed send for session ${sessionId}.`);
     return row;

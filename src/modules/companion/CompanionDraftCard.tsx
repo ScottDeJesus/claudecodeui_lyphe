@@ -223,7 +223,7 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
           variant="ghost"
           size="sm"
           disabled={sending !== null}
-          // The panel holds two Clears: this one discards the brief, the header's wipes her memory. `ml-auto`, not a
+          // The panel holds two Clears: this one discards the brief, the header's wipes her conversation. `ml-auto`, not a
           // spacer before it: when the row wraps on a narrow phone, Clear stands at the right end of its own line, apart
           // from the sends, never under the lead one.
           aria-label={t('companion.draft.clearLabel')}

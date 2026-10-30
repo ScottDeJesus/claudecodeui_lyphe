@@ -34,8 +34,13 @@ CREATE TABLE IF NOT EXISTS followups (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     done_at TEXT,
-    -- Who settled it: the chat's own command, or the person ticking it in the widget.
+    -- Who settled it: the chat's own command, or the person ticking it in the widget. NULL both while the
+    -- item is open and when the house closed it itself on a completion, which closed_for records.
     closed_by TEXT CHECK (closed_by IN ('chat', 'user')),
+    -- What finished and closed the item, in one of three forms; NULL otherwise. '<feature>': a feature finished.
+    -- '<feature>/<task key>': a task of a feature finished. 'epic:<epic>': an epic finished. A slug holds no
+    -- colon, so the 'epic:' prefix cannot collide with a feature name; read it before splitting on the slash.
+    closed_for TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
 );

@@ -22,10 +22,12 @@ import {
 import type { PressInput } from './companion-press.js';
 import { type CompanionSettingsPatch } from './companion-settings.js';
 import type { CompanionService } from './companion.service.js';
+import { createFaceRoutes } from './face/face.routes.js';
+import { createMemoryRoutes } from './memory/memory.routes.js';
 
 /**
  * Her door for the page: every route of the companion's table.
- * Mounted at `/api/companion` behind `authenticateToken` by the server entrypoint.
+ * Mounted at `/api/companion` behind `authenticateToken` by the server entrypoint. `/memory` (Settings' "Her memory" card) and `/face` (her face, `face/face.routes.ts`) are routers of their own, mounted at the foot.
  *
  * ONLY TRANSPORT. A route here reads who is asking (`req.user`, which is her account) and which page (the
  * `x-companion-client` header), checks the SHAPE of what came (a body that is an object, a `text` of 1 to 8000
@@ -36,7 +38,7 @@ import type { CompanionService } from './companion.service.js';
  *
  * AN ANSWER IS THE THING ITSELF, not wrapped: `GET /` answers the picture, `PUT /settings` the settings and
  * `PUT /draft` the draft, so a page folds them straight into what it holds. A write that has nothing to
- * say answers 204.
+ * say answers 204 — `DELETE /draft` and `DELETE /action` (his × on the card of the action waiting for his word) among them.
  *
  * THE PRESS DOOR, `POST /press`, is the one multipart route: the clip as `audio` and the page's own clock for it as
  * `durationMs`. It answers 202 `{ text }` — what he said as heard, `''` for the empty press — or the 409/502 of a
@@ -255,6 +257,16 @@ export function createCompanionRoutes(service: CompanionService): Router {
     }),
   );
 
+  // His × on the action card: the action waiting for his word comes off his panel, withdrawn. 204 whether or not one was standing.
+  router.delete(
+    '/action',
+    asyncHandler(async (request: Request, response: Response) => {
+      readClientId(request);
+      service.cancelAction(readAuthenticatedUserId(request));
+      response.status(204).end();
+    }),
+  );
+
   router.delete(
     '/notes/:id',
     asyncHandler(async (request: Request, response: Response) => {
@@ -281,6 +293,10 @@ export function createCompanionRoutes(service: CompanionService): Router {
       response.status(204).end();
     }),
   );
+
+  // Her memory bank, for Settings' card: `GET` reads its count, `DELETE` clears it. Behind the same authentication as every route above.
+  router.use('/memory', createMemoryRoutes());
+  router.use('/face', createFaceRoutes());
 
   return router;
 }

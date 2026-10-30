@@ -1,19 +1,29 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { useCompanionFab } from '@/modules/companion/hooks/useCompanionFab';
 import { useCompanionVoice } from '@/modules/companion/hooks/useCompanionVoice';
 import { useTalkBinding } from '@/modules/companion/hooks/useTalkBinding';
 import { useTalkPress } from '@/modules/companion/hooks/useTalkPress';
-import { isCompanionPicture, reduceCompanion } from '@/modules/companion/utils/companionReducer';
+import { isCompanionPicture, isOpenTarget, reduceCompanion } from '@/modules/companion/utils/companionReducer';
+import type { PcmPlayer } from '@/modules/companion/utils/pcmPlayer';
 import { api, refusalSentence } from '@/shared/api';
-import type { CompanionFrame, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
+import type { CompanionFrame, CompanionOpenTarget, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { CompanionVoice, TalkPress } from '@/shared/types';
+import type { DockableFabPosition } from '@/shared/ui';
 import { companionClientId } from '@/shared/utils';
 
 type CompanionContextValue = {
   /** Her picture as this page holds it; null until the first read lands (and after a read that failed, until the next event re-reads). */
   picture: CompanionPicture | null;
+  /**
+   * Why the last read failed (the server's own sentence when it gave one), while this page holds no picture; null once a picture
+   * is held and while a read is out. The panel says so instead of waiting for ever, and offers `reread`.
+   */
+  readFailure: string | null;
+  /** The panel's Try again after a failed read: the failure gives way to the waiting row while the read is out. */
+  reread: () => void;
   /** Whether her panel is open on this page. */
   open: boolean;
   /** This page's name for itself to her: the floor is whichever page last typed or opened her panel. */
@@ -30,6 +40,14 @@ type CompanionContextValue = {
    */
   sendDraft: (mode: 'turn' | 'steer') => Promise<string>;
   clearDraft: () => Promise<void>;
+  /**
+   * His × on the card of the action `actionId`, the one the card shows: the action comes off his panel, withdrawn. On the
+   * server's 2xx the page folds the withdrawal itself, so the card does not stay up while its own frame is in flight, and
+   * only while the page still holds `actionId` (a newer prepare that arrived while the call was out is not erased). A refusal
+   * rejects with the server's sentence, or with an EMPTY message when it sent none or never answered, so the card says its
+   * own plain line instead of a status or a transport error.
+   */
+  cancelAction: (actionId: string) => Promise<void>;
   dismissNote: (id: number) => Promise<void>;
   /** Stops her own turn. */
   interrupt: () => Promise<void>;
@@ -49,16 +67,37 @@ type CompanionContextValue = {
    */
   voice: CompanionVoice;
   /**
-   * The id of the chat she sent a draft to in the last four seconds (counted from the `companion_open_chat` frame this page
-   * heard), else null. `useAvatarTarget` points the button at that chat's composer while it is set.
+   * The id of the chat she opened in the last four seconds — the chat a send went to, or one she was told to open (counted from
+   * the `companion_open` frame for a chat target that this page heard) — else null. `useAvatarTarget` points the button at that chat's
+   * composer while it is set.
    */
   recentSend: string | null;
+  /**
+   * Where her disc rests, as he left it (`companion-fab` in localStorage): docked in the rail's cell, or a point. On a phone,
+   * where the rail is tucked away, docked rests in her corner. Read by `CompanionFab`, which draws the disc there, and by
+   * `CompanionDock`, which seats the disc only while it is docked.
+   */
+  fabPosition: DockableFabPosition;
+  /** Sets and stores her rest: the release of a drag, docked or the point where he let go. */
+  moveFab: (next: DockableFabPosition) => void;
+  /** The rail cell's rect while the rail is docked (md and up) and the rect is on screen, else null: the place the disc docks to. */
+  dockRect: DOMRect | null;
+  /** The cell's report of its rect (null as it leaves, or below md); believed only while the rect is on screen. Stable for the page's life. */
+  registerDock: (rect: DOMRect | null) => void;
+  /** Whether a look holds her disc away from its seat (gliding to a chat or the file tree, resting there, gliding home): the cell shows its mark. */
+  fabAway: boolean;
+  /** Set by `CompanionFab`, which knows the look; read by `CompanionDock`. Stable for the page's life. */
+  setFabAway: (away: boolean) => void;
+  /** The page player's `level()`, 0..1: what her face's mouth follows while she speaks. Stable for the page's life. */
+  level: () => number;
+  /** The page player's `progress()`: the sounding sentence's seconds elapsed and, once its body has ended, its length — what picks the vowel of her mouth. Stable for the page's life. */
+  progress: PcmPlayer['progress'];
 };
 
 const CompanionContext = createContext<CompanionContextValue | null>(null);
 
 /**
- * Used by this module's panel, door and `useAvatarTarget`, and through the barrel by the project-workspace module's command
+ * Used by this module's panel, dock, disc and `useAvatarTarget`, and through the barrel by the project-workspace module's command
  * palette: what Kaylee's provider holds for this page. Throws outside CompanionProvider, so a consumer placed wrong fails at once.
  */
 export function useCompanion(): CompanionContextValue {
@@ -80,23 +119,32 @@ const RECENT_SEND_MS = 4000;
 const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kind === 'string' && event.kind.startsWith('companion_');
 
 /**
- * Used by the project-workspace module's shell, which holds it above the whole workspace, so her door, her panel and the command palette's
+ * Used by the project-workspace module's shell, which holds it above the whole workspace, so her disc, her cell in the rail, her panel and the command palette's
  * "Talk to Kaylee" share one picture. She is box-wide, tied to no chat, route or project: the one thing she asks of the page
- * is to open a chat, and she does it through `onOpenChat`, which the composition root answers with its own navigation.
+ * is to open a chat, a card or a page, and she does it through `onOpen`, which the composition root answers with its own navigation.
  *
  * THE PICTURE IS SEEDED, THEN KEPT. It is read once with `GET /api/companion` and from then on folded, frame by frame, from
  * the one socket (`companion_*` frames) through the pure reducer. It is read again whenever the frames can no longer be
  * trusted to have told the whole story: after the socket reconnects (frames were missed while it was down), after a
  * clear (the server's own word on what is left), and when the panel opens on a page whose first read failed. Every one of
- * those is an event; nothing here polls.
+ * those is an event; nothing here polls. A read that failed while the page holds no picture is `readFailure`, which the panel
+ * shows with a Try again (`reread`); the picture stays null until a read lands.
  *
  * FRAMES AND THE READ ARE NOT ORDERED. While a read is out, each frame is also queued, and folded over the answer when it
  * lands, so a frame the answer predates is not lost; the reducer folds a frame twice without harm. A clear is the exception:
  * it drops the queue and discards a read that was out, because the read that follows it is the one that counts.
  *
- * A chat is opened only on a `companion_open_chat` whose `floor` is this page's client id. Every other page of the account
- * hears the frame too and does not open it, so she opens a chat where he is, not on every screen he has open; every page
- * does note the send (`recentSend`), which is what the button's look reads.
+ * AN OPEN IS ANSWERED ONLY BY THE PAGE THAT HOLDS THE FLOOR. `companion_open` carries a target (a chat, a card or a page), the
+ * `floor` it is addressed to and the spoken `label` the door resolved for it; `onOpen(target, label)` is called only when that is
+ * this page's client id (the workspace ignores the label; the station's stage names what she opened by it). Every other page of the
+ * account hears the frame too and does nothing with it, so she opens a thing where he is, not on every screen he has open;
+ * every page does note a chat open (`recentSend`), which is what the button's look reads, and a card's or a page's open is
+ * noted by no one.
+ *
+ * HIS × ON THE ACTION CARD is `cancelAction(actionId)`: the server's `DELETE /api/companion/action`, and on its 2xx the page
+ * clears that action from its picture itself, as `editDraft` folds its answer, so the card never stays up while its frame is in
+ * flight. The request names no action, so the server withdraws whichever one stands when it is handled: an action that replaced
+ * the card meanwhile is withdrawn with it (the page's echo skips it, and the route's `companion_pending: null` frame removes it).
  *
  * THE PAGE'S ONE TALK PRESS lives here: `useTalkPress` is called once, and `useTalkBinding` beside it binds the account's
  * `talkBinding` (from the picture's settings, so a re-bind on any page reaches every page by its settings frame) to that press.
@@ -106,10 +154,12 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  * the picture's `floor` is this page's client id. The press is handed the voice, so it can cut her off. The player is unlocked in
  * the first gesture: opening her panel, typing to her, or a talk press. A Stop and a Clear silence the page's voice as well as her turn.
  */
-export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessionId: string) => void; children: ReactNode }) {
+export function CompanionProvider({ onOpen, children }: { onOpen: (target: CompanionOpenTarget, label: string) => void; children: ReactNode }) {
   const { subscribe } = useWebSocket();
   // The picture this page draws. State, not a ref: the panel, the door and the palette all render from it.
   const [picture, setPicture] = useState<CompanionPicture | null>(null);
+  // Why the last read failed; cleared when a read lands and when Try again starts one. Meaningful only while `picture` is null.
+  const [readFailure, setReadFailure] = useState<string | null>(null);
   // Whether her panel is open on THIS page. The page's own: another tab of the same account opens and closes her on its own.
   const [open, setOpenState] = useState(false);
   // This page's name for itself, read once so it cannot change under a conversation; the floor and every frame addressed to a page use it.
@@ -120,6 +170,8 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   const recentSendTimerRef = useRef(0);
   // The page's one voice: it plays her sentences while the picture says this page holds the floor, and its switch is on.
   const speech = useCompanionVoice({ picture, clientId });
+  // Her disc and her rail cell meet here: where she rests, the cell's rect, and whether a look holds her off the seat.
+  const { fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway } = useCompanionFab();
   // Stable for the page's life (unlike `speech`, which moves with every sentence), so the callbacks below keep their identity.
   const { unlock: unlockVoice, silence: silenceVoice } = speech;
   // The page's one press, and the key or mouse button he bound to it. The press is not state of the picture: it is this page's mic.
@@ -134,12 +186,12 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   const queuedRef = useRef<CompanionFrame[]>([]);
   // False once the provider unmounted: a read that lands then sets nothing.
   const aliveRef = useRef(false);
-  // The latest `onOpenChat`, read when a frame arrives, so a new callback each render does not resubscribe the socket.
-  const onOpenChatRef = useRef(onOpenChat);
+  // The latest `onOpen`, read when a frame arrives, so a new callback each render does not resubscribe the socket.
+  const onOpenRef = useRef(onOpen);
 
   useEffect(() => {
-    onOpenChatRef.current = onOpenChat;
-  }, [onOpenChat]);
+    onOpenRef.current = onOpen;
+  }, [onOpen]);
 
   const seed = useCallback(async () => {
     if (seedingRef.current) {
@@ -159,10 +211,14 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
           if (seedAgainRef.current) continue;
           const queued = queuedRef.current;
           queuedRef.current = [];
-          if (aliveRef.current) setPicture(queued.reduce(reduceCompanion, read));
+          if (aliveRef.current) {
+            setPicture(queued.reduce(reduceCompanion, read));
+            setReadFailure(null);
+          }
         } catch (error) {
-          // The socket's next reconnect, or opening the panel, reads again; there is no retry loop to run here.
+          // The socket's next reconnect, opening the panel, or the panel's Try again reads again; there is no retry loop to run here.
           console.warn('[Companion] Could not read her picture:', error);
+          if (aliveRef.current) setReadFailure((error instanceof Error && error.message) || 'Request failed');
         }
       } while (seedAgainRef.current);
     } finally {
@@ -220,14 +276,20 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
     }
     if (!isCompanionFrame(event)) return;
     const frame = event as unknown as CompanionFrame;
-    if (frame.kind === 'companion_open_chat') {
-      // Every page notes the send, floor or not: her activity is the account's and the button on every page follows it, so the
-      // button on every page follows the send too. Only the floor's page opens the chat. The window's end is a deadline this
-      // frame sets, not a clock that checks.
-      setRecentSend(frame.sessionId);
-      window.clearTimeout(recentSendTimerRef.current);
-      recentSendTimerRef.current = window.setTimeout(() => setRecentSend(null), RECENT_SEND_MS);
-      if (frame.floor === clientId) onOpenChatRef.current(frame.sessionId);
+    if (frame.kind === 'companion_open') {
+      const { target } = frame;
+      // A target of a kind this build does not know, or cut short of its name or id, is not acted on.
+      if (!isOpenTarget(target)) return;
+      // Every page notes a chat open, floor or not: her activity is the account's, so the button on every page follows the
+      // open. The window's end is a deadline this frame sets, not a clock that checks.
+      if (target.kind === 'chat') {
+        setRecentSend(target.sessionId);
+        window.clearTimeout(recentSendTimerRef.current);
+        recentSendTimerRef.current = window.setTimeout(() => setRecentSend(null), RECENT_SEND_MS);
+      }
+      // Only the page that holds the floor acts: the host answers each target.
+      // A server a moment older than this page sends no label; the open still lands, named by nothing.
+      if (frame.floor === clientId) onOpenRef.current(target, typeof frame.label === 'string' ? frame.label : '');
       return;
     }
     fold(frame);
@@ -237,6 +299,11 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   useEffect(() => {
     if (open && picture === null) void seed();
   }, [open, picture, seed]);
+
+  const reread = useCallback(() => {
+    setReadFailure(null);
+    void seed();
+  }, [seed]);
 
   const setOpen = useCallback((next: boolean) => {
     setOpenState(next);
@@ -273,7 +340,7 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   }, [fold]);
 
   // A send answers only what happened; the draft clears and the chat opens by their own frames (`companion_draft`,
-  // `companion_open_chat`), in the same tick as the send.
+  // `companion_open`), in the same tick as the send.
   const sendDraft = useCallback(async (mode: 'turn' | 'steer'): Promise<string> => {
     const response = await ensureOk(await api.companion.sendDraft(mode));
     const sent = await response.json().catch(() => null);
@@ -282,6 +349,16 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
 
   const clearDraft = useCallback(async () => {
     await ensureOk(await api.companion.clearDraft());
+  }, []);
+
+  // The server answers 204 whether or not an action was standing. The page's own echo of it is conditional on the action the
+  // card showed. The route names no action: it withdraws whichever one stands, and its frame (sent in the same tick) is the
+  // guarantee, so a prepare that crossed the call is withdrawn by that frame (nothing fires; the safe direction).
+  const cancelAction = useCallback(async (actionId: string) => {
+    const response = await api.companion.cancelAction().catch(() => null);
+    if (response === null) throw new Error('');
+    if (!response.ok) throw new Error((await refusalSentence(response)) ?? '');
+    setPicture((held) => (held?.pending?.id === actionId ? { ...held, pending: null } : held));
   }, []);
 
   const dismissNote = useCallback(async (id: number) => {
@@ -299,8 +376,16 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   }, []);
 
   const value = useMemo<CompanionContextValue>(
-    () => ({ picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk, voice: speech.voice, recentSend }),
-    [picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk, speech.voice, recentSend],
+    () => ({
+      picture, readFailure: picture === null ? readFailure : null, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft,
+      clearDraft, cancelAction, dismissNote, interrupt, clear, talk,
+      voice: speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
+      progress: speech.progress,
+    }),
+    [
+      picture, readFailure, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, interrupt, clear,
+      talk, speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress,
+    ],
   );
 
   return <CompanionContext.Provider value={value}>{children}</CompanionContext.Provider>;

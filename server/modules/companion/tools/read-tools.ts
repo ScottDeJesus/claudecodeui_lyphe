@@ -13,6 +13,7 @@ import { toolLine } from '../session/companion-prompt.js';
 
 import type { CompanionToolDeps } from './companion-tools.js';
 import { resolveDactylFiles } from './dactyl-paths.js';
+import { stepBrackets } from './followup-plans.js';
 import { askLine, chatNameOf, chatState, pendingAsksOf, resolveChat } from './house-reads.js';
 import {
   companionScratchDir,
@@ -70,8 +71,11 @@ const CHAT_FOLLOWUPS_MAX = 200;
 /** The last line of every digest: where the rendered turns are, so a sharper question can go to a dactyl. */
 const readableAt = (file: string): string => `The turns are rendered at ${file}; ask_dactyl can read that file for a sharper question.`;
 
-/** The call's own AbortSignal, when the SDK hands one in the handler's second argument (it does for a tool call that is cancelled, as when she is stopped). */
-function signalOf(extra: unknown): AbortSignal | undefined {
+/**
+ * The call's own AbortSignal, when the SDK hands one in the handler's second argument (it does for a tool call that is cancelled, as when she is stopped).
+ * Consumed by this file's tools and by the eyes' reads (`eyes/*-reads.ts`), which stop a dactyl with the call.
+ */
+export function signalOf(extra: unknown): AbortSignal | undefined {
   const signal = isRecord(extra) ? extra.signal : undefined;
   return signal instanceof AbortSignal ? signal : undefined;
 }
@@ -183,13 +187,15 @@ function readSession(deps: CompanionToolDeps, args: { session: string; scope: st
 
 /**
  * `list_followups`: the open follow-ups of one chat, or of every chat (newest first), one line each:
- * `chat name · next|gap · text`. The text is the widget's own (`Followup.text`, one plain line by construction),
- * untouched. A named chat is listed whole, as the widget shows it (up to the service's 200); every chat together are cut
+ * `chat name · next|gap · text [<plan>: <step>] · #<id>`. The text is the widget's own (`Followup.text`, one plain line by
+ * construction), untouched; the id is what `close_followup` takes; and each plan the text names as a whole word is followed
+ * by its current step (`followup-plans.ts`), once per plan, so a follow-up that waits on a plan which has since shipped reads
+ * stale at a glance. A named chat is listed whole, as the widget shows it (up to the service's 200); every chat together are cut
  * at 20, and the last line says so. It names a chat when one is given, but moves neither her focus nor her activity:
  * she looks at what a chat left for him in passing, while the conversation may be about another.
  */
 function listFollowups(deps: CompanionToolDeps, args: { session?: string }): Promise<ToolTextResult> {
-  return guardedToolResult('list_followups', 'read the follow-ups', () => {
+  return guardedToolResult('list_followups', 'read the follow-ups', async () => {
     const wanted = args.session?.trim() ?? '';
     let chat: CompanionSessionRef | null = null;
     if (wanted !== '') {
@@ -200,7 +206,8 @@ function listFollowups(deps: CompanionToolDeps, args: { session?: string }): Pro
     const open = listOpenFollowups(deps.userId, chat?.sessionId ?? null, chat ? CHAT_FOLLOWUPS_MAX : FOLLOWUPS_SHOWN + 1);
     if (open.length === 0) return textResult(chat ? `"${chat.name}" has no open follow-ups.` : 'No chat has an open follow-up.');
     const shown = chat ? open : open.slice(0, FOLLOWUPS_SHOWN);
-    const lines = shown.map(({ sessionId, followup }) => `${chat?.name ?? chatNameOf(sessionId)} · ${followup.kind} · ${followup.text}`);
+    const steps = await stepBrackets(deps.house, shown.map(({ followup }) => followup.text));
+    const lines = shown.map(({ sessionId, followup }, index) => `${chat?.name ?? chatNameOf(sessionId)} · ${followup.kind} · ${followup.text}${steps[index]} · #${followup.id}`);
     const cutNote = chat
       ? open.length >= CHAT_FOLLOWUPS_MAX ? `\nThese are the newest ${CHAT_FOLLOWUPS_MAX}; older open ones are not listed.` : ''
       : open.length > FOLLOWUPS_SHOWN ? `\nMore are open than these ${FOLLOWUPS_SHOWN}; name one chat to see its own.` : '';

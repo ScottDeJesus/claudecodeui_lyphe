@@ -1,6 +1,6 @@
 import type {
-  CompanionActivity, CompanionDraft, CompanionLogEntry, CompanionNote, CompanionPicture, CompanionProcess,
-  CompanionSessionRef, CompanionSettings, CompanionWalk,
+  CompanionActionTarget, CompanionActivity, CompanionCarriedLine, CompanionDraft, CompanionFace, CompanionLogEntry, CompanionNote,
+  CompanionPendingAction, CompanionPicture, CompanionProcess, CompanionSessionRef, CompanionSettings, CompanionWalk,
 } from '@/shared/companion-types';
 
 /*
@@ -12,6 +12,10 @@ import type {
  * The chats are named the way the operator names his (Kanban lanes, the migration chat) and the sentences are cut and
  * marked the way the server's `parseExpression` cuts and marks them: mood brackets lifted, a sound's `at` the length of
  * the words before it, so "Oh nice" + mark + " the lane drag landed." Times are relative to when the fixture loads.
+ *
+ * The actions waiting for his word are put as the hands put them (hands/action-recipe.ts): an Accept's prompt is the lock's
+ * header and the census, a round's its questions numbered with their options, a card's `spoken` its title, a follow-up's
+ * the first five words of its text, `say` the verb and that name, every carried line one of his spoken rows, by its id.
  */
 
 const NOW = Date.now();
@@ -19,6 +23,7 @@ const ago = (seconds: number): string => new Date(NOW - seconds * 1000).toISOStr
 
 const MODELS: CompanionPicture['models'] = [
   { value: 'sonnet', label: 'Sonnet 5.5' },
+  { value: 'fable', label: 'Fable 5.1' },
   { value: 'opus', label: 'Opus 5.5' },
   { value: 'haiku', label: 'Haiku 5.5' },
 ];
@@ -101,10 +106,12 @@ const NOTES: CompanionNote[] = [
   {
     id: 41, at: ago(200), title: 'Files the lane drag touched',
     text: 'src/modules/kanban/KanbanBoard.tsx\nsrc/modules/kanban/hooks/useLaneDrag.ts\nsrc/shared/ui/KanbanLane.tsx',
+    kind: 'note', ref: null, pinned: false,
   },
   {
     id: 42, at: ago(90), title: 'Where the migration stands',
     text: 'Three of five tables are copied and checked. The last two wait on the sessions backfill, which the migration chat says finishes tonight.',
+    kind: 'note', ref: null, pinned: false,
   },
 ];
 
@@ -121,7 +128,7 @@ function longLog(): CompanionLogEntry[] {
     rows.push(she(at - 5, `t-long-${turn}`, 2, 'Want me to read the question out?'));
     if (turn === 2) rows.push(house(at - 120, 'alert', 'Feature finished · Kanban lanes · claudecodeui_lyphe\nLane drag landed. Follow-ups it filed for him: keep the drop zone the full lane height.'));
     if (turn === 5) rows.push(house(at - 90, 'alert', 'Permission · Migration chat · shadow-connector\nWaiting on him: run `npm run migrate` in Bash.'));
-    if (turn === 6) rows.push(house(at - 60, 'system', 'Her memory could not be resumed; she starts fresh.'));
+    if (turn === 6) rows.push(house(at - 60, 'system', 'Her conversation could not be resumed; she starts fresh.'));
   }
   rows.push(he(60, 'and the migration chat?'));
   rows.push(she(55, 't-long-end', 0, 'Three of five tables are copied and checked.', [{ tag: 'short pause', at: 44 }]));
@@ -153,14 +160,140 @@ const SPOKEN = [
   she(18, 't-spoken', 3, 'Want to walk them now?'),
 ];
 
+/** A line he said, carried into an action as the log holds it: its row's id, its time, its words. */
+const carriedOf = (entry: CompanionLogEntry): CompanionCarriedLine => ({ logId: entry.id, at: entry.at, text: entry.text });
+
+/** An action prepared `secondsAgo`, lapsing thirty minutes after it went up. */
+const prepared = (secondsAgo: number, action: Omit<CompanionPendingAction, 'preparedAt' | 'expiresAt'>): CompanionPendingAction => ({ ...action, preparedAt: ago(secondsAgo), expiresAt: ago(secondsAgo - 1800) });
+
+const card = (name: string, spoken: string): CompanionActionTarget => ({ kind: 'card', name, spoken, arc: 'kanban' });
+
+/** An Accept as the card draws it: the lock's header, then the census `dispatcher question` prints, its token last. */
+const CENSUS = [
+  'Intent lock', '', 'kanban--lane-drag — 4 tasks', '',
+  'A card dropped anywhere over a lane lands in that lane, where the pointer marks it; a drop between two lanes goes to the one under the pointer.',
+  '', 'Repo ~/.claude/claudecodeui_lyphe · Epic kanban · 4 tasks in 2 waves · 3 decisions settled', '',
+  '1. The drop zone, the full height of the lane — hephaestus/claude', '2. A drop between two lanes — hephaestus/claude',
+  "3. The lane's drop marker, composed — iris/claude — after 1", '4. The marker live, shown at 390 and 1440 — hephaestus/claude — after 2, 3',
+  '', 'Run it? · lock:4be1c09a7d',
+].join('\n');
+
+const QUEUE_LOG = [
+  he(150, 'Get lane drag ready to queue.', 'spoken'),
+  she(146, 't-queue', 0, 'Okay, Lane drag is on your panel to queue.'),
+  she(145, 't-queue', 1, 'The prompt reads "kanban--lane-drag — 4 tasks", and it delivers: a card dropped anywhere over a lane lands in that lane.'),
+  she(144, 't-queue', 2, 'Say "Queue Lane drag" when you want it.'),
+];
+const QUEUE = prepared(147, { id: 'fx-act-queue', action: 'queue', target: card('kanban--lane-drag', 'Lane drag'), prompt: CENSUS, carried: [], say: 'Queue Lane drag' });
+
+const QUESTIONS = [
+  '1. Should the WIP badge count the cards that are blocked?', '   - Yes, a blocked card still takes room in the lane', '   - No, only the cards being worked', '',
+  '2. Where does the badge sit while a lane is folded?', "   - On the folded lane's spine", '   - Hidden until the lane opens',
+].join('\n');
+
+const ANSWER_LOG = [
+  he(240, 'Answer the WIP badge questions.', 'spoken'),
+  she(236, 't-q1', 0, 'Question one: should the badge count the cards that are blocked?'),
+  he(210, 'Yes, count the blocked ones.', 'spoken'),
+  he(200, 'They still take up room in the lane.', 'spoken'),
+  she(190, 't-q2', 0, 'And two: where does it sit while a lane is folded?'),
+  he(170, 'On the spine, so I can see it while it is folded.', 'spoken'),
+  she(160, 't-answer', 0, 'Your answers to WIP badge are on your panel, word for word.'),
+  she(159, 't-answer', 1, 'Say "Send the answers to WIP badge" to send them.'),
+];
+const ANSWER = prepared(161, {
+  id: 'fx-act-answer', action: 'answer', target: card('kanban--wip-badge', 'WIP badge'), prompt: QUESTIONS, say: 'Send the answers to WIP badge',
+  carried: [
+    { label: 'Should the WIP badge count the cards that are blocked?', lines: [carriedOf(ANSWER_LOG[2]), carriedOf(ANSWER_LOG[3])] },
+    { label: 'Where does the badge sit while a lane is folded?', lines: [carriedOf(ANSWER_LOG[5])] },
+  ],
+});
+
+/**
+ * A round at the length he really speaks (his spoken lines to her average 96 characters, his round answers run to 459), and
+ * of the size most rounds have, three questions: the third he left unanswered, so it goes as "(no answer)".
+ */
+const LIMIT_QUESTIONS = [
+  "What should a lane's WIP limit count, and how is it shown when a lane goes over it?",
+  'Who hears about a lane that stays over its limit, and where does that land?', 'Should a lane over its limit refuse a new card by itself?',
+];
+const ROUND_LOG = [
+  he(330, 'Answer the lane limits questions.', 'spoken'),
+  she(326, 't-r1', 0, "Question one: what should a lane's WIP limit count, and how is it shown when a lane goes over it?"),
+  he(300, "Count the cards in the lane that are not archived and not blocked, and show it as a badge on the lane's head beside its name.", 'spoken'),
+  he(290, "When a lane goes over, the badge turns into a warning with the count and the limit, and the lane's border goes amber until it is back under.", 'spoken'),
+  she(270, 't-r2', 0, 'Two: who hears about a lane that stays over its limit, and where does that land?'),
+  he(250, "Nobody gets pinged for now. It shows on the board and in the lane's own history, and later we decide which roles hear about it, so put that in the milestones as its own feature, after the sticky headers land.", 'spoken'),
+  she(200, 't-r3', 0, 'Your answers to Lane limits are on your panel; the third question goes with no answer.'),
+  she(199, 't-r3', 1, 'Say "Send the answers to Lane limits" to send them.'),
+];
+const ROUND = prepared(201, {
+  id: 'fx-act-round', action: 'answer', target: card('kanban--lane-limits', 'Lane limits'), say: 'Send the answers to Lane limits',
+  prompt: LIMIT_QUESTIONS.map((question, at) => `${at + 1}. ${question}\n   - As the design proposes\n   - Something else`).join('\n\n'),
+  carried: [
+    { label: LIMIT_QUESTIONS[0], lines: [carriedOf(ROUND_LOG[2]), carriedOf(ROUND_LOG[3])] },
+    { label: LIMIT_QUESTIONS[1], lines: [carriedOf(ROUND_LOG[5])] },
+    { label: LIMIT_QUESTIONS[2], lines: [] },
+  ],
+});
+
+/** A rework with no Accept prompt open: his notes go to the card's designer as a message, so the card shows them alone. */
+const REWORK_LOG = [
+  he(130, 'Rework sticky headers. Here are my notes.', 'spoken'),
+  she(127, 't-notes', 0, 'Go ahead, I will carry them word for word.'),
+  he(110, 'The headers have to stick on Safari too, not just Chrome.', 'spoken'),
+  he(95, 'Keep the lane count in the header while it sticks.', 'spoken'),
+  he(80, 'No shadow under it, the border is enough.', 'spoken'),
+  she(72, 't-rework', 0, 'Three notes for Sticky headers are on your panel.'),
+  she(71, 't-rework', 1, 'There is no Accept prompt open, so they go to its designer as a message.'),
+  she(70, 't-rework', 2, 'Say "Rework Sticky headers" to send them.'),
+];
+const REWORK = prepared(74, {
+  id: 'fx-act-rework', action: 'rework', target: card('kanban--sticky-headers', 'Sticky headers'), prompt: null, say: 'Rework Sticky headers',
+  carried: [{ label: null, lines: [REWORK_LOG[2], REWORK_LOG[3], REWORK_LOG[4]].map(carriedOf) }],
+});
+
+const OPEN_LOG = [
+  he(50, 'Pull up the voice companion prompt page.', 'spoken'),
+  she(46, 't-open', 0, 'Voice companion prompt is ready to open on your screen.'),
+  she(45, 't-open', 1, 'Say "Open Voice companion prompt".'),
+];
+const OPEN = prepared(47, {
+  id: 'fx-act-open', action: 'open', prompt: null, carried: [], say: 'Open Voice companion prompt',
+  target: { kind: 'page', pageId: 'page-1793032570463-003-ev8jb8', blockId: null, spoken: 'Voice companion prompt' },
+});
+
+const CLOSE_LOG = [
+  he(64, 'Close the follow-up about retesting lane drag on Safari.', 'spoken'),
+  she(60, 't-close', 0, 'Follow-up 12 is on your panel to close: "Retest lane drag on Safari once the sticky headers land."'),
+  she(59, 't-close', 1, 'Say "Close the follow-up on Retest lane drag on Safari".'),
+];
+const CLOSE = prepared(61, {
+  id: 'fx-act-close', action: 'close_followup', prompt: null, carried: [], say: 'Close the follow-up on Retest lane drag on Safari',
+  target: { kind: 'followup', id: 12, sessionId: KANBAN.sessionId, spoken: 'Retest lane drag on Safari', text: 'Retest lane drag on Safari once the sticky headers land.' },
+});
+
+const CLEAR_LOG = [
+  he(44, 'Get ready to clear your memory.', 'spoken'),
+  she(40, 't-clear', 0, 'Your memory is on your panel to clear: the 3 things you keep.'),
+  she(39, 't-clear', 1, 'Say "Clear your memory".'),
+];
+const CLEAR = prepared(41, {
+  id: 'fx-act-clear', action: 'clear_memory', carried: [], say: 'Clear your memory',
+  prompt: "She forgets the 3 things she keeps. The docstore's history keeps them.",
+  target: { kind: 'memory', spoken: 'your memory', count: 3 },
+});
+
 const IDLE: CompanionActivity = { phase: 'idle', session: null, files: null, walk: null };
 const AWAKE: CompanionProcess = { state: 'awake', error: null };
+/** The face of an account for which none is made, the value the server's picture answers until its face service does: every fixture draws as it did before faces. */
+const NO_FACE: CompanionFace = { id: null, original: true, bake: null };
 const FAILED_SENTENCE = "Kaylee couldn't start: the Claude login on this box has expired. Sign in again from Settings > Account.";
 
 /** A picture: the defaults of an awake, idle companion with an empty panel, and whatever a state changes. */
 const picture = (change: Partial<CompanionPicture>): CompanionPicture => ({
   settings: FAKE_SETTINGS, models: MODELS, process: AWAKE, activity: IDLE, turnId: null, focus: null,
-  draft: null, walk: null, notes: [], log: [], floor: 'fixture-page', ...change,
+  draft: null, pending: null, walk: null, notes: [], log: [], floor: 'fixture-page', face: NO_FACE, ...change,
 });
 
 /** One state of the panel: her picture, whether the draft's target is working, and the page's open state. */
@@ -198,4 +331,13 @@ export const FAKE_PANEL: Record<string, FakePanelState> = {
   closed: state({ log: HELLO }, false, false),
   heard: state({ log: HEARD }),
   spoken: state({ log: SPOKEN, focus: KANBAN }),
+  actionQueue: state({ log: [...HELLO, ...QUEUE_LOG], pending: QUEUE }),
+  actionAnswer: state({ log: [...HELLO, ...ANSWER_LOG], pending: ANSWER }),
+  actionRound: state({ log: [...HELLO, ...ROUND_LOG], pending: ROUND }),
+  actionRework: state({ log: [...HELLO, ...REWORK_LOG], focus: KANBAN, pending: REWORK }),
+  actionOpen: state({ log: [...HELLO, ...OPEN_LOG], pending: OPEN }),
+  actionClose: state({ log: [...HELLO, ...CLOSE_LOG], pending: CLOSE }),
+  actionClear: state({ log: [...HELLO, ...CLEAR_LOG], pending: CLEAR }),
+  // The densest dock an action meets: a round's prompt and his answers above a draft that stays where it was.
+  actionDraft: state({ log: [...HELLO, ...ANSWER_LOG], focus: KANBAN, draft: DRAFT_KANBAN, pending: ANSWER }),
 };

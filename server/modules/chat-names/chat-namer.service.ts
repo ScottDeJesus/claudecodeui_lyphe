@@ -1,10 +1,10 @@
 import { sessionsDb } from '@/modules/database/index.js';
 import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
+import { isSayableName } from '@/shared/sayable-name.js';
 import { errorReason } from '@/shared/utils.js';
 
 import { readFirstExchange } from './first-exchange.js';
 import { askHaikuForName } from './haiku-name.js';
-import { isSayableName } from './sayable-name.js';
 
 /**
  * Subscribes the naming pass to every run's end. Consumed by the server entrypoint (`server/index.ts`), which starts it after `listen`

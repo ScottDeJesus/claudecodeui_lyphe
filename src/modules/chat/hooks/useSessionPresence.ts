@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { companionClientId } from '@/shared/utils';
 
 /**
  * How often a visible tab re-states itself.
@@ -28,6 +29,13 @@ type UseSessionPresenceInput = {
  * make every verification run look unwatched.
  */
 const isVisible = (hostDocument: Document) => hostDocument.visibilityState === 'visible';
+
+/**
+ * Whether the window the chat is drawn in has the keyboard. It is the HOST window's answer, and it is what separates two windows
+ * on two monitors that are both visible: the server uses it to pick the page that speaks for his screen when none holds her
+ * floor. Never a reading of visibility (`isVisible` is that), and false in headless Chromium, which only costs the tiebreak.
+ */
+const isFocused = (hostDocument: Document) => hostDocument.hasFocus();
 
 /**
  * THE ONE DEFINITION OF "THE OPERATOR IS LOOKING AT THE SESSION": the chat is on screen (`isActive` —
@@ -82,12 +90,23 @@ export function useSessionPresence({ sessionId, sendMessage, isConnected }: UseS
     if (!isConnected) return undefined;
 
     const hostDocument = hostWindow.document;
+    // `clientId` names this page to the server (it is the id Kaylee's floor is held under) and `focused` says whether its window
+    // has the keyboard: together they let the server find the page he last talked to her from.
     const announce = () => {
-      sendRef.current({ type: 'chat.presence', sessionId, visible: isVisible(hostDocument) });
+      sendRef.current({
+        type: 'chat.presence',
+        sessionId,
+        visible: isVisible(hostDocument),
+        clientId: companionClientId(),
+        focused: isFocused(hostDocument),
+      });
     };
 
     announce();
     hostDocument.addEventListener('visibilitychange', announce);
+    // Moving the keyboard between windows changes which page speaks for his screen, and no heartbeat is owed to say so.
+    hostWindow.addEventListener('focus', announce);
+    hostWindow.addEventListener('blur', announce);
     // A token refresh swaps the socket without `isConnected` ever reading false, so this effect
     // does not re-run — and the server forgot the record with the old socket. The new socket's
     // open is announced as `websocket_reconnected`; restating on it closes a 30 s gap in which a
@@ -105,11 +124,13 @@ export function useSessionPresence({ sessionId, sendMessage, isConnected }: UseS
 
     return () => {
       hostDocument.removeEventListener('visibilitychange', announce);
+      hostWindow.removeEventListener('focus', announce);
+      hostWindow.removeEventListener('blur', announce);
       unsubscribe();
       window.clearInterval(heartbeat);
       // A closed socket is forgotten server-side on its own, but a session switch or an
       // unmount inside a live socket has to say so or this tab keeps muting the old session.
-      sendRef.current({ type: 'chat.presence', sessionId: null, visible: false });
+      sendRef.current({ type: 'chat.presence', sessionId: null, visible: false, clientId: companionClientId(), focused: false });
     };
   // `hostWindow`: a move to another window re-runs this, which announces the new document's
   // visibility (the cleanup first says the old one has left).

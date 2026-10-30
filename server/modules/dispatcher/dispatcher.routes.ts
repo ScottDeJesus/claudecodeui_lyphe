@@ -287,7 +287,7 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // the card's `Override` — and its undo (`… --off --by app:card`, `Turn off`). It lifts the pacer and nothing
   // else: the plan's model word, its epic's and the house switch are untouched, and every soul rides the
   // route that switch gives it. THE DISPATCHER REFUSES THE LIFT INSIDE A CLAUDE SESSION, and this lane's
-  // child environment carries none (`laneEnv`), so the card's press is the operator's own. The two words
+  // child environment carries none (`sessionlessEnv`), so the card's press is the operator's own. The two words
   // are ours (`--by app:card` names the press's door in the plan's log); no body and no argument travel.
   // A refusal (`REFUSED override …`: a finished plan, one the roadmap still holds, one already past the
   // pacer, or `--off` on a plan that carries none) is a 409 whose body is that sentence, untouched.

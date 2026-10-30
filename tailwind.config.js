@@ -90,6 +90,10 @@ export default {
         "accent-ink": "color-mix(in srgb, var(--accent-ink) calc(<alpha-value> * 100%), transparent)",
         "accent-soft": "color-mix(in srgb, var(--accent-soft) calc(<alpha-value> * 100%), transparent)",
         "accent-soft-hover": "color-mix(in srgb, var(--accent-soft-hover) calc(<alpha-value> * 100%), transparent)",
+        // Verve's warm accent ("Orange is a garnish, never a wall"): Kaylee Station's warm touch, the italic
+        // word of its title. A word in it is `text-garnish`. No new colour: tokens.css's `--garnish`, which
+        // reads 11:1 on the dark canvas the station always holds.
+        garnish: "color-mix(in srgb, var(--garnish) calc(<alpha-value> * 100%), transparent)",
         // The tone swap's own properties (tokens.css, the `[data-tone]` rules), named. A container
         // that sets `data-tone` hands `--tone-soft`, `--tone-ink` and `--tone-dot` to everything inside
         // it, and these three let that content spell them as Tailwind names: a status mark is

@@ -7,10 +7,9 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { launchAccountEnv } from '@/modules/providers/index.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
+import { countWords, hasScriptWithoutSpaces, isSayableName } from '@/shared/sayable-name.js';
 import type { ChatFirstExchange } from '@/shared/types.js';
 import { errorReason } from '@/shared/utils.js';
-
-import { isSayableName } from './sayable-name.js';
 
 /**
  * The naming pass's one model call, shaped like the Cerberus summary audit (`cerberus/diagnosis/diagnosis-audit.ts`): a single
@@ -29,6 +28,12 @@ const NAMING_TIMEOUT_MS = 30_000;
 
 const FEWEST_NAME_WORDS = 2;
 const MOST_NAME_WORDS = 4;
+/**
+ * A name in a script without spaces may stand one over `MOST_NAME_WORDS`: `countWords` counts such a name by dictionary pieces, and the
+ * dictionary divides finer than a reader hears (measured 2026-10-28, 22 Haiku answers to Japanese, Chinese and Thai chats: "数据库连接排查",
+ * three words to a reader, counts 5 — "数据|库|连接|排|查" — and was refused at a ceiling of 4; the names of three to four words count 3 to 4).
+ */
+const SEGMENT_COUNT_OVERRUN = 1;
 
 const NAMING_SYSTEM_PROMPT =
   'You name a chat session for a person who refers to it aloud. Read the session\'s first message and first reply, and answer with a name of two to four plain words saying what the chat is about, the way a person would call it in conversation, for example Kanban board, Login fix, Estimate drafts. No punctuation, no quotes, no emoji, no file names, no paths, no slash commands. Reply with the name only.';
@@ -48,7 +53,8 @@ function namingWorkingDirectory(): string {
  * Haiku's reply as a name, or null when it is not one. The prompt asks for the name alone, one line, no emoji: a reply of several lines
  * (two lines stitched by the space collapse would read as one longer name) or holding an emoji is refused. Outer quotes and trailing
  * punctuation are dropped (repeatedly, so a quoted name with a full stop either side of the quote goes the same way), spaces collapse,
- * the first letter is capitalized, and the result must be two to four words that pass `isSayableName`.
+ * the first letter is capitalized, and the result must be two to four words (`countWords`: a reply in a script written without spaces is
+ * counted by its dictionary pieces, not as one word, and may stand one piece over) that pass `isSayableName`.
  */
 function cleanedName(reply: string): string | null {
   const trimmed = reply.trim();
@@ -60,8 +66,9 @@ function cleanedName(reply: string): string | null {
     name = name.replace(QUOTE_MARKS, '').replace(TRAILING_PUNCTUATION, '').trim();
   } while (name !== previous);
   name = name.replace(/^\p{L}/u, (letter) => letter.toUpperCase());
-  const words = name === '' ? 0 : name.split(' ').length;
-  if (words < FEWEST_NAME_WORDS || words > MOST_NAME_WORDS) return null;
+  const words = countWords(name);
+  const mostWords = hasScriptWithoutSpaces(name) ? MOST_NAME_WORDS + SEGMENT_COUNT_OVERRUN : MOST_NAME_WORDS;
+  if (words < FEWEST_NAME_WORDS || words > mostWords) return null;
   return isSayableName(name) ? name : null;
 }
 

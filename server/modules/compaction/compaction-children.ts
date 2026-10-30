@@ -6,7 +6,9 @@ import path from 'node:path';
 import { userFacingEnv } from '@/shared/child-env.js';
 
 /**
- * The two processes a compaction launches, and the only places CloudCLI signals anything for it.
+ * The two processes a compaction launches, and the only places CloudCLI signals anything for it. The verb
+ * has a second caller, `compaction-oneshot.ts` (the companion's handover), which goes through the same
+ * `runSummarizeVerb`.
  *
  * Both are CHILDREN this module spawned, and a signal goes to the pid that spawn returned and to nothing
  * else (`signalOwnChild`). The verb in turn hands the signal down to the summarizer child it launched.
@@ -102,6 +104,8 @@ export function runSummarizeVerb(input: {
   transcriptPath: string;
   providerSessionId: string;
   instructions: string | null;
+  /** Variables set for this one call beside the house's user-facing environment (the verb's own seams, `SUMMARIZE_TAIL_TOKENS`). */
+  env?: Record<string, string>;
   onChild: (stop: () => void) => void;
 }): Promise<VerbAnswer> {
   return new Promise<VerbAnswer>((resolve) => {
@@ -116,7 +120,7 @@ export function runSummarizeVerb(input: {
 
     let child: ChildProcess;
     try {
-      child = spawn(SUMMARIZE_VERB, args, { env: userFacingEnv(), cwd: os.homedir(), stdio: ['pipe', 'pipe', 'pipe'] });
+      child = spawn(SUMMARIZE_VERB, args, { env: { ...userFacingEnv(), ...input.env }, cwd: os.homedir(), stdio: ['pipe', 'pipe', 'pipe'] });
     } catch (error) {
       resolve({ exitCode: null, json: null, stderr: error instanceof Error ? error.message : String(error) });
       return;

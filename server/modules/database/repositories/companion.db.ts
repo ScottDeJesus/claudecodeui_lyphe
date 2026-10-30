@@ -1,9 +1,14 @@
 import { getConnection } from '@/modules/database/connection.js';
+import { companionActionsDb } from '@/modules/database/repositories/companion-actions.db.js';
+import type { CompanionNoteKind, CompanionNoteRef } from '@/shared/companion-types.js';
+import { isStoreStamp } from '@/shared/utils.js';
 
 /**
  * `companion_state`, `companion_log` and `companion_notes`, as row-level statements — the three
- * tables of Kaylee's per-account side. The fourth table of her schema, `relayed_sends`, hangs on
- * a chat rather than an account and has its own repository (`relayed-sends.db.ts`).
+ * tables of Kaylee's per-account side — and, through the spread at the end of `companionDb`, the
+ * verbs of her record of actions (`companion_actions`, written in `companion-actions.db.ts`). The
+ * fifth table of her schema, `relayed_sends`, hangs on a chat rather than an account and has its
+ * own repository (`relayed-sends.db.ts`).
  *
  * This file speaks in ROWS: snake_case columns, JSON columns as the text they are stored as.
  * Mapping a row to the wire contract (`server/shared/companion-types.ts`) — parsing the JSON,
@@ -15,8 +20,9 @@ import { getConnection } from '@/modules/database/connection.js';
  * keeps the newest `COMPANION_LOG_KEEP` rows per account and deletes the rest in the same
  * transaction as the insert, so the table never holds more than that for one account.
  *
- * Consumers: `server/modules/companion/companion-store.ts` — the lane's reader and writer, `readSentence` included — and
- * `companion.service.ts`, which asks `userIdsFocusedOn` which accounts a finished run is news to.
+ * Consumers: `server/modules/companion/companion-store.ts` — the lane's reader and writer, `readSentence` included —
+ * `companion.service.ts`, which asks `userIdsFocusedOn` which accounts a finished run is news to, and
+ * `server/modules/companion/memory/memory-verbs.ts`, which reads and writes `memory_forget_line` through `readState` and `writeState`.
  * Reach it through `@/modules/database/index.js`. Every statement runs on the caller's
  * connection; only `appendLog` and `clearAccount` open a transaction of their own, so each lands
  * whole or not at all.
@@ -30,14 +36,37 @@ export type CompanionStateRow = {
   user_id: number;
   /** Her CLI conversation; NULL until her first init and after Clear. */
   provider_session_id: string | null;
+  /** The fingerprint of her tools and prompt when that conversation began (`companion-shape.ts`); written and nulled with `provider_session_id`. NULL for a conversation begun before the column. */
+  session_shape: string | null;
+  /** The handover of the conversation her last refused resume dropped (`companion/session/companion-handover.ts`); the first message after the fresh start carries it once, and the row is emptied when the launch that was handed that message reports `init`. NULL for none. */
+  handover: string | null;
   /** `CompanionSessionRef` as JSON text, or NULL. */
   focus_json: string | null;
   /** `CompanionDraft` as JSON text, or NULL. */
   draft_json: string | null;
   /** `CompanionWalk` as JSON text, or NULL. */
   walk_json: string | null;
+  /** The pending action with its server-only pin as JSON text, or NULL. */
+  pending_json: string | null;
+  /** His messages no turn of hers has answered yet (`UnansweredMessage[]`) as JSON text, or NULL for none. */
+  unanswered_json: string | null;
   /** The client id holding the floor. Survives Clear. */
   floor: string | null;
+  /**
+   * The id of the `companion_log` line of his that the last forget of her memory used, or NULL before any. A forget needs a line with a
+   * greater id, so one word of his forgets at most five memories. Survives Clear: log ids are never reused, so an old value stays a true
+   * lower bound. A log id, never a memory: CloudCLI keeps none. Read and written only by `memory-verbs.ts`.
+   */
+  memory_forget_line: number | null;
+  /**
+   * The face her pages draw (`<photoId>-<recipeId>`, `server/modules/companion/face/`); NULL for the original. Survives Clear: Clear wipes her
+   * memory, not her look. Written only by the face service.
+   */
+  face_id: string | null;
+  /** The face being made from his upload, which a restart resumes; NULL when none is being made. Survives Clear. Written only by the face service. */
+  face_pending_id: string | null;
+  /** The sentence of the last bake that failed, shown in Settings until the next upload or restore; NULL for none. Survives Clear. Written only by the face service. */
+  face_error: string | null;
   updated_at: string;
 };
 
@@ -74,14 +103,32 @@ export type CompanionLogInput = {
   sounds_json?: string | null;
 };
 
-/** One `companion_notes` row, exactly as the table stores it. */
+/**
+ * One `companion_notes` row, exactly as the table stores it: `kind` is the card's kind as text (the store reads one it does not
+ * know as a `note`), `ref_json` what the card is about as JSON text (NULL for nothing) and `pinned` 1 or 0.
+ */
 export type CompanionNoteRow = {
   id: number;
   user_id: number;
   at: string;
   title: string;
   text: string;
+  kind: string;
+  ref_json: string | null;
+  pinned: number;
 };
+
+/** One log line as the check of his word reads it: who said it, how and when, with its words. Only his lines (`operator`) and hers (`kaylee`) are ever read this way. */
+export type CompanionHeardRow = {
+  id: number;
+  at: string;
+  role: 'operator' | 'kaylee';
+  via: 'typed' | 'spoken' | null;
+  text: string;
+};
+
+/** One account's faces as the face service's start and prune read them: the face it draws and the one being made (each NULL for none). */
+export type CompanionFaceRow = Pick<CompanionStateRow, 'user_id' | 'face_id' | 'face_pending_id'>;
 
 /** What `clearAccount` removed and whether a state row was there to reset. */
 export type CompanionClearResult = {
@@ -91,11 +138,11 @@ export type CompanionClearResult = {
 };
 
 /** Every state column the table holds besides the key: what a read returns and `writeState` may name. */
-const STATE_PATCH_COLUMNS = ['provider_session_id', 'focus_json', 'draft_json', 'walk_json', 'floor'] as const;
+const STATE_PATCH_COLUMNS = ['provider_session_id', 'session_shape', 'handover', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor', 'memory_forget_line', 'face_id', 'face_pending_id', 'face_error'] as const;
 
 const STATE_COLUMNS = `user_id, ${STATE_PATCH_COLUMNS.join(', ')}, updated_at`;
 const LOG_COLUMNS = 'id, user_id, at, role, via, turn_id, turn_index, text, mood, sounds_json';
-const NOTE_COLUMNS = 'id, user_id, at, title, text';
+const NOTE_COLUMNS = 'id, user_id, at, title, text, kind, ref_json, pinned';
 
 export const companionDb = {
   /** The account's state row, or `null` before anything of hers has been stored. */
@@ -123,6 +170,35 @@ export const companionDb = {
       .all(sessionId) as Array<{ user_id: number }>;
 
     return rows.map((row) => row.user_id);
+  },
+
+  /**
+   * The accounts whose last process left a message of his unanswered, ascending: what the server finds at boot to know
+   * whose Kaylee must be made now, so she says those messages to her again without a page asking for her. A column that
+   * holds an empty list names no one.
+   */
+  userIdsWithUnanswered(): number[] {
+    const rows = getConnection()
+      .prepare(`SELECT user_id FROM companion_state WHERE unanswered_json IS NOT NULL AND unanswered_json <> '[]' ORDER BY user_id`)
+      .all() as Array<{ user_id: number }>;
+
+    return rows.map((row) => row.user_id);
+  },
+
+  /**
+   * EVERY account with its face and pending face (each NULL for none), ascending by account — an account that has never
+   * touched Kaylee has no state row and is listed on the original. The face service reads it at start, to resume the bakes and to
+   * bring a face whose recipe is no longer current up to date; after the original's face changes, to tell each account on the
+   * original; and for each prune, to know which faces are named.
+   */
+  listFaces(): CompanionFaceRow[] {
+    return getConnection()
+      .prepare(
+        `SELECT users.id AS user_id, companion_state.face_id AS face_id, companion_state.face_pending_id AS face_pending_id
+         FROM users LEFT JOIN companion_state ON companion_state.user_id = users.id
+         ORDER BY users.id`
+      )
+      .all() as CompanionFaceRow[];
   },
 
   /**
@@ -224,15 +300,49 @@ export const companionDb = {
     return row ?? null;
   },
 
-  /** Inserts one card for the account, stamped now, and answers the row as stored. */
-  addNote(userId: number, note: { title: string; text: string }): CompanionNoteRow {
+  /**
+   * His lines and hers (`operator` and `kaylee` rows) logged after `since`, oldest first, at most `COMPANION_LOG_KEEP` —
+   * the whole of what the log keeps for the account, which is the most a check of his word can need. `since` is an
+   * ISO-8601 stamp; the stamps are fixed-width UTC, so the comparison is a text comparison and a line logged in the very
+   * millisecond of `since` is not after it. A `since` that is not such a stamp (`''` would be "before every line") throws:
+   * a check that reads "after the card went up" must not fail open. The panel's own lines (`alert`, `system`) are not his
+   * words and are never read.
+   */
+  heardSince(userId: number, since: string): CompanionHeardRow[] {
+    if (!isStoreStamp(since)) throw new Error(`heardSince needs a stored stamp (ISO-8601 UTC with milliseconds), not ${JSON.stringify(since)}.`);
+    return getConnection()
+      .prepare(
+        `SELECT id, at, role, via, text FROM companion_log
+         WHERE user_id = ? AND role IN ('operator', 'kaylee') AND at > ?
+         ORDER BY id LIMIT ?`
+      )
+      .all(userId, since, COMPANION_LOG_KEEP) as CompanionHeardRow[];
+  },
+
+  /**
+   * His newest line of any kind (`operator` rows, spoken or typed), or `null` when he has said nothing. The trigger a harmless
+   * action's record carries as its `said` (`open` and `close_followup` are done at once and wait for no word, so the line is the
+   * record's, never a check). Consumed by `hands/direct-tools.ts`.
+   */
+  newestOperatorLine(userId: number): CompanionHeardRow | null {
+    const row = getConnection()
+      .prepare(`SELECT id, at, role, via, text FROM companion_log WHERE user_id = ? AND role = 'operator' ORDER BY id DESC LIMIT 1`)
+      .get(userId) as CompanionHeardRow | undefined;
+    return row ?? null;
+  },
+
+  /**
+   * Inserts one card for the account, stamped now, unpinned, and answers the row as stored. `kind` is a `note` unless given and
+   * `ref` (what the card is about) is NULL unless given; `ref` is the one object this file serializes, written as `ref_json`.
+   */
+  addNote(userId: number, note: { title: string; text: string; kind?: CompanionNoteKind; ref?: CompanionNoteRef | null }): CompanionNoteRow {
     const row = getConnection()
       .prepare(
-        `INSERT INTO companion_notes (user_id, at, title, text)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO companion_notes (user_id, at, title, text, kind, ref_json)
+         VALUES (?, ?, ?, ?, ?, ?)
          RETURNING ${NOTE_COLUMNS}`
       )
-      .get(userId, new Date().toISOString(), note.title, note.text) as CompanionNoteRow | undefined;
+      .get(userId, new Date().toISOString(), note.title, note.text, note.kind ?? 'note', note.ref ? JSON.stringify(note.ref) : null) as CompanionNoteRow | undefined;
 
     if (!row) throw new Error(`Could not insert companion note "${note.title}".`);
     return row;
@@ -255,27 +365,39 @@ export const companionDb = {
   },
 
   /**
-   * Clear: deletes the account's log and cards and empties its state's conversation, focus, draft
-   * and walkthrough — in one transaction. `floor` stays (which client holds the floor is no part
-   * of her memory), and `relayed_sends` is never touched: those rows are facts about chats. No
-   * state row is created when the account has none.
+   * Clear: deletes the account's log and cards and empties its state's conversation (its id, shape and handover), focus, draft,
+   * pending action, unanswered messages and walkthrough — in one transaction. `floor` stays (which client holds the floor
+   * is no part of her conversation), and so do her face columns (Clear wipes her memory, not her look), and so does `memory_forget_line`: log ids are AUTOINCREMENT and never reused, so the id of the line
+   * the last forget of her memory used stays a true lower bound after the log it named is gone, and a line he says next always has a
+   * greater id. `relayed_sends` and `companion_actions` are never deleted from:
+   * those rows are facts about chats and about the house. The one write Clear makes to
+   * `companion_actions` is to END any row with no outcome yet as `cancelled`, in the same
+   * transaction and before the state loses its `pending_json` — found by the row's own empty outcome rather than through
+   * the column about to be emptied, so a `pending_json` that no longer parses cannot strand its row. A row a take has claimed
+   * (`claimAction`: its firing line is written) is spared: its door is out, and the take ends it with the door's own outcome.
+   * No state row is created when the account has none.
    */
   clearAccount(userId: number): CompanionClearResult {
     const db = getConnection();
 
     return db.transaction(() => {
+      const clearedAt = new Date().toISOString();
+      db.prepare(`UPDATE companion_actions SET ended_at = ?, outcome = 'cancelled' WHERE user_id = ? AND outcome IS NULL AND said_log_id IS NULL`).run(clearedAt, userId);
       const logRemoved = db.prepare('DELETE FROM companion_log WHERE user_id = ?').run(userId).changes;
       const notesRemoved = db.prepare('DELETE FROM companion_notes WHERE user_id = ?').run(userId).changes;
       const stateReset =
         db
           .prepare(
             `UPDATE companion_state
-             SET provider_session_id = NULL, focus_json = NULL, draft_json = NULL, walk_json = NULL, updated_at = ?
+             SET provider_session_id = NULL, session_shape = NULL, handover = NULL, focus_json = NULL, draft_json = NULL, walk_json = NULL, pending_json = NULL, unanswered_json = NULL, updated_at = ?
              WHERE user_id = ?`
           )
-          .run(new Date().toISOString(), userId).changes > 0;
+          .run(clearedAt, userId).changes > 0;
 
       return { logRemoved, notesRemoved, stateReset };
     })();
   },
+
+  // Her record of actions (`openAction`, `endAction`, `listActions`): the same object, so the companion reads one repository.
+  ...companionActionsDb,
 };

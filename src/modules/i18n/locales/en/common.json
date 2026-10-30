@@ -1721,7 +1721,8 @@
       "choose": "Choose a page…",
       "custom": "Type an address…",
       "open": "Open the page in a new tab",
-      "rejected": "That is not an http:// or https:// address"
+      "rejected": "That is not an http:// or https:// address",
+      "plainHttpBlocked": "This page is plain http, and a browser will not draw a plain-http page inside this app while it is open over https. Use the Open link to see it in its own tab."
     },
     "notes": {
       "title": "Notes"
@@ -1750,6 +1751,9 @@
     "empty": "Nothing open in this chat.",
     "doneFold": "Done ({{n}})",
     "doneWhen": "Done {{when}}",
+    "doneWhenFeatureFinished": "Done {{when}} when feature {{feature}} finished",
+    "doneWhenTaskFinished": "Done {{when}} when task {{task}} of feature {{feature}} finished",
+    "doneWhenEpicFinished": "Done {{when}} when epic {{epic}} finished",
     "reading": "Reading this chat's list…",
     "unreachable": "Could not read this chat's list",
     "retry": "Try again",
@@ -3176,7 +3180,9 @@
     },
     "appearanceLight": "Light appearance",
     "appearanceDark": "Dark appearance",
-    "divider": "Resize applications"
+    "divider": "Resize applications",
+    "mixedContentTitle": "This app can't be shown here",
+    "mixedContentMessage": "{{name}} is served over plain http, and a browser will not draw a plain-http page inside this app while it is open over https."
   },
   "chatHost": {
     "panelLabel": "Floating chat",
@@ -3209,6 +3215,8 @@
       "close": "Close {{name}}",
       "loading": "Opening {{name}}'s conversation…",
       "loadingStatus": "Loading…",
+      "readFailed": "Couldn't open {{name}}'s conversation: {{reason}}",
+      "retry": "Try again",
       "failedUnknown": "{{name}} stopped."
     },
     "status": {
@@ -3246,7 +3254,11 @@
       "draftingNew": "{{name}}, drafting a new chat",
       "walking": "{{name}}, walking {{chat}}, item {{at}} of {{total}}",
       "walkingPlain": "{{name}}, walking a result",
-      "cut": "{{name}}, stopped talking"
+      "cut": "{{name}}, stopped talking",
+      "loading": "{{name}}, loading",
+      "failed": "{{name}}, stopped",
+      "asleep": "{{name}}, asleep",
+      "waking": "{{name}}, waking up"
     },
     "focus": "Focus",
     "model": "Model",
@@ -3259,11 +3271,11 @@
     "stopHint": "Stop {{name}}'s answer",
     "stopRefused": "Her answer didn't stop",
     "clear": "Clear",
-    "clearLabel": "Clear {{name}}'s memory",
-    "clearTitle": "Clear {{name}}'s memory?",
-    "clearMessage": "She forgets this conversation, her notes, the draft and the walkthrough, and starts fresh. Briefs she already sent stay in their chats.",
-    "clearConfirm": "Clear her memory",
-    "clearRefused": "{{name}}'s memory wasn't cleared",
+    "clearLabel": "Clear {{name}}'s conversation",
+    "clearTitle": "Clear {{name}}'s conversation?",
+    "clearMessage": "She forgets this conversation, her notes, the draft and the walkthrough, and starts fresh. What she keeps in her memory stays, and briefs she already sent stay in their chats.",
+    "clearConfirm": "Clear the conversation",
+    "clearRefused": "{{name}}'s conversation wasn't cleared",
     "cancel": "Cancel",
     "log": {
       "label": "Conversation with {{name}}",
@@ -3316,6 +3328,55 @@
       "saveRefused": "Your edit wasn't saved: {{reason}}",
       "saveRefusedPlain": "Your edit wasn't saved. It is still here."
     },
+    "action": {
+      "waiting": "Waiting for your word",
+      "verb": {
+        "queue": "Queue <target/>",
+        "hide": "Hide <target/>",
+        "show": "Show <target/>",
+        "rework": "Rework <target/>",
+        "answer": "Send the answers to <target/>",
+        "recut": "Re-cut <target/>",
+        "stop": "Stop <target/>",
+        "resume": "Resume <target/>",
+        "kick": "Kick <target/>",
+        "resumeRun": "Resume the run <target/>",
+        "open": "Open <target/>",
+        "closeFollowup": "Close the follow-up on <target/>",
+        "clearMemory": "Clear <target/>"
+      },
+      "kind": {
+        "feature": "Feature",
+        "epic": "Epic",
+        "run": "Run",
+        "page": "DocSpace page",
+        "chat": "Chat",
+        "followup": "Follow-up #{{id}}",
+        "memory_one": "Your memory, {{count}} thing kept",
+        "memory_other": "Your memory, {{count}} things kept",
+        "check": "Check"
+      },
+      "inEpic": "epic {{epic}}",
+      "atBlock": "block {{block}}",
+      "prompt": "The prompt",
+      "followup": "The follow-up",
+      "questions": "The questions, with their options",
+      "noAnswer": "No answer — it goes as “(no answer)”",
+      "carried": {
+        "rework": "Your notes · sent word for word",
+        "answer": "Your answers · sent word for word",
+        "resumeRun": "Your rulings · sent word for word",
+        "other": "Your words · sent word for word"
+      },
+      "quoted": "“{{text}}”",
+      "say": "Say:",
+      "aloud": "Aloud, not typed",
+      "lapses": "Lapses at {{time}}",
+      "withdraw": "Withdraw",
+      "withdrawHint": "Withdraw: {{name}} won't do it",
+      "withdrawRefused": "Not withdrawn: {{reason}}",
+      "withdrawRefusedPlain": "Not withdrawn. Try again."
+    },
     "composer": {
       "placeholder": "Message {{name}}…",
       "label": "Message {{name}}",
@@ -3337,6 +3398,80 @@
       "group": "{{name}}",
       "talk": "Talk to {{name}}",
       "keywords": "kaylee companion voice assistant talk draft brief"
+    },
+    "noteKind": {
+      "note": "Note",
+      "list": "List",
+      "diff": "Diff",
+      "plan": "Plan page",
+      "page": "DocSpace page"
+    }
+  },
+  "station": {
+    "title": "Kaylee Station",
+    "focusKind": {
+      "chat": "Session",
+      "card": "Feature or epic",
+      "ask": "Waiting ask",
+      "followups": "Follow-ups",
+      "check": "Check",
+      "note": "Card",
+      "walk": "Walkthrough",
+      "page": "Page"
+    },
+    "bar": {
+      "title": "Kaylee <accent>Station</accent>",
+      "back": "CloudCLI",
+      "backLabel": "Back to CloudCLI"
+    },
+    "stage": {
+      "name": "Stage",
+      "back": "Back",
+      "clear": "Clear the stage",
+      "empty": {
+        "title": "Nothing on the stage",
+        "message": "Press anything on either side, or ask her to show you something."
+      }
+    },
+    "card": {
+      "looking": "Looking for {{label}}…"
+    },
+    "page": {
+      "page": "A page in DocSpace",
+      "block": "One block of a page in DocSpace",
+      "open": "Open in DocSpace"
+    },
+    "fallback": {
+      "why": {
+        "chat": "The station has no view of a chat yet.",
+        "card": "The station has no view of this card yet.",
+        "ask": "The station has no view of a waiting ask yet.",
+        "followups": "The station has no view of follow-ups yet.",
+        "check": "The station has no view of a check yet.",
+        "note": "The station has no view of her cards yet.",
+        "walk": "The station has no view of her walkthrough yet.",
+        "page": "The station has no view of a page yet."
+      },
+      "open": {
+        "chat": "Open the chat in CloudCLI",
+        "card": "Open its card in the Runner",
+        "ask": "Open the chat it waits in",
+        "followups": "Open the chat in CloudCLI",
+        "check": "Open CloudCLI",
+        "note": "Open CloudCLI",
+        "walk": "Open CloudCLI",
+        "page": "Open CloudCLI"
+      }
+    },
+    "gone": {
+      "chat": "{{label}} is no longer in CloudCLI",
+      "card": "{{label}} is no longer on the roadmap",
+      "ask": "{{label}} is no longer waiting",
+      "followups": "{{label}} has no open follow-ups now",
+      "check": "{{label}} is no longer failing",
+      "note": "{{label}} is no longer on her cards",
+      "walk": "{{label}} has ended",
+      "page": "{{label}} is no longer in DocSpace"
     }
   }
 }

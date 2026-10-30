@@ -24,7 +24,8 @@ const isPreformatted = (text: string): boolean => LIST_LINE.test(text) || PATH.t
 
 /**
  * The cards she put on the panel with `show_note` instead of saying them: a list, a path, a set of numbers — things better
- * seen than heard. Each card is its title and its text, and a ✕ that dismisses it; it stays until he does. A note that
+ * seen than heard. Each card is its title and its text, and a ✕ that dismisses it; it stays until he does, or until she
+ * takes it down herself (`dismiss_note`, which arrives as the same `companion_note_removed`). A note that
  * holds a list or a path keeps her lines exactly, in monospace (a long path breaks where it must rather than running off the card);
  * any other note is prose with her line breaks kept. The panel scrolls the notes as one, between the walkthrough and the
  * draft, so a long note never pushes the draft or the composer off the panel and never nests a scroller in a scroller.

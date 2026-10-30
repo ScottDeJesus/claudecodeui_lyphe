@@ -27,7 +27,9 @@ import { fillSystemPrompt } from './companion-prompt.js';
  *   - `strictMcpConfig` — the operator's own MCP servers (`~/.claude.json`) are not loaded into her.
  * She differs from the diagnosis agent in four ways, each one a reason she lives longer than a call:
  *   - she PERSISTS: `persistSession` stays on and the CLI session id the caller holds is passed as
- *     `resume`, so her memory outlives the process (the idle closer ends it after two hours of silence);
+ *     `resume`, so her conversation outlives the process (the idle closer ends it after two hours of silence) — but only while her
+ *     tools and prompt are what that conversation began with: the CLI records both once and keeps them on a resume, so
+ *     `session/companion-session.ts` resumes a conversation only when its stored shape (`session/companion-shape.ts`) is the launch's own;
  *   - her `cwd` is `~/.claude/state/companion/<user id>`, a hidden project root
  *     (`shared/hidden-project-paths.ts`): her conversation never reaches a project list, and the heal
  *     reads her turns as a program's, never as the operator's correction (INV-4352);
@@ -35,8 +37,9 @@ import { fillSystemPrompt } from './companion-prompt.js';
  *   - `maxTurns` is 30 PER TURN of hers (a turn is one answer to him, with every tool call inside it).
  * It is a Claude launch like any other, so it starts on the account the house chose, on the subscription.
  *
- * Consumers: `session/companion-session.ts` (every launch and relaunch) and `tools/companion-tools.ts`
- * (which re-exports `COMPANION_MCP_SERVER_NAME`, the one name her tools are registered under).
+ * Consumers: `session/companion-session.ts` (every launch and relaunch), `session/companion-handover.ts` (where the thread of a
+ * conversation she drops is filed) and `tools/companion-tools.ts` (which re-exports `COMPANION_MCP_SERVER_NAME`, the one name her tools
+ * are registered under).
  */
 
 /**
@@ -72,6 +75,19 @@ const SESSION_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
  */
 export function resumableSessionId(held: string | null): string | null {
   return held !== null && SESSION_ID_SHAPE.test(held) ? held : null;
+}
+
+/**
+ * Where the CLI filed her conversation `sessionId`: `~/.claude/projects/<her working directory with every character but a letter, a digit
+ * and `-` turned into `-`>/<id>.jsonl` (every login's `projects` is the same folder). `null` when the id is not a UUID (a damaged id never
+ * reaches a path) or no such file stands. Consumed by `session/companion-handover.ts`, which hands the thread of a conversation she is
+ * about to drop to the summarizer.
+ */
+export function companionTranscriptPath(userId: number, sessionId: string): string | null {
+  if (resumableSessionId(sessionId) === null) return null;
+  const folder = companionWorkingDirectory(userId).replace(/[^a-zA-Z0-9-]/g, '-');
+  const transcript = path.join(os.homedir(), '.claude', 'projects', folder, `${sessionId}.jsonl`);
+  return fs.existsSync(transcript) ? transcript : null;
 }
 
 /** Every tool name the CLI will list for her: the definitions' own names under the server's prefix. */

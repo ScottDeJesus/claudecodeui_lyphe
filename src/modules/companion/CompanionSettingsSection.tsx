@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CompanionFaceSettings } from '@/modules/companion/CompanionFaceSettings';
+import { CompanionMemorySettings } from '@/modules/companion/CompanionMemorySettings';
 import { CompanionSettingsForm } from '@/modules/companion/CompanionSettingsForm';
 import { TalkBindingField } from '@/modules/companion/TalkBindingField';
 import { useCompanionSettings } from '@/modules/companion/hooks/useCompanionSettings';
@@ -21,18 +23,32 @@ type CompanionSettingsViewProps = {
    * talks to her comes before who she is. Absent, nothing is drawn for it.
    */
   talkBinding?: ReactNode;
+  /**
+   * Her face card (CompanionFaceSettings), drawn directly after the talk button's card once her fields are read: how she
+   * looks comes right after how he reaches her. It draws its own card, its question and its lightbox, so this view only
+   * places it. Absent, nothing is drawn for it.
+   */
+  face?: ReactNode;
+  /**
+   * Her memory card (CompanionMemorySettings), drawn after the talk button's card and her face card, directly above her
+   * fields, once they are read. It draws its own card, its waiting row and its warn Banner, so this view only places it.
+   * Absent, nothing is drawn for it.
+   */
+  memory?: ReactNode;
 };
 
 /**
  * Settings > Voice > Companion, drawn: the section title, then the talk button's binding in a card of its own when it is
- * given, then her four fields (CompanionSettingsForm) in the settings tab's own card. Before they are read, a waiting row
- * in that card; a read that failed is a warn Banner with Try again, and no fields, because a field offered over a setting
- * the section cannot see is how a good value gets overwritten.
+ * given, then her face card and her memory card when they are given, then her four fields (CompanionSettingsForm) in the
+ * settings tab's own card. Before they are read, a waiting row in that card; a read that failed is a warn Banner with Try
+ * again, and no fields, because a field offered over a setting the section cannot see is how a good value gets overwritten.
  *
  * Exported for this file's CompanionSettingsSection and for `.verify/companion-panel-scaffold.mjs`, which draws each of
- * these states, and `.verify/kaylee-talk-scaffold.mjs`, which draws the talk button's row in its card.
+ * these states, `.verify/kaylee-talk-scaffold.mjs`, which draws the talk button's row in its card,
+ * `.verify/kaylee-face-card.mjs`, which draws her face card in its place, and `.verify/kaylee-memory-card.mjs`, which
+ * draws her memory card in its place.
  */
-export function CompanionSettingsView({ settings, loadFailed, onRetry, onSave, talkBinding }: CompanionSettingsViewProps) {
+export function CompanionSettingsView({ settings, loadFailed, onRetry, onSave, talkBinding, face, memory }: CompanionSettingsViewProps) {
   const { t } = useTranslation('settings');
 
   let body;
@@ -40,6 +56,8 @@ export function CompanionSettingsView({ settings, loadFailed, onRetry, onSave, t
     body = (
       <>
         {talkBinding && <SettingsCard className="mb-3">{talkBinding}</SettingsCard>}
+        {face && <div className="mb-3">{face}</div>}
+        {memory && <div className="mb-3">{memory}</div>}
         <CompanionSettingsForm settings={settings} onSave={onSave} />
       </>
     );
@@ -67,10 +85,10 @@ export function CompanionSettingsView({ settings, loadFailed, onRetry, onSave, t
 /**
  * Her Settings section, self-contained: what the settings module's VoiceSettingsTab renders after its own sections,
  * whether or not voice is on. It does its own read and its own save, so it works wherever Settings renders, and hands
- * both to CompanionSettingsView.
+ * both to CompanionSettingsView. Her face card is mounted with the face that same read carried, once both are known.
  */
 export function CompanionSettingsSection() {
-  const { settings, loadFailed, retry, save } = useCompanionSettings();
+  const { settings, face, loadFailed, retry, save } = useCompanionSettings();
   // Bind's capture: the next key or mouse button is saved as `talkBinding` through this section's own save, or its refusal is shown.
   const capture = useTalkBindingCapture((talkBinding) => save({ talkBinding }));
 
@@ -90,6 +108,8 @@ export function CompanionSettingsSection() {
           onCancel={capture.cancel}
         />
       }
+      face={settings && face && <CompanionFaceSettings name={settings.name} face={face} />}
+      memory={settings && <CompanionMemorySettings name={settings.name} />}
     />
   );
 }

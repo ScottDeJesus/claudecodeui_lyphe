@@ -1,3 +1,8 @@
+import {
+  recoveredCopy,
+  redCopy,
+  redReminderCopy,
+} from '@/modules/notifications/services/cerberus-red-copy.service.js';
 import { humanizeTokens } from '@/shared/utils.js';
 
 /**
@@ -70,9 +75,10 @@ const PLAN_EXCERPT_CHARS = 600;
 const TOOL_INPUT_JSON_CHARS = 300;
 
 /**
- * Every body's ceiling. Web push refuses a payload over ~4 KB and the
- * orchestrator settles those refusals silently, so a long Bash command or a
- * many-option question must never be the reason a push does not arrive.
+ * The push channels' body ceiling, and the default of `buildNotificationText`. Web push refuses a payload over
+ * ~4 KB and the orchestrator settles those refusals silently, so a long Bash command or a many-option question
+ * must never be the reason a push does not arrive. The companion's alert asks for the whole body of a question card
+ * only (`companion/feeds/alert-block.ts`).
  */
 const MAX_BODY_CHARS = 1000;
 
@@ -308,6 +314,11 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
       body: turns === null ? 'The run stopped at its turn limit' : `The run stopped after ${turns} turns`,
     };
   }],
+  // The Cerberus red watch (`cerberus-red-copy.service.ts` holds the wording): a check red for an hour, still red,
+  // green again. One event per tick, so the meta carries the groups that moved and the copy names them all.
+  ['cerberus.red', ({ meta }) => redCopy(meta)],
+  ['cerberus.red.reminder', ({ meta }) => redReminderCopy(meta)],
+  ['cerberus.recovered', ({ meta }) => recoveredCopy(meta)],
   ['api.error', ({ meta }) => ({
     headline: 'API error',
     body: `${readText(meta.reason) ?? 'unknown'} after ${readNumber(meta.attempts) ?? 0} retries`,
@@ -418,14 +429,19 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
  * Renders one notification event as the title and body every channel shows.
  *
  * Consumed by the notification orchestrator's `buildNotificationPayload` (web
- * push, desktop and ntfy all send its output) and exported from the module
- * barrel for any caller that must show an event's wording. The title is the
+ * push, desktop and ntfy all send its output) and, through the module barrel, by
+ * the companion's alert block (`buildAlertBlock`), which asks for the whole body of a question card. The title is the
  * code's headline followed by ` · <session name>` when one is known — except
  * an account-limit code, whose headline names the window instead, followed by
  * the launch account's slug when the emitter sent one; an unknown code renders
  * the generic CloudCLI copy rather than nothing.
+ *
+ * `bodyLimit` is the most characters the body keeps, cut without an ellipsis: the push cap (`MAX_BODY_CHARS`) when
+ * omitted, so every push channel is unchanged, or `null` for the whole body — the companion's alert
+ * (`companion/feeds/alert-block.ts`) for a question card, which is a message to a model and not a payload a push
+ * service refuses. A caller passing `null` owns the bound: a body built from free text (a Bash command, an error) is unbounded.
  */
-export function buildNotificationText(event: NotificationEventLike): NotificationText {
+export function buildNotificationText(event: NotificationEventLike, bodyLimit: number | null = MAX_BODY_CHARS): NotificationText {
   const meta = isRecord(event.meta) ? event.meta : {};
   const copy = typeof event.code === 'string' ? COPY_BY_CODE.get(event.code) : undefined;
   const { headline, body } = copy ? copy({ meta, providerLabel: providerLabel(event.provider) }) : FALLBACK_COPY;
@@ -438,6 +454,6 @@ export function buildNotificationText(event: NotificationEventLike): Notificatio
 
   return {
     title: `${headline}${accountSlug ? ` · ${accountSlug}` : ''}${sessionName ? ` · ${sessionName}` : ''}`,
-    body: body.slice(0, MAX_BODY_CHARS),
+    body: bodyLimit === null ? body : body.slice(0, bodyLimit),
   };
 }

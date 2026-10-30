@@ -35,7 +35,10 @@ type EpicPanelProps = {
  * The ⋯ menu is the epic's whole: add a feature, edit, move it to another milestone, mark it blocked or
  * unblock it, and delete it while it holds no feature, since the store refuses the rest.
  *
- * Used by the roadmap module's panel, `panel/TreePanel`, for an epic's selection.
+ * Used by the roadmap module's panel, `panel/TreePanel`, for an epic's selection, and by the station module's
+ * `CardStage`, which draws it on the stage for an epic the dispatcher no longer holds (the roadmap barrel exports it
+ * for that). Its menu and Add a feature open their dialogs through `RoadmapFaceContext`, so they open under the
+ * Roadmap face or under a `RoadmapDialogHost`, which `CardStage` draws it in.
  */
 export function EpicPanel({ epic, n, dots, headingId, onSelect }: EpicPanelProps) {
   const { t } = useTranslation();

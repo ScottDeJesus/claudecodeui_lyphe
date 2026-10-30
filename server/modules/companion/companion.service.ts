@@ -11,6 +11,8 @@ import { buildPicture } from './companion-picture.js';
 import { readCompanionSettings, saveCompanionSettings, type CompanionSettingsPatch } from './companion-settings.js';
 import type { CompanionAlert } from './feeds/alert-block.js';
 import { focusNewsEnvelope, readRunReply } from './feeds/focus-feed.js';
+import { withdrawStandingAction } from './hands/action-end.js';
+import type { CompanionHouse } from './house.js';
 
 /**
  * Kaylee, per account. The service holds one `CompanionAccount` (her store, her live conversation, her activity)
@@ -21,25 +23,29 @@ import { focusNewsEnvelope, readRunReply } from './feeds/focus-feed.js';
  * cannot reach another account's rows, pages or conversation. The routes only parse and answer; the verbs decide:
  *   - `sendText` takes the floor for the page that typed, logs his line and pushes it to her;
  *   - `saveSettings` stores the patch, tells every page, and applies a model change to her running process
- *     with her memory kept (`setModel`);
+ *     with her conversation kept (`setModel`);
  *   - `press` is a press of the talk button (`companion-press.ts`): the page takes the floor, the clip is heard, and
  *     his words (or the empty press) are logged and pushed in arrival order; a hearing that fails pushes nothing;
  *   - `sendDraft` is the panel's Send: the draft goes to its target (a turn, or folded into the running one) and the
  *     pressing page takes the floor, so the chat opens where he pressed;
+ *   - `cancelAction` is the × on the action card: the one action waiting for his word comes off his panel and its row in her
+ *     record of actions ends `cancelled` (or `expired`, when it had already lapsed); with none standing it changes nothing;
  *   - `speech` and `cut` are her voice (`companion-speech.ts`): the audio of one sentence for the floor page, and the
  *     press that stops her while she speaks and owes her next message a `<cut>`;
- *   - `clear` wipes her: process, CLI conversation, log, notes, draft, walk, focus and the turn's audio. What chats
- *     were sent through her (`relayed_sends`) stays, because those rows belong to the chats;
+ *   - `clear` wipes her: process, CLI conversation, log, notes, draft, pending action, walk, focus and the turn's audio.
+ *     What chats were sent through her (`relayed_sends`) stays, because those rows belong to the chats, and so does her
+ *     record of actions (`companion_actions`), a fact about the house: a pending action Clear finds standing ends `cancelled`, unless a take is carrying it out;
  *   - `stopAll` winds every conversation and every synthesis down for shutdown and from then on refuses a message with a
  *     503: the HTTP drain comes after it, and a process woken then would have nothing left to end it;
- *   - `alert`, `runFailed` and `runCompleted` are the verbs the house's feeds call (each is explained at its verb);
+ *   - `alert`, `runFailed`, `runCompleted` and `chatDeleted` are the verbs the house's feeds call (each is explained at its verb);
  *     `alert` and the focus push refuse once `stopAll` has run, for the reason a message does.
  *
- * THE RUNTIME is the gateway her tools stop, answer and send through. The module is built by the entrypoint, which owns
- * it, so `createCompanionModule` attaches it before anything can call a verb; an account made before that is refused.
+ * THE RUNTIME is the gateway her tools stop, answer and send through, and THE HOUSE is the readers only a module instance
+ * holds (`house.ts`). The module is built by the entrypoint, which owns both, so `createCompanionModule` attaches them
+ * together before anything can call a verb; an account made before that is refused.
  *
  * Consumers: `companion.routes.ts` (every verb but the feeds'), `companion.module.ts` (`attachRuntime`, `stopAll`)
- * and the alert and focus feeds (`alert`, `runFailed`, `runCompleted`).
+ * and the alert, focus and deleted-chat feeds (`alert`, `runFailed`, `runCompleted`, `chatDeleted`).
  */
 
 /**
@@ -59,6 +65,7 @@ const stopping = (): AppError =>
 function createCompanionService() {
   const accounts = new Map<number, CompanionAccount>();
   let runtime: ProviderRuntimeGateway | null = null;
+  let house: CompanionHouse | null = null;
   // Set by `stopAll`: from then on a message is refused, because `stopAll` has already run and nothing would end the process it woke.
   let stopped = false;
   // Chat id → when the alert feed heard its run fail; read and cleared by `runCompleted`, so a failed run is not also told as finished.
@@ -82,16 +89,18 @@ function createCompanionService() {
   function accountOf(userId: number): CompanionAccount {
     const held = accounts.get(userId);
     if (held) return held;
-    if (runtime === null) throw new Error('The companion has no runtime gateway: createCompanionModule attaches it before any verb is called.');
-    const made = createCompanionAccount(userId, runtime);
+    // Falsy, not `=== null`: a plain-JS caller (a probe) that forgets the second argument of `attachRuntime` hands `undefined`, which must be refused here and not carried into the tools.
+    if (!runtime || !house) throw new Error('The companion has no runtime gateway or house: createCompanionModule attaches them before any verb is called.');
+    const made = createCompanionAccount(userId, runtime, house);
     accounts.set(userId, made);
     return made;
   }
 
   return {
-    /** The gateway her tools act through; a module built is a service that takes messages again. Called once by `createCompanionModule`. */
-    attachRuntime(gateway: ProviderRuntimeGateway): void {
+    /** The gateway her tools act through and the house they read the panels through; a module built is a service that takes messages again. Called once by `createCompanionModule`. */
+    attachRuntime(gateway: ProviderRuntimeGateway, handedHouse: CompanionHouse): void {
       runtime = gateway;
+      house = handedHouse;
       stopped = false;
     },
 
@@ -125,7 +134,7 @@ function createCompanionService() {
 
     /**
      * Stores `patch`, tells every page the settings as they now read, and applies a model change to her running
-     * process (her memory is kept; a process that is asleep launches on the stored model). A model the CLI
+     * process (her conversation is kept; a process that is asleep launches on the stored model). A model the CLI
      * refuses to switch to is a system line on the panel, never a failed save: the setting IS saved and the
      * next time she wakes she runs on it.
      */
@@ -160,6 +169,18 @@ function createCompanionService() {
     },
 
     /**
+     * His × on the action card. The standing action's row ends `cancelled` — or `expired` when it is already past its
+     * `expiresAt`, a lapse found by this verb (nothing times a lapse out: the next prepare, take or cancel that meets it
+     * ends it) — and then the action leaves her state and his panel. With none standing it changes nothing and sends nothing,
+     * so a second page's × on an action the first already withdrew is not an error. An action a take is carrying out cannot be
+     * withdrawn: its door is out, the card goes when the take finishes, and the × changes nothing.
+     */
+    cancelAction(userId: number): void {
+      // The same function her `cancel_action` ends an action through, so the two doors cannot end one two ways.
+      withdrawStandingAction(userId, accountOf(userId).store);
+    },
+
+    /**
      * The panel's Send: the held draft goes to its target as `mode` asks (see `companion-send.ts` for what a send is). The
      * pressing page takes the floor, because the chat opens on the page that holds it. `text`, when a caller gives it, must
      * equal the draft's. Answers the outcome and the sentence that says it; `refused` carries the reason.
@@ -176,8 +197,24 @@ function createCompanionService() {
       accountOf(userId).store.removeNote(id);
     },
 
-    /** Stops her own turn now. A Stop with no turn running does nothing. */
-    interrupt: (userId: number): Promise<void> => accountOf(userId).session.interrupt(),
+    /** Stops her own turn now: his Stop, so the words that turn was answering are dropped. A Stop with no turn running does nothing. */
+    interrupt: (userId: number): Promise<void> => accountOf(userId).session.interrupt('operator'),
+
+    /**
+     * Says to her again, for each user whose last process left words of his unanswered, those words (making the account if it is
+     * not made yet): she answers them without anyone speaking to her or a page opening. A duty of the SOLE server on the port,
+     * which the entrypoint runs once the predecessor of a handover is gone (`soleServerDuties`) — a predecessor still serving may
+     * be answering the same words. One account's failure is logged and is that account's alone.
+     */
+    resendUnanswered(): void {
+      for (const userId of companionDb.userIdsWithUnanswered()) {
+        try {
+          accountOf(userId).session.resendUnanswered();
+        } catch (error) {
+          console.error(`[Companion] account ${userId}: her unanswered messages could not be sent again`, error);
+        }
+      }
+    },
 
     /**
      * Wipes her. The session is told first and SYNCHRONOUSLY detaches its process and forgets the CLI conversation
@@ -268,6 +305,29 @@ function createCompanionService() {
     },
 
     /**
+     * A chat row was deleted: every account whose focus is that chat drops the focus, and its pages hear `companion_focus` null.
+     * Found from the stored rows (`userIdsFocusedOn`), so an account whose Kaylee has not been touched since the server
+     * booted is found too. One account that fails is logged and does not hold the rest. Her draft's target and her walkthrough
+     * are left as they are: a deleted chat there is told to her when she is next asked to send to it, or ended by her `walk` 0.
+     */
+    chatDeleted(sessionId: string): void {
+      let audience: number[];
+      try {
+        audience = companionDb.userIdsFocusedOn(sessionId);
+      } catch (error) {
+        console.error(`[Companion] could not find who is focused on the deleted session ${sessionId}`, error);
+        return;
+      }
+      for (const userId of audience) {
+        try {
+          accountOf(userId).store.setFocus(null);
+        } catch (error) {
+          console.error(`[Companion] account ${userId}: her focus on the deleted session ${sessionId} was not dropped`, error);
+        }
+      }
+    },
+
+    /**
      * Winds down each running session for the server's shutdown, and refuses every message after it (the HTTP
      * drain comes later, so one can still arrive). A session's interrupt and its close run TOGETHER: the interrupt
      * stops a turn in flight and the close ends the input and, past its grace, the process, so a CLI that answers
@@ -280,7 +340,8 @@ function createCompanionService() {
           // A sentence streaming to a page would hold the HTTP drain open for as long as Gemini kept speaking.
           speechCache.end();
           try {
-            await Promise.all([session.interrupt(), session.close('the server is stopping')]);
+            // The server's stop is no word of his: what she was answering stays stored for the next process to answer.
+            await Promise.all([session.interrupt('server'), session.close('the server is stopping')]);
           } catch (error) {
             console.error(`[Companion] account ${userId}: her process did not wind down cleanly`, error);
           }

@@ -21,7 +21,7 @@
 | which door delivers a change: the dialog, `enroll.sh --refresh` (a changed launcher, a NEW unit), enroll; releases on disk; the build's `cerberus.note` | MAN-7949 | `enroll.sh`, `build.mjs`, `launcher.mjs`, `systemd/*.service` |
 | the diagnosis tools: `diag.open`, `diag.call`, `diag.close`, the three reads, the denylist, the mask | MAN-7928 | `diag-tools.mjs`, `diag-reads.mjs`, `diag-argv.mjs`, `diag-guard.mjs`, `.verify/warden-diag-tools.mjs` |
 | the session host: `session.open`, the host registry the API runs, `cerberus-warden-sessions.service` | MAN-7897 | `sessions.mjs`, `systemd/cerberus-warden-sessions.service`, `.verify/warden-sessions.sh` |
-| eis1, the first node: nine probes, 74 labels | MAN-7838 | `.verify/probe-warden-probes.mjs` |
+| eis1, the first node: eight probes, 74 labels | MAN-7838 | `.verify/probe-warden-probes.mjs` |
 | rules an edit keeps | INV-7017 kinds · INV-7028 scheduler · INV-7039 link and outbox · INV-7042 install · INV-7043 daemon · INV-7080 runner · INV-7095 session host · INV-7130 diagnosis tools · INV-7131 updater and launcher | |
 
 ## Rules of the package
@@ -579,9 +579,9 @@ One of the two systemd units a node runs for Cerberus; the other, `cerberus-ward
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden.service
 
-## MAN-7838 — eis1 — the first node: its nine probes and why each exists, shadow-connector's 74 labels, and the measured install
+## MAN-7838 — eis1 — the first node: its eight probes and why each exists, shadow-connector's 74 labels, and the measured install
 
-eis1 is the host Cerberus runs on, enrolled as a remote node: the first warden and the proof of the install path. Its definition is one document in Cerberus's store (`GET` / `PUT /api/cerberus/definitions/eis1`, MAN-7812); `.verify/probe-warden-probes.mjs` carries the first seven probe specs (every one but the estate-backup pair) as its verification copy. The pair, `estate-backup/copy.age` and `estate-backup/drill.age`, went in on 2026-10-07 by one `PUT` of the whole document with the service `estate-backup` ("Cloud backup") appended, together with the fix "Back up now" (MAN-7925); what they judge: `estate-backup status copy` and `status drill` (MAN-8018). Probe kinds: MAN-7818, MAN-7820. Unit: MAN-7837. Home: MAN-7836. Install: MAN-7826.
+eis1 is the host Cerberus runs on, enrolled as a remote node: the first warden and the proof of the install path. Its definition is one document in Cerberus's store (`GET` / `PUT /api/cerberus/definitions/eis1`, MAN-7812); `.verify/probe-warden-probes.mjs` carries the first seven probe specs (every one but `estate-backup/copy.age`) as its verification copy. `estate-backup/copy.age` went in on 2026-10-07 by one `PUT` of the whole document with the service `estate-backup` ("Cloud backup") appended, together with the fix "Back up now" (MAN-7925); what it judges: `estate-backup status copy` (MAN-8018). Probe kinds: MAN-7818, MAN-7820. Unit: MAN-7837. Home: MAN-7836. Install: MAN-7826.
 
 ## Facts
 | item | value |
@@ -589,9 +589,9 @@ eis1 is the host Cerberus runs on, enrolled as a remote node: the first warden a
 | node | `eis1` |
 | center | `http://100.103.222.79:3012` (`identity.json`), the tailnet address; no warden code path defaults to a loopback center, so the first node is remote in every way but geography |
 | installed | `current` → `releases/<version>`, moved by the updater (MAN-7929), the version in force is eis1's `wardenVersion` in `GET /api/cerberus/overview`; unit `cerberus-warden.service` as `lyphe` |
-| checks | 83 = 74 components + 9 probes' own checks (`shadow-connector/health` is one of the 9) |
+| checks | 82 = 74 components + 8 probes' own checks (`shadow-connector/health` is one of the 8) |
 
-## The nine probes
+## The eight probes
 Rule: a probe exists only for a fact no service reports itself (Ruling 3: no check is reimplemented), with one exception, `system/disk.used`, for which the operator waived Ruling 3 on 2026-10-07 (its row). shadow-connector reports its own 74 components in its health document; the warden carries that document and probes nothing else it already reports (Supabase, Postgres, n8n, the Xact tokens). `staleAfter` is 3 × `every`, so a quiet check stays vouched for between runs (the three 300 s probes state 900 explicitly).
 | key | kind · target | every / timeout | judged by | label | why it exists |
 |---|---|---|---|---|---|
@@ -603,7 +603,6 @@ Rule: a probe exists only for a fact no service reports itself (Ruling 3: no che
 | `docstore/backup.age` | `file_age` `/home/lyphe/.claude/state/docstore/backups` | 300 / 10 | `age < 26h`, `staleAfter` 900 | Backed up in the last day | a cron backup (`30 3 * * *`, a rotating set `docstore-1..7.dump`) that stops leaves everything else green; 26 h is the daily run plus slack |
 | `system/disk.used` | `exec` `df -P / \| awk 'NR==2{sub("%","",$5); print $5"% full"}'` | 300 / 10 | `pass value < 85`, `warn value >= 80`, `staleAfter` 900 | Disk under 85% full | the one overlap, kept by the operator's waiver of Ruling 3 (2026-10-07, "Keep it"): shadow-connector's `system_resources` component also carries `disk.percent` for `/` (yellow past 85 %, red past 95 %, `health.py`), but only while its document reads, and as one component with CPU, memory, temperatures, GPU and uptime. This probe warns from 80 % and fails from 85 %, against the component's 85 % and 95 %, so it speaks first; it does not depend on shadow-connector being up, and it still reports the disk when `system_resources` is muted for its CPU temperature. `value` is the leading number of the last stdout line |
 | `estate-backup/copy.age` | `exec` `/usr/local/sbin/estate-backup status copy` | 300 / 10 | `pass value < 26`, `staleAfter` 900 | Copied to Google Drive in the last day | the copy's own report of itself, which no service makes to Cerberus: a night that stops, a Drive that refuses the token or is full, or a repository that never took its first copy leaves every other check green. Only the healthy line opens with a number (hours since the newest copy); every other sentence ("No copy in Google Drive yet — the first upload is running: …", "The weekly check found the copy damaged: …", "No backup has run on this machine") has no `value`, fails the check, and is the check's sentence. 26 h is the nightly run (01:30) plus slack, as `docstore/backup.age`: at 24 the check would go amber every night between last night's copy turning a day old and tonight's landing, while 26 still turns amber the morning after a missed night. It fails as `failing` (amber), never `denied` |
-| `estate-backup/drill.age` | `exec` `/usr/local/sbin/estate-backup status drill` | 3600 / 10 | `pass value < 35`, `staleAfter` 10800 | A restore drill passed in the last 35 days | the monthly restore drill (first Saturday, 02:30, in a KVM VM) is what proves the copy restores into a running machine; a drill that fails, or stops running, leaves the copy looking healthy while the restore is broken. `value` is whole days since the last pass; "The restore drill on <Mon d> failed: …" and "No restore drill has passed yet" fail the check with the reason. 35 days is a monthly drill plus a week. Amber (`failing`) too |
 
 ## shadow-connector's 74 labels
 - A component's label is its PASSING condition in plain English, six words or fewer (74 labels, 3–6 words): `approval_v2_hmac` → "Approval webhook signatures are accepted", `xactimate_token` → "Xactimate token is valid", `xactanalysis_session` → "XactAnalysis polls are succeeding", `supabase` → "Supabase is reachable".
@@ -618,7 +617,7 @@ Rule: a probe exists only for a fact no service reports itself (Ruling 3: no che
 - Same day, the unit stopped 135 s: the overview read eis1 `silent` 90 s after the last frame heard and all 81 checks `unknown`; a lookup inside the stop answered `stale` for the 30 s checks and `result` for `system/disk.used` (its `staleAfter` is 900 s).
 - Same day, 0.2.0 installed with `… | sudo sh -s -- --refresh`: "The warden on eis1 runs 0.2.0.", `current` → `releases/0.2.0` beside the kept `releases/0.1.0`, identity fingerprint unchanged, linked within seconds.
 - Same day, after the pass: `GET /api/cerberus/overview` → eis1 `reporting`, `wardenVersion` 0.2.0, 81 checks; the live document `http://127.0.0.1:8001/status/infrastructure` carried 74 components.
-- 2026-10-07 22:02 -07:00, the pair added (`PUT /api/cerberus/definitions/eis1`, version 1 → 2, 7 → 9 probes; the five old services read back unchanged): the warden logged `now running checks version 2: 9 probe(s)`. `estate-backup/copy.age` reported at 22:06 and `estate-backup/drill.age` at 22:41 (39 min: a new probe's first run comes after a random delay between 0 and its `every`, MAN-7821). Both read `failing`, never `denied`; the overview then carried 83 checks.
+- 2026-10-07 22:02 -07:00, `estate-backup/copy.age` added (`PUT /api/cerberus/definitions/eis1`, version 1 → 2; the five old services read back unchanged): the warden logged `now running checks version 2`. It reported at 22:06 (a new probe's first run comes after a random delay between 0 and its `every`, MAN-7821) and read `failing`, never `denied`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-warden-probes.mjs
 

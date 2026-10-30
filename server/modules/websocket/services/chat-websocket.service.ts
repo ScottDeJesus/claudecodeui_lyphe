@@ -307,6 +307,8 @@ async function dispatchRun(
     sessionId,
     cwd: clientOptions.cwd ?? session.project_path ?? undefined,
     projectPath: session.project_path ?? clientOptions.projectPath,
+    // Set by a server caller (`runDetachedChatTurn`) or by nobody: a page's own `messageUuid` never reaches the runtime.
+    messageUuid: typeof extraRuntimeOptions.messageUuid === 'string' ? extraRuntimeOptions.messageUuid : undefined,
     // Where the project's sessions run. Only the Claude runtime reads it (only Claude has a session
     // host), and it is the server's answer, never the client's: set after the client's options.
     node: session.project_path ? projectsDb.nodeForPath(session.project_path) : null,
@@ -547,20 +549,28 @@ function handlePermissionResponse(data: AnyRecord, dependencies: ChatWebSocketDe
 }
 
 /**
- * Handles `chat.presence`: records which session this socket is showing and
- * whether its tab is in the foreground.
+ * Handles `chat.presence`: records which session this socket is showing, whether its tab is in the
+ * foreground and, from a station page, what its stage holds.
  *
  * The notification channels read it to stay quiet about a session the user is
- * already watching. Presence is keyed by the connection, never by the user — a
+ * already watching, and the companion reads it to tell Kaylee what is on his
+ * screen. Presence is keyed by the connection, never by the user — a
  * laptop and a phone on the same account are two records, and one of them
  * switching sessions must not speak for the other. Leaving a session is this
  * same frame with `sessionId: null`; there is no `chat.unsubscribe`.
+ *
+ * `clientId` (a string of 1 to 200 characters) names the page, so the one that holds her floor can
+ * be found; `focused` says the page's window has the keyboard; `view` is the station's focus, and
+ * `markPresence` keeps it only when it is a whole one.
  */
 function handleChatPresence(ws: WebSocket, userId: string | number | null, data: AnyRecord): void {
   const sessionId = typeof data.sessionId === 'string' && data.sessionId.length > 0 ? data.sessionId : null;
   const visible = data.visible === true;
+  const clientId = typeof data.clientId === 'string' && data.clientId.length >= 1 && data.clientId.length <= 200 ? data.clientId : null;
+  const focused = data.focused === true;
+  const view = typeof data.view === 'object' && data.view !== null ? data.view : null;
 
-  markPresence(ws, { userId, sessionId, visible });
+  markPresence(ws, { userId, sessionId, visible, clientId, focused, view });
 
   // A visible report is also the moment the chat came on screen, which is what
   // clears an unread dot left by a run that finished while it was away.
@@ -602,7 +612,7 @@ function markReadIfCompleted(sessionId: string): void {
  * - `chat.abort`               { sessionId }
  * - `chat.subscribe`           { sessions: [{ sessionId, lastSeq? }] }
  * - `chat.permission-response` { requestId, allow, updatedInput?, message?, rememberEntry? }
- * - `chat.presence`            { sessionId, visible }
+ * - `chat.presence`            { sessionId, visible, clientId?, focused?, view? }
  *
  * Outbound protocol (server to client): every frame is `kind`-based — either
  * a provider `NormalizedMessage` (with `seq`) or a gateway event
@@ -636,6 +646,12 @@ export async function runDetachedChatTurn(
     interruptActiveRun?: boolean;
     /** Runs after the run is registered, before the provider: re-adoption ends an already-completed turn here. */
     beforeRun?: (run: NonNullable<ReturnType<typeof chatRunRegistry.startRun>>) => void | Promise<void>;
+    /**
+     * The uuid to stamp on this turn's user message, which the Claude CLI keeps as the transcript row's own: the caller that
+     * records the send (the companion's) can then name its row. A runtime option the SERVER sets: a `chat.send` from a page
+     * cannot carry one (`dispatchRun` clears it from the client's options).
+     */
+    messageUuid?: string;
   },
   dependencies: ChatWebSocketDependencies,
 ): Promise<{ started: boolean; error: string | null }> {
@@ -669,7 +685,7 @@ export async function runDetachedChatTurn(
     session,
     { sessionId: input.sessionId, content: input.content, options: input.options ?? {} },
     dependencies,
-    {}, input.beforeRun, // no extra runtime options; the hook is dispatchRun's eighth argument
+    { messageUuid: input.messageUuid }, input.beforeRun, // the one extra runtime option; the hook is dispatchRun's eighth argument
   );
 }
 

@@ -1,5 +1,5 @@
 import { listOpenFollowups } from '@/modules/followups/index.js';
-import { buildNotificationPayload } from '@/modules/notifications/index.js';
+import { spendFreeWording } from '@/modules/notifications/index.js';
 import { oneLine } from '@/shared/tool-call-hint.js';
 import type { NotificationEvent } from '@/shared/types.js';
 
@@ -15,25 +15,26 @@ import { activityLine, chatState, resolveChat } from '../tools/house-reads.js';
  * seconds after the event, so an ask the runtime registers just AFTER it raised the notification is already there):
  *   - the kind in words, and the chat's name and project (`resolveChat`; an event of a chat that is not one of his
  *     falls back to the name the notification carries, and a dispatcher ending belongs to no chat at all);
- *   - the notification's own title and body — `buildNotificationPayload`, the one wording every channel uses;
+ *   - the notification's own title and body — the one wording every channel uses (`spendFreeWording`). The body
+ *     is cut at the push channels' 1000 characters (a push service refuses a long payload) EXCEPT a question card's —
+ *     a design's questions or an Accept prompt (`AskUserQuestion`) — which she gets WHOLE, because that block runs
+ *     past 1000 and she would be told option 2 and nothing after it. Every other body is built from free text (a Bash
+ *     command, an error, a message) and stays cut: her 20-alert window is the guard against a flood, and it holds only
+ *     while each alert is bounded;
  *   - up to five open follow-ups that chat filed for him (`listOpenFollowups`, newest first);
  *   - for a permission or a question, the ask it waits on in one line (`activityLine`) — only while it is STILL
  *     waiting, so an ask he answered in the meantime is not announced as open.
  *
  * NEVER A WORD ABOUT USAGE OR SPEND (ruling 17). The house's wording for a finished feature ends with what it cost,
- * a budget stop says its figure and its headline says "budget", and an `api.error` names its reason (`rate_limit`):
- * the figures are taken out of the event's `meta` before the wording is built, a usage reason is put in neutral words,
- * and a budget stop's headline and body are replaced ("Run stopped at a limit"). The rest of every sentence is the
- * house's own.
+ * a budget stop says its figure and its headline says "budget", and an `api.error` names its reason (`rate_limit`).
+ * The notifications module owns the one rule that takes all three out (`spendFreeWording`), and the title and body here
+ * are its answer; the notification history she reads back is worded by the same function.
  *
  * Consumer: `feeds/alert-feed.ts`.
  */
 
 /** One alert ready to deliver: `envelope` is what she is pushed, `line` the one line her panel logs. Consumed by `alert-feed.ts` (builds them) and `companion.service.ts` (`alert` logs and pushes them). */
 export type CompanionAlert = { envelope: string; line: string };
-
-/** The `meta` keys that carry a cost or a token count (the dispatcher's endings and a budget stop): removed before the wording is built. */
-const SPEND_META_KEYS = ['costUsd', 'totalCostUsd', 'tokens', 'tokensIn', 'tokensOut'] as const;
 
 /** How many open follow-ups an alert names: a handful she can say, never the whole backlog. */
 const FOLLOWUPS_NAMED = 5;
@@ -43,18 +44,6 @@ const LOG_LINE_MAX = 280;
 
 /** The kinds whose chat may be waiting on him, so whose ask is read. */
 const KINDS_THAT_WAIT: ReadonlySet<CompanionAlertKind> = new Set(['permission', 'asking']);
-
-/** The `api.error` reasons that are about usage, not about the request (`rate_limit`, a quota, credits): she is told the request failed, never that a limit was hit. */
-const USAGE_REASON = /limit|quota|credit|billing|overage|usage/i;
-
-/** The event's `meta` as the wording is built from it: no cost or token figure, and no usage reason in an `api.error`. */
-function metaForHer(event: NotificationEvent): Record<string, unknown> {
-  const meta = { ...event.meta };
-  for (const key of SPEND_META_KEYS) delete meta[key];
-  // The house's sentence is "<reason> after N retries"; with the reason put in neutral words it still reads true.
-  if (event.code === 'api.error' && typeof meta.reason === 'string' && USAGE_REASON.test(meta.reason)) meta.reason = 'A request could not be made';
-  return meta;
-}
 
 /** An optional part of an alert: when its read fails the alert goes without it and the fault is logged, so the alert itself is never lost for a missing line. */
 function optionally<T>(part: string, event: NotificationEvent, read: () => T, without: T): T {
@@ -73,7 +62,9 @@ function optionally<T>(part: string, event: NotificationEvent, read: () => T, wi
  * Consumed by `alert-feed.ts`, once per event that survived its gates.
  */
 export function buildAlertBlock(userId: number, event: NotificationEvent, kind: CompanionAlertKind): CompanionAlert {
-  const payload = buildNotificationPayload({ ...event, meta: metaForHer(event) });
+  // The question card is the one body asked for whole (no limit); every other keeps the push cap. `sessionName` is the
+  // chat's name as the orchestrator resolves it (meta first, else the session row's, after its provider-id remap and fold).
+  const { title, body, sessionName } = spendFreeWording(event, event.meta.toolName === 'AskUserQuestion' ? null : undefined);
   const sessionId = event.sessionId;
   const chat = sessionId === null ? null : optionally('the chat\'s name', event, () => resolveChat(sessionId), null);
   const known = chat?.ok ? chat.chat : null;
@@ -84,14 +75,9 @@ export function buildAlertBlock(userId: number, event: NotificationEvent, kind: 
       ? optionally('the ask it waits on', event, () => (chatState(sessionId) === 'waiting' ? activityLine(sessionId, 'waiting') : null), null)
       : null;
 
-  // A run that stopped at its BUDGET is a spend word, and the house's headline says it: she is told it stopped at a limit.
-  const budgetStop = event.code === 'run.limit' && event.meta.limit === 'budget';
-  const title = budgetStop ? `Run stopped at a limit${payload.data.sessionName ? ` · ${payload.data.sessionName}` : ''}` : payload.title;
-  const body = budgetStop ? 'The run stopped at a limit it was given' : payload.body;
-
   const envelope = alertEnvelope({
     kind,
-    session: known?.name ?? payload.data.sessionName ?? '',
+    session: known?.name ?? sessionName ?? '',
     sessionId: sessionId ?? '',
     project: known?.project ?? '',
     title,

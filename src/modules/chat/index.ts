@@ -24,7 +24,8 @@ export { SubagentTranscriptView } from '@/modules/chat/subagents/SubagentTranscr
 // module, so exporting them would be a door nobody walks through.
 export { EmbedWidgetBody } from '@/modules/chat/embeds/EmbedWidgetBody';
 export { useEmbedWidgetState } from '@/modules/chat/embeds/embedSource';
-// The words of a question, through the chat's own markdown renderer. Consumer: the dispatcher
+// The words of a question, through the chat's own markdown renderer. Consumers: the dispatcher
 // module's `LockAnswer` and `RoundAnswer`, so a plan's prompt reads in the same words and markdown
-// as a question in the chat.
+// as a question in the chat, and the companion module's `CompanionActionCard`, which draws the
+// prompt of an action waiting for his word (an Accept census, a round's questions) as the Roadmap does.
 export { QuestionText } from '@/modules/chat/tools/ContentRenderers/QuestionText';

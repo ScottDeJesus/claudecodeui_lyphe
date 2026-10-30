@@ -1,12 +1,15 @@
-import { viewOf } from '@/modules/notifications/index.js';
+import { viewTargetOf } from '@/modules/notifications/index.js';
 import { readVoiceSettings } from '@/modules/voice/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
-import type { CompanionActivity } from '@/shared/companion-types.js';
+import type { CompanionActivity, CompanionWalk } from '@/shared/companion-types.js';
 
 import type { DraftSender } from './companion-send.js';
 import { createSpeechCache, type SpeechCache } from './companion-speech-cache.js';
 import { createCompanionStore, type CompanionStore } from './companion-store.js';
 import { readCompanionSettings } from './companion-settings.js';
+import type { CompanionHouse } from './house.js';
+import { lastWordsOf } from './session/companion-handover.js';
+import type { ViewShown } from './session/companion-envelopes.js';
 import { createCompanionSession } from './session/companion-session.js';
 import type { CompanionSession } from './session/companion-session-types.js';
 import { IDLE_ACTIVITY } from './session/companion-turns.js';
@@ -24,7 +27,12 @@ import { createToolDeps } from './tools/tool-deps.js';
  *   - her process's condition → `companion_process`;
  *   - a line of the system's → a `system` log line.
  * And the readers a message is assembled from at push time: his settings, her focus, draft and walk, the roster,
- * the chat on his screen and the sounds she may make (the voice settings' sound-tag list).
+ * what is on his screen and the sounds she may make (the voice settings' sound-tag list).
+ *
+ * THE HOUSE (`house.ts`) is handed in by the server entrypoint through `companion.module.ts` and the service, and passes
+ * through here untouched to the tools as `CompanionToolDeps.house`: the readers only a module instance holds (the
+ * roadmap and dispatcher pictures, a card's text, the souls lane's launches, Cerberus's overview, the heal service).
+ * Nothing in the account reads it; only the tools do.
  *
  * ACTIVITY has two writers, the turn and the tools, and they must not undo each other: `tools/tool-deps.ts` says how.
  * It is HELD here, in one place both write through, so the picture can say what she is doing.
@@ -48,19 +56,47 @@ export type CompanionAccount = {
 };
 
 /**
- * The chat on this account's screen with the name she is to call it, or `null` when none is shown or the shown
- * chat is not one she can act on (a chat she cannot resolve is a chat she could not draft for, so naming it would
- * only invite her to try). Read when a message is pushed, never earlier.
+ * A chat she can act on, named the way she calls it, or `null` for no chat or one she cannot resolve (a chat she could not
+ * draft for, so naming it would only invite her to try).
  */
-function viewedChat(userId: number): { sessionId: string; name: string } | null {
-  const sessionId = viewOf(userId);
+function chatShown(sessionId: string | null): ViewShown | null {
   if (sessionId === null) return null;
   const chat = resolveChat(sessionId);
-  return chat.ok ? { sessionId, name: chat.chat.name } : null;
+  return chat.ok ? { kind: 'chat', sessionId: chat.chat.sessionId, label: chat.chat.name } : null;
 }
 
-/** Consumed by `companion.service.ts`: one call per account, on the account's first use. Nothing is launched: she is asleep until a message is pushed. */
-export function createCompanionAccount(userId: number, runtime: ProviderRuntimeGateway): CompanionAccount {
+/**
+ * Her walkthrough's item under discussion, in her own words: the page only says "walk", so the place and the item come from the
+ * walk she holds, and none held is nothing to show. `at` 0 is a walk set up and not begun, which has no item yet.
+ */
+function walkShown(label: string, walk: CompanionWalk | null): ViewShown | null {
+  if (walk === null) return null;
+  const item = walk.at < 1 ? 'not begun' : (walk.items[walk.at - 1] ?? '');
+  return { kind: 'walk', label, at: walk.at, total: walk.items.length, item };
+}
+
+/**
+ * What is on this account's screen, with the words she is to call it by, or `null` when nothing is shown or what is shown is not
+ * something she can name. The page that speaks for his screen is the one that holds her floor (`viewTargetOf`): a page with no
+ * view is a page of the workspace and its chat is what he sees; a station's view is its kind, a chat named through `resolveChat`
+ * and a walk filled from her store. Read when a message is pushed, never earlier.
+ */
+function viewShown(userId: number, store: CompanionStore): ViewShown | null {
+  const held = store.readState();
+  const target = viewTargetOf(userId, held.floor);
+  if (target === null) return null;
+  const { view } = target;
+  if (view === null) return chatShown(target.sessionId);
+  if (view.kind === 'chat') return chatShown(view.sessionId);
+  if (view.kind === 'walk') return walkShown(view.label, held.walk);
+  return view;
+}
+
+/**
+ * Consumed by `companion.service.ts`: one call per account, on the account's first use. Nothing is launched: she is asleep until a message is pushed.
+ * `runtime` and `house` are the entrypoint's, passed through to the tools (`CompanionToolDeps.runtime` and `.house`).
+ */
+export function createCompanionAccount(userId: number, runtime: ProviderRuntimeGateway, house: CompanionHouse): CompanionAccount {
   const store = createCompanionStore(userId);
   const speechCache = createSpeechCache();
   let activity: CompanionActivity = IDLE_ACTIVITY;
@@ -70,7 +106,7 @@ export function createCompanionAccount(userId: number, runtime: ProviderRuntimeG
     store.emit({ kind: 'companion_activity', activity: next });
   };
 
-  const toolDeps = createToolDeps({ userId, store, runtime, activity: { current: () => activity, set: setActivity } });
+  const toolDeps = createToolDeps({ userId, store, runtime, house, activity: { current: () => activity, set: setActivity } });
 
   const session = createCompanionSession({
     userId,
@@ -78,11 +114,23 @@ export function createCompanionAccount(userId: number, runtime: ProviderRuntimeG
     readSettings: () => readCompanionSettings(userId),
     readState: () => store.readState(),
     readRoster: rosterText,
-    readView: () => viewedChat(userId),
+    readView: () => viewShown(userId, store),
     // The voice settings hold the one sound-tag list: the parse of her turns and the register she is taught both read it from here.
     readSoundTags: () => readVoiceSettings(userId).gemini.soundTags,
-    readProviderSessionId: () => store.readState().providerSessionId,
-    writeProviderSessionId: (id) => store.setProviderSessionId(id),
+    readProviderSession: () => {
+      const { providerSessionId, sessionShape } = store.readState();
+      return providerSessionId === null ? null : { id: providerSessionId, shape: sessionShape };
+    },
+    writeProviderSession: (session) => store.setProviderSession(session?.id ?? null, session?.shape ?? null),
+    // The handover of a conversation her refused resume drops: on her row until the launch that was handed the first message after the fresh start (the one that carries it) reports `init`.
+    readHandover: () => store.readHandover(),
+    writeHandover: (text) => store.setHandover(text),
+    dropHandover: () => store.setHandover(null),
+    // The newest exchange of her log: the summarizer of the handover is not shown it. A window of the newest 80 lines holds her last turn and what it answered.
+    readLastWords: () => lastWordsOf(store.readLog(80)),
+    // His words no turn has answered: the next process says them to her again (`session/companion-ledger.ts`). No frame goes to a page.
+    readUnanswered: () => store.readUnanswered(),
+    writeUnanswered: (unanswered) => store.setUnanswered(unanswered),
     onSentence: (sentence) => {
       store.appendLog({ role: 'kaylee', text: sentence.display, turnId: sentence.turnId, index: sentence.index, mood: sentence.mood, sounds: sentence.sounds });
     },

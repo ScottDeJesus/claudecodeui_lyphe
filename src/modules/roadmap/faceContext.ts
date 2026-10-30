@@ -33,9 +33,10 @@ export type RoadmapFace = {
 };
 
 /**
- * The face's context. Provided by `RoadmapTreeFace`, on every surface that draws the roadmap; read by
+ * The face's context. Provided by `RoadmapTreeFace`, on every surface that draws the roadmap, and by
+ * `RoadmapDialogHost`, on a page that draws the roadmap's panels with no face (Kaylee Station's stage); read by
  * `RoadmapPicker` (its New roadmap…) and by the tree's panels (`RoadmapPanel`, `MilestonePanel`, `EpicPanel` and
- * `FeaturePanel`) for `openDialog`. A press with no face above it says so in the console rather than do
+ * `FeaturePanel`) for `openDialog`. A press with no face or host above it says so in the console rather than do
  * nothing in silence.
  */
 export const RoadmapFaceContext = createContext<RoadmapFace>({

@@ -1,14 +1,15 @@
 import { useSyncExternalStore } from 'react';
 
 import { api } from '@/shared/api';
+import { AUTH_TOKEN_REFRESHED_EVENT } from '@/shared/authToken';
 import type { VoiceProvider } from '@/shared/types';
 import { VOICE_CONFIG_SYNC_EVENT } from '@/shared/voiceConfig';
 
 // The account's provider as the server last answered it, shared by every caller on the page. A module value rather than
 // per-caller state because each message row mounts a caller and they must all agree on one answer from one request.
-// 'openai' (today's behavior) until a read answers, and whenever a read fails.
+// 'openai' (today's behavior) until a read answers; a read that fails leaves the last answer as it was.
 let currentProvider: VoiceProvider = 'openai';
-// Set by the first caller to subscribe, never cleared: the page asks once on its own, then only on the sync event.
+// Set by the first caller to subscribe, never cleared: the page asks once on its own, then on the sync event and when it is returned to.
 let firstReadStarted = false;
 // True while a GET is on the wire, so reads run one at a time and never answer out of order.
 let reading = false;
@@ -44,7 +45,11 @@ async function fetchProvider(): Promise<VoiceProvider | null> {
   }
 }
 
-/** Reads the provider and tells the callers if it changed. A read asked for while one is out is run after it, once. */
+/**
+ * Reads the provider and tells the callers if it changed. A read asked for while one is out is run after it, once. A read
+ * that fails changes nothing: the page returning from sleep asks while the network is still down, and a mic that drew a
+ * moment ago must not vanish because that one answer never came.
+ */
 async function readProvider(): Promise<void> {
   if (reading) {
     readAgain = true;
@@ -56,7 +61,7 @@ async function readProvider(): Promise<void> {
       readAgain = false;
       lastReadStartedAt = Date.now();
       const answered = await fetchProvider();
-      const next = answered ?? 'openai';
+      const next = answered ?? currentProvider;
       if (next !== currentProvider) {
         currentProvider = next;
         listeners.forEach((notify) => notify());
@@ -89,9 +94,40 @@ function onVoiceConfigSync(): void {
   requestRead();
 }
 
+/**
+ * The events after which an earlier read may have failed or may be old: the page coming back into view (a tab left behind
+ * for an hour, a laptop woken), the window taking focus, the network returning, and a sign-in (`AUTH_TOKEN_REFRESHED_EVENT`,
+ * which a refresh raises too; another account's provider is not this one's). One return raises several of them at once, so
+ * a read is asked for only when none began inside the gap: that read has seen the newest state. A read that began EARLIER and
+ * is still out may have gone out while the network was down, so the return is not dropped: `readProvider` runs one more
+ * after it, once.
+ */
+function onPageReturn(): void {
+  if (document.visibilityState !== 'visible' || pendingReadTimer !== null) return;
+  if (Date.now() - lastReadStartedAt < MIN_READ_GAP_MS) return;
+  void readProvider();
+}
+
+/** Adds or removes the page-return listeners, with the sync one: they live as long as a caller is mounted. */
+function listenForReturn(on: boolean): void {
+  const returns: ReadonlyArray<readonly [EventTarget, string]> = [
+    [document, 'visibilitychange'],
+    [window, 'focus'],
+    [window, 'online'],
+    [window, AUTH_TOKEN_REFRESHED_EVENT],
+  ];
+  for (const [target, type] of returns) {
+    if (on) target.addEventListener(type, onPageReturn);
+    else target.removeEventListener(type, onPageReturn);
+  }
+}
+
 function subscribe(notify: () => void): () => void {
   listeners.add(notify);
-  if (listeners.size === 1) window.addEventListener(VOICE_CONFIG_SYNC_EVENT, onVoiceConfigSync);
+  if (listeners.size === 1) {
+    window.addEventListener(VOICE_CONFIG_SYNC_EVENT, onVoiceConfigSync);
+    listenForReturn(true);
+  }
   if (!firstReadStarted) {
     firstReadStarted = true;
     void readProvider();
@@ -100,6 +136,7 @@ function subscribe(notify: () => void): () => void {
     listeners.delete(notify);
     if (listeners.size === 0) {
       window.removeEventListener(VOICE_CONFIG_SYNC_EVENT, onVoiceConfigSync);
+      listenForReturn(false);
       if (pendingReadTimer !== null) {
         window.clearTimeout(pendingReadTimer);
         pendingReadTimer = null;
@@ -120,9 +157,11 @@ const readCurrentProvider = (): VoiceProvider => currentProvider;
  *
  * `active` says whether this caller needs the answer. One `GET /api/voice/settings` per page serves every active
  * caller, made by the first to mount and asked again when `VOICE_CONFIG_SYNC_EVENT` fires (Settings does after a
- * provider change, so an open composer follows the picker in the same tab). An inactive caller (voice off, or read-aloud,
- * which stays on the OpenAI-compatible backend whatever the provider) subscribes to nothing, so a page with no use for
- * the answer never asks for it. The answer is 'openai' until the server has answered, and when the read fails.
+ * provider change, so an open composer follows the picker in the same tab) and when the page is returned to: it
+ * becomes visible, takes focus, comes back online or signs in (`onPageReturn`). An inactive caller (voice off, or
+ * read-aloud, which stays on the OpenAI-compatible backend whatever the provider) subscribes to nothing, so a page with
+ * no use for the answer never asks for it. The answer is 'openai' until the server has answered; a read that fails
+ * leaves the last answer, and the next return reads again.
  */
 export function useVoiceProvider(active: boolean): VoiceProvider {
   return useSyncExternalStore(active ? subscribe : subscribeToNothing, readCurrentProvider, () => 'openai');

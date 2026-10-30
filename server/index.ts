@@ -86,7 +86,7 @@ import { worktreesRoutes } from './modules/worktrees/index.js';
 import browserUseMcpRoutes from './modules/browser-use/browser-use-mcp.routes.js';
 import { browserUseService } from './modules/browser-use/browser-use.service.js';
 import { initializeDatabase, sessionsDb } from './modules/database/index.js';
-import { configureWebPush, createNtfyActionRoutes } from './modules/notifications/index.js';
+import { configureWebPush, createNtfyActionRoutes, startNotificationHistory } from './modules/notifications/index.js';
 
 const __dirname = getModuleDirectory(import.meta.url);
 // The server source runs from /server, while the compiled output runs from /dist-server/server.
@@ -313,12 +313,6 @@ app.use('/api/followups-cmd', followups.commandRouter);
 const cerberus = createCerberusModule({ supervised });
 app.use('/api/cerberus', authenticateToken, cerberus.router);
 
-// Kaylee, the voice companion (protected): one conversation per account, beside every chat and tied to none.
-// Built once here because her conversations are CLI processes this server must wind down first on shutdown,
-// and she acts on chats through the same runtime gateway the chat socket uses, so an act of hers is the page's own.
-const companion = createCompanionModule({ runtime: chatRuntime });
-app.use('/api/companion', authenticateToken, companion.router);
-
 // The SAME board router behind a second door, for the `kanban-pm` MCP child and nothing else —
 // no verb is duplicated here, and there is deliberately NO `authenticateToken`: a Metis is not a
 // user and holds no user token. `kanbanMetisSecretGuard` is that door's own credential check, on a
@@ -396,6 +390,30 @@ app.use('/api/carrier-bulletins', authenticateToken, carrierBulletins.router);
 // reason `dispatcher` is: its poll starts after `listen` and stops on shutdown.
 const dispatchSouls = createDispatchSoulsModule();
 app.use('/api/dispatch-souls', authenticateToken, dispatchSouls.router);
+
+// Kaylee, the voice companion (protected): one conversation per account, beside every chat and tied to none.
+// Built once here because her conversations are CLI processes this server must wind down first on shutdown,
+// and she acts on chats through the same runtime gateway the chat socket uses, so an act of hers is the page's own.
+// Built HERE, after the lanes above, because her reads go through the same readers the panels use, and those
+// handles exist only on the module instances this file holds: the roadmap and dispatcher pictures, a card's
+// text, the souls lane's launches, Cerberus's overview and the heal service, and the two doors her acts on his spoken
+// word go through (the dispatcher's `relay`, the souls lane's `resumeRun`). That is the house she is handed
+// (`companion/house.ts`), the way she is handed the chat gateway. Nothing catches a request between her mount
+// and the lanes', because she is mounted after them.
+const companion = createCompanionModule({
+  runtime: chatRuntime,
+  house: {
+    roadmap: roadmap.picture,
+    dispatcher: dispatcher.picture,
+    cardText: dispatcher.cardText,
+    launches: dispatchSouls.launches,
+    cerberus: cerberus.overview,
+    heal: heal.service,
+    relay: dispatcher.relay,
+    resumeRun: dispatchSouls.resumeRun,
+  },
+});
+app.use('/api/companion', authenticateToken, companion.router);
 
 // The estate map — every tracked file in the four crawled repos — and the watcher that rebuilds it
 // when a repo's HEAD moves (protected; the map is the estate, and this app is reachable from a LAN).
@@ -689,12 +707,19 @@ async function soleServerDuties() {
     claudeUpdates.startReconciler();
     // Center's own three checks and the store's daily prune: rows only the serving process may write.
     cerberus.soleDuties();
+    // The words of his that her last process was given and never answered are said to her again. The predecessor of a
+    // handover may be answering the same words until it is gone, and two processes must not both say them to her.
+    companion.resendUnanswered();
 }
 
 // Stops the stall watchdog on shutdown. Assigned inside the `listen` callback that
 // starts it, named out here because the shutdown path below has to reach it — the
 // same reason `dispatcher` is built at module scope.
 let stopRunStallWatchdog: (() => void) | null = null;
+
+// Unsubscribes the notification history on shutdown. Assigned inside the `listen` callback that starts it,
+// named out here for the same reason as the watchdog's.
+let stopNotificationHistory: (() => void) | null = null;
 
 // Initialize database and start server
 async function startServer() {
@@ -771,6 +796,11 @@ async function startServer() {
             // notification it sends is about runs this server is now able to host.
             stopRunStallWatchdog = startRunStallWatchdog();
 
+            // Keep what the house tells him: one row per notification the orchestrator is handed, written
+            // at its listener seam before any push gate. Same placement: the events it hears are raised by
+            // the runs and lanes this server is now able to host, and nothing polls for them.
+            stopNotificationHistory = startNotificationHistory();
+
             // Name chats at their runs' ends. Same placement: a name is written, and announced to the
             // sockets this server is only now able to accept.
             chatNamer.start();
@@ -805,6 +835,7 @@ async function startServer() {
             dispatchSouls.stop();
             universe.stop();
             stopRunStallWatchdog?.();
+            stopNotificationHistory?.();
             // A pass in flight holds a Haiku child; it ends here, ahead of the exit that would orphan it.
             await chatNamer.stop();
             // Requests already running finish before anything they may still need is torn down, and

@@ -9,7 +9,7 @@ import { MoveDialog } from '@/modules/roadmap/modals/MoveDialog';
  * The dialog the Roadmap face has open, mounted: the one `FaceDialog` the face holds, drawn as the dialog
  * it names with the target it carries. Every dialog closes through the one `onClose`, whether its write
  * landed or not — the picture that follows is what shows a write, so the face has no use for the answer.
- * Used by `RoadmapTreeFace`, in its one dialog slot.
+ * Used by `RoadmapTreeFace`, in its one dialog slot, and by `RoadmapDialogHost`, in its own, on a page with no face.
  */
 export function OpenDialog({ dialog, onClose, onOpenCard }: {
   dialog: FaceDialog;

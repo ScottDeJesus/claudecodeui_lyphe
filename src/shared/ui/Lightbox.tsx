@@ -27,9 +27,11 @@ const CONTROL_CLASS = 'rounded-full p-2 text-white transition-colors hover:bg-wh
  * zoomable and pannable. Closes on Escape, the close button, or a click on the backdrop — never on a
  * click on the content, and never on the end of a drag.
  *
- * Used by chat's `ImageLightbox` (pictures, attachments and file previews) and by markdown-preview's
- * `MermaidDiagram` (a diagram opened from the chat's mermaid fence or a markdown preview): one
- * viewer for both modules, so it lives in the kit and neither module reaches into the other.
+ * Used by chat's `ImageLightbox` (pictures, attachments and file previews), by markdown-preview's
+ * `MermaidDiagram` (a diagram opened from the chat's mermaid fence or a markdown preview), by the
+ * affected-areas module (a view's photo with its regions, the day-one plan's drawing), by carrier-bulletins'
+ * `PageImage` (a bulletin's page as stored) and by the companion module's face card in Settings (every frame
+ * of her face): one viewer for every module, so it lives in the kit and no module reaches into another.
  *
  * Zoom: wheel and trackpad pinch about the pointer, two-finger pinch, double-click / double-tap for
  * fit ↔ 2×, `+` / `−` / fit buttons and the `+` `−` `0` keys. Pan: drag. The content is scaled with a

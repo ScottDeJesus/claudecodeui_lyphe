@@ -8,3 +8,6 @@
 // stopChatCompaction: used by the same entrypoint's shutdown, so no idle deadline or pending compaction
 // starts a verb on a process that is leaving, and a verb not yet at its seed append is not orphaned.
 export { withChatCompaction, stopChatCompaction } from './compaction-runtime.js';
+// summarizeTranscript: used by the companion's fresh-start handover (`companion/session/companion-handover.ts`), the summarizer verb's
+// second caller: one transcript in, one short text out, with none of a chat compaction's frames, rows or seed.
+export { summarizeTranscript } from './compaction-oneshot.js';

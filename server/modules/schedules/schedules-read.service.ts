@@ -165,6 +165,9 @@ function toPromptJob(message: ScheduledMessageRow, userId: number): CronJob {
 /**
  * Every tracked job, and the last sync that touched them: the registry's own rows first — ordered
  * by the table, the order they entered it — then the asking user's pending prompts, soonest first.
+ *
+ * Consumed by `schedules.module.ts` (handed to the routes for the tab's GET) and, through the barrel, by the companion's `read_schedules`
+ * (`companion/eyes/schedule-reads.ts`), which reads the same snapshot and writes nothing.
  */
 export function readRegistry(userId: number): CronRegistrySnapshot {
   const prompts = scheduledMessagesDb.listPendingForUser(userId).map((row) => toPromptJob(row, userId));

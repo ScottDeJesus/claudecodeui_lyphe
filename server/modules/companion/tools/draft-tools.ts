@@ -1,21 +1,24 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 
-import type { CompanionDraftTarget, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
+import { CLAUDE_MODEL_VALUE_BY_ALIAS, type ClaudeModelAlias } from '@/modules/providers/index.js';
+import type { CompanionDraftTarget, CompanionNote, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
 import { guardedToolResult, textResult, type ToolTextResult } from '@/shared/tool-text-result.js';
 
 import { characterCount, DRAFT_TEXT_MAX } from '../companion-input.js';
+import { escapeText } from '../session/companion-envelopes.js';
 import { toolLine } from '../session/companion-prompt.js';
 
 import type { CompanionToolDeps } from './companion-tools.js';
 import { resolveChat, resolveProject } from './house-reads.js';
 
 /**
- * The five tools that put her work on his screen and send it: `update_draft` (the one brief she keeps, with its
- * target), `show_note` (a card, for what is better seen than heard), `walk` (the walkthrough's cursor), and
- * `send_to_session` / `create_session` (the draft going out). The first three write through the account's store, so
- * the matching frame (`companion_draft`, `companion_note`, `companion_walk`) reaches his panel the moment she calls
- * it, and the answer is one plain sentence.
+ * The six tools that put her work on his screen and send it: `update_draft` (the one brief she keeps, with its
+ * target; an empty text clears both), `show_note` (a card, for what is better seen than heard) and `dismiss_note`
+ * (takes one down), `walk` (the walkthrough's cursor), and `send_to_session` / `create_session` (the draft going
+ * out). The first four write through the account's store, so the matching frame (`companion_draft`, `companion_note`,
+ * `companion_note_removed`, `companion_walk`) reaches his panel the moment she calls it, and the answer is one plain
+ * sentence.
  *
  * THE DRAFT IS THE ONLY THING SENT. There is one draft at a time, addressed to a chat or to a new chat in a
  * project; `send_to_session` and `create_session` send it as it stands, and their text must equal it, trimmed.
@@ -23,7 +26,11 @@ import { resolveChat, resolveProject } from './house-reads.js';
  * `deps.sendDraft` (`companion-send.ts`), the same verb as the panel's Send: these two tools only name what they
  * mean to send and say what happened. A mismatch is refused, and the refusal names the draft.
  *
- * THE WALK'S CURSOR lives in the store, because her memory of it does not survive her own compaction or a turn
+ * THE MODEL is hers to choose when she opens a chat or sends a turn: the optional `model` of both is one of the house's
+ * names (the keys of the provider's alias table, never a list of its own). Left out, a new chat runs on the account's default
+ * and an existing chat keeps its own; what the sender does with it is `companion-send.ts`'s.
+ *
+ * THE WALK'S CURSOR lives in the store, because her conversation's hold on it does not survive her own compaction or a turn
  * to another chat: `walk` carries the cursor, the store holds it, and `<state>` restates it after a compaction.
  * One walk per account; a call that would MOVE it by naming another chat without `items` is refused rather
  * than guessed at, while `at` 0 ends the held walk whichever chat is named (its own chat may be gone).
@@ -37,16 +44,19 @@ import { resolveChat, resolveProject } from './house-reads.js';
  * system prompt says are one text; the arguments' own descriptions say what the prompt's shorthand leaves out
  * (the prompt's `update_draft(target, …)` is the pair `session` / `project` here).
  *
- * Consumer: `tools/companion-tools.ts`, which adds these five to the thirteen it builds.
+ * Consumer: `tools/companion-tools.ts`, which adds these six to the tools it builds.
  */
 
+/** A note card's longest title, in characters. Consumed by `show_note` below and by `eyes/eyes-answer.ts` (`toPanel`), so an eyes answer put on his panel is cut where `show_note` refuses. */
+export const NOTE_TITLE_MAX = 80;
+/** A note card's longest text, in characters. Consumed by `show_note` below and by `eyes/eyes-answer.ts` (`toPanel`). */
+export const NOTE_TEXT_MAX = 4_000;
+
 /**
- * The limits of the table: a draft is a full brief, a note a card, a walk a list of short titles. The draft's own
+ * The limits of the table: a draft is a full brief, a note a card (above), a walk a list of short titles. The draft's own
  * (`DRAFT_TEXT_MAX`, counted in characters as a person counts them) is the one `PUT /draft` uses, imported so the
  * route and this tool cannot disagree.
  */
-const NOTE_TITLE_MAX = 80;
-const NOTE_TEXT_MAX = 4_000;
 const WALK_ITEMS_MAX = 60;
 const WALK_ITEM_MAX = 120;
 const CHAT_TITLE_MAX = 60;
@@ -57,6 +67,18 @@ const sentText = z
   .min(1)
   .refine((text) => characterCount(text) <= DRAFT_TEXT_MAX, `The text is over ${DRAFT_TEXT_MAX} characters; the draft cannot be that long.`)
   .describe('The draft\'s text exactly as update_draft last stored it. A text that differs from the draft is refused, and the refusal shows the draft.');
+
+/** The house's model names, the keys of the alias table the pickers' stored values come from: the choices of `model`. */
+const MODEL_NAMES = Object.keys(CLAUDE_MODEL_VALUE_BY_ALIAS) as [ClaudeModelAlias, ...ClaudeModelAlias[]];
+
+/**
+ * What each model name is for, in her terms: the rule the operator ruled (doers on opus, judgment work on the stronger model).
+ * Families only, never a generation or which family the account default is: the CLI moves a generation under a list written
+ * here (the picker's fallback rows say the same) and the operator moves his default, so the text names the role and nothing
+ * a release or a setting can make false.
+ */
+const MODEL_CHOICES =
+  'opus: for doers, the chats that execute your detailed briefs (fixes, checks, page edits). fable: the stronger model, for judgment work (design, review, whole-flow reasoning). sonnet. haiku: when he names it, as for a probe.';
 
 /** Where `update_draft` was asked to aim, resolved: the target to store, the chat it names (none for a new chat) and how the answer names it. */
 type DraftAim = { target: CompanionDraftTarget; chat: CompanionSessionRef | null; label: string };
@@ -80,14 +102,27 @@ function aimOf(session: string, project: string): { ok: true; aim: DraftAim } | 
 }
 
 /**
- * `update_draft`: replaces the draft and its target. The text is stored exactly as given (no trim): `send_to_session`
- * compares what it is handed with it, so the draft must be the words she will pass again.
+ * An empty `update_draft`: clears the draft and its target, the verb the panel's own button has (`DELETE /draft`). A clear
+ * names no chat, so her focus stays where it was and no activity is set; with no draft held there is nothing to write,
+ * and the answer is plain text, not a refusal.
+ */
+function clearDraft(deps: CompanionToolDeps): ToolTextResult {
+  if (deps.store.readState().draft === null) return textResult('There was no draft to clear.');
+  deps.store.setDraft(null);
+  return textResult('Draft cleared.');
+}
+
+/**
+ * `update_draft`: replaces the draft and its target, or, given an empty text (blank after trim), clears them (`clearDraft`).
+ * The empty text is tested FIRST: a clear needs no target, so `session` / `project` are not looked at. A non-empty text is
+ * stored exactly as given (no trim): `send_to_session` compares what it is handed with it, so the draft must be the words
+ * she will pass again.
  */
 function updateDraft(deps: CompanionToolDeps, args: { session?: string; project?: string; text: string }): Promise<ToolTextResult> {
   return guardedToolResult('update_draft', 'keep the draft', async () => {
+    if (args.text.trim() === '') return clearDraft(deps);
     const aimed = aimOf(args.session?.trim() ?? '', args.project?.trim() ?? '');
     if (!aimed.ok) return deps.refuse(aimed.sentence);
-    if (args.text.trim() === '') return deps.refuse('The draft has no words in it. Write the whole brief as it now stands, or leave the draft alone.');
     const { target, chat, label } = aimed.aim;
     return deps.withActivity('drafting', chat, null, async () => {
       // The write first: a write that fails must not leave the panel on a chat she was told the draft is not for.
@@ -98,11 +133,33 @@ function updateDraft(deps: CompanionToolDeps, args: { session?: string; project?
   });
 }
 
-/** `show_note`: one card on his panel; it stays until he dismisses it. */
+/** `show_note`: one card on his panel; it stays until he dismisses it or she does (`dismiss_note`). The answer names the card's number, which is how she can take it down. */
 function showNote(deps: CompanionToolDeps, args: { title: string; text: string }): Promise<ToolTextResult> {
   return guardedToolResult('show_note', 'put the note on his panel', () => {
-    deps.store.addNote({ title: args.title, text: args.text });
-    return textResult('On his panel.');
+    const note = deps.store.addNote({ title: args.title, text: args.text });
+    return textResult(`On his panel as card ${note.id}.`);
+  });
+}
+
+/**
+ * A card as her answers name it: its number and its title on one line (`2 "Lane diff"`), so she can say which card went
+ * and choose between old ones. The title is stored text, escaped as an envelope escapes it (`escapeText`).
+ */
+const cardLabel = (card: CompanionNote): string => `${card.id} "${escapeText(card.title.replace(/\s+/g, ' ').trim())}"`;
+
+/**
+ * `dismiss_note`: takes one card off his panel, the one by its number or, with none given, the newest (the highest
+ * number). It goes through the store's `removeNote`, as the panel's ✕ does (`DELETE /notes/:id`), so only this account's
+ * cards can be named. A number that is not up is refused naming the ones that are, each with its title, so she can correct
+ * herself. A card he dismissed in the same instant is not a refusal: the store answers `false` and the card is gone either way.
+ */
+function dismissNote(deps: CompanionToolDeps, args: { note?: number }): Promise<ToolTextResult> {
+  return guardedToolResult('dismiss_note', 'take the card down', () => {
+    const cards = [...deps.store.listNotes()].sort((a, b) => a.id - b.id);
+    if (cards.length === 0) return deps.refuse('There is no card on his panel.');
+    const card = args.note === undefined ? cards[cards.length - 1] : cards.find((candidate) => candidate.id === args.note);
+    if (card === undefined) return deps.refuse(`No card ${args.note} is on his panel; up now: ${cards.map(cardLabel).join(', ')}.`);
+    return textResult(`Card ${cardLabel(card)} ${deps.store.removeNote(card.id) ? 'taken down' : 'was already gone'}.`);
   });
 }
 
@@ -174,12 +231,12 @@ const answerSend = (deps: CompanionToolDeps, sent: { outcome: string; sentence: 
  * `send_to_session`: sends the draft to the chat she names, as `mode` asks. The draft must be for that chat and the
  * text must equal it; a chat that is working takes the brief into its running turn whichever mode was asked.
  */
-function sendToSession(deps: CompanionToolDeps, args: { session: string; text: string; mode: 'turn' | 'steer' }): Promise<ToolTextResult> {
+function sendToSession(deps: CompanionToolDeps, args: { session: string; text: string; mode: 'turn' | 'steer'; model?: ClaudeModelAlias }): Promise<ToolTextResult> {
   return guardedToolResult('send_to_session', 'send the brief', async () => {
     const found = resolveChat(args.session);
     if (!found.ok) return deps.refuse(found.sentence);
     const { chat } = found;
-    return deps.withActivity('drafting', chat, null, async () => answerSend(deps, await deps.sendDraft({ mode: args.mode, text: args.text, chat })));
+    return deps.withActivity('drafting', chat, null, async () => answerSend(deps, await deps.sendDraft({ mode: args.mode, text: args.text, chat, model: args.model })));
   });
 }
 
@@ -187,17 +244,17 @@ function sendToSession(deps: CompanionToolDeps, args: { session: string; text: s
  * `create_session`: starts a new chat in `project` with the draft as its first message, named `title`. The draft must be
  * for a new chat in that project and the text must equal it. The new chat becomes her focus and opens on his screen.
  */
-function createSession(deps: CompanionToolDeps, args: { project: string; text: string; title: string }): Promise<ToolTextResult> {
+function createSession(deps: CompanionToolDeps, args: { project: string; text: string; title: string; model?: ClaudeModelAlias }): Promise<ToolTextResult> {
   return guardedToolResult('create_session', 'start the chat', async () => {
     const found = resolveProject(args.project);
     if (!found.ok) return deps.refuse(found.sentence);
     const newChat = { projectPath: found.project.path, title: args.title };
-    return deps.withActivity('drafting', null, null, async () => answerSend(deps, await deps.sendDraft({ mode: 'turn', text: args.text, newChat })));
+    return deps.withActivity('drafting', null, null, async () => answerSend(deps, await deps.sendDraft({ mode: 'turn', text: args.text, newChat, model: args.model })));
   });
 }
 
 /**
- * The definitions of `show_note`, `update_draft`, `walk`, `send_to_session` and `create_session` (the order her prompt lists them, the sends last), built with the SDK's
+ * The definitions of `show_note`, `dismiss_note`, `update_draft`, `walk`, `send_to_session` and `create_session` (this file's order, not the prompt's: `walk` stands before the two sends here and last in the prompt), built with the SDK's
  * `tool()` and zod. None is read-only (each writes what he sees), so none carries `readOnlyHint`; the CLI asks no
  * permission for them regardless, because `allowedTools` names every tool of hers.
  */
@@ -213,6 +270,14 @@ export function draftTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
       (args) => showNote(deps, args)
     ),
     tool(
+      'dismiss_note',
+      toolLine('dismiss_note'),
+      {
+        note: z.number().int().min(1).optional().describe('The card\'s number, as show_note answered it. Leave out to take down the newest card.'),
+      },
+      (args) => dismissNote(deps, args)
+    ),
+    tool(
       'update_draft',
       toolLine('update_draft'),
       {
@@ -221,9 +286,8 @@ export function draftTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
         // Counted in characters as `PUT /draft` counts them (a refinement, not `.max`, which counts UTF-16 units and would refuse text the route accepts).
         text: z
           .string()
-          .min(1)
           .refine((text) => characterCount(text) <= DRAFT_TEXT_MAX, `The draft is over ${DRAFT_TEXT_MAX} characters: keep the brief to what the chat needs.`)
-          .describe(`The whole brief as it now stands, up to ${DRAFT_TEXT_MAX} characters: it replaces the draft on his screen, and it is the text that is sent.`),
+          .describe(`The whole brief as it now stands, up to ${DRAFT_TEXT_MAX} characters: it replaces the draft on his screen, and it is the text that is sent. An empty text clears the draft and its target; give neither session nor project then.`),
       },
       (args) => updateDraft(deps, args)
     ),
@@ -254,6 +318,10 @@ export function draftTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
         session: z.string().trim().min(1).max(200).describe('The chat the draft is for, by its id or its whole name. The draft must be addressed to it.'),
         text: sentText,
         mode: z.enum(['turn', 'steer']).describe('turn starts a turn; steer folds the brief into the turn the chat is running now. A chat that is working takes it as a steer whichever you say; a steer to an idle chat starts a turn.'),
+        model: z
+          .enum(MODEL_NAMES)
+          .optional()
+          .describe(`The model this turn runs on. ${MODEL_CHOICES} Left out, the chat keeps the model it has. Given, the turn runs on it and the chat keeps it from then on. A chat that is working cannot take one, since the brief folds into the turn it is running: the send is refused and nothing goes out, so send without model or wait for the turn to end.`),
       },
       (args) => sendToSession(deps, args)
     ),
@@ -270,6 +338,10 @@ export function draftTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
           .max(CHAT_TITLE_MAX)
           .regex(/^[^\r\n\u2028\u2029]+$/, 'A title is one line: no line break.')
           .describe(`The new chat's name in his list: a few words, up to ${CHAT_TITLE_MAX} characters.`),
+        model: z
+          .enum(MODEL_NAMES)
+          .optional()
+          .describe(`The model the new chat runs on, and keeps from then on. ${MODEL_CHOICES} Left out, the new chat runs on the account default.`),
       },
       (args) => createSession(deps, args)
     ),

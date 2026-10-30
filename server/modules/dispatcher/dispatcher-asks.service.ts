@@ -1,9 +1,11 @@
+import type { RelayedPress } from '@/shared/relayed-press-types.js';
 import type { DispatcherAsk, DispatcherCardAnswer, DispatcherStateEvent, ProviderPermissionDecision, ProviderRuntimePermissionGateway, ProviderRuntimeRecalledPrompt } from '@/shared/types.js';
 
 import { REWORK_OPTION, readReply } from './dispatcher-answer.service.js';
-import type { AnswerDoor, AskReply, CarriedAnswer } from './dispatcher-answer.service.js';
+import type { AnswerDoor, AskReply, CarriedAnswer, CarryRelay } from './dispatcher-answer.service.js';
 import { isAskKey, keyOf } from './dispatcher-ask-names.service.js';
 import { createAskReads } from './dispatcher-ask-reads.service.js';
+import type { AskRaisedMemory } from './dispatcher-raised-asks.service.js';
 
 /**
  * The prompts this lane has up: THE OPEN ASKS OF THE PICTURE, KEPT AS A BOOK FOR THE PHONE'S PUSH AND
@@ -30,6 +32,11 @@ import { createAskReads } from './dispatcher-ask-reads.service.js';
  * verdict comes back on the reply (`DispatcherCardAnswer`) — the dispatcher's own first line, or the
  * lane's sentence for why the word never reached it.
  *
+ * THE THIRD DOOR IS KAYLEE'S (`answerOnHisWord`): his SPOKEN word for that specific card, carried with
+ * kaylee--press's record of it (who, when, what he said). It finds the book's record of the ask by the ask's name
+ * exactly as the card's door does, led by nothing else the order carries, so a prompt re-cut or answered since he
+ * heard it read back is refused, never carried; a carried one is retracted and held down as a card press is.
+ *
  * THE ASK'S NAME IS THE ASK (`keyOf`): the store's own record of it, the `asked` event — for an Accept
  * with its lock token, the census the operator is shown. The event is new for every landing (a re-cut
  * after a Rework rewrites phase goals the token does not digest, and its fresh prompt must buzz the
@@ -43,6 +50,21 @@ import { createAskReads } from './dispatcher-ask-reads.service.js';
  * THE RAISE PUTS AN ASK UP THE MOMENT IT IS RECORDED (`show`), off the ask the dispatcher printed, so
  * the prompt reaches the card on the tick that saw its landing; the pictures after it carry the same
  * ask under the same name. Only a picture generated AFTER an ask can say it is closed.
+ *
+ * ONE PUSH PER ASK, NOT PER PROCESS (`raisedMemory`). The book above is this process's memory and dies
+ * with it, and the dev server is a fresh process on nearly every save (61 handovers in ten minutes,
+ * 2026-10-28 12:11–12:21): a book that alone decided "already pushed" pushed every open ask again on
+ * the first picture after each boot, under the SAME name, and the orchestrator's and Kaylee's own
+ * dedupes are in memory too — "Accept kaylee--memory?" reached her 24 times. So a raise is also
+ * written to a durable record, and a name the record holds is put in the book WITHOUT a push: only the
+ * buzz is not repeated. The name is forgotten when the ask is over — it left the picture, or its
+ * answer was taken and the grace ended (`answered`) — and when an answer was REFUSED, just before the
+ * prompt goes back up; NEVER while a carry is out, because a successor that boots in that window must
+ * find the name and stay silent for an ask the operator is answering. So an ask that comes back (a
+ * refused answer, a re-cut's new `asked` event and so new name) is raised fresh, and a held name can
+ * never swallow a genuinely new ask. A name whose ask left while no process held it (the server was
+ * down) is kept by `prune` for seven days, then dropped; the name carries the `asked` event, so it
+ * can name no other ask meanwhile.
  *
  * ANY PROCESS ANSWERS. An answer names an ask, and the process that hears it need not be the one that
  * raised it: the phone's tap outlives the push that made it, and lands on whichever server is serving
@@ -108,14 +130,20 @@ export type AskPush = {
 export type DispatcherAsksDependencies = {
   /** The session `plan`'s prompt belongs to, resolved to this app's own, or `null` when this server knows of none. */
   sessionOf: (plan: DispatcherStateEvent['plans'][number]) => AskSession | null;
-  /** The `permission.required` push for a prompt just raised. */
-  push: (push: AskPush) => void;
+  /**
+   * The `permission.required` push for a prompt just raised. Answers whether it reached at least one
+   * user: `false` (no user, or every user's push threw) leaves the ask unrecorded, so the next process
+   * pushes it again — a push that went nowhere is never remembered as made.
+   */
+  push: (push: AskPush) => boolean;
   /** Retires a prompt's phone buttons — it was answered, or it is gone. */
   forgetButtons: (promptKey: string) => void;
-  /** Carries one reply to the plan; resolves what the dispatcher did with it and its own first line saying so (`carryReply`). */
-  carry: (ask: DispatcherAsk, reply: AskReply, door: AnswerDoor) => Promise<CarriedAnswer>;
+  /** Carries one reply to the plan; resolves what the dispatcher did with it and its own first line saying so (`carryReply`). `relay` rides only Kaylee's door. */
+  carry: (ask: DispatcherAsk, reply: AskReply, door: AnswerDoor, relay?: CarryRelay) => Promise<CarriedAnswer>;
   /** One fresh read of the store's plans (`readDispatcherState`) — for an answer whose ask this process has not raised. THROWS when the dispatcher did not answer. */
   read: () => Promise<Pick<DispatcherStateEvent, 'plans' | 'generated_at'>>;
+  /** The asks already pushed, durable across restarts (`dispatcher-raised-asks.service.ts`). */
+  raisedMemory: AskRaisedMemory;
   /** Injected by the composition root — this server has no logger. */
   log: (message: string) => void;
 };
@@ -129,6 +157,8 @@ export type DispatcherAsks = {
   gateway: ProviderRuntimePermissionGateway;
   /** The card's door: the ask exactly as the card drew it, and the operator's decision. Never throws. */
   answer(ask: DispatcherAsk, decision: ProviderPermissionDecision): Promise<DispatcherCardAnswer>;
+  /** Kaylee's door: the ask as she read it back, the reply his spoken word makes, and his press. Never throws. */
+  answerOnHisWord(ask: DispatcherAsk, reply: AskReply, press: RelayedPress): Promise<CarriedAnswer>;
 };
 
 /**
@@ -168,19 +198,31 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
   // above its definition.
   const reads = createAskReads({ read: dependencies.read, observe: (picture) => observe(picture), log: dependencies.log });
 
-  /** Takes a prompt down: the book forgets it, and its phone buttons are retired. Nothing is sent. */
+  /**
+   * Takes a prompt down: the book forgets it and its phone buttons are retired. Nothing is sent, and
+   * the durable record keeps the name — whoever calls this decides whether the ask is over (`observe`)
+   * or an answer is out for it (`carryEntry`), and a name forgotten while a carry is out lets a
+   * successor push the ask the operator is answering.
+   */
   const retract = (entry: RaisedAsk): void => {
     raised.delete(entry.promptKey);
     dependencies.forgetButtons(entry.promptKey);
   };
 
-  /** Puts one open ask up in the book and pushes it to the phone, whatever session its plan names. */
+  /**
+   * Puts one open ask up in the book and pushes it to the phone, whatever session its plan names —
+   * unless the durable record holds its name: an earlier process already pushed this very ask, and
+   * this one only takes it into the book (`raisedMemory`). The name is recorded AFTER the push, and only
+   * when the push reached someone, so a process that dies between the two — or a push that went nowhere —
+   * costs a repeated buzz, never a lost one.
+   */
   const raise = (ask: DispatcherAsk, session: AskSession | null): void => {
     const promptKey = keyOf(ask);
     const entry: RaisedAsk = { promptKey, ask, input: inputOf(ask), session, receivedAt: new Date() };
     raised.set(promptKey, entry);
     reads.forget(entry.promptKey);
-    dependencies.push({
+    if (dependencies.raisedMemory.has(promptKey)) return;
+    const reached = dependencies.push({
       provider: session?.provider ?? 'system',
       sessionId: session?.sessionId ?? null,
       promptKey,
@@ -195,6 +237,7 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
         askKind: ask.kind,
       },
     });
+    if (reached) dependencies.raisedMemory.add(promptKey, Date.now());
   };
 
   const observe = (picture: Pick<DispatcherStateEvent, 'plans' | 'generated_at'>): void => {
@@ -211,13 +254,24 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
     }
     const now = Date.now();
     for (const [promptKey, at] of answered) {
-      if (!open.has(promptKey) || now - at >= ANSWER_GRACE_MS) answered.delete(promptKey);
+      if (!open.has(promptKey) || now - at >= ANSWER_GRACE_MS) {
+        answered.delete(promptKey);
+        // The answer's life is over: the ask closed, or it is still owed after the grace and goes back
+        // up below as a new state — which is pushed, so the name must not be held.
+        dependencies.raisedMemory.forget(promptKey);
+      }
     }
+    // The record's names for asks that left the picture while no process held them (the server was
+    // down); the ones this process saw leave are forgotten as they leave, below.
+    dependencies.raisedMemory.prune(new Set(open.keys()), now);
     // A picture generated no later than an ask's own second may predate it — the raise puts an ask
     // up the moment it is recorded (`show`), a poll before any picture carries it — so only a picture
     // generated AFTER the ask can say it is closed. Both stamps are the store's own second-grained UTC.
     for (const entry of [...raised.values()]) {
-      if (!open.has(entry.promptKey) && picture.generated_at > entry.ask.asked.at) retract(entry);
+      if (!open.has(entry.promptKey) && picture.generated_at > entry.ask.asked.at) {
+        retract(entry);
+        dependencies.raisedMemory.forget(entry.promptKey);
+      }
     }
     for (const [promptKey, { ask, session }] of open) {
       if (raised.has(promptKey) || answering.has(promptKey) || answered.has(promptKey)) continue;
@@ -251,12 +305,12 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
    * The phone's path VOIDS the promise — its own HTTP reply is what its operator hears — while the
    * card's door awaits it, because its reply is the one line the card shows.
    */
-  const carryEntry = (entry: RaisedAsk, reply: AskReply, door: AnswerDoor): Promise<CarriedAnswer> => {
+  const carryEntry = (entry: RaisedAsk, reply: AskReply, door: AnswerDoor, relay?: CarryRelay): Promise<CarriedAnswer> => {
     answering.add(entry.promptKey);
     retract(entry);
     /** The carry as it settled, so the chain's own failure to put the prompt back never loses it. */
     let carried: CarriedAnswer = { outcome: 'refused', said: '' };
-    return dependencies.carry(entry.ask, reply, door)
+    return dependencies.carry(entry.ask, reply, door, relay)
       .catch((error): CarriedAnswer => {
         dependencies.log(`[Dispatcher] ${entry.ask.plan}: the answer could not be carried: ${error instanceof Error ? error.message : String(error)}`);
         return { outcome: 'refused', said: '' };
@@ -269,7 +323,11 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
         if (settled.outcome !== 'refused') answered.set(entry.promptKey, Date.now());
         if (settled.outcome === 'already-answered') tellAlreadyAnswered(entry, door);
         // A refused answer's prompt — or the fresh one a stale token's census now asks — goes back up
-        // on the picture in hand: a verb that changed nothing moves no frame to wait for.
+        // on the picture in hand: a verb that changed nothing moves no frame to wait for. The name stayed
+        // in the durable record while the verb was out (a successor booting then stayed silent); it is
+        // forgotten here, so this raise is a new state of the card and is pushed — the refusal is news
+        // to the operator, not a repeat. A taken answer's name is forgotten when `answered` lets go of it.
+        if (settled.outcome === 'refused') dependencies.raisedMemory.forget(entry.promptKey);
         if (last !== null) observe(last);
         return settled;
       })
@@ -364,6 +422,40 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
   };
 
   /**
+   * KAYLEE'S door: the book's own record of the ask, found by its name (`keyOf`, `catchUp` for a name not held), is what
+   * is carried — the order's `ask` decides only WHICH prompt is meant. A name the store does not carry (re-cut, answered
+   * from the card or the phone meanwhile, being carried now) or a reply that does not fit the prompt is refused.
+   * `acceptTarget` comes from the newest picture: the epic when the lock names several plans, else the plan.
+   */
+  const answerOnHisWord = async (ask: DispatcherAsk, reply: AskReply, press: RelayedPress): Promise<CarriedAnswer> => {
+    const key = keyOf(ask);
+    const refuse = (said: string): CarriedAnswer => {
+      dependencies.log(`[Dispatcher] ${ask.plan}: Kaylee's answer on his word carried nothing — ${said}`);
+      return { outcome: 'refused', said };
+    };
+    const changed = (): CarriedAnswer => refuse('that prompt changed since you read it back; read it again');
+    let entry = raised.get(key);
+    if (entry === undefined && (answering.has(key) || answered.has(key) || reads.knownClosed(key))) return changed();
+    if (entry === undefined) {
+      if (!(await reads.catchUp(`Kaylee's answer to ${ask.plan} was not carried`))) {
+        return refuse('the dispatcher could not be read, so nothing was carried; read it again');
+      }
+      entry = raised.get(key);
+    }
+    if (entry === undefined) {
+      reads.rememberClosed(key);
+      return changed();
+    }
+    if ((reply.kind === 'answers') !== (entry.ask.kind === 'questions')) return changed();
+    const arc = entry.ask.plans.length > 1 ? last?.plans.find((plan) => plan.name === entry.ask.plan)?.arc ?? null : null;
+    const carried = await carryEntry(entry, reply, 'kaylee', { press, acceptTarget: arc ?? entry.ask.plan });
+    if (carried.outcome !== 'took') {
+      dependencies.log(`[Dispatcher] ${ask.plan}: Kaylee's answer on his word carried nothing — ${carried.outcome}${carried.said === '' ? '' : `: ${carried.said}`}`);
+    }
+    return carried;
+  };
+
+  /**
    * An answer for an ask this book does not hold: the successor of the process that raised it, hearing
    * it before its first picture, or an answer to an ask that has since closed. NOTHING IS CARRIED: a
    * re-cut's notes or answers would reach a designer for a question no longer asked, and an Accept for
@@ -453,5 +545,5 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
 
   const gateway: ProviderRuntimePermissionGateway = { resolve, recall };
 
-  return { observe, show, gateway, answer: answerFromCard };
+  return { observe, show, gateway, answer: answerFromCard, answerOnHisWord };
 }

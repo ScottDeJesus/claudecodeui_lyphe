@@ -80,11 +80,46 @@ function sendToConnectedClients(payloads: string[]): void {
   });
 }
 
+type SessionUpsertedListener = (sessionId: string) => void;
+
+/** Called with the app session id of every `session_upserted` event that goes out. */
+const sessionUpsertedListeners = new Set<SessionUpsertedListener>();
+
+/**
+ * Subscribes to the sessions this broadcaster announces — one call per `session_upserted` event it sends, with the
+ * event's app session id; returns the unsubscribe. A listener that throws is logged and the rest still hear it.
+ * Consumed by the companion module's station hint, which tells the station a chat changed when its row was written
+ * (a rename, a new chat, a re-index), none of which a run's events carry.
+ */
+export function onSessionUpserted(listener: SessionUpsertedListener): () => void {
+  sessionUpsertedListeners.add(listener);
+  return () => {
+    sessionUpsertedListeners.delete(listener);
+  };
+}
+
+/** Tells the listeners the events just sent, each on its own try. */
+function announceSessionsUpserted(sessionIds: string[]): void {
+  for (const sessionId of sessionIds) {
+    for (const listener of sessionUpsertedListeners) {
+      try {
+        listener(sessionId);
+      } catch (error) {
+        console.error('[SessionUpsert] Upserted listener failed', {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+}
+
 /** Announces one session. Used by the chat run registry when a run reports its provider-native id. */
 export async function broadcastSessionUpserted(sessionIdOrProviderSessionId: string): Promise<void> {
   const event = await buildSessionUpsertedEvent(sessionIdOrProviderSessionId);
   if (event) {
     sendToConnectedClients([JSON.stringify(event)]);
+    announceSessionsUpserted([event.sessionId]);
   }
 }
 
@@ -97,14 +132,17 @@ export async function broadcastSessionUpsertedBatch(
   sessionIds: Iterable<string>,
 ): Promise<void> {
   const payloads: string[] = [];
+  const announced: string[] = [];
   for (const sessionId of sessionIds) {
     const event = await buildSessionUpsertedEvent(sessionId);
     if (event) {
       payloads.push(JSON.stringify(event));
+      announced.push(event.sessionId);
     }
   }
 
   sendToConnectedClients(payloads);
+  announceSessionsUpserted(announced);
 }
 
 /** @internal Exported for the broadcast tests, which assert the payload shape directly. */

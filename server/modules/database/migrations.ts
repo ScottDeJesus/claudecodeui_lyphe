@@ -23,6 +23,7 @@ import { FOLLOWUPS_SCHEMA_SQL } from '@/modules/database/followups-schema.js';
 import { KANBAN_SCHEMA_SQL } from '@/modules/database/kanban-schema.js';
 import { MEMORY_SCHEMA_SQL } from '@/modules/database/memory-schema.js';
 import { NOTES_SCHEMA_SQL } from '@/modules/database/notes-schema.js';
+import { NOTIFICATION_HISTORY_SCHEMA_SQL } from '@/modules/database/notification-history-schema.js';
 import { migrateProvenanceColumnToLegacyId } from '@/modules/database/migrations-legacy-id.js';
 
 const SQLITE_UUID_SQL = `
@@ -586,6 +587,140 @@ const addSessionNameGivenColumn = (db: Database): void => {
 };
 
 /**
+ * Adds `relayed_sends.message_uuid`: the transcript uuid of the user row a relayed brief became.
+ *
+ * A turn Kaylee starts stamps its message with a uuid the CLI keeps as the row's own, so the history mark follows the row
+ * instead of its words (`session-relayed-sends.ts`). NULL for every send recorded before this column and for a steer,
+ * whose persisted row is a queued-command attachment: those keep the text rule.
+ */
+const addRelayedSendMessageUuidColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'relayed_sends').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'relayed_sends', columnNames, 'message_uuid', 'TEXT');
+};
+
+/**
+ * Adds `followups.closed_for`: what finished and closed the item — `<feature>`, `<feature>/<task key>` or `epic:<epic>`.
+ *
+ * `followups-schema.ts` carries the column for a fresh database; a database that already has the table gets it here.
+ * NULL for every item closed by a person, a chat, or not at all.
+ */
+const addFollowupsClosedForColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'followups').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'followups', columnNames, 'closed_for', 'TEXT');
+};
+
+/**
+ * Adds `companion_state.pending_json`: the one action Kaylee has prepared and he has not yet spoken for,
+ * as the wire's `CompanionPendingAction` plus the server-only `pin` the prepare took (the ask and its lock
+ * token, the chain, the follow-up, the open's target). NULL for none, which is every row before this column.
+ */
+const addCompanionPendingColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'pending_json', 'TEXT');
+};
+
+/**
+ * Adds `companion_state.memory_forget_line`: the id of the `companion_log` line of his that the last `forget` of her memory used, or
+ * NULL before any has. It is how one word of his forgets at most five memories: a forget must be given a line with a greater id,
+ * so "forget everything" cannot empty her bank five at a time. It holds a log id and never a memory (CloudCLI stores none of her
+ * memory, ruling 1). Clear leaves it: log ids are AUTOINCREMENT and never reused, so a value from before a Clear stays a true lower
+ * bound, and a line he says after the Clear always has a greater id.
+ */
+const addCompanionMemoryForgetLineColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'memory_forget_line', 'INTEGER');
+};
+
+/**
+ * Adds the three columns of an account's face to `companion_state`: `face_id`, the face her pages draw (NULL for the original);
+ * `face_pending_id`, the face being made from his upload, which a restart resumes; and `face_error`, the sentence of the last
+ * bake that failed. All NULL for every row before these columns, which is the original face with nothing being made. Clear leaves
+ * them (`clearAccount` names only the conversation's columns): Clear wipes her memory, not her look.
+ */
+const addCompanionFaceColumns = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'face_id', 'TEXT');
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'face_pending_id', 'TEXT');
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'face_error', 'TEXT');
+};
+
+/**
+ * Adds the three columns of a card's shape to `companion_notes`: `kind` (what the card is: `note`, `list`, `diff`, `plan` or `page`),
+ * `ref_json` (what it is about, as the wire's `CompanionNoteRef`, or NULL for nothing) and `pinned` (1 when he pinned it). Every
+ * card held before these columns reads, truthfully, as a note about nothing, unpinned: the defaults say so, so no backfill is run.
+ */
+const addCompanionNoteShapeColumns = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_notes').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_notes', columnNames, 'kind', "TEXT NOT NULL DEFAULT 'note'");
+  addColumnToTableIfNotExists(db, 'companion_notes', columnNames, 'ref_json', 'TEXT');
+  addColumnToTableIfNotExists(db, 'companion_notes', columnNames, 'pinned', 'INTEGER NOT NULL DEFAULT 0');
+};
+
+/**
+ * Adds `companion_actions.armed_from`: when the action's ceremony began. A prepare that re-arms an action which lapsed (the same
+ * action on the same target) carries the first prepare's stamp here, so her read-back from before the lapse and his yes since
+ * still count. NULL means the ceremony began at the row's own `prepared_at`, which is every row before this column.
+ *
+ * The same release ends the old ceremony's standing cards, once, with the column: a pending action stored before it has no
+ * `armedFrom` (and may be an `open`, which has no pending action now), so the store would drop it with a warning at every read of the
+ * state. Each such card was a five-minute wait; its row ends `cancelled` with the sentence that says why, and the state forgets it.
+ * A row a take has claimed (a firing line written) is left to the take, or to the next prepare's orphan sweep.
+ */
+const addCompanionActionArmedFromColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_actions').map((column) => column.name);
+  if (columnNames.includes('armed_from')) return;
+
+  addColumnToTableIfNotExists(db, 'companion_actions', columnNames, 'armed_from', 'TEXT');
+  db.prepare(
+    `UPDATE companion_actions SET ended_at = ?, outcome = 'cancelled', answer = ?
+     WHERE outcome IS NULL AND said_log_id IS NULL`
+  ).run(new Date().toISOString(), 'How an action waits for his word changed while this waited; it was taken off his panel and nothing was done.');
+  db.prepare('UPDATE companion_state SET pending_json = NULL WHERE pending_json IS NOT NULL').run();
+};
+
+/**
+ * Adds `companion_state.unanswered_json`: the messages of his that no turn of Kaylee's has answered yet, as a list of
+ * `{ uuid, body, via, at }` (his raw words and how they came), written when one is pushed and read by the next process, which
+ * says them to her again. NULL for none, which is every row before this column.
+ */
+const addCompanionUnansweredColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'unanswered_json', 'TEXT');
+};
+
+/**
+ * Adds `companion_state.session_shape`: the fingerprint of Kaylee's tools and system prompt as they were when `provider_session_id`
+ * began (`companion-shape.ts`), written with the id and nulled with it. The CLI records a conversation's tools and prompt once and
+ * keeps them on every resume, so a conversation is resumed only when this equals the launch's own; a session id held with no shape
+ * (every one from before this column) is refused once and she starts fresh. NULL for none, which is every row before this column.
+ */
+const addCompanionSessionShapeColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'session_shape', 'TEXT');
+};
+
+/**
+ * Adds `companion_state.handover`: the short account of the conversation Kaylee's tools or prompt made her drop, written before her
+ * fresh start and read by the first message assembled after it (`companion/session/companion-handover.ts`), which carries it once;
+ * the column is emptied when the launch that was handed that message reports `init`. It sits on the row so a crash between the summary
+ * and that message, or a launch that fails before `init`, does not lose it. NULL for none, which
+ * is every row before this column and every row between handovers.
+ */
+const addCompanionHandoverColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'handover', 'TEXT');
+};
+
+/**
  * Adds the `permission_mode` column that records the permission mode a session last ran under.
  *
  * Recorded beside `model` and `effort` on every send, so a send the companion relays can run in
@@ -743,10 +878,23 @@ export const runMigrations = (db: Database) => {
     // The followups table: a chat's own next steps and known gaps. It references `sessions` (its
     // cascade is what removes a deleted chat's items) and `users`, both of which exist by here.
     db.exec(FOLLOWUPS_SCHEMA_SQL);
-    // The companion's tables: Kaylee's per-account state, exchange and cards (each cascading from
-    // `users`), and the briefs she has relayed into chats (cascading from `sessions`, which exists
-    // by here with its `permission_mode` column).
+    addFollowupsClosedForColumn(db);
+    // The companion's tables: Kaylee's per-account state, exchange, cards and record of actions (each
+    // cascading from `users`), and the briefs she has relayed into chats (cascading from `sessions`,
+    // which exists by here with its `permission_mode` column).
     db.exec(COMPANION_SCHEMA_SQL);
+    addRelayedSendMessageUuidColumn(db);
+    addCompanionPendingColumn(db);
+    addCompanionMemoryForgetLineColumn(db);
+    addCompanionFaceColumns(db);
+    addCompanionUnansweredColumn(db);
+    addCompanionSessionShapeColumn(db);
+    addCompanionHandoverColumn(db);
+    addCompanionActionArmedFromColumn(db);
+    addCompanionNoteShapeColumns(db);
+    // What the house told each account, kept: one row per notification the orchestrator was handed, written at
+    // the listener seam. It references `users` alone, so it sits beside the companion's script, which reads it.
+    db.exec(NOTIFICATION_HISTORY_SCHEMA_SQL);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');

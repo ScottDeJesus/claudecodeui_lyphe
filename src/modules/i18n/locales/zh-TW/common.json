@@ -379,7 +379,8 @@
       "choose": "選擇頁面…",
       "custom": "輸入網址…",
       "open": "在新分頁中開啟頁面",
-      "rejected": "這不是 http:// 或 https:// 網址"
+      "rejected": "這不是 http:// 或 https:// 網址",
+      "plainHttpBlocked": "此頁面透過未加密的 http 提供，而本應用程式以 https 開啟時，瀏覽器不會在應用程式內顯示 http 頁面。請使用「開啟」連結在獨立分頁中檢視。"
     },
     "notes": {
       "title": "筆記"
@@ -463,7 +464,9 @@
     },
     "appearanceLight": "淺色外觀",
     "appearanceDark": "深色外觀",
-    "divider": "調整應用程式大小"
+    "divider": "調整應用程式大小",
+    "mixedContentTitle": "此應用程式無法在此處顯示",
+    "mixedContentMessage": "{{name}} 透過未加密的 http 提供，而本應用程式以 https 開啟時，瀏覽器不會在應用程式內顯示 http 頁面。"
   },
   "chatHost": {
     "panelLabel": "浮動聊天",

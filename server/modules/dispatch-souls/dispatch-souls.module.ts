@@ -2,10 +2,12 @@ import type { Router } from 'express';
 
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import { createPolledLane } from '@/shared/polled-lane.service.js';
+import type { RelayAnswer, ResumeRunOrder } from '@/shared/relayed-press-types.js';
 import type { SoulLaunchSnapshot, SoulLaunchStateEvent } from '@/shared/types.js';
 import { dispatchSoulsStateDir } from '@/shared/utils.js';
 
 import { createDispatchSoulsRouter } from './dispatch-souls.routes.js';
+import { resumeChainOnHisWord } from './run-resume.service.js';
 import { readSoulTranscript } from './soul-transcript.service.js';
 import { snapshotLaunches } from './soul-launch.service.js';
 
@@ -26,10 +28,27 @@ const POLL_MS = 2000;
  */
 const LAUNCH_KEEP_S = 6 * 60 * 60;
 
+/**
+ * How long a read of the launches waits for this boot's first reading of the launch root: the dispatcher and roadmap
+ * lanes' bound, so a reader of the house is owed an answer either way and is told "not read yet" past it.
+ */
+const FIRST_READ_WAIT_MS = 5000;
+
+/**
+ * What `createDispatchSoulsModule` hands the server entrypoint: the router to mount, the poll's `start` and `stop`, and
+ * `launches()`, the lane's picture behind `whenLanded` — the souls and chains sessions launched by hand. The lane's
+ * reading is synchronous and seeded when it is built, so this answers at once; `null` is the shared lane's type, never
+ * a case this lane meets. The entrypoint passes `launches` on to the companion's house
+ * (`CompanionHouse.launches`), and `resumeRun(order)` after it (`CompanionHouse.resumeRun`): a chain resumed with his
+ * rulings on his spoken word, through the plan-runner's own door with kaylee--press's record of it
+ * (`run-resume.service.ts`) — this lane owns the runs on this server.
+ */
 export type DispatchSoulsModule = {
   router: Router;
   start(): void;
   stop(): void;
+  launches(): Promise<SoulLaunchSnapshot[] | null>;
+  resumeRun(order: ResumeRunOrder): Promise<RelayAnswer>;
 };
 
 /**
@@ -92,5 +111,7 @@ export function createDispatchSoulsModule(): DispatchSoulsModule {
     }),
     start: () => lane.start(),
     stop: () => lane.stop(),
+    launches: () => lane.whenLanded(FIRST_READ_WAIT_MS),
+    resumeRun: (order) => resumeChainOnHisWord(order, (line) => console.log(line)),
   };
 }

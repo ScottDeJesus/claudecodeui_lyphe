@@ -90,11 +90,15 @@
           "server/shared/document-fields.ts",
           "server/shared/cerberus-types.ts",
           "server/shared/companion-types.ts",
+          "server/shared/station-types.ts",
           "server/shared/shadow-connector-lane.ts",
           "server/shared/shadow-connector-lane-router.ts",
           "server/shared/prompt-stream.ts",
           "server/shared/tool-call-hint.ts",
-          "server/shared/tool-text-result.ts"
+          "server/shared/tool-text-result.ts",
+          "server/shared/relayed-press-types.ts",
+          "server/shared/relay-record.ts",
+          "server/shared/sayable-name.ts"
         ],
         "mode": "file"
       },
@@ -135,6 +139,8 @@
           "src/shared/roadmap-types.ts",
           "src/shared/cerberus-types.ts",
           "src/shared/companion-types.ts",
+          "src/shared/station-types.ts",
+          "src/shared/cloudcliDoors.ts",
           "src/shared/affected-areas-types.ts",
           "src/shared/affected-areas-layout-types.ts",
           "src/shared/carrier-bulletins-types.ts",

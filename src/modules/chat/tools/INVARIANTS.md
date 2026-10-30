@@ -2,7 +2,7 @@
 
 ## INV-205 — Question cards share three parts
 
-`AskUserQuestionPanel` (pending) and `AnsweredQuestion` (answered) render one question from the same `QuestionText` and `QuestionOptionRow`; the dispatcher module's `RoundAnswer` (a round's options) does too, through `@/shared/ui`. A style change to either part changes every card.
+`AskUserQuestionPanel` (pending) and `AnsweredQuestion` (answered) render one question from the same `QuestionText` and `QuestionOptionRow`; the dispatcher module's `RoundAnswer` (a round's options) does too, through `@/shared/ui`. `QuestionText` alone, through the chat barrel, also draws the dispatcher's `LockAnswer` (the Accept census) and the companion's `CompanionActionCard` (the prompt of an action waiting for his word). A style change to either part changes every card.
 
 1. `QuestionOptionRow` inside an option group takes `choice`: `'radio'` (single-select) or `'checkbox'` (multi-select) gives `role` plus `aria-checked`. why: `aria-pressed` inside a radiogroup announces a one-way pick as a toggle.
 2. `QuestionOptionRow` with no `choice` is a toggle button with `aria-pressed` — only the "Other" row, which sits outside the group and really switches off.

@@ -675,7 +675,7 @@ let companionClientIdInMemory: string | null = null;
 /**
  * The name Kaylee knows THIS page by: minted on first use and kept in the tab's sessionStorage, so a reload keeps it and a
  * second tab gets its own. It rides every companion call as `x-companion-client`, and the page that last typed to her or
- * opened her panel holds the floor — the one page a `companion_open_chat` frame is addressed to.
+ * opened her panel holds the floor — the one page a `companion_open` frame is addressed to.
  *
  * Minted with `crypto.getRandomValues`, not `randomUUID`: the app is reached over plain HTTP on a tailnet address, which is
  * not a secure context, and `randomUUID` does not exist there. Used by `api.companion` (the header) and the companion
@@ -713,4 +713,68 @@ export function companionClientId(): string {
 export function recordingFileName(mimeType: string): string {
   const extension = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : 'webm';
   return `recording.${extension}`;
+}
+
+// ---------------------------
+
+//----------------- A DOCK'S MEASURED RECT ------------
+
+/**
+ * The rect a floating button may dock to, or null — the two rules a measured rect has to pass before it is believed.
+ *
+ * A NON-ZERO RECT IS NOT ENOUGH. The sidebar's mobile drawer is hidden with `invisible opacity-0`, and
+ * `visibility: hidden` KEEPS the layout box: `getBoundingClientRect()` answers the dock's full size from a point a
+ * drawer's width off the left edge, roughly 85vw away. A record reading `docked: true` against that rect paints the
+ * button off-screen — and the button is the reader's only way out of a pane. So the rect must also INTERSECT THE
+ * VIEWPORT. Null in, null out, and null is a real answer rather than an error: it means the button has nowhere to dock
+ * and the kit floats it at its clamped resting corner instead of at a remembered ghost.
+ *
+ * Used by the app-switcher module's provider (`registerDock`) and the companion module's (`registerDock`): each dock
+ * hands over what `getBoundingClientRect()` said about its box in the sidebar's views rail.
+ */
+export function dockableRect(rect: DOMRect | null): DOMRect | null {
+  if (rect === null || rect.width === 0 || rect.height === 0) return null;
+  const intersectsViewport =
+    rect.right > 0 && rect.bottom > 0 && rect.left < window.innerWidth && rect.top < window.innerHeight;
+  return intersectsViewport ? rect : null;
+}
+
+/**
+ * Whether two rects are the same place. A dock re-measures on every resize, so an unchanged measurement has to leave the
+ * state object it found: a fresh `DOMRect` with the same numbers would re-render the provider, and a re-render that moved
+ * the button would ask for another measurement. Used by the same two providers, beside `dockableRect`.
+ */
+export function sameRect(a: DOMRect | null, b: DOMRect | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
+}
+
+// ---------------------------
+
+//----------------- A FRAME THE BROWSER WILL NOT DRAW ------------
+
+/**
+ * Whether a browser blocks `address` as mixed content when a page opened at `pageProtocol` frames it: a plain-`http:` address
+ * inside an `https:` page. The browser blocks it silently, so the frame is a blank rectangle with nothing for the page to
+ * read, and the only honest answer is to know it BEFORE the frame is rendered and say so instead.
+ *
+ * The scheme is read by PARSING the address, never by matching a prefix (case and leading whitespace defeat a prefix test).
+ * An address that does not parse answers false: it is a malformed address rather than a blocked one, and the frame's own
+ * load shows that. A LOOPBACK host answers false too: a browser treats `localhost`, `*.localhost`, `127.0.0.0/8` and `::1`
+ * as potentially trustworthy, so it draws that frame from an https page and a card would be wrong about it. Pass
+ * `window.location.protocol` as `pageProtocol`; it is an argument so the rule can be run under `tsx`.
+ *
+ * Used by the widgets module's `EmbedUrlFrame` (the transcript's embed card and the Embed gutter widget) and the
+ * app-switcher module's `AppPane`: each swaps its iframe for a card with a link out when this is true.
+ */
+export function isBlockedAsMixedContent(address: string, pageProtocol: string): boolean {
+  if (pageProtocol !== 'https:') return false;
+  try {
+    const { protocol, hostname } = new URL(address);
+    if (protocol !== 'http:') return false;
+    const isLoopback = hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '[::1]' || /^127\.\d+\.\d+\.\d+$/.test(hostname);
+    return !isLoopback;
+  } catch {
+    return false;
+  }
 }

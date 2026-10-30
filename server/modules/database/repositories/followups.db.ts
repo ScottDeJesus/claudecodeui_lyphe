@@ -6,7 +6,9 @@ import { getConnection } from '@/modules/database/connection.js';
  *
  * Every read and write names the chat (`session_id`, the APP session id) or the account (`user_id`)
  * it acts for in its `WHERE` clause, so an id that belongs to another chat or account reads as no row
- * and no verb can touch an item its caller does not own. The stamps are ISO-8601 UTC with
+ * and no verb can touch an item its caller does not own. The ONE exception is the completion closer
+ * (`listOpenNaming`, `closeForCompletion`): it is the house acting on every chat and every account at once,
+ * and reaches a row by the words it carries and its id, never by an owner. The stamps are ISO-8601 UTC with
  * milliseconds, written in JS. A row leaves the table only with its chat (the foreign key's cascade,
  * `followups-schema.ts`) — nothing here deletes one — and moves with its chat when a duplicate row is
  * merged away (`moveToSession`).
@@ -33,10 +35,11 @@ export type FollowupRow = {
   updated_at: string;
   done_at: string | null;
   closed_by: 'chat' | 'user' | null;
+  closed_for: string | null;
 };
 
 /** Every column of an item, in one spelling: what a read returns and a write reads back. */
-const FOLLOWUP_COLUMNS = 'id, session_id, user_id, kind, text, state, created_at, updated_at, done_at, closed_by';
+const FOLLOWUP_COLUMNS = 'id, session_id, user_id, kind, text, state, created_at, updated_at, done_at, closed_by, closed_for';
 
 export const followupsDb = {
   /** Every item of one chat, oldest first (`id` is the order they were filed in). */
@@ -141,12 +144,47 @@ export const followupsDb = {
       ).run(now, now, id, userId);
     } else {
       db.prepare(
-        `UPDATE followups SET state = 'open', done_at = NULL, closed_by = NULL, updated_at = ?
+        `UPDATE followups SET state = 'open', done_at = NULL, closed_by = NULL, closed_for = NULL, updated_at = ?
          WHERE id = ? AND user_id = ? AND state = 'done'`,
       ).run(now, id, userId);
     }
 
     return followupsDb.getOfUser(userId, id);
+  },
+
+  /**
+   * The OPEN items of every chat and account whose text contains `name`, case-insensitively, oldest first. A wide
+   * net on purpose: the followups service applies the exact rule (a whole slug token or a cue, a pointer at a task) to
+   * what this returns. The completion closer's read, in `followups.service.ts` (`closeForCompletions`).
+   */
+  listOpenNaming(name: string): FollowupRow[] {
+    return getConnection()
+      .prepare(`SELECT ${FOLLOWUP_COLUMNS} FROM followups WHERE state = 'open' AND instr(lower(text), lower(?)) > 0 ORDER BY id`)
+      .all(name) as FollowupRow[];
+  },
+
+  /**
+   * Settles items because the feature, task or epic they named finished, and answers the rows it changed, as stored.
+   * `doneAt` is the completion's own stamp (ISO-8601 UTC with milliseconds), `closedFor` the feature, `<feature>/<task key>`
+   * or `epic:<epic>`.
+   * Only an OPEN item changes, so a row a person or a chat settled between the read and this write keeps its stamps and
+   * is left out of the answer. The completion closer's write, in `followups.service.ts` (`closeForCompletions`).
+   */
+  closeForCompletion(ids: number[], doneAt: string, closedFor: string): FollowupRow[] {
+    const db = getConnection();
+    const now = new Date().toISOString();
+    const close = db.prepare(
+      `UPDATE followups SET state = 'done', done_at = ?, closed_by = NULL, closed_for = ?, updated_at = ?
+       WHERE id = ? AND state = 'open'
+       RETURNING ${FOLLOWUP_COLUMNS}`,
+    );
+
+    return db.transaction(() =>
+      ids.flatMap((id) => {
+        const row = close.get(doneAt, closedFor, now, id) as FollowupRow | undefined;
+        return row ? [row] : [];
+      }),
+    )();
   },
 
   /**

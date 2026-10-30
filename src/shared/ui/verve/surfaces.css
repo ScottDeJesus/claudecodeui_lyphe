@@ -71,7 +71,10 @@
  * draws it. It is a way in and out, never the screen's subject, so it stays the smallest thing in the
  * rail beside the wordmark; the 44px catch is what a finger needs. The radial's discs stand at the
  * FAB's own size and keep its catch, so they read these same three numbers instead of restating them
- * (FAB_SIZE_PX and FAB_CATCH_PX in shared/constants.ts are the JS twins). */
+ * (FAB_SIZE_PX and FAB_CATCH_PX in shared/constants.ts are the JS twins). A FAB whose owner sets
+ * --vv-fab-size on it (Kaylee's disc, larger while she is active) is read the same way by the box, the
+ * floating clamp() and the dock's centring: it grows about its own centre and, docked, stays inside the
+ * safe area as floating does. */
 .vv-fab,
 .vv-fab-disc {
   --vv-fab-size: 28px;

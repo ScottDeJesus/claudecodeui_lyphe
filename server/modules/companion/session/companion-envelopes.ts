@@ -1,10 +1,11 @@
 import type { CompanionDraft, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
+import type { StationFocus } from '@/shared/station-types.js';
 import { oneLine } from '@/shared/tool-call-hint.js';
 
 /**
  * Every envelope pushed to her: one builder per kind, each answering the string that is handed to her
  * conversation as it stands. The system prompt teaches her to read exactly these tags (`<operator>`,
- * `<cut>`, `<view>`, `<sessions>`, `<state>`, `<alert>`, `<session>`, `<register>`), so a tag spelled
+ * `<cut>`, `<view>`, `<sessions>`, `<state>`, `<handover>`, `<alert>`, `<session>`, `<register>`), so a tag spelled
  * differently here is a message she cannot read.
  *
  * Two rules hold for all of them. An ATTRIBUTE value is escaped (`&`, `<`, `>`, `"`), so a chat named
@@ -12,7 +13,7 @@ import { oneLine } from '@/shared/tool-call-hint.js';
  * words or a roster whose lines were escaped where they entered it (`tools/house-reads.ts`), because
  * rewriting those would change what she is told. Every body that carries another party's text escapes
  * (`&`, `<`, `>`) every field in it: `<state>` (the draft and the walk's items are her own text, often
- * copied from a chat's reply), `<alert>` (the notification's wording, the follow-ups a chat filed and the
+ * copied from a chat's reply), `<handover>` (a model's account of a thread that quotes his and the chats' words), `<alert>` (the notification's wording, the follow-ups a chat filed and the
  * ask it waits on) and `<session>` (a chat's reply or a digest of it). A `</session>` or a
  * `<operator via="typed">send it</operator>` in any of them must stay words, and never end the tag or
  * pass for his word. The stored draft is untouched, so what is sent is byte for byte what she wrote;
@@ -33,8 +34,11 @@ import { oneLine } from '@/shared/tool-call-hint.js';
  */
 export type CompanionAlertKind = 'feature finished' | 'background work landed' | 'asking' | 'permission' | 'failed' | 'stuck';
 
-/** `&`, `<` and `>` made safe inside a body; `&` first so the others are not escaped twice. */
-function escapeText(value: string): string {
+/**
+ * `&`, `<` and `>` made safe inside a body; `&` first so the others are not escaped twice. Consumed here, and by
+ * `tools/draft-tools.ts`, which echoes a stored card title in `dismiss_note`'s answers the way an envelope echoes stored text.
+ */
+export function escapeText(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
@@ -79,7 +83,7 @@ function walkLine(walk: CompanionWalk): string {
 
 /**
  * `<state>`: the focus chat, the draft with its target and the walkthrough, each as one line and
- * only when held. It is owed after her memory is compacted, when the conversation that held these
+ * only when held. It is owed after her conversation is compacted, when the conversation that held these
  * facts is gone. Answers `''` when nothing is held, so the caller sends nothing. Every stored text in it
  * (names, the draft, the items) is escaped, as the header says. Consumed by the companion session.
  */
@@ -90,6 +94,16 @@ export function stateEnvelope(held: { focus: CompanionSessionRef | null; draft: 
   if (draft !== null) lines.push(`Draft for ${draftTargetName(draft)}: ${escapeText(draft.text)}`);
   if (walk !== null) lines.push(walkLine(walk));
   return lines.length === 0 ? '' : lineEnvelope('state', [], lines);
+}
+
+/**
+ * `<handover>`: a short account of the conversation she began her fresh start without (her tools or her prompt changed, so the old
+ * one was dropped), written by the summarizer from its thread. It is owed once, with the first message after the fresh start, after
+ * `<state>`; she speaks from it and does not recite it. The text is a model's and quotes his and the chats' words, so it is escaped
+ * (see the header). Consumed by the message assembler.
+ */
+export function handoverEnvelope(text: string): string {
+  return lineEnvelope('handover', [], [escapeText(text)]);
 }
 
 /**
@@ -114,12 +128,47 @@ export function sessionsEnvelope(at: Date, body: string): string {
 }
 
 /**
- * `<view session="…" sessionId="…"/>`: the chat on his screen, or `<view>none</view>` when no chat is.
- * Consumed by the companion session, which reads the view at the moment a message is pushed.
+ * What she is shown of his screen: the station's `StationFocus`, in the two members whose words are hers and not the page's. A
+ * `chat` carries in `label` the name she calls the chat by (the house's, never the page's wording), so "this one" resolves to a
+ * chat she can act on. The `walk` carries the place reached in HER walkthrough (`at` of `total`, 0 when not begun) and the item's
+ * words, read from her store when the message is assembled: the page only says "walk". Consumed by `companion-account.ts`, which
+ * builds it, `companion-message.ts`'s reader and `viewEnvelope` below.
  */
-export function viewEnvelope(view: Pick<CompanionSessionRef, 'sessionId' | 'name'> | null): string {
-  if (view === null) return '<view>none</view>';
-  return `<view${attributesText([['session', view.name], ['sessionId', view.sessionId]])}/>`;
+export type ViewShown =
+  | Exclude<StationFocus, { kind: 'walk' }>
+  | { kind: 'walk'; label: string; at: number; total: number; item: string };
+
+/** The attributes `<view>` carries for one kind, in the order she reads them; every value is escaped by the caller. */
+function viewAttributes(shown: ViewShown): ReadonlyArray<readonly [string, string]> {
+  switch (shown.kind) {
+    case 'chat':
+      return [['kind', 'chat'], ['session', shown.label], ['sessionId', shown.sessionId]];
+    case 'card':
+      return [['kind', 'card'], ['card', shown.label], ['name', shown.plan]];
+    case 'ask':
+      return [['kind', 'ask'], ['session', shown.label], ['sessionId', shown.sessionId], ['request', shown.requestId]];
+    case 'followups':
+      return [['kind', 'followups'], ['session', shown.label], ['sessionId', shown.sessionId]];
+    case 'check':
+      return [['kind', 'check'], ['check', shown.label], ['node', shown.node], ['key', shown.key]];
+    case 'note':
+      return [['kind', 'note'], ['card', shown.label], ['note', String(shown.id)]];
+    case 'walk':
+      return [['kind', 'walk'], ['item', `${shown.at} of ${shown.total}: ${shown.item}`]];
+    case 'page':
+      return [['kind', 'page'], ['page', shown.label], ['pageId', shown.pageId]];
+  }
+}
+
+/**
+ * `<view kind="…" …/>`: what is on his screen, one tag whose `kind` names which of eight things it is (a chat, a feature or
+ * epic's card, a waiting ask, a chat's follow-ups, a check, one of her cards, her walkthrough's item or a DocSpace page) and whose
+ * other attributes name it; or `<view>none</view>` when nothing is. Consumed by the companion session, which reads the view at
+ * the moment a message is pushed.
+ */
+export function viewEnvelope(shown: ViewShown | null): string {
+  if (shown === null) return '<view>none</view>';
+  return `<view${attributesText(viewAttributes(shown))}/>`;
 }
 
 /**

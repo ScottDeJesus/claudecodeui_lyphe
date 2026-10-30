@@ -185,7 +185,7 @@ The Claude picker's options, names, descriptions and effort levels come from the
 - **When it runs.** Once per installed CLI version, keyed on `readInstalledCliVersion()`, the `cli-version` module's one cached reading; the catalog never runs a `--version` of its own. The answer is kept at `~/.cloudcli/claude-model-catalog.json` beside the version it was read on (`CLOUDCLI_CLAUDE_MODEL_CATALOG_PATH` redirects it), so the dev server's handovers load it instead of respawning the CLI. A reading with no version ("not heard") is served whatever is kept under a real version and never spawns the CLI or replaces that record; only a CLI never named by path, with nothing keyed, is read once per process. `getSupportedModels` also sits on the send path (effort validation), so a caller waits at most 3 s for a read in flight and is otherwise served what is already known.
 - **The open tab.** The picker asked for its list once, at mount, so a CLI update left an open tab on the old list until the page was reloaded (2026-10-08: the CLI served Haiku 5.5 and the catalog file named it within seconds, while a tab listed only Haiku 4.5). `src/modules/chat/hooks/useReloadModelsOnCliChange.ts` re-reads `GET /api/providers/<provider>/models` for every provider when `useCliVersion().installed` moves from one version string to another — the app's one reading of the installed CLI, so it adds no poll. The first reading (null to a string) is not a move, and a null is "not heard". The answer is laid over the previous catalog (`{ ...previous, ...next }`), so a provider whose answer is unusable (a JSON error body) keeps its last good list.
 - **When the read fails.** The server serves the last good catalog on disk, whatever version it came from. With none, it serves `CLAUDE_FALLBACK_MODELS`, whose rows are named by family alone ("Opus", "Sonnet") and state no generation. One `[Claude models]` log line says which. A failed version is asked again after 10 minutes.
-- **What is offered** (`list/claude/claude-model-options.ts`). One row per family, the newest: the family's alias entry where the catalog has one, else its newest pinned id (Fable: its value is the id it runs, with or without the `[1m]` context suffix). `default` and the older pinned versions are dropped. A new family appears on its own, in the catalog's order. Ultracode is added exactly where the catalog's effort levels include `xhigh`. Values stay the ones stored sessions hold (`opus[1m]`, `fable`, `sonnet[1m]`, `haiku`), so every stored selection still matches an option.
+- **What is offered** (`list/claude/claude-model-options.ts`). One row per family, the newest: the family's alias entry where the catalog has one, else its newest pinned id (Fable: its value is the id it runs, with or without the `[1m]` context suffix). `default` and the older pinned versions are dropped. A new family appears on its own, in the catalog's order. Ultracode is added exactly where the catalog's effort levels include `xhigh`. Values stay the ones stored sessions hold (`opus[1m]`, `fable`, `sonnet[1m]`, `haiku`), so every stored selection still matches an option. They come from the exported table `CLAUDE_MODEL_VALUE_BY_ALIAS`, which the companion's `model` choice also reads (MAN-9201).
 - **Names carry the version.** The CLI words a name one of two ways: with the version in it ("Haiku 4.5"), or by family alone ("Opus") with the version opening the description ("Opus 5.5 · Best for everyday, complex tasks"). A name with a version is shown as the CLI gives it. A name with none, whose description opens with that name, a version (`5`, `5.5`, `4.8`) and ` · `, is shown as `<name> <version>` ("Opus 5.5") over the description that follows the separator, so the menu does not say the version twice. That name is the option's `label` and the `LABELS_BY_MODEL_ID` entry, so the menu, the composer chip and chat captions all read it, and it stays right with each release. Everything else stays as the catalog says it: a description that opens with another name ("Default (recommended)" over "Sonnet 5.5 · …") or a notice ("Newer version available · …"), an entry with no description, and the no-catalog fallback. The composer's model rows show the name only; the description is in the API's answer.
 - **Stored ids.** The definition carries `LABELS_BY_MODEL_ID`, the picker's name for every concrete id the catalog lists. `mergeProviderModels` passes it through, and `src/modules/chat/utils/modelLabels.ts` reads it before its own generation-parsing fallback, which names only ids the catalog does not list. So `claude-sonnet-5-5` reads "Sonnet 5.5"; `claude-sonnet-5`, which the 2.1.310 catalog does not list, reads "Sonnet 5" from the fallback (the family plus the id's own version).
 - **Proof.** `.verify/probe-claude-catalog-picker.mjs [run-name]` prints the API's answer (each option's label and description, `LABELS_BY_MODEL_ID`) and, from the DOM, the chip and every row of the open menu, desktop and phone, dark and light, with the console errors and failed responses; it writes the four screenshots and a JSON report to `.verify/out/<run-name>-*`. `.verify/probe-opus-55-selector.mjs` covers stored-turn captions and the resumed-session chip.
@@ -977,22 +977,22 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/cl
 A user message that came to a chat through Kaylee wears a small "Through Kaylee" mark, live and after a reload.
 
 ## The record and the live row
-- `companion-send.ts` records every send: `relayedSendsDb.record(sessionId, 'turn' | 'steer', words)` (table: MAN-9082). The text is stored trimmed.
+- `companion-send.ts` records every send: `relayedSendsDb.record(sessionId, 'turn' | 'steer', words, messageUuid?)` (table: MAN-9082). The text is stored trimmed. A TURN stamps a uuid on its message (`runDetachedChatTurn`'s `messageUuid`, a server-only option: `dispatchRun` clears any a page sends; `claude-runtime.provider.js` `buildPromptMessages` uses it when it is a uuid) which the CLI keeps as the transcript row's own uuid, and records it in `relayed_sends.message_uuid`. A steer records none, and neither does a turn into a chat of another provider: only the Claude runtime reads `options.messageUuid`, so `companion-send.ts` stamps one only when the chat's provider is `claude`, and any other provider's row is marked by the text rule below.
 - Live echo: a user `text` row with id `local_kaylee_<uuid>`, `spokenVia: 'kaylee'`, written by the send (MAN-9072). A steer's echo is the only live row: the SDK stream replays no `user` row for a steer (MAN-9068).
 - Persisted row: the history read marks it again. A steer's persisted row is the `queued_command` attachment drawn as a user row (`claude-queued-prompt.ts`, MAN-9068); without it there is nothing to mark.
 
 ## `markRelayedSends(sessionId, messages)` (`providers/services/session-relayed-sends.ts`)
 `sessionsService.fetchHistory` applies it to EVERY page it returns, after the page is cut, cached or read directly. The mark rides the same REST payload as the row.
-A user row gets `spokenVia: 'kaylee'` when ALL hold:
+A send WITH a `message_uuid` marks that row and no other: a user `text` row whose id is the uuid or the uuid plus `_text…` (`transcriptUuidOf`), whatever its words or time. A send WITHOUT one (a steer, and every send recorded before the column) is matched by text, below. A user row gets `spokenVia: 'kaylee'` by the text rule when ALL hold:
 | test | rule |
 |---|---|
 | shape | `kind === 'text'`, `role === 'user'`, `content` a string |
 | words | `content.trim()` is not empty and equals the trimmed text of one of this chat's `relayed_sends` |
 | time | the row's `timestamp` is at or after that send's `sent_at` minus `SEND_CLOCK_SKEW_MS` = 5000 |
-- Matched by TEXT, not by transcript uuid, on purpose: `claude-runtime.provider.js` stays untouched by this feature.
+- Why steers stay on the text rule: a steer's persisted row is the `queued_command` attachment, whose `source_uuid` was not shown to be the pushed message's uuid (two real steers pushed mid-turn on 2026-10-28 were filed as plain user rows with the pushed uuid, the house's own measured form is the attachment): matching it by uuid on a guess could drop a real mark.
 - Per text, the earliest threshold of any send of it decides: a brief sent twice marks both of its rows.
 - Never marks: a blank row (a picture-only row has `content: ''`; blank never matches blank), a row whose timestamp does not parse, a send whose `sent_at` does not parse or whose text is empty. `SEND_CLOCK_SKEW_MS` exists because the row's time is the CLI's clock and `sent_at` is this server's.
-- The same words typed by hand AFTER a send also wear the mark (designed, INV-9854).
+- The same words typed by hand AFTER a TURN send wear nothing (its row is named by uuid). After a STEER (or a send recorded before `message_uuid`) they still wear the mark: the text rule's limit.
 - A row it marks is a copy; every other row is the object it was given; the input is never mutated, because `fetchHistory` hands it rows the full-history cache also holds.
 - Reads `relayed_sends` once per call. A chat with none, or a read that throws, returns `messages` itself; the throw is logged `[relayed-sends] could not read the relayed sends of session <id>; the page goes out unmarked` and never fails the page.
 
@@ -1004,6 +1004,7 @@ A user row gets `spokenVia: 'kaylee'` when ALL hold:
 | `MessageComponent` user bubble | `AudioLinesIcon` + `t('message.throughKaylee', { defaultValue: 'Through Kaylee' })`, left of the bubble's controls (`mr-auto`) so the copy button keeps the right edge; always visible; drawn in an export too: it says where the message came from, not a control |
 
 ## Proof
+`.verify/kaylee-through-mark-row.mjs` (live, one Haiku chat; the companion's own send through `POST /api/companion/draft/send`): the relayed row's id starts with the recorded `message_uuid` and is marked; the same words typed by hand afterwards are not.
 `.verify/kaylee-through-mark.mjs`: one Haiku chat in `PROBE_PROJECT`, three turns from the composer: A the brief's words before any record exists, B the same words after `relayedSendsDb.record`, C different words after it. REST: only B carries `spokenVia`; after a reload only B's bubble draws the mark.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-relayed-sends.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/MessageComponent.tsx
@@ -1029,9 +1030,45 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/service
 ## Read — `sessionsDb.latestPermissionMode(provider?)`
 - The most recent NON-NULL `permission_mode`, ordered by `julianday(COALESCE(updated_at, created_at)) DESC, rowid DESC`. why `julianday`: `updated_at` is written in two spellings (SQLite's `CURRENT_TIMESTAMP` and the watcher's ISO), which do not sort as text.
 - `provider` narrows it to that provider's chats: a mode is a provider's own word. `null` when no chat has one.
-- Caller: `tools/send-options.ts` (`sendOptionsFor`) for a NEW chat. For an existing chat the send reads that row's own `permission_mode` and leaves the option out when it holds none (MAN-9072 §Options). `latestModelChoice(provider?)` is its sibling for model and effort.
+- Caller: `tools/send-options.ts` (`sendOptionsFor`) for a NEW chat. For an existing chat the send reads that row's own `permission_mode` and leaves the option out when it holds none (MAN-9072 §Options).
 
 ## Proof
 `.verify/companion-permission-mode.mjs`: a scratch chat in `PROBE_PROJECT`, on Haiku through the composer's own chip; `sqlite3 -readonly` shows `permission_mode` NULL before the first send and the composer's mode after one typed send (Enter); the chat is deleted at the end. `.verify/companion-storage.ts` runs `latestPermissionMode` before and after a session is given one.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-models.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts
+
+## MAN-9201 — Claude model names — CLAUDE_MODEL_VALUE_BY_ALIAS, readAccountDefaultModelAlias and what a turn with no model runs on
+
+The house's model names and the account's default model. Code: `list/claude/claude-model-options.ts`, `list/claude/claude-account-default-model.ts`, exported through `providers/index.ts`.
+
+## `CLAUDE_MODEL_VALUE_BY_ALIAS` and `ClaudeModelAlias`
+| name (key) | value a chat runs on and stores |
+|---|---|
+| `opus` | `opus[1m]` |
+| `fable` | `fable` |
+| `sonnet` | `sonnet[1m]` |
+| `haiku` | `haiku` |
+- ONE table. The picker's rows (`buildClaudeModelsDefinition`, `fallbackOption`) take their stored value from it (MAN-7405); the companion offers its keys as the choices of `model` and `sendOptionsFor` maps the key to the value (MAN-9072 §`model`).
+- `ClaudeModelAlias` is `keyof typeof CLAUDE_MODEL_VALUE_BY_ALIAS`. `server/modules/companion` imports the table, the type and the reader from the barrel only.
+- A family the table does not name is offered under the catalog's own value.
+
+## What a turn with no model runs on
+- `claude-runtime.provider.js`: `sdkOptions.model = options.model || CLAUDE_DEFAULT_MODEL` (`opus[1m]`). A turn sent with no `model` runs on `opus[1m]`, NOT on the CLI's account default.
+- A caller that means "the account default" names it with `readAccountDefaultModelAlias()`.
+
+## `readAccountDefaultModelAlias(): Promise<ClaudeModelAlias | null>`
+- Reads `model` from `<claudeConfigDir()>/settings.json` on every call; nothing is kept, so a hand edit of the setting is followed by the next chat opened.
+- Reads the FAMILY out of the string: lowercased, split on non-alphanumerics, the first table key among the words. `claude-fable-5-1[1m]` → `fable`; `sonnet[1m]` → `sonnet`. The generation is never kept, so the chat is stored as `fable` like every chat on that family.
+| setting | answer | logged |
+|---|---|---|
+| file absent, `model` missing or blank | `null` | no |
+| file unreadable or not JSON | `null` | `[Claude] the account default model could not be read from its settings` with the path |
+| `model` names no table family (`default`, another name) | `null` | `[Claude] the account default model names a family the house has no name for…` |
+- `null` → the caller sends no model and `opus[1m]` runs.
+- Consumer: `companion-send.ts` `sendToNewChat`, for a new chat whose `model` she left out (MAN-9072).
+- `claudeConfigDir()` (`server/shared/utils.ts`): `CLAUDE_CONFIG_DIR` trimmed when set, else `~/.claude`. Callers: this reader and `claude-auth.provider.ts`.
+
+## Proof
+`.verify/kaylee-model-choice.mjs` section 2: the real settings give `fable`; alias, pinned id and `[1m]` forms read down; `default`, empty, absent and non-JSON give `null`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-account-default-model.ts

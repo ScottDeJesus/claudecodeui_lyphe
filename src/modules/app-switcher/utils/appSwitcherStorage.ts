@@ -1,3 +1,4 @@
+import { FAB_DEFAULT_INSET_X, FAB_DEFAULT_INSET_Y } from '@/shared/constants';
 import type { DockableFabPosition } from '@/shared/ui';
 
 /**
@@ -22,23 +23,6 @@ const STORAGE_KEY = 'app-switcher';
 
 /** At or above this width the FAB starts docked in the sidebar's rail; below it, it floats. */
 const DOCK_MIN_WIDTH = 768;
-
-/**
- * The floating default's inset, in px, from the window's bottom-right corner to the FAB's own
- * top-left corner: 72 leaves the button's right edge 44px off the right of the window, 112 its foot
- * 84px above the bottom edge (measured at 390x844, 2026-09-17). The retired hub's numbers, carried
- * over when the button was 56px and kept when it became 28 — which is why the gaps read wider than
- * the margin they once meant.
- *
- * 84px up is NOT clear of a phone's chat composer, which docks to the same edge: the 44px catch
- * around the dot covers the right end of the composer's first line, and a press there opens the
- * sheet instead of placing the caret. Left as it stands, deliberately — no pair of fixed insets
- * clears a composer whose height follows the text in it and the keyboard, and lifting the button
- * past the composer puts that same 44px catch in the middle of the conversation's scroll, where a
- * press meant for the text moves the button.
- */
-const FAB_DEFAULT_INSET_X = 72;
-const FAB_DEFAULT_INSET_Y = 112;
 
 /** The divider's starting share of the layer — the midpoint of the 0.15–0.85 range it is clamped to. */
 const DEFAULT_RATIO = 0.5;

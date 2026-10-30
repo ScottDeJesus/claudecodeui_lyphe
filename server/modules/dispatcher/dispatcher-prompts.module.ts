@@ -6,15 +6,16 @@ import type { DispatcherAsk, DispatcherCardAnswer, DispatcherPlan, DispatcherSta
 import { carryReply } from './dispatcher-answer.service.js';
 import { runDispatcherAsk, runDispatcherCommand } from './dispatcher-ask.transport.js';
 import { createDispatcherAsks } from './dispatcher-asks.service.js';
-import type { AskSession } from './dispatcher-asks.service.js';
+import type { AskSession, DispatcherAsks } from './dispatcher-asks.service.js';
 import { createDispatcherRaiser } from './dispatcher-raise.service.js';
+import { createRaisedAsksMemory } from './dispatcher-raised-asks.service.js';
 import { readDispatcherState } from './dispatcher-state.service.js';
 
 /**
  * The prompts a plan owes the operator, raised on the plan's card — the composition of the raise
  * (`dispatcher-raise.service.ts`: a landing that owes his word has its ask recorded by the dispatcher's
  * own `ask` verb), of the book of the open asks for the phone's push and buttons and for the card's
- * door (`dispatcher-asks.service.ts`), and of the doors his answer goes back through
+ * and Kaylee's doors (`dispatcher-asks.service.ts`), and of the doors his answer goes back through
  * (`dispatcher-answer.service.ts`).
  *
  * A composition root of its own, under `dispatcher.module.ts`, for the reason that file's head gives:
@@ -25,6 +26,13 @@ import { readDispatcherState } from './dispatcher-state.service.js';
 
 /** The `app_config` key holding each plan's newest LANDING already raised for — durable for the endings' reason (`dispatcher-endings.service.ts`), per plan for the raise's (`dispatcher-raise.service.ts`). */
 const RAISED_THROUGH_KEY = 'dispatcher_raised_through';
+
+/**
+ * The `app_config` key holding the open asks already pushed: ONE JSON OBJECT, `{ [promptKey]: raisedAtMs }`
+ * (`dispatcher-asks.service.ts`, "ONE PUSH PER ASK, NOT PER PROCESS"). Durable because the dev server is a
+ * new process on nearly every save, and every in-memory dedupe on the way to Kaylee dies with it.
+ */
+const ASKS_RAISED_KEY = 'dispatcher_asks_raised';
 
 /**
  * The orchestrator is JavaScript, so TypeScript reads `dedupeKey = null` and `sessionId = null` as
@@ -58,6 +66,8 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
   stop(): void;
   /** The card's own door — the ask as the card drew it, and the operator's decision (`DispatcherAsks.answer`). */
   answer(ask: DispatcherAsk, decision: ProviderPermissionDecision): Promise<DispatcherCardAnswer>;
+  /** Kaylee's door — the ask as she read it back, the reply his spoken word makes, and his press (`DispatcherAsks.answerOnHisWord`). */
+  answerOnHisWord: DispatcherAsks['answerOnHisWord'];
 } {
   const { commands, log } = dependencies;
 
@@ -90,6 +100,16 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
   };
 
   /**
+   * The asks already pushed, in the `app_config` table (`dispatcher-raised-asks.service.ts`): the record
+   * the asks book consults before it pushes, so a restart does not push every open ask again.
+   */
+  const raisedAsks = createRaisedAsksMemory({
+    read: () => appConfigDb.get(ASKS_RAISED_KEY),
+    write: (raw) => appConfigDb.set(ASKS_RAISED_KEY, raw),
+    log,
+  });
+
+  /**
    * The session a plan's prompt belongs to: its owning session, resolved to this app's own. RESOLVED
    * OR NOTHING, never guessed — `plan.session_app_id` is `null` when the plan names no session, and an
    * id no row carries resolves to itself (`sessions.db.ts`'s `resolveAppSessionId`) and is caught by
@@ -109,6 +129,9 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
     // user's own switches and channels deciding what reaches them. The key carries the user for the
     // endings' reason: the orchestrator's dedupe is process-wide.
     push: ({ provider, sessionId, meta, promptKey }) => {
+      // Whether anyone was reached: the asks book records an ask as pushed only then, so a push that
+      // threw for everyone (a locked database in a restart storm) or had nobody to go to is tried again.
+      let reached = false;
       for (const userId of userDb.getActiveUserIds()) {
         try {
           notifyUserIfEnabled({
@@ -124,18 +147,21 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
               dedupeKey: `dispatcher:${userId}:${promptKey}`,
             }),
           });
+          reached = true;
         } catch (error) {
           log(`[Dispatcher] could not push a prompt to user ${userId}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
+      return reached;
     },
     forgetButtons: forgetPendingAction,
+    raisedMemory: raisedAsks,
     // Each verb an answer runs is its own line, never folded by the once-per-message journal: the
     // journal is where the operator's answer is read back, command and reply.
-    carry: (ask, reply, door) => carryReply({
+    carry: (ask, reply, door, relay) => carryReply({
       run: (args, stdin) => runDispatcherCommand(commands, args, stdin),
       say: (line) => console.log(line),
-    }, ask, reply, door),
+    }, ask, reply, door, relay),
     // The store, read now — the same document the poll reads — for an answer or a tap that names an ask
     // this process has not raised yet (`dispatcher-asks.service.ts`, "ANY PROCESS ANSWERS").
     read: () => readDispatcherState(commands),
@@ -178,7 +204,9 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
     },
     stop: unregisterAsks,
     // The card's answer, straight off the asks service: this root owns the composition, the book owns
-    // the lookup and the carry.
+    // the lookup and the carry. Kaylee's door is the same book's third (`dispatcher.module.ts` routes the
+    // lock orders of `relay` here).
     answer: asks.answer,
+    answerOnHisWord: asks.answerOnHisWord,
   };
 }

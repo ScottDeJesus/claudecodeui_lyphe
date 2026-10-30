@@ -2,6 +2,8 @@ import { api } from '@/shared/api';
 import {
   applyEntryPatch,
   clearEntryOutbox,
+  entryDocumentDiff,
+  entryListsOf,
   entryRuleOf,
   foldEntryPatches,
   readEntryOutbox,
@@ -33,6 +35,7 @@ export type UserPreferences = {
   userLanguage: string;
   tasksEnabled: boolean;
   projectSortOrder: 'name' | 'date';
+  /** Claude's tool permissions, `{ allowedTools, disallowedTools, skipPermissions, permissionMode? }`. Callers write the WHOLE document; `allowedTools` and `disallowedTools` go up as entry patches against the copy this device held (`WHOLE_DOCUMENT_ENTRY_KEYS`), so a page open since before the server remembered a rule (her "always" receipt) cannot erase it. */
   claudePermissions: unknown;
   cursorPermissions: unknown;
   codexPermissions: unknown;
@@ -122,7 +125,32 @@ const PREFERENCE_KEYS = Object.keys(LEGACY_STORAGE_KEYS) as UserPreferenceKey[];
  * stale device would erase the pins made on another. Its server half is `ENTRY_LISTED_KEYS`
  * in `user-preferences.db.ts` — the two lists change together.
  */
-const ENTRY_PATCHED_KEYS: ReadonlySet<UserPreferenceKey> = new Set<UserPreferenceKey>(['dispatcher', 'roadmapSeen', 'filesPins']);
+const ENTRY_PATCHED_KEYS: ReadonlySet<UserPreferenceKey> = new Set<UserPreferenceKey>(['dispatcher', 'roadmapSeen', 'filesPins', 'claudePermissions']);
+
+/**
+ * The entry-patched keys whose callers write the WHOLE document (`writeUserPreference`, `writeUserPreferences`) and not a patch:
+ * `claudePermissions`, written by the chat's "always" (`saveClaudePermissions`) and by the Settings autosave, which build the
+ * document from this device's own copy. Their wire value is the difference from the copy this device held
+ * (`entryDocumentDiff`), so no caller has to know the lists are entry lists, and a future writer of the key is safe by construction.
+ */
+const WHOLE_DOCUMENT_ENTRY_KEYS: ReadonlySet<UserPreferenceKey> = new Set<UserPreferenceKey>(['claudePermissions']);
+
+/** What `wireOf` answers when the write differs from the copy this device held in nothing the server stores: no message is queued. (`null` is a wire value too: `simpleChatProjectId`.) */
+const NOTHING_TO_SEND = Symbol('nothing to send');
+
+/**
+ * What goes to the server for a whole-document write of `key`: the value itself, or for a key in `WHOLE_DOCUMENT_ENTRY_KEYS` the
+ * difference from `previous` (its lists also go to the outbox, which keeps them until the server has them), or `NOTHING_TO_SEND`
+ * when nothing differs.
+ */
+function wireOf(key: UserPreferenceKey, previous: unknown, value: unknown): unknown {
+  if (!WHOLE_DOCUMENT_ENTRY_KEYS.has(key)) return value;
+  const diff = entryDocumentDiff(previous, value);
+  if (Object.keys(diff).length === 0) return NOTHING_TO_SEND;
+  const lists = entryListsOf(diff);
+  if (Object.keys(lists).length > 0) recordEntryPatch(key, lists);
+  return diff;
+}
 
 type PreferenceRecord = Partial<Record<UserPreferenceKey, unknown>>;
 
@@ -390,13 +418,15 @@ export function writeUserPreference(key: UserPreferenceKey, value: unknown, wire
     return;
   }
 
+  const wire = wireValue === undefined ? wireOf(key, preferences[key], value) : wireValue;
   preferences = { ...preferences, [key]: value };
   writeMirror();
   // `wireValue` is for a preference the server merges rather than replaces (`chatGutters`, whose
   // value holds a section per chat): the browser keeps the whole document, and sends only the part
   // it changed, so a section another device wrote — and this one last read hours ago — is neither
-  // asserted nor reverted. Absent, the value itself goes up, which is right for every other key.
-  queueServerWrite({ [key]: wireValue === undefined ? value : wireValue });
+  // asserted nor reverted. Absent, the value itself goes up, which is right for every other key
+  // but the whole-document entry keys (`wireOf`), whose difference goes up.
+  if (wire !== NOTHING_TO_SEND) queueServerWrite({ [key]: wire });
   notifyListeners();
 }
 
@@ -427,9 +457,15 @@ export function writeUserPreferences(updates: PreferenceRecord): void {
     return;
   }
 
+  const wired: PreferenceRecord = {};
+  for (const [key, value] of Object.entries(changed) as Array<[UserPreferenceKey, unknown]>) {
+    const wire = wireOf(key, preferences[key], value);
+    if (wire !== NOTHING_TO_SEND) wired[key] = wire;
+  }
+
   preferences = { ...preferences, ...changed };
   writeMirror();
-  queueServerWrite(changed);
+  if (Object.keys(wired).length > 0) queueServerWrite(wired);
   notifyListeners();
 }
 

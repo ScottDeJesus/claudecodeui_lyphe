@@ -379,7 +379,8 @@
       "choose": "ページを選択…",
       "custom": "アドレスを入力…",
       "open": "ページを新しいタブで開く",
-      "rejected": "http:// または https:// のアドレスではありません"
+      "rejected": "http:// または https:// のアドレスではありません",
+      "plainHttpBlocked": "このページは暗号化されていない http で提供されており、このアプリが https で開かれている間、ブラウザは http のページをアプリ内に表示しません。「開く」リンクから専用のタブで表示できます。"
     },
     "notes": {
       "title": "メモ"
@@ -463,7 +464,9 @@
     },
     "appearanceLight": "ライト表示",
     "appearanceDark": "ダーク表示",
-    "divider": "アプリケーションの幅を変更"
+    "divider": "アプリケーションの幅を変更",
+    "mixedContentTitle": "このアプリはここでは表示できません",
+    "mixedContentMessage": "{{name}} は暗号化されていない http で提供されており、このアプリが https で開かれている間、ブラウザは http のページをアプリ内に表示しません。"
   },
   "chatHost": {
     "panelLabel": "フローティングチャット",

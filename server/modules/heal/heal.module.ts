@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { Router } from 'express';
 
 import { createHealRouter } from './heal.routes.js';
-import { createHealService } from './heal.service.js';
+import { createHealService, type HealService } from './heal.service.js';
 
 /**
  * The heal reflex's worker, unless the operator moved it. The env name is the runner-switch idiom
@@ -27,7 +27,13 @@ function expandHome(value: string): string {
   return value.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : value;
 }
 
-export type HealModule = { router: Router };
+/**
+ * What `createHealModule` hands the server entrypoint: the router to mount and the lane's one `service` (its
+ * `summary` and `kind`, through the worker `HEAL_REFLEX_BIN` names). The entrypoint passes `service` on to the
+ * companion's house (`CompanionHouse.heal`), so her `read_heal` and `list_alerts` read the heal summary through the
+ * same worker and its one binary rule.
+ */
+export type HealModule = { router: Router; service: HealService };
 
 /**
  * Builds the heal lane for the server entrypoint: the six routes and the one worker behind them.
@@ -45,6 +51,7 @@ export function createHealModule(): HealModule {
   const service = createHealService({ bin });
 
   return {
+    service,
     router: createHealRouter({
       summary: () => service.summary(),
       kind: (kind) => service.kind(kind),

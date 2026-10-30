@@ -10,10 +10,23 @@ import {
   MonitorPlay,
   Palette,
   Plug,
+  ClipboardList,
+  FileDiff,
+  FileText,
+  Footprints,
+  List,
+  MessageCircleQuestion,
+  MessageSquare,
+  Route,
+  ShieldCheck,
+  StickyNote,
+  type LucideIcon,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
+import type { CompanionNoteKind } from '@/shared/companion-types';
 import type { RoadmapEpicWord, RoadmapFeatureWord, RoadmapMilestoneWord } from '@/shared/roadmap-types';
+import type { StationFocusKind } from '@/shared/station-types';
 import type { AffectedAreasTrouble, FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, RoadmapDotState, SettingsMainTab } from '@/shared/types';
 import type { UserPreferenceKey } from '@/shared/userSettings';
 
@@ -318,7 +331,7 @@ export const CHAT_TOGGLE_KEY = '.';
  * is what draws; keep the two equal (the radial's proof measures a disc against the FAB itself).
  *
  * Used by the DockableFab kit piece, the app-switcher module's radial layout and labels, the chat-host module's
- * floating panel, and the companion module's disc (the square her face is drawn in).
+ * floating panel, and the companion module's disc (her size at rest, which her disc grows from while she is active).
  */
 export const FAB_SIZE_PX = 28;
 
@@ -334,13 +347,36 @@ export const FAB_SIZE_PX = 28;
 export const FAB_CATCH_PX = 44;
 
 /**
- * The kit's FAB, found in the page: the node the switcher's radial fans out from and gives focus back to, and the
- * node the dock hands focus to when the list collapses. There is one. The class is `DockableFab`'s own (surfaces.css).
+ * The floating default's inset, in px, from the window's bottom-right corner to the FAB's own top-left corner: 72 leaves
+ * the button's right edge 44px off the right of the window, 112 its foot 84px above the bottom edge (measured at
+ * 390x844, 2026-09-17). The retired hub's numbers, carried over when the button was 56px and kept when it became
+ * 28 — which is why the gaps read wider than the margin they once meant.
+ *
+ * 84px up is NOT clear of a phone's chat composer, which docks to the same edge: the 44px catch around the dot covers
+ * the right end of the composer's first line, and a press there opens the sheet instead of placing the caret. Left as it
+ * stands, deliberately — no pair of fixed insets clears a composer whose height follows the text in it and the
+ * keyboard, and lifting the button past the composer puts that same 44px catch in the middle of the conversation's
+ * scroll, where a press meant for the text moves the button.
+ *
+ * Used by the app-switcher module's storage (where a reader who never touched the button starts on a phone) and the
+ * companion module's disc, whose phone corner stands one catch to the left of that spot: change the 72 and the two
+ * discs' catches overlap.
+ */
+export const FAB_DEFAULT_INSET_X = 72;
+
+/** The same default's vertical inset (see `FAB_DEFAULT_INSET_X`): the window's bottom edge to the FAB's top edge, in px. */
+export const FAB_DEFAULT_INSET_Y = 112;
+
+/**
+ * The switcher's FAB, found in the page: the node the switcher's radial fans out from and gives focus back to, and the
+ * node the dock hands focus to when the list collapses. The class is `DockableFab`'s own (surfaces.css), and the
+ * companion's disc, which is the same kit piece inside its `[data-companion-fab]` layer, is left out, so the match is
+ * the applications button whatever order the two mount in.
  *
  * Used by the app-switcher module's AppSwitcherRadial (the press that is its own toggle, and where an Escape or a
  * keyboard-chosen act returns focus) and AppSwitcherDock (where focus lands as the list collapses).
  */
-export const FAB_SELECTOR = '.vv-fab';
+export const FAB_SELECTOR = '.vv-fab:not([data-companion-fab] .vv-fab)';
 
 // ---------------------------
 
@@ -470,7 +506,8 @@ export const ROADMAP_DOT_PAINT: Record<RoadmapDotState, { fill: string; stroke: 
 /**
  * The query parameter a landing names a plan in (`?runner=<plan>`): the key one side writes and the other
  * reads. Used by the project-workspace module's `useRunnerLanding`, which reads it, and the shared
- * `useRevealCard`, which writes it from a surface that has no Roadmap tab above it.
+ * `useRevealCard`, which writes it from a surface that has no Roadmap tab above it, as does the station module's
+ * `FocusFallback` (its way to a card in CloudCLI).
  */
 export const RUNNER_LANDING_PARAM = 'runner';
 
@@ -574,3 +611,42 @@ export const PAGE_ANCHOR = {
   filesView: 'files-view',
   railFiles: 'rail:files',
 } as const;
+
+// ---------------------------
+
+//----------------- COMPANION NOTE KINDS ------------
+
+/**
+ * The glyph and the word of each kind of card Kaylee puts up (`CompanionNote.kind`): `icon` is the lucide mark and `wordKey` the
+ * i18n key of its word (`companion.noteKind.<kind>`: Note, List, Diff, Plan page, DocSpace page). A kind is always drawn with its
+ * word beside the mark, never the mark alone. Read by the companion module's inline cards in her conversation and by the
+ * stage and shelf that draw a card.
+ */
+export const COMPANION_NOTE_KIND_GLYPHS: Record<CompanionNoteKind, { icon: LucideIcon; wordKey: string }> = {
+  note: { icon: StickyNote, wordKey: 'companion.noteKind.note' },
+  list: { icon: List, wordKey: 'companion.noteKind.list' },
+  diff: { icon: FileDiff, wordKey: 'companion.noteKind.diff' },
+  plan: { icon: ClipboardList, wordKey: 'companion.noteKind.plan' },
+  page: { icon: FileText, wordKey: 'companion.noteKind.page' },
+};
+
+// ---------------------------
+
+//----------------- STATION FOCUS KINDS ------------
+
+/**
+ * The glyph and the word of each kind of thing the station's stage can hold (`StationFocus.kind`): `icon` is the lucide mark and
+ * `wordKey` the i18n key of its word (`station.focusKind.<kind>`: Session, Feature or epic, Waiting ask, Follow-ups, Check, Card,
+ * Walkthrough, Page). A kind is always drawn with its word beside the mark, never the mark alone. Read by the station's stage
+ * head, by its fallback for a view that has not landed, and by every region's press, which names its kind by them.
+ */
+export const STATION_FOCUS_GLYPHS: Record<StationFocusKind, { icon: LucideIcon; wordKey: string }> = {
+  chat: { icon: MessageSquare, wordKey: 'station.focusKind.chat' },
+  card: { icon: Route, wordKey: 'station.focusKind.card' },
+  ask: { icon: MessageCircleQuestion, wordKey: 'station.focusKind.ask' },
+  followups: { icon: ListChecks, wordKey: 'station.focusKind.followups' },
+  check: { icon: ShieldCheck, wordKey: 'station.focusKind.check' },
+  note: { icon: StickyNote, wordKey: 'station.focusKind.note' },
+  walk: { icon: Footprints, wordKey: 'station.focusKind.walk' },
+  page: { icon: FileText, wordKey: 'station.focusKind.page' },
+};

@@ -1597,6 +1597,16 @@ export function expandHome(value: string): string {
 }
 
 /**
+ * Where Claude Code keeps its settings and login: `CLAUDE_CONFIG_DIR` when set, else `~/.claude`.
+ *
+ * Consumers: `claude-auth.provider.ts` (where the login's credentials live) and
+ * `claude-account-default-model.ts` (the user settings' `model`, the account's default).
+ */
+export function claudeConfigDir(): string {
+  return process.env.CLAUDE_CONFIG_DIR?.trim() || path.join(os.homedir(), '.claude');
+}
+
+/**
  * Where the launcher keeps its launch directories, unless the operator moved it.
  *
  * Consumers: the dispatch-souls module (its poll and its running-launchers read) and the providers
@@ -1701,4 +1711,22 @@ export function humanizeTokens(n: number): string {
  */
 export function errorReason(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+// ---------------------------
+//----------------- STORED TIMESTAMP UTILITIES ------------
+
+/** The shape `new Date().toISOString()` writes: UTC, milliseconds, fixed width, so two of them compare correctly as text. */
+const STORE_STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+/**
+ * Whether `value` is a stamp the way the stores keep every time: a fixed-width ISO-8601 UTC instant with milliseconds that is also a
+ * real date. A text comparison of two such stamps is a comparison in time, which a bare `isText` cannot promise (`''`, `'banana'` and
+ * `'2026'` are text); a check that reads "after `since`" or "past `expiresAt`" must refuse anything else rather than fail open.
+ *
+ * Consumed by the companion module (`companion-pending.ts`, which refuses a stored action whose stamps are not this) and the companion
+ * repository (`companion.db.ts`, whose `heardSince` refuses a `since` that is not this).
+ */
+export function isStoreStamp(value: unknown): value is string {
+  return typeof value === 'string' && STORE_STAMP.test(value) && Number.isFinite(Date.parse(value));
 }

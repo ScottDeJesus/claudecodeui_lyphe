@@ -144,11 +144,24 @@ function formatAge(iso) {
   return `${Math.floor(seconds / 86_400)}d`;
 }
 
+/**
+ * The mark before a done row: `[done]`, or — when the house closed it as the feature, task or epic it named finished —
+ * which one, so the chat can tell a settled item from one a person or a chat ticked. `closedFor` is `<feature>`,
+ * `<feature>/<task key>` or `epic:<epic>`; the epic prefix is tested BEFORE the slash split.
+ */
+function doneMark(item) {
+  if (item.closedBy !== 'completion' || typeof item.closedFor !== 'string') return '[done]';
+  if (item.closedFor.startsWith('epic:')) return `[done: epic ${item.closedFor.slice('epic:'.length)} finished]`;
+  const slash = item.closedFor.indexOf('/');
+  if (slash === -1) return `[done: feature ${item.closedFor} finished]`;
+  return `[done: task ${item.closedFor.slice(slash + 1)} of feature ${item.closedFor.slice(0, slash)} finished]`;
+}
+
 /** `followups list`'s stdout: one line per item, in the order the door answered (oldest first). */
 function formatList(items) {
   if (items.length === 0) return ['Nothing open in this chat.'];
   return items.map((item) => {
-    const text = item.state === 'done' ? `[done] ${oneLine(item.text)}` : oneLine(item.text);
+    const text = item.state === 'done' ? `${doneMark(item)} ${oneLine(item.text)}` : oneLine(item.text);
     return `#${item.id}  ${item.kind}  ${formatAge(item.createdAt)}  ${text}`;
   });
 }

@@ -6,7 +6,7 @@ import type { NavigateFunction } from 'react-router-dom';
 import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
-import type { CompanionSessionRef } from '@/shared/companion-types';
+import type { CompanionLogEntry, CompanionSessionRef } from '@/shared/companion-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
 
@@ -1065,16 +1065,46 @@ export type CompanionVoice = { on: boolean; setOn: (on: boolean) => void; speaki
 
 // ---------------------------
 
+//----------------- HER FACE'S INPUTS ON THE PAGE ------------
+
+/**
+ * The sentence this page's player is sounding, as `progress()` says it: its place (`turnId`, `index`), `elapsed` seconds since its
+ * first sample on the audio clock, and its `duration` in seconds once its body has ended and every sample is scheduled (else null,
+ * still arriving). The companion module's player gives it, and her face reads it to pick the vowel of her mouth.
+ */
+export type CompanionSoundProgress = { turnId: string; index: number; elapsed: number; duration: number | null };
+
+/**
+ * What her face reads of the page's voice: `level()` is the loudness of what sounds, 0..1, and `progress()` the sentence sounding.
+ * Both are functions, never props that change, so a level sixty times a second never redraws React. Null where a face hears no voice
+ * (Settings' preview). Handed by the companion module's CompanionFab to CompanionAvatar and on to CompanionPortrait.
+ */
+export type CompanionFaceVoice = { level: () => number; progress: () => CompanionSoundProgress | null };
+
+/**
+ * The sentences her face reads from her log: `playing` the one this page's player is sounding (its mood, text and sounds), `newest` the
+ * newest of hers in the running turn, read only by a page that plays no voice, and `turnRunning` whether a turn is under way. Derived by
+ * the companion module's `useFaceInputs`; handed through CompanionAvatar to CompanionPortrait.
+ */
+export type CompanionFaceSentences = { playing: CompanionLogEntry | null; newest: CompanionLogEntry | null; turnRunning: boolean };
+
+/** Where the anchor she looks at lies from her disc's centre, in screen pixels (`dx` rightward, `dy` downward). Her face turns toward it. */
+export type CompanionFaceLook = { dx: number; dy: number };
+
+// ---------------------------
+
 //----------------- COMPANION PRESENCE ON THE PAGE ------------
 
 /**
- * What Kaylee is doing on this page right now, as the one word for her activity, her talk press and her player together.
- * It has no word for her process (asleep, waking, failed) or a picture still loading: the status line takes those words
- * from the picture, and here the state is what her activity says ('idle' at rest). The first three beat everything else,
- * in this order, because they are the page's own: 'cut' (the 900 ms breath after a talk press stopped her voice
- * mid-sentence) > 'listening' > 'transcribing' (his talk press) > 'speaking' (this page's player is sounding a sentence of
- * hers). Below them it is her activity's phase, named as it is: 'reading_code' > 'reading_session' > 'drafting' >
- * 'walking' > 'thinking' > 'idle'. Produced only by the companion module's `useCompanionPresence`.
+ * What Kaylee is doing on this page right now, as the one word for her activity, her talk press, her player and her
+ * process together: the button's face and label and the panel's status line both read it, so they never differ. Fourteen
+ * words, in the order they win. The first four are the page's own: 'cut' (the 900 ms breath after a talk press stopped
+ * her voice mid-sentence) > 'listening' > 'transcribing' (his talk press) > 'speaking' (this page's player is sounding a
+ * sentence of hers). Then her picture and her process: 'loading' (this page has not read her picture yet) > 'failed' >
+ * 'asleep' > 'waking' (her process is not awake); a button that said "ready" while she could not answer would be good
+ * news she has not earned. Last is her activity's phase, named as it is: 'reading_code' > 'reading_session' > 'drafting'
+ * > 'walking' > 'thinking' > 'idle'.
+ * Produced only by the companion module's `presenceOf`, through `useCompanionPresence`.
  */
 export type CompanionPresenceState =
   | 'idle'
@@ -1086,15 +1116,22 @@ export type CompanionPresenceState =
   | 'reading_code'
   | 'drafting'
   | 'walking'
-  | 'cut';
+  | 'cut'
+  | 'loading' // this page has not read her picture yet
+  | 'failed' // her process failed: picture.process.state is 'failed'
+  | 'asleep' // her process is closed; his next word wakes her
+  | 'waking'; // her process is starting
 
 /**
- * Kaylee's presence on this page: the `state` and what it concerns, all taken from her server-held activity. `session` is
- * the chat a read, a draft or a walk is about, `files` the file names a code read has open and `walk` the walkthrough's
- * place (`at` of `total`, 1-based; `0` when it is set up and not begun); each is null when her activity names none. They
- * are carried whatever the `state`, so a page-owned state such as 'listening' still knows where she was looking. One value
- * per change of its parts, so a consumer that memoizes on it redraws only when she does. Built by the companion module's
- * `useCompanionPresence` and drawn by its CompanionHeader, whose status line CompanionPanel hands it to.
+ * Kaylee's presence on this page: the `state`, which is the page's own talk press or player when one outranks the rest,
+ * else 'loading' while her picture is unread, else her process when it is not awake, else her activity's phase, and what
+ * it concerns, which is taken from her server-held activity. `session` is the chat a read, a draft or a walk is about,
+ * `files` the file names a code read has open and `walk` the walkthrough's place (`at` of `total`, 1-based; `0` when it is
+ * set up and not begun); each is null when her activity names none. They are carried whatever the `state`, so a
+ * page-owned state such as 'listening' still knows where she was looking. One value per change of its parts, so a
+ * consumer that memoizes on it redraws only when she does. Built by the companion module's `useCompanionPresence` and
+ * read by two of its consumers: CompanionHeader, whose status line CompanionPanel hands it to, and CompanionFab, which
+ * draws it as the button's face and label and points the button by it (`useAvatarTarget`).
  */
 export type CompanionPresence = {
   state: CompanionPresenceState;
@@ -2738,7 +2775,7 @@ export type NoteSaveOutcome = 'saved' | 'blocked' | 'failed';
 // The client mirror of `server/shared/types.ts` § FOLLOWUPS, where the same shapes are stated for the
 // wire. A change to either shape belongs in both files at once.
 
-/** One item a chat keeps open for the person: a `next` step (a question put, an offer waiting, a step put off) or a known `gap` (something untested, unhandled or risky that was left). `state` is `open` until it is settled; `closedBy` says who settled it — the chat's own command or the person ticking it in the widget — and is `null` while open. All stamps are ISO-8601 UTC with milliseconds; `doneAt` is `null` while open. The chat and the account it belongs to never ride the item. */
+/** One item a chat keeps open for the person: a `next` step (a question put, an offer waiting, a step put off) or a known `gap` (something untested, unhandled or risky that was left). `state` is `open` until it is settled; `closedBy` says who settled it — the chat's own command (`chat`), the person ticking it in the widget (`user`), or the house itself (`completion`: it closed the item when the feature, task or epic it named finished, which `closedFor` names — `<feature>`, `<feature>/<task key>` or `epic:<epic>`) — and is `null` while open. `closedFor` is `null` unless `closedBy` is `completion`. All stamps are ISO-8601 UTC with milliseconds; `doneAt` is `null` while open (on a `completion` it is the stamp of the finish). The chat and the account it belongs to never ride the item. */
 export type Followup = {
   id: number;
   kind: 'next' | 'gap';
@@ -2747,7 +2784,8 @@ export type Followup = {
   createdAt: string;
   updatedAt: string;
   doneAt: string | null;
-  closedBy: 'chat' | 'user' | null;
+  closedBy: 'chat' | 'user' | 'completion' | null;
+  closedFor: string | null;
 };
 
 /** The frame the server sends to every open socket after a chat's followups moved. It names the chat by its APP session id under `appSessionId` (never `sessionId`, which would raise the chat's unread mark); the widget re-reads when the id is its own chat's. */
@@ -3887,3 +3925,37 @@ export type ClaudeApiCardView = {
   remove: (slot: number) => Promise<void>;
   refresh: () => Promise<void>;
 };
+
+// ---------------------------
+
+//----------------- KAYLEE STATION ------------
+
+/**
+ * Which arrangement of the station's regions fits the window: `wide`, `laptop` (a small laptop's window) or `narrow` (a phone).
+ * Read from the window's width on `resize` by the station's context and handed to every region as `StationRegionProps.tier`.
+ */
+export type StationTier = 'wide' | 'laptop' | 'narrow';
+
+/**
+ * The named places of the station's layout that a region fills: `strip`, `sessions`, `corner`, `head`, `conversation`, `dock`,
+ * `talk` and `needs`. A slot nothing fills draws nothing. Keys the layout's slot map and the fixtures' slices.
+ */
+export type StationSlot = 'strip' | 'sessions' | 'corner' | 'head' | 'conversation' | 'dock' | 'talk' | 'needs';
+
+/**
+ * Every place the station remembers a scroll position for: the slots, the `roadmap` and the `stage`. The key of the station's
+ * scroll memory, written when a region scrolls and put back when the page reloads or the layout moves a region.
+ */
+export type StationRegion = StationSlot | 'roadmap' | 'stage';
+
+/**
+ * The station's own preferences, remembered per window by `useStationPref`: `stripCollapsed` (the strip is folded),
+ * `cornerOpen` (the corner is open) and `compact` (the regions draw in their denser form).
+ */
+export type StationPrefKey = 'stripCollapsed' | 'cornerOpen' | 'compact';
+
+/**
+ * The props every region of the station's layout takes: the `tier` it is drawn in. A region draws itself for the tier it is given
+ * and never reads the window's width on its own.
+ */
+export type StationRegionProps = { tier: StationTier };

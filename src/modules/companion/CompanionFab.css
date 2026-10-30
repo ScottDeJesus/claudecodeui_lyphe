@@ -1,6 +1,6 @@
 /*
  * Kaylee's disc (CompanionFab.tsx): the layer that carries her glide and her hop. The disc itself is the kit's DockableFab
- * and is drawn by surfaces.css; nothing here restyles it.
+ * and is drawn by surfaces.css; nothing here restyles it but its size (THE GROWTH, below).
  *
  * THE GLIDE is the layer's `translate`: none at rest, the target less the rest on a look, so going and coming home are one
  * property easing between two values. 450 ms on Verve's ease-out curve (`--ease-enter`, what lifts and entries use):
@@ -13,15 +13,53 @@
  *
  * REDUCED MOTION jumps: no transition, so no glide, and no transition's end, so no hop. The hop is only ever declared
  * under `no-preference` besides, so no rule can turn it on there.
+ *
+ * THE GROWTH is the disc's own size (`--companion-fab-size`, written on this layer by CompanionFab: 28 px at rest, larger while
+ * she is active). The layer sets the kit's `--vv-fab-size` on her disc alone, so the applications button and every other FAB keep
+ * their 28 px. The disc eases its width, height, left and top together on `--dur-move`, so the centre the kit gave it stays
+ * where it is while it grows: a docked disc grows about its cell's centre, a floating one about its point's. The ease runs only
+ * while the size is changing (`data-resizing`): left and top also move when the dock's cell arrives or the window resizes, and
+ * those stay as instant as they are for every other FAB. A drag in hand moves the disc under the finger, so no geometry eases
+ * then; reduced motion jumps.
  */
 
 .companion-fab {
   transition: translate 450ms var(--ease-enter);
 }
 
-/* The layer covers the viewport and passes every pointer through; the disc takes its own back. */
+/* The layer covers the viewport and passes every pointer through; the disc takes its own back. Its size is hers: the kit draws
+ * the box, the floating clamp and the dock's centring from this one variable. */
 .companion-fab > .vv-fab {
   pointer-events: auto;
+  --vv-fab-size: var(--companion-fab-size, 28px);
+}
+
+/* Her face fills the disc as the disc grows, frame for frame: it is sized by the box and not by the pixels its `size` names. */
+.companion-fab .vv-fab__glyph > span > * {
+  width: 100%;
+  height: 100%;
+}
+
+/* The disc eases only while its size is changing (CompanionFab sets `data-resizing` for the length of the change). The transition
+ * restates the kit's three (surfaces.css) and adds the box's geometry, which move together, so the centre the kit gave the disc
+ * stays where it is as it grows. */
+.companion-fab[data-resizing] > .vv-fab {
+  transition:
+    transform var(--dur-quick) var(--ease-press),
+    background-color 0.2s,
+    box-shadow var(--dur-move),
+    width var(--dur-move) var(--ease-enter),
+    height var(--dur-move) var(--ease-enter),
+    left var(--dur-move) var(--ease-enter),
+    top var(--dur-move) var(--ease-enter);
+}
+
+/* A drag in hand moves the disc under the finger: no geometry may trail it. */
+.companion-fab[data-resizing][data-dragging] > .vv-fab {
+  transition:
+    transform var(--dur-quick) var(--ease-press),
+    background-color 0.2s,
+    box-shadow var(--dur-move);
 }
 
 /* A drag in hand moves the disc under the finger: no glide may trail it. */
@@ -41,7 +79,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .companion-fab {
+  .companion-fab,
+  .companion-fab[data-resizing] > .vv-fab,
+  .companion-fab[data-resizing][data-dragging] > .vv-fab {
     transition: none;
   }
 }

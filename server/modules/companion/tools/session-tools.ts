@@ -17,7 +17,7 @@ import { activityLine, chatRows, listVisibleProjects, type ChatRow } from './hou
  * Each description is her prompt's own line for the tool (`toolLine`), so what the tool list says and what her
  * system prompt says are one text.
  *
- * Consumer: `tools/companion-tools.ts`, which puts these two first in the list of thirteen it builds.
+ * Consumer: `tools/companion-tools.ts`, which puts these two first in the list it builds.
  */
 
 /** How many chats `recent` lists and how many a phrase may match: a list she reads aloud from is short. */

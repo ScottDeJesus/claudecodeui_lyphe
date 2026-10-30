@@ -2,7 +2,7 @@ import { useLayoutEffect } from 'react';
 
 import { AppSwitcherFab, AppSwitcherLayer, useCurrentApplication } from '@/modules/app-switcher';
 import { ChatHostFloating, useChatHost } from '@/modules/chat-host';
-import { CompanionPanel } from '@/modules/companion';
+import { CompanionFab, CompanionPanel } from '@/modules/companion';
 import FloatingChatHeader from '@/modules/project-workspace/FloatingChatHeader';
 import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffects';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
@@ -21,6 +21,9 @@ import { useChatHotkey } from '@/modules/project-workspace/hooks/useChatHotkey';
  * goes to `reportCovered`. The chat's door (`useChatDoor`) is built once here and pressed from three places: the
  * hotkey, wherever the reader's keys land (this tab or the chat's picture-in-picture window), the FAB, and the
  * command palette's Applications group.
+ *
+ * Kaylee's button is mounted after the applications button, on the same floating layer, so it rides over every application
+ * and her panel, one rung under the applications button.
  */
 export default function WorkspaceFrame({
   isMobile,
@@ -68,6 +71,7 @@ export default function WorkspaceFrame({
         <ChatHostFloating header={<FloatingChatHeader />} />
         <CompanionPanel />
         <AppSwitcherFab chatDoor={door} onAnchorChange={reportAnchor} />
+        <CompanionFab />
       </div>
     </>
   );

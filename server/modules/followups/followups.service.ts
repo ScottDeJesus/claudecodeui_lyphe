@@ -1,7 +1,20 @@
 import { followupsDb, type FollowupRow } from '@/modules/database/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
-import type { Followup, FollowupInput, FollowupsChangedEvent } from '@/shared/types.js';
+import type {
+  Followup,
+  FollowupCompletionArc,
+  FollowupCompletionPlan,
+  FollowupInput,
+  FollowupsChangedEvent,
+} from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
+
+import {
+  closuresForArc,
+  closuresForPlan,
+  epicFinishedAt,
+  type CompletionClosure,
+} from './followups-completion-rule.service.js';
 
 /**
  * The followups lane's verbs: one chat's next steps and known gaps, filed and closed by the chat's own
@@ -20,13 +33,18 @@ import { AppError } from '@/shared/utils.js';
  * text) answers that item's id and writes nothing — a retried call after a timeout, or a chat that forgot it
  * filed the line two turns ago, must not grow the list.
  *
+ * THE HOUSE CLOSES ITEMS TOO. When the feature, task or epic an open item names finishes, `closeForCompletions` settles it —
+ * for every chat and every account at once — and marks it `closedBy: 'completion'` with `closedFor` naming what
+ * finished. The rule is `followups-completion-rule.service.ts`; the dispatcher's watcher is the caller.
+ *
  * THE FRAME NAMES THE CHAT. Every write that changed a row sends one `followups_changed` to every open
  * socket, carrying the chat's app session id; a widget of another chat ignores it, and a client that is not
  * the owner only learns that some chat moved. Nothing else rides the frame.
  *
  * Consumers: `followups.routes.ts` (the widget's door) and `followups.command-routes.ts` (the `followups`
  * command's), handed this object — so the two doors refuse alike and both send the frame. The companion
- * module reads through `listOpenForAccount`, by way of the barrel's `listOpenFollowups`.
+ * module reads through `listOpenForAccount`, by way of the barrel's `listOpenFollowups`; the dispatcher
+ * module's watcher calls `closeForCompletions`, by way of the barrel's `closeFollowupsForCompletions`.
  */
 
 /** A line's ceiling, in characters after trimming — the number the refusal sentence quotes back to the chat. */
@@ -58,8 +76,20 @@ function toFollowup(row: FollowupRow): Followup {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     doneAt: row.done_at,
-    closedBy: row.closed_by,
+    closedBy: row.closed_for !== null ? 'completion' : row.closed_by,
+    closedFor: row.closed_for,
   };
+}
+
+/**
+ * Writes each closure and appends the rows it moved to `into` — only those still open when the write ran
+ * (`closeForCompletion`). Appended closure by closure, so a write that throws leaves the rows of the closures before it
+ * in `into` for the caller to announce.
+ */
+function writeClosures(closures: CompletionClosure[], into: FollowupRow[]): void {
+  for (const closure of closures) {
+    into.push(...followupsDb.closeForCompletion(closure.ids, closure.doneAt, closure.closedFor));
+  }
 }
 
 /** A refused line: 422 with the sentence that says why, so the chat can word the line again. */
@@ -190,6 +220,16 @@ export const followupsService = {
   },
 
   /**
+   * One of the account's items by id, open or closed, beside the app session id of its chat; `null` when no item of THIS account carries
+   * the id (another account's reads as none). The companion's `close_followup` reads it to tell an item already closed from an id that is
+   * not his, so the first is answered "already closed" and the second refused.
+   */
+  findForAccount(userId: number, id: number): { sessionId: string; followup: Followup } | null {
+    const row = followupsDb.getOfUser(userId, id);
+    return row === null ? null : { sessionId: row.session_id, followup: toFollowup(row) };
+  },
+
+  /**
    * Files a batch of lines for the chat and answers each line's item in the order given — a line the chat
    * already has open answers the existing item. Whole or nothing: the first refused line throws before a row is written.
    */
@@ -227,6 +267,54 @@ export const followupsService = {
     const rows = followupsDb.closeInChat(appSessionId, ids);
     broadcastFollowupsChanged(appSessionId);
     return rows.map(toFollowup);
+  },
+
+  /**
+   * Settles every open item, of any chat and any account, whose feature, task or epic has finished, and answers the items
+   * it closed beside the chat each belongs to. `plans` and `arcs` are the dispatcher's picture (`DispatcherPlan[]` and
+   * `DispatcherArc[]` are assignable); the rules are `closuresForPlan` and `closuresForArc`. The plans run FIRST and
+   * their closures are written before an epic's candidates are read, so a feature or task claims an item before an epic
+   * can: one item, one `closed_for`. Idempotent — an item already settled is not open and is never read again — so it is
+   * safe to run on every picture, including the first after a boot (which catches what finished while the server was
+   * down for as long as the picture still carries it). Sends ONE `followups_changed` per chat that moved, after the
+   * writes landed — and still when a later write throws, for the rows already closed — and logs one line per item closed.
+   */
+  closeForCompletions(
+    plans: FollowupCompletionPlan[],
+    arcs: FollowupCompletionArc[],
+  ): Array<{ sessionId: string; followup: Followup }> {
+    const closedRows: FollowupRow[] = [];
+
+    try {
+      for (const plan of plans) {
+        // A plan with nothing finished closes nothing, so it costs no query.
+        const hasFinished = plan.completed_at !== null || plan.phases.some((phase) => phase.status === 'done');
+        if (!hasFinished) continue;
+
+        const candidates = followupsDb.listOpenNaming(plan.name);
+        if (candidates.length === 0) continue;
+
+        writeClosures(closuresForPlan(plan, candidates), closedRows);
+      }
+
+      for (const arc of arcs) {
+        // Likewise an epic that has not finished costs no query.
+        const finishedAt = epicFinishedAt(arc, plans);
+        if (finishedAt === null) continue;
+
+        const candidates = followupsDb.listOpenNaming(arc.name);
+        if (candidates.length === 0) continue;
+
+        writeClosures(closuresForArc(arc, finishedAt, candidates), closedRows);
+      }
+    } finally {
+      // A fault part-way (a locked database, say) must not leave the rows already closed unannounced: the widget
+      // refreshes only on a frame, and the next picture will not repeat a closure that is already written.
+      for (const row of closedRows) console.log(`[Followups] closed #${row.id} for ${row.closed_for}`);
+      for (const appSessionId of new Set(closedRows.map((row) => row.session_id))) broadcastFollowupsChanged(appSessionId);
+    }
+
+    return closedRows.map((row) => ({ sessionId: row.session_id, followup: toFollowup(row) }));
   },
 
   /** Ticks (`done`) or unticks (`open`) one of the account's items for the person at the widget and answers it as stored. */

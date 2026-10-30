@@ -70,7 +70,8 @@ export function resolveGeminiKey(userId: number): string | null {
 
 /**
  * Where the account's key comes from, and its last four characters when it is the account's own. The house's key
- * is never shown, even in part. Consumed by the settings routes (every answer carries it).
+ * is never shown, even in part. Consumed by the settings routes (every answer carries it) and, through the voice barrel, by the
+ * companion's `read_settings`, which reads the `source` alone and says "a key of yours", "the house's key" or "no key".
  */
 export function geminiKeyStatus(userId: number): GeminiKeyStatus {
   const stored = credentialsDb.getActiveCredential(userId, CREDENTIAL_TYPE);

@@ -1,7 +1,7 @@
 import type { Router } from 'express';
 
 import { getCerberusConnection } from '@/modules/database/index.js';
-import type { CerberusGatewayState, CerberusReadInputs } from '@/shared/cerberus-types.js';
+import type { CerberusGatewayState, CerberusOverview, CerberusReadInputs } from '@/shared/cerberus-types.js';
 
 import { startAutoRun } from './auto-run.js';
 import { registerCatalogHandlers } from './catalog.service.js';
@@ -10,6 +10,8 @@ import { loadCenterKey } from './center-key.js';
 import { seedHub } from './definitions.service.js';
 import { registerDiagnosisService, stopDiagnoses } from './diagnosis/diagnosis.service.js';
 import { ingest } from './ingest.service.js';
+import { buildOverview } from './read-model/overview.js';
+import { startRedWatch, stopRedWatch } from './red-watch.service.js';
 import { registerRunsService } from './runs.service.js';
 import { startSelfChecks, stopSelfChecks } from './self-checks.service.js';
 import { startDailyPrune, stopDailyPrune } from './store-prune.service.js';
@@ -20,7 +22,7 @@ import { wardenLinks } from './warden-links.js';
 
 /**
  * The Cerberus composition root: the router for `/api/cerberus`, and the three things that are ARMED
- * rather than called — the store and the gateway (`start`), the self-checks and the prune
+ * rather than called — the store and the gateway (`start`), the self-checks, the red watch and the prune
  * (`soleDuties`), and their shutdown (`stop`).
  *
  * `start()` runs in the entrypoint's `listen` callback BEFORE it signals READY (the entrypoint waits
@@ -43,9 +45,10 @@ import { wardenLinks } from './warden-links.js';
  * logged and leaves the API serving: Cerberus is how the fleet is watched, never a reason for the API
  * to be down.
  *
- * `soleDuties()` is the entrypoint's `soleServerDuties` calling in, and it arms the self-checks and
- * the prune only in the process that holds the port: a second API process on the same store would
- * write a second set of hub rows. It can run BEFORE `start()` (a plain boot runs its sole duties
+ * `soleDuties()` is the entrypoint's `soleServerDuties` calling in, and it arms the self-checks, the red
+ * watch (`red-watch.service.ts`: a check red for an hour pages the operator's phone) and the prune only in
+ * the process that holds the port: a second API process on the same store would write a second set of hub
+ * rows, and page the same incident from its own memory. It can run BEFORE `start()` (a plain boot runs its sole duties
  * before it listens) or after it (a handover boot runs them at takeover), so each call only
  * records its half and the duties start when both have happened — never against a store that
  * `start()` has not yet opened and seeded.
@@ -71,11 +74,16 @@ function isApiOwnPort(listen: string): boolean {
   return target !== null && target.port === Number.parseInt(process.env.SERVER_PORT || '3001', 10);
 }
 
+/**
+ * `overview()` is the Cerberus tab's overview — `buildOverview(readInputs())`, what `GET /api/cerberus/overview` answers —
+ * read straight from the module's own inputs. The entrypoint passes it on to the companion's house (`CompanionHouse.cerberus`).
+ */
 export function createCerberusModule(dependencies: { supervised: boolean }): {
   router: Router;
   start: () => Promise<void>;
   soleDuties: () => void;
   stop: () => void;
+  overview: () => CerberusOverview;
 } {
   const { supervised } = dependencies;
 
@@ -103,10 +111,15 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
     };
   }
 
+  /** The Cerberus tab's overview, read from the module's own inputs: the route's answer, the companion's, the red watch's. */
+  const overview = (): CerberusOverview => buildOverview(readInputs());
+
   /** Starts the sole duties once both `start()` and `soleDuties()` have happened; idempotent. */
   function armSoleDuties(): void {
     if (!startFinished || !dutiesAsked || stopped) return;
     startSelfChecks(() => gatewayState);
+    // Its first tick is one interval away (`startRedWatch`), after the server has finished starting.
+    startRedWatch(overview);
     startDailyPrune();
   }
 
@@ -155,8 +168,10 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
       stopAutoRun();
       stopDiagnoses();
       stopSelfChecks();
+      stopRedWatch();
       stopDailyPrune();
       gateway?.stop();
     },
+    overview,
   };
 }

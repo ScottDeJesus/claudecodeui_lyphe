@@ -34,7 +34,8 @@ import { companionScratchDir } from './transcript-render.js';
  * A name that is not a full path (`server/shared/prompt-stream.ts`, as a person says it) is looked for under the
  * visible projects: one project holding it is the file, none or several is a sentence that says what to give.
  *
- * Consumer: `read-tools.ts` (`ask_dactyl`), on every file and on the context file.
+ * Consumers: `read-tools.ts` (`ask_dactyl`), on every file and on the context file, and `eyes/house-reads.ts` (`read_git`),
+ * which holds a changed file to the same rule through `isDeniedPath` before it reads that file's diff.
  */
 
 /** The file or folder names that are secrets whole, whatever sits beside them. Compared in lower case. */
@@ -94,6 +95,18 @@ function deniedBy(candidate: string): string | null {
     if (isUnder(candidate, root) || isUnder(candidate, real)) return `it sits under ~/${homePath}`;
   }
   return null;
+}
+
+/**
+ * Whether `candidate` is a file no reader of hers may open: the rule above as a predicate, judged the way `judgeFile` judges
+ * it — on the path as written AND on the real file it resolves to when it exists (a link called `notes.txt` that points at a
+ * `.env` is a `.env`), and whether or not the file exists. `candidate` is an absolute path, or `~/…`; a relative one is taken
+ * against the server's own working directory, so a caller holding a project-relative name joins it to the project first.
+ * Consumed by `eyes/house-reads.ts` (`read_git`), which names a changed file this refuses and never reads its diff.
+ */
+export function isDeniedPath(candidate: string): boolean {
+  const written = path.resolve(withHome(candidate.trim()));
+  return deniedBy(written) !== null || deniedBy(realOrSelf(written)) !== null;
 }
 
 /** The refusal of a denied file: names it, says why, and says no dactyl started. */

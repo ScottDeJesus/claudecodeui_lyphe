@@ -36,7 +36,7 @@ import { listHisChats, resolveChat } from './house-reads.js';
  *
  * Each description is her prompt's own line for the tool (`toolLine`).
  *
- * Consumer: `tools/companion-tools.ts`, which adds these three to the thirteen it builds.
+ * Consumer: `tools/companion-tools.ts`, which adds these three to the tools it builds.
  */
 
 /** The longest name she may give a chat: the sidebar shows a title, not a sentence. */
@@ -77,9 +77,10 @@ const stringsOf = (value: unknown): string[] => (Array.isArray(value) ? value.fi
 /**
  * Writes `entry` into the account's `claudePermissions`: added to `allowedTools` when it is not there, removed from
  * `disallowedTools` when it is (an entry he once denied and now allows is allowed, not both), every other key of the
- * preference left as it was. The page's `grantClaudeToolPermission` does the same merge on its own copy. Synchronous
- * on purpose: read and write share no `await`, so two chats answered "always" in parallel cannot both read the list
- * before either writes it and lose an entry.
+ * preference left as it was. The page's `grantClaudeToolPermission` does the same merge on its own copy, and the page's store
+ * sends the DIFFERENCE from the copy it held (INV-10017), so a page open since before this write cannot erase the entry this
+ * remembered. Synchronous on purpose: read and write share no `await`, so two chats answered "always" in parallel cannot both
+ * read the list before either writes it and lose an entry.
  */
 function rememberAllowedTool(userId: number, entry: string): void {
   const stored = userPreferencesDb.getPreferences(userId)[CLAUDE_PERMISSIONS_KEY];

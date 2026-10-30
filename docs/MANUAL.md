@@ -946,7 +946,7 @@ is written as well as where it is drawn — so a stored value can never put a pa
 cannot reach its edge. The left pane is the same element whether or not a right one exists, so
 opening or closing the second pane never remounts what the first is showing.
 
-**A pane is an iframe and nothing else** — no title bar, no close button, no watchdog:
+**A pane is an iframe and nothing else** — no title bar, no close button, no watchdog (the one exception is below: an address the browser would block):
 
 ```tsx
 <iframe src={resolved} title={app.name} data-pane-side={side} referrerPolicy="no-referrer"
@@ -961,7 +961,17 @@ opening or closing the second pane never remounts what the first is showing.
   which is the whole premise of the framing grant below. These are the operator's own applications
   on the operator's own host, not untrusted embeds.
 - **`data-pane-side`** is `left` or `right`, passed by the layer. It is how `useFrontPane` tells
-  which frame holds focus; see MAN-491.
+  which frame holds focus (or, for the card below, which card's button does, read at `focusin`);
+  see MAN-491.
+- **A plain-http address inside an https page is not framed.** The browser blocks it as mixed
+  content without a word, which would leave a blank pane; `AppPane` is where every way of putting an
+  application up passes through (a row, dual screen, the companion's `showApplication`, a project
+  link), so it checks the resolved address against the page's protocol (`isBlockedAsMixedContent`)
+  and draws an `EmptyState` card in place of the frame — what the application is, why it is not
+  drawn, and an **Open in a new tab** action that is the same `window.open(…, '_blank', 'noopener')`
+  as above. An https address, a loopback address (a browser draws that one from an https page), and
+  any address on a page opened over plain http, is framed as before. A row that is this app itself
+  never reaches a pane (it opens a tab).
 - **Reload** bumps a per-pane counter used in the frame's React key, which remounts the element.
   **Open in a new tab** is `window.open(resolved, '_blank', 'noopener')`. Both, and **Close**, are
   acts of `useSwitcherActions` on the FRONT pane, not controls on the frame.
@@ -991,6 +1001,9 @@ setting here:
 - **Any other row** opens in a pane and shows whatever its own headers allow. An application that
   refuses framing paints a blank pane; that is its answer, and the row's menu still offers Open in a
   new tab.
+- **A plain-http row, while this app is open over https,** is not framed at all: the browser blocks
+  it as mixed content, so the pane says so and offers Open in a new tab. A row with an https address
+  (an https door in front of the application) or a loopback one is framed as usual.
 
 ## MAN-490 — The kit the switcher is built on
 section: applications/012 The kit the switcher is built on
@@ -1015,6 +1028,7 @@ which is what earns a component in this house. Every screen composes them; none 
   where the bare rect says 29.68, so a panel standing off the FAB does not twitch on hover. The latest
   callback is read through a ref, so a new function identity each render neither re-binds the resize
   listener nor re-reports. The node is still never remounted.
+  Sites (MAN-569): `AppSwitcherFab` (MAN-486) and `CompanionFab` (MAN-9125) compose it unchanged; the second site added no prop. `onDragStart` and `onRectChange` have both as sites; `indicator` only the first.
 - **`SplitPane.tsx`** — two panes and a draggable seam, or one pane filling the row. The seam is
   its own narrow gutter BESIDE the panes rather than over them: a grab area laid over a pane would
   steal the clicks of whatever that application draws flush against its edge. It carries
@@ -1091,7 +1105,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DockableFab.tsx, /
 ## MAN-491 — The switcher's own files
 section: applications/013 The switcher's own files
 
-`src/modules/app-switcher/`, whose barrel exports six things and nothing else: four mounts — the provider, the dock, the FAB and the layer — and two hooks, `useCurrentApplication` (an ANSWER: the application in front, or null) and `useSwitcherActions` (a set of VERBS: the five acts). Exactly these two leave because each is computed inside the module from the state hook and hands out a result, never the state: which pane is in front and which row is this app are decided in one place. The state hook (`useAppSwitcher`), the registry hook, the url and storage utils, the drawer and the pane stay inside. A third export is how a rule decided in one place starts being read in two. The dock carries one more fact across the seam as a prop, not an export: the rail's press override (`pressOverride`, written to the context as `dockPress`), which the FAB reads.
+`src/modules/app-switcher/`, whose barrel exports eight things and nothing else: four mounts — the provider, the dock, the FAB and the layer — and four hooks, `useCurrentApplication` (an ANSWER: the application in front, or null), `useSwitcherActions` (a set of VERBS: the five acts), `useShowApplication` (a VERB: puts a registered application up at its address plus a path, and MOVES its pane there when it is already up, where the drawer's `open` would take it down — Kaylee's open of a DocSpace page in ArchPulse) and `useBackToWorkspace` (a VERB: takes every application down — the way back to the workspace). Exactly these four leave because each is computed inside the module from the state hook and its own URL rule and hands out a result, never the state: which pane is in front, which row is this app and where an application lives are decided in one place. The state hook (`useAppSwitcher`), the registry hook, the url and storage utils, the drawer and the pane stay inside. A fifth export is how a rule decided in one place starts being read in two. The dock carries one more fact across the seam as a prop, not an export: the rail's press override (`pressOverride`, written to the context as `dockPress`), which the FAB reads.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/registryRequests.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx
 
@@ -1100,7 +1114,7 @@ section: applications/013 The switcher's own files/001 `context/AppSwitcherConte
 
 | File | What |
 |---|---|
-| `context/AppSwitcherContext.tsx` | The one state home: the registry, the two panes, dual, the ratio, the FAB position, the dock rect, the dock's press override (`dockPress`, with its stable `setDockPress`: MAN-9014), the drawer's open flag, `projects` (`ProjectChoice[]`, handed in by the shell: the one outside list the switcher reads), `frontSide`, `closePane`, `openInDualScreen` (dual-on-and-filled in one update) — and `refresh()` on every drawer open. Once a registry read has landed it clears, in the render that sees it, any pane whose row the registry no longer holds; a failed read keeps the last good list, so a refusal never empties a pane. |
+| `context/AppSwitcherContext.tsx` | The one state home: the registry, the two panes, dual, the ratio, the FAB position, the dock rect (`registerDock` believes a measured rect only through `dockableRect` and `sameRect`, imported from `src/shared/utils.ts`: MAN-9010), the dock's press override (`dockPress`, with its stable `setDockPress`: MAN-9014), the drawer's open flag, `projects` (`ProjectChoice[]`, handed in by the shell: the one outside list the switcher reads), `frontSide`, `closePane`, `openInDualScreen` (dual-on-and-filled in one update), `putUp(appId, src)` (puts an app up where `open` would and never toggles it down: an app already up is moved to `src` in the half it holds, a new `src` on the same frame, and the same `src` again bumps the slot's `reloadNonce`, which remounts the frame at it) — and `refresh()` on every drawer open. Once a registry read has landed it clears, in the render that sees it, any pane whose row the registry no longer holds; a failed read keeps the last good list, so a refusal never empties a pane. |
 | `AppSwitcherDock.tsx` | `AppSwitcherDock({ unreadBadgeHidden?, pressOverride? })`: the empty 28px box in the top cell of the sidebar's views rail (project-workspace's `WorkspaceRail` mounts it), which holds the space open and reports its rect, and never unmounts on a collapse of the chat list. `pressOverride` (`DockPress`), the dock's own button for a disc dragged out and the focus move: MAN-9014. |
 | `AppSwitcherFab.tsx` · `AppDrawer.tsx` | The kit's FAB wearing the app logo. A tap collapses a floating chat, else (seated with a `dockPress`) runs the rail's override, else opens `AppSwitcherRadial` beside it (drawing only the acts that can run), whose Applications act opens `AppDrawer` (MAN-7475). `AppSwitcherFab({ chatDoor: ChatDoor, onAnchorChange: (rect: DOMRect \| null) => void })` passes the kit's rect report on and reports `null` when it unmounts; it draws the dot while `chatDoor.unread`, the chat is not floating and the disc is not seated in the rail (or is seated with the rail's Chat badge scrolled out of sight: `dockBadgeHidden`) (MAN-486); the module imports nothing of chat-host (MAN-7478). |
 | `AppSwitcherRadial.tsx` · `utils/radialLabels.ts` | The acts that can run drawn on the arc as `role="menuitem"` discs with label pills, and the plan that puts each label on a side of its disc. Not in the barrel; mounted only by `AppSwitcherFab`. Rules, seams, proof: MAN-7475. |
@@ -1117,22 +1131,30 @@ section: applications/013 The switcher's own files/002 `hooks/useFrontPane.ts`
 
 | File | What |
 |---|---|
-| `hooks/useFrontPane.ts` | `useFrontPane(panes, setPanes)` → `{ frontSide, closePane }`, mounted by the provider. `frontSide` is the side whose frame last took focus (default `left`). What the hook returns is the side READ as in front: a side whose slot is empty reads as `left` in the very render that emptied it (a survivor is always left), so no reader sees a one-commit "nothing up"; an effect then resets the stored side to `left`. `closePane(side)` empties one slot and moves a survivor left. |
+| `hooks/useFrontPane.ts` | `useFrontPane(panes, setPanes)` → `{ frontSide, closePane }`, mounted by the provider. `frontSide` is the side whose frame last took focus (default `left`); for an address the browser would block, the pane is a card in the page's own document (`AppPane`, MAN-488), so the side is the one whose card holds focus. It is read from `activeElement.closest('[data-pane-side]')` at three moments: the window's `blur` (focus left the page for a frame), a capture-phase `pointerdown` (the reader's next press in the page names the frame they last used), and `focusin` (a press or a Tab into a card, read after focus has moved). What the hook returns is the side READ as in front: a side whose slot is empty reads as `left` in the very render that emptied it (a survivor is always left), so no reader sees a one-commit "nothing up"; an effect then resets the stored side to `left`. `closePane(side)` empties one slot and moves a survivor left. |
 | `hooks/useCurrentApplication.ts` | `useCurrentApplication()` → `CurrentApplication` (`{ app, src }`) of `frontSide`'s slot, or null when nothing is up or the registry lacks the row. Memoised on `app` and `src`. |
 | `hooks/useSwitcherActions.ts` | `useSwitcherActions(chatDoor)` → the five `SwitcherAction`s in order: Chat, Applications, Reload, Close, Open in a new tab (keys `chat`, `applications`, `reload`, `close`, `open-in-tab`; printed "Chat", or "Collapse chat" while the chat floats, "Apps", "Reload app", "Close app", "Open in tab": `applications.actChat` … `actOpenInTab`). Chat and Applications are always enabled; the other three are `disabled` while nothing is up and act on `frontSide`. Open in a new tab is `window.open(src, '_blank', 'noopener')`. `chatDoor` comes from the caller: only project-workspace knows which conversation an application brings; `AppSwitcherFab` and `ProjectCommandPalette` each call it with the one door `WorkspaceFrame` hands them, so the radial (which leaves out the `disabled` ones) and the palette's Applications group (MAN-7483, which greys them) draw from one list. |
+| `hooks/useShowApplication.ts` | `useShowApplication()` → `(appId, path) => void`, a barrel verb. Finds the registry row, resolves it for this page's host and lays `path` on it (`appAddressAt`: the row's own path stays in front, a trailing slash is not doubled), and calls the context's `putUp`. The module's second reader of the page's address, at its open site. A row the registry lacks, or one that is this very app (never framed), puts nothing up and logs why. Its one consumer is project-workspace's `CompanionHost`: ArchPulse at `/#page=<id>[&block=<id>]`; ArchPulse resolves a fragment change on `hashchange`, so a moved pane lands on the page without a reload. |
+| `hooks/useBackToWorkspace.ts` | `useBackToWorkspace()` → `() => void`, a barrel verb: the context's `close`, which clears both panes. `CompanionHost` calls it before it lands the Roadmap tab on a card, since an application over the main region hides the tab. |
 | `hooks/useAppRegistry.ts` | `GET /api/apps` on mount and on every drawer open — no polling, no websocket. A failed read keeps the last good list and raises an error beside it; `registryRead` is set once, after the first read settles either way. |
 | `utils/registryRequests.ts` | The registry's WRITE verbs — `addRegistryApp`, `describeRegistryApp` and `linkRegistryProject` (both `api.apps.update`, `PATCH /api/apps/:id`; blank unlinks), `removeRegistryApp`, `moveRegistryRow` and the three divider verbs — and `refusalInWords`, the one reader of a refusal's sentence every registry request in this module shares. |
-| `utils/paneSlots.ts` | `EMPTY_SLOT` and `loneAppOnTheLeft(panes)`. A lone application always sits in `panes.left`, because `SplitPane` draws its left child whether or not a right one exists. Every act that takes an application down passes its result through `loneAppOnTheLeft`. It lives here, not in the context, because the context imports `useFrontPane`, which needs it. |
+| `utils/paneSlots.ts` | `EMPTY_SLOT`, `placeApplication(panes, appId, src, aim)` (where a new application lands: the aimed side, or the left when the left is empty; used by `open` and `putUp`) and `loneAppOnTheLeft(panes)`. A lone application always sits in `panes.left`, because `SplitPane` draws its left child whether or not a right one exists. Every act that takes an application down passes its result through `loneAppOnTheLeft`. It lives here, not in the context, because the context imports `useFrontPane`, which needs it. |
 | `utils/radialLayout.ts` | `radialLayout(fab, viewport, count)` → item centres for the radial's arc; imports only `FAB_CATCH_PX` (`shared/constants.ts`); `[]` when `count` is below 1 or NaN. Constants at the top: a 34° step between neighbours (an arc of N items spans N−1 steps, so two items sit together and five span 136°), 100px radius, 60px item (`FAB_CATCH_PX` + 16), 8px edge gap. The item is the ROOM an item is given; the drawn disc is the FAB's own `FAB_SIZE_PX` (28px, `shared/constants.ts`). The arc is centred on the FAB and faces the viewport's centre; where a wall leaves no room it turns to the nearest angle that fits. A corner too tight for any turn narrows the sweep and grows the radius, up to 120px past 100, until neighbours stand as far apart as the smaller of the open arc's spacing (58.5px) and an item's room (60px); a viewport too small for that clamps each centre in and slides it along the wall to a full radius. Every centre is at least 100px from the FAB's centre and 38px (edge gap plus half an item) inside each wall, so a drawing caller reads the returned centres and never assumes 100px. `AppSwitcherFab` reads it for the radial's `points`. |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/registryRequests.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useBackToWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useShowApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/registryRequests.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx
 
-## MAN-9010 — The switcher's own files — `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts` · `utils/dockRect.ts`
-section: applications/013 The switcher's own files/003 `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts` · `utils/dockRect.ts`
+## MAN-9010 — The switcher's own files — `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts`
+section: applications/013 The switcher's own files/003 `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts`
 
 | File | What |
 |---|---|
-| `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts` · `utils/dockRect.ts` | The pure functions of §"`{host}`…", the `localStorage` record, and the two rules (`dockableRect`, `sameRect`) a measured dock rect passes before the provider believes it. |
+| `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts` | The pure functions of §"`{host}`…" and the `localStorage` record. `resolveAppUrl(url, host)` substitutes `{host}`; `appAddressAt(url, host, path)` is that address with a path (and its query and fragment) laid on it, which `useShowApplication` frames (the row's own query and fragment stay unless the path brings its own); `isSelfOrigin` says a row is this very app. |
+
+Shared with the companion module, so neither lives here:
+| What | Where | Read by |
+|---|---|---|
+| `dockableRect(rect)`, `sameRect(a, b)`: the two rules a measured dock rect passes before a provider believes it (non-empty and on screen; the same place keeps the object it found) | `src/shared/utils.ts` | `registerDock` of `AppSwitcherContext.tsx` and of the companion's `useCompanionFab` (MAN-9125) |
+| `FAB_DEFAULT_INSET_X` = 72, `FAB_DEFAULT_INSET_Y` = 112: the floating default's inset from the window's bottom-right corner to the disc's top-left | `src/shared/constants.ts` | `appSwitcherStorage.ts` (a reader who never moved the button, on a phone) and `CompanionFab` (her phone corner is one `FAB_CATCH_PX` left of it: change the 72 and the two catches overlap) |
 
 Types live in `src/shared/types.ts`, group `APPLICATION SWITCHER`: `PaneSide`, `PaneSlot`, `CurrentApplication`, `DockPress`, `ChatDoor` (`{ floating, unread, toggle, collapse }`, built by project-workspace's `useChatDoor`: MAN-7478) and `SwitcherAction` (`{ key, label, keywords, icon, disabled, shortcut, run }`).
 
@@ -1145,10 +1167,10 @@ Types live in `src/shared/types.ts`, group `APPLICATION SWITCHER`: `PaneSide`, `
 
 The context lives in `context/` and no file here ends in `Provider.tsx`, which is what the frontend
 standard asks for and what the ten contexts already in this repo do. The provider is mounted by
-`src/modules/project-workspace/ProjectWorkspaceShell.tsx`, whose tree is `ChatHostProvider` →
-`AppSwitcherProvider` → `WorkspaceFrame`. The layer and the FAB are mounted by
+`src/modules/project-workspace/ProjectWorkspaceShell.tsx`, whose tree is `PageAnchorsProvider` →
+`ChatHostProvider` → `AppSwitcherProvider` → `AccountsProvider` → `CompanionHost` → `WorkspaceFrame`. The layer and the FAB are mounted by
 `src/modules/project-workspace/WorkspaceFrame.tsx`: it gives its main-region wrapper the `relative`
-the layer needs, renders the layer as that wrapper's last child and the FAB as the container's last child, after the command
+the layer needs, renders the layer as that wrapper's last child and the FAB as the container's last child but one (Kaylee's disc, `CompanionFab`, is the last: MAN-9125), after the command
 palette and `ChatHostFloating` (MAN-7478) — outside the main region, so the button floats over an open application
 instead of being covered by it. It builds the one `door` (`useChatDoor`), hands it to the FAB and to `ProjectCommandPalette` as `chatDoor={door}` and to the hotkey as `door.toggle`, and reports `useCurrentApplication() !== null` to chat-host's `reportCovered` in a layout effect (MAN-7464).
 
@@ -3144,8 +3166,8 @@ governs: /home/lyphe/.claude/hooks/skill_router.py, /home/lyphe/.claude/skills/h
 ## MAN-1498 — The dispatcher lane
 section: dispatcher/000
 
-A polled lane on this server: twenty-five routes under `/api/dispatcher` (twenty-four in `dispatcher.routes.ts`: three reads, twelve presses on a plan, eight on an arc, one on the board; plus the card's `POST /answer`, MAN-7534), behind `authenticateToken` in `server/index.ts` (`createDispatcherModule()`, the mount, and its `start()`/`stop()` after `listen` and on shutdown), wired in `dispatcher.module.ts`, plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
-'dispatcher_state'` — and the notifications its endings earn (a feature in no epic pushes each ending; a feature of an epic pushes once per wave of trouble, and the epic's own finish pushes once — MAN-5639). A plan that lands owing the OPERATOR's word has its prompt put up on the plan's card (In flight face, Runs widget) and on his phone — the Accept prompt or the designer's questions, raised by this lane itself through `dispatcher ask <name>` and answered back through `dispatcher accept` and `dispatcher tell` (MAN-7400) — and still not a word of it is this lane's composition: the census, the options and the questions are the dispatcher's. A path under `/api` that no lane names answers 404 JSON (MAN-5437).
+A polled lane on this server: twenty-five routes under `/api/dispatcher` (twenty-four in `dispatcher.routes.ts`: three reads, twelve presses on a plan, eight on an arc, one on the board; plus the card's `POST /answer`, MAN-7534), behind `authenticateToken` in `server/index.ts` (`createDispatcherModule()`, the mount, its `start()`/`stop()` after `listen` and on shutdown, and its `picture()`, `cardText(name)` and `relay(order)` handles, which the entrypoint hands the companion's house: MAN-9142, MAN-9152), wired in `dispatcher.module.ts`, plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
+'dispatcher_state'` — and the notifications its endings earn (a feature in no epic pushes each ending; a feature of an epic pushes once per wave of trouble, and the epic's own finish pushes once — MAN-5639). A plan that lands owing the OPERATOR's word has its prompt put up on the plan's card (In flight face, Runs widget) and on his phone — the Accept prompt or the designer's questions, raised by this lane itself through `dispatcher ask <name>` and answered back through `dispatcher accept` and `dispatcher tell` (MAN-7400) — and still not a word of it is this lane's composition: the census, the options and the questions are the dispatcher's. A path under `/api` that no lane names answers 404 JSON (MAN-5437). Beside the routes the module hands the entrypoint `relay(order)`: Kaylee's acts on his spoken word, with kaylee--press's record of it (MAN-9152).
 
 The dispatcher is a separate program. It owns a SQLite store under `~/.claude/state/dispatcher`
 (`hooks/dispatcher/`), a daemon that walks one phase at a time, and a command whose `status --json`
@@ -3174,7 +3196,9 @@ and the frame the first landing broadcasts fills the tab a moment later. The tic
 store, 2026-10-14: a 5 MB document, 1.4–1.9 s wall (3.2 s before the `stages_by_phase`, `events_by_phase` and
 `events_by_plan` indexes, MAN-1444): 70–95% of the 2 s interval, and a read that runs past it skips the next
 tick; the roadmap's read is 0.3 s. A read that throws leaves the LAST good picture on the tab with one line in the
-journal per distinct message.
+journal per distinct message. Each CHANGED picture (and the first after a boot) first settles the follow-ups that name a
+feature or task it shows finished (`closeFollowupsForCompletions`, MAN-9003), then runs the endings and the prompts, then
+broadcasts; a failure of any step costs the tabs nothing.
 
 The keys of that picture this lane treats as a clock rather than as content are `generated_at` and,
 on every plan and every arc, `runtime_s`: the dispatcher derives the first at second resolution on
@@ -3313,7 +3337,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 ## MAN-1557 — The plan card
 section: dispatcher/010 The plan card
 
-`PlanCard` draws one plan the dispatcher carries, over the dispatcher's document. It is drawn in the Roadmap tab's In flight face and in the Runs widget, both in `src/modules/runner-tab` (MAN-642): INSIDE the card of its own arc
+`PlanCard` draws one plan the dispatcher carries, over the dispatcher's document. It is drawn in the Roadmap tab's In flight face and in the Runs widget, both in `src/modules/runner-tab` (MAN-642), and on Kaylee Station's stage (`CardStage`, `src/modules/station`: MAN-9228) for the one plan or epic in focus: INSIDE the card of its own arc
 where the store gives it one (`DispatchArcDeck`, §"The arc's deck" below), and on its own where it belongs to no arc: in the
 tab's wall under the decks, and in the widget's list (the open chat's items first, the card wearing `SessionPin`). Its phases are SHOWN in both, each as a node of the face's track (§"The face"); the card carries no `defaultOpen` at all. An owed word is the ASK BAND: a plan that owes the operator one draws its prompt between its head and its fold (`PlanAsk`, one per ask, drawn outside the fold so a fold keeps it — §"The frame", MAN-7537), and a plan inside an arc's deck draws none, because the arc's asks draw once on the deck, above its strip (§"The arc's deck").
 
@@ -3849,7 +3873,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 ## MAN-5707 — The arc deck's frame — One shape, two homes, two widths.
 section: dispatcher/015 The arc deck's frame/003 One shape, two homes, two widths.
 
-**One shape, two homes, two widths.** `DispatchArcDecks`' `home` prop (`'tab'` | `'gutter'`) changes no layout: it is written on the DOM as `data-dispatch-arcs`, so a reading is always taken from ONE home, and the width each home gives the deck is the whole of the difference — the tab's scroll body spans the pane (1440: a 1037px strip in a 1440px pane, `px-4 lg:px-6` and the scroll body's own edges; 390: the pane less 32px), the widget's card is a column a card wide (1920: a 320px deck in a 346px widget, a 294px strip, MAN-642 → "The gutter"). Nothing is drawn at zero arcs: no empty frame, no heading over nothing.
+**One shape, two homes, two widths.** `DispatchArcDecks`' `home` prop (`'tab'` | `'gutter'`) changes no layout: it is written on the DOM as `data-dispatch-arcs`, so a reading is always taken from ONE home, and the width each home gives the deck is the whole of the difference — the tab's scroll body spans the pane (1440: a 1037px strip in a 1440px pane, `px-4 lg:px-6` and the scroll body's own edges; 390: the pane less 32px), the widget's card is a column a card wide (1920: a 320px deck in a 346px widget, a 294px strip, MAN-642 → "The gutter"). Nothing is drawn at zero arcs: no empty frame, no heading over nothing. The station's stage (MAN-9228) draws one deck with the default `home` (`tab`), at the stage's width.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useSnapStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SnapStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 
@@ -6548,8 +6572,11 @@ owns the fan-out:
    other listener. `onNotification(listener)` (exported by the notifications barrel) returns an
    idempotent unsubscribe; a listener that subscribes or unsubscribes while it runs changes the NEXT
    announcement, not this one. A listener is called synchronously and returns quickly; anything slow
-   is its to start. The only subscriber today is the companion's alert feed, which turns the codes
-   Kaylee says unasked into `<alert>`s while his Live is on (see the companion manual).
+   is its to start. Two subscribe today: the companion's alert feed, which turns the codes Kaylee
+   says unasked into `<alert>`s while his Live is on (see the companion manual), and the notification
+   history (`notification-history.service.ts`), which writes one row for every event the seam hears
+   into `notification_history` — the house's record of what it told him, in its wording with every
+   figure taken out (see the notification history manual).
 1. **Event preference.** The event's `kind` maps to one switch in the user's notification
    preferences (`KIND_TO_PREF_KEY`): `action_required` → `events.actionRequired`, `stop` →
    `events.stop`, `error` → `events.error`, `limit` → `events.limits`, `background` →
@@ -6693,6 +6720,9 @@ section: notifications/004 The ntfy channel/007 What gets pushed, and how loud
 | `dispatcher.finished` · `dispatcher.epic_finished` | 3 | `white_check_mark` |
 | `dispatcher.limit_paused` | 3 | `hourglass_flowing_sand` |
 | `dispatcher.relaunched` | 4 | `warning` |
+| `cerberus.red` (a check red for an hour; one push per tick, MAN-9205) | 5 (urgent: sounds through Do Not Disturb) | `rotating_light` |
+| `cerberus.red.reminder` | 4 | `warning` |
+| `cerberus.recovered` | 3 | `white_check_mark` |
 | `action_required` | 4 (high) | `question` |
 | `error` | 4 | `rotating_light` |
 | `limit.reached`, `limit.out_of_credits` | 4 | `no_entry` |
@@ -6904,7 +6934,7 @@ reports.
 ## MAN-622 — The wording
 section: notifications/012 The wording
 
-`buildNotificationText(event)` in
+`buildNotificationText(event, bodyLimit = 1000)` in
 `server/modules/notifications/services/notification-copy.service.ts` words every notification
 for every channel. To change what a code says, change it there and nowhere else; the function is
 also exported from the module's `index.ts` for any caller that has to show an event's wording.
@@ -6919,8 +6949,9 @@ also exported from the module's `index.ts` for any caller that has to show an ev
 - The dispatcher's endings are worded off the `meta` its lane fills (MAN-1498), with progress counted over ALL of a plan's phases (`done`/`phases`) so the push agrees with the plan's card: `dispatcher.finished` reads `Feature finished`, body `<done>/<phases> tasks · <spend>` (`task` when `phases` is 1); `dispatcher.epic_finished` reads `Epic finished · <epic>`, body `<n> features · <m> tasks · <spend>` (`feature`/`task` when 1, no tasks clause when `meta.tasks` is null); `dispatcher.paused` reads `Feature paused`, body `<done>/<phases> tasks · <detail> · Resume from the Roadmap tab`; `dispatcher.relaunched` reads `Task relaunched`, body `Task <key> was taken up again · <detail>` (`A task was taken up again` with no key). A paused or relaunched push from a feature of an epic ends with `Epic <epic>: further stops|retries stay on its card until it has been quiet for an hour` (MAN-5639).
 - `<spend>` is `spendText(meta)`, the SAME rule the In flight face draws, and A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED: `$0.28 DeepSeek` for a plan a paying API billed, with NO tokens (a vendor's tokens are its own business), and `1.2M in · 48k out` — the total alone, `1.2M tokens`, on a record written before the split — for one on the operator's Claude subscription, with no `$` at all, never `$0.00` (operator rule, 2026-09-24). A plan that used both hands states both, `$0.32 DeepSeek · 12.4M in · 80k out`, its token half counting its CLAUDE records ONLY. the lane fills `costUsd`/`tokensIn`/`tokensOut` in its ending `meta` (`dispatcher-endings.service.ts`) and a meta that recorded none drops the phrase entirely rather than printing a zero.
 - `compaction.failed` (an automatic custom compaction that did not take, MAN-8065) reads `Compaction failed`, body `The idle|end-of-turn compaction did not take: <meta.reason>. The chat stays on its current session.` (`meta.trigger` `idle` picks the first word; the `: <reason>` part drops when `meta.reason` is empty).
-- The body is cut at 1,000 characters: web push refuses a payload over about 4 KB, and the
-  orchestrator settles that refusal silently.
+- The body is cut at 1,000 characters (`bodyLimit`, default `MAX_BODY_CHARS`): web push refuses a payload over about 4 KB, and the
+  orchestrator settles that refusal silently. `bodyLimit` `null` keeps the whole body and the caller owns the bound; the one caller
+  that passes it is the companion's alert for a question card (`AskUserQuestion`, MAN-9069).
 - A tool approval's body is the thing being approved: the Bash command, the path for a file tool,
   otherwise the tool input as JSON (cut at 300 characters). A question lists its options numbered
   from 1 in their own order. A plan ready for approval carries its first 600 characters.
@@ -7673,7 +7704,7 @@ order, the selected provider. They are not folded into `uiPreferences`: that blo
 boolean reducer (`src/shared/uiPreferences.ts`), and a project id is a `string | null`, not a
 flag. `filesPins` (`{ pinned: string[] }`, the folders pinned on the Files view's strip) is the Files
 view's one key. `useFilesPins` reads it and `pinFolder` / `unpinFolder` write it by entry patch, never whole
-(INV-9662; the other entry-patched keys: `dispatcher` INV-4406, `roadmapSeen` INV-6580). The store itself —
+(INV-9662; the other entry-patched keys: `dispatcher` INV-4406, `roadmapSeen` INV-6580, `claudePermissions` INV-10017). The store itself —
 how a write reaches the mirror before the server, the legacy-key seeding
 rule, why a setting born after that migration seeds nothing — is documented once, in
 [src/shared/userSettings.ts](../src/shared/userSettings.ts)'s own header.
@@ -8060,7 +8091,7 @@ project, and hands back the page plus `shoot()`, `api()`, and the console errors
 `openConsole({ appUrl })` drives another client than `:5183` — a pre-change `dist` served by
 `vite preview` on a port of its own — and returns `appUrl` for the caller's own `goto`s; it exists for a before/after pair, one probe driving a pre-change build beside the current one.
 `openConsole({ preferences })` is what the pages see laid over the dev account's stored preferences — by default English and an expanded sidebar (`.verify/lib/prefs-pin.mjs`), the two the harness's selectors cannot run without, pinned per page and never written to the account; `null` opts out for a probe whose subject is the stored language or sidebar. A probe that signs in by `POST /api/auth/login` and sets `auth-token` itself (a chain Athena's own `lib.mjs`) is not covered: it adds `await pinPreferences(context)` from `prefs-pin.mjs` before its first `goto`, or its page boots in whatever language and sidebar the account stores (`zh-TW` from 2026-09-29 18:51 and collapsed, measured 2026-10-01) — `hooks/probe_account_hint.py` (MAN-7561) names the stored values at its first Playwright timeout.
-`openConsole({ navigationTimeout })` is a number of ms laid over Playwright's 30 s navigation timeout before the first `goto`; default unset. A scratch Vite with a cold dependency cache serves the document at once and then spends a minute or more transforming the module graph, so `waitUntil: 'networkidle'` misses 30 s and the page is photographed empty — a probe on a cold scratch Vite passes it (`.verify/whole-account-switch-panel.mjs`; `probe-pace-override.mjs` sets the same number by hand); the live client leaves it unset. The wait for the first project row is 90 s for every caller (measured 2026-10-22: 21.7 s on a warm client).
+`openConsole({ navigationTimeout })` is a number of ms laid over Playwright's 30 s navigation timeout before the first `goto`; default unset. A scratch Vite with a cold dependency cache serves the document at once and then spends a minute or more transforming the module graph, so `waitUntil: 'networkidle'` misses 30 s and the page is photographed empty — a probe on a cold scratch Vite passes it (`.verify/whole-account-switch-panel.mjs`; `probe-pace-override.mjs` sets the same number by hand); the live client leaves it unset. The wait for the first project row is 90 s for every caller (measured 2026-10-22: 21.7 s on a warm client). A probe's own navigation onto the signed-in app uses `gotoApp` / `reloadApp` from `.verify/lib/app-load.mjs`, never `waitUntil: 'networkidle'` (MAN-9136).
 `openConsole({ stubs })` is `[{pattern: RegExp, body}]`, answered locally beside the built-in stubbed requests and registered before the first navigation — for a route that must answer at mount (`.verify/probe-settings-rows.mjs` stubs TaskMaster installed so the Tasks tab draws its one row). It never writes a real flag.
 `openSettings(page, tab?)` works at any width (below 768px it presses the header's hamburger for the gear, and `tab` is pressed through the rail the width draws), and a Playwright wait that times out carries a `PAGE WHEN THE WAIT GAVE UP:` block in its message — MAN-8078.
 
@@ -10339,7 +10370,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 
 ## MAN-7400 — The dispatcher lane — the prompts a plan owes the operator, raised for the plan's card and the phone: the raise, the book, the answer
 
-**The prompts a plan owes the operator, raised for the plan's card and the phone.** Composed in `dispatcher-prompts.module.ts` under the lane's root from three pieces that watch the SAME picture the endings do (`dispatcher.module.ts`'s `broadcast`, the lane's own picture and nothing else). No model is involved, no chat turn is spent, nothing is written into a transcript in the operator's name, no frame about a prompt goes to any socket. The prompt is DRAWN by the plan's card in the In flight face and the Runs widget (client MAN-7537) and PUSHED to the phone (MAN-618). A plan's session is consulted at the raise alone, to name the push.
+**The prompts a plan owes the operator, raised for the plan's card and the phone.** Composed in `dispatcher-prompts.module.ts` under the lane's root from three pieces that watch the SAME picture the endings do (`dispatcher.module.ts`'s `broadcast`, the lane's own picture and nothing else). No model is involved, no chat turn is spent, nothing is written into a transcript in the operator's name, no frame about a prompt goes to any socket. The prompt is DRAWN by the plan's card in the In flight face and the Runs widget (client MAN-7537) and PUSHED to the phone (MAN-618). A plan's session is consulted at the raise alone, to name the push. Three doors answer it: the card, the phone and Kaylee (`answerOnHisWord`, his spoken word with kaylee--press's record of it; MAN-8494, MAN-9152). She draws and pushes nothing.
 
 ## The raise (`dispatcher-raise.service.ts`)
 - Events: `design-loaded`, `phases-loaded`. It runs `dispatcher ask <name>` (`dispatcher-ask.transport.ts`, `hooks/dispatcher/ask.py`, MAN-7399), which records the ask in the STORE (`prompted_at` and an `asked` event) and prints it in the document's `asking` shape; the prompt goes up at once (`asks.show`), on the tick that saw the landing (measured 2026-09-29: 0.7 s from a probe plan's landing to its push, the lane polling every 2 s).
@@ -10356,12 +10387,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/, /hom
 section: The dispatcher lane — the prompts a plan owes the operator, raised for the plan's card and the phone: the raise, the book, the answer/001 The book (`dispatcher-asks.service.ts`)
 
 A BOOK of what THIS process has put up, kept off every picture's `asking` keys. Records are `{ promptKey, ask, input, session: AskSession | null, receivedAt }`. Each distinct open ask is raised exactly once, whatever session it names.
-- A raise is two things: the book's record, and one `permission.required` push (`AskPush`) with the runtime's own meta — `toolName: 'AskUserQuestion'`, `toolInput`, `promptKey`, `sessionName` — plus `plan` and `askKind`, so the phone gets its buttons (MAN-618). `meta` carries no `requestId`; `provider` is `session?.provider ?? 'system'`, `sessionId` `session?.sessionId ?? null`.
-- Nothing is sent to a chat: no `permission_request` frame, no place in `chat_subscribed`'s `pendingPermissions`, no sidebar mark. A prompt retracts silently: `retract` drops the record and the phone's buttons (`forgetButtons`).
+- A raise is two things: the book's record, and — unless the durable record holds the name (below) — one `permission.required` push (`AskPush`) with the runtime's own meta — `toolName: 'AskUserQuestion'`, `toolInput`, `promptKey`, `sessionName` — plus `plan` and `askKind`, so the phone gets its buttons (MAN-618). `meta` carries no `requestId`; `provider` is `session?.provider ?? 'system'`, `sessionId` `session?.sessionId ?? null`.
+- Nothing is sent to a chat: no `permission_request` frame, no place in `chat_subscribed`'s `pendingPermissions`, no sidebar mark. A prompt retracts silently: `retract` drops the book's record and the phone's buttons (`forgetButtons`); the durable record is not its business.
+- THREE ENTRIES ANSWER A BOOK RECORD, one per door: the phone's tap (`answer`, through the gateway), the card's `answerFromCard` and Kaylee's `answerOnHisWord(ask, reply, press)` (returned beside `observe`, `show`, `gateway` and `answer`). The third looks the ask up by `keyOf(ask)` exactly as the card's does (`catchUp` for a key the book does not hold), carries the BOOK's record through `carryEntry` with door `kaylee` and the press, and answers the `CarriedAnswer { outcome, said }`; no HTTP shape. A key being carried, answered, known closed or absent after the read, or a reply that does not fit the prompt, is `refused` "that prompt changed since you read it back; read it again". MAN-8494 holds the door's rules; the press's record: MAN-9152.
 - Gateway: `registerPermissionGateway(asks.gateway)` (provider registry) with `{ resolve, recall }` only. `resolve` answers the phone's tap; `recall` reads the prompt a token names. `listPending` and `listPendingSessions` are OPTIONAL on `ProviderRuntimePermissionGateway` (`server/shared/types.ts`) and the dispatcher's declares neither; the registry's readers call them optionally (`gateway.listPending?.(sessionId) ?? []`) because a plan's prompt is pending in no chat.
 - THE NAME IS THE ASK (`keyOf`, `isAskKey`, `dispatcher-ask-names.service.ts`): `dispatcher:lock:<token>:<id>-<stamp>` for an Accept (the id its LEAD plan's) and `dispatcher:questions:<plan>:<id>-<stamp>` for a questions round. Derived from the store's record of the `asked` event, never minted: identical in every process. The book, the push and its buttons, the card's door and the lane's bell all key on it.
 - The stamp (whole epoch seconds of the `asked` event) is in the name. why: `events.id` has no `AUTOINCREMENT`; after `dispatcher drop` frees the tail a re-loaded plan is born under the same ids, and the same plan file asked again would be taken for the first life's ask (no buzz, no bell).
-- One arc's lock carried on every plan it names is ONE prompt; every landing is a new one. A re-cut after a Rework rewrites phase goals the token does not digest, and its fresh prompt buzzes the phone and rings the bell like the first; a restart or a handover's second server reads the same asks back off the store without buzzing again.
+- One arc's lock carried on every plan it names is ONE prompt; every landing is a new one. A re-cut after a Rework rewrites phase goals the token does not digest, and its fresh prompt buzzes the phone and rings the bell like the first; a restart or a handover's second server reads the same asks back off the store without buzzing again (the durable record below).
+- ONE PUSH PER ASK, NOT PER PROCESS: `AskRaisedMemory` (`raisedMemory`, built by `createRaisedAsksMemory` in `dispatcher-raised-asks.service.ts`, kept by the composition root in the `app_config` row `dispatcher_asks_raised` as one JSON object `{ [promptKey]: raisedAtMs }`). `raise` puts the ask in the book either way, and pushes only when the record does not hold the name; it records the name after the push, and only when the push reached at least one user (`push` answers a boolean: a push that threw for everyone, or had nobody to go to, is tried again by the next process). A name the record holds is an ask an earlier process already pushed, so the first picture after every boot no longer pushes every open ask again. why: the dev server is a fresh process on nearly every save (61 handovers in ten minutes, 2026-10-28), the book dies with it, and the orchestrator's 20 s dedupe and Kaylee's alert feed's own are in memory too — "Accept kaylee--memory?" reached her 24 times in ten minutes.
+- The name is forgotten when the ask is over — it left the picture (`observe`'s retraction), or an answer was taken and `answered` lets go of it (the grace ended, or the ask closed) — and when an answer is REFUSED, just before the prompt goes back up, so that re-raise is a fresh push. It is NEVER forgotten while a carry is out (`retract` itself touches only the book and the buttons): a successor that boots while the verb runs (0.7–1.2 s) finds the name and stays silent for an ask the operator is answering. A re-cut (new `asked` event, new name) raises fresh. `prune` runs once per `observe` and drops names older than 7 days that the picture does not carry (the asks that left while no process held them). Every call reads the row fresh and writes it whole (a handover's two processes share it); a row that cannot be read is an empty record — one push more, never one less.
 - A picture generated no later than an ask's own second cannot retract it (both stamps are the store's second-grained UTC). An answered ask stays down for `ANSWER_GRACE_MS` (30 s) while the store's own close of it reaches the picture; one whose answer the dispatcher did not take goes straight back up.
 - A PLAN IS APPROVED ONCE PER LOAD (`store.approve`), so a second Accept — a double answer, two servers hearing one tap, a terminal Accept first — is refused by the store whichever server sends it: `dispatcher accept` exits 3 (`accept.ALREADY_APPROVED_EXIT`, apart from every other refusal's 2) and `carryReply` answers `already-answered` (`DispatcherAnswerOutcome`) instead of `refused`. That prompt is NOT put back: it stays down for the grace like a taken one. `tellAlreadyAnswered` writes one journal line for every door (`[Dispatcher] <plan>: the <door> answer was already answered — …`) and sends nothing. The card hears `already-answered` in its reply; a phone tap's own reply says `Answered` before the verb runs, and only the journal hears the truth.
 
@@ -10370,13 +10404,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/, /hom
 ## MAN-8494 — The dispatcher lane — the prompts a plan owes the operator, raised for the — The answer (`dispatcher-answer.service.ts`)
 section: The dispatcher lane — the prompts a plan owes the operator, raised for the plan's card and the phone: the raise, the book, the answer/002 The answer (`dispatcher-answer.service.ts`)
 
-Two doors: the plan's card (names the ask by the ask it drew) and the phone (by its prompt key). `AnswerDoor` is `'card' | 'phone'`.
+Three doors: the plan's card (names the ask by the ask it drew), the phone (by its prompt key) and Kaylee (`DispatcherAsks.answerOnHisWord`: his spoken word for that specific card, carried with kaylee--press's record of it — who spoke, when, what he said). `AnswerDoor` is `'card' | 'phone' | 'kaylee'`.
+- KAYLEE'S DOOR finds the book's own record of the ask by the ask's name (`keyOf`, with `catchUp` for a name the book does not hold) and carries THAT; a prompt re-cut, answered or being carried since he heard it read back, or a reply that does not fit the prompt (an answers round on an Accept ask, a non-answers reply on a questions ask), answers `refused` — "that prompt changed since you read it back; read it again" — and nothing is carried. A store that cannot be read answers `refused` "the dispatcher could not be read, so nothing was carried; read it again"; a Kaylee answer with no record is `refused` before any verb runs. Every non-`took` outcome is one journal line, `[Dispatcher] <plan>: Kaylee's answer on his word carried nothing — <why>`. It retracts the prompt, takes its phone buttons down and holds the answered prompt down for its grace, as a card press does. Its Accept adds `--relay <record>` (target: the epic when the lock names several plans, else the plan; `token`: the `--lock`); a refusal of the dispatcher's door (`REFUSED …`, exit 2) comes back as the answer's `said` (MAN-9152 §Doors that exist today); each `tell` adds `--relay` naming its own target and no token, and the notes or answers stay his words on stdin. The journal names the record `<record>` and never copies it. The other acts on his word (hide, show, recut, stop, resume, kick, a plain tell) are not the book's: MAN-9152.
 - THE CARD'S DOOR: `POST /api/dispatcher/answer` (`dispatcher-answer.routes.ts`, `DispatcherAsks.answer`), the ask back exactly as the card drew it — `took` 200 · `already-answered`, `refused`, `not-open` 409 · `no-answer` 400 · `unread` 503. The status is the outcome, and the sentence in the body is the lane's own (MAN-7534).
 - Queue runs `dispatcher accept --lock <token> --by app:<door> <plans…>` (the plans join the queue); Hide is the same with `--hidden` (approved and held out of the queue until Show). The verb re-checks the token; a stale one approves NOTHING, after which the current prompt is up again.
 - Rework (notes typed on the card, `needsNote`; the phone's Rework button opens the push's landing instead, MAN-618) runs `dispatcher tell <target> --brief -` with the notes verbatim once per designer target.
 - A questions round runs `dispatcher tell <target> --brief -` with the answers as `Q:`/`A:` pairs in the designer's own words.
 - A decision that carries no answer (a skip, a Rework with no notes, a label no prompt offered) keeps the prompt up; a phone's is journalled (`a phone decision carried no answer — the prompt stays up`).
-- Every verb an answer runs is one journal line: the command, its exit, the dispatcher's own first line. The lane's child environment drops `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION` (`laneEnv`). why: the server is nobody's Claude session, `accept` refuses inside one, and `tell` would write a stray id onto the outing it queues.
+- Every verb an answer runs is one journal line: the command, its exit, the dispatcher's own first line. The lane's child environment drops `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION` (`sessionlessEnv`). why: the server is nobody's Claude session, `accept` refuses inside one, and `tell` would write a stray id onto the outing it queues.
 
 ## Any process answers (`dispatcher-asks.service.ts`)
 An answer names an ask; the process that hears it need not be the one that raised it. why: a phone tap outlives its push and lands on whichever server is serving; a card's press can reach a handover's successor before its first picture (measured 2026-09-28 18:59:54 on the dev unit's restart).
@@ -11239,7 +11274,7 @@ A second door sits beside it for the `notes` command a chat runs: `app.use('/api
 |---|---|
 | `notes.routes.ts` | `createNotesRoutes(service: NotesService): Router` — transport shape only: the caller is an account, `title` and a present `description` are strings, `:id` is a path parameter |
 | `notes.command-routes.ts` | `createNotesCommandRoutes(service)` — the command door (MAN-8993) |
-| `notes.service.ts` | `notesService` (`list`, `get`, `create`, `update`, `remove`) and `NotesService = typeof notesService` — normalise, then judge, then write; module-private `toNote` and `broadcastNotesChanged` |
+| `notes.service.ts` | `notesService` (`list`, `get`, `create`, `update`, `remove`) and `NotesService = typeof notesService` — normalise, then judge, then write; module-private `toNote` and `broadcastNotesChanged`. The barrel exports `notesService` to Kaylee's `read_notes`, which calls `list` and `get` only (MAN-9160) |
 | `notes.module.ts` | `createNotesModule(): { userRouter, commandRouter }` — one `notesService` instance handed to both route files; links `~/.local/bin/notes` |
 | `index.ts` | barrel: `createNotesModule` only |
 
@@ -11682,7 +11717,7 @@ The workspace's half of a tap on a plan's prompt. The server's half (`landingPat
 - A `urlPath` not starting with `/` (a message from a worker older than the field) falls through to `/session/<sessionId>`, else `/`. No `?runner=` then; no landing.
 - `ProjectEffects` sets `chat` first; the landing's `setActiveTab('runner')` follows from the URL it navigated to.
 - `?roadmap=<name>` takes and strips under rules 1–9 below exactly as `?runner=` does. Its name is `ROADMAP_LANDING_PARAM` (`src/shared/constants.ts`), written by the widget's `roadmap.widget.open` (MAN-7668). A name the picture lacks selects nothing and is retired; the tab opens on its Roadmap face, on the roadmap already on screen (MAN-7748).
-- The param's name is `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), read here. Written by the server's `landingPathOf` and by `useRevealCard` (MAN-7650), which navigates (`replace`) to `?runner=<plan>` from a roadmap press with no Roadmap tab above it.
+- The param's name is `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), read here. Written by the server's `landingPathOf` and by `useRevealCard` (MAN-7650), which navigates (`replace`) to `?runner=<plan>` from a roadmap press with no Roadmap tab above it and from Kaylee's open of a card (project-workspace's `CompanionHost`, MAN-9083). Also written by the station's `FocusFallback` into a card's path (`/?runner=<plan>`, MAN-9228).
 
 ## `useRunnerLanding` — rules
 1. The name is held from the commit that first sees it, with a project selected or not. why: every view's pane draws with no project (the Roadmap view among them), so nothing waits for a pick; and the pick (`handleProjectSelect`) rewrites the location to bare `/`, so the URL is no place to keep a name.
@@ -11701,7 +11736,8 @@ The workspace's half of a tap on a plan's prompt. The server's half (`landingPat
 - Waits until `useLiveTopic(DISPATCHER_ALL_TOPIC) !== undefined` ("the bus has spoken"). `undefined` is nothing retained yet; `useDispatcherPlans` folds it into an empty lane, so the pane reads the topic itself. why: a lookup on a cold board retires a request that had nothing to find; an empty board dealt is an answer, and a pending request would scroll the pane later with no URL to explain it.
 - Then scopes to its own `data-runner-panel` root and looks for:
   - a plan of no arc: `[data-runner-loose-plans] [data-dispatcher-card][data-plan-name="<name>"]`;
-  - a plan of a drawn arc (the arc read off `plans` from `useDispatcherPlans()`): `[data-dispatch-arc][data-arc-name="<arc>"]`, the deck, since the deck's strip pages its plans.
+  - a plan of a drawn arc (the arc read off `plans` from `useDispatcherPlans()`): `[data-dispatch-arc][data-arc-name="<arc>"]`, the deck, since the deck's strip pages its plans;
+  - failing both, the name as an epic's own, bare or as `<name>.arc` (Kaylee's open of an epic names the arc): the same deck selector for that name, which lands on the deck.
 - Both names go through `CSS.escape`. A found target gets `scrollIntoView({ block: 'start' })`.
 - `onRevealed()` runs found or not: a plan put away since the push, or a name the lane does not carry, retires the request.
 - It scrolls. It unfolds nothing and un-hides nothing.
@@ -11751,7 +11787,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askState.
 
 ## MAN-7534 — The dispatcher lane — THE CARD'S DOOR. `POST /api/dispatcher/answer` answers a plan's prompt from its card
 
-**THE CARD'S DOOR.** `POST /api/dispatcher/answer`: the plan's own card (In flight face, Runs widget; client MAN-6805) answers the prompt a plan owes, without the chat. Behind the lane mount's `authenticateToken`. Second door beside the phone (MAN-7400); it carries through the same `carryEntry`, so the dispatcher's verbs, the book and the grace are shared. Nothing about a prompt goes to a chat: the card is where it is answered.
+**THE CARD'S DOOR.** `POST /api/dispatcher/answer`: the plan's own card (In flight face, Runs widget; client MAN-6805) answers the prompt a plan owes, without the chat. Behind the lane mount's `authenticateToken`. Second door beside the phone (MAN-7400), Kaylee's the third (MAN-8494); it carries through the same `carryEntry`, so the dispatcher's verbs, the book and the grace are shared. Nothing about a prompt goes to a chat: the card is where it is answered.
 
 Wiring:
 - `createDispatcherAnswerRouter` (`dispatcher-answer.routes.ts`) — only reads and validates the body, maps the outcome to a status.
@@ -11789,7 +11825,7 @@ Reply `DispatcherCardAnswer { outcome, stdout }` (`server/shared/types.ts`, mirr
 
 Rules:
 - The carry runs on the BOOK entry's ask, never the request's: the request's ask only derives the key, so no request string reaches an argv and a census the card never drew is never approved.
-- The door is written to `approved_by` as `app:card`: `AnswerDoor` is `'card' | 'phone'`, and `dispatcher accept --by` takes `cli|app:card|app:phone` (`hooks/dispatcher/cmd/run.py`, MAN-6048).
+- The door is written to `approved_by` as `app:card`: `AnswerDoor` is `'card' | 'phone' | 'kaylee'` (Kaylee's writes `app:kaylee`, beside the `--relay` record of his spoken word), and `dispatcher accept --by` takes `cli|app:card|app:phone` (`hooks/dispatcher/cmd/run.py`, MAN-6048), not `app:kaylee`: Kaylee's Accept is refused with the binary's `usage:` line until kaylee--press's door lands (MAN-9152 §Doors that exist today).
 - `carryReply` returns `CarriedAnswer { outcome, said }`; `said` is the refusing run's first line, else the last run's, `''` when nothing printed. Every run still journals its own line.
 - The phone voids the `carryEntry` promise (its HTTP reply tells the operator); the card awaits it.
 - `tellAlreadyAnswered` journals one line for every door and sends nothing; the card hears `already-answered` in its reply.
@@ -12252,8 +12288,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-w
 Files
 | file | owns |
 |---|---|
-| `index.ts` | exports `createRoadmapModule` and type `RoadmapModule` = `{ router, start(), stop() }` |
-| `roadmap.module.ts` | composition root: the only file reading the environment (`DISPATCHER_BIN`, default `~/.claude/scripts/dispatcher`; `CASES_BIN`, default `~/.claude/scripts/cases`); `laneEnv()`, the constants, `createPolledLane`, `casesDependencies` (the lane's own plus the cases `bin` and `door: 'cases'`), the router |
+| `index.ts` | exports `createRoadmapModule` and type `RoadmapModule` = `{ router, start(), stop(), picture() }`; `picture()` is the lane's picture behind `whenLanded(FIRST_READ_WAIT_MS)`, the call its router's `current` makes, which the entrypoint hands the companion's house (MAN-9142) |
+| `roadmap.module.ts` | composition root: the only file reading the environment (`DISPATCHER_BIN`, default `~/.claude/scripts/dispatcher`; `CASES_BIN`, default `~/.claude/scripts/cases`); `sessionlessEnv()`, the constants, `createPolledLane`, `casesDependencies` (the lane's own plus the cases `bin` and `door: 'cases'`), the router |
 | `roadmap-state.service.ts` | `readRoadmapState(dependencies)`: `dispatcher roadmap show --json` read field by field into `RoadmapPicture` |
 | `roadmap-cases.service.ts` | `readFeatureCases(dependencies, feature)`: the cases door's list read field by field into `RoadmapCase[]`; MAN-7658 |
 | `roadmap.routes.ts` | `createRoadmapRouter({ current, relay, poke, cases })`: two GETs, nine POSTs, `statusForWrite` |
@@ -12270,14 +12306,18 @@ Constants, `roadmap.module.ts` unless named
 | `POLL_MS` | 2000 | the dispatcher lane's cadence; `roadmap show` reads the store only, about 0.2 s |
 | `READ_TIMEOUT_MS` | 20000 | one command, read and writes alike; a write may kick the daemon first |
 | `FIRST_READ_WAIT_MS` | 5000 | how long a GET waits for this boot's first reading |
-| `DEFAULT_PATH` | `/usr/local/bin:/usr/bin:/bin` | `PATH` when the process has none: the verbs look up `systemctl --user` |
 | `ROADMAP_MAX_BUFFER` | 1 MiB, in `roadmap-state.service.ts` | the document is 190 KB (2026-10-03: two roadmaps, 51 features) |
 | `CASES_MAX_BUFFER` | 1 MiB, in `roadmap-cases.service.ts` | a case is about 890 bytes; MAN-7658 |
 
-- `laneEnv()` = `userFacingEnv({ PATH })` minus `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION`. why: this server is no Claude session; `accept` refuses inside one and `tell` stamps it onto the outing. A promote queues a design owned by no session.
-- `laneEnv` and `DEFAULT_PATH` are copied in `modules/dispatcher/dispatcher.module.ts`: edit both.
+- `sessionlessEnv()` (`@/shared/child-env.ts`) = `userFacingEnv({ PATH })` minus `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION`; the `PATH` fallback (`/usr/local/bin:/usr/bin:/bin`, for a process with none: the verbs look up `systemctl --user`) is its own. why: this server is no Claude session; `accept` refuses inside one and `tell` stamps it onto the outing. A promote queues a design owned by no session. The dispatcher lane and dispatch-souls call the same function.
 
 Routes, mounted at `/api/roadmap`
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-cases.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts
+
+## MAN-9176 — The roadmap lane — the module: GET /api/roadmap, GET /api/roadmap/cases, the — route
+section: The roadmap lane — the module: GET /api/roadmap, GET /api/roadmap/cases, the nine writes and the roadmap_state frame (roadmap.module.ts, roadmap.routes.ts, roadmap-state.service.ts, roadmap-cases.service.ts, roadmap-relay.service.ts)/001 route
+
 | route | answer |
 |---|---|
 | `GET /` | `{ ...RoadmapPicture, at: Date.now() }` (`at` epoch ms) from `watcher.whenLanded(FIRST_READ_WAIT_MS)`; never a fresh read |
@@ -12300,7 +12340,7 @@ Write bodies, JSON; the act is the route's; a key a route does not list is ignor
 - Every argv ends `--by app:card`: the actor is spelled in `roadmap-write.service.ts`, no request names it.
 - Free text (`title`, `goal`, `why`, `project`, `repo`) rides as ONE word `--flag=value`, so a title starting with `-` stays a title; names (`parent`, `to`, `before`, `after`) ride as `--flag name`. Fences, add rules per kind and the 400 sentences: MAN-7630.
 - `edit` fields a kind lacks (a milestone's `repo`) and a promoted feature's `goal` and `repo` are the store's to refuse (`store_roadmap.edit`): a 409 with its sentence.
-- `promote` runs `dispatcher design <name> --by app:card`, not a roadmap verb. The child env names no session (`laneEnv()`), so the design it queues is owned by no session and the app's own prompts reach it.
+- `promote` runs `dispatcher design <name> --by app:card`, not a roadmap verb. The child env names no session (`sessionlessEnv()`), so the design it queues is owned by no session and the app's own prompts reach it.
 
 Write statuses, `statusForWrite`
 | case | status | body |
@@ -12319,6 +12359,12 @@ Write statuses, `statusForWrite`
 - Measured 2026-10-03 on the running API as `verve`: add roadmap, add milestone, block, remove ×2 → 200; two-line title → 400 `title must be one line of 1 to 120 characters`; promote `no-such-plan` → 409 `REFUSED design no-such-plan: …`; blocking a roadmap → 400 naming `kind`.
 
 The frame
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-cases.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts
+
+## MAN-9177 — The roadmap lane — the module: GET /api/roadmap, GET /api/roadmap/cases, the — `roadmap_state` = `{ kind: 'roadmap_state', ...picture, at: Date.now() }` to every open `/ws`
+section: The roadmap lane — the module: GET /api/roadmap, GET /api/roadmap/cases, the nine writes and the roadmap_state frame (roadmap.module.ts, roadmap.routes.ts, roadmap-state.service.ts, roadmap-cases.service.ts, roadmap-relay.service.ts)/002 `roadmap_state` = `{ kind: 'roadmap_state', ...picture, at: Date.now() }` to every open `/ws`
+
 - `roadmap_state` = `{ kind: 'roadmap_state', ...picture, at: Date.now() }` to every open `/ws` client; nothing else rides it.
 - `serialize` drops `generated_at` (second-resolution clock, moves every read): the lane speaks only when the picture changed. The frame still carries it.
 - A frame goes out when a tick's picture differs from the last one sent (the first reading after `start()` always differs):
@@ -12352,7 +12398,7 @@ Same on both
 | the poll | MAN-534: `createPolledLane`, `POLL_MS` 2000, `FIRST_READ_WAIT_MS` 5000, `serialize` without `generated_at`; a read that fails keeps the last good picture |
 | not read yet | a 200 `{ error }` body, never a non-2xx |
 | a relayed command's status | `statusForWrite` (roadmap) = `statusForVerb` (dispatcher): 200 ok, 409 refusal, 504 `timeout`, 503 `spawn-failed`; the dispatcher's sentence travels in `stdout` untouched |
-| child env | `laneEnv()`: `userFacingEnv({ PATH })` minus `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION`. why: this server is no Claude session; `accept` refuses inside one and `tell` stamps it onto the outing |
+| child env | `sessionlessEnv()` (`@/shared/child-env.ts`, one copy for both lanes and dispatch-souls): `userFacingEnv({ PATH })` minus `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION`. why: this server is no Claude session; `accept` refuses inside one, every door that carries Kaylee's relay of his word does too, and `tell` stamps it onto the outing |
 | the store | written by neither: every write is a dispatcher verb |
 | the journal | each distinct message said once per process (`logErrorOnce`) |
 
@@ -12369,7 +12415,7 @@ Differs
 | routes | 11 | 17 |
 
 Edit together
-- `laneEnv()` and `DEFAULT_PATH` are copied in `roadmap.module.ts` and `dispatcher.module.ts`.
+- The child environment is `sessionlessEnv()` alone; neither module copies it or its `PATH` fallback (`DEFAULT_CHILD_PATH`).
 - `statusForWrite` in `roadmap.routes.ts` and `statusForVerb` in `dispatcher.routes.ts` map the same four outcomes.
 - A new lane that runs the dispatcher's command builds `DispatcherCommandDependencies` from the same two rules and imports `runDispatcherCommand` / `readDispatcherJson` from `@/shared/dispatcher-command.js`, as both lanes do.
 
@@ -12532,14 +12578,14 @@ section: The roadmap module — RoadmapFeed and the roadmap:all topic, useRoadma
 Data layer
 | file | owns |
 |---|---|
-| `index.ts` | barrel: `RoadmapFeed`, lazy `RoadmapTab` (the `runner` tab's pane), `RoadmapWidgetBody`, `RoadmapWidgetFullscreenBody`, `useRoadmap` |
+| `index.ts` | barrel: `RoadmapFeed`, lazy `RoadmapTab` (the `runner` tab's pane), `RoadmapWidgetBody`, `RoadmapWidgetFullscreenBody`, `useRoadmap`, and for the station's stage (MAN-9228) `FeatureFacts`, `EpicPanel`, `RoadmapDialogHost` |
 | `lazyRoadmapTab.ts` | `RoadmapTab = lazy(() => import('RoadmapTab'))`: the one lazy door to the tab's pane, re-exported by the barrel for `WorkspaceMain` and drawn by `RoadmapWidgetFullscreenBody` |
 | `RoadmapFeed.tsx` | headless feed: the only client code naming the `roadmap_state` frame |
 | `hooks/useRoadmap.ts` | read side: `RoadmapView` = `{ picture, roadmaps, selected, select }` |
 | `hooks/useRoadmapWrites.ts` | write side: `RoadmapWrites` = `Record<RoadmapAct, (body: RoadmapWriteBody) => Promise<boolean>>` |
 | `caseMark.ts` | pure `caseMark(cases)` -> `{ key, count, tone } \| null`: the case-phrase rule `FeaturePanel` reads (MAN-7660) |
 | `hooks/useFeatureCases.ts` | `useFeatureCases(name, counts)` -> `{ cases, loading, failure }`: the dialog's read of `api.roadmap.cases` (MAN-7660) |
-| `faceContext.ts`, `hooks/useRevealCard.ts`, `modals/OpenDialog.tsx` | what a press under the face reaches (MAN-7650) |
+| `faceContext.ts`, `hooks/useRevealCard.ts`, `modals/OpenDialog.tsx`, `RoadmapDialogHost.tsx` | what a press under the face, or under a host on a page with no face, reaches (MAN-7650) |
 | `hooks/useTreeRoom.ts` | `useTreeRoom(bodyRef, active)` -> the px of height a viewport-fit face can give its tree, or `null` until measured (MAN-7829) |
 | `celebrationContext.ts` | `Moment`, `CelebrationActive`, `CelebrationContext` (module root, not `context/`) |
 | `hooks/useCelebrations.ts`, `utils/celebrationMoments.ts`, `utils/seenStamp.ts` | which moments play and when, and the seen stamp: MAN-7648, rules MAN-7656 |
@@ -12557,6 +12603,7 @@ Components (module root).
 | `RoadmapWidgetBody` | `RoadmapTreeFace` at `column` fit, `Button` (the foot's "Open the roadmap"); reads `useRoadmap` | MAN-7668 |
 | `RoadmapWidgetFullscreenBody` | `Suspense`, `Spinner`; the lazy `RoadmapTab` handed no landing (`revealPlan` and `openRoadmap` `null`, both callbacks a no-op): the Roadmap widget's body while its card is full screen | MAN-7668 |
 | `RoadmapTreeFace` | `Spinner`, `EmptyState`, `RoadmapPicker`, `UnplacedBanner`, `RoadmapTree`, `TreePanel`, `OpenDialog`, `CelebrationLayer`; provides `RoadmapFaceContext`, `CelebrationContext`; reads `useRoadmap`, `useCelebrations`, `useMilestoneMomentInView`, `useRevealCard`, `useTreeRoom`, `layoutTree` | MAN-7829 |
+| `RoadmapDialogHost` | `OpenDialog`; provides `RoadmapFaceContext`; holds its own one `FaceDialog`; drawn by the station's `CardStage` around `FeatureFacts` and `EpicPanel` | MAN-7650 |
 | `UnplacedBanner` | `Banner`, `Badge`, `Button` | MAN-7829 |
 | `RoadmapPicker` | `Select`; reads `useRoadmap`, `RoadmapFaceContext` | MAN-7640 |
 | `RoadmapTree` | `TreeGoal`, `TreeMilestoneNode`, `TreeEpicNode`, `TreeTip`; reads `useTreeWords`, `useTreePane`; its nodes read `CelebrationContext` | MAN-7827 |
@@ -12979,6 +13026,7 @@ Props and the rules every dialog shares: MAN-7643. Words: MAN-7634.
 - The feature is read off each frame by name (`placeOf`), so a follow-on's write already shows when it hands back; a frame without the feature closes this dialog and its follow-on.
 
 ## FeatureFacts
+- Drawn by `FeatureDialog` as its body and, exported by the roadmap barrel, by the station's `CardStage` for a feature the dispatcher no longer holds (MAN-9228), where `onWriteGoal` is `RoadmapDialogHost`'s `writeGoal` (MAN-7650).
 - Top to bottom: `StateLine` with the step phrase and the waits; the goal; the `cases` slot under the heading `roadmap.cases.heading` (`FeatureCases`, handed in by `FeatureDialog`; nothing when null); the tasks under a `Meter`; the dates; `Name for Claude`. why: a case is the goal's claim checked, and the tasks are history once a feature ships.
 - The step phrase is left out when `waiting_on_you` is set (the warn banner says it) and when `step` is `waiting` with `waits_on` (the waits say it). `building` wraps it in `Shimmer`.
 - A wait reads `dialog.feature.waitsOn` (title, word through `ROADMAP_FEATURE_WORD_KEYS`) from `roadmapFeatureIndex(picture)`. A check when its word is `shipped`, an hourglass otherwise. A name the index lacks reads `waitsOnAnother`, never the slug.
@@ -13103,11 +13151,12 @@ What every press under `RoadmapTreeFace` reaches. The face: MAN-7829. Dialogs: M
 ## RoadmapFaceContext — `faceContext.ts`
 `RoadmapFace` = `{ openDialog(dialog: FaceDialog): void }`: puts one dialog on the face; one is open at a time.
 - Provided by `RoadmapTreeFace` on every surface that draws the roadmap (the tab, the widget at full screen, the gutter's widget): one `useMemo` value `{ openDialog: setDialog }`.
+- Provided too by `RoadmapDialogHost` (`RoadmapDialogHost.tsx`, roadmap barrel), on a page that draws the roadmap's panels with no face: Kaylee Station's stage, where the station module's `CardStage` stands `EpicPanel` and `FeatureFacts` inside it. `RoadmapDialogHost({ onOpenCard, children })`: its own one `FaceDialog` state and `OpenDialog` in its own slot, the same `{ openDialog: setDialog }` value; a feature dialog's Open its card or Answer on its card closes the dialog, then calls `onOpenCard(plan)`; `children` is a function handed `{ writeGoal(feature) }`, which opens `edit` with `goalFirst` (the goal editor `FeatureDialog` opens), for `FeatureFacts`' `onWriteGoal`.
 - `openDialog` is read by `RoadmapPicker` (its New roadmap…) and the tree panel's four bodies (`RoadmapPanel`, `MilestonePanel`, `EpicPanel`, `FeaturePanel`: MAN-7841).
 - A feature's live card is not in the context: the face takes `openCard` as a prop (MAN-7829).
 - Default with no provider: `openDialog` calls `console.warn` `[roadmap] a press opened the <dialog> dialog with no dialog host above it`.
 
-`FaceDialog` is the one dialog state `RoadmapTreeFace` holds. `kind` is the dispatcher's word: `arc` an epic, `plan` a feature.
+`FaceDialog` is the one dialog state `RoadmapTreeFace` (or a `RoadmapDialogHost`) holds. `kind` is the dispatcher's word: `arc` an epic, `plan` a feature.
 | `dialog` | fields | `OpenDialog` draws |
 |---|---|---|
 | `add` | `kind: RoadmapKind`, `parent: { name, title } \| null` (roadmap for a milestone, milestone for an `arc`, epic for a `plan`, `null` for a roadmap) | `ItemDialog` adding |
@@ -13120,21 +13169,22 @@ What every press under `RoadmapTreeFace` reaches. The face: MAN-7829. Dialogs: M
 ## OpenDialog — `modals/OpenDialog.tsx`
 - `OpenDialog({ dialog, onClose, onOpenCard })`: a `switch` on `dialog.dialog`; mounts the one dialog it names with the target it carries.
 - Every dialog closes through the one `onClose`, written or not: the next picture shows a write, so the face has no use for the answer.
-- `RoadmapTreeFace` mounts it in its one slot (`dialog !== null`), after the scroller and before `CelebrationLayer`, closing with `setDialog(null)`.
+- `RoadmapTreeFace` mounts it in its one slot (`dialog !== null`), after the scroller and before `CelebrationLayer`, closing with `setDialog(null)`; `RoadmapDialogHost` mounts it after what it holds, the same way.
 - `PromoteDialog` is not a `FaceDialog`: `FeatureDialog` draws it as its own follow-on (MAN-7645).
 
 ## useRevealCard — `src/shared/hooks/useRevealCard.ts`
-`useRevealCard(): (plan: string) => void`. Shared because two modules read it: the roadmap module's `RoadmapTreeFace` (a feature dialog's Open its card and Answer on its card, `onOpenCard`, after the face has closed the dialog) and the dispatcher module's `WaitingAsks` (the Answer button of each row of the Inbox's Roadmap section: MAN-9013).
+`useRevealCard(): (plan: string) => void`. Shared because three modules read it: the roadmap module's `RoadmapTreeFace` (a feature dialog's Open its card and Answer on its card, `onOpenCard`, after the face has closed the dialog) the dispatcher module's `WaitingAsks` (the Answer button of each row of the Inbox's Roadmap section: MAN-9013) and project-workspace's `CompanionHost` (Kaylee's open of a card: MAN-9083).
 | caller | when | does |
 |---|---|---|
 | `RoadmapTreeFace` | the face's `openCard` prop is set (the tab, the widget at full screen) | the face calls `openCard(plan)`: `RoadmapTab` turns to In flight and hands the plan to `RunnerPanel` |
 | `RoadmapTreeFace` | `openCard` is `null` (the gutter's widget) | `reveal(plan)`: `navigate({ search: '?runner=<plan>' }, { replace: true })`; `useRunnerLanding` brings the view forward and the card into view |
 | `WaitingAsks` | every Answer press | `reveal(plan)`, the same `?runner=<plan>` landing: the Roadmap view comes forward on In flight with that feature's card in view, with or without a project selected |
+| project-workspace's `CompanionHost` | Kaylee's `companion_open` for a card, on the page that holds the floor | `useBackToWorkspace()` first when an application covers the workspace, then `setActiveTab('runner')` and `reveal(plan)`: the same landing |
 - `replace: true`. why: the press is a redirection; Back must not find the same URL twice (`useRunnerLanding` strips the param the same way).
-- The param is `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), shared with `useRunnerLanding`.
+- The param is `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), shared with `useRunnerLanding` (reads it) and the station's `FocusFallback`, which writes it into a card's CloudCLI path (MAN-9228).
 - Needs a router above it (`useNavigate`).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/faceContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useRevealCard.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/faceContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapDialogHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useRevealCard.ts
 
 ## MAN-7654 — The Roadmap tab — its place on the rail, ungated, the In flight switch's pill and amber mark, two faces, palette row and landing (useWorkspaceViews, WorkspaceMain)
 
@@ -13210,11 +13260,12 @@ Two per-user preferences, kept in the per-user store every setting lives in (mir
 
 | half | list | holds | file |
 |---|---|---|---|
-| client | `ENTRY_PATCHED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins` | folds two patches queued in one debounce per entry, retries only the failed entries, keeps the persisted outbox until the server has them | `src/shared/userSettings.ts` |
-| server | `ENTRY_LISTED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins` | `mergeEntryLists` replaces the named entry and keeps the others; at most `ENTRY_LIST_CAP` (200) entries, newest last. Under `FORWARD_ONLY_KEYS` (`roadmapSeen`) an entry whose `at` is older than the stored one is a stale device's retry and is NOT applied; a `null` entry still drops, so a rewind is drop, then write. Under `STRING_ONLY_KEYS` (`filesPins`) an entry that is not a string is not stored, and a stored one is dropped by the next patch to its list. The client's `applyEntryPatch` and `unreflectedEntries` take the key's `EntryRule` (`entryRuleOf`, `src/shared/preferenceEntryPatch.ts`: `FORWARD_ONLY_ENTRY_KEYS`, `STRING_ONLY_ENTRY_KEYS`) and say the same | `server/modules/database/repositories/user-preferences.db.ts` |
+| client | `ENTRY_PATCHED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins`, `claudePermissions` | folds two patches queued in one debounce per entry, retries only the failed entries, keeps the persisted outbox until the server has them | `src/shared/userSettings.ts` |
+| server | `ENTRY_LISTED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins`, `claudePermissions` | `mergeEntryLists` replaces the named entry and keeps the others; at most `ENTRY_LIST_CAP` (200) entries, newest last. Under `FORWARD_ONLY_KEYS` (`roadmapSeen`) an entry whose `at` is older than the stored one is a stale device's retry and is NOT applied; a `null` entry still drops, so a rewind is drop, then write. Under `STRING_ONLY_KEYS` (`filesPins`) an entry that is not a string is not stored, and a stored one is dropped by the next patch to its list. The client's `applyEntryPatch` and `unreflectedEntries` take the key's `EntryRule` (`entryRuleOf`, `src/shared/preferenceEntryPatch.ts`: `FORWARD_ONLY_ENTRY_KEYS`, `STRING_ONLY_ENTRY_KEYS`) and say the same | `server/modules/database/repositories/user-preferences.db.ts` |
 
 - One list without the other sends patches the server stores whole, or stores whole what the client patches. The two change together.
 - `filesPins` is the third key in both lists, not forward-only and string-only; its writes and reader rules: INV-9662.
+- `claudePermissions` is the fourth, string-only, and the one whose callers write the whole document: the store sends the difference from the copy the device held (`WHOLE_DOCUMENT_ENTRY_KEYS`); INV-10017.
 - A stamp writer never sends an `at` older than the one it read, and the merge drops an older one a stale device retries. Rule: INV-6580.
 - Entries of removed roadmaps are never pruned.
 
@@ -13276,7 +13327,7 @@ Statuses
 The read, `readFeatureCases(dependencies, feature)` in `roadmap-cases.service.ts`
 - Runs `list --plan <feature> --state active --json` through `readDispatcherJson` with `CASES_MAX_BUFFER` (1 MiB; a case is about 890 bytes, so about 1,170 in one plan), then reads each item field by field.
 - Item fields: `name`, `sentence` (text); `word` (one of `holding` `broken` `regressed` `not run` `can't run`); `last_run_at` and `last_saw` from `newest_run.at` and `newest_run.saw`. A case with no `newest_run` reads both as `null`. Anything else refuses the whole read by path, `document` `cases list --plan <feature> --state active --json`.
-- `casesDependencies` (`roadmap.module.ts`) = the lane's `dependencies` with `bin` from `CASES_BIN` (default `~/.claude/scripts/cases`) and `door: 'cases'`; the same `READ_TIMEOUT_MS` and `laneEnv()`.
+- `casesDependencies` (`roadmap.module.ts`) = the lane's `dependencies` with `bin` from `CASES_BIN` (default `~/.claude/scripts/cases`) and `door: 'cases'`; the same `READ_TIMEOUT_MS` and `sessionlessEnv()`.
 - Client: `api.roadmap.cases(feature)` in `src/shared/api.ts` = GET with `encodeURIComponent(feature)`.
 
 Measured 2026-10-04 on the running API as `verve`
@@ -13547,6 +13598,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dactyls-
 - Takes the last stdout line as JSON; `model`, `effort`, `why` strings, `ready` boolean, `cli` object `{path, size, mtime_ns, version}` — any field missing or mistyped = `null` whole, logged `summarize --status failed: <cause>`.
 - `null` = "could not ask": never off, never `ready: false`.
 - On while `ready` is false = armed, not broken: chats compact as before until the CLI can serve the summarizer's model.
+- The companion's fresh-start handover (MAN-9211) reads neither the switch nor the readiness cache: it calls the verb itself, and a verb that is not ready (exit 3) is a failed handover.
 
 ## The client
 - `api.settings.customCompactionSwitch()` / `saveCustomCompactionSwitch({ enabled })` (`src/shared/api.ts`), after the Dactyls pair.
@@ -13952,20 +14004,24 @@ The credential, the guard, the account of a chat and the link: MAN-8992. The gut
 | file | owns |
 | --- | --- |
 | `server/modules/database/followups-schema.ts` | `FOLLOWUPS_SCHEMA_SQL`, `IF NOT EXISTS`, exec'd at every boot beside `NOTES_SCHEMA_SQL` (`migrations.ts`) |
-| `server/modules/database/repositories/followups.db.ts` | `followupsDb` (`listForChat`, `listForChatOfUser`, `listOpenOfUser`, `getInChat`, `getOfUser`, `addMany`, `closeInChat`, `setStateForUser`, `moveToSession`), `FollowupRow`, `FollowupKind` |
-| `server/modules/followups/followups.service.ts` | `followupsService`: the judging, the dedupe, the frame, and the companion's read (`listOpenForAccount`) |
+| `server/modules/database/repositories/followups.db.ts` | `followupsDb` (`listForChat`, `listForChatOfUser`, `listOpenOfUser`, `getInChat`, `getOfUser`, `addMany`, `closeInChat`, `setStateForUser`, `listOpenNaming`, `closeForCompletion`, `moveToSession`), `FollowupRow`, `FollowupKind`. `listOpenNaming` and `closeForCompletion` are the one pair that act across every chat and account (the completion closer); every other statement names its chat or account |
+| `server/modules/followups/followups.service.ts` | `followupsService`: the judging, the dedupe, the frame, the companion's reads (`listOpenForAccount`, `findForAccount`) and the completion closer (`closeForCompletions`) |
+| `server/modules/followups/followups-completion-rule.service.ts` | `closuresForPlan`, `closuresForArc`, `epicFinishedAt`: the pure rule that says which open items a finished feature, task or epic settles; `CompletionClosure` |
 | `server/modules/followups/followups.routes.ts` | the widget's door (`/api/followups`), `readFollowupId` |
 | `server/modules/followups/followups.command-routes.ts` | the command's door (`/api/followups-cmd`) |
-| `server/modules/followups/followups.module.ts`, `index.ts` | `createFollowupsModule()`: both routers over one service; links `~/.local/bin/followups`. The barrel also exports `listOpenFollowups`, the companion's read |
+| `server/modules/followups/followups.module.ts`, `index.ts` | `createFollowupsModule()`: both routers over one service; links `~/.local/bin/followups`. The barrel also exports `listOpenFollowups` and `findFollowupForAccount`, the companion's reads, and `closeFollowupsForCompletions`, the dispatcher watcher's call |
 | `bin/followups.mjs` | the command |
 | `server/modules/providers/list/claude/surface-signal.ts` | `FOLLOWUPS_SIGNAL`, the standing instruction |
 | `src/modules/followups/` | `useFollowups` (hooks/), `FollowupsContext` (context/), `FollowupsWidgetBody`, `FollowupRow`, barrel |
 
 ## The table `followups`
 
-`id` INTEGER AUTOINCREMENT (never reused: a chat holds ids in its context, and an old number must never name a different item), `session_id` (FK `sessions(session_id)` ON DELETE CASCADE), `user_id` (FK `users(id)` ON DELETE CASCADE; the account `accountOfChat` named at add), `kind` `next` | `gap`, `text`, `state` `open` | `done`, `created_at`, `updated_at`, `done_at`, `closed_by` `chat` | `user`; ISO-8601 UTC with milliseconds, written in JS. Index `ix_followups_session(session_id, state, id)`. The DDL is `IF NOT EXISTS`: editing a column there changes nothing on a database that has the table (a later column needs `addColumnToTableIfNotExists`).
+`id` INTEGER AUTOINCREMENT (never reused: a chat holds ids in its context, and an old number must never name a different item), `session_id` (FK `sessions(session_id)` ON DELETE CASCADE), `user_id` (FK `users(id)` ON DELETE CASCADE; the account `accountOfChat` named at add), `kind` `next` | `gap`, `text`, `state` `open` | `done`, `created_at`, `updated_at`, `done_at`, `closed_by` `chat` | `user` (NULL while open AND when the house closed the item itself), `closed_for` (what finished and closed it: `<feature>`, `<feature>/<task key>` or `epic:<epic>`; NULL otherwise; added to existing databases by `addFollowupsClosedForColumn` in `migrations.ts`); ISO-8601 UTC with milliseconds, written in JS. Index `ix_followups_session(session_id, state, id)`. The DDL is `IF NOT EXISTS`: editing a column there changes nothing on a database that has the table (a later column needs `addColumnToTableIfNotExists`).
 
-## Every path that removes a session row
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/
+
+## MAN-9143 — Next steps — the followups lane: the table, every session-row removal, the — Every path that removes a session row
+section: Next steps — the followups lane: the table, every session-row removal, the service rules, both doors and the frame/001 Every path that removes a session row
 
 | path (`sessions.db.ts`) | what becomes of the items |
 | --- | --- |
@@ -13983,7 +14039,36 @@ The cascade is why no delete path needs to know the table; the merges are the on
 
 A line is trimmed and must be 1-240 characters, one line of plain text with no control character in it (NUL, ESC, tab ...), and draw as something (a line of only zero-width or control characters is empty). It is REFUSED, never repaired: 422 `FOLLOWUP_TEXT_REFUSED` whose sentence says why ("A line cannot be empty." / "A line must be one line, with no line breaks in it." / "A line can be 240 characters at most; this one is 241."). A call is judged whole before a row is written: with several lines the sentence names the line ("Line 2 of 2 was refused, and nothing from this call was filed: ..."), and none is filed. More than 20 lines in one call is 422 `FOLLOWUP_BATCH_TOO_LARGE`; none, 400 `FOLLOWUP_NOTHING_TO_FILE`. A line identical (same kind, same text) to one of the chat's still-OPEN items answers that item's id and writes nothing, so a retried call or a forgotten earlier filing never grows the list. An id no item of the chat carries is 404 `FOLLOWUP_NOT_FOUND`, and a `done` call is refused whole, naming every unknown id and, when it carried several, saying nothing from it was closed ("No item #7 in this chat. Run "followups" to list the ids that are open here." / "No items #7, #8 in this chat, so nothing from this call was closed. ..."). The widget's tick of an item that is gone gets the same code with a sentence for a person: "That item is no longer there."
 
-## The two doors
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/
+
+## MAN-9144 — Next steps — the followups lane: the table, every session-row removal, the — The house closes items — `closeForCompletions`
+section: Next steps — the followups lane: the table, every session-row removal, the service rules, both doors and the frame/002 The house closes items — `closeForCompletions`
+
+Nothing in a follow-up's text is a pointer, so "points at a feature" can only mean "names it". The dispatcher module's watcher calls `closeFollowupsForCompletions(frame.plans, frame.arcs)` FIRST in its callback on every changed picture (and on the first picture after a boot), in its own try/catch (`[Dispatcher] could not close follow-ups for a completion: …`), BEFORE `endings.observe`, so the "feature finished" alert no longer lists the items the completion settled. It reads stamps and nothing else, so it is idempotent: no watermark, no "already swept" mark, and a feature that finished while the server was down is caught on the first picture while the lane still holds it (`ENDED_KEEP_S`, 24 h after `completed_at`). The plan's `FollowupCompletionPlan` shape is deliberately narrow (`name`, `completed_at`, each phase's `key`, `status`, `done_at`); a `DispatcherPlan[]` is assignable. The epic's `FollowupCompletionArc` is as narrow (`name`, `status`, `completed_at`, `plans`: the names of its plans); a `DispatcherArc[]` is assignable. `closeForCompletions(plans, arcs)` takes both, required: the plans run FIRST and write their closures, then each epic reads its candidates from the database, so a feature or task claims an item before an epic can. A plan with nothing finished, and an epic whose `epicFinishedAt` is `null`, cost no query; otherwise one `listOpenNaming(name)` (open rows of ANY account and chat whose text contains the name, case-insensitive) and the rule decides.
+
+The rule (`followups-completion-rule.service.ts`), stamps compared with `Date.parse` (the dispatcher's stamps carry no milliseconds, `created_at` does):
+
+| finished | closes an OPEN item when | `closed_for` |
+| --- | --- | --- |
+| a feature (`completed_at` set) | the text names the plan (`namesThing`, below) and the item has stood untouched since before `completed_at` (its `updated_at` is earlier; see below) | `<feature>` |
+| an epic (`epicFinishedAt` answers a stamp) | the text names the epic (`namesThing`, below) and the item has stood untouched since before that stamp | `epic:<epic>` |
+| a task (`status` done, `done_at` set) | the same, untouched since before `done_at`, AND the text points at the task: the key right after the feature name joined by one space, `/` or `:`, or the words `phase <key>`, `task <key>`, `<key> phase`, `<key> task` — a bare word never counts (keys are ordinary words) | `<feature>/<task key>` |
+
+`namesThing(text, name, 'feature' | 'epic')`, case-insensitive:
+
+| name | counts as naming when |
+| --- | --- |
+| hyphenated (`drying-report-direct-readers`) | it is a bare whole token: not touching `[A-Za-z0-9_-]`, so `…-v2` does not match |
+| no hyphen (`kaylee`, `dactyls`: an ordinary word) | a cue stands with it: `feature <name>` / `<name> feature` (`epic` for an epic), or the name between matching `'`, `"` or backticks, the opening quote not touching a word on its outer side (the apostrophe of `Kaylee's` opens none). Curly quotes are no cue |
+
+`epicFinishedAt(arc, plans)`: `null` unless `arc.status` is `complete`; otherwise the LATEST readable stamp among the arc's `completed_at` and the `completed_at` of each of its plans found by name in `plans` (`null` when none is readable). The epic's own stamp is not the finish: it is written once and never moved, so an epic judged after its last feature, an epic that completed and took on new plans (it reads `live` with the old stamp) and a roadmap-made epic (never stamped) would each be judged against the wrong time. A plan the picture no longer carries adds no stamp.
+
+"Untouched" is `updated_at`, not `created_at`: an open item's `updated_at` is its `created_at` until a person unticks it in the widget, which sets it to now, later than every stamp the lane holds. So an item filed after a stamp is never touched, and an item a person REOPENED stays open for good — compared on `created_at` the next picture (seconds later, while any plan is live, and for 24 h after a feature finishes) would have closed it again. An item filed AFTER a stamp is never touched; a plan whose `completed_at` is null closes nothing at the plan level; for one item a feature closure wins over a task closure, and either wins over an epic closure. The write sets `state = 'done'`, `done_at` = the stamp as ISO-8601 UTC with milliseconds, `closed_by = NULL`, `closed_for`, `updated_at` = now, and only where `state = 'open'`, so a row a person or a chat settled in between keeps its stamps. One log line per item (`[Followups] closed #244 for drying-report-direct-readers`; `… for epic:<epic>` for an epic) and ONE `followups_changed` per affected chat; both run in a `finally`, so a throw part-way (a locked database) still announces the rows already closed. On the wire `closedBy` reads `completion` and `closedFor` names what finished; unticking in the widget clears both (`setStateForUser`) and the item stays open. The widget draws "Done <when> when feature <name> finished" / "Done <when> when task <key> of feature <name> finished" / "Done <when> when epic <name> finished"; `followups list --all` prints `[done: feature <name> finished]` / `[done: task <key> of feature <name> finished]` / `[done: epic <name> finished]`. The companion's reads list OPEN items only, so a settled one stops being read to him. Measured 2026-10-28 on the live server: the first picture after the restart closed exactly one row, #244 (Photo Evidence Cooberator's "Feature 'drying-report-direct-readers' is being designed…", for the feature finished on the 27th/28th), `done_at` `2026-10-28T02:34:45.000Z`, and no other. 2026-10-28, epic rule live: no open item names a finished epic, no row carries `epic:%`, and the first picture after the restart closed nothing.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/
+
+## MAN-9145 — Next steps — the followups lane: the table, every session-row removal, the — The two doors
+section: Next steps — the followups lane: the table, every session-row removal, the service rules, both doors and the frame/003 The two doors
 
 | door | mount | guard | verbs |
 | --- | --- | --- | --- |
@@ -13994,11 +14079,17 @@ There is no delete and no reopen on the chat's door: an item leaves only with it
 
 ## The companion's read
 
-`listOpenFollowups(userId, appSessionId | null, limit = 20)` (barrel; `followupsService.listOpenForAccount`) answers `Array<{ sessionId, followup }>`: that account's OPEN items, newest first, for one chat or, with `null`, for every chat, each mapped by the same `toFollowup` the widget's read uses, so a line reads exactly as the Next steps widget shows it. `limit` is held to 1-200 (a non-finite one is 20): the answer lands in a model's context. One chat's read is `listForChatOfUser` (the account's rows only, so a chat of another account reads none); the account-wide read is `followupsDb.listOpenOfUser(userId, limit)`, `ORDER BY id DESC`. Its consumer is the companion's `list_followups(session)` tool, which `companion-prompt.ts` names; 2026-10-26: nothing in `server/` calls `listOpenFollowups` yet. Shown by `.verify/probe-companion-reads.mjs` step 7: two items filed through the command door read back field for field as `GET /api/followups?session=` answers them.
+`listOpenFollowups(userId, appSessionId | null, limit = 20)` (barrel; `followupsService.listOpenForAccount`) answers `Array<{ sessionId, followup }>`: that account's OPEN items, newest first, for one chat or, with `null`, for every chat, each mapped by the same `toFollowup` the widget's read uses, so a line reads exactly as the Next steps widget shows it. `limit` is held to 1-200 (a non-finite one is 20): the answer lands in a model's context. One chat's read is `listForChatOfUser` (the account's rows only, so a chat of another account reads none); the account-wide read is `followupsDb.listOpenOfUser(userId, limit)`, `ORDER BY id DESC`. Its consumer is the companion's `list_followups(session)` tool, which `companion-prompt.ts` names; it is also called by the companion's alert (`alert-block.ts`, the up-to-five open items an `<alert>` names). Shown by `.verify/probe-companion-reads.mjs` step 7: two items filed through the command door read back field for field as `GET /api/followups?session=` answers them.
+
+## The companion's close
+
+`findFollowupForAccount(userId, id)` (barrel; `followupsService.findForAccount`, over `followupsDb.getOfUser`) answers `{ sessionId, followup }` for one item of THAT account by id, open or closed (`toFollowup`, as the widget reads it), else `null`: another account's id reads as none.
+
+`closeFollowupForAccount(userId, id)` (barrel; `followupsService.setStateForUser(userId, id, 'done')`) is his own tick of one follow-up of his, exactly as the widget's checkbox does it: `closed_by` is `user`, the chat's row is told with `followups_changed`, and an id of another account, or one that is gone, throws the lane's 404. It answers the item as stored. Its consumer is the companion's `close_followup` tool, done the moment he asks (`hands/direct-tools.ts`, MAN-9207): the door (`closeFollowup`, MAN-9173) reads the item through `findFollowupForAccount` first, so an item already closed is `already`, never a throw, and an id that is not his is refused.
 
 ## The frame
 
-Every write that changed a row sends ONE `followups_changed { appSessionId, at }` to every open socket (`FollowupsChangedEvent`). The key is `appSessionId` and NOT `sessionId`: `useProjectsState` flags a chat for attention (the unread mark) when any frame carries a `sessionId` that is not the one on screen. The widget re-reads on a frame naming its own chat and on `websocket_reconnected`; a frame for another chat is ignored. The subscription is made before the first read; reads take tickets and an older answer never replaces a newer one, but only an answer that APPLIES moves the ticket, so a newer failed read never discards an older good one.
+Every write that changed a row sends ONE `followups_changed { appSessionId, at }` to every open socket (`FollowupsChangedEvent`); the completion closer sends one per chat it moved. The key is `appSessionId` and NOT `sessionId`: `useProjectsState` flags a chat for attention (the unread mark) when any frame carries a `sessionId` that is not the one on screen. The widget re-reads on a frame naming its own chat and on `websocket_reconnected`; a frame for another chat is ignored. The subscription is made before the first read; reads take tickets and an older answer never replaces a newer one, but only an answer that APPLIES moves the ticket, so a newer failed read never discards an older good one.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/
 
@@ -14012,7 +14103,7 @@ Plain dependency-free Node ESM, mode 755, linked at boot by `ensureChatCommandLi
 
 | call | prints |
 | --- | --- |
-| `followups` or `followups list [--all]` | one line per item, oldest first: `#<id>  next|gap  <age>  <text>` (a done item's text is prefixed `[done] `); with nothing: `Nothing open in this chat.` |
+| `followups` or `followups list [--all]` | one line per item, oldest first: `#<id>  next|gap  <age>  <text>` (a done item's text is prefixed `[done] `, or `[done: feature <name> finished]` / `[done: task <key> of feature <name> finished]` / `[done: epic <name> finished]` when the house closed it on a completion, MAN-9003); with nothing: `Nothing open in this chat.` |
 | `followups add [--next "<line>"]... [--gap "<line>"]...` | one line per filed item in the order given: `#<id>  <kind>  <text>` |
 | `followups done <id> [<id>...]` | `Closed #3, #4.` (`#3` is accepted too) |
 
@@ -14026,7 +14117,7 @@ What it took (Haiku, 2026-10-25, one short turn naming neither widget nor comman
 
 ## The widget
 
-Id `followups`, title `gutters.followups.title` ("Next steps"), `ListChecksIcon`; default place the top of the right side, OPEN (MAN-7526). The badge is the count of open items across both groups. `ChatGutterLayout` calls `useFollowups(wide ? sessionId : null)` once and provides the reading to `FollowupsWidgetBody` through `FollowupsContext`, so the badge and the rows are one list and nothing is read while the gutters are not drawn (phone, narrow window, floating chat). The body composes shared components only (`Checkbox`, `Collapsible`, `FoldChevron`, `EmptyState`, `Spinner`): two groups "Next steps" and "Known gaps", each row the line (wrapping, an unbroken run included), a muted age and a tick; a group with nothing open is not drawn; both empty reads "Nothing open in this chat."; a closed "Done (N)" fold lists the done items, each with an untick. Every word is in `followups.*` of the English locale; the other locales fall back. No phone surface: gutters do not draw on phone. A reading is kept only for elements that are items (`isFollowup`): the array feeds the badge outside every widget's boundary, so a `null` or a half-item is dropped on arrival.
+Id `followups`, title `gutters.followups.title` ("Next steps"), `ListChecksIcon`; default place the top of the right side, OPEN (MAN-7526). The badge is the count of open items across both groups. `ChatGutterLayout` calls `useFollowups(wide ? sessionId : null)` once and provides the reading to `FollowupsWidgetBody` through `FollowupsContext`, so the badge and the rows are one list and nothing is read while the gutters are not drawn (phone, narrow window, floating chat). The body composes shared components only (`Checkbox`, `Collapsible`, `FoldChevron`, `EmptyState`, `Spinner`): two groups "Next steps" and "Known gaps", each row the line (wrapping, an unbroken run included), a muted age and a tick; a group with nothing open is not drawn; both empty reads "Nothing open in this chat."; a closed "Done (N)" fold lists the done items, each with an untick and its settled line ("Done 2h ago", or "Done 2h ago when feature <name> finished" / "Done 2h ago when task <key> of feature <name> finished" / "Done 2h ago when epic <name> finished" for an item the house closed, from `closedBy` `completion` and `closedFor`). Every word is in `followups.*` of the English locale; the other locales fall back. No phone surface: gutters do not draw on phone. A reading is kept only for elements that are items (`isFollowup`): the array feeds the badge outside every widget's boundary, so a `null` or a half-item is dropped on arrival.
 
 ## Run the probe — `.verify/probe-followups-widget.mjs` (`.verify/lib/followups-kit.mjs` holds its measuring half)
 
@@ -14122,7 +14213,7 @@ What a press on the switcher's disc (the FAB, MAN-486) does while it sits in the
 ## The focus move
 A focused button that unmounts leaves focus on `<body>` and fires no event anyone hears. The hide button of the list unmounts with the collapse it ran, so the dock moves focus itself.
 - It moves only when the override's presence CHANGES (`hadOverride` starts as the mount's value), `document.activeElement` is the body, and the last element that held focus (`focusin` is remembered) is no longer connected.
-- Arrival: focus goes to the seated disc (`FAB_SELECTOR` = `.vv-fab`), or to the dock's own button when the disc is out (`seatedRef`, read at the arrival so a later drag does not re-run it).
+- Arrival: focus goes to the seated disc (`FAB_SELECTOR` = `.vv-fab:not([data-companion-fab] .vv-fab)`, `src/shared/constants.ts`: the kit's FAB less Kaylee's, which is the same kit piece inside her layer, MAN-9125), or to the dock's own button when the disc is out (`seatedRef`, read at the arrival so a later drag does not re-run it).
 - Departure (the dock's own button was pressed to show the list and unmounts): focus goes to the disc.
 - A page that loads with the list collapsed, or a collapsed preference that arrives after load or from another tab, has no such element and moves nothing.
 
@@ -14166,3 +14257,85 @@ Headless Playwright against the running client; no model call, no chat turn, no 
 - The meters' "As of …, the provider gave no figures" line appears whenever the in-use account's filed reading is over 3 minutes old; the probe masks it in the before/after comparison.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs
+
+## MAN-9136 — The verify kit's navigations — gotoApp and reloadApp resolve at domcontentloaded and the caller's element wait is the gate; networkidle is advisory, never the gate
+
+`.verify/lib/app-load.mjs` is how the cloudcli verify kit moves a page onto the live app (`:5183`). `gotoApp(page, url)` and `reloadApp(page)` resolve at `domcontentloaded`, then let the network settle for at most 15 s and say nothing if it does not. The caller then waits for the ELEMENT it is about to use, for `APP_BOOT_MS` (90 s, exported). `networkidle` is advisory, never the gate. `.verify/` is git-ignored; the files below are the whole change.
+
+**Why (measured 2026-10-28, heal `heal-tool-result-20261028-030229-5827`).** `parkOnProjectTree` (the step of `openConsole` that PATCHes `simpleChatList:false` and reloads) reloaded with `waitUntil:'networkidle'` and Playwright's 30 s navigation budget, then `selectFirstProject` waited for the project row for 90 s. Two budgets for one readiness, the short one first: the signed-in app's boot fans out to ~40 endpoints and `networkidle` wants all of them answered plus 500 ms of quiet, which on this box (12 CPUs shared with every soul's builds, load 12 to 50, seven probe browsers at once) takes longer than 30 s, and the throw lands before the wait that was always the gate. Heal ledger, 14 days to 2026-10-28: 12 `page.reload: Timeout 30000ms exceeded` whose stack names `parkOnProjectTree`, 5 more with its page text and no frames ("Loading projects… Fetching your Claude projects and sessions", or a page already drawn that never went idle: rows 55690, 54785), and two `frame.goto … /session/<id> … networkidle` out of `openScratchChatOnHaiku` ("Loading projects… 2/11 projects"). On a quiet box the same reload reaches idle in 6-7 s (measured at load 12), so the kit passed whenever nothing else was running.
+
+| site | what changed |
+|---|---|
+| `lib/app-load.mjs` (new) | `APP_BOOT_MS`, `settleSoftly`, `gotoApp`, `reloadApp` — the reason and the evidence live in its header, once |
+| `console.mjs` `parkOnProjectTree` | `reloadApp`; `selectFirstProject`'s row wait uses `APP_BOOT_MS` (it was the literal 90000) |
+| `scratch-chat.mjs` `openScratchChatOnHaiku` | `gotoApp`, then a wait for the rail's Chat button or the drawer's hamburger (`attached`, `APP_BOOT_MS`) BEFORE the one-shot `aria-current` read, since that read needed `networkidle` to have drawn the page; the model-chip wait is `APP_BOOT_MS` |
+| `kaylee-fab-live.mjs` (chat-row wait), `whole-check-inpage-legs.mjs` (`onScratchChat`, the reload that keeps the panel size), `whole-check-window-legs.mjs` (`newVisit`) | `gotoApp` / `reloadApp`; the first element wait behind each is `APP_BOOT_MS` (it was 30 s) |
+
+The diagnostic for treating a site: the navigation is followed directly by a wait for an element that exists only once the app has drawn, and that wait is the real readiness. A one-shot read after the navigation (nothing that waits), or a comment that leans on the settle, is not that.
+
+**Proof, on the running dev app.** The real `openConsole` with every signed-in answer of one endpoint held back through a context route (scratch script, kit untouched): kit as it was, heal summary held 40 s → `page.reload: Timeout 30000ms exceeded … waiting for navigation until "networkidle"` at 36.9 s, the ledger's own text; `/api/projects` held 26 s → the same throw at 37.5 s, page "Loading projects… 9/11 projects". Kit as patched, the same two holds → `openConsole` returned (34.4 s and 40.5 s), 11 project rows on screen, 0 `authenticated`-stage errors. `openScratchChatOnHaiku` on a real scratch chat with the summary held 40 s: before, `frame.goto: Timeout 30000ms exceeded … /session/<id> … networkidle` at 30.0 s; after, the Haiku chip read at 18.0 s; the chat was deleted through the app both times. `reloadApp` and `gotoApp` against the live app reach the project row with the held request still pending (16.8 s, 16.4 s). All six modules import clean.
+
+**Left on purpose (not the same disease).** The pre-auth `goto` in `openConsole`, `signOut` and `read-only-page.mjs`: the login screen boots no data and the wait behind it (`#password`, 15 s) is shorter than the navigation's. `whole-check-window-legs.mjs` `goto('/')` (about line 135): its comment says the app is let to settle at `/` so a boot effect cannot replace the pushState that follows — the idle is what it measures. The two `frame.goto` rows of 2026-10-22 out of `openConsole` on a scratch Vite (`:5294`, "the page shows no text"): a cold dependency cache, which `openConsole({ navigationTimeout })` is for (MAN-674); the caller did not pass it. The 31 `page.goto … never reached READY` rows of 2026-10-19 to 10-23: `/opt/eis-app`'s mock-app runner, a different harness, quiet since. A dev app that never draws in 90 s still ends in the `[BLOCKED: the sidebar rendered with no project row…]` throw with the page block; and the app's own request ceiling is `REQUEST_TIMEOUT_MS` = 30 s (`src/shared/api.ts`), so a projects answer later than that fails in the APP, not the kit.
+
+**Not done, named.** 51 one-off probes in `.verify/` still `reload({ waitUntil: 'networkidle' })` (72 sites; `phase-4/11/15/17/18`, `probe-simple-*`, `companion-*`, `whole-sidebar-rail`…) and 88 more `goto` the same way (148 sites). Most are followed by a 20-30 s project-row wait, which is shorter than the navigation's budget, so the diagnosis does not hold for them, and each is a pinned probe of a past plan; a script of a soul's own that does this meets the same timeout (rows 53752 `select-x2.mjs`, 33452 `athena-cerb/kit.mjs` are two). A new probe uses `gotoApp` / `reloadApp` from `lib/app-load.mjs`.
+
+**To read it next time.** A `page.reload` / `frame.goto` timeout "waiting for navigation until networkidle" whose stack names `parkOnProjectTree` or `openScratchChatOnHaiku` came from a kit that still had this fault; with the fix it cannot. A timeout at one of the sites above that now reads `page.waitForSelector: Timeout 90000ms exceeded` (or `frame.waitForSelector`; the ledger shape `page.waitforselector: timeout #ms exceeded.`), or, out of `selectFirstProject`, the `[BLOCKED: the sidebar rendered with no project row…]` text, is the app: 90 s is `APP_BOOT_MS`, and the page block under it says what the app drew. A Playwright timeout never names the constant its budget came from; the 90000 is the observable.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs
+
+## MAN-9152 — Kaylee's relay doors — relay(order), resumeRun(order), relayRecord and the relayed-press types (dispatcher-relay.service.ts, run-resume.service.ts, server/shared)
+
+Kaylee carries an act on the operator's spoken word through two lane doors, each with kaylee--press's record of that word attached as `--relay <record>`. The lanes decide nothing of his: the dispatcher and the plan-runner own the verbs, the words and the refusals; a door's first line comes back untouched as `said`.
+
+| door | built by | takes | answers |
+|---|---|---|---|
+| `relay(order)` | `createDispatcherModule()` (`dispatcher.module.ts`) | `RelayOrder` | `RelayAnswer` |
+| `resumeRun(order)` | `createDispatchSoulsModule()` (`dispatch-souls.module.ts`) | `ResumeRunOrder` | `RelayAnswer` |
+
+- Neither throws. Both are handles of `CompanionHouse` (MAN-9142); the hands fire through them (MAN-9173).
+- Environment of every command: `sessionlessEnv()` (MAN-7632). why: press's doors refuse a relay inside a Claude session; only this server and his terminal write "the operator said".
+
+## Types — `server/shared/relayed-press-types.ts` (types only; three modules read them)
+| type | shape |
+|---|---|
+| `RelayedPress` | `{ account: { id, name }, saidAt (ISO), words (verbatim), press (id in her log), token: string \| null }` |
+| `RelayOrder` | `{ verb: 'queue' \| 'hide-lock', ask, press }` · `{ verb: 'rework-lock', ask, notes, press }` · `{ verb: 'answers', ask, brief, press }` · `{ verb: 'hide' \| 'show' \| 'recut' \| 'stop' \| 'resume' \| 'kick', name, press }` · `{ verb: 'tell', name, brief, press }` |
+| `ResumeRunOrder` | `{ chainId, rulingsFile, press }` — the PATH of a file the companion wrote his rulings to, not the rulings. why: dispatch-souls cannot reach her scratch folder without importing the companion |
+| `RelayAnswer` | `{ outcome: 'took' \| 'already' \| 'refused', said }` — `said` is the door's first line, or the lane's sentence when the word never reached the door |
+
+## The record — `relayRecord(press, target)`, `server/shared/relay-record.ts`
+- Returns ONE argv string: the JSON of `{ by: 'app:kaylee', account: { id, name }, said_at, target, words, press }` plus `token` when it is not `null`. Keys come in that order.
+- `target` is the card (or chain) THIS act is on, the verb's own argument, never the press's. why: a door refuses a record naming another card.
+- `words` is his line exactly as said; JSON escapes it, nothing trims it.
+- THE LANE WRITES `token`, never the press: an Accept's record carries the book's `--lock` (equal to the argv's); every `tell`, every `relayOrder` verb and the resume pass `token: null`. why: press's door takes a token on an Accept alone and refuses it on any other act; a Rework's press pins an Accept prompt, its `tell` has none.
+- Written by `dispatcher-answer.service.ts` (the Accept, each `tell`; MAN-8494), `dispatcher-relay.service.ts` and `run-resume.service.ts`: two modules write it, so one function does.
+
+## `relay(order)` roads — `dispatcher.module.ts`, `dispatcher-relay.service.ts`
+| order | road |
+|---|---|
+| `queue`, `hide-lock`, `rework-lock`, `answers` (`isLockOrder`: they carry `ask`) | `prompts.answerOnHisWord(order.ask, replyOfLockOrder(order), order.press)`, the book's third door (MAN-8494); `relayAnswerOf` maps the carried answer: `took`→`took`, `already-answered`→`already`, `refused`→`refused` with `said` or `the dispatcher took no word of it` |
+| `hide` | `hide <name> --relay <record>` |
+| `show` | `unhide <name> --relay <record>` |
+| `recut` | `cut <name> --relay <record>` |
+| `stop`, `resume` | `<verb> <name> --relay <record>` |
+| `kick` | `kick --relay <record>`; names no plan, the record's target is the card he asked about |
+| `tell` | `tell <name> --brief - --relay <record>`; `brief` verbatim on stdin, the record never written into it |
+
+`relayOrder(order, commands, say)` runs the six verbs above (`VerbRelayOrder`):
+1. `name` off `^[a-z0-9][a-z0-9-]*(\.arc)?$` (`CARD_NAME`): `refused` "that is not the name of a plan or an epic; name the card again", nothing spawned. why: a leading dash is read as an option; `stop --help` prints usage and exits 0, which would read as `took`.
+2. Exit 0: `took`, `said` = first stdout line, else first stderr line.
+3. Any other exit: `refused`, `said` = that line, else `the dispatcher exited <n> and said nothing`.
+4. Never exited (killed at `VERB_TIMEOUT_MS`, 20 s, or never started): `refused`, `said` = "the dispatcher did not answer within 20 s or could not be started; the act may have gone through, so read the card before asking again". why: the transport's `Command failed: <bin> <argv>` holds the record, his account and his words; a verb acts before it prints.
+- Journal: one line per verb, `[Dispatcher] <name>: Kaylee's <verb> on his word ran \`dispatcher <argv>\` → exit <n>: <line>`; the `--relay` value prints as `<record>` (`shownCommand`). His words are in the store's `relayed` line.
+
+## `resumeRun(order)` — `run-resume.service.ts`
+- Runs `plan-runner chain --resume <chainId> --rulings <rulingsFile> --relay <record>` by `execFile` (no shell). Binary: `PLAN_RUNNER_BIN`, default `~/.claude/scripts/plan-runner`. cwd: the home directory. Bound: `RESUME_TIMEOUT_MS`, 30 s. Record target: the chain id, no token.
+- Refused before any spawn, "that is not a chain id with a rulings file; name the run again": a `chainId` off `^[A-Za-z0-9][A-Za-z0-9_-]*$`; a `rulingsFile` that is not absolute or holds a NUL. why: the runner joins the id onto its record root unchecked (`../../x`), and a leading dash is an option (`-h` exits 0, reads as `took`).
+- Exit 0: `took`. Any other exit: `refused`. `said` = first stdout line, else first stderr line, cut at 200 characters; `the plan-runner exited <n> and said nothing` when blank.
+- Never exited: `refused`, `said` = "the plan-runner did not answer within 30 s or could not be started; the run may have resumed, so read its status before asking again". why: the runner forks its walker and returns, so a runner killed at its bound may have resumed the run.
+- Journal: `[DispatchSouls] <chainId>: Kaylee's resume on his word ran \`plan-runner chain --resume <id> --rulings <file> --relay <record>\` → exit <n>: <line>`.
+
+## Doors that exist today
+The dispatcher's doors are in. `dispatcher accept` takes `--by app:kaylee` with `--relay <record>`; `hide`, `unhide`, `stop`, `resume`, `kick`, `tell`, `cut` and `plan-runner chain --resume` take `--relay <record>`; `dispatcher shapes relay` prints the record's shape and example (`hooks/dispatcher/relay.py`, MAN-9180). A door's refusal comes back as `refused` with its first line as `said`: `--by app:kaylee` with no record, a record written inside a Claude session, a record naming another card, a token that is not the Accept's `--lock`, a stale `--lock`, a token on any act but an Accept. `.verify/kaylee-eyes-whole.mjs` (MAN-9173) finds the door itself (`dispatcher accept --help` lists `--relay`): with the door present its checks that want `took` print PASS or FAIL, never BLOCKED.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-relay.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/run-resume.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/relayed-press-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/relay-record.ts

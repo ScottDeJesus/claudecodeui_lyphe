@@ -1,7 +1,7 @@
 import type { Router } from 'express';
 
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
-import { userFacingEnv } from '@/shared/child-env.js';
+import { sessionlessEnv } from '@/shared/child-env.js';
 import { createPolledLane } from '@/shared/polled-lane.service.js';
 import type { RoadmapAct, RoadmapPicture, RoadmapStateEvent } from '@/shared/roadmap-types.js';
 import { expandHome } from '@/shared/utils.js';
@@ -39,14 +39,6 @@ const DEFAULT_BIN = '~/.claude/scripts/dispatcher';
 const DEFAULT_CASES_BIN = '~/.claude/scripts/cases';
 
 /**
- * The `PATH` a command runs with when this process has none of its own. The dispatcher's verbs wake a
- * daemon and arm calendar units, so they look up `systemctl --user` on `PATH`; the three directories
- * every login shell falls back to, stated rather than left empty so a lookup can succeed instead of
- * failing in a way that reads like the dispatcher's fault.
- */
-const DEFAULT_PATH = '/usr/local/bin:/usr/bin:/bin';
-
-/**
  * How often the document is read. `roadmap show` reads the store and no stage record, so it costs
  * about a fifth of a second on this host; two seconds is the dispatcher lane's own cadence, and a
  * write pressed on the screen does not wait for it (the poke).
@@ -67,30 +59,24 @@ const READ_TIMEOUT_MS = 20000;
 const FIRST_READ_WAIT_MS = 5000;
 
 /**
- * The lane's child environment: the server's own, minus the two names that say WHOSE SESSION a command
- * runs in. This server is nobody's Claude session, whatever shell it was started from, and the
- * dispatcher reads those names as exactly that: `accept` refuses inside a Claude session, and `tell`
- * writes the session it finds onto the outing it queues. A promote pressed on the screen is the
- * operator's own and queues a design owned by no session, which the app's own prompts reach.
+ * What `createRoadmapModule` hands the server entrypoint: the router to mount, the poll's `start` (after `listen`) and
+ * `stop` (at shutdown), and `picture()`, the lane's picture behind `whenLanded` with the same bound as the router's
+ * `current` — `null` while this boot's first reading has not landed. The entrypoint passes `picture` on to the
+ * companion's house (`CompanionHouse.roadmap`), so her reads and the Roadmap tab are one reading.
  */
-function laneEnv(): NodeJS.ProcessEnv {
-  const env = userFacingEnv({ PATH: process.env.PATH ?? DEFAULT_PATH });
-  delete env.CLAUDE_CODE_SESSION_ID;
-  delete env.DISPATCHER_SESSION;
-  return env;
-}
-
 export type RoadmapModule = {
   router: Router;
   start(): void;
   stop(): void;
+  picture(): Promise<RoadmapPicture | null>;
 };
 
 export function createRoadmapModule(): RoadmapModule {
   const dependencies = {
     bin: expandHome(process.env.DISPATCHER_BIN || DEFAULT_BIN),
     timeoutMs: READ_TIMEOUT_MS,
-    env: laneEnv(),
+    // The lane's child environment: the server's own, minus the names that say whose Claude session a command runs in.
+    env: sessionlessEnv(),
   };
 
   // The cases door is its own binary with the lane's own timeout and child environment: the feature
@@ -159,5 +145,6 @@ export function createRoadmapModule(): RoadmapModule {
     router,
     start: () => watcher.start(),
     stop: () => watcher.stop(),
+    picture: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
   };
 }

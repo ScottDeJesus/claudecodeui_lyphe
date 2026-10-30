@@ -9,6 +9,9 @@ export { synthesizeSentence } from './gemini-speech.js';
 // readVoiceSettings: used by the companion module's wiring (`companion-account.ts`) to read the account's sound-tag list fresh, at the start
 // of each turn (the parse that strips her sentences) and at each push (the register that teaches her the sounds).
 export { readVoiceSettings } from './voice-settings.js';
+// geminiKeyStatus: used by the companion's `read_settings` (`eyes/house-reads.ts`) to say whose Gemini key the voice is using ("a key of yours", "the house's
+// key", "no key"). The companion reads the `source` alone: the key and its last characters never leave the voice module's settings routes.
+export { geminiKeyStatus } from './gemini-key.js';
 // DEFAULT_SOUND_TAGS: the ten sounds an account holds until it saves its own list; used by the companion's sentence-stream probe
 // (`.verify/companion-wire-contract.mjs`) to prove the parse against the shipped set. The live readers take the list from readVoiceSettings.
 export { DEFAULT_SOUND_TAGS } from './voice-settings.js';

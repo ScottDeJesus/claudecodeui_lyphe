@@ -1,6 +1,4 @@
 export {
-  // Used by notification tests and delivery workflows to create channel payloads.
-  buildNotificationPayload,
   // Used by provider runtimes and Settings to create normalized notification events.
   createNotificationEvent,
   // Used by provider runtimes and Settings to deliver events through enabled channels.
@@ -12,8 +10,25 @@ export {
   // Used by provider runtimes to report background work that finished after its turn ended.
   notifyBackgroundWorkCompleted,
 } from '@/modules/notifications/services/notification-orchestrator.service.js';
+// The meta of a Cerberus red-watch event: the checks it names, in the shape its copy reads (`modules/cerberus/red-watch.service.ts`).
+export type {
+  CerberusRedItem,
+  CerberusRedMeta,
+} from '@/modules/notifications/services/cerberus-red-copy.service.js';
 // Used by callers outside this module that show an event's wording: the one headline and body per code.
 export { buildNotificationText } from '@/modules/notifications/services/notification-copy.service.js';
+// spendFreeWording: used by the companion module's alert block, which tells her what the house said as it lands.
+// The title and body of an event with every cost, token and usage figure taken out — the one rule, beside
+// `buildNotificationPayload`, so no wording that reaches her can carry a cost.
+export { spendFreeWording } from '@/modules/notifications/services/notification-spend-free.service.js';
+export type { SpendFreeWording } from '@/modules/notifications/services/notification-spend-free.service.js';
+// startNotificationHistory: used by the server entrypoint, which starts the house's notification history after `listen`
+// and calls the unsubscribe it answers on shutdown. listNotificationHistory: used by the companion module's `list_alerts`,
+// which reads what the house told him lately.
+export {
+  listNotificationHistory,
+  startNotificationHistory,
+} from '@/modules/notifications/services/notification-history.service.js';
 export {
   registerDesktopNotificationClient,
   sendDesktopNotification,
@@ -28,9 +43,9 @@ export {
   isSessionWatched,
   markPresence,
 } from '@/modules/notifications/services/session-presence.service.js';
-// viewOf: used by the companion module's view — the chat on the account's freshest visible tab, named in
-// the message she is pushed so "this one" means the chat he is looking at.
-export { viewOf } from '@/modules/notifications/services/session-presence.service.js';
+// viewTargetOf: used by the companion module's view — what the account's one speaking page shows (its chat, or the station's
+// stage), named in the message she is pushed so "this one" means what he is looking at.
+export { viewTargetOf } from '@/modules/notifications/services/session-presence.service.js';
 // onNotification: used by the companion module's alert feed, which hears every event the orchestrator is handed
 // — before any push preference or dedupe — and turns the few that are her business into what she says unasked.
 export { onNotification } from '@/modules/notifications/services/notification-listeners.service.js';

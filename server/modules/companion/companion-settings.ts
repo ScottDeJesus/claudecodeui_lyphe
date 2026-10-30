@@ -38,10 +38,10 @@ const DEFAULT_MODEL: CompanionModel = 'sonnet';
 const LAST_RESORT_OPERATOR_NAME = 'Operator';
 
 /**
- * The three models she can run on, in the order the picker lists them. Consumed by `companion-picture.ts`, which
+ * The models she can run on, in the order the picker lists them. Consumed by `companion-picture.ts`, which
  * labels each from the installed CLI's catalog, and by the model check below.
  */
-export const COMPANION_MODELS: readonly CompanionModel[] = ['sonnet', 'opus', 'haiku'];
+export const COMPANION_MODELS: readonly CompanionModel[] = ['sonnet', 'fable', 'opus', 'haiku'];
 
 type TextField = 'name' | 'operatorName' | 'register' | 'deliveryNote' | 'talkBinding.label';
 type TextLimits = { min: number; max: number; singleLine: boolean };

@@ -70,7 +70,7 @@ a by-hand `npm run server:dev`, must never make a plain boot share `:3011` with 
 | Bit | Set on | Effect in the child |
 | --- | ------ | ------------------- |
 | `CLOUDCLI_SUPERVISED=1` | every child | listens with `reusePort: true`, and sends `ready` from the listen callback once `cerberus.start()` has bound the warden gateway (waited for at most 3 s; MAN-7804) |
-| `CLOUDCLI_HANDOVER=1` | only a child spawned beside a serving one | defers re-adoption, the scheduled-message dispatcher and plugin startup until `takeover` |
+| `CLOUDCLI_HANDOVER=1` | only a child spawned beside a serving one | defers `soleServerDuties` (`server/index.ts`) until `takeover`: re-adoption, the scheduled-message dispatcher, plugin startup, the update reconciler, Center's own checks and red watch and Kaylee's re-send of the words her last process never answered |
 
 `child.mjs` **deletes** the handover bit when it does not apply rather than leaving it unset: a
 stray one in the unit's environment would park every first boot forever, waiting on a takeover no
@@ -204,6 +204,13 @@ editor had replaced an hour earlier, and three saves of it unseen while `touch` 
 handed over at once. A directory watch reports its children by name whatever their inode, so this
 cannot recur. The journal says how many directories are watched on start:
 `[supervisor] watching <n> directories under …/server`.
+
+Each directory's watch is armed BEFORE it is listed (`watchTree`): a subdirectory born during the
+walk is then in the listing, or reported by its parent's watch, or both — never neither. The other
+order (list the tree, arm afterwards) loses a directory born in between for good; measured
+2026-10-28, `server/modules/companion/session/` was created 1 ms after its parent and no save to
+its files restarted the API for two days. The count in that journal line should equal the number
+of directories under `server/` (node_modules aside).
 
 One rough edge: a connection already queued on the retiring listener's accept queue when it closes
 can see a reset instead of being served. The host-level cure is `net.ipv4.tcp_migrate_req=1`, which

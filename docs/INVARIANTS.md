@@ -85,7 +85,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs
 Every write to the `dispatcher` preference (`hiddenPlans`, `collapsedCards`, `cardOrder`, `askDrafts`) goes through `writeUserPreferenceEntries` (`src/shared/userSettings.ts`) as an ENTRY PATCH, `{ <list>: { <entry key>: <entry> | null } }`, naming only the entries its press changes. The server applies it per entry (`mergeEntryLists`, `server/modules/database/repositories/user-preferences.db.ts`), and the client applies the same rule to its own copy (`src/shared/preferenceEntryPatch.ts`): drop every named entry, append the non-null ones in the patch's order, keep the newest 200.
 
 - why: a client's copy of the preference is read at sign-in and never again. While writes sent the whole document, any second open client (a phone, a second tab, the :5184 build) wrote its old copy back and erased every hide and fold made elsewhere since. Measured 2026-09-28 in `auth.db`: the operator's arc Hide stored restorly's 4 lane plans at 22:17:49; at 22:18:00 another of his clients folded the same arc and stored `{"hiddenPlans":[],"collapsedCards":["darc:restorly"]}`, and the arc was back at his next load ("unable to dismiss an arc"). `.verify/probe-dismiss-done.mjs` replays it with two browsers (the arc's corner is Dismiss now: the dismissal is the same entry).
-- `roadmapSeen` is the second entry-patched key, with its own rule: INV-6580. `filesPins` is the third (the Files strip's pins; INV-9662).
+- `roadmapSeen` is the second entry-patched key, with its own rule: INV-6580. `filesPins` is the third (the Files strip's pins; INV-9662), and `claudePermissions` the fourth (its callers write the whole document and the store sends the difference; INV-10017).
 - never hand `writeUserPreference('dispatcher', …)` a whole document. A list sent as an ARRAY still REPLACES that list (the write of a bundle from before the patch), so a tab still running such a bundle can erase entries until it is reloaded.
 - a patch stays in the persisted outbox (localStorage `user-preferences:entry-outbox`, `preferenceEntryPatch.ts`) until the server has stored it or refused it for good. The sign-in read lays every unconfirmed entry over the copy it fetched, whether or not the server holds the key, and sends again what that copy lacks; a failed read sends the whole outbox again. So a reload before the PATCH lands (the 400 ms debounce, a retry backing off behind a 5xx or a dropped request) and a read the server answered before the PATCH landed both keep the press. Sending twice is safe: a patch names only its own entries. A queued patch folds per entry with the next one (`foldEntryPatches`), and a retry is rebuilt from the store's current entries (`refreshEntryPatch`).
 
@@ -609,3 +609,165 @@ expect: 1 then 1 then 1 then 1 — a 0 on any line is a key in one list or rule 
 ```
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
+
+## INV-10017 — claudePermissions is written whole by its callers and goes up as entry patches — and the server's own receipt still replaces its lists whole
+
+`claudePermissions` is `{ allowedTools: string[], disallowedTools: string[], skipPermissions: boolean, permissionMode?: string }`: Claude's tool rules for the account. It is the fourth entry-listed preference, beside `dispatcher` (INV-4406), `roadmapSeen` (INV-6580) and `filesPins` (INV-9662), and the only one whose callers write the WHOLE document.
+
+- Two kinds of writer change its lists: a page (the chat's "always", `saveClaudePermissions`, and the Settings autosave, `writeUserPreferences`) and the server (her "always" receipt, `rememberAllowedTool` in `server/modules/companion/tools/act-tools.ts`). A page's copy is read at sign-in and never again, so a page open since before her receipt wrote its old list back and erased the entry she had remembered (reproduced 2026-10-28: the receipt's entry gone after the page's next grant).
+- The callers keep handing `writeUserPreference` / `writeUserPreferences` the whole document. The store makes the wire value from the difference between that document and the copy this device held (`wireOf` in `src/shared/userSettings.ts`, `entryDocumentDiff` in `src/shared/preferenceEntryPatch.ts`): `{ allowedTools: { [rule]: rule } }` adds, `{ [rule]: null }` removes, the other fields ride beside the lists as plain values that replace, and a write that differs from the held copy in nothing sends nothing. `WHOLE_DOCUMENT_ENTRY_KEYS` (the client) holds the key. why: a caller never has to know the lists are entry lists, and a writer added later is safe by construction.
+- The key is in all four lists, and they change together in the same piece of work: `ENTRY_PATCHED_KEYS` and `WHOLE_DOCUMENT_ENTRY_KEYS` (`src/shared/userSettings.ts`), `STRING_ONLY_ENTRY_KEYS` (`src/shared/preferenceEntryPatch.ts`), and `ENTRY_LISTED_KEYS` with `STRING_ONLY_KEYS` (`server/modules/database/repositories/user-preferences.db.ts`). A client that sends patches to a server without the key stores the patch object as the document: the server half is live before the client's.
+- The merge keeps the newest 200 entries of a list (`ENTRY_LIST_CAP`, newest last), as for every entry-listed key (MAN-7655): a stored list of more than 200 rules loses its oldest on the next patch, `disallowedTools` included, where a whole array replaced the list uncapped. No account is near it (the largest stored list is 1); a key that needs more is exempted from the cap in both halves.
+- A page still running a bundle from before this rule sends whole lists, which replace as they always did, until it reloads (the same limit INV-4406 states for `dispatcher`). `.verify/claude-permissions-stale-page.mjs` replays the page as it is now.
+- The server's own receipt sends WHOLE lists, which the merge accepts (a list sent as an array replaces that list alone, its strings only). It reads and writes in one synchronous step, so two chats answered "always" in one tick both land (`.verify/companion-act-direct.mjs`).
+- A deliberate removal still removes: a page that drops a rule from its list sends `{ [rule]: null }`. What a page cannot do any more is assert a rule it never held or revive one another writer took out. A page that was open before her receipt still does not SEE the rule until it reloads (her receipt says so); it no longer erases it.
+- Not treated, on purpose: `cursorPermissions` (`allowedCommands`, `disallowedCommands`) has the same shape and a single kind of writer (the Settings autosave), so no second writer erases anything; it joins the lists above when a server-side writer of it exists.
+- Proof, on the live client and server, leaving the account as found: `node .verify/claude-permissions-stale-page.mjs`.
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -cE "ENTRY_PATCHED_KEYS.*'claudePermissions'" src/shared/userSettings.ts; grep -cE "WHOLE_DOCUMENT_ENTRY_KEYS.*'claudePermissions'" src/shared/userSettings.ts; grep -cE "STRING_ONLY_ENTRY_KEYS.*'claudePermissions'" src/shared/preferenceEntryPatch.ts; grep -cE "ENTRY_LISTED_KEYS.*'claudePermissions'" server/modules/database/repositories/user-preferences.db.ts; grep -cE "STRING_ONLY_KEYS.*'claudePermissions'" server/modules/database/repositories/user-preferences.db.ts
+expect: 1 on every line — a 0 is a key in one list only (the client sends patches the server stores whole, or the server patches what the client sends whole)
+```
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/chatPermissions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-permissions-stale-page.mjs
+
+## INV-10035 — probe — MEDIUM — a person's untick of a completion-closed follow-up is undone by the next picture (seconds)
+
+MEDIUM — a person's untick of a completion-closed follow-up is undone by the next picture (seconds)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF2'
+import { execFileSync } from "node:child_process";
+const kit = await import("/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs");
+const { API, withDb, sleep } = kit;
+const plans = JSON.parse(execFileSync(`${process.env.HOME}/.claude/scripts/dispatcher`, ["status", "--json"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })).plans;
+const done = plans.filter((p) => p.completed_at).sort((a, b) => Date.parse(b.completed_at) - Date.parse(a.completed_at))[0];
+if (!done || Date.now() - Date.parse(done.completed_at) > 23 * 3600 * 1000) { console.log("no feature finished in the last 23 h is on the lane: this probe cannot answer today"); process.exit(0); }
+const login = await (await fetch(`${API}/api/auth/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "verve", password: "verve-dev-2026" }) })).json();
+const H = { authorization: `Bearer ${login.token}`, "content-type": "application/json" };
+const made = await (await fetch(`${API}/api/providers/sessions`, { method: "POST", headers: H, body: JSON.stringify({ provider: "claude", projectPath: "/tmp/cloudcli-probe-chat", initialMessage: "" }) })).json();
+const chat = made.data.sessionId;
+const stateOf = (id) => withDb((db) => db.prepare("select state, closed_by, closed_for from followups where id = ?").get(id));
+const waitDone = async (ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (stateOf(id).state === "done") return Date.now() - t0; await sleep(250); } return null; };
+let id;
+try {
+  const filed = new Date(Date.parse(done.completed_at) - 3600 * 1000).toISOString();
+  id = withDb((db) => Number(db.prepare("insert into followups (session_id,user_id,kind,text,state,created_at,updated_at) values (?,?,?,?,?,?,?)").run(chat, 1, "next", `athena probe: press Queue on ${done.name}`, "open", filed, filed).lastInsertRowid), { write: true });
+  const first = await waitDone(15000);
+  console.log(`1. feature ${done.name}: an item filed an hour before it finished was closed by the house after`, first === null ? "NEVER (15 s)" : `${first} ms`);
+  const res = await fetch(`${API}/api/followups/${id}`, { method: "PATCH", headers: H, body: JSON.stringify({ state: "open" }) });
+  const body = await res.json();
+  console.log("2. widget untick -> HTTP", res.status, JSON.stringify({ state: body.data?.state, closedBy: body.data?.closedBy, closedFor: body.data?.closedFor }));
+  const back = await waitDone(15000);
+  console.log("3. after the untick the house closed it again after", back === null ? "NEVER (15 s): the untick held" : `${back} ms`);
+} finally {
+  await fetch(`${API}/api/providers/sessions/${encodeURIComponent(chat)}?force=true`, { method: "DELETE", headers: H });
+  console.log("scratch chat rows left:", withDb((db) => db.prepare("select count(*) as n from followups where session_id = ?").get(chat).n));
+}
+EOF2
+printf 'node "$1/p.mjs"\n' > "$D/p.sh"
+timeout 100 bash "$D/p.sh" "$D" 2>&1 | tail -8
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: line 3 reads `closed it again after <n> ms` while the defect stands; cured when it reads `NEVER (15 s): the untick held`. `no feature finished in the last 23 h…` means nothing is on the lane to test against today.
+```
+
+measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding M1, MEDIUM
+probe-key: 4f7c74eb691241a84aeb62e24d17cf2d1d8e3a05
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
+
+## INV-10036 — probe — MEDIUM — "whole" was applied to every alert kind, and the cap that bounded a Bash command or an error text for her is gone with nothing downstream to replace it
+
+MEDIUM — "whole" was applied to every alert kind, and the cap that bounded a Bash command or an error text for her is gone with nothing downstream to replace it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/q.mts" <<'TS'
+const m = await import('@/modules/database/index.js'); await m.initializeDatabase();
+const { buildNotificationText } = await import('@/modules/notifications/index.js');
+const { buildAlertBlock } = await import('@/modules/companion/feeds/alert-block.js');
+const ev = (code: string, meta: object) => ({ userId: 1, kind: 'action_required', code, provider: 'claude', sessionId: null, dedupeKey: 'x', meta }) as any;
+const bash = ev('permission.required', { toolName: 'Bash', toolInput: { command: 'python3 - <<EOF\n' + 'print("x")\n'.repeat(6000) + 'EOF' } });
+const failed = ev('run.failed', { error: 'Error: ' + 'frame\n'.repeat(50000) });
+for (const [label, e, kind] of [['Bash command 66 KB', bash, 'permission'], ['run.failed error 300 KB', failed, 'failed']] as const)
+  console.log(`F2 ${label}: push body ${buildNotificationText(e).body.length} | her envelope ${buildAlertBlock(1, e, kind).envelope.length}`);
+process.exit(0);
+TS
+cat > "$D/p.sh" <<'EOF'
+D=$1
+: > "$D/auth.db"
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+DATABASE_PATH=$D/auth.db TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/q.mts" 2>&1 | grep -E '^F2|Error' | head -5
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `push body 1000 | her envelope 66108` and `… 300089` while the defect stands; cured when her envelope is bounded (a few thousand) for both
+```
+
+measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding M2, MEDIUM
+probe-key: 7ee59977ab23e7f5d956d650accdc2fe42f9485e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
+
+## INV-10037 — probe — LOW — `FollowupRow` throws on an item that has no `closedFor`, so a new client against an older server loses the widget
+
+LOW — `FollowupRow` throws on an item that has no `closedFor`, so a new client against an older server loses the widget
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF2'
+const L = "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib";
+const { openConsole } = await import(`${L}/console.mjs`);
+const sc = await import(`${L}/scratch-chat.mjs`);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole({ appUrl: "http://127.0.0.1:5184", viewport: { width: 1920, height: 1080 } });
+const id = await sc.createScratchChat(s);
+const now = new Date().toISOString();
+const open = { id: 9001, kind: "next", text: "athena probe item", state: "open", createdAt: now, updatedAt: now, doneAt: null, closedBy: null };
+try {
+  for (const [label, data] of [["open item WITH closedFor:null", [{ ...open, closedFor: null }]], ["open item WITHOUT closedFor", [open]]]) {
+    s.errors.length = 0;
+    await s.page.route("**/api/followups?*", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true, data }) }));
+    await s.page.goto(`http://127.0.0.1:5184/session/${id}`, { waitUntil: "networkidle" });
+    await sleep(3000);
+    const text = (await s.page.locator('[data-widget="followups"]').first().innerText().catch(() => "n/a")).replace(/\n+/g, " | ").slice(0, 90);
+    const typeErr = s.errors.filter((e) => /TypeError/.test(e)).map((e) => e.slice(0, 100));
+    console.log(`${label}: widget = ${JSON.stringify(text)} ${JSON.stringify(typeErr.slice(0, 1))}`);
+    await s.page.unroute("**/api/followups?*");
+  }
+} finally {
+  await sc.deleteScratchChat(s, id);
+  await s.browser.close();
+}
+EOF2
+printf 'node "$1/p.mjs"\n' > "$D/p.sh"
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: the first line shows the widget with the item; while the defect stands the second shows `Something went wrong` and `TypeError: Cannot read properties of undefined (reading 'indexOf')`; cured, the two lines match
+```
+
+measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding L1, LOW
+probe-key: 13bf554839279545c4f20b438a282cd82143c3c7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
+
+## INV-10038 — probe — LOW — MAN-9145, born from this phase's split of MAN-9003, still says nothing calls `listOpenFollowups`
+
+LOW — MAN-9145, born from this phase's split of MAN-9003, still says nothing calls `listOpenFollowups`
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "MAN-9145 lines saying nothing calls it: $(docstore get MAN-9145 --text | grep -c 'nothing in .server/. calls')"
+echo "server files outside followups/ that call it: $(grep -rln 'listOpenFollowups(' server --include=*.ts | grep -vc '^server/modules/followups')"
+echo "[probe exit $?]"
+# expect: `1` and `2` while the sentence stands; cured when the first is 0
+```
+
+measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding L2, LOW
+probe-key: d8c99da807c52e6a873ddd3787d7f406bc83e86c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx

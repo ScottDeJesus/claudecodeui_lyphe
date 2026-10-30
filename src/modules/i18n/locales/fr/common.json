@@ -381,7 +381,8 @@
       "choose": "Choisir une page…",
       "custom": "Saisir une adresse…",
       "open": "Ouvrir la page dans un nouvel onglet",
-      "rejected": "Ce n'est pas une adresse http:// ou https://"
+      "rejected": "Ce n'est pas une adresse http:// ou https://",
+      "plainHttpBlocked": "Cette page est servie en http simple, et un navigateur n'affiche pas une page http dans cette appli tant qu'elle est ouverte en https. Utilisez le lien Ouvrir pour la voir dans son propre onglet."
     },
     "notes": {
       "title": "Notes"
@@ -467,7 +468,9 @@
     },
     "appearanceLight": "Apparence claire",
     "appearanceDark": "Apparence sombre",
-    "divider": "Redimensionner les applications"
+    "divider": "Redimensionner les applications",
+    "mixedContentTitle": "Cette appli ne peut pas être affichée ici",
+    "mixedContentMessage": "{{name}} est servie en http simple, et un navigateur n'affiche pas une page http dans cette appli tant qu'elle est ouverte en https."
   },
   "chatHost": {
     "panelLabel": "Chat flottant",

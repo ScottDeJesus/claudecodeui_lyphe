@@ -41,8 +41,8 @@ export type HisChat = { sessionId: string; name: string; project: string; projec
 /** A chat with its state at the moment of the read. Consumed by `session-tools.ts`'s `list_sessions`. */
 export type ChatRow = { chat: HisChat; state: ChatState };
 
-/** The name a chat shows when it has none, as the sidebar does. */
-const UNTITLED_CHAT = 'Untitled Session';
+/** The name a chat shows when it has none, as the sidebar does. Consumed by `chatNameOf` here and by `eyes/alert-reads.ts`, which tells a chat's own name from this fallback. */
+export const UNTITLED_CHAT = 'Untitled Session';
 
 const refOf = (chat: HisChat): CompanionSessionRef => ({ sessionId: chat.sessionId, name: chat.name, project: chat.project });
 

@@ -15,6 +15,13 @@ export { readClaudeCommandCatalog } from './list/claude/claude-command-catalog.j
 // Claude CLI's own catalog ("Sonnet 5.5"), so a label names the generation the CLI runs and goes stale with no release.
 export { readClaudeModelsDefinition } from './list/claude/claude-model-catalog.js';
 
+// CLAUDE_MODEL_VALUE_BY_ALIAS, ClaudeModelAlias, readAccountDefaultModelAlias: used by the companion module's
+// `send_to_session` / `create_session`: their `model` offers the house's model names (the table's keys) and carries the value
+// a chat runs on (the table's value); left out for a new chat, the chat runs on the account's default model.
+export { CLAUDE_MODEL_VALUE_BY_ALIAS } from './list/claude/claude-model-options.js';
+export type { ClaudeModelAlias } from './list/claude/claude-model-options.js';
+export { readAccountDefaultModelAlias } from './list/claude/claude-account-default-model.js';
+
 // buildClaudeToolPermissionEntry: used by the companion module's `answer_session`, which answers "always" with the
 // entry the runtime's grammar matcher accepts for the ask — the same string the chat page's "Allow and remember" writes.
 export { buildClaudeToolPermissionEntry } from './list/claude/claude-tool-permission-entry.js';
@@ -56,6 +63,10 @@ export type { LiveHost } from './list/claude/session-host/index.js';
 // connects — the chats that have a live session host — so a page starts from the truth and the pushed changes
 // (host-liveness.ts) keep it there.
 export { sessionHostLivenessSnapshot } from './list/claude/session-host/index.js';
+
+// onHostLivenessChanged: used by the companion module's station hint, which hears a chat gain or lose its last live host
+// (the `live` and `asleep` pushes, never the snapshot) and tells the station a chat changed.
+export { onHostLivenessChanged } from './list/claude/session-host/index.js';
 
 // readClaudeTranscriptBySessionId: used by the dispatch-souls module to read a launched soul's own
 // Claude transcript from the session id its launch recorded. A soul has no app session row, so its

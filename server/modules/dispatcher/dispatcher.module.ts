@@ -1,19 +1,23 @@
 import type { Router } from 'express';
 
 import { appConfigDb, userDb } from '@/modules/database/index.js';
+import { closeFollowupsForCompletions } from '@/modules/followups/index.js';
 import { createNotificationEvent, notifyUserIfEnabled } from '@/modules/notifications/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
+import type { RelayAnswer, RelayOrder } from '@/shared/relayed-press-types.js';
 import type { DispatcherStateEvent, DispatcherVerb } from '@/shared/types.js';
-import { userFacingEnv } from '@/shared/child-env.js';
+import { sessionlessEnv } from '@/shared/child-env.js';
 import { expandHome } from '@/shared/utils.js';
 
 import { createDispatcherAnswerRouter } from './dispatcher-answer.routes.js';
+import { readCardText, type DispatcherCardText } from './dispatcher-card-text.service.js';
 import { createDispatcherEndingsNotifier } from './dispatcher-endings.service.js';
 import type { DispatcherEnding } from './dispatcher-endings.service.js';
 import { createOffpeakClock } from './dispatcher-offpeak.service.js';
 import { createDispatcherPrompts } from './dispatcher-prompts.module.js';
+import { isLockOrder, relayAnswerOf, relayOrder, replyOfLockOrder } from './dispatcher-relay.service.js';
 import { createDispatcherRouter } from './dispatcher.routes.js';
-import { readDispatcherState } from './dispatcher-state.service.js';
+import { readDispatcherState, type DispatcherPicture } from './dispatcher-state.service.js';
 import { runDispatcherVerb } from './dispatcher-verb.service.js';
 import { createDispatcherWatcher } from './dispatcher-watcher.service.js';
 
@@ -40,16 +44,6 @@ import { createDispatcherWatcher } from './dispatcher-watcher.service.js';
 
 /** The dispatcher's entry point, unless the operator moved it. */
 const DEFAULT_BIN = '~/.claude/scripts/dispatcher';
-
-/**
- * The `PATH` a verb runs with when this process has none of its own.
- *
- * The dispatcher's verbs wake a daemon and arm calendar units, so they look up `systemctl --user` and
- * `systemd-run --user` on `PATH` — and this server's unit may have been handed none at all. The same
- * three directories every login shell falls back to, stated rather than left empty so a lookup can
- * succeed instead of failing in a way that reads like the dispatcher's fault.
- */
-const DEFAULT_PATH = '/usr/local/bin:/usr/bin:/bin';
 
 /**
  * How often the document is read. One subprocess per tick over a store of a few dozen plans is tens
@@ -92,28 +86,30 @@ const buildEndingEvent = createNotificationEvent as (input: {
 }) => object;
 
 /**
- * The lane's child environment: the server's own, minus the two names that say WHOSE SESSION a verb
- * runs in. This server is nobody's Claude session, whatever shell it was started from, and the
- * dispatcher reads those names as exactly that: `accept` refuses inside a Claude session (the
- * operator's press on a prompt this lane raised is his own, and must land), and `tell` writes the
- * session it finds onto the outing it queues, where a stray id would own the designer's next load.
+ * What `createDispatcherModule` hands the server entrypoint: the router to mount, the poll's `start` (after `listen`)
+ * and `stop` (at shutdown), and the two readers only this instance holds, which the entrypoint passes on to the
+ * companion's house (`CompanionHouse.dispatcher` and `.cardText`):
+ *   - `picture()` is the lane's picture behind `whenLanded`, bounded exactly as the router's `current` is: `null`
+ *     while this boot's first reading has not landed;
+ *   - `cardText(name)` is `dispatcher show <name>`, run with the lane's own command and child environment;
+ *   - `relay(order)` carries one act of Kaylee's on his spoken word, with kaylee--press's record of it: the answer to an
+ *     open prompt goes through the book of the open asks as its third door (`kaylee`, beside the card and the phone), every
+ *     other act is a dispatcher verb of its own run with `--relay` (`dispatcher-relay.service.ts`). The companion's house
+ *     hands it to her `take_action` (`CompanionHouse.relay`).
  */
-function laneEnv(): NodeJS.ProcessEnv {
-  const env = userFacingEnv({ PATH: process.env.PATH ?? DEFAULT_PATH });
-  delete env.CLAUDE_CODE_SESSION_ID;
-  delete env.DISPATCHER_SESSION;
-  return env;
-}
-
 export type DispatcherModule = {
   router: Router;
   start(): void;
   stop(): void;
+  picture(): Promise<DispatcherPicture | null>;
+  cardText(name: string): Promise<DispatcherCardText>;
+  relay(order: RelayOrder): Promise<RelayAnswer>;
 };
 
 export function createDispatcherModule(): DispatcherModule {
   const bin = expandHome(process.env.DISPATCHER_BIN || DEFAULT_BIN);
-  const env = laneEnv();
+  // The lane's child environment: the server's own, minus the names that say whose Claude session a verb runs in.
+  const env = sessionlessEnv();
 
   /** Every frame this module's sockets carry: the lane's own picture, and nothing else. */
   const broadcast = (frame: object): void => {
@@ -189,6 +185,14 @@ export function createDispatcherModule(): DispatcherModule {
     // Endings are read off the same picture the tabs receive, and only when it changed — which an
     // ending always is. A failure to announce never costs the tabs their frame.
     broadcast: (frame) => {
+      // The follow-ups that name a feature, task or epic this picture shows finished are settled FIRST, so the
+      // "feature finished" alert `endings` raises next no longer lists the items the completion closed. The
+      // closer is idempotent and reads only stamps, so the first picture after a boot is as good as any.
+      try {
+        closeFollowupsForCompletions(frame.plans, frame.arcs);
+      } catch (error) {
+        logErrorOnce(`[Dispatcher] could not close follow-ups for a completion: ${error instanceof Error ? error.message : String(error)}`);
+      }
       try {
         endings.observe(frame.plans, frame.arcs);
       } catch (error) {
@@ -225,5 +229,10 @@ export function createDispatcherModule(): DispatcherModule {
       prompts.stop();
       watcher.stop();
     },
+    picture: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
+    cardText: (name: string) => readCardText(name, commands),
+    relay: (order: RelayOrder) => isLockOrder(order)
+      ? prompts.answerOnHisWord(order.ask, replyOfLockOrder(order), order.press).then(relayAnswerOf)
+      : relayOrder(order, commands, (line) => console.log(line)),
   };
 }

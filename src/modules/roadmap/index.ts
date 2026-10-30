@@ -18,3 +18,16 @@ export { RoadmapWidgetFullscreenBody } from '@/modules/roadmap/RoadmapWidgetFull
 // The roadmap lane's read side: the picture and the ONE roadmap on screen. Its consumer is
 // src/modules/chat-gutters (`ChatGutterLayout`, which reads the selected roadmap's standing for the widget's badge).
 export { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
+// The roadmap's own facts of a feature (the feature dialog's body) and of an epic (the tree's epic panel), the
+// existing drawings and never a second one. Their consumer is src/modules/station (`CardStage`), which draws them on
+// the stage for a feature or an epic the dispatcher no longer holds.
+export { FeatureFacts } from '@/modules/roadmap/modals/FeatureFacts';
+export { EpicPanel } from '@/modules/roadmap/panel/EpicPanel';
+// What the roadmap holds under one name, shaped for those two drawings (the feature with its Cases section; the epic with
+// its milestone's place and its features' dots). Its consumer is src/modules/station (`CardStage`).
+export { useRoadmapCard } from '@/modules/roadmap/hooks/useRoadmapCard';
+export type { RoadmapCardFacts } from '@/modules/roadmap/hooks/useRoadmapCard';
+// The roadmap's dialogs on a page with no Roadmap face: the presses of the two above (an epic's menu and Add a
+// feature, a feature's empty goal) open the roadmap's own dialogs under it. Its consumer is src/modules/station
+// (`CardStage`, around the stage's roadmap facts).
+export { RoadmapDialogHost } from '@/modules/roadmap/RoadmapDialogHost';

@@ -30,15 +30,15 @@ import { createSentenceStream, parseExpression } from './sentence-stream.js';
 
 /**
  * One sentence of hers, parsed: the turn it belongs to, its place in that turn from 0, the leading
- * `mood` (`null` for none), the `speech` text a voice synthesizes (sounds kept as `<tag>`), the
- * `display` text the panel draws and the `sounds` as offsets into `display`. Handed to the sentence
- * callback; consumed by the companion store (which writes the log line) and the voice.
+ * `mood` (`null` for none), the `display` text the panel draws and the `sounds` as offsets into
+ * `display`. The words a voice is given are not carried here: the speech door rebuilds them from the
+ * stored row with `utteranceOf` (`companion-utterance.ts`), so the panel and the voice read one record.
+ * Handed to the sentence callback; consumed by the companion store, which writes the log line.
  */
 export type CompanionSentence = {
   turnId: string;
   index: number;
   mood: string | null;
-  speech: string;
   display: string;
   sounds: CompanionSound[];
 };
@@ -61,6 +61,8 @@ export type TurnSink = {
 type TurnTracker = {
   /** The id of the turn in flight; `null` while she is idle. */
   readonly turnId: string | null;
+  /** The messages the turn in flight holds, in the order they were admitted; none while she is idle. What a result that lists nothing consumed. */
+  inFlightUuids(): string[];
   /** A message with this uuid was pushed: it joins the turn in flight, or starts one. */
   admit(uuid: string): void;
   /** One streamed delta of her speech. */
@@ -125,6 +127,7 @@ export function createTurnTracker(sink: TurnSink, readSoundTags: () => readonly 
     get turnId() {
       return current?.id ?? null;
     },
+    inFlightUuids: () => (current === null ? [] : [...owners].filter(([, owner]) => owner === current).map(([uuid]) => uuid)),
     admit(uuid) {
       owners.set(uuid, current ?? begin());
     },
