@@ -3305,6 +3305,8 @@
     "draft": {
       "title": "Draft",
       "forChat": "For {{chat}}",
+      "forChatPress": "For <chat/>",
+      "showOnStage": "Show {{chat}} on the stage",
       "newChat": "New chat in {{project}}",
       "updated": "Updated {{when}}",
       "working": "Working now",
@@ -3410,6 +3412,13 @@
   },
   "station": {
     "title": "Kaylee Station",
+    "conversation": {
+      "openCard": "Open {{kind}} {{title}} on the stage"
+    },
+    "talk": {
+      "orPress": "or press",
+      "bindHint": "Bind a key in Settings"
+    },
     "focusKind": {
       "chat": "Session",
       "card": "Feature or epic",
@@ -3507,6 +3516,8 @@
     },
     "cards": {
       "reading": "Reading her cards…",
+      "readFailed": "Her cards could not be read just now.",
+      "retry": "Try again",
       "pin": "Pin",
       "unpin": "Unpin",
       "dismiss": "Dismiss",
@@ -3523,6 +3534,7 @@
         "refused": "The walkthrough did not move",
         "endRefused": "The walkthrough did not end",
         "reading": "Reading her walkthrough…",
+        "readFailed": "Her walkthrough could not be read just now.",
         "label": "The walkthrough of {{name}}",
         "place": "Item {{at}} of {{total}}",
         "notBegun": "Not begun",
@@ -3615,6 +3627,7 @@
         "ownWords": "Or answer in your own words",
         "yourAnswer": "Your answer",
         "send": "Send the answer",
+        "cut": "Only part of this is shown here, so a yes waits for the chat, where the whole stands.",
         "sent": "Your answer was sent.",
         "refused": "The answer could not be sent just now.",
         "unreached": "The server could not be reached; the ask is still waiting."
@@ -3657,6 +3670,10 @@
       "retry": "Try again",
       "expand": "Show the whole week",
       "collapse": "Show only the newest"
+    },
+    "dock": {
+      "label": "{{name}}’s draft",
+      "empty": "When she drafts a brief for a session, it waits here for your Send."
     },
     "memory": {
       "title": "What I'm keeping",

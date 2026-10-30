@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 
 import { useStationWindow } from '@/modules/station/hooks/useStationWindow';
-import { followScroll } from '@/modules/station/stationScroll';
+import { FOLLOWS_END, followScroll } from '@/modules/station/stationScroll';
 import {
   BACK_STACK_DEPTH,
   backableFrom,
@@ -37,7 +37,9 @@ type StationContextValue = {
   phone: boolean;
   /**
    * A region's scroll memory, as a ref callback for its scroller: the stored `scrollTop` is put back as the node mounts and
-   * each newer one is remembered from its `scroll` events. The same callback comes back for the same region.
+   * each newer one is remembered from its `scroll` events, except a place at the end of a scroller that follows its own end (the
+   * conversation's log: `FOLLOWS_END`), which is no place, so a log that grew while he was away still opens at its newest line.
+   * The same callback comes back for the same region.
    */
   scrollMemory: (region: StationRegion) => (node: HTMLElement | null) => void;
 };
@@ -141,7 +143,10 @@ export function StationProvider({ children }: { children: ReactNode }) {
     let release: (() => void) | null = null;
     const bind = (node: HTMLElement | null) => {
       release?.();
-      release = node === null ? null : followScroll(node, scrollRef.current[region] ?? 0, (top) => { scrollRef.current[region] = top; });
+      release = node === null ? null : followScroll(node, scrollRef.current[region] ?? 0, (top) => {
+        if (top === null) delete scrollRef.current[region];
+        else scrollRef.current[region] = top;
+      }, FOLLOWS_END.has(region));
     };
     binders.current.set(region, bind);
     return bind;

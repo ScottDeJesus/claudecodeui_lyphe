@@ -22,19 +22,21 @@ type StationNeedsContextValue = {
 
 const StationNeedsContext = createContext<StationNeedsContextValue | null>(null);
 
-/** The five kinds the rail has an item for: an item of any other would have the rail draw nothing for its kind, so the read is refused instead. */
+/** The five kinds the rail has an item for: an item of any other (a server newer than this page's bundle) cannot be drawn, so it is left out of the list and the rest is drawn. */
 const NEED_KINDS: ReadonlySet<StationNeed['kind']> = new Set(['accept', 'questions', 'ask', 'followups', 'check']);
 
 /** Whether `kind` is one this page can draw. */
 const isNeedKind = (kind: unknown): kind is StationNeed['kind'] => typeof kind === 'string' && NEED_KINDS.has(kind as StationNeed['kind']);
 
-/** Whether `answer` is `{ needs, faults }` of items this page can draw. A 200 that is not (a proxy's page, a server of another shape) is a failed read. */
-function isNeedsAnswer(answer: unknown): answer is { needs: StationNeed[]; faults: StationNeed['kind'][] } {
+/** Whether `item` is a need this page can draw: an object of a known kind with an id. */
+const isDrawableNeed = (item: unknown): item is StationNeed =>
+  typeof item === 'object' && item !== null && isNeedKind((item as StationNeed).kind) && typeof (item as StationNeed).id === 'string';
+
+/** Whether `answer` is `{ needs, faults }` as lists. A 200 that is not (a proxy's page, a server of another shape) is a failed read; one item this page cannot draw is not: it is dropped by `isDrawableNeed`, and its kind by `isNeedKind`. */
+function isNeedsAnswer(answer: unknown): answer is { needs: unknown[]; faults: unknown[] } {
   if (typeof answer !== 'object' || answer === null) return false;
   const { needs, faults } = answer as { needs?: unknown; faults?: unknown };
-  return Array.isArray(needs) && Array.isArray(faults)
-    && needs.every((item) => typeof item === 'object' && item !== null && isNeedKind((item as StationNeed).kind) && typeof (item as StationNeed).id === 'string')
-    && faults.every(isNeedKind);
+  return Array.isArray(needs) && Array.isArray(faults);
 }
 
 /** An Error that says `sentence` and carries what really threw as `cause`; the client's TypeScript lib predates `new Error(message, { cause })`, so it is set as a property. */
@@ -124,8 +126,8 @@ export function StationNeedsProvider({ children }: { children: ReactNode }) {
           });
           if (!isNeedsAnswer(answer)) throw new Error('the answer is not a list of needs this page can draw');
           if (aliveRef.current) {
-            setNeeds(answer.needs);
-            setFaults(answer.faults);
+            setNeeds(answer.needs.filter(isDrawableNeed));
+            setFaults(answer.faults.filter(isNeedKind));
             setFailure(null);
           }
         } catch (error) {

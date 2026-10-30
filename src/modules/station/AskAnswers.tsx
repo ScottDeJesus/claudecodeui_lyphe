@@ -34,6 +34,25 @@ function AnswersRow({ labelId, whatId, children }: { labelId: string; whatId: st
   );
 }
 
+/**
+ * Whether the ask's whole is not what the stage shows (`need.cut`): then the answers that let work go are withheld, because a press
+ * fires only what it shows whole. Read as `!== false`, so a server that sends no flag at all is treated as cut, never as whole.
+ */
+const isCut = (need: AnswerProps['need']): boolean => need.cut !== false;
+
+/** Said where Allow, Always allow or Approve would stand when the ask is cut: why they are not there, and where the whole is. */
+function CutNote() {
+  const { t } = useTranslation();
+  return (
+    <p role="note" data-station-ask-cut="" data-tone="warn" className="flex min-w-0 items-start gap-1.5 text-sm leading-snug text-tone-ink">
+      <span aria-hidden="true">▲</span>
+      <span className="min-w-0 break-words">
+        {t('station.needs.ask.cut', 'Only part of this is shown here, so a yes waits for the chat, where the whole stands.')}
+      </span>
+    </p>
+  );
+}
+
 /** One answer's press: busy while it is out, refused while another is, and the server's word for it when pressed. */
 function pressOf(answer: string, { answering, onAnswer }: Pick<AnswerProps, 'answering' | 'onAnswer'>) {
   return {
@@ -47,27 +66,33 @@ function pressOf(answer: string, { answering, onAnswer }: Pick<AnswerProps, 'ans
  * A PERMISSION'S THREE, one press each, their words the server's (`allow`, `deny`, `always`, decided by `answerFor` as the
  * chat's own banner decides them): Allow, the press that lets work go, in the strongest paint and first in the answers' row
  * the keyboard lands on; Deny, quiet; and Always allow, with the rule it keeps written under it, so the one answer that
- * changes more than this ask says what else it changes before it is pressed. An ask that names no rule offers no Always.
+ * changes more than this ask says what else it changes before it is pressed. An ask that names no rule offers no Always. An ask the
+ * stage shows cut (`need.cut`: the command ran past 600 characters, or a Write's or an Edit's body is not in the line) offers neither
+ * Allow nor Always allow, only Deny and the sentence that says where the whole stands; a plan cut offers no Approve the same way.
  */
 function PermissionAnswers({ need, labelId, whatId, ...press }: AnswerProps) {
   const { t } = useTranslation();
   const ruleId = useId();
+  const cut = isCut(need);
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <AnswersRow labelId={labelId} whatId={whatId}>
-        <Button data-station-answer="allow" className={ANSWER} {...pressOf('allow', press)}>
-          {t('station.needs.ask.allow', 'Allow')}
-        </Button>
+        {!cut && (
+          <Button data-station-answer="allow" className={ANSWER} {...pressOf('allow', press)}>
+            {t('station.needs.ask.allow', 'Allow')}
+          </Button>
+        )}
         <Button variant="outline" data-station-answer="deny" className={ANSWER} {...pressOf('deny', press)}>
           {t('station.needs.ask.deny', 'Deny')}
         </Button>
-        {need.rule !== null && (
+        {need.rule !== null && !cut && (
           <Button variant="tonal" data-station-answer="always" aria-describedby={ruleId} className={ANSWER} {...pressOf('always', press)}>
             {t('station.needs.ask.always', 'Always allow')}
           </Button>
         )}
       </AnswersRow>
-      {need.rule !== null && (
+      {cut && <CutNote />}
+      {need.rule !== null && !cut && (
         <p id={ruleId} data-station-ask-rule="" className="break-words text-xs leading-relaxed text-muted-foreground">
           <Trans
             t={t}
@@ -86,18 +111,22 @@ function PermissionAnswers({ need, labelId, whatId, ...press }: AnswerProps) {
  * A PLAN'S TWO: Approve lets it go ahead (`allow`), Send back returns it to its chat to revise (`deny`), in the answers' row
  * the keyboard lands on.
  */
-function PlanAnswers({ labelId, whatId, ...press }: AnswerProps) {
+function PlanAnswers({ need, labelId, whatId, ...press }: AnswerProps) {
   const { t } = useTranslation();
+  const cut = isCut(need);
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <AnswersRow labelId={labelId} whatId={whatId}>
-        <Button data-station-answer="allow" className={ANSWER} {...pressOf('allow', press)}>
-          {t('station.needs.ask.approve', 'Approve')}
-        </Button>
+        {!cut && (
+          <Button data-station-answer="allow" className={ANSWER} {...pressOf('allow', press)}>
+            {t('station.needs.ask.approve', 'Approve')}
+          </Button>
+        )}
         <Button variant="outline" data-station-answer="deny" className={ANSWER} {...pressOf('deny', press)}>
           {t('station.needs.ask.sendBack', 'Send back')}
         </Button>
       </AnswersRow>
+      {cut && <CutNote />}
       <p className="text-xs leading-relaxed text-muted-foreground">
         {t('station.needs.ask.sendBackHint', 'Send back returns the plan to its chat to revise.')}
       </p>

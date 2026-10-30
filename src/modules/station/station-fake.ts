@@ -3,11 +3,15 @@ import type { ComponentProps, ComponentType } from 'react';
 import { ROADMAP_ALL_TOPIC } from '@/modules/live-bus';
 import { CardStageView } from '@/modules/station/CardStage';
 import { shelfFor, WALK_FOCUS, WALK_STAGE } from '@/modules/station/fake/cards';
+import { CONVERSATION_FAKE, CONVERSATION_STATES } from '@/modules/station/fake/conversation';
 import { CORNER_FAKE, CORNER_STATES } from '@/modules/station/fake/corner';
+import { DOCK_FAKE, DOCK_STATES } from '@/modules/station/fake/dock';
+import { HEAD_FAKE, HEAD_STATES } from '@/modules/station/fake/head';
 import { NEEDS_FAKE, NEEDS_STATES } from '@/modules/station/fake/needs';
 import { HOME_CHAT_STAGE, HOME_FOCUS, ROADMAP_PICTURES, SESSIONS_FAKE, SESSIONS_STATES } from '@/modules/station/fake/sessions';
 import { WAITING_FEATURE } from '@/modules/station/fake/stage';
 import { STRIP_FAKE, STRIP_STATES } from '@/modules/station/fake/strip';
+import { TALK_FAKE, TALK_STATES } from '@/modules/station/fake/talk';
 import type { StationFocus } from '@/shared/station-types';
 import type { StationSlot } from '@/shared/types';
 
@@ -64,6 +68,10 @@ const REGION_FAKES: Partial<Record<StationSlot, Record<StationPicture, StationDr
   corner: CORNER_FAKE,
   needs: NEEDS_FAKE,
   sessions: SESSIONS_FAKE,
+  head: HEAD_FAKE,
+  conversation: CONVERSATION_FAKE,
+  talk: TALK_FAKE,
+  dock: DOCK_FAKE,
 };
 
 /**
@@ -75,6 +83,10 @@ export const REGION_STATES: Partial<Record<StationSlot, Record<string, StationDr
   corner: CORNER_STATES,
   needs: NEEDS_STATES,
   sessions: SESSIONS_STATES,
+  head: HEAD_STATES,
+  conversation: CONVERSATION_STATES,
+  talk: TALK_STATES,
+  dock: DOCK_STATES,
 };
 
 /* `home`'s focus is `fake/sessions.ts`'s `HOME_FOCUS`: the chat he pressed on the left rail. */

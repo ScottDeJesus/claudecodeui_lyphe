@@ -629,7 +629,7 @@ cd /home/lyphe/.claude/claudecodeui_lyphe && grep -cE "ENTRY_PATCHED_KEYS.*'clau
 expect: 1 on every line — a 0 is a key in one list only (the client sends patches the server stores whole, or the server patches what the client sends whole)
 ```
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/chatPermissions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-permissions-stale-page.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/chatPermissions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-permissions-stale-page.mjs
 
 ## INV-10035 — probe — MEDIUM — a person's untick of a completion-closed follow-up is undone by the next picture (seconds)
 

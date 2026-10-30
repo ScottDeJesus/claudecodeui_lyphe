@@ -7,7 +7,7 @@ import type { StationLanded } from '@/shared/station-types';
 import { ScrollArea } from '@/shared/ui';
 import { cn, resizeObserverIn } from '@/shared/utils';
 
-/** The rule on the timeline: where he last looked, between the last landing he saw and the first he has not. */
+/** The rule on the timeline: where he last looked, between the last landing he saw and the first he has not, or after the newest when he has seen them all. */
 function LastLookRule({ when }: { when: string }) {
   const { t } = useTranslation();
   return (
@@ -23,12 +23,34 @@ function LastLookRule({ when }: { when: string }) {
   );
 }
 
+/** The leading edge's fade (`mask-image`, 1.5rem at the house's 16 px root): a landing the line rests on must stand clear of it. */
+const FADE_PX = 24;
+
+/**
+ * Where the line rests on the newest landing: its end, so what landed last stands in view. The one case it is not the end is the
+ * rule after the newest (he has seen everything) on a line hardly wider than one landing, a phone's: the end would push the newest
+ * out at the left behind the rule. There the line rests, in this order of care, with the newest whole in view, then clear of the
+ * leading fade, then as far toward the rule as that allows; the rule is then one swipe on.
+ */
+function newestPlace(node: HTMLElement): number {
+  const end = Math.max(0, node.scrollWidth - node.clientWidth);
+  const landings = node.querySelectorAll('[data-landed-entry]');
+  const newest = landings.item(landings.length - 1)?.getBoundingClientRect();
+  if (newest === undefined) return end;
+  const frame = node.getBoundingClientRect();
+  const left = newest.left - frame.left + node.scrollLeft;
+  const right = newest.right - frame.left + node.scrollLeft;
+  if (node.scrollWidth - right <= 1) return end;
+  const whole = right - node.clientWidth;
+  return Math.max(0, Math.max(whole, Math.min(end, left - FADE_PX)));
+}
+
 type LandedTimelineProps = {
   /** The week's landings, oldest first. */
   entries: StationLanded[];
   /** Where the new landings start: the index of the first one after his last look, `-1` when none is new. */
   firstFresh: number;
-  /** His last look in the strip's words on his clock, for the rule; `null` when none is on record, and then no rule stands. */
+  /** His last look in the strip's words on his clock, for the rule; `null` when none is on record (every landing is then new), and then no rule stands. */
   lastLook: string | null;
   /** One landing, drawn: the strip's `LandedEntry`, with its badge, its time and its press, and whether it is the line's tab stop. */
   entryOf: (entry: StationLanded, at: number, place: { tabbable: boolean }) => ReactNode;
@@ -40,12 +62,15 @@ type LandedTimelineProps = {
  * THE STRIP'S TIMELINE, the week sideways: its landings oldest to newest in a horizontal `ScrollArea`, a finger panning it
  * and a mouse's wheel turning it, between the strip's head and its fold. The rule "You last looked" stands before the
  * first new landing, so "since you last looked" is a place on the line and not only a colour: its dashed edge in the
- * garnish, his last look's time over its words.
+ * garnish, his last look's time over its words. With nothing new it stands at the line's end, after the newest landing: he has
+ * looked at everything, and the next landing will join the line after it, so the place he looked from never leaves the line
+ * (it is the "<n> new" press, and every look-away, that moves it there).
  *
  * IT LANDS ON THE NEWEST as it is drawn (the strip opening from its fold draws it anew) and as a new landing joins its
- * end, so what landed last is what stands in view. And while it stands at that end it holds it: a narrower line (the
- * head's words grown as "<n> new" is pressed, the rule gone, a narrower window) moves its end without a scroll, so a
- * resize puts it back there; a line he scrolled back to read stays where he put it. Its own scroll events say where it
+ * end, so what landed last is what stands in view (`newestPlace`: the end, or on a phone's line, where the rule after the
+ * newest would push it out, the newest whole with the rule one swipe on). And while it stands there it holds it: a
+ * narrower line (the head's words grown as "<n> new" is pressed, the rule moved to the end, a narrower window) moves its end
+ * without a scroll, so a resize puts it back there; a line he scrolled back to read stays where he put it. Its own scroll events say where it
  * stands, and its leading edge fades while it is not at its start, so a landing cut there reads as "more this way" and
  * not as a fragment. Its times run along its top, each landing's and the rule's alike.
  *
@@ -59,8 +84,8 @@ export function LandedTimeline({ entries, firstFresh, lastLook, entryOf, scrollR
   const hostWindow = useHostWindow();
   // The scroller this lands on the newest; the station's scroll memory is handed the same node.
   const scroller = useRef<HTMLDivElement | null>(null);
-  // Whether the line stands at its newest end, from its own scroll events: while it does, a resize puts it back there.
-  // A ref, as nothing is drawn from it; true at first, as the line is drawn at its end.
+  // Whether the line rests on the newest or is scrolled on past it (`newestPlace`), from its own scroll events: while it does, a
+  // resize puts it back on the newest. A ref, as nothing is drawn from it; true at first, as the line is drawn at its end.
   const atEnd = useRef(true);
   // Whether the line stands at its oldest end. State, as the leading edge's fade is drawn from it.
   const [atStart, setAtStart] = useState(true);
@@ -77,8 +102,16 @@ export function LandedTimeline({ entries, firstFresh, lastLook, entryOf, scrollR
   // On the newest: as the timeline is drawn, and as a new landing joins its end (even one he had scrolled back from).
   useLayoutEffect(() => {
     const node = scroller.current;
-    if (node !== null) node.scrollLeft = node.scrollWidth;
+    if (node !== null) node.scrollLeft = newestPlace(node);
   }, [newestId]);
+
+  // The rule moving to the line's end, or leaving it ("<n> new" pressed, a landing joining), changes what the line rests on, and no
+  // resize need follow it: a line resting on the newest follows, one he scrolled back stays.
+  const ruleAtEnd = firstFresh === -1 && lastLook !== null;
+  useLayoutEffect(() => {
+    const node = scroller.current;
+    if (node !== null && atEnd.current) node.scrollLeft = newestPlace(node);
+  }, [ruleAtEnd]);
 
   // Where the line stands, on its own scroll events; and a line that stood at its end kept there as it narrows, on the
   // resize of the scroller or of its list. Events only: the observer's first report reads the line as drawn.
@@ -86,11 +119,11 @@ export function LandedTimeline({ entries, firstFresh, lastLook, entryOf, scrollR
     const node = scroller.current;
     if (node === null) return undefined;
     const read = () => {
-      atEnd.current = node.scrollLeft + node.clientWidth >= node.scrollWidth - 1;
+      atEnd.current = node.scrollLeft >= newestPlace(node) - 1;
       setAtStart(node.scrollLeft <= 1);
     };
     const settle = () => {
-      if (atEnd.current) node.scrollLeft = node.scrollWidth;
+      if (atEnd.current) node.scrollLeft = newestPlace(node);
       read();
     };
     node.addEventListener('scroll', read, { passive: true });
@@ -155,6 +188,11 @@ export function LandedTimeline({ entries, firstFresh, lastLook, entryOf, scrollR
             <li className="w-max min-w-0 max-w-52 shrink-0 md:max-w-72">{entryOf(entry, at, { tabbable: entry.id === stopId })}</li>
           </Fragment>
         ))}
+        {ruleAtEnd && (
+          <li className="flex shrink-0">
+            <LastLookRule when={lastLook} />
+          </li>
+        )}
       </ol>
     </ScrollArea>
   );

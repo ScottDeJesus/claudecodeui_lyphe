@@ -1131,8 +1131,9 @@ export type CompanionPresenceState =
  * set up and not begun); each is null when her activity names none. They are carried whatever the `state`, so a
  * page-owned state such as 'listening' still knows where she was looking. One value per change of its parts, so a
  * consumer that memoizes on it redraws only when she does. Built by the companion module's `useCompanionPresence` and
- * read by its consumers: CompanionHeader, whose CompanionStatus line CompanionPanel hands it to, and CompanionFab, which
- * draws it (through CompanionFace) as the button's face and label and points the button by it (`useAvatarTarget`).
+ * read by its consumers: CompanionStatus (the panel header's line, which CompanionPanel hands it to, and the station head's),
+ * CompanionFab (the button's label and size, and where it points: `useAvatarTarget`) and CompanionFace (her face, on the
+ * button and on the station's head).
  */
 export type CompanionPresence = {
   state: CompanionPresenceState;

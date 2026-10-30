@@ -4646,7 +4646,7 @@ section: 07-live-widgets/002 The pieces
 
 | File | Role |
 | --- | --- |
-| `src/modules/widgets/index.ts` | The barrel. Exports `WidgetFrame` and nothing else |
+| `src/modules/widgets/index.ts` | The barrel. Exports `WidgetFrame`, `EmbedUrlFrame`, `classifyWidgetBody`, `resolveEmbedUrl`, `resolveDocSpaceOrigin` and `docSpacePageUrl` |
 | `src/modules/widgets/WidgetFrame.tsx` | `WidgetFrame` — the `<pre>`/iframe decision, and the optional `frame` a caller hands it — and the private `WidgetFrameLive`, which only ever renders in a browser. Both frames are keyed on the host window and the body (`windowKey`); the Escape listener binds to the host window (MAN-7443) |
 | `src/modules/widgets/buildWidgetDocument.ts` | `WIDGET_CSP` and `buildWidgetDocument` — the whole HTML document a widget lives in |
 | `src/modules/widgets/widgetBridgeScript.ts` | `WIDGET_BRIDGE_SCRIPT` — the in-frame script that becomes `window.live` |
@@ -4660,7 +4660,7 @@ section: 07-live-widgets/002 The pieces
 | `src/modules/chat/embeds/EmbedWidgetBody.tsx` | `EmbedWidgetBody` — the gutter widget: the follow latch, the one-row dropdown (house presets, the chat's addresses, `Type an address…`), the way out, and `EmbedUrlFrame` filling the card |
 | `src/modules/chat-gutters/GutterWidgetFrame.tsx` | The gutter card, its `fullscreen` / `onToggleFullscreen` / `flush` / `headerAction` / `countTone` props, and the focus hand-off to its fullscreen switch when the card leaves full screen (MAN-422) |
 | `src/modules/widgets/embedUrl.ts` | `isLoopbackHost` and `resolveEmbedUrl` — a loopback address moved onto the host that reached this page, because an `src` is resolved by the reader's browser |
-| `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, `docspaceStudioUrl`, `docSpacePageUrl` and `isForeignOrigin` — the gate on `allow-same-origin`. `docSpacePageUrl(pageId, blockId)` is the ONE builder of a link into DocSpace for a page or one block of it (MAN-485); `docspaceStudioUrl` calls it. The barrel exports it for the companion module (Settings' "Open her memory") and the station module (the page stage's "Open in DocSpace") |
+| `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, `docspaceStudioUrl`, `docSpacePageUrl` and `isForeignOrigin` — the gate on `allow-same-origin`. `docSpacePageUrl(pageId, blockId)` is the ONE builder of a link into DocSpace for a page or one block of it (MAN-485); `docspaceStudioUrl` calls it. The barrel exports it for the companion module (Settings' "Open her memory") and the station module (the page stage's "Open in DocSpace", the note stage's page card, the memory corner's "Open the full page") |
 | `src/modules/widgets/DocSpaceFrame.tsx` | `DOCSPACE_SANDBOX`, `DOCSPACE_READY_TIMEOUT_MS` and `DocSpaceFrame` — the second frame: a `src` on ArchPulse's origin, the latched theme, the ready timer, and the `framed` prop that drops its own border where a card already draws one |
 | `src/modules/widgets/WidgetErrorCard.tsx` | `WidgetErrorCard` — the two-sentence card shown where a widget was asked for and cannot be drawn |
 | `src/modules/live-bus/topics.ts` | `LIVE_TOPIC_ALLOWLIST`, `isAllowedTopic`, `DISPATCHER_ALL_TOPIC`, `ROADMAP_ALL_TOPIC`, `SOULS_ALL_TOPIC`, `UNIVERSE_ALL_TOPIC` — the whole vocabulary |

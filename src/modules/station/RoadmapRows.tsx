@@ -35,7 +35,7 @@ type FeatureRowProps = {
  * picture, so each row is a component of its own), " · Blocked" after it while its dot is blocked so that red is never the whole
  * signal (the tree's tip says it so). A feature that waits on him has its phrase in the warn ink, and the phrase says "waiting on
  * you" itself. The phrase is cut to one line: it stands whole on the card the press opens, and the `Tooltip` repeats it for a
- * pointer and a keyboard.
+ * pointer and a keyboard (it is not drawn where nothing hovers, so a tap leaves none standing over the stage).
  */
 function FeatureRow({ feature, dot, tier, current, onPress }: FeatureRowProps) {
   const { t } = useTranslation();
@@ -47,7 +47,7 @@ function FeatureRow({ feature, dot, tier, current, onPress }: FeatureRowProps) {
         content={said}
         position={tier === 'narrow' ? 'top' : 'right'}
         showOnFocus
-        className="max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere]"
+        className="max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere] [@media(hover:none)]:hidden"
       >
         <RailRow kind="feature" name={feature.name} current={current} onPress={() => onPress(cardOf(feature.name, feature.title))}>
           {/* The dot sits on the title's first line: h-5 is the title's own line height. */}
@@ -188,6 +188,7 @@ export function RoadmapRows({ tier, roadmap, focus, completeOpen, onCompleteOpen
           label={t('station.roadmap.complete', { count: folded.length, defaultValue: 'Complete · {{count}}' })}
           open={completeOpen}
           onOpenChange={onCompleteOpen}
+          current={focus?.kind === 'card' && folded.some((placed) => placed.epic.name === focus.plan)}
         >
           {rowsOf(folded, false)}
         </RailFold>

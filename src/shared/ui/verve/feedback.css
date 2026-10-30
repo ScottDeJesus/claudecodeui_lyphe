@@ -239,6 +239,19 @@
 }
 .vv-empty__title { font-family: var(--font-display); font-size: 24px; font-style: italic; color: var(--ink-faint); }
 .vv-empty__message { max-width: 260px; margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-faint); }
+/* The small size (`size="sm"`): one quiet line that keeps a place's room while it holds nothing yet. The frame slims, and the
+ * title steps down from the display serif to the body's small size in the MUTED ink: the faint ink is under 4.5:1 on the
+ * light canvas at this size, and a serif this small loses its shape. Two classes deep, so it holds wherever the file lands. */
+.vv-empty.vv-empty--sm { gap: 2px; padding: 10px 14px; }
+.vv-empty.vv-empty--sm .vv-empty__title {
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-style: normal;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+.vv-empty.vv-empty--sm .vv-empty__message { font-size: 12.5px; }
+.vv-empty.vv-empty--sm .vv-empty__icon { width: 28px; height: 28px; margin-bottom: 0; }
 
 /* ---------------------------------------------------------------- Menu */
 .vv-menu { position: relative; }

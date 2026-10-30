@@ -1,4 +1,5 @@
 import { ArrowUpRight } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,7 +10,7 @@ import { SessionStateChip } from '@/modules/station/SessionRows';
 import { openInCloudcli } from '@/shared/cloudcliDoors';
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import type { StationFocus, StationSession } from '@/shared/station-types';
-import { Button, Card, Spinner } from '@/shared/ui';
+import { Banner, Button, Card, Spinner } from '@/shared/ui';
 import { cn, formatRelativeTime } from '@/shared/utils';
 
 /** A chat on the stage. */
@@ -21,6 +22,10 @@ type ChatStageViewProps = {
   session: StationSession | null | undefined;
   /** "Open the chat": the chat itself, in CloudCLI. */
   onOpenChat: () => void;
+  /** Why his sessions' first read failed, in the server's sentence; null while none has. Only drawn while `session` is undefined. */
+  failure?: string | null;
+  /** Try again: his sessions read once more. */
+  onReread?: () => void;
 };
 
 /**
@@ -31,14 +36,31 @@ type ChatStageViewProps = {
  * says what it waits on in the warn ink, as its row does. The open is a 44 px catch under a finger below 768 px (the touch law).
  *
  * While his sessions have not been read, a quiet "Reading your sessions…" waits, so a stage restored on a reload never calls gone
- * a chat it has not looked for; a chat his sessions no longer hold says so in the kind's own line (`StageGone`).
+ * a chat it has not looked for; when the first read has failed it says so in the rail's own warn banner, with Try again, rather
+ * than read for good; a chat his sessions no longer hold says so in the kind's own line (`StageGone`).
  *
- * `data-station-chat` reads which of the three it drew. A pure view: `ChatStage` below binds it. Drawn on the stage by
+ * `data-station-chat` reads which of the four it drew. A pure view: `ChatStage` below binds it. Drawn on the stage by
  * `StationStage` for a `chat` focus (registered in `stageViews.ts`), and by `.verify/kaylee-station-shots.mjs` for `home`.
  */
-export function ChatStageView({ focus, session, onOpenChat }: ChatStageViewProps) {
+export function ChatStageView({ focus, session, onOpenChat, failure = null, onReread }: ChatStageViewProps) {
   const { t } = useTranslation();
 
+  if (session === undefined && failure !== null) {
+    return (
+      <div role="alert" data-station-chat="failed">
+        <Banner
+          tone="warn"
+          action={onReread && (
+            <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onReread}>
+              {t('station.sessions.retry', { defaultValue: 'Try again' })}
+            </Button>
+          )}
+        >
+          <p className="break-words text-sm font-medium">{failure}</p>
+        </Banner>
+      </div>
+    );
+  }
   if (session === undefined) {
     return (
       <div data-station-chat="reading" className="grid place-items-center py-10">
@@ -94,14 +116,23 @@ export function ChatStage({ focus }: { focus: ChatFocus }) {
   const navigate = useNavigate();
   const { phone } = useStation();
   const { isPWA } = useDeviceSettings({ trackMobile: false });
-  const { sessions } = useStationSessions();
-  // null (not yet read) stays undefined for the view, which waits; a read that lacks the chat is null, which the view calls gone.
-  const session = sessions === null ? undefined : (sessions.find((item) => item.sessionId === focus.sessionId) ?? null);
+  const { sessions, failure, reread } = useStationSessions();
+  // The answer his sessions held when this chat was staged (the stage's body is keyed by its focus, so this is taken once per chat).
+  // State, because it must outlive the renders: an answer that was already out when the chat was staged cannot know a chat staged
+  // after it (she has just opened or created it, and its row comes with the next read), so a chat that answer lacks is "not yet" and
+  // not "no longer" until a newer answer, which is a new array, has landed.
+  const [heldAtStaging] = useState(sessions);
+  // null (not yet read) stays undefined for the view, which waits; a chat a read that came after the staging lacks is null, which the view calls gone.
+  const session = sessions === null
+    ? undefined
+    : (sessions.find((item) => item.sessionId === focus.sessionId) ?? (sessions === heldAtStaging ? undefined : null));
 
   return (
     <ChatStageView
       focus={focus}
       session={session}
+      failure={failure}
+      onReread={reread}
       // The chat in CloudCLI: the window named `cloudcli` on a desktop, this window on a phone or in the home-screen app (the door's own rule).
       onOpenChat={() => openInCloudcli(`/session/${encodeURIComponent(focus.sessionId)}`, navigate, { phone, pwa: isPWA })}
     />

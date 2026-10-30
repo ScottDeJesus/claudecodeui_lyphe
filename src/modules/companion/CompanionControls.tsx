@@ -9,6 +9,7 @@ import type { CompanionModel, CompanionPicture } from '@/shared/companion-types'
 import { useToast } from '@/shared/context/ToastContext';
 import type { CompanionPresence, CompanionVoice } from '@/shared/types';
 import { Button, ConfirmDialog, Select, Switch, Tooltip } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 type CompanionControlsProps = {
   /** Her name as he set it, or the default while the picture loads: Stop's hint, Clear's label and question, and the toast of a refused Clear. */
@@ -25,19 +26,28 @@ type CompanionControlsProps = {
    * row.
    */
   voice?: Pick<CompanionVoice, 'on' | 'setOn'>;
-  /** `rows` is the panel's: the controls row, and the voice row under it. */
-  layout: 'rows';
   onModelChange: (model: CompanionModel) => Promise<void>;
   onLiveChange: (live: boolean) => Promise<void>;
   onInterrupt: () => Promise<void>;
   onClear: () => Promise<void>;
-  /**
-   * Where `rows` draws Stop: the node the panel's title row keeps beside her way out. Stop is drawn into it and nowhere
-   * else, so until the node exists (null) it waits. Required, so a caller that forgets the node fails to compile rather
-   * than lose the one urgent press without a word.
-   */
-  stopSlot: HTMLElement | null;
-};
+} & (
+  | {
+      /** `rows` is the panel's: the controls row, and the voice row under it. */
+      layout: 'rows';
+      /**
+       * Where `rows` draws Stop: the node the panel's title row keeps beside her way out. Stop is drawn into it and nowhere
+       * else, so until the node exists (null) it waits. Required, so a caller that forgets the node fails to compile rather
+       * than lose the one urgent press without a word.
+       */
+      stopSlot: HTMLElement | null;
+    }
+  | {
+      /** `line` is the station's: every control in one line, Stop first, wrapping where the line runs out of width. */
+      layout: 'line';
+      /** Where the line's controls stand in its box: `start` (the default) under words that start there, `center` under her face centred over hers (the station's wide head). */
+      align?: 'start' | 'center';
+    }
+);
 
 /**
  * Her controls: Stop, the model picker, the Live switch, Clear (asked first) and, given `voice`, this device's voice.
@@ -50,12 +60,19 @@ type CompanionControlsProps = {
  * Clear. A row of its own because the controls row has no width to give a labelled switch (measured: 50px spare on the
  * 400px column, none at 320px), and because it is this device's where the controls row's are hers, on every device.
  *
+ * LINE, the station's (its head draws it under her state): one line, in the order the eye wants it — Stop while her turn
+ * runs, the model picker, the Live switch, "Voice on this device" given `voice`, then Clear. Each keeps its words and its
+ * catch under a finger, the panel's own; the line wraps rather than cut a word where its box runs out of width (her
+ * column at 1440 px, a phone), and the voice switch and Clear wrap as one, so Clear never stands alone on a line of its own:
+ * "Stop · model · Live" over "Voice on this device · Clear". `align` centres it under a centred head.
+ *
  * A model or Live choice shows at once and holds while its save is out: the picture keeps the old value until the
  * server's settings come back, and a control that snapped back meanwhile would read as refused. A refused save puts
  * the old value back and says so in a toast; so does a Stop or a Clear that fails. Clear asks first. The voice switch is
  * the page's own and answers at once.
  */
-export function CompanionControls({ name, picture, voice, onModelChange, onLiveChange, onInterrupt, onClear, stopSlot }: CompanionControlsProps) {
+export function CompanionControls(props: CompanionControlsProps) {
+  const { name, picture, voice, onModelChange, onLiveChange, onInterrupt, onClear } = props;
   const { t } = useTranslation();
   const pushToast = useToast();
   // The model he just chose, shown until its save settles; null when none is out. Needed because the picture only
@@ -108,69 +125,105 @@ export function CompanionControls({ name, picture, voice, onModelChange, onLiveC
   };
 
   const stopButton = (
-    <Button variant="outline" size="sm" busy={stopping} onClick={stop} className="shrink-0 [@media(pointer:coarse)]:h-11" aria-label={t('companion.stopHint', { name })}>
+    <Button variant="outline" size="sm" busy={stopping} onClick={stop} className="shrink-0 max-md:h-11 [@media(pointer:coarse)]:h-11" aria-label={t('companion.stopHint', { name })}>
       <Square aria-hidden="true" className="fill-current" />
       {t('companion.stop')}
     </Button>
   );
 
+  const select = (
+    <Select
+      size="sm"
+      ariaLabel={t('companion.model')}
+      options={(picture?.models ?? []).map((option) => ({ value: option.value, label: option.label }))}
+      value={model ?? ''}
+      placeholder={t('companion.model')}
+      disabled={!ready || pendingModel !== null}
+      onChange={chooseModel}
+    />
+  );
+
+  const liveSwitch = (
+    <Tooltip content={t('companion.liveHint')} showOnFocus position="bottom">
+      {/* A label around the word and the switch, so a press anywhere on it presses the switch: the kit's 30px switch
+          gets a 44px catch under a finger. The switch carries the name; the word beside it is for the eye. */}
+      <label className="flex cursor-pointer items-center gap-2 max-md:min-h-11 [@media(pointer:coarse)]:min-h-11">
+        <span aria-hidden="true" className="text-xs font-medium text-foreground">{t('companion.live')}</span>
+        <Switch checked={live} label={t('companion.live')} disabled={!ready || pendingLive !== null} onChange={switchLive} />
+      </label>
+    </Tooltip>
+  );
+
+  const clearButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      disabled={!ready}
+      // The panel holds two Clears: this one wipes her conversation, the draft card's discards the brief.
+      aria-label={t('companion.clearLabel', { name })}
+      onClick={() => setConfirmingClear(true)}
+      className="shrink-0 text-muted-foreground hover:text-foreground max-md:h-11 [@media(pointer:coarse)]:h-11"
+    >
+      {t('companion.clear')}
+    </Button>
+  );
+
+  const voiceSwitch = voice && <CompanionVoiceSwitch on={voice.on} onChange={voice.setOn} />;
+
+  const confirmClear = (
+    <ConfirmDialog
+      open={confirmingClear}
+      title={t('companion.clearTitle', { name })}
+      message={t('companion.clearMessage')}
+      actions={[
+        { label: t('companion.cancel'), variant: 'outline', onSelect: () => setConfirmingClear(false), disabled: clearing },
+        { label: t('companion.clearConfirm'), variant: 'destructive', onSelect: clear, busy: clearing },
+      ]}
+      onDismiss={() => { if (!clearing) setConfirmingClear(false); }}
+    />
+  );
+
+  if (props.layout === 'line') {
+    return (
+      <>
+        <div data-companion-controls="line" className={cn('flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2', props.align === 'center' && 'justify-center')}>
+          {turnRunning && stopButton}
+          {/* A fixed width, so the line does not move as he picks a model with a longer name. */}
+          <div className="w-36 min-w-0">{select}</div>
+          {liveSwitch}
+          {/* The voice switch and Clear as one: a lone Clear on a line of its own reads as a stray word. The switch's own box is
+              as wide as its words: its row is a full-width label, made for the panel's row of its own. */}
+          <div className="flex min-w-0 items-center gap-3">
+            {voiceSwitch && <div className="flex min-w-0">{voiceSwitch}</div>}
+            {clearButton}
+          </div>
+        </div>
+        {confirmClear}
+      </>
+    );
+  }
+
   return (
     <>
-      {turnRunning && stopSlot && createPortal(stopButton, stopSlot)}
+      {turnRunning && props.stopSlot && createPortal(stopButton, props.stopSlot)}
 
       <div className="flex items-center gap-3 border-t border-border px-3 py-2">
         {/* The picker gives way at the narrowest (a 320px phone), so Live and Clear always stand inside the sheet. */}
-        <div className="min-w-0 basis-36">
-          <Select
-            size="sm"
-            ariaLabel={t('companion.model')}
-            options={(picture?.models ?? []).map((option) => ({ value: option.value, label: option.label }))}
-            value={model ?? ''}
-            placeholder={t('companion.model')}
-            disabled={!ready || pendingModel !== null}
-            onChange={chooseModel}
-          />
-        </div>
-        <Tooltip content={t('companion.liveHint')} showOnFocus position="bottom">
-          {/* A label around the word and the switch, so a press anywhere on it presses the switch: the kit's 30px switch
-              gets a 44px catch under a finger. The switch carries the name; the word beside it is for the eye. */}
-          <label className="flex cursor-pointer items-center gap-2 [@media(pointer:coarse)]:min-h-11">
-            <span aria-hidden="true" className="text-xs font-medium text-foreground">{t('companion.live')}</span>
-            <Switch checked={live} label={t('companion.live')} disabled={!ready || pendingLive !== null} onChange={switchLive} />
-          </label>
-        </Tooltip>
+        <div className="min-w-0 basis-36">{select}</div>
+        {liveSwitch}
         <span className="flex-1" />
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={!ready}
-          // The panel holds two Clears: this one wipes her conversation, the draft card's discards the brief.
-          aria-label={t('companion.clearLabel', { name })}
-          onClick={() => setConfirmingClear(true)}
-          className="shrink-0 text-muted-foreground hover:text-foreground [@media(pointer:coarse)]:h-11"
-        >
-          {t('companion.clear')}
-        </Button>
+        {clearButton}
       </div>
 
-      {voice && (
-        // Under the controls, its switch closing the row as Clear closes the one above. On a touch screen the switch's
+      {voiceSwitch && (
+        // Under the controls, its switch closing the row as Clear closes the one above. Below 768 px and on a touch screen the switch's
         // 44px label is the row's height, so the row adds no padding of its own there.
-        <div data-companion-voice-row="" className="flex items-center border-t border-border px-3 py-1.5 [@media(pointer:coarse)]:py-0">
-          <CompanionVoiceSwitch on={voice.on} onChange={voice.setOn} />
+        <div data-companion-voice-row="" className="flex items-center border-t border-border px-3 py-1.5 max-md:py-0 [@media(pointer:coarse)]:py-0">
+          {voiceSwitch}
         </div>
       )}
 
-      <ConfirmDialog
-        open={confirmingClear}
-        title={t('companion.clearTitle', { name })}
-        message={t('companion.clearMessage')}
-        actions={[
-          { label: t('companion.cancel'), variant: 'outline', onSelect: () => setConfirmingClear(false), disabled: clearing },
-          { label: t('companion.clearConfirm'), variant: 'destructive', onSelect: clear, busy: clearing },
-        ]}
-        onDismiss={() => { if (!clearing) setConfirmingClear(false); }}
-      />
+      {confirmClear}
     </>
   );
 }

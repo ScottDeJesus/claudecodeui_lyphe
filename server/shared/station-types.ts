@@ -54,14 +54,14 @@ export type StationAskKind = 'permission' | 'question' | 'plan';
  * One thing that waits for his word, told apart by `kind`; `id` names it in the needs list and `say` is what he says aloud to answer
  * it (`null` when it has no spoken answer, or when her resolvers would refuse the phrase for it: a name two cards share, an unnamed chat). `accept` is a plan's (or, `epic`, an arc's) Accept prompt on `card` with `features` to
  * cut; `questions` an open questions round of `count` on `card`; `ask` a chat's waiting request (`ask` its kind, `tool` the tool,
- * `what` what it would do, `rule` the permission rule that would allow it, `options` the answers it offers, `more` how many
+ * `what` what it would do, `cut` whether `what` is less than the whole of it (cut at a count, or a file tool's path with its body left out), so a page that shows it offers no Allow, `rule` the permission rule that would allow it, `options` the answers it offers, `more` how many
  * requests wait behind it); `followups` a chat's `count` open follow-ups, `newest` the latest; `check` a service check that is
  * `failing` or `denied` (`value` its reading, `since` when it began, each `null` when unknown).
  */
 export type StationNeed =
   | { kind: 'accept'; id: string; card: string; epic: boolean; title: string; headline: string; features: number; say: string | null }
   | { kind: 'questions'; id: string; card: string; title: string; headline: string; count: number; say: string | null }
-  | { kind: 'ask'; id: string; sessionId: string; requestId: string; chat: string; ask: StationAskKind; tool: string; what: string; rule: string | null; options: string[]; more: number; say: string | null }
+  | { kind: 'ask'; id: string; sessionId: string; requestId: string; chat: string; ask: StationAskKind; tool: string; what: string; cut: boolean; rule: string | null; options: string[]; more: number; say: string | null }
   | { kind: 'followups'; id: string; sessionId: string; chat: string; count: number; newest: string; say: string | null }
   | { kind: 'check'; id: string; node: string; key: string; label: string; status: 'failing' | 'denied'; value: string | null; since: number | null; say: string | null };
 

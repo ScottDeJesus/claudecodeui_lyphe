@@ -1,5 +1,5 @@
 import { ArrowUpRight, FolderGit2, Pin, PinOff, X } from 'lucide-react';
-import { Fragment } from 'react';
+import { Fragment, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCompanion } from '@/modules/companion';
@@ -8,10 +8,11 @@ import { ListBody, NoteBody, PageBody, PlanBody } from '@/modules/station/cardBo
 import { labelOf } from '@/modules/station/cardLabel';
 import { useStation } from '@/modules/station/context/StationContext';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
-import { StageGone } from '@/modules/station/FocusFallback';
+import { StageGone, StageReadFailed } from '@/modules/station/FocusFallback';
+import { useKeepFocusWhenGone } from '@/modules/station/hooks/useKeepFocusWhenGone';
+import { refusalMessage } from '@/modules/station/stageRefusal';
 import { StageHeadActions } from '@/modules/station/stageSlots';
 import { docSpacePageUrl } from '@/modules/widgets';
-import { errorMessage } from '@/shared/api';
 import type { CompanionNote, CompanionNoteRef } from '@/shared/companion-types';
 import { COMPANION_NOTE_KIND_GLYPHS, STATION_FOCUS_GLYPHS } from '@/shared/constants';
 import { useToast } from '@/shared/context/ToastContext';
@@ -29,6 +30,8 @@ type NoteStageViewProps = {
   focus: NoteFocus;
   /** The card as her picture holds it: undefined until her picture has been read, null once it has and the card is not in it. */
   note: CompanionNote | null | undefined;
+  /** Set while her picture has not been read because the read FAILED: the stage says so and offers `onRetry`, in place of waiting. Absent for a read still out. */
+  readFailed?: { onRetry: () => void } | null;
   /** The DocSpace link of the page the card is about (`ref.kind === 'page'`); null for a card about anything else. */
   pageHref: string | null;
   /** Pin or Unpin, pressed: `pinned` is what the card becomes. */
@@ -127,16 +130,28 @@ function NoteRef({ noteRef, pageHref, onOpenRef }: { noteRef: CompanionNoteRef; 
  * card's text drawn as its kind (`cardBodies.tsx`), at body size and a reading measure. A long body scrolls under the head.
  *
  * While her picture has not been read, a quiet "Reading her cards…" waits, so a stage restored on a reload never says a card
- * was taken down before it has looked; a card her picture no longer holds says "<title> was taken down" (`StageGone`).
+ * was taken down before it has looked, and a read that failed says so with a Try again (`StageReadFailed`) rather than wait for
+ * ever; a card her picture no longer holds says "<title> was taken down" (`StageGone`), and the keyboard that pressed Dismiss
+ * stays on that line instead of falling to the page's top.
  *
  * THE TOUCH LAW. Pin, Dismiss and the ref's press are 44 px catches under a finger below 768 px, and say what they do in
- * words. `data-station-note` reads the card's id, or `reading` or `gone`. A pure view: `NoteStage` below binds it, and
+ * words. `data-station-note` reads the card's id, or `reading`, `failed` or `gone`. A pure view: `NoteStage` below binds it, and
  * `.verify/kaylee-station-shots.mjs` draws it on `fake/cards.ts`'s cards.
  */
-export function NoteStageView({ focus, note, pageHref, onPin, onDismiss, onOpenRef }: NoteStageViewProps) {
+export function NoteStageView({ focus, note, readFailed = null, pageHref, onPin, onDismiss, onOpenRef }: NoteStageViewProps) {
   const { t } = useTranslation();
+  // The gone line's box, which takes the keyboard when a card leaves while Dismiss had it (`useKeepFocusWhenGone`).
+  const goneRef = useRef<HTMLDivElement>(null);
+  useKeepFocusWhenGone(note !== undefined && note !== null, goneRef);
 
   if (note === undefined) {
+    if (readFailed !== null) {
+      return (
+        <div data-station-note="failed">
+          <StageReadFailed kind="note" title={t('station.cards.readFailed', { defaultValue: 'Her cards could not be read just now.' })} onRetry={readFailed.onRetry} />
+        </div>
+      );
+    }
     return (
       <div data-station-note="reading" className="grid place-items-center py-10">
         <Spinner size={32} label={t('station.cards.reading', { defaultValue: 'Reading her cards…' })} />
@@ -145,7 +160,7 @@ export function NoteStageView({ focus, note, pageHref, onPin, onDismiss, onOpenR
   }
   if (note === null) {
     return (
-      <div data-station-note="gone">
+      <div ref={goneRef} tabIndex={-1} data-station-note="gone" className="outline-none">
         <StageGone focus={focus} />
       </div>
     );
@@ -211,7 +226,7 @@ export function NoteStageView({ focus, note, pageHref, onPin, onDismiss, onOpenR
 export function NoteStage({ focus }: { focus: NoteFocus }) {
   const { t } = useTranslation();
   const pushToast = useToast();
-  const { picture, pinNote, dismissNote } = useCompanion();
+  const { picture, readFailure, reread, pinNote, dismissNote } = useCompanion();
   const { setFocus } = useStation();
   const { sessions } = useStationSessions();
   const { picture: roadmap } = useRoadmap();
@@ -220,12 +235,14 @@ export function NoteStage({ focus }: { focus: NoteFocus }) {
   const note = picture === null ? undefined : (picture.notes.find((card) => card.id === focus.id) ?? null);
   const pageHref = note?.ref?.kind === 'page' ? docSpacePageUrl(note.ref.pageId, note.ref.blockId) : null;
 
-  const refuse = (title: string, error: unknown) => pushToast({ tone: 'warn', title, message: errorMessage(error) ?? undefined });
+  const refuse = (title: string, error: unknown) => pushToast({ tone: 'warn', title, message: refusalMessage(error) });
 
   return (
     <NoteStageView
       focus={focus}
       note={note}
+      // Her picture is null and its read failed: the stage says so with a Try again (`reread`) instead of waiting on it.
+      readFailed={picture === null && readFailure !== null ? { onRetry: reread } : null}
       pageHref={pageHref}
       onPin={(pinned) => {
         pinNote(focus.id, pinned).catch((error: unknown) => {

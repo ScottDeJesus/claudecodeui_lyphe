@@ -139,6 +139,7 @@ const PERMISSION: Extract<StationNeed, { kind: 'ask' }> = {
   ask: 'permission',
   tool: 'Bash',
   what: 'Bash rsync -av --delete --exclude node_modules --exclude .vite dist/ eis1:/srv/cloudcli/releases/2026-10-30/ && ssh eis1 "ln -sfn /srv/cloudcli/releases/2026-10-30 /srv/cloudcli/current && systemctl --user restart cloudcli"',
+  cut: false,
   rule: 'Bash(rsync:*)',
   options: [],
   more: 1,
@@ -272,6 +273,7 @@ export const NEEDS_STAGE_FAKE = {
       focus: CHECK_FOCUS,
       found: { kind: 'needs', need: CHECK_NEED },
       onOpenSheet: NO_PRESS,
+      onRetry: NO_PRESS,
     } satisfies ComponentProps<typeof CheckStageView>,
   },
 } satisfies Record<string, { picture: string; focus: StationFocus; view: unknown; props: unknown }>;

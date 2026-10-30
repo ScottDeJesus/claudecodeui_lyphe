@@ -8,7 +8,7 @@ import type { DispatcherAsk, DispatcherPlan } from '@/shared/types.js';
 import { describeToolInput, oneLine } from '@/shared/tool-call-hint.js';
 
 import { buildCardBook, type Card, type CardBook } from '../eyes/card-lines.js';
-import { checkName, findChecks, withoutUsageChecks } from '../eyes/cerberus-lines.js';
+import { checkName, findChecksToOpen, withoutUsageChecks } from '../eyes/cerberus-lines.js';
 import { clipLine } from '../eyes/line-words.js';
 import { resolveCard } from '../eyes/roadmap-reads.js';
 import { sayOf } from '../hands/action-prompts.js';
@@ -21,8 +21,10 @@ import { chatNameOf, chatRows, hiddenChatRows, pendingAsksOf, resolveChat, type 
  * THE FOUR READERS of what needs him, one per family of `StationNeed`. Each reads the house through the door her own eyes and
  * hands read it through, so an item is what she would say of the same thing, and its `say` is built by the SAME `sayOf` her
  * check of his word is built from, and offered only when her resolver for that kind of thing takes it (the card's `resolveCard`,
- * the chat's `resolveChat`, the check's `findChecks`, and `checkHisWord`'s own `canBeNamed` for an action): the rail can never
- * teach him a phrase she would refuse, and an item she could not take by voice carries `say: null`. A reader answers its items in the
+ * the chat's `resolveChat`, the check's `findChecksToOpen`, and `checkHisWord`'s own `canBeNamed` for an action), and an item she
+ * could not take by voice carries `say: null`. A reader tests ITS OWN kind only: her `open` tries a card, a run, a page, a chat and a
+ * check, and refuses a name two kinds share ("fits 2 kinds of thing", wanting the kind in front, `chat: cerberus`), which no
+ * reader here tests; the rail only shows the words and fires nothing. A reader answers its items in the
  * order the rail shows them and throws when its source cannot be read; `station-needs.ts` isolates each, so one that throws
  * costs its kind and never the rail.
  *
@@ -152,6 +154,22 @@ function askKindOf(toolName: string): StationAskKind {
  */
 const wholeLine = (text: string): string => describeToolInput('Bash', { command: text }).slice('Bash'.length).trimStart();
 
+/** `describeToolInput`'s cut marker (and `wholeLine`'s, which is its Bash case): the text says how many characters it left out. */
+const CUT_MARKER = /… \(\d+ more characters not shown\)/;
+
+/** The file tools whose body (what a Write writes, what an Edit swaps in) `describeToolInput` leaves out, showing the file's path alone. Read is a read: its path is all of what it would do. */
+const BODY_HIDDEN_TOOLS: ReadonlySet<string> = new Set(['Edit', 'MultiEdit', 'Write']);
+
+/**
+ * Whether what the stage can show of a permission or a plan is LESS than the whole of what it would do: the text carries the cut marker, or
+ * the tool is one whose body the line never holds. A page that draws such an ask withholds Allow, Always allow and Approve, because a press
+ * fires only what it shows whole; Deny, Send back and "Open the chat" stay.
+ */
+function isCut(kind: StationAskKind, toolName: string, what: string): boolean {
+  if (kind === 'question') return false;
+  return CUT_MARKER.test(what) || (kind === 'permission' && BODY_HIDDEN_TOOLS.has(toolName));
+}
+
 /** What the ask would do, whole: a permission is `describeToolInput` (a command whole to 600 characters), a question its first question's text, a plan its text, each cut with a count (`wholeLine`). */
 function whatOf(kind: StationAskKind, toolName: string, input: unknown): string {
   if (kind === 'permission') return describeToolInput(toolName, input);
@@ -163,10 +181,12 @@ function whatOf(kind: StationAskKind, toolName: string, input: unknown): string 
   return wholeLine(isRecord(input) && typeof input.plan === 'string' ? input.plan : 'a plan is ready and waits for his approval');
 }
 
-/** One waiting chat's oldest ask as an item. A permission or a plan is answered by `Allow <chat>`; a question's words are its option, so it has none. */
+/** One waiting chat's oldest ask as an item. A permission or a plan is answered by `Allow <chat>`; a question's words are its option, and a cut ask's Allow waits for its chat, so each has none. */
 function chatAskNeed(sessionId: string, chat: string, { ask, more }: OldestAsk): StationNeed {
   const kind = askKindOf(ask.toolName);
   const questions = kind === 'question' ? questionsOf(ask.input) : [];
+  const what = whatOf(kind, ask.toolName, ask.input);
+  const cut = isCut(kind, ask.toolName, what);
   return {
     kind: 'ask',
     id: `ask:${ask.requestId}`,
@@ -175,11 +195,13 @@ function chatAskNeed(sessionId: string, chat: string, { ask, more }: OldestAsk):
     chat,
     ask: kind,
     tool: ask.toolName,
-    what: whatOf(kind, ask.toolName, ask.input),
+    what,
+    cut,
     rule: kind === 'permission' ? buildClaudeToolPermissionEntry(ask.toolName, ask.input) : null,
     options: questions.length === 1 ? questions[0].options.map(oneLine).filter(Boolean) : [],
     more,
-    say: kind === 'question' ? null : `Allow ${chat}`,
+    // A cut ask's stage offers Deny alone (the answer route itself does not look at `cut`), so the rail teaches no Allow for it.
+    say: kind === 'question' || cut ? null : `Allow ${chat}`,
   };
 }
 
@@ -251,8 +273,8 @@ export function checkNeeds(house: CompanionHouse): StationNeed[] {
       status: check.status,
       value: check.value === null ? null : clipLine(check.value, CHECK_VALUE_MAX),
       since: check.since,
-      // Her `open` finds a check by `findChecks` over the overview without the usage family, and refuses a phrase that fits several.
-      say: sayableChecks.has(check) && findChecks(sayable, label).length === 1 ? sayOf('open', label) : null,
+      // Her `open` finds a check by `findChecksToOpen` over the overview without the usage family, and refuses a phrase that fits several.
+      say: sayableChecks.has(check) && findChecksToOpen(sayable, label).checks.length === 1 ? sayOf('open', label) : null,
     } satisfies StationNeed];
   });
 }

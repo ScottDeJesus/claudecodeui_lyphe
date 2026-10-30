@@ -43,7 +43,7 @@ import { stationLanded } from './station/station-landed.js';
  *     record of actions (`companion_actions`), a fact about the house: a pending action Clear finds standing ends `cancelled`, unless a take is carrying it out;
  *   - `stopAll` winds every conversation and every synthesis down for shutdown and from then on refuses a message with a
  *     503: the HTTP drain comes after it, and a process woken then would have nothing left to end it;
- *   - `landed` is the station strip's read: the account's landings of the last seven days. It is the one verb that hands the
+ *   - `landed` is the station strip's read: the account's landings of the last seven days. Like `stationNeeds` it hands the
  *     house to a station reader, so the route stays transport and the house stays private here;
  *   - `alert`, `runFailed`, `runCompleted` and `chatDeleted` are the verbs the house's feeds call (each is explained at its verb);
  *     `alert` and the focus push refuse once `stopAll` has run, for the reason a message does;

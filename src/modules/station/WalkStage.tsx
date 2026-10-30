@@ -1,13 +1,14 @@
 import { ArrowLeft, ArrowRight, Check, Mic, X } from 'lucide-react';
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCompanion } from '@/modules/companion';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
-import { StageGone } from '@/modules/station/FocusFallback';
+import { StageGone, StageReadFailed } from '@/modules/station/FocusFallback';
+import { useKeepFocusWhenGone } from '@/modules/station/hooks/useKeepFocusWhenGone';
+import { refusalMessage } from '@/modules/station/stageRefusal';
 import { StageFoot, StageHeadActions } from '@/modules/station/stageSlots';
-import { errorMessage } from '@/shared/api';
 import type { CompanionWalk } from '@/shared/companion-types';
 import { useToast } from '@/shared/context/ToastContext';
 import type { StationFocus } from '@/shared/station-types';
@@ -20,6 +21,8 @@ type WalkFocus = Extract<StationFocus, { kind: 'walk' }>;
 type WalkStageViewProps = {
   /** The walk as her picture holds it: undefined until her picture has been read, null once it has and no walk is held. */
   walk: CompanionWalk | null | undefined;
+  /** Set while her picture has not been read because the read FAILED: the stage says so and offers `onRetry`, in place of waiting. Absent for a read still out. */
+  readFailed?: { onRetry: () => void } | null;
   /** The chat it walks, by the name he knows it by: the walk's own accessible name. */
   sessionName: string;
   /** Back, pressed (or ←): the item before. Refused at the first. */
@@ -66,15 +69,26 @@ function isPlainArrow(event: KeyboardEvent<HTMLElement>): boolean {
  * key, ← and →, which move it too while the keyboard is inside the walk. No swipe: on a phone the browser's own edge swipe is
  * Back. A press tells her nothing until his next word, which carries the stage's `<view kind="walk">`.
  *
- * While her picture has not been read, a quiet "Reading her walkthrough…" waits; with no walk held, "The walkthrough ended"
- * (`StageGone`). `data-station-walk` reads `walking`, `reading` or `ended`. A pure view: `WalkStage` below binds it, and
+ * While her picture has not been read, a quiet "Reading her walkthrough…" waits, and a read that failed says so with a Try again
+ * (`StageReadFailed`) rather than wait for ever; with no walk held, "The walkthrough ended" (`StageGone`), where the keyboard
+ * that pressed End stays. `data-station-walk` reads `walking`, `reading`, `failed` or `ended`. A pure view: `WalkStage` below binds it, and
  * `.verify/kaylee-station-shots.mjs` draws it on `fake/cards.ts`'s walk at item 4 of 15.
  */
-export function WalkStageView({ walk, sessionName, onBack, onNext, onEnd }: WalkStageViewProps) {
+export function WalkStageView({ walk, readFailed = null, sessionName, onBack, onNext, onEnd }: WalkStageViewProps) {
   const { t } = useTranslation();
   const listId = useId();
+  // The ended line's box, which takes the keyboard when the walk ends while End had it (`useKeepFocusWhenGone`).
+  const endedRef = useRef<HTMLDivElement>(null);
+  useKeepFocusWhenGone(walk !== undefined && walk !== null, endedRef);
 
   if (walk === undefined) {
+    if (readFailed !== null) {
+      return (
+        <div data-station-walk="failed">
+          <StageReadFailed kind="walk" title={t('station.cards.walk.readFailed', { defaultValue: 'Her walkthrough could not be read just now.' })} onRetry={readFailed.onRetry} />
+        </div>
+      );
+    }
     return (
       <div data-station-walk="reading" className="grid place-items-center py-10">
         <Spinner size={32} label={t('station.cards.walk.reading', { defaultValue: 'Reading her walkthrough…' })} />
@@ -83,7 +97,7 @@ export function WalkStageView({ walk, sessionName, onBack, onNext, onEnd }: Walk
   }
   if (walk === null) {
     return (
-      <div data-station-walk="ended">
+      <div ref={endedRef} tabIndex={-1} data-station-walk="ended" className="outline-none">
         <StageGone focus={{ kind: 'walk', label: sessionName }} />
       </div>
     );
@@ -207,7 +221,7 @@ export function WalkStageView({ walk, sessionName, onBack, onNext, onEnd }: Walk
 export function WalkStage({ focus }: { focus: WalkFocus }) {
   const { t } = useTranslation();
   const pushToast = useToast();
-  const { picture, moveWalk, endWalk } = useCompanion();
+  const { picture, readFailure, reread, moveWalk, endWalk } = useCompanion();
   const { sessions } = useStationSessions();
 
   // undefined while her picture has not been read (the view waits); null once it has and no walk is held (ended or replaced
@@ -220,20 +234,22 @@ export function WalkStage({ focus }: { focus: WalkFocus }) {
   // tool's own sentence, said in a toast; the walk keeps standing where it was.
   const move = (at: number) => {
     moveWalk(at).catch((error: unknown) => {
-      pushToast({ tone: 'warn', title: t('station.cards.walk.refused', { defaultValue: 'The walkthrough did not move' }), message: errorMessage(error) ?? undefined });
+      pushToast({ tone: 'warn', title: t('station.cards.walk.refused', { defaultValue: 'The walkthrough did not move' }), message: refusalMessage(error) });
     });
   };
 
   return (
     <WalkStageView
       walk={walk}
+      // Her picture is null and its read failed: the stage says so with a Try again (`reread`) instead of waiting on it.
+      readFailed={picture === null && readFailure !== null ? { onRetry: reread } : null}
       sessionName={sessionName}
       onBack={() => { if (walk && walk.at > 1) move(walk.at - 1); }}
       // At 0 the walk is set up and not begun: Next begins it.
       onNext={() => { if (walk && walk.at < walk.items.length) move(walk.at + 1); }}
       onEnd={() => {
         endWalk().catch((error: unknown) => {
-          pushToast({ tone: 'warn', title: t('station.cards.walk.endRefused', { defaultValue: 'The walkthrough did not end' }), message: errorMessage(error) ?? undefined });
+          pushToast({ tone: 'warn', title: t('station.cards.walk.endRefused', { defaultValue: 'The walkthrough did not end' }), message: refusalMessage(error) });
         });
       }}
     />

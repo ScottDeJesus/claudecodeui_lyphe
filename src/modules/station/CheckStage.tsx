@@ -16,9 +16,10 @@ type CheckFocus = Extract<StationFocus, { kind: 'check' }>;
 /**
  * What the stage holds of its check: `loading` while Cerberus's overview has not been read; `needs`, the check as Cerberus's
  * "Needs you" holds it — its view, the fix offered for it, its recent run and its diagnosis, whatever its status is now; `gone`
- * once it needs no one (it recovered, or a mute covers it).
+ * once it needs no one (it recovered, or a mute covers it); `unread`, Cerberus's overview could not be read at all, so whether the check
+ * is red is not known.
  */
-type CheckFound = { kind: 'loading' } | { kind: 'needs'; need: CerberusNeed } | { kind: 'gone' };
+type CheckFound = { kind: 'loading' } | { kind: 'unread' } | { kind: 'needs'; need: CerberusNeed } | { kind: 'gone' };
 
 /**
  * THE CHECK SHEET'S WIDTH in each arrangement: over the station's right side, never over her face. Wide, the kit's own
@@ -43,6 +44,8 @@ type CheckStageViewProps = {
   found: CheckFound;
   /** The card's own presses (its name, its run's strip, Diagnose once started, See diagnosis) and "Open the check": the sheet on that check. */
   onOpenSheet: (target: CerberusSheetTarget) => void;
+  /** Try again, while the overview could not be read: Cerberus's overview read once more. */
+  onRetry: () => void;
 };
 
 /**
@@ -60,10 +63,10 @@ type CheckStageViewProps = {
  * its presses). Every press on the card and "Open the check" is a 44 px catch under a finger below 768 px (the touch law; the
  * card's presses are sized in the cerberus module).
  *
- * A pure view: `CheckStage` below binds it. Drawn on the stage for a `check` focus once `stageViews.ts` registers it (`live`),
+ * A pure view: `CheckStage` below binds it. Drawn on the stage for a `check` focus (`stageViews.ts`),
  * and by `.verify/kaylee-station-shots.mjs` on its fixture (`fake/needs.ts`), inside Cerberus's own provider.
  */
-export function CheckStageView({ focus, found, onOpenSheet }: CheckStageViewProps) {
+export function CheckStageView({ focus, found, onOpenSheet, onRetry }: CheckStageViewProps) {
   const { t } = useTranslation();
 
   const openCheck = (target: CerberusSheetTarget) => (
@@ -80,6 +83,23 @@ export function CheckStageView({ focus, found, onOpenSheet }: CheckStageViewProp
           <Spinner size={32} label={t('station.needs.check.looking', 'Looking for the check…')} />
         </div>
       );
+    case 'unread': {
+      const target = targetOfKey(focus.node, focus.key);
+      return (
+        <div data-station-check="unread" className="flex min-w-0 flex-col gap-3">
+          <p role="status" data-tone="warn" className="flex min-w-0 items-start gap-1.5 text-sm leading-snug text-tone-ink">
+            <span aria-hidden="true">▲</span>
+            <span className="min-w-0 break-words">{t('station.needs.fault.check', 'Couldn’t read the checks just now')}</span>
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" data-station-check-retry="" className="max-md:h-11" onClick={onRetry}>
+              {t('station.needs.retry', 'Try again')}
+            </Button>
+            {target !== null && openCheck(target)}
+          </div>
+        </div>
+      );
+    }
     case 'gone': {
       const target = targetOfKey(focus.node, focus.key);
       return (
@@ -115,14 +135,14 @@ export function CheckStageView({ focus, found, onOpenSheet }: CheckStageViewProp
  */
 export function CheckStage({ focus }: { focus: CheckFocus }) {
   const { tier } = useStation();
-  const need = useCerberusNeedOf(focus.node, focus.key);
+  const { need, unreachable, retry } = useCerberusNeedOf(focus.node, focus.key);
   // The check the sheet is open on, null while it is shut. State, because the sheet is drawn from it and it opens on a press of the card or of "Open the check".
   const [sheet, setSheet] = useState<CerberusSheetTarget | null>(null);
-  const found: CheckFound = need === undefined ? { kind: 'loading' } : need === null ? { kind: 'gone' } : { kind: 'needs', need };
+  const found: CheckFound = need === undefined ? { kind: unreachable ? 'unread' : 'loading' } : need === null ? { kind: 'gone' } : { kind: 'needs', need };
 
   return (
     <>
-      <CheckStageView focus={focus} found={found} onOpenSheet={setSheet} />
+      <CheckStageView focus={focus} found={found} onOpenSheet={setSheet} onRetry={retry} />
       {sheet !== null && (
         <CheckSheet
           open

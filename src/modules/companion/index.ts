@@ -1,9 +1,9 @@
 // Kaylee's public surface, for the project-workspace module (its shell holds the provider, its frame draws the panel and her
 // button, its rail her dock, its command palette opens her), the settings module (its voice tab draws her section) and the
 // station module (its route mounts the page's other `CompanionProvider`, with an `onOpen` that puts what she opens on the
-// stage; its fallback and its floor hook read `useCompanion`; its right rail draws her action card; its head, conversation and
-// talk control compose her face, state words, controls, log, talk button and composer rather than rebuild them). Everything
-// else in this module is private.
+// stage; its fallback and its floor hook read `useCompanion`; its right rail draws her action card; its dock draws her draft
+// card; its head, conversation and talk control compose her face, state words, controls, log, talk button and composer rather
+// than rebuild them). Everything else in this module is private.
 export { CompanionProvider, useCompanion } from '@/modules/companion/context/CompanionContext';
 export { CompanionPanel } from '@/modules/companion/CompanionPanel';
 export { CompanionFab } from '@/modules/companion/CompanionFab';
@@ -12,7 +12,13 @@ export { CompanionSettingsSection } from '@/modules/companion/CompanionSettingsS
 // The action waiting for his word, as her panel draws it in her dock; its second home is the head of the station's right
 // rail, "What needs you" (`WhatNeedsYou`), with every rule of MAN-9186.
 export { CompanionActionCard } from '@/modules/companion/CompanionActionCard';
+// Her draft, its one editor, as her panel draws it last in her dock; its second home is the station's dock (`StationDock`), at
+// the foot of her column over the talk control, which hands it `onTargetPress` so the target's name puts its session on the
+// stage, with every rule of MAN-9090.
+export { CompanionDraftCard } from '@/modules/companion/CompanionDraftCard';
 // The pieces the station composes, each defined with its consumers named:
+// the one state of hers (MAN-9089): this module's panel, button and face read it, and the station's head reads it for its status line.
+export { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
 // her face bound to the provider: this module's button (CompanionFab, inside the disc), and the station's head.
 export { CompanionFace } from '@/modules/companion/CompanionFace';
 // her state in words with its dot: this module's panel header (CompanionHeader), and the station's head.

@@ -8,7 +8,7 @@ import { openInCloudcli } from '@/shared/cloudcliDoors';
 import { RUNNER_LANDING_PARAM, STATION_FOCUS_GLYPHS } from '@/shared/constants';
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import type { StationFocus, StationFocusKind } from '@/shared/station-types';
-import { Button, Card, EmptyState } from '@/shared/ui';
+import { Banner, Button, Card, EmptyState } from '@/shared/ui';
 
 /**
  * Each kind's "no longer here" line: what the stage says of a thing that has gone while it stood there (a chat
@@ -43,6 +43,30 @@ export function StageGone({ focus }: { focus: StationFocus }) {
         icon={STATION_FOCUS_GLYPHS[focus.kind].icon}
         title={t(`station.gone.${focus.kind}`, { label: focus.label, defaultValue: GONE_LINES[focus.kind] })}
       />
+    </div>
+  );
+}
+
+/**
+ * A read of what a stage draws that did not land: her picture, for her cards' two stages. It says so in a sentence of the page's
+ * own (`title`) with a Try again (`onRetry`, a 44 px catch under a finger below 768 px), where the stage's quiet "Reading…"
+ * would otherwise wait for ever on a picture that is not coming. The raw reason is not drawn: it is the browser's words for a
+ * dropped connection as often as the server's, and it is already in the console. Used by `NoteStageView` and `WalkStageView`.
+ */
+export function StageReadFailed({ kind, title, onRetry }: { kind: StationFocusKind; title: string; onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div role="alert" data-station-read-failed={kind}>
+      <Banner
+        tone="warn"
+        action={(
+          <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onRetry}>
+            {t('station.cards.retry', { defaultValue: 'Try again' })}
+          </Button>
+        )}
+      >
+        <p className="break-words text-sm font-medium">{title}</p>
+      </Banner>
     </div>
   );
 }
@@ -107,7 +131,7 @@ type FocusFallbackViewProps = {
  * A thing that has gone draws its kind's "no longer here" line (`StageGone`) instead.
  *
  * A pure view: `FocusFallback` below binds it. Drawn on the stage by `StationStage` for every kind `STAGE_VIEWS`
- * holds no view of, and by `.verify/kaylee-station-shots.mjs` for the `walkthrough` picture's walk.
+ * holds no view of: every kind has one now, so this stands for a kind added to `StationFocusKind` before its view lands.
  */
 export function FocusFallbackView({ focus, gone, onOpen }: FocusFallbackViewProps) {
   const { t } = useTranslation();

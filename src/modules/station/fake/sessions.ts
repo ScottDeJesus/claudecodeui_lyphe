@@ -104,6 +104,17 @@ export const SESSIONS_FAKE = {
   empty: rail({ sessions: [], roadmap: null, focus: null }),
 };
 
+/**
+ * The chat the rail draws by this name in a picture, its row whole (its state among it): how another region's slice names a
+ * chat of the same house (`fake/dock.ts`'s draft targets, working or not as their rows say). Throws when the rail draws no
+ * such chat, so a renamed fixture fails at once instead of drawing a chat no rail holds.
+ */
+export function railChat(picture: keyof typeof SESSIONS_FAKE, name: string): StationSession {
+  const found = SESSIONS_FAKE[picture].props.sessions?.find((session) => session.name === name);
+  if (found === undefined) throw new Error(`fake/sessions.ts draws no chat "${name}" in its ${picture} picture`);
+  return found;
+}
+
 /** The roadmap lane's picture the live bus carries in each picture, so a feature's step phrase names what it waits on. */
 export const ROADMAP_PICTURES: Record<keyof typeof SESSIONS_FAKE, RoadmapPicture> = {
   home: roadmapPictureOf(HOME_ROADMAP),

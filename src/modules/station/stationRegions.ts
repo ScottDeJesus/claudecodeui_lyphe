@@ -2,6 +2,10 @@ import type { ComponentType } from 'react';
 
 import { MemoryCorner } from '@/modules/station/MemoryCorner';
 import { SinceYouLastLooked } from '@/modules/station/SinceYouLastLooked';
+import { StationConversation } from '@/modules/station/StationConversation';
+import { StationDock } from '@/modules/station/StationDock';
+import { StationHead } from '@/modules/station/StationHead';
+import { StationTalk } from '@/modules/station/StationTalk';
 import { WhatNeedsYou } from '@/modules/station/WhatNeedsYou';
 import { WhereThingsStand } from '@/modules/station/WhereThingsStand';
 import type { StationRegionProps, StationSlot } from '@/shared/types';
@@ -19,4 +23,8 @@ export const STATION_REGIONS: Partial<Record<StationSlot, ComponentType<StationR
   corner: MemoryCorner,
   strip: SinceYouLastLooked,
   needs: WhatNeedsYou,
+  head: StationHead,
+  conversation: StationConversation,
+  dock: StationDock,
+  talk: StationTalk,
 };

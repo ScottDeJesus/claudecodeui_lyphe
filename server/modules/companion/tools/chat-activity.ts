@@ -107,7 +107,9 @@ function idleLine(sessionId: string): string {
  * words (80 characters), a waiting chat's ask, an idle or asleep chat's "idle 12 min". `state` is for a caller
  * that already read it. The answer is folded to ONE line here, at the one place every path leaves through: a tool
  * call's file name or tool name is whatever the model wrote, and a line break in it would add lines to the roster and
- * to `list_sessions` that read as other chats. Consumed by `house-reads.ts` (the roster) and `session-tools.ts` through it.
+ * to `list_sessions` that read as other chats. Consumed by `house-reads.ts` (the roster), `session-tools.ts` through it,
+ * `feeds/alert-block.ts` (the ask a waiting chat holds) and `station/station-sessions.ts`, which serves the line as it is to the
+ * station's rail (the page cuts it to one line there, never here).
  */
 export function activityLine(sessionId: string, state: ChatState = chatState(sessionId)): string {
   const line = state === 'working' ? workingLine(sessionId) : state === 'waiting' ? waitingLine(sessionId) : idleLine(sessionId);

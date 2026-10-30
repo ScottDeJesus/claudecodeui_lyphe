@@ -95,7 +95,7 @@ const buildEndingEvent = createNotificationEvent as (input: {
  *   - `relay(order)` carries one act of Kaylee's on his spoken word, with kaylee--press's record of it: the answer to an
  *     open prompt goes through the book of the open asks as its third door (`kaylee`, beside the card and the phone), every
  *     other act is a dispatcher verb of its own run with `--relay` (`dispatcher-relay.service.ts`). The companion's house
- *     hands it to her `take_action` (`CompanionHouse.relay`).
+ *     hands it to her `take_action` (`CompanionHouse.relay`). An act the dispatcher took pokes the lane, as the card's verbs do.
  */
 export type DispatcherModule = {
   router: Router;
@@ -244,8 +244,14 @@ export function createDispatcherModule(): DispatcherModule {
     },
     picture: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
     cardText: (name: string) => readCardText(name, commands),
-    relay: (order: RelayOrder) => isLockOrder(order)
-      ? prompts.answerOnHisWord(order.ask, replyOfLockOrder(order), order.press).then(relayAnswerOf)
-      : relayOrder(order, commands, (line) => console.log(line)),
+    relay: async (order: RelayOrder) => {
+      const answer = await (isLockOrder(order)
+        ? prompts.answerOnHisWord(order.ask, replyOfLockOrder(order), order.press).then(relayAnswerOf)
+        : relayOrder(order, commands, (line) => console.log(line)));
+      // His spoken word is the third door beside the card's verbs and answers, and it pokes the lane for the same reason they do: the card, the
+      // Inbox and the station's rail leave the Accept on the picture that follows his yes, not up to two seconds later on the next poll.
+      if (answer.outcome === 'took') watcher.poke();
+      return answer;
+    },
   };
 }

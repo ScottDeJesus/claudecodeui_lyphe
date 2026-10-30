@@ -29,20 +29,41 @@ type StationShellViewProps = {
 };
 
 /**
+ * THE DOCK WHILE HE EDITS THE BRIEF in the stack (the focus inside it): it sticks to the foot of the stack's view, which the
+ * frame ends at the on-screen keyboard's top, so the field, its target and its sends stand above the keys whether the keys
+ * rose before the field took the focus or after (nothing re-scrolls a stack its frame shrinks under). In the stack's flow,
+ * never a fixed or absolute box: it rides the frame as the stage's foot does, and lets go when the focus leaves.
+ */
+const DOCK_EDITING_IN_THE_STACK =
+  '[[data-station-tier=narrow]_&:focus-within]:sticky [[data-station-tier=narrow]_&:focus-within]:bottom-0 [[data-station-tier=narrow]_&:focus-within]:z-10';
+
+/**
  * How each slot stands in its column. The lists take the room (sessions, the conversation, needs) and scroll inside
- * themselves; the rest are their own height. The conversation keeps a floor of 3.5rem whatever else stands in her
- * column, so her newest line stays in sight (her panel's own rule); the dock gives way before it does. Below laptop
- * the column is a stack, where these read as their own heights.
+ * themselves; the rest are their own height.
+ *
+ * HER COLUMN'S ONE BUDGET (wide and laptop, read off `data-station-column=her`), in the order things give way as it runs
+ * short, each by its shrink: first the stage beside her on a laptop (a guest there, 10000), down to its floor; then the dock's
+ * field, down to its 88 px floor — the dock's basis is its card at that floor as the card measures it (its target line, the
+ * field's 88 px, its sends, and a notice or a refused send's sentence when one stands), with the dock's padding: the property
+ * `--station-dock-floor`, whose one writer is the dock's `useDockFloor`, and 14.25rem until it has written it — and it grows to
+ * its words (10000, to its content and no further) only into room
+ * her conversation's share leaves; then her conversation (100), from its share of 30% of the column, so her newest lines stay
+ * in sight, down to its 3.5rem floor (her panel's own rule); and last the dock (1) below its card's floor, scrolling with the
+ * card whole inside it. So his sends and a line of the brief stand whenever her conversation is above its floor. The dock's
+ * own cap, 45% of the column wide and 40% on a laptop, is the dock's (`StationDock`, in `cqh` of this column). Below laptop
+ * the column is a stack, where these read as their own heights: the conversation keeps its 3.5rem, and the dock holds itself
+ * to the frame instead.
  *
  * The corner is the rail's foot whatever stands above it (`mt-auto`, its hairline its own), so it never rises to the
- * rail's head while the sessions are not drawn; under the sessions, which take the room, the margin is nothing.
+ * rail's head while the sessions are not drawn; under the sessions, which take the room, the margin is nothing. The dock,
+ * while he edits it in the stack, rides the frame above the keyboard (`DOCK_EDITING_IN_THE_STACK`).
  */
 const SLOT_BOX: Record<BodySlot, string> = {
   sessions: 'min-h-0 flex-1',
   corner: 'mt-auto shrink-0 border-t border-border',
   head: 'shrink-0',
-  conversation: 'min-h-14 flex-1',
-  dock: 'min-h-0 flex-[0_1_auto]',
+  conversation: 'min-h-14 flex-1 [[data-station-column=her]_&]:flex-[1_100_30%]',
+  dock: cn('min-h-0 flex-[0_1_auto] [[data-station-column=her]_&]:max-h-max [[data-station-column=her]_&]:flex-[10000_1_var(--station-dock-floor,14.25rem)]', DOCK_EDITING_IN_THE_STACK),
   talk: 'shrink-0',
   needs: 'min-h-0 flex-1',
 };
@@ -50,9 +71,32 @@ const SLOT_BOX: Record<BodySlot, string> = {
 /**
  * The stage in her column on a laptop, beside her regions: its own height up to 55% of the column, and the first to
  * give way when the column runs short — a guest there, as her panel's notes are — down to a floor that keeps its head
- * and a line of what it holds.
+ * and a line of what it holds (7.5rem), and its foot when a kind draws one (her walk's Back and Next, which stand outside the
+ * body's scroller so they are never scrolled away): 4rem more, the foot's own height. Measured at 1280×800 with her head,
+ * conversation, dock and talk control all drawn: the 7.5rem floor alone stood the walk's foot 23 px over her conversation.
+ * Her cards' shelf over the stage takes 4.5rem more: its own height (53 px) and the rest of the first line of what the stage
+ * holds, whole under it. Measured at 1280×800 with the dock drawn: the 7.5rem floor alone was all shelf and head, not a word
+ * of the chat on it; at 11rem the first line stood cut in half. With the foot too, 16rem. The shelf's two floors hold only in
+ * a column tall enough for them and the dock's card both — 45rem, or 48rem where the column is under 38rem across and her
+ * head and talk row stand taller (a 1024 px window) — read off her column as a query container (`her`): in a shorter one the
+ * stage, a guest, keeps the 7.5rem (11.5rem with the walk's foot), its head and title still saying what it holds, and the
+ * dock's sends stay in sight (at 1280×720 the 12rem floor scrolled them away). An empty stage under the shelf lets go of the
+ * floor (`stageCell`), so the shelf's rule leaves it alone.
  */
-const LAPTOP_STAGE_BESIDE_HER = 'max-h-[55%] min-h-[7.5rem] flex-[0_10000_auto]';
+const LAPTOP_STAGE_BESIDE_HER = cn(
+  'max-h-[55%] min-h-[7.5rem] flex-[0_10000_auto] [&:has([data-station-stage-foot]:not(:empty))]:min-h-[11.5rem]',
+  '[@container_her_(min-height:45rem)_and_(min-width:38rem)]:[&:has([data-station-shelf]):not(:has([data-station-stage=empty]))]:min-h-[12rem]',
+  '[@container_her_(min-height:48rem)]:[&:has([data-station-shelf]):not(:has([data-station-stage=empty]))]:min-h-[12rem]',
+  '[@container_her_(min-height:45rem)_and_(min-width:38rem)]:[&:has([data-station-shelf]):has([data-station-stage-foot]:not(:empty))]:min-h-[16rem]',
+  '[@container_her_(min-height:48rem)]:[&:has([data-station-shelf]):has([data-station-stage-foot]:not(:empty))]:min-h-[16rem]',
+);
+
+/**
+ * Her column as a query container, `her`, of its own height and width (its grid cell's: nothing it holds sizes it), so her head
+ * draws her face over her words only while the column is tall enough (StationHead's wide form). Never in the narrow stack,
+ * whose height is what it holds.
+ */
+const HER_CONTAINER = '[container-name:her] [container-type:size]';
 
 /** The left rail, top to bottom: the sessions over the memory corner. */
 const LEFT: readonly BodySlot[] = ['sessions', 'corner'];
@@ -168,7 +212,7 @@ export function StationShellView({ tier, slots, stage, onBackToCloudcli }: Stati
       body = (
         <>
           {left}
-          <Column key="her" name="her" className="border-r border-border [grid-area:her]" pieces={piecesOf(HER, slots)} />
+          <Column key="her" name="her" className={cn('border-r border-border [grid-area:her]', HER_CONTAINER)} pieces={piecesOf(HER, slots)} />
           <div key="stage" data-station-column="stage" className="flex min-h-0 min-w-0 flex-col [grid-area:stage]">{stage}</div>
           {right}
         </>
@@ -185,7 +229,7 @@ export function StationShellView({ tier, slots, stage, onBackToCloudcli }: Stati
           <Column
             key="her"
             name="her"
-            className="[grid-area:her]"
+            className={cn('[grid-area:her]', HER_CONTAINER)}
             pieces={[...head, stageCell(herDrawn, herDrawn ? LAPTOP_STAGE_BESIDE_HER : 'min-h-0 flex-1'), ...below]}
           />
           {right}

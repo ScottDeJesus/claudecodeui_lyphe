@@ -12,8 +12,9 @@ export { CerberusProvider } from '@/modules/cerberus/context/CerberusProvider';
 
 // Read by src/modules/project-workspace (useRailBadges, for the Cerberus glyph's badge on the views rail): how many checks need a person right now, `0` until the first read answers.
 export { useCerberusNeeds } from '@/modules/cerberus/context/CerberusContext';
-// Read by src/modules/station (CheckStage): one check's entry in "Needs you" by its node and key, `undefined` until the overview is
-// read and `null` once the check needs no one, which is how the stage knows the check it was opened on has recovered.
+// Read by src/modules/station (CheckStage): one check's entry in "Needs you" by its node and key (`undefined` until the overview is
+// read, `null` once the check needs no one, which is how the stage knows the check it was opened on has recovered), whether the
+// overview could not be read at all, and a retry.
 export { useCerberusNeedOf } from '@/modules/cerberus/context/CerberusContext';
 
 // Drawn by src/modules/station (CheckStage): a red check on the station's stage is Cerberus's own card for it, with its fix

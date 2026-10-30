@@ -71,8 +71,9 @@ type SessionRowProps = {
  * One chat's row: its name over its project, its state chip at the right of the name's first line, the line she reads of it cut
  * to one line, and her mark when she looks at it. A chat waiting on him says what it waits on in the warn ink. The cut line is
  * read whole on the stage this row's press opens, which is how a finger reads it; the `Tooltip` over the row only repeats it for
- * a pointer, and for a keyboard as the row takes the focus. On the columns the tip opens to the row's right, over her column; in
- * the narrow stack, above the row.
+ * a pointer, and for a keyboard as the row takes the focus. It is not drawn where nothing hovers (`hover:none`): a tap's
+ * compatibility mouse events would open it and leave it standing over the stage the press has just opened. On the columns the
+ * tip opens to the row's right, over her column; in the narrow stack, above the row.
  */
 function SessionRow({ session, tier, current, her, onPress }: SessionRowProps) {
   const press = () => onPress({ kind: 'chat', sessionId: session.sessionId, label: session.name });
@@ -82,7 +83,7 @@ function SessionRow({ session, tier, current, her, onPress }: SessionRowProps) {
         content={session.activity}
         position={tier === 'narrow' ? 'top' : 'right'}
         showOnFocus
-        className="max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere]"
+        className="max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere] [@media(hover:none)]:hidden"
       >
         <RailRow kind="session" name={session.sessionId} current={current} onPress={press}>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -210,6 +211,7 @@ export function SessionRows({ tier, sessions, failure, onReread, focus, her, asl
               label={t('station.sessions.asleep', { count: asleep.length, defaultValue: 'Asleep · {{count}}' })}
               open={asleepOpen}
               onOpenChange={onAsleepOpen}
+              current={onStage !== null && asleep.some((session) => session.sessionId === onStage)}
               closedMark={herAsleep && her !== null ? <HerMark her={her} wrap /> : undefined}
             >
               {rowsOf(asleep)}

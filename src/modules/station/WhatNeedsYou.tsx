@@ -96,7 +96,7 @@ type WhatNeedsYouViewProps = {
  * In the columns the head stays and the body scrolls inside the rail; in the narrow stack (a phone) the page scrolls, and the
  * action card's foot, sticky to the bottom edge, keeps the words that fire it in sight while any of the card is.
  *
- * A pure view: `WhatNeedsYou` below binds it. Drawn in the `needs` slot by `StationShell` once registered, and by
+ * A pure view: `WhatNeedsYou` below binds it. Drawn in the `needs` slot by `StationShell` (`stationRegions.ts`), and by
  * `.verify/kaylee-station-shots.mjs` on the fixtures' pictures (`fake/needs.ts`).
  */
 export function WhatNeedsYouView({

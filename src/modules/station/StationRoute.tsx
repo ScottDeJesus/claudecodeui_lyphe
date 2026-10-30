@@ -11,6 +11,7 @@ import { StationSessionsProvider } from '@/modules/station/context/StationSessio
 import { useCardsTakeStage } from '@/modules/station/hooks/useCardsTakeStage';
 import { useStationPresence } from '@/modules/station/hooks/useStationPresence';
 import { useTakeHerFloor } from '@/modules/station/hooks/useTakeHerFloor';
+import { useUnlockHerVoice } from '@/modules/station/hooks/useUnlockHerVoice';
 import { StationShell } from '@/modules/station/StationShell';
 import type { CompanionOpenTarget } from '@/shared/companion-types';
 import { useTheme } from '@/shared/context/ThemeContext';
@@ -47,9 +48,10 @@ function StationCompanion({ children }: { children: ReactNode }) {
   return <CompanionProvider onOpen={openOnStage}>{children}</CompanionProvider>;
 }
 
-/** What stands inside both providers: her floor, the presence of the stage, her cards and walk taking the stage, and the station's layout. */
+/** What stands inside both providers: her floor, her voice's unlock, the presence of the stage, her cards and walk taking the stage, and the station's layout. */
 function StationHome() {
   useTakeHerFloor();
+  useUnlockHerVoice();
   useStationPresence();
   useCardsTakeStage();
   return <StationShell />;
@@ -69,7 +71,7 @@ function StationHome() {
  * look are heard for as long as the page stands); `StationNeedsProvider` (everything that needs him, read at mount and kept on
  * six events: the rail draws its items, the stages say when theirs is gone, and the compact and phone plans read its count); her
  * provider (`CompanionProvider`), mounted here because the workspace's host is not; and `StationHome` (her floor, the presence
- * of the stage, her new cards and walk taking the stage, the layout).
+ * of the stage, her new cards and walk taking the stage, her voice's unlock on the first press, the layout).
  * Beside them the route runs the two hooks of a phone's frame, which the sidebar and the workspace's route run for the
  * workspace: `pwa-mode` on html and body in the home-screen app, and `--keyboard-height` from the visual viewport.
  *

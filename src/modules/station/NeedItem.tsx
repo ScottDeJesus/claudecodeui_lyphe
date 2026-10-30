@@ -103,7 +103,8 @@ type NeedItemProps = {
  *   while it is the thing on the stage;
  * - what it is about, in its weight, cut at two lines;
  * - its one line, cut at one (a permission's in mono: it is a command; a question's and a plan's are prose, in the body face);
- *   the whole of it in a `Tooltip` for a pointer, which only repeats what the stage shows whole;
+ *   the whole of it in a `Tooltip` for a pointer, which only repeats what the stage shows whole (and is not drawn where nothing
+ *   hovers, `hover:none`: a tap's compatibility mouse events would leave its bubble over the rail's head);
  * - its act as a kit `Button`, and beside it, when it has them, the words that fire it — "Say “Queue Kaylee's desk”" with
  *   the mic, in the muted ink — always drawn, never on a hover.
  * An Accept and a red check wear `data-tone="warn"`: the tone's bar down the left edge and their kind word in its ink. A
@@ -118,6 +119,8 @@ export function NeedItem({ need, current, onPress, tooltipSide }: NeedItemProps)
   const kind: StationNeedKind = need.kind === 'ask' ? need.ask : need.kind;
   const look = STATION_NEED_KINDS[kind];
   const KindIcon = look.icon;
+  // A cut ask's stage offers no Allow (`need.cut`, read as `AskAnswers` reads it), so its act does not promise one: it opens it, plainly.
+  const act = need.kind === 'ask' && need.ask !== 'question' && need.cut !== false ? STATION_NEED_KINDS.followups.act : look.act;
   const line = lineOf(need, t);
   // The kind's own ink on a toned card, the muted one on the rest: the word is what says it, the colour only repeats it.
   const kindInk = look.warn ? 'text-tone-ink' : 'text-muted-foreground';
@@ -134,7 +137,7 @@ export function NeedItem({ need, current, onPress, tooltipSide }: NeedItemProps)
       )}
     >
       {look.warn && <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-tone-dot" />}
-      <Tooltip content={line} position={tooltipSide} className="max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere]">
+      <Tooltip content={line} position={tooltipSide} className="max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere] [@media(hover:none)]:hidden">
         <button
           type="button"
           tabIndex={-1}
@@ -167,7 +170,7 @@ export function NeedItem({ need, current, onPress, tooltipSide }: NeedItemProps)
           className="shrink-0 max-md:h-11"
           onClick={onPress}
         >
-          {t(look.act.key, look.act.english)}
+          {t(act.key, act.english)}
         </Button>
         {need.say !== null && (
           <p data-station-need-say="" className="flex min-w-0 flex-1 basis-40 items-start gap-1.5 text-xs leading-snug text-muted-foreground">

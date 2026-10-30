@@ -83,6 +83,8 @@ type RailFoldProps = {
   onOpenChange: (open: boolean) => void;
   /** What stands under the head's words while the fold is closed, when a row it hides has something to say (her mark). */
   closedMark?: ReactNode;
+  /** Whether the thing on the stage is a row of this fold: while the fold is closed that row is out of reach, so the head is lit in its place. */
+  current?: boolean;
   /** The rows it holds: drawn, and out of the tab order and the reading order while it is closed. */
   children: ReactNode;
 };
@@ -91,16 +93,21 @@ type RailFoldProps = {
  * A FOLD OF THE LEFT RAIL: the kit's `Collapsible`, its head a press as tall as a row (a 44 px catch under a finger), turning
  * the house's one fold sign (`FoldChevron`) beside its words, and its body the kit's `CardFoldBody`, so the rows a closed fold
  * hides are neither tabbed to nor read out. Opened and closed only by his press; the open state is the caller's, which the
- * station keeps per device.
+ * station keeps per device. While it is closed and the thing on the stage is one of its rows (`current`), its head is lit in
+ * that row's place.
  *
  * Used by this module's `SessionRows` (his asleep chats) and `RoadmapRows` (the complete epics).
  */
-export function RailFold({ kind, label, open, onOpenChange, closedMark, children }: RailFoldProps) {
+export function RailFold({ kind, label, open, onOpenChange, closedMark, current = false, children }: RailFoldProps) {
+  // The lit row of a closed fold is inert and out of the reading order, so the head stands lit for it (the same look and
+  // `aria-current` a row wears): the rail still says which side of it holds what is on the stage. An open fold lights the row itself.
+  const litForHiddenRow = current && !open;
   return (
     <Collapsible data-station-fold={kind} open={open} onOpenChange={onOpenChange} className="flex min-w-0 flex-col">
       <CollapsibleTrigger
         data-station-fold-head={kind}
-        className={cn(PRESS, 'flex-col items-start justify-center gap-1 text-muted-foreground hover:bg-muted/60 hover:text-foreground')}
+        aria-current={litForHiddenRow ? 'true' : undefined}
+        className={cn(PRESS, 'flex-col items-start justify-center gap-1', litForHiddenRow ? LIT : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground')}
       >
         <span className="flex min-w-0 items-center gap-2.5">
           <FoldChevron collapsed={!open} className="text-sm" />

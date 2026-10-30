@@ -116,13 +116,15 @@ export function useCerberusNeeds(): number {
 }
 
 /**
- * One check's entry in "Needs you", found by its node and its key (`<service>/<id>`): the card's whole need (the check, the fix
- * offered for it, its run and its diagnosis) in whatever status it holds now. `undefined` while the overview has not been read
- * (not asked yet is not "recovered"); `null` once the check needs no one: it recovered, a mute covers it, or it is gone.
+ * One check's entry in "Needs you", found by its node and its key (`<service>/<id>`), and how the overview it is read from stands.
+ * `need` is the card's whole need (the check, the fix offered for it, its run and its diagnosis) in whatever status it holds now:
+ * `undefined` while the overview has not been read (not asked yet is not "recovered"), `null` once the check needs no one (it
+ * recovered, a mute covers it, or it is gone). `unreachable` is the overview's own: no read has ever answered and the last one failed,
+ * so `need` stays `undefined` and a reader says so instead of waiting; `retry` reads the overview again.
  * Read by src/modules/station (CheckStage), through the barrel, to draw Cerberus's own card for the check a rail item opened.
  */
-export function useCerberusNeedOf(node: string, key: string): CerberusNeed | null | undefined {
-  const overview = useCerberus().overview;
-  if (overview === null) return undefined;
-  return overview.needsYou.find((need) => need.check.node === node && need.check.key === key) ?? null;
+export function useCerberusNeedOf(node: string, key: string): { need: CerberusNeed | null | undefined; unreachable: boolean; retry: () => void } {
+  const { overview, unreachable, refresh } = useCerberus();
+  const need = overview === null ? undefined : overview.needsYou.find((entry) => entry.check.node === node && entry.check.key === key) ?? null;
+  return { need, unreachable, retry: () => void refresh() };
 }

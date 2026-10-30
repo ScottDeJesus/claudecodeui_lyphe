@@ -39,9 +39,8 @@ function sentenceFor(sentence: string, cause: unknown): Error {
 }
 
 /**
- * For the station's rail (`WhereThingsStand`) and the chat's stage (`ChatStage`), which draw his chats, and the draft dock's
- * Steer and the walk stage's chat name, which name a chat (neither calls it yet; `FILL` markers hold their places): all four read
- * the same rows, so a chat is never working in one and idle in another.
+ * For every region of the station that draws or names one of his chats (the rail, the chat's stage, the strip, her cards' and
+ * walkthrough's stages: grep the callers): all read the same rows, so a chat is never working in one and idle in another.
  * Throws outside `StationSessionsProvider`, so a consumer placed wrong fails at once.
  */
 export function useStationSessions(): StationSessionsContextValue {
@@ -55,8 +54,8 @@ export function useStationSessions(): StationSessionsContextValue {
  * (`chatRows()` and the line she reads of each, served as they are), held for every region of the page.
  *
  * IT IS KEPT ON EVENTS, and nothing polls. It reads at mount, on every `station_sessions_changed` hint (whatever its `states`:
- * the run registry, the upsert broadcaster, host liveness and a raised ask each stand behind one, so every change the rail draws
- * has a hint behind it) and on `websocket_reconnected` (the hints that came while the socket was down are lost). The only other
+ * the run registry, the upsert broadcaster, a deleted, archived or restored chat, host liveness and a raised ask each stand
+ * behind one, so every change the rail draws has a hint behind it) and on `websocket_reconnected` (the hints that came while the socket was down are lost). The only other
  * read is the failed state's Try again, which is a press.
  *
  * ONE READ IS IN FLIGHT. A request that lands while a read is out does not start another: it leaves one mark, and when the read

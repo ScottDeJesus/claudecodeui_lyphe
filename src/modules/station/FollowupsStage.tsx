@@ -34,8 +34,8 @@ type FollowupsStageViewProps = {
  * walks into its ticks); with nothing open, "Open the chat" is. Every tick, the Done fold and "Open the chat" are 44 px catches
  * under a finger below 768 px (the touch law; the ticks and the fold are the followups module's, sized there).
  *
- * A pure view: `FollowupsStage` below binds it. Drawn on the stage for a `followups` focus once `stageViews.ts` registers it
- * (`live`), and by `.verify/kaylee-station-shots.mjs` on its fixture (`fake/needs.ts`).
+ * A pure view: `FollowupsStage` below binds it. Drawn on the stage for a `followups` focus (`stageViews.ts`), and by
+ * `.verify/kaylee-station-shots.mjs` on its fixture (`fake/needs.ts`).
  */
 export function FollowupsStageView({ focus, reading, onOpenChat }: FollowupsStageViewProps) {
   const { t } = useTranslation();

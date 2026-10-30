@@ -22,7 +22,7 @@ type AskNeed = Extract<StationNeed, { kind: 'ask' }>;
 /**
  * What the stage holds of its ask: `loading` while the needs have not been read; `waiting`, the ask, his to answer;
  * `answered`, his answer from this stage landed, `told` the server's sentence of what it did; `unread`, the chats' asks could
- * not be read just now (the server named `ask` in its faults), so whether this one still waits is not known; `gone`, no longer
+ * not be read just now (the server named `ask` in its faults, or the first read of the needs failed), so whether this one still waits is not known; `gone`, no longer
  * waiting — answered in its chat or by her, its chat ended, or his press refused 409 for that reason.
  */
 type AskFound =
@@ -72,7 +72,7 @@ type AskStageViewProps = {
  * "answered elsewhere" over a chat still blocked on its ask. Gone: "That ask was answered elsewhere." Every answer, Try again
  * and "Open the chat" is a 44 px catch under a finger below 768 px (the touch law).
  *
- * A pure view: `AskStage` below binds it. Drawn on the stage for an `ask` focus once `stageViews.ts` registers it (`live`),
+ * A pure view: `AskStage` below binds it. Drawn on the stage for an `ask` focus (`stageViews.ts`),
  * and by `.verify/kaylee-station-shots.mjs` on its fixture (`fake/needs.ts`).
  */
 export function AskStageView({ focus, found, answering, refusal, onAnswer, onReread, onOpenChat }: AskStageViewProps) {
@@ -214,7 +214,7 @@ function toldOf(body: unknown): string | null {
  */
 export function AskStage({ focus }: { focus: AskFocus }) {
   const { t } = useTranslation();
-  const { needs, faults, reread } = useStationNeeds();
+  const { needs, faults, failure, reread } = useStationNeeds();
   const openChat = useOpenChatInCloudcli();
   // The server's sentence of what it did with his answer from this stage. State, because "Answered" draws from it and it must
   // outlast the ask itself: the answer takes the ask off the list, and without this the stage would call it "answered elsewhere".
@@ -230,7 +230,8 @@ export function AskStage({ focus }: { focus: AskFocus }) {
   let found: AskFound;
   if (told !== null) found = { kind: 'answered', told };
   else if (refusedAsGone) found = { kind: 'gone' };
-  else if (needs === null) found = { kind: 'loading' };
+  // The first read failed (the provider holds `failure` only while it has no list): the rail says so with Try again, and so does this stage, which would otherwise look for the ask forever.
+  else if (needs === null) found = failure === null ? { kind: 'loading' } : { kind: 'unread' };
   else if (waiting !== undefined) found = { kind: 'waiting', need: waiting };
   // The chats' asks could not be read: whether this one still waits is not known, which is never "answered elsewhere".
   else if (faults.includes('ask')) found = { kind: 'unread' };

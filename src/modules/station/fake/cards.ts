@@ -64,13 +64,19 @@ const DIFF = card(900405, 25, 'claudecodeui_lyphe: uncommitted diff', DIFF_LINES
 const INBOX = card(900406, 12, 'What waits in his inbox', INBOX_LINES, 'list', null, false);
 const RUN = card(900407, 3, 'Restorly uploads handoff: its run\'s report', RUN_LINES, 'note', { kind: 'chat', sessionId: UPLOADS.sessionId }, false);
 
-/** Every card she holds in the stage's own shots: on the shelf, two pinned and her three newest, and two more in the conversation. */
-const ALL_CARDS = [RUNS, PLAN, NOTE, PAGE, DIFF, INBOX, RUN];
+/**
+ * Every card she holds in the stage's own shots: on the shelf, two pinned and her three newest, and two more in the conversation.
+ * `fake/conversation.ts`'s dense state stands all seven in her conversation where she put them.
+ */
+export const ALL_CARDS = [RUNS, PLAN, NOTE, PAGE, DIFF, INBOX, RUN];
 /** `home`'s cards: the pinned list of runs, and the diff. */
 const HOME_CARDS = [RUNS, DIFF];
 
-/** Her cards on each picture's shelf: none in `walkthrough` and `empty`, which draw no shelf. */
-const SHELF_NOTES: Record<'home' | 'waiting' | 'walkthrough' | 'empty', CompanionNote[]> = {
+/**
+ * Her cards in each picture, her picture's `notes`: the shelf draws them, and `fake/conversation.ts` stands each in her
+ * conversation where she put it. None in `walkthrough` and `empty`, which draw no shelf.
+ */
+export const SHELF_NOTES: Record<'home' | 'waiting' | 'walkthrough' | 'empty', CompanionNote[]> = {
   home: HOME_CARDS,
   waiting: [PLAN],
   walkthrough: [],
@@ -120,9 +126,9 @@ const homeCard = (note: CompanionNote, notes: CompanionNote[] = ALL_CARDS) => ({
   picture: 'home' as const, focus: focusOf(note), ...noteStage(focusOf(note), note), canGoBack: true, shelf: shelf(notes, focusOf(note)),
 });
 
-/** A walk shot over `walkthrough`, its stage at `walk`, her face's place drawn beside it, no card on the shelf. */
+/** A walk shot over `walkthrough`, its stage at `walk` beside her head (the picture's own), no card on the shelf. */
 const walkShot = (walk: CompanionWalk | null | undefined) => ({
-  picture: 'walkthrough' as const, focus: WALK_FOCUS, ...walkStage(walk), canGoBack: false, shelf: null, face: true,
+  picture: 'walkthrough' as const, focus: WALK_FOCUS, ...walkStage(walk), canGoBack: false, shelf: null,
 });
 
 /** A card she took down while it stood on the stage: the focus still names it, her picture no longer holds it. */
@@ -130,8 +136,8 @@ const GONE_FOCUS: Extract<StationFocus, { kind: 'note' }> = { kind: 'note', id: 
 
 /**
  * THE STAGE'S OWN SHOTS, each a stage and a shelf drawn over a picture in the stage's place (`.verify/kaylee-station-shots.mjs`,
- * by name): `picture`, the `focus` on the stage, its `view` and `props` (no view: the empty stage), whether Back is drawn, the
- * shelf's drawing (null: no cards), and `face` where the shot shows her face's place beside the walk.
+ * by name): `picture`, the `focus` on the stage, its `view` and `props` (no view: the empty stage), whether Back is drawn, and the
+ * shelf's drawing (null: no cards). Each is drawn beside her head, the picture's own (`fake/head.ts`).
  */
 export const CARDS_STAGE_FAKE = {
   'card-note': homeCard(RUN),

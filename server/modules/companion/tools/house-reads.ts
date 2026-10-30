@@ -112,7 +112,8 @@ function withStates(chats: HisChat[]): ChatRow[] {
 
 /**
  * Every chat of his with its state, ONE liveness read for all: waiting first, then working, then live, then
- * asleep, each most recent first. Consumed by `session-tools.ts`'s `list_sessions` and the roster below.
+ * asleep, each most recent first. Consumed by `session-tools.ts`'s `list_sessions`, the roster below, `station/station-sessions.ts`
+ * (the rows of the station's left rail, in this order) and `station/need-readers.ts` (the waiting asks).
  */
 export function chatRows(): ChatRow[] {
   return withStates(listHisChats());
