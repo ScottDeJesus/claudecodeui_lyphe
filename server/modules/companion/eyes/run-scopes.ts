@@ -6,6 +6,7 @@ import { dispatchSoulsStateDir } from '@/shared/utils.js';
 
 import type { CompanionToolDeps } from '../tools/companion-tools.js';
 
+import { runShape, type CardShape } from './card-shapes.js';
 import { toPanel, wholeOrDigest } from './eyes-answer.js';
 import { momentWords } from './run-list.js';
 import type { ResolvedRun } from './run-resolve.js';
@@ -45,12 +46,13 @@ type Part = string | Digest;
 
 /**
  * Builds the answer from its parts. For his panel the parts are joined whole into one note (a digest's text unabridged) and she is
- * told it is there. Otherwise each digest runs in turn through `wholeOrDigest`; a digest that cannot be had is told as a line and the
- * facts before it stand, because a refusal there would hide the head of the answer she already has.
+ * told it is there, a note about the run's plan or its chat (`shape`, from `runShape`). Otherwise each digest runs in turn through
+ * `wholeOrDigest`; a digest that cannot be had is told as a line and the facts before it stand, because a refusal there would hide the
+ * head of the answer she already has.
  */
-async function answerOf(deps: CompanionToolDeps, panel: boolean, title: string, parts: Part[], signal: AbortSignal | undefined): Promise<ToolTextResult> {
+async function answerOf(deps: CompanionToolDeps, panel: boolean, title: string, parts: Part[], shape: CardShape, signal: AbortSignal | undefined): Promise<ToolTextResult> {
   if (panel) {
-    return toPanel(deps, title, textResult(parts.map((part) => (typeof part === 'string' ? part : `${part.intro}\n${part.text}`)).join('\n\n')));
+    return toPanel(deps, title, textResult(parts.map((part) => (typeof part === 'string' ? part : `${part.intro}\n${part.text}`)).join('\n\n')), shape);
   }
   const lines: string[] = [];
   for (const part of parts) {
@@ -195,7 +197,7 @@ export async function readRunScope(deps: CompanionToolDeps, run: ResolvedRun, sc
     const soul = readSoulRun(run.id);
     if (soul === null) return deps.refuse(`The files of ${run.id} have been cleared from disk, so there is nothing left to read of it; call list_runs for the runs there are.`);
     const parts = await soulScope(scope, soul, soulState(soul.role, soul.state));
-    return answerOf(deps, panel, `Soul ${soul.agent}: ${scope}`, parts, signal);
+    return answerOf(deps, panel, `Soul ${soul.agent}: ${scope}`, parts, runShape(run), signal);
   }
   const chain = readChainRun(run.id);
   if (chain === null) return deps.refuse(`The files of ${run.id} have been cleared from disk, so there is nothing left to read of it; call list_runs for the runs there are.`);
@@ -204,5 +206,5 @@ export async function readRunScope(deps: CompanionToolDeps, run: ResolvedRun, sc
     : scope === 'failure' ? chainFailure(chain, state, run)
       : scope === 'findings' ? chainFindings(chain, state, run)
         : chainLog(chain, state, run);
-  return answerOf(deps, panel, `Run ${chain.slug}: ${scope}`, parts, signal);
+  return answerOf(deps, panel, `Run ${chain.slug}: ${scope}`, parts, runShape(run), signal);
 }

@@ -29,7 +29,7 @@ export function memoryTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition
         panel: z
           .boolean()
           .optional()
-          .describe('true puts the whole answer on his panel as a note and tells you only that it is there; the answer never enters your context. Leave out to read it yourself.'),
+          .describe('true puts the whole answer on his panel as a card and tells you only that it is there; the answer never enters your context. Leave out to read it yourself.'),
       },
       (args) => guardedToolResult('recall', 'read your memory', () => recall(deps, args)),
       { annotations: { readOnlyHint: true } }

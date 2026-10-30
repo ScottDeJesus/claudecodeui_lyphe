@@ -1,6 +1,7 @@
-import { AudioLines } from 'lucide-react';
+import { AudioLines, LayoutDashboard } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import { useSwitcherActions } from '@/modules/app-switcher';
 import { CommandPalette } from '@/modules/command-palette';
@@ -8,7 +9,9 @@ import { useCompanion } from '@/modules/companion';
 import { selectGitRepository } from '@/modules/git-panel';
 import { useProjectCommandState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
+import { openStation } from '@/shared/cloudcliDoors';
 import { GIT_REPO_PATHS } from '@/shared/constants';
+import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import type { ChatDoor, PaletteGroup, PaletteNavRow } from '@/shared/types';
 
 /**
@@ -63,22 +66,35 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
     [views, t, setActiveTab, openSettings],
   );
 
-  // Kaylee's group: one row that opens her panel. Her name is the one he gave her, so it is read off her picture, and the
-  // memo keeps the group's identity through the frames she sends (each sentence changes the picture, not her name).
+  // Kaylee's group: a row that opens her panel and a row that opens her station. Her name is the one he gave her, so it is
+  // read off her picture, and the memo keeps the group's identity through the frames she sends (each sentence changes the
+  // picture, not her name). The station's door is `openStation`: its own window on a desktop (named, so a second press brings
+  // the same one forward), this window on a phone or in the home-screen app; the same door her panel's head carries.
   const { picture, setOpen: setCompanionOpen } = useCompanion();
+  const navigate = useNavigate();
+  const { isMobile, isPWA } = useDeviceSettings();
   const companionName = picture?.settings.name ?? t('companion.defaultName');
   const companionGroup = useMemo<PaletteGroup>(
     () => ({
       heading: t('companion.palette.group', { name: companionName }),
-      rows: [{
-        key: 'companion',
-        label: t('companion.palette.talk', { name: companionName }),
-        keywords: t('companion.palette.keywords'),
-        icon: AudioLines,
-        run: () => setCompanionOpen(true),
-      }],
+      rows: [
+        {
+          key: 'companion',
+          label: t('companion.palette.talk', { name: companionName }),
+          keywords: t('companion.palette.keywords'),
+          icon: AudioLines,
+          run: () => setCompanionOpen(true),
+        },
+        {
+          key: 'station',
+          label: t('companion.palette.station', { defaultValue: 'Open Kaylee Station' }),
+          keywords: t('companion.palette.stationKeywords', { defaultValue: 'kaylee station watch floor dashboard monitor window' }),
+          icon: LayoutDashboard,
+          run: () => openStation(navigate, { phone: isMobile, pwa: isPWA }),
+        },
+      ],
     }),
-    [t, companionName, setCompanionOpen],
+    [t, companionName, setCompanionOpen, navigate, isMobile, isPWA],
   );
 
   return (

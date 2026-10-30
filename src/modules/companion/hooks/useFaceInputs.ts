@@ -3,13 +3,16 @@ import { useMemo } from 'react';
 import type { CompanionLogEntry, CompanionPicture } from '@/shared/companion-types';
 import type { CompanionFaceLook, CompanionFaceSentences, CompanionVoice } from '@/shared/types';
 
-type FaceInputsArgs = {
+type FaceSentencesArgs = {
   /** Her picture: the log her sentences are read from, the running turn's id and the floor. Null until the first read. */
   picture: CompanionPicture | null;
   /** This page's voice: `speaking` is the sentence its player is sounding, and `on` its switch. */
   voice: CompanionVoice;
   /** This page's name for her, to know whether it holds the floor and so plays her voice. */
   clientId: string;
+};
+
+type FaceLookArgs = {
   /** The rect of the anchor the disc is drawing a look at, null when none is drawn: none holds, or a drag is in hand or set the look aside. */
   anchor: DOMRect | null;
   /** Her rest's box: where she stands at home, which the disc reports. Null before the kit has placed her. */
@@ -34,22 +37,16 @@ function newestOfHers(log: CompanionLogEntry[], matches: (entry: CompanionLogEnt
 }
 
 /**
- * Used by this module's CompanionFab: what her face reads, derived from what the button already holds, so the button itself
- * stays a binding of the provider to the disc.
+ * Used by this module's CompanionFace, which is her face bound to the provider wherever it is drawn (the button, the station):
+ * the sentences her face reads, derived from the picture and the page's voice.
  *
- * THE SENTENCES. `playing` is the log entry matching the turn and index of the sentence this page's player is sounding
- * (`voice.speaking`): its mood word, its text and its sounds drive her mouth. `newest` is the newest entry of hers whose turn is
- * the running one (`picture.turnId`), the mood a page with no voice wears as her sentences arrive: it is read only where this page
- * plays none, because a page that plays her voice takes each mood as its sentence starts sounding and not as it arrives. A page plays
- * her voice when its switch is on and it holds the floor (`useCompanionVoice`). `turnRunning` is whether a turn is under way.
- *
- * THE LOOK is the anchor's centre less her own, in whole pixels, and it has two phases. While she glides to the anchor, hers is her REST
- * centre: she turns toward where she is going. Once she has landed, hers is her TARGET centre: she faces the thing beside her.
+ * `playing` is the log entry matching the turn and index of the sentence this page's player is sounding (`voice.speaking`): its mood
+ * word, its text and its sounds drive her mouth. `newest` is the newest entry of hers whose turn is the running one
+ * (`picture.turnId`), the mood a page with no voice wears as her sentences arrive: it is read only where this page plays none, because
+ * a page that plays her voice takes each mood as its sentence starts sounding and not as it arrives. A page plays her voice when its
+ * switch is on and it holds the floor (`useCompanionVoice`). `turnRunning` is whether a turn is under way.
  */
-export function useFaceInputs({ picture, voice, clientId, anchor, rest, target, size, landed }: FaceInputsArgs): {
-  sentences: CompanionFaceSentences;
-  look: CompanionFaceLook | null;
-} {
+export function useFaceSentences({ picture, voice, clientId }: FaceSentencesArgs): CompanionFaceSentences {
   const log = picture?.log ?? NO_LOG;
   const turnId = picture?.turnId ?? null;
   const { speaking } = voice;
@@ -64,15 +61,21 @@ export function useFaceInputs({ picture, voice, clientId, anchor, rest, target, 
     [log, playsVoice, turnId],
   );
   const turnRunning = turnId !== null;
-  const sentences = useMemo(() => ({ playing, newest, turnRunning }), [playing, newest, turnRunning]);
+  return useMemo(() => ({ playing, newest, turnRunning }), [playing, newest, turnRunning]);
+}
 
-  const look = useMemo(() => {
+/**
+ * Used by this module's CompanionFab, whose disc is the one face that looks at things: where the anchor lies from her, for
+ * CompanionFace's `look`. It is the anchor's centre less her own, in whole pixels, and it has two phases. While she glides to the
+ * anchor, hers is her REST centre: she turns toward where she is going. Once she has landed, hers is her TARGET centre: she faces
+ * the thing beside her.
+ */
+export function useFaceLook({ anchor, rest, target, size, landed }: FaceLookArgs): CompanionFaceLook | null {
+  return useMemo(() => {
     if (anchor === null || target === null || rest === null) return null;
     const from = landed
       ? { x: target.left + size / 2, y: target.top + size / 2 }
       : { x: rest.x + rest.width / 2, y: rest.y + rest.height / 2 };
     return { dx: Math.round(anchor.left + anchor.width / 2 - from.x), dy: Math.round(anchor.top + anchor.height / 2 - from.y) };
   }, [anchor, target, rest, size, landed]);
-
-  return { sentences, look };
 }

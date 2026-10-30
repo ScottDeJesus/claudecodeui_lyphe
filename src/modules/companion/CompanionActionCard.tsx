@@ -109,6 +109,8 @@ function targetFacts(target: CompanionActionTarget, t: TFunction): string {
  * THE ACTION WAITING FOR HIS WORD: the one thing on screen that says what will happen. Nothing fires on her judgment, so all
  * of it is here to be read at a glance, on a phone too, before he says the words. Drawn by this module's CompanionPanel in
  * her dock, above the draft: the draft's sibling, with the same Card, the same eyebrow's type and a target line under it.
+ * Its second home is the head of the station module's right rail, "What needs you" (`WhatNeedsYouView`, through the
+ * barrel), drawn there exactly as here: the rail's scroller is the edge its foot sticks to.
  *
  * TOP, standing: the waiting mark and "Waiting for your word" in the warn tone (an amber pulse, the Roadmap's own mark for a
  * prompt waiting on him, and words beside it, never the colour alone), and the × that withdraws it. Then the action as a

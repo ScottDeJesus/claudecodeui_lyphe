@@ -20,9 +20,10 @@ import type { CompanionFace, CompanionFrame, CompanionLogEntry, CompanionNote, C
  *
  * `companion_pending` replaces the one action waiting for his word (`null` when it was taken, withdrawn, replaced or
  * lapsed on the server), and a frame cut short of the fields the action card draws from is left alone like any other.
- * `companion_cleared` empties what Clear empties on the server — the log, the notes, the draft, the pending action, the
+ * `companion_cleared` empties what Clear empties on the server — the log, the unpinned notes, the draft, the pending action, the
  * walk, the focus, her activity and the turn — so the panel is bare at once; the provider also reads the picture again,
- * which is the server's own word on the rest. It keeps her `face`: Clear wipes her memory, not her look. `companion_face`
+ * which is the server's own word on the rest. It keeps her `face` (Clear wipes her memory, not her look) and the cards he
+ * pinned (his keep). `companion_note_pinned` replaces one card's `pinned` by its id. `companion_face`
  * replaces the face the page draws (an upload, a restore, each frame a bake renders and the bake's end), and one that is not
  * a face is left alone like any other frame. `companion_open` changes nothing here: it is an order to the page whose
  * client id it names, which the provider carries out.
@@ -122,7 +123,7 @@ const isWord = (value: unknown): value is string => isText(value) && value.trim(
 
 /**
  * Whether the target of a `companion_open` is one this page can act on: a chat with its session id, a card with its plan, a
- * page with its id (and a block id that is a word or `null`). A target of a kind this build does not know, or one cut short
+ * page with its id (and a block id that is a word or `null`), a service check with its node and its key. A target of a kind this build does not know, or one cut short
  * of its field, is not acted on, the same as a frame of an unknown kind. Consumed by this module's CompanionProvider, which
  * hands the host only targets that pass it.
  */
@@ -132,6 +133,7 @@ export function isOpenTarget(value: unknown): value is CompanionOpenTarget {
     case 'chat': return isWord(value.sessionId);
     case 'card': return isWord(value.plan);
     case 'page': return isWord(value.pageId) && (value.blockId === null || isWord(value.blockId));
+    case 'check': return isWord(value.node) && isWord(value.key);
     default: return false;
   }
 }
@@ -197,6 +199,11 @@ export function reduceCompanion(picture: CompanionPicture, frame: CompanionFrame
       return isNumber(frame.id) && picture.notes.some((note) => note.id === frame.id)
         ? { ...picture, notes: picture.notes.filter((note) => note.id !== frame.id) }
         : picture;
+    // A pin moved: the card's `pinned` is replaced by id, and a frame for a card this picture does not hold (or already holds so) changes nothing.
+    case 'companion_note_pinned':
+      return isNumber(frame.id) && typeof frame.pinned === 'boolean' && picture.notes.some((note) => note.id === frame.id && note.pinned !== frame.pinned)
+        ? { ...picture, notes: picture.notes.map((note) => (note.id === frame.id ? { ...note, pinned: frame.pinned } : note)) }
+        : picture;
     case 'companion_settings':
       return isSettings(frame.settings) ? { ...picture, settings: frame.settings } : picture;
     case 'companion_process':
@@ -207,12 +214,12 @@ export function reduceCompanion(picture: CompanionPicture, frame: CompanionFrame
     // The account's face moved: an upload began or finished, a bake rendered a frame, a restore brought the original back.
     case 'companion_face':
       return isFace(frame.face) ? { ...picture, face: frame.face } : picture;
-    // Clear wipes her memory, not her look: `face` is kept.
+    // Clear wipes her memory, not her look: `face` is kept. A pinned card is his keep, so it is kept as well.
     case 'companion_cleared':
       return {
         ...picture,
         log: [],
-        notes: [],
+        notes: picture.notes.filter((note) => note.pinned),
         draft: null,
         pending: null,
         walk: null,

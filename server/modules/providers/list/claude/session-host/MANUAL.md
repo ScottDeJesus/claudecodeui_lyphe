@@ -533,6 +533,8 @@ Why the facade's `exit` and not a second listener per cause: the CLI's `exit` fr
 
 The frame, `SessionHostLivenessEvent` in `server/shared/types.ts`: `{ kind: 'session_host_liveness', change: 'snapshot' | 'live' | 'asleep', sessionIds: string[], at }`. The ids ride an array and not a `sessionId` key on purpose: `useProjectsState` marks a chat for attention when any frame carries a `sessionId` that is not the one on screen, and a host ending is no news in the chat. No `seq` and no `sessionId`, so it never becomes a transcript row or a mark. The fan-out copies `broadcastKanbanEvent`.
 
+`onHostLivenessChanged(listener)` (`host-liveness.ts`, through `session-host/index.ts` and the providers barrel) is the server's own ear for the same pushes: a listener set that answers the unsubscribe and is called with the chat ids (`string[]`) of each `live` or `asleep` change as it is broadcast, never for the snapshot. A listener that throws is logged (`[keepalive] a host-liveness listener failed`) and the rest, and the pages' frame, still go. Consumed by the companion module's station hint (MAN-9257).
+
 Silence while the API exits: a facade that settles under `isApiExiting()` was detached (D-10), not ended, so `asleep` is not pushed; the successor's snapshot, held until it has re-adopted, tells the pages.
 
 Boundaries:

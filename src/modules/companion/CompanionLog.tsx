@@ -90,7 +90,8 @@ function SpeakingDots({ label }: { label: string }) {
 }
 
 /**
- * Her exchange with him, newest last. Drawn by this module's CompanionPanel, between the header and the dock.
+ * Her exchange with him, newest last. Drawn by this module's CompanionPanel, between the header and the dock, and by the
+ * station module's conversation.
  *
  * HIS LINES stand on the right in the secondary ground, captioned "You · typed" or "You · spoken" with the glyph of the
  * way they came (a keyboard, a mic), as the chat draws his turn. A spoken line with no words (a press that carried none,

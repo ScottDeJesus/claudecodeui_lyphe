@@ -14,8 +14,8 @@ type SelectedCheckProps = {
   editor: ReactElement | null;
   /** "Name this check", or the ✎ beside a name: opens the editor. */
   onName: () => void;
-  /** Mute, offered while no mute covers the check. */
-  onMute: () => void;
+  /** Mute, offered while no mute covers the check. Absent, no Mute is drawn: the sheet's host has no Mute dialog to open. */
+  onMute?: () => void;
   /** Unmute, beside the note of the mute that covers the check. */
   onUnmute: () => void;
   /** The check's newest diagnosis, or null when it has none. "Diagnose again" reads once there is one, and no button stands while it runs: center takes one diagnosis at a time on a check. */
@@ -36,8 +36,8 @@ type SelectedCheckProps = {
  * - the value it reported; "Checked 17:52:10 · every 30 s · by the warden on eis1" (by Cerberus on
  *   this server for the hub's own checks, "No result yet" before the first); and the raw key, which
  *   a check with no label already shows as its name.
- * - the action row: Diagnose ("Diagnose again" once the check has a diagnosis), then Mute, or the mute's note
- *   ("Muted until 18:40 · <reason>") with Unmute.
+ * - the action row: Diagnose ("Diagnose again" once the check has a diagnosis), then Mute (where the sheet's host
+ *   offers one), or the mute's note ("Muted until 18:40 · <reason>") with Unmute.
  *
  * When the editor closes it takes focus with it. If focus fell to the page, it comes back to what
  * opened the editor, which after a save is the ✎ that now follows the name.
@@ -123,9 +123,11 @@ export function SelectedCheck({ check, editor, onName, onMute, onUnmute, diagnos
           />
         )}
         {check.mute === null ? (
-          <Button variant="ghost" size="sm" onClick={onMute}>
-            {t('cerberus.sheet.mute')}
-          </Button>
+          onMute && (
+            <Button variant="ghost" size="sm" onClick={onMute}>
+              {t('cerberus.sheet.mute')}
+            </Button>
+          )
         ) : (
           <>
             {/* The mute is the operator's own note, so it reads in full: a neutral block that wraps,

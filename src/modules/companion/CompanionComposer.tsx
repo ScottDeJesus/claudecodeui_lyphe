@@ -25,7 +25,8 @@ type CompanionComposerProps = {
 /**
  * The box to type to her: the kit's PromptInput as one row that grows with the text — the field, then the talk button's
  * place, then send. Enter sends and Shift+Enter breaks the line (a phone's Enter key says "Send"); an IME still composing
- * keeps its Enter. Drawn by this module's CompanionPanel, at the panel's foot, clear of a phone's home indicator.
+ * keeps its Enter. Drawn by this module's CompanionPanel, at the panel's foot, clear of a phone's home indicator, and by the
+ * station module's talk control.
  *
  * THE TALK BUTTON (CompanionTalkButton) stands in the tools cluster before send, the same press as the key or mouse
  * button he binds, here for the phone: drawn from `talk`, the page's one press. What failed with a press on the page

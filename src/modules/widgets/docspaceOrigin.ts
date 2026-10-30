@@ -137,7 +137,7 @@ export function docspaceStudioUrl(pageId: string, blockId: string): string {
  * belt-and-braces reason `docspaceStudioUrl` states.
  *
  * Read by `docspaceStudioUrl` (a block, from the transcript), by the companion module's Settings ("Open her memory", the
- * memory page) and by the station module's page stage; the cards plan's page card and the memory corner will read it too.
+ * memory page) and by the station module's page stage and memory corner ("Open the full page"); the cards plan's page card will read it too.
  */
 export function docSpacePageUrl(pageId: string, blockId: string | null): string {
   const page = `${resolveDocSpaceOrigin()}/#page=${encodeURIComponent(pageId)}`;

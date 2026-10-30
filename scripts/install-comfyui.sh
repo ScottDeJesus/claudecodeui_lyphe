@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Installs the toolchain that bakes Kaylee's face: ComfyUI, CPU-only torch, the AdvancedLivePortrait
 # node and the six models it reads. One-time and idempotent: every step prints `ran` or `skip`, a
-# step whose result is already there is skipped, and nothing is deleted (the one file a run
-# replaces is its own install.json.previous).
+# step whose result is already there is skipped, and nothing is deleted. What a run replaces is
+# install.json.previous (the old install.json is renamed over it) and a model that failed its sha256.
 #
 # Where: COMPANION_COMFYUI_DIR (default /opt/comfyui, where this box keeps its third-party installs).
 # The folder holds a venv and multi-gigabyte models, so it lives outside the tracked tree, and the

@@ -12,23 +12,28 @@ import { Button, Card, EmptyState } from '@/shared/ui';
 
 /**
  * Each kind's "no longer here" line: what the stage says of a thing that has gone while it stood there (a chat
- * deleted, an ask answered, a check recovered, her card put away, her walk ended). The label is the focus's own.
+ * deleted, an ask answered elsewhere, a check no longer red, her card put away, her walk ended). The label is the
+ * focus's own, where the line names it.
  */
 const GONE_LINES: Record<StationFocusKind, string> = {
-  chat: '{{label}} is no longer in CloudCLI',
+  chat: 'This session is no longer in your list.',
   card: '{{label}} is no longer on the roadmap',
-  ask: '{{label}} is no longer waiting',
+  ask: 'That ask was answered elsewhere.',
   followups: '{{label}} has no open follow-ups now',
-  check: '{{label}} is no longer failing',
-  note: '{{label}} is no longer on her cards',
-  walk: '{{label}} has ended',
+  check: '{{label}} is no longer red',
+  note: '{{label}} was taken down',
+  walk: 'The walkthrough ended',
   page: '{{label}} is no longer in DocSpace',
 };
 
 /**
  * A thing that has gone, said in its kind's own line beside its kind's glyph, where its view stood: the stage keeps
- * the head (its label, Back and ✕) and says why nothing is under it. Used by this file's `FocusFallbackView` and by
- * `CardStageView` (this module), for a feature or epic neither the dispatcher nor the roadmap holds any more.
+ * the head (its label, Back and ✕) and says why nothing is under it. Used by this file's `FocusFallbackView`, by
+ * `CardStageView` (this module), for a feature or epic neither the dispatcher nor the roadmap holds any more, and by
+ * the right rail's three stages (`AskStageView`, `FollowupsStageView`, `CheckStageView`) for an ask answered
+ * elsewhere, a chat with no follow-ups left and a check no longer red, by the chat's stage (`ChatStageView`) for a
+ * chat his sessions no longer hold, and by her cards' two stages (`NoteStageView`, `WalkStageView`) for a card taken
+ * down and a walk ended.
  */
 export function StageGone({ focus }: { focus: StationFocus }) {
   const { t } = useTranslation();

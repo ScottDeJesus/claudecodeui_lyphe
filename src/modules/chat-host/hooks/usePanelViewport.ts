@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 /** The room the panel is laid out in, in CSS pixels: the window's width, and its height less the virtual keyboard. */
 function readViewport(): { width: number; height: number } {
-  // `--keyboard-height` is set on the root element by project-workspace's `useVisualViewportKeyboardOffset`
+  // `--keyboard-height` is set on the root element by the shared `useVisualViewportKeyboardOffset`
   // and is unset on a machine with no virtual keyboard, where parsing it gives NaN and means 0.
   const keyboardHeight = Number.parseFloat(
     getComputedStyle(document.documentElement).getPropertyValue('--keyboard-height'),

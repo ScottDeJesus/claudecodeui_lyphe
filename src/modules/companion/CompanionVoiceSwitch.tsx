@@ -11,8 +11,9 @@ type CompanionVoiceSwitchProps = {
 };
 
 /**
- * "Voice on this device": the switch that silences her on this page alone. Composed for this module's CompanionHeader,
- * in the row of its own under her controls; `.verify/kaylee-voice-scaffold.mjs` draws it on and off.
+ * "Voice on this device": the switch that silences her on this page alone. Composed for this module's CompanionControls
+ * (which CompanionHeader draws), in the row of its own under her controls; `.verify/kaylee-voice-scaffold.mjs` draws it on
+ * and off.
  *
  * Off, this page neither plays nor fetches her speech, so nothing is spent on it here, and her words still stream into the
  * log; every other device keeps its own switch. The words lead and the kit's Switch closes the row at its far end, under

@@ -5,6 +5,7 @@ import { AppError } from '@/shared/utils.js';
 
 import type { CompanionToolDeps } from '../tools/companion-tools.js';
 
+import { LIST_ABOUT_NOTHING } from './card-shapes.js';
 import { answerRead, INLINE_MAX_CHARACTERS, LIST_MAX, moreLine } from './eyes-answer.js';
 import { cardFacts, cardLine, LANE_WORDS_LINE, laneCountsLine, laneNamed, laneWord, openCardCount } from './kanban-lines.js';
 import { counted, fitLines, linesThatFit, maskCredentials } from './line-words.js';
@@ -120,7 +121,7 @@ function cardAnswer(deps: CompanionToolDeps, card: KanbanCardDetail, panel: bool
   const description = maskCredentials(card.description).trim();
   return answerRead(
     deps,
-    { panel, title: card.title, text: description === '' ? '(no description)' : description, label: 'kanban-card', brief: CARD_BRIEF, intro: `${cardFacts(card)}\nDescription:` },
+    { panel, title: card.title, text: description === '' ? '(no description)' : description, label: 'kanban-card', brief: CARD_BRIEF, intro: `${cardFacts(card)}\nDescription:`, shape: LIST_ABOUT_NOTHING },
     signal
   );
 }
@@ -147,7 +148,7 @@ function cardByWords(deps: CompanionToolDeps, board: KanbanBoard, phrase: string
   if (fits.length === 0) return textResult(`No card on ${board.name} has "${phrase}" in its title or tags. ${LANE_WORDS_LINE}`);
   if (fits.length === 1) return cardAnswer(deps, kanbanCardsService.getCard(fits[0].id), panel, signal);
   const text = `${counted(fits.length, 'card')} on ${board.name} fit "${phrase}":\n${fitLines(fits.map(cardLine))}`;
-  return answerRead(deps, { panel, title: `Kanban: ${phrase}`, text, label: 'kanban-list', brief: LIST_BRIEF, intro: '' }, signal);
+  return answerRead(deps, { panel, title: `Kanban: ${phrase}`, text, label: 'kanban-list', brief: LIST_BRIEF, intro: '', shape: LIST_ABOUT_NOTHING }, signal);
 }
 
 /** `read_kanban`: see the file's head. */
@@ -163,11 +164,11 @@ export async function readKanban(
   const scope = args.scope.trim();
 
   if (scope.toLowerCase() === 'board') {
-    return answerRead(deps, { panel, title: `Kanban: ${board.name}`, text: boardOverview(board, counts, unnamed), label: 'kanban-board', brief: LIST_BRIEF, intro: '' }, signal);
+    return answerRead(deps, { panel, title: `Kanban: ${board.name}`, text: boardOverview(board, counts, unnamed), label: 'kanban-board', brief: LIST_BRIEF, intro: '', shape: LIST_ABOUT_NOTHING }, signal);
   }
   const lane = laneNamed(scope);
   if (lane !== null) {
-    return answerRead(deps, { panel, title: `Kanban: ${laneWord(lane)}`, text: laneCards(board, counts, lane), label: 'kanban-lane', brief: LIST_BRIEF, intro: '' }, signal);
+    return answerRead(deps, { panel, title: `Kanban: ${laneWord(lane)}`, text: laneCards(board, counts, lane), label: 'kanban-lane', brief: LIST_BRIEF, intro: '', shape: LIST_ABOUT_NOTHING }, signal);
   }
   if (/^c-\d+$/i.test(scope)) return cardById(deps, scope, panel, signal);
   return cardByWords(deps, board, scope, panel, signal);

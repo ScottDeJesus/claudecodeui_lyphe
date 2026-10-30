@@ -14,7 +14,7 @@ import { getConnection } from '@/modules/database/connection.js';
  * merged away (`moveToSession`).
  *
  * Consumers: `server/modules/followups/followups.service.ts` — the lane's only reader and writer; the
- * companion reads through the followups barrel's `listOpenFollowups`, never this file — and `sessions.db.ts`,
+ * companion reads through the followups barrel's `listOpenFollowups` and `listOpenFollowupGroups`, never this file — and `sessions.db.ts`,
  * which calls `moveToSession` inside its merge transactions. Reach it through
  * `@/modules/database/index.js`. Every statement runs on the caller's connection; only `addMany`
  * opens a transaction of its own, so a batch lands whole or not at all.
@@ -65,6 +65,23 @@ export const followupsDb = {
     return getConnection()
       .prepare(`SELECT ${FOLLOWUP_COLUMNS} FROM followups WHERE user_id = ? AND state = 'open' ORDER BY id DESC LIMIT ?`)
       .all(userId, limit) as FollowupRow[];
+  },
+
+  /**
+   * The account's OPEN items grouped by chat, the chat with the newest item first: each chat's NEWEST open item (a whole row) beside how
+   * many open items the chat holds. Counted in SQL over every open row of the account, so no ceiling cuts a group — the station's
+   * read, which says how many a chat left for him.
+   */
+  listOpenGroupsOfUser(userId: number): Array<FollowupRow & { open_count: number }> {
+    return getConnection()
+      .prepare(
+        `SELECT ${FOLLOWUP_COLUMNS}, g.open_count
+         FROM followups
+         JOIN (SELECT MAX(id) AS newest_id, COUNT(*) AS open_count FROM followups WHERE user_id = ? AND state = 'open' GROUP BY session_id) g
+           ON g.newest_id = followups.id
+         ORDER BY followups.id DESC`
+      )
+      .all(userId) as Array<FollowupRow & { open_count: number }>;
   },
 
   /** One item of the chat by id, or `null` when no item of THAT chat carries it. */

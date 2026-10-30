@@ -27,7 +27,14 @@ type NeedCardProps = {
   /** It stopped needing you: drawn for .55 s more as it leaves, and no longer pressable. */
   leaving: boolean;
   onOpen: (target: CerberusSheetTarget) => void;
-  onMute: (check: CerberusCheckView) => void;
+  /** Mute, pressed: the host opens its Mute dialog on the check. Absent, no Mute is drawn: a page that hosts no Mute dialog does not offer one. */
+  onMute?: (check: CerberusCheckView) => void;
+  /**
+   * What the check reported, drawn whole rather than cut at two lines: where this card is the whole of what a finger can read
+   * (the station's check stage, where the rail's cut line must stand whole). Absent, the tab's cut, its whole on hover and in
+   * the sheet.
+   */
+  wholeValue?: boolean;
 };
 
 /**
@@ -35,12 +42,18 @@ type NeedCardProps = {
  * down its left edge, so a column of cards reads by severity before a word is read; its round glyph (the
  * status's icon, ringing while it fails), its name and word, where it runs and since when, its raw key,
  * and what it last reported, cut at two lines so a health document's prose cannot stretch a row of cards
- * (the whole of it on hover, and in the sheet); then its actions. A status the table draws `solid` —
+ * (the whole of it on hover, and in the sheet; whole on the card where its host asks, `wholeValue`); then its
+ * actions. A status the table draws `solid` —
  * failing, refused: broken now, not close to a limit — also washes the card's head in its tone. A check
  * with no label yet is named by its key, in mono, which then is not written a second time under it.
- * The bar, the wash and the glyph are decoration: the word is written beside them.
+ * The bar, the wash and the glyph are decoration: the word is written beside them. Its presses are 44 px
+ * catches under a finger below 768 px, the house's touch floor.
+ *
+ * Used by this file's `NeedsYouCard`, once per card, and by the station module's check stage (`CheckStage`,
+ * through the barrel), which draws one red check's card on its stage, with its fix and Diagnose, no Mute, and
+ * its reported value whole.
  */
-function NeedCard({ need, leaving, onOpen, onMute }: NeedCardProps) {
+export function NeedCard({ need, leaving, onOpen, onMute, wholeValue = false }: NeedCardProps) {
   const { t } = useTranslation();
   const { check } = need;
   const look = STATUS_TABLE[check.status];
@@ -70,7 +83,7 @@ function NeedCard({ need, leaving, onOpen, onMute }: NeedCardProps) {
           type="button"
           disabled={leaving}
           onClick={() => onOpen(target)}
-          className="min-w-0 flex-1 text-left"
+          className="min-w-0 flex-1 text-left max-md:min-h-11"
         >
           <span className="block text-[14.5px] font-medium">
             {check.label ?? <span className="font-mono text-[13px] [overflow-wrap:anywhere]">{check.key}</span>}{' '}
@@ -89,7 +102,10 @@ function NeedCard({ need, leaving, onOpen, onMute }: NeedCardProps) {
         </button>
       </div>
       {check.value !== null && (
-        <p title={check.value} className="line-clamp-2 pl-[34px] text-[13px] text-secondary-foreground [overflow-wrap:anywhere]">
+        <p
+          title={wholeValue ? undefined : check.value}
+          className={cn('pl-[34px] text-[13px] text-secondary-foreground [overflow-wrap:anywhere]', !wholeValue && 'line-clamp-2')}
+        >
           {check.value}
         </p>
       )}
@@ -100,19 +116,22 @@ function NeedCard({ need, leaving, onOpen, onMute }: NeedCardProps) {
           // No diagnosis since it went bad: asking for one opens the sheet, where its steps arrive.
           <DiagnoseButton node={check.node} checkKey={check.key} label={t('cerberus.diagnosis.diagnose')} disabled={leaving} onStarted={() => onOpen(target)} />
         ) : (
-          <Button variant="outline" size="sm" disabled={leaving} onClick={() => onOpen(target)}>
+          <Button variant="outline" size="sm" disabled={leaving} className="max-md:h-11" onClick={() => onOpen(target)}>
             {t(need.diagnosis.status === 'running' ? 'cerberus.diagnosis.diagnosing' : 'cerberus.diagnosis.see')}
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={leaving}
-          // The Mute dialog on this check, which the root opens.
-          onClick={() => onMute(check)}
-        >
-          {t('cerberus.needs.mute')}
-        </Button>
+        {onMute && (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={leaving}
+            className="max-md:h-11"
+            // The Mute dialog on this check, which the root opens.
+            onClick={() => onMute(check)}
+          >
+            {t('cerberus.needs.mute')}
+          </Button>
+        )}
       </div>
     </li>
   );

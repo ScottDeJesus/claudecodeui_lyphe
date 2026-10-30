@@ -1,5 +1,5 @@
 /**
- * Fences: what a fenced block's body is — a row of stat tiles, a diff, or output long enough to
+ * Fences: what a fenced block's body is — a row of stat tiles, or output long enough to
  * fold. Re-exported by `shapes/detect.ts` — import it from there.
  */
 
@@ -38,16 +38,6 @@ export function deltaTone(delta: string | null): DeltaTone {
   if (first === '+') return 'positive';
   if (first === '-' || first === '−') return 'danger';
   return 'neutral';
-}
-
-/** Which kind of diff line this is. `+++`/`---` are tested first, or a header reads as a change. */
-export function splitDiffLine(line: string): 'add' | 'remove' | 'hunk' | 'meta' | 'context' {
-  if (line.startsWith('+++') || line.startsWith('---')) return 'meta';
-  if (line.startsWith('diff ') || line.startsWith('index ')) return 'meta';
-  if (line.startsWith('@@')) return 'hunk';
-  if (line.startsWith('+')) return 'add';
-  if (line.startsWith('-')) return 'remove';
-  return 'context';
 }
 
 /** Line count over which a plain fence folds, and how much of it stays visible when it does. */

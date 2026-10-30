@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 
-import type { CerberusCatalogEntryView, CerberusNodeProject, CerberusOverview, CerberusStartedBatch, CerberusWardens } from '@/shared/cerberus-types';
+import type { CerberusCatalogEntryView, CerberusNeed, CerberusNodeProject, CerberusOverview, CerberusStartedBatch, CerberusWardens } from '@/shared/cerberus-types';
 import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove, CerberusPromoteInput } from '@/shared/types';
 
 /**
@@ -113,4 +113,16 @@ export function useCerberus(): CerberusValue {
  */
 export function useCerberusNeeds(): number {
   return useCerberus().overview?.counts.needsYou ?? 0;
+}
+
+/**
+ * One check's entry in "Needs you", found by its node and its key (`<service>/<id>`): the card's whole need (the check, the fix
+ * offered for it, its run and its diagnosis) in whatever status it holds now. `undefined` while the overview has not been read
+ * (not asked yet is not "recovered"); `null` once the check needs no one: it recovered, a mute covers it, or it is gone.
+ * Read by src/modules/station (CheckStage), through the barrel, to draw Cerberus's own card for the check a rail item opened.
+ */
+export function useCerberusNeedOf(node: string, key: string): CerberusNeed | null | undefined {
+  const overview = useCerberus().overview;
+  if (overview === null) return undefined;
+  return overview.needsYou.find((need) => need.check.node === node && need.check.key === key) ?? null;
 }

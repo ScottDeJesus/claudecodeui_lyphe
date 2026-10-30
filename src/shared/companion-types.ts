@@ -195,7 +195,7 @@ export type CompanionTurnOutcome = 'answered' | 'stopped' | 'failed';
  * and `show`, `recut`, `stop`, `resume` and `kick` act on a card. `resume_run` resumes a chain that is not running, with
  * his rulings. `clear_memory` retires every memory of her own bank, which only he can ask of her, in the words he says
  * aloud. The other two are harmless and are done the moment he asks, with no pending action: `open` brings a card,
- * run, page or chat up on his screen, and `close_followup` ticks one of his follow-ups off. All thirteen are kinds of a row of her
+ * run, page, chat or Cerberus check up on his screen, and `close_followup` ticks one of his follow-ups off. All thirteen are kinds of a row of her
  * record of actions and verbs of the panel; a pending action holds only the eleven (the server types it so: `CompanionStoredPending`).
  */
 export type CompanionActionKind = 'queue' | 'hide' | 'show' | 'rework' | 'answer' | 'recut' | 'stop' | 'resume' | 'kick' | 'resume_run' | 'open' | 'close_followup' | 'clear_memory';
@@ -260,7 +260,7 @@ export type CompanionPendingAction = {
 /**
  * Where an open lands, on the page that holds the floor: a `chat` by its app session id, a roadmap `card`
  * by its plan's name, a DocSpace `page` (and `blockId`, `null` for the page itself), or a service `check`
- * by its `node` and its `key` (`<service>/<id>`), which only the station draws. Carried by
+ * by its `node` and its `key` (`<service>/<id>`), which the station puts on its stage and the workspace on its Cerberus tab. Carried by
  * `companion_open`.
  */
 export type CompanionOpenTarget =
@@ -379,8 +379,9 @@ export type CompanionPicture = {
  * station's stage names what she opened by it; the workspace ignores it); `companion_floor` says the
  * floor moved: `floor` is the client id of the page that holds it now, so the page whose own id equals it
  * may play her voice and every other page shows the text only (sent on every write of the floor, whether
- * or not the holder changed); `companion_cleared` says the account's log, notes and pending action were
- * cleared, with her conversation, and the panel empties; `companion_face` carries the account's face after an
+ * or not the holder changed); `companion_cleared` says the account's log, unpinned notes and pending action were
+ * cleared, with her conversation, and the panel empties but for the cards he pinned, which Clear keeps;
+ * `companion_face` carries the account's face after an
  * upload, a restore, each frame a bake renders and the bake's end.
  */
 export type CompanionFrame =

@@ -144,10 +144,11 @@
     overflow: hidden;
   }
 
-  /* Clear the iOS status bar in PWA mode — for the APP FRAME ONLY, the two layers that carry
-     persistent chrome: the workspace shell and the mobile drawer it holds. `#root`'s own
-     padding cannot do this, because a `position:fixed` child's containing block is the
-     viewport, not `#root`; hence a `top` on the frame itself, which is what these two do.
+  /* Clear the iOS status bar in PWA mode — for the APP FRAME ONLY, the layers that carry
+     persistent chrome: the workspace shell and the mobile drawer it holds, and Kaylee
+     Station's root (`StationShell`). `#root`'s own padding cannot do this, because a
+     `position:fixed` child's containing block is the viewport, not `#root`; hence a `top` on
+     the frame itself, which is what these do.
      `pwa-status-clear` is opt-IN, and that is the whole point: this used to read
      `body.pwa-mode .fixed.inset-0`, which caught every full-screen fixed layer in the app —
      every dialog's scrim, every lightbox, the Settings sheet — and pushed its box off the

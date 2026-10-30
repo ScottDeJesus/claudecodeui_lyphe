@@ -33,10 +33,13 @@ type StationShellViewProps = {
  * themselves; the rest are their own height. The conversation keeps a floor of 3.5rem whatever else stands in her
  * column, so her newest line stays in sight (her panel's own rule); the dock gives way before it does. Below laptop
  * the column is a stack, where these read as their own heights.
+ *
+ * The corner is the rail's foot whatever stands above it (`mt-auto`, its hairline its own), so it never rises to the
+ * rail's head while the sessions are not drawn; under the sessions, which take the room, the margin is nothing.
  */
 const SLOT_BOX: Record<BodySlot, string> = {
   sessions: 'min-h-0 flex-1',
-  corner: 'shrink-0',
+  corner: 'mt-auto shrink-0 border-t border-border',
   head: 'shrink-0',
   conversation: 'min-h-14 flex-1',
   dock: 'min-h-0 flex-[0_1_auto]',
@@ -113,8 +116,9 @@ function Column({ name, pieces, className }: { name: string; pieces: Piece[]; cl
  * - NARROW (below, a phone included): one scrolling column — her head, the stage, then the rest in reading order.
  *
  * A slot with no region draws nothing, and an empty stage folds away wherever her column (or the stack) holds a region
- * of its own; with none it stays, so a frame with nothing in it still says why. Each is a data condition — what is
- * drawn — never a mode. Hairlines part the columns and the pieces inside a column; the regions paint themselves.
+ * of its own, all but her cards' shelf while it has cards; with none it stays, so a frame with nothing in it still says
+ * why. Each is a data condition — what is drawn — never a mode. Hairlines part the columns and the pieces inside a
+ * column; the regions paint themselves.
  *
  * A tier change re-parents what moves (the stage between wide and laptop, everything into the narrow stack), so a
  * region keeps its state in the station's context or its scroll memory, never only in itself.
@@ -123,12 +127,20 @@ function Column({ name, pieces, className }: { name: string; pieces: Piece[]; cl
  * fixtures' pictures (`station-fake.ts`) at 1440×900, 1280×800 and 390×844.
  */
 export function StationShellView({ tier, slots, stage, onBackToCloudcli }: StationShellViewProps) {
-  // An empty stage gives way to her own regions: in her column on a laptop, in the stack below laptop.
+  // An empty stage gives way to her own regions: in her column on a laptop, in the stack below laptop. While her cards'
+  // shelf stands on it (she has cards), the shelf stays and only the empty stage's words give way, so a pinned card is one
+  // press away there too; the cell then lets go of the stage's floor (the laptop's 7.5rem, kept for a stage's head and a line
+  // of what it holds), so it stands at the shelf's own height, and the shelf drops its own hairline for the one the next piece
+  // draws. All four are read off what is drawn (`:has`), a data condition and never a mode.
   const stageCell = (regionsBeside: boolean, box: string): Piece => ({
     key: 'stage',
     node: stage,
     slot: null,
-    box: cn(box, regionsBeside && 'has-[[data-station-stage=empty]]:hidden'),
+    box: cn(
+      box,
+      regionsBeside && '[&:has([data-station-stage=empty]):not(:has([data-station-shelf]))]:hidden [&_[data-station-stage-empty-message]]:hidden',
+      regionsBeside && '[&:has([data-station-stage=empty])]:min-h-0 [&:has([data-station-stage=empty])_[data-station-shelf]]:border-b-0',
+    ),
   });
 
   let body: ReactNode;

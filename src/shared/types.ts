@@ -7,6 +7,7 @@ import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, Read
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
 import type { CompanionLogEntry, CompanionSessionRef } from '@/shared/companion-types';
+import type { StationAskKind, StationNeed } from '@/shared/station-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
 
@@ -1077,14 +1078,14 @@ export type CompanionSoundProgress = { turnId: string; index: number; elapsed: n
 /**
  * What her face reads of the page's voice: `level()` is the loudness of what sounds, 0..1, and `progress()` the sentence sounding.
  * Both are functions, never props that change, so a level sixty times a second never redraws React. Null where a face hears no voice
- * (Settings' preview). Handed by the companion module's CompanionFab to CompanionAvatar and on to CompanionPortrait.
+ * (Settings' preview). Handed by the companion module's CompanionFace to CompanionAvatar and on to CompanionPortrait.
  */
 export type CompanionFaceVoice = { level: () => number; progress: () => CompanionSoundProgress | null };
 
 /**
  * The sentences her face reads from her log: `playing` the one this page's player is sounding (its mood, text and sounds), `newest` the
  * newest of hers in the running turn, read only by a page that plays no voice, and `turnRunning` whether a turn is under way. Derived by
- * the companion module's `useFaceInputs`; handed through CompanionAvatar to CompanionPortrait.
+ * the companion module's `useFaceSentences`; handed through CompanionAvatar to CompanionPortrait.
  */
 export type CompanionFaceSentences = { playing: CompanionLogEntry | null; newest: CompanionLogEntry | null; turnRunning: boolean };
 
@@ -1130,8 +1131,8 @@ export type CompanionPresenceState =
  * set up and not begun); each is null when her activity names none. They are carried whatever the `state`, so a
  * page-owned state such as 'listening' still knows where she was looking. One value per change of its parts, so a
  * consumer that memoizes on it redraws only when she does. Built by the companion module's `useCompanionPresence` and
- * read by two of its consumers: CompanionHeader, whose status line CompanionPanel hands it to, and CompanionFab, which
- * draws it as the button's face and label and points the button by it (`useAvatarTarget`).
+ * read by its consumers: CompanionHeader, whose CompanionStatus line CompanionPanel hands it to, and CompanionFab, which
+ * draws it (through CompanionFace) as the button's face and label and points the button by it (`useAvatarTarget`).
  */
 export type CompanionPresence = {
   state: CompanionPresenceState;
@@ -3950,12 +3951,36 @@ export type StationRegion = StationSlot | 'roadmap' | 'stage';
 
 /**
  * The station's own preferences, remembered per window by `useStationPref`: `stripCollapsed` (the strip is folded),
- * `cornerOpen` (the corner is open) and `compact` (the regions draw in their denser form).
+ * `cornerOpen` (the corner is open), `compact` (the regions draw in their denser form), `asleepOpen` (the left rail's fold of
+ * his asleep chats is open) and `completeOpen` (its fold of the roadmap's complete epics is open).
  */
-export type StationPrefKey = 'stripCollapsed' | 'cornerOpen' | 'compact';
+export type StationPrefKey = 'stripCollapsed' | 'cornerOpen' | 'compact' | 'asleepOpen' | 'completeOpen';
 
 /**
  * The props every region of the station's layout takes: the `tier` it is drawn in. A region draws itself for the tier it is given
  * and never reads the window's width on its own.
  */
 export type StationRegionProps = { tier: StationTier };
+
+/**
+ * One word or line the station draws: its locale `key` and its `english`, the `defaultValue` it is drawn with when the locale holds
+ * none. The station's tables of words (the rail's fault lines, its item's status words, the ask's wells, `STATION_NEED_KINDS`)
+ * are made of these, so each is drawn as `t(words.key, words.english)`.
+ */
+export type LocaleWords = { key: string; english: string };
+
+/**
+ * What an item of the station's right rail says it is: its need's kind (`StationNeed.kind`), with a chat's ask told apart by its
+ * own kind (`StationAskKind`: a `permission`, a `question` the chat asked, a `plan` to approve) — seven in all. The key of
+ * `STATION_NEED_KINDS`, which gives each its glyph, its word, its tone and its one act.
+ */
+export type StationNeedKind = Exclude<StationNeed['kind'], 'ask'> | StationAskKind;
+
+/**
+ * Her mark on the station's left rail, while her activity names one of his chats (she is reading it, drafting for it or walking
+ * it): that chat's `sessionId`, her `initial` (her name's first letter, as her disc draws it) and the `words` that say what she
+ * is doing there ("Kaylee is reading Bugfixes"). Built by the rail's region (`WhereThingsStand`) from her activity, drawn by its
+ * sessions section (`SessionRows`) on the chat's row, and on the asleep fold's head while that fold hides the row; the
+ * fixtures (`fake/sessions.ts`) hold one for the `walkthrough` picture.
+ */
+export type StationHerMark = { sessionId: string; initial: string; words: string };

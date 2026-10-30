@@ -5,6 +5,7 @@ import { useStationWindow } from '@/modules/station/hooks/useStationWindow';
 import { followScroll } from '@/modules/station/stationScroll';
 import {
   BACK_STACK_DEPTH,
+  backableFrom,
   focusKey,
   readStationRecord,
   writeStationRecord,
@@ -21,7 +22,9 @@ type StationContextValue = {
   focus: StationFocus | null;
   /**
    * Puts `next` on the stage; the focus it replaces is pushed onto the back-stack (ten deep). Pressing what is already there
-   * changes nothing. `null` (the stage's ✕) empties the stage, and what was there is one Back away.
+   * changes nothing. `null` (the stage's ✕) empties the stage and leaves what was there on the stack: the empty stage draws no
+   * Back, so it is the Back of the next, different thing staged. Staging that same thing again takes it off the stack, so a
+   * Back never returns to what is already on the stage.
    */
   setFocus: (next: StationFocus | null) => void;
   /** Puts the most recent replaced focus back on the stage and pops it. Nothing when the back-stack is empty. */
@@ -74,7 +77,7 @@ export function useStationPref<T>(key: StationPrefKey, initial: T): [T, (next: T
 }
 
 /**
- * THE STATION'S PROVIDER, mounted by `StationRoute` beneath her provider.
+ * THE STATION'S PROVIDER, mounted by `StationRoute` above her provider, whose `onOpen` is a press on this stage.
  *
  * THE FOCUS lives here, beside the back-stack it is pushed onto: a station has one thing on its stage, and every region
  * that can put a thing there (a press on a session, a need, a card) reaches the stage through `setFocus`.
@@ -117,14 +120,15 @@ export function StationProvider({ children }: { children: ReactNode }) {
     const held = stageRef.current;
     const same = next === null ? held.focus === null : held.focus !== null && focusKey(held.focus) === focusKey(next);
     if (same) return;
-    const stack = held.focus === null ? held.stack : [...held.stack, held.focus].slice(-BACK_STACK_DEPTH);
-    commit({ focus: next, stack });
+    const pushed = held.focus === null ? held.stack : [...held.stack, held.focus].slice(-BACK_STACK_DEPTH);
+    commit({ focus: next, stack: backableFrom(pushed, next) });
   }, [commit]);
 
   const back = useCallback(() => {
     const { stack } = stageRef.current;
     if (stack.length === 0) return;
-    commit({ focus: stack[stack.length - 1], stack: stack.slice(0, -1) });
+    const returned = stack[stack.length - 1];
+    commit({ focus: returned, stack: backableFrom(stack.slice(0, -1), returned) });
   }, [commit]);
 
   const setPref = useCallback((key: StationPrefKey, value: unknown) => {
@@ -149,7 +153,9 @@ export function StationProvider({ children }: { children: ReactNode }) {
     writeStationRecord({ ...latest.current, scroll: scrollRef.current });
   }, [stage, prefs]);
 
-  // And when the page is hidden or leaves, which is when the scroll the listeners have kept is carried into it.
+  // And when the page is hidden or leaves, which is when the scroll the listeners have kept is carried into it. The station
+  // is also left by the app's own router (a phone's and the home-screen app's doors navigate in the same window, so no
+  // `pagehide` comes): the provider's unmount writes it too.
   useEffect(() => {
     const write = () => writeStationRecord({ ...latest.current, scroll: scrollRef.current });
     const writeWhenHidden = () => { if (document.visibilityState === 'hidden') write(); };
@@ -158,6 +164,7 @@ export function StationProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener('pagehide', write);
       document.removeEventListener('visibilitychange', writeWhenHidden);
+      write();
     };
   }, []);
 

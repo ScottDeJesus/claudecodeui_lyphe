@@ -16,8 +16,9 @@ function isReading(body: unknown): body is CompanionMemoryReading {
  * Used by this module's CompanionMemorySettings, which draws Settings > Voice > Companion's "Her memory" card from what it returns.
  *
  * The card's own read and clear of her memory bank: `GET /api/companion/memory` when the section opens, `DELETE` when he confirms Clear,
- * and the `GET` again after it. EVENTS, NOT A WATCHDOG: no frame announces her bank, so nothing here polls it or re-reads on a timer. A
- * count is as old as the last open or clear, which is the truth of a card he looks at and acts on.
+ * and the `GET` again after it. EVENTS, NOT A WATCHDOG: nothing here polls it or re-reads on a timer. The `companion_memory` frame the
+ * server sends after each write of her bank is followed by the station's corner (`useMemoryLines`), not by this card: its count is as
+ * old as the last open or clear, which is the truth of a card he looks at and acts on.
  *
  * The read after a clear happens whether the clear went through or was refused: a clear that stopped part way (the docstore door
  * went away between two retires) has already forgotten some, so the count the card keeps drawing would be wrong. A refused clear is

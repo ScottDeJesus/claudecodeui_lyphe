@@ -23,7 +23,8 @@ import { readSchedules } from './schedule-reads.js';
  *
  * EVERY READ TAKES A SCOPE and answers small: a list is one line per item and capped (`cappedLines`), and an answer past 2,000
  * characters is handed to a dactyl under the scope's fixed brief (`wholeOrDigest`), so none of the house is in her context until
- * she looks. `panel: true` puts the whole answer on his panel as a note and tells her only that it is there. NO EYES TOOL MOVES
+ * she looks. `panel: true` puts the whole answer on his panel as a card (its kind and what it is about are the reader's: `card-shapes.ts`)
+ * and tells her only that it is there. NO EYES TOOL MOVES
  * HER FOCUS OR HER ACTIVITY: a read runs as `thinking`, so none of them calls `setFocus` or `withActivity`. NEVER SPEND
  * (ruling 1): no renderer here reads a cost, a token count or a cap.
  *
@@ -38,7 +39,7 @@ const SCOPE_MAX = 200;
 const PANEL_FIELD = z
   .boolean()
   .optional()
-  .describe('true puts the whole answer on his panel as a note and tells you only that it is there; the answer never enters your context. Leave out to read it yourself.');
+  .describe('true puts the whole answer on his panel as a card and tells you only that it is there; the answer never enters your context. Leave out to read it yourself.');
 
 /** The call's own AbortSignal, when the SDK hands one in the handler's second argument (it does for a tool call that is cancelled, as when she is stopped). */
 function signalOf(extra: unknown): AbortSignal | undefined {

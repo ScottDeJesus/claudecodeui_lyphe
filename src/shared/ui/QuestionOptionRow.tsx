@@ -25,8 +25,10 @@ type QuestionOptionRowProps = {
  * One option of an AskUserQuestion question, as a Verve row: the surface's own ground and edge at
  * rest, the accent's soft wash and ring once chosen — the selected chip's language, so the choice
  * reads in greyscale too. Used by chat's AskUserQuestionPanel as the control and by
- * AnsweredQuestion as the record of what was chosen, and by the dispatcher module's RoundAnswer for
- * a round's options, so the option looks the same before and after and in both modules' cards.
+ * AnsweredQuestion as the record of what was chosen, by the dispatcher module's RoundAnswer for
+ * a round's options, and by the station module's ask stage for a chat's question, so the option looks
+ * the same before and after and in every module's card. Below 768 px a row is a 44 px catch under a
+ * finger, the house's touch floor.
  */
 export const QuestionOptionRow: React.FC<QuestionOptionRowProps> = ({
   label,
@@ -68,7 +70,7 @@ export const QuestionOptionRow: React.FC<QuestionOptionRowProps> = ({
   );
 
   const frame = cn(
-    'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors duration-quick',
+    'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors duration-quick max-md:min-h-11',
     selected ? 'border-primary/60 bg-primary/10' : 'border-border bg-card',
     dashed && !selected && 'border-dashed',
   );

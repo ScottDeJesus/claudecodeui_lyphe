@@ -4,6 +4,7 @@ import type { CronJob, CronJobDrift, CronJobState, CronSyncReport } from '@/shar
 
 import type { CompanionToolDeps } from '../tools/companion-tools.js';
 
+import { LIST_ABOUT_NOTHING } from './card-shapes.js';
 import { answerRead, whenWords } from './eyes-answer.js';
 import { clipLine, counted, fitLines } from './line-words.js';
 
@@ -100,7 +101,7 @@ export function readSchedules(
   const { jobs, lastSync } = readRegistry(deps.userId);
   const sync = syncWords(lastSync);
   const answer = (title: string, text: string, intro: string, brief: string): Promise<ToolTextResult> | ToolTextResult =>
-    answerRead(deps, { panel, title, text, label: 'schedules', brief, intro }, signal);
+    answerRead(deps, { panel, title, text, label: 'schedules', brief, intro, shape: LIST_ABOUT_NOTHING }, signal);
 
   if (lower === 'list') {
     if (jobs.length === 0) return textResult(`No job is tracked. ${sync}`);

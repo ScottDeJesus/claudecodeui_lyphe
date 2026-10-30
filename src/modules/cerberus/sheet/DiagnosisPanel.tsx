@@ -142,8 +142,8 @@ type DiagnosisPanelProps = {
   diagnosisId: string;
   /** Another run holds the check (a catalog fix's, not this diagnosis's one-off): Run it once waits, disabled, as `CheckFixes`' entries do. */
   held: boolean;
-  /** Add to catalog, pressed: the root opens the Promote dialog on this diagnosis, in front of the sheet, as it does Mute. */
-  onPromote: (diagnosis: CerberusDiagnosisView) => void;
+  /** Add to catalog, pressed: the root opens the Promote dialog on this diagnosis, in front of the sheet, as it does Mute. Absent, it is not offered: the sheet's host has no Promote dialog. */
+  onPromote?: (diagnosis: CerberusDiagnosisView) => void;
 };
 
 /**
@@ -176,7 +176,7 @@ export function DiagnosisPanel({ diagnosisId, held, onPromote }: DiagnosisPanelP
   };
   // Add to catalog goes up to the root's Promote dialog, in front of the sheet.
   const promote = () => {
-    if (diagnosis !== null) onPromote(diagnosis);
+    if (diagnosis !== null) onPromote?.(diagnosis);
   };
   const oneOffLive = useStillAhead(diagnosis?.oneOffExpiresAt ?? null);
   // Whether the steps show once it is over: the person's press on their one line. While it runs they always show.
@@ -188,7 +188,7 @@ export function DiagnosisPanel({ diagnosisId, held, onPromote }: DiagnosisPanelP
   const running = diagnosis.status === 'running';
   const proposal = diagnosis.status === 'done' ? diagnosis.proposal : null;
   const offerRun = proposal !== null && diagnosis.run === null && oneOffLive;
-  const offerPromote = proposal !== null && diagnosis.promotedTo === null;
+  const offerPromote = proposal !== null && diagnosis.promotedTo === null && onPromote !== undefined;
   // Never run, and its one-off ran out or never reached the warden: the box says why Run it once is gone.
   const oneOffGone = proposal !== null && diagnosis.run === null && !oneOffLive;
   // What the buttons on screen mean: both, Add to catalog alone, or nothing once only Run it once is left.

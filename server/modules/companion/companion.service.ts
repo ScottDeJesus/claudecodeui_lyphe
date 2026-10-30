@@ -1,6 +1,7 @@
 import { companionDb } from '@/modules/database/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import type { CompanionDraft, CompanionPicture, CompanionSessionRef, CompanionSettings } from '@/shared/companion-types.js';
+import type { StationAskAnswer, StationLanded, StationNeed } from '@/shared/station-types.js';
 import { AppError } from '@/shared/utils.js';
 
 import { createCompanionAccount, type CompanionAccount } from './companion-account.js';
@@ -9,17 +10,20 @@ import { createSpeech } from './companion-speech.js';
 import type { DraftSendOutcome } from './companion-send.js';
 import { buildPicture } from './companion-picture.js';
 import { readCompanionSettings, saveCompanionSettings, type CompanionSettingsPatch } from './companion-settings.js';
+import { endHeldWalk, moveHeldWalk } from './companion-walk.js';
 import type { CompanionAlert } from './feeds/alert-block.js';
 import { focusNewsEnvelope, readRunReply } from './feeds/focus-feed.js';
 import { withdrawStandingAction } from './hands/action-end.js';
 import type { CompanionHouse } from './house.js';
+import { answerStationAsk, stationNeeds, type StationAskOutcome } from './station/station-needs.js';
+import { stationLanded } from './station/station-landed.js';
 
 /**
  * Kaylee, per account. The service holds one `CompanionAccount` (her store, her live conversation, her activity)
  * for each CloudCLI account that has used her, made on the account's first call and never before; a made account is
  * still ASLEEP until a message is pushed — creating one launches no process.
  *
- * Every verb here backs one route (`companion.routes.ts`) or one feed, and takes the account's id first, so a call
+ * Every verb here backs one route (`companion.routes.ts`, `cards.routes.ts`) or one feed, and takes the account's id first, so a call
  * cannot reach another account's rows, pages or conversation. The routes only parse and answer; the verbs decide:
  *   - `sendText` takes the floor for the page that typed, logs his line and pushes it to her;
  *   - `saveSettings` stores the patch, tells every page, and applies a model change to her running process
@@ -32,19 +36,25 @@ import type { CompanionHouse } from './house.js';
  *     record of actions ends `cancelled` (or `expired`, when it had already lapsed); with none standing it changes nothing;
  *   - `speech` and `cut` are her voice (`companion-speech.ts`): the audio of one sentence for the floor page, and the
  *     press that stops her while she speaks and owes her next message a `<cut>`;
- *   - `clear` wipes her: process, CLI conversation, log, notes, draft, pending action, walk, focus and the turn's audio.
+ *   - `pinNote` is his Pin on a card, and `moveWalk` and `endWalk` are his Back, Next and × on the walk (`companion-walk.ts`: the same
+ *     cursor her `walk` tool moves, so every page hears `companion_walk`); the walk's move is refused with the tool's own sentences;
+ *   - `clear` wipes her: process, CLI conversation, log, unpinned cards (a pinned card is his keep), draft, pending action, walk, focus and the turn's audio.
  *     What chats were sent through her (`relayed_sends`) stays, because those rows belong to the chats, and so does her
  *     record of actions (`companion_actions`), a fact about the house: a pending action Clear finds standing ends `cancelled`, unless a take is carrying it out;
  *   - `stopAll` winds every conversation and every synthesis down for shutdown and from then on refuses a message with a
  *     503: the HTTP drain comes after it, and a process woken then would have nothing left to end it;
+ *   - `landed` is the station strip's read: the account's landings of the last seven days. It is the one verb that hands the
+ *     house to a station reader, so the route stays transport and the house stays private here;
  *   - `alert`, `runFailed`, `runCompleted` and `chatDeleted` are the verbs the house's feeds call (each is explained at its verb);
- *     `alert` and the focus push refuse once `stopAll` has run, for the reason a message does.
+ *     `alert` and the focus push refuse once `stopAll` has run, for the reason a message does;
+ *   - `stationNeeds` and `answerStationAsk` back the station's rail (`station/needs.routes.ts`): everything that needs him, read whole
+ *     through the house, and one chat's waiting ask answered through the runtime. Neither touches her account or her conversation.
  *
  * THE RUNTIME is the gateway her tools stop, answer and send through, and THE HOUSE is the readers only a module instance
  * holds (`house.ts`). The module is built by the entrypoint, which owns both, so `createCompanionModule` attaches them
  * together before anything can call a verb; an account made before that is refused.
  *
- * Consumers: `companion.routes.ts` (every verb but the feeds'), `companion.module.ts` (`attachRuntime`, `stopAll`)
+ * Consumers: `companion.routes.ts` (every verb but the feeds', and the three of the cards, which `cards.routes.ts` serves), `companion.module.ts` (`attachRuntime`, `stopAll`)
  * and the alert, focus and deleted-chat feeds (`alert`, `runFailed`, `runCompleted`, `chatDeleted`).
  */
 
@@ -85,13 +95,21 @@ function createCompanionService() {
     }
   }
 
+  /**
+   * The gateway and the house `attachRuntime` handed in. Falsy, not `=== null`: a plain-JS caller (a probe) that forgets the second
+   * argument of `attachRuntime` hands `undefined`, which must be refused here and not carried into the tools.
+   */
+  function attached(): { runtime: ProviderRuntimeGateway; house: CompanionHouse } {
+    if (!runtime || !house) throw new Error('The companion has no runtime gateway or house: createCompanionModule attaches them before any verb is called.');
+    return { runtime, house };
+  }
+
   /** The account's Kaylee, made on first use. */
   function accountOf(userId: number): CompanionAccount {
     const held = accounts.get(userId);
     if (held) return held;
-    // Falsy, not `=== null`: a plain-JS caller (a probe) that forgets the second argument of `attachRuntime` hands `undefined`, which must be refused here and not carried into the tools.
-    if (!runtime || !house) throw new Error('The companion has no runtime gateway or house: createCompanionModule attaches them before any verb is called.');
-    const made = createCompanionAccount(userId, runtime, house);
+    const attachedTo = attached();
+    const made = createCompanionAccount(userId, attachedTo.runtime, attachedTo.house);
     accounts.set(userId, made);
     return made;
   }
@@ -106,6 +124,18 @@ function createCompanionService() {
 
     /** The whole of her for a page: `GET /api/companion`. */
     picture: (userId: number): Promise<CompanionPicture> => buildPicture(accountOf(userId)),
+
+    /** Everything that needs him now, in his order, with the kinds that could not be read: `GET /api/companion/station/needs` (`station/station-needs.ts`), read through the house. */
+    stationNeeds: (userId: number): Promise<{ needs: StationNeed[]; faults: StationNeed['kind'][] }> => stationNeeds(userId, attached().house),
+
+    /** One chat's waiting ask answered as the page's own decision: `POST /api/companion/station/asks` (`station/station-needs.ts`), settled through the runtime. */
+    answerStationAsk: (userId: number, answer: StationAskAnswer): Promise<StationAskOutcome> => answerStationAsk(userId, answer, attached().runtime),
+
+    /**
+     * What landed for the account in the last seven days, newest first (`station/station-landed.ts`): `GET /api/companion/station/landed`.
+     * Makes no account of hers and wakes nothing: it reads the history, and the house only to name the chat of a dispatcher landing.
+     */
+    landed: (userId: number): Promise<StationLanded[]> => stationLanded(userId, attached().house),
 
     /** The page `client` holds the floor from now on: she acts on it, and "open this chat" is sent to it alone. */
     takeFloor(userId: number, client: string): void {
@@ -192,10 +222,19 @@ function createCompanionService() {
       return account.sendDraft({ mode, text });
     },
 
-    /** Dismisses a note card. A note already gone (the other page dismissed it first) is not an error. */
+    /** Dismisses a note card. A note already gone (the other page dismissed it first) is not an error. His ×, pinned or not: it is his act. */
     dismissNote(userId: number, id: number): void {
       accountOf(userId).store.removeNote(id);
     },
+
+    /** His Pin or Unpin on a card: a pinned card is his keep, which her Clear leaves and her `dismiss_note` refuses. `false` for a card not on his panel (taken down meanwhile, or another account's id); a card already in that state still answers `true`. */
+    pinNote: (userId: number, id: number, pinned: boolean): boolean => accountOf(userId).store.setNotePinned(id, pinned),
+
+    /** His Back or Next on the walk: moves the one held walk's cursor to item `at` (from 1) as her `walk` tool does, or answers the sentence that refuses (none held, or `at` past the last item). Her activity is not set and she is told by no push. */
+    moveWalk: (userId: number, at: number): { ok: true } | { ok: false; sentence: string } => moveHeldWalk(accountOf(userId).store, at),
+
+    /** His × on the walk: the held walk ends, and with none held nothing changes and nothing is sent. */
+    endWalk: (userId: number): void => endHeldWalk(accountOf(userId).store),
 
     /** Stops her own turn now: his Stop, so the words that turn was answering are dropped. A Stop with no turn running does nothing. */
     interrupt: (userId: number): Promise<void> => accountOf(userId).session.interrupt('operator'),

@@ -102,7 +102,7 @@ export function directTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition
       'open',
       toolLine('open'),
       {
-        target: z.string().trim().min(1).max(300).describe('What to bring up, as he named it: a card (feature or epic) by its name or title, a run by the id list_runs prints or by its plan and task, a page by its id or title, a chat by its name or id. Write the kind in front ("chat: …", "page: …") if the name could be more than one. When the answer lists several that fit, ask him which: nothing else.'),
+        target: z.string().trim().min(1).max(300).describe('What to bring up, as he named it: a card (feature or epic) by its name or title, a run by the id list_runs prints or by its plan and task, a page by its id or title, a chat by its name or id, a Cerberus check by its label or its path. Write the kind in front ("chat: …", "page: …", "check: …") if the name could be more than one. When the answer lists several that fit, ask him which: nothing else.'),
       },
       (args) => openIt(deps, args.target),
     ),

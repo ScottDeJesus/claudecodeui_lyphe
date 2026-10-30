@@ -1,13 +1,15 @@
+import { userPreferencesDb } from '@/modules/database/index.js';
 import { buildClaudeToolPermissionEntry } from '@/modules/providers/index.js';
 import { isRecord } from '@/shared/document-fields.js';
 import { describeToolInput, oneLine } from '@/shared/tool-call-hint.js';
 import type { ProviderPermissionDecision } from '@/shared/types.js';
 
 /**
- * What an answer of hers means to the ask it answers: the decision the runtime's own resolver is handed, for the
- * three kinds of ask a chat can be waiting on. Nothing here touches the server — the functions read an ask and a
- * sentence and say what to hand the resolver, or why they cannot — so `answer_session` (`act-tools.ts`) is left
- * only the doing.
+ * What an answer means to the ask it answers: the decision the runtime's own resolver is handed, for the three kinds
+ * of ask a chat can be waiting on. The functions read an ask and a sentence and say what to hand the resolver, or why
+ * they cannot, so each door that answers (`answer_session`, `act-tools.ts`; the station's `POST /asks`,
+ * `station/station-needs.ts`) is left only the doing, and the station's reader of a chat's asks (`station/need-readers.ts`) lists them in the same terms. The one write here is `rememberAllowedTool`, the rule an
+ * "always" stores: it lives beside the decision it belongs to so both doors write it the same way.
  *
  * The decisions are the page's own, byte for byte, so an answer from her and one from his hand settle an ask alike:
  *   - a PERMISSION (any tool): `allow` is `{ allow: true }`, `deny` is `{ allow: false, message: 'User denied tool
@@ -22,13 +24,14 @@ import type { ProviderPermissionDecision } from '@/shared/types.js';
  *   - `ExitPlanMode`: `allow` approves with `{ allow: true }` and `deny` sends the plan back with `{ allow: false,
  *     message: 'User asked to revise the plan' }` (`PlanDisplay.tsx`, `handleBuild` and `handleRevise`).
  *
- * Consumer: `tools/act-tools.ts`, the `answer_session` handler.
+ * Consumers: `tools/act-tools.ts` (the `answer_session` handler), `station/station-needs.ts` (`answerStationAsk`, the
+ * station's `POST /asks`) and `station/need-readers.ts` (the reader that lists a waiting chat's asks).
  */
 
-/** One ask a chat is waiting on, as `getPendingApprovalsForSession` lists it: the request to answer, the tool it is for and the input it was raised with. Consumed by `act-tools.ts`. */
+/** One ask a chat is waiting on, as `getPendingApprovalsForSession` lists it: the request to answer, the tool it is for and the input it was raised with. Consumed by `act-tools.ts`, `station/station-needs.ts` and `station/need-readers.ts`. */
 export type PendingAsk = { requestId: string; toolName: string; input: unknown };
 
-/** The oldest ask of a chat's list and how many others wait behind it. Consumed by `act-tools.ts`. */
+/** The oldest ask of a chat's list and how many others wait behind it. Consumed by `act-tools.ts`, `station/station-needs.ts` and `station/need-readers.ts`. */
 export type OldestAsk = { ask: PendingAsk; more: number };
 
 /** When an entry of the pending list was raised, in epoch ms; `Infinity` for one that says not, so it sorts after those that do. */
@@ -42,7 +45,7 @@ function raisedAt(entry: Record<string, unknown>): number {
  * The oldest ask of `pending` (the list `getPendingApprovalsForSession` answers) — the one she answers — and how
  * many more wait, or `null` when none does. An entry with no request id cannot be answered and is not counted.
  * Ties keep the list's own order, which is the order the runtime raised them in.
- * Consumed by `act-tools.ts`.
+ * Consumed by `act-tools.ts` (the oldest ask), `station/need-readers.ts` (the oldest ask of each waiting chat) and `station/station-needs.ts` (one named ask put through it as a list of one).
  */
 export function oldestPendingAsk(pending: unknown[]): OldestAsk | null {
   const asks = pending.flatMap((entry) => {
@@ -59,7 +62,7 @@ export function oldestPendingAsk(pending: unknown[]): OldestAsk | null {
 /**
  * What an answer comes to: the decision to hand the resolver, the entry to remember beside it (`null` unless the
  * answer was `always`), and the sentence to give her; or the sentence that refuses it and says what to answer instead.
- * Consumed by `act-tools.ts`.
+ * Consumed by `act-tools.ts` and `station/station-needs.ts`.
  */
 export type AskAnswer =
   | { ok: true; decision: ProviderPermissionDecision; remember: string | null; told: string }
@@ -72,8 +75,8 @@ const PERMISSION_WORDS: ReadonlySet<string> = new Set(['allow', 'deny', 'always'
 
 type Question = { question: string; options: string[] };
 
-/** The questions an `AskUserQuestion` input carries, each with its option labels. A malformed entry is left out. */
-function questionsOf(input: unknown): Question[] {
+/** The questions an `AskUserQuestion` input carries, each with its option labels. A malformed entry is left out. Consumed here and by `station/need-readers.ts`, which lists a question's text and options. */
+export function questionsOf(input: unknown): Question[] {
   if (!isRecord(input) || !Array.isArray(input.questions)) return [];
   return input.questions.flatMap((entry: unknown) => {
     if (!isRecord(entry) || typeof entry.question !== 'string') return [];
@@ -144,10 +147,46 @@ function answerPermission(ask: PendingAsk, words: string, chatName: string): Ask
 /**
  * What `words` means to `ask`, for the chat called `chatName`. `AskUserQuestion` and `ExitPlanMode` (the page names
  * the second `exit_plan_mode` as well) are the two asks with a shape of their own; every other tool is a permission.
- * Consumed by `act-tools.ts`.
+ * Consumed by `act-tools.ts` and `station/station-needs.ts`.
  */
 export function answerFor(ask: PendingAsk, words: string, chatName: string): AskAnswer {
   if (ask.toolName === 'AskUserQuestion') return answerQuestion(ask, words, chatName);
   if (ask.toolName === 'ExitPlanMode' || ask.toolName === 'exit_plan_mode') return answerPlan(words, chatName);
   return answerPermission(ask, words, chatName);
 }
+
+//----------------- THE RULE AN "ALWAYS" STORES ------------
+
+/** The key his tool permissions are stored under (`UserPreferences.claudePermissions`), the one the page's Settings reads and writes. */
+const CLAUDE_PERMISSIONS_KEY = 'claudePermissions';
+
+/** The strings of a stored list; anything else in it is not a rule and is dropped. */
+const stringsOf = (value: unknown): string[] => (Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []);
+
+/**
+ * Writes `entry` into the account's `claudePermissions`: added to `allowedTools` when it is not there, removed from
+ * `disallowedTools` when it is (an entry he once denied and now allows is allowed, not both), every other key of the
+ * preference left as it was. The page's `grantClaudeToolPermission` does the same merge on its own copy, and the page's store
+ * sends the DIFFERENCE from the copy it held (INV-10017), so a page open since before this write cannot erase the entry this
+ * remembered. Synchronous on purpose: read and write share no `await`, so two chats answered "always" in parallel cannot both
+ * read the list before either writes it and lose an entry.
+ *
+ * Consumed by `act-tools.ts` (`answer_session`, before it answers an "always") and `station/station-needs.ts` (`answerStationAsk`, the
+ * same write before the station's own answer), so a rule remembered from her hands and from his is one write.
+ */
+export function rememberAllowedTool(userId: number, entry: string): void {
+  const stored = userPreferencesDb.getPreferences(userId)[CLAUDE_PERMISSIONS_KEY];
+  const current = isRecord(stored) ? stored : {};
+  const allowedTools = stringsOf(current.allowedTools);
+  const disallowedTools = stringsOf(current.disallowedTools);
+  if (allowedTools.includes(entry) && !disallowedTools.includes(entry)) return;
+  userPreferencesDb.savePreferences(userId, {
+    [CLAUDE_PERMISSIONS_KEY]: {
+      ...current,
+      allowedTools: allowedTools.includes(entry) ? allowedTools : [...allowedTools, entry],
+      disallowedTools: disallowedTools.filter((tool) => tool !== entry),
+    },
+  });
+}
+
+// ---------------------------

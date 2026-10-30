@@ -13,6 +13,7 @@ import { chatNameOf } from '../tools/house-reads.js';
 import { signalOf } from '../tools/read-tools.js';
 
 import { checkText, findChecks, findNode, foundLines, needsLines, nodeText, overviewText, withoutUsageChecks } from './cerberus-lines.js';
+import { LIST_ABOUT_NOTHING, NOTE_ABOUT_NOTHING } from './card-shapes.js';
 import { answerRead, cappedLines, wholeOrDigest } from './eyes-answer.js';
 import { readGit } from './git-reads.js';
 import { counted } from './line-words.js';
@@ -58,7 +59,7 @@ const SETTINGS_BRIEF = 'What are these settings? At most 8 lines; cite L<n>.';
 const PANEL_FIELD = z
   .boolean()
   .optional()
-  .describe('true puts the whole answer on his panel as a note and tells you only that it is there; the answer never enters your context. Leave out to read it yourself.');
+  .describe('true puts the whole answer on his panel as a card and tells you only that it is there; the answer never enters your context. Leave out to read it yourself.');
 
 type Args = { scope: string; panel?: boolean };
 
@@ -68,7 +69,8 @@ function readCerberus(deps: CompanionToolDeps, args: Args, signal: AbortSignal |
   const overview = withoutUsageChecks(deps.house.cerberus());
   const scope = args.scope.trim();
   const panel = args.panel === true;
-  const answer = (title: string, text: string, label: string, brief: string, intro = '') => answerRead(deps, { panel, title: `Cerberus: ${title}`, text, label, brief, intro }, signal);
+  const answer = (title: string, text: string, label: string, brief: string, intro = '') =>
+    answerRead(deps, { panel, title: `Cerberus: ${title}`, text, label, brief, intro, shape: LIST_ABOUT_NOTHING }, signal);
 
   if (scope.toLowerCase() === 'overview') return answer('overview', overviewText(overview), 'cerberus-overview', OVERVIEW_BRIEF);
   if (scope.toLowerCase() === 'needs') {
@@ -96,7 +98,7 @@ function readMemory(deps: CompanionToolDeps, args: Args, signal: AbortSignal | u
   const scope = args.scope.trim();
   const panel = args.panel === true;
   const list = (title: string, lines: string[], intro: string) =>
-    answerRead(deps, { panel, title: `Memory: ${title}`, text: cappedLines(lines, MEMORY_LIST_MAX), label: 'memory-list', brief: MEMORY_LIST_BRIEF, intro }, signal);
+    answerRead(deps, { panel, title: `Memory: ${title}`, text: cappedLines(lines, MEMORY_LIST_MAX), label: 'memory-list', brief: MEMORY_LIST_BRIEF, intro, shape: LIST_ABOUT_NOTHING }, signal);
 
   if (scope.toLowerCase() === 'pending') {
     const waiting = listMemoryCandidates({ status: 'pending', limit: MEMORY_SCAN_LIMIT });
@@ -115,7 +117,7 @@ function readMemory(deps: CompanionToolDeps, args: Args, signal: AbortSignal | u
     const candidate = getMemoryCandidate(id);
     if (candidate === null) return deps.refuse(`No memory proposal has the id ${id}. Scope pending lists the ones waiting.`);
     const text = proposalText(candidate, sourceWords(proposedBy(candidate.sessionId)));
-    return answerRead(deps, { panel, title: `Memory: ${candidate.name}`, text, label: 'memory-proposal', brief: PROPOSAL_BRIEF, intro: '' }, signal);
+    return answerRead(deps, { panel, title: `Memory: ${candidate.name}`, text, label: 'memory-proposal', brief: PROPOSAL_BRIEF, intro: '', shape: NOTE_ABOUT_NOTHING }, signal);
   }
   const holding = listMemoryCandidates({ limit: MEMORY_SCAN_LIMIT }).filter((candidate) => proposalHolds(candidate, scope));
   if (holding.length === 0) return textResult(`No memory proposal holds "${scope}" in its id, title, target or project.`);

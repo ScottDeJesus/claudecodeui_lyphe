@@ -700,6 +700,23 @@ export function companionClientId(): string {
   return companionClientIdInMemory;
 }
 
+/**
+ * Takes this page's name to her out of a window this page has just opened, before that window's document has loaded, so it
+ * mints a name of its own. A window opened with `window.open` starts with a COPY of its opener's sessionStorage, and the name
+ * lives there: left alone, the new window would be the same page to her as this one, answer the same `companion_open`, and
+ * (the later of two same-named pages) speak her `<view>` over this one's. Reached through the window's own storage, which is
+ * readable while it still holds its initial document; a window that cannot be read is left as it is.
+ *
+ * Consumed by `src/shared/cloudcliDoors.ts`, which opens every window the station opens for CloudCLI.
+ */
+export function forgetCompanionClientIdIn(opened: Window): void {
+  try {
+    opened.sessionStorage.removeItem(COMPANION_CLIENT_STORAGE_KEY);
+  } catch (error) {
+    console.warn('[Companion] Could not clear the page name a new window inherited:', error);
+  }
+}
+
 // ---------------------------
 
 //----------------- A RECORDED CLIP'S FILE NAME ------------
@@ -777,4 +794,22 @@ export function isBlockedAsMixedContent(address: string, pageProtocol: string): 
   } catch {
     return false;
   }
+}
+
+// ---------------------------
+
+//----------------- A UNIFIED DIFF'S LINES ------------
+
+/**
+ * Which kind of diff line this is: `meta`, `hunk`, `add`, `remove` or `context`. `+++`/`---` are tested first, or a header
+ * reads as a change. Read by `DiffLines` (the kit's drawing of a diff) and by the chat's `DiffBlock`, whose header counts the
+ * added and removed lines.
+ */
+export function splitDiffLine(line: string): 'add' | 'remove' | 'hunk' | 'meta' | 'context' {
+  if (line.startsWith('+++') || line.startsWith('---')) return 'meta';
+  if (line.startsWith('diff ') || line.startsWith('index ')) return 'meta';
+  if (line.startsWith('@@')) return 'hunk';
+  if (line.startsWith('+')) return 'add';
+  if (line.startsWith('-')) return 'remove';
+  return 'context';
 }

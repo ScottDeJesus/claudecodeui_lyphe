@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { byArc, DispatchArcDecks, PlanCard, usePutAway, useDispatcherPlans, waitsOnSiblings } from '@/modules/dispatcher';
 import { EpicPanel, FeatureFacts, RoadmapDialogHost, useRoadmap, useRoadmapCard } from '@/modules/roadmap';
 import { useStation } from '@/modules/station/context/StationContext';
+import { labelOf } from '@/modules/station/cardLabel';
 import { StageGone } from '@/modules/station/FocusFallback';
 import type { RoadmapEpic, RoadmapFeature, RoadmapPicture } from '@/shared/roadmap-types';
 import type { StationFocus } from '@/shared/station-types';
@@ -116,23 +117,6 @@ const NO_PRESS = () => {};
 
 /** The card order the operator saved matters among many cards and not within one arc's deck, so the split for the one arc is given none. */
 const NO_RANKS: ReadonlyMap<string, number> = new Map();
-
-/** What the stage calls a feature or an epic: its title in the roadmap picture, else its name. */
-function labelOf(picture: RoadmapPicture | null, name: string): string {
-  if (picture === null) return name;
-  for (const roadmap of picture.roadmaps) {
-    for (const milestone of roadmap.milestones) {
-      for (const epic of milestone.epics) {
-        if (epic.name === name) return epic.title;
-        const feature = epic.features.find((item) => item.name === name);
-        if (feature) return feature.title;
-      }
-    }
-  }
-  return picture.unplaced.features.find((item) => item.name === name)?.title
-    ?? picture.unplaced.epics.find((item) => item.name === name)?.title
-    ?? name;
-}
 
 /**
  * The card stage on the page: registered for the `card` kind in `stageViews.ts`, drawn by `StationStage`. It finds

@@ -252,8 +252,9 @@ async function restoreSeedPhoto(recorded: string): Promise<void> {
  * `seed.json` names is always kept so: after a recipe change the original's face does not exist yet, and its photo and its
  * frame cache are what make it cheap to make.
  *
- * The only deletion of the seam, and it removes only a path joined from ids the root's own listing produced and that matched
- * their exact patterns, resolved by `insideRoot` to lie strictly inside the root. A symlink is not a directory to
+ * The only recursive deletion of the seam (the others are single files it wrote itself: ComfyUI's pid file, the lock's note,
+ * the padded source, an atomic write's scratch), and it removes only a path joined from ids the root's own listing produced
+ * and that matched their exact patterns, resolved by `insideRoot` to lie strictly inside the root. A symlink is not a directory to
  * `readdir`'s types, so none is followed. A folder it cannot remove is logged and left, and the rest is still pruned. Answers
  * the face ids it removed. Consumed by `face.service.ts`.
  */

@@ -22,7 +22,8 @@ type CompanionTalkButtonProps = {
 
 /**
  * The talk button: the same press as the key or mouse button he binds in Settings, on her panel for the phone. Composed
- * for this module's CompanionComposer, in its slot before send; `.verify/kaylee-talk-scaffold.mjs` draws it in each state.
+ * for this module's CompanionComposer, in its slot before send, and for the station module's talk control;
+ * `.verify/kaylee-talk-scaffold.mjs` draws it in each state.
  *
  * ONE BUTTON, THREE STATES, at send's size (32px to the eye, a 44px catch under a finger, Verve's touch floor; under a
  * finger it stands 8px further from send, so the two catches meet and neither takes the other's edge):

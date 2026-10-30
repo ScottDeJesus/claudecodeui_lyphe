@@ -26,6 +26,7 @@ type EmptyStateProps = {
  *
  * "Empty" is not "we don't know" and not "zero": this belongs where the app has looked and
  * found nothing. A pane that is still loading, or that failed to read, says its own thing.
+ * Its action is a 44 px catch under a finger below 768 px, the house's touch floor.
  */
 export function EmptyState({ title = 'Nothing here yet', message, icon: Icon, actionLabel, onAction }: EmptyStateProps) {
   return (
@@ -38,7 +39,7 @@ export function EmptyState({ title = 'Nothing here yet', message, icon: Icon, ac
       <div className="vv-empty__title">{title}</div>
       {message && <p className="vv-empty__message">{message}</p>}
       {actionLabel && (
-        <Button variant="tonal" className="mt-2" onClick={onAction}>
+        <Button variant="tonal" className="mt-2 max-md:h-11" onClick={onAction}>
           {actionLabel}
         </Button>
       )}

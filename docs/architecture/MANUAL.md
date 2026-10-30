@@ -82,7 +82,7 @@ section: 01-websocket-transport/003 The pieces
 | `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the seven inbound handlers, `protocol_error`, the attachment trust boundary, `runDetachedChatTurn`, and the one `session_host_liveness` snapshot a connecting socket is sent (MAN-8122) |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | `chatRunRegistry` — one run per session, `seq` stamping, the replay buffer, the exactly-one-`complete` contract |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter` — the object runtimes write into; swallows `session_created`, fans out to every attached socket |
-| `server/modules/websocket/services/session-upsert-broadcast.service.ts` | The only builder of `session_upserted`, and the batched broadcast helper |
+| `server/modules/websocket/services/session-upsert-broadcast.service.ts` | The only builder of `session_upserted`, the batched broadcast helper, and `onSessionUpserted(listener)`: a listener set called with the app session id of each event that goes out (consumed by the station hint, MAN-9257) |
 | `server/modules/projects/services/projects-with-sessions-fetch.service.ts` | `broadcastProgress` — the `loading_progress` frames |
 | `server/modules/taskmaster/taskmaster.routes.ts` | `broadcastTaskMasterUpdate` — the `type`-keyed exception |
 | `server/modules/websocket/services/shell-websocket.service.ts` | The `/shell` protocol, the PTY registry, output buffering and reattachment |
@@ -2785,10 +2785,10 @@ section: 05-scrolling/003 The pieces
 | `src/modules/chat/utils/searchTargetLocator.ts` | `findSearchTargetIndex` resolves a sidebar hit against loaded data; `resolveSearchWindowSize` sizes the render window. |
 | `src/modules/chat/utils/messageKeys.ts` | `getIntrinsicMessageKey` — stable render keys, so a prepend does not remount the rows below it. |
 | `src/index.css` | Mobile `touch-action`, document-level overscroll containment, `.search-highlight-flash`. **Neither the pane nor a row carries `contain`** — containment makes the element the containing block for a fullscreen card's `position: fixed` box, which is what a card asking for the screen sized itself to (MAN-388). |
-| `src/modules/project-workspace/hooks/useVisualViewportKeyboardOffset.ts` | Publishes `--keyboard-height` so the shell shrinks above the iOS keyboard. |
+| `src/shared/hooks/useVisualViewportKeyboardOffset.ts` | Publishes `--keyboard-height` so the shell shrinks above the iOS keyboard: once as the hook mounts (a keyboard that closed while neither route was mounted sent its `resize` to no one) and on every visual-viewport `resize`. Called by the workspace's route and by the station's route (the station's root rides it too); with `usePwaModeClass` and `pwa-status-clear` it is the phone's frame (MAN-9258). |
 | `src/shared/ui/ScrollArea.tsx` | **Not used by chat.** Every caller is a pane outside the transcript; the component's own head comment names them, and `grep -rl "<ScrollArea" src` is the live list. The rule is the exclusion, not the roll call. Its INNER scroller is `relative`, the containing block of everything it scrolls: while it was static, every `sr-only` span in a Runner plan card escaped it to the `overflow-hidden` outer box and gave that box a scroll range (2820px over 621px at 320px), so a centring `scrollIntoView` (`block: 'center'`) on a control near the list's end scrolled the outer box and left the pane's foot drawn empty with `Show all` out of reach (2026-09-26). A focus does not reach that range: it scrolls the inner box to its end and stops. |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useHostMoveScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessagesPane.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LazyMessageRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LoadAllMessagesOverlay.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/messageKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/searchTargetLocator.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useHostMoveScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessagesPane.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LazyMessageRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LoadAllMessagesOverlay.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/messageKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/searchTargetLocator.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
 
 ## MAN-374 — Who writes `scrollTop`
 section: 05-scrolling/003 The pieces/004 Who writes `scrollTop`
@@ -2849,7 +2849,7 @@ reads the pane's own `scrollTop`/`scrollHeight` and so simply re-measures the un
 transcript.
 
 `src/shared/ui/ScrollArea.tsx` is a different component with a nested inner scroller and
-`touchAction: 'pan-y'`. Chat does not use it. If you are debugging chat scrolling,
+`touchAction: 'pan-y'` (its `orientation="horizontal"` panes use `pan-x`). Chat does not use it. If you are debugging chat scrolling,
 `ScrollArea` is a dead end.
 
 **Why `onWheel` and `onTouchMove` sit next to a real `scroll` listener.** They look
@@ -3382,9 +3382,10 @@ section: 05-scrolling/019 Mobile, keyboard and CSS
 | --- | --- | --- |
 | `html, body { overflow: hidden; overscroll-behavior-y: contain; }` | `src/index.css` | The shell is a `fixed inset-0` container, so the document never needs to scroll. Clipping it removes the phantom full-height scrollbar and disables mobile pull-to-refresh. |
 | `* { touch-action: manipulation; }` under `max-width: 768px` | `src/index.css` | Kills the 300 ms tap delay — and would kill scrolling, which is why the next two rules exist. |
-| `.overflow-y-auto { touch-action: pan-y; -webkit-overflow-scrolling: touch; }` | `src/index.css` | Re-asserts vertical panning and momentum for the pane. |
+| `.overflow-y-auto:not(.overflow-x-auto), [data-scroll-container] { touch-action: pan-y; -webkit-overflow-scrolling: touch; }` | `src/index.css` | Re-asserts vertical panning and momentum for the pane. A pane that scrolls sideways too is left both axes (INV-7075). |
 | `.chat-message { touch-action: pan-y; }` | `src/index.css` | Same, for the rows themselves. |
-| `--keyboard-height` from `visualViewport.resize` | `useVisualViewportKeyboardOffset.ts` | `ProjectWorkspaceShell.tsx` applies it as `style={{ bottom: 'var(--keyboard-height, 0px)' }}`, so the fixed shell shrinks above the iOS keyboard instead of being covered by it. |
+| `<ScrollArea orientation="horizontal">` sets `touch-action: pan-x` inline | `src/shared/ui/ScrollArea.tsx` | `pan-y` refuses a sideways swipe outright, so a sideways list inside it never moves under a finger. The inline style beats the CSS rules above. Callers: the station's strip timeline and cards' shelf. |
+| `--keyboard-height` from `visualViewport.resize`, and once as the hook mounts | `src/shared/hooks/useVisualViewportKeyboardOffset.ts` | `ProjectWorkspaceShell.tsx` and the station's root (`StationShell.tsx`) apply it as `style={{ bottom: 'var(--keyboard-height, 0px)' }}`, so the fixed shell shrinks above the iOS keyboard instead of being covered by it. |
 | `@media (prefers-reduced-motion: reduce) { scroll-behavior: auto !important; }` | `src/index.css` | The only `scroll-behavior` declaration in the repo. Nothing sets `smooth` in CSS. |
 
 `scrollToBottom` (the jump button, the composer send) is an instant `scrollTop = scrollHeight`
@@ -4659,7 +4660,7 @@ section: 07-live-widgets/002 The pieces
 | `src/modules/chat/embeds/EmbedWidgetBody.tsx` | `EmbedWidgetBody` — the gutter widget: the follow latch, the one-row dropdown (house presets, the chat's addresses, `Type an address…`), the way out, and `EmbedUrlFrame` filling the card |
 | `src/modules/chat-gutters/GutterWidgetFrame.tsx` | The gutter card, its `fullscreen` / `onToggleFullscreen` / `flush` / `headerAction` / `countTone` props, and the focus hand-off to its fullscreen switch when the card leaves full screen (MAN-422) |
 | `src/modules/widgets/embedUrl.ts` | `isLoopbackHost` and `resolveEmbedUrl` — a loopback address moved onto the host that reached this page, because an `src` is resolved by the reader's browser |
-| `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, `docspaceStudioUrl`, and `isForeignOrigin` — the gate on `allow-same-origin` |
+| `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, `docspaceStudioUrl`, `docSpacePageUrl` and `isForeignOrigin` — the gate on `allow-same-origin`. `docSpacePageUrl(pageId, blockId)` is the ONE builder of a link into DocSpace for a page or one block of it (MAN-485); `docspaceStudioUrl` calls it. The barrel exports it for the companion module (Settings' "Open her memory") and the station module (the page stage's "Open in DocSpace") |
 | `src/modules/widgets/DocSpaceFrame.tsx` | `DOCSPACE_SANDBOX`, `DOCSPACE_READY_TIMEOUT_MS` and `DocSpaceFrame` — the second frame: a `src` on ArchPulse's origin, the latched theme, the ready timer, and the `framed` prop that drops its own border where a card already draws one |
 | `src/modules/widgets/WidgetErrorCard.tsx` | `WidgetErrorCard` — the two-sentence card shown where a widget was asked for and cannot be drawn |
 | `src/modules/live-bus/topics.ts` | `LIVE_TOPIC_ALLOWLIST`, `isAllowedTopic`, `DISPATCHER_ALL_TOPIC`, `ROADMAP_ALL_TOPIC`, `SOULS_ALL_TOPIC`, `UNIVERSE_ALL_TOPIC` — the whole vocabulary |
@@ -4835,6 +4836,8 @@ to dark with the plain effect, 0 with the layout effect (`/tmp/widget-theme-prob
 through the app's own switch, no reload, diff against a fresh dark load). Any other reader of the
 computed tokens gets the same guarantee only from an ordinary effect; one in its own layout effect,
 or at render time, would still read the old theme.
+
+`isDarkMode` is the colour ON SCREEN: a theme held with `holdTheme(theme)` while any hold stands (the station holds dark: MAN-9251), else his own choice. The layout effect above and `useWidgetHost`'s repost both key on it, so a hold or its release changes a widget's theme exactly as his switch does, and the hold stores nothing.
 
 The repost reads the opener's `<html>`, never the picture-in-picture window's copy of it. chat-host's mirror keeps that copy live through a `MutationObserver`, which runs AFTER the widget host's effect on a click-driven flip; a read there posted the new `dark` flag with the previous theme's tokens, one flip behind on every flip (measured 2026-09-29). The window's sheets are clones of the opener's, so once the mirror catches up it computes the same values.
 
@@ -5450,7 +5453,7 @@ section: 08-rendered-shapes/002 The pieces
 | `markdownCards.css` | The element cards a markdown surface opts into by carrying `MARKDOWN_CARDS_CLASS` (`src/shared/constants.ts`, `'chat-md-cards'`). Imported by `Markdown.tsx` as a side effect; see §"Element cards" |
 | `shapes/shapeMotion.css` | The transcript's entrances: `[data-vv-enter]` plays `animate-shape-rise` once, and the rows, items and tiles inside it follow on `animate-shape-item` with a per-position stagger. FRAMES ONLY — a plain list, a quotation and the footnotes carry no key and render identically streaming or settled, so only a `ShapeFrame` root ever carries the marker. Imported by `Markdown.tsx` as a side effect, directly after `markdownCards.css`; see §"Header, type and motion" |
 | `StreamingMarkdown.tsx` | Renders a reply as a settled `<MarkdownBody>` and a pending `<MarkdownBody streaming>` |
-| `shapes/detect.ts` | Every trigger, behind the one import path every consumer uses: `classifyTable`, `soleNumericColumn`, `parseNumber`, `parseStatsFence`, `deltaTone`, `parseAlertKind`, `parseVerdict`, `isLeadInText`/`LEAD_IN_MAX_CHARS`, `isTimeToken`/`timeTokenLength`, `checkGlyph`/`checkGlyphLength`, `parseFileRef`, `FILE_REF_SCAN`, `KNOWN_EXTENSIONS`, `KNOWN_DOTFILES`, `IMAGE_EXTENSIONS`/`previewKindOf`, `parseHexColor`, `parseKeyCombo`, `splitDiffLine`, `LONG_OUTPUT_LINES`, `LONG_OUTPUT_PREVIEW_LINES`. A barrel with no logic of its own — a new trigger goes in its family's module and gets its name added here |
+| `shapes/detect.ts` | Every trigger, behind the one import path every consumer uses: `classifyTable`, `soleNumericColumn`, `parseNumber`, `parseStatsFence`, `deltaTone`, `parseAlertKind`, `parseVerdict`, `isLeadInText`/`LEAD_IN_MAX_CHARS`, `isTimeToken`/`timeTokenLength`, `checkGlyph`/`checkGlyphLength`, `parseFileRef`, `FILE_REF_SCAN`, `KNOWN_EXTENSIONS`, `KNOWN_DOTFILES`, `IMAGE_EXTENSIONS`/`previewKindOf`, `parseHexColor`, `parseKeyCombo`, `LONG_OUTPUT_LINES`, `LONG_OUTPUT_PREVIEW_LINES`. A barrel with no logic of its own — a new trigger goes in its family's module and gets its name added here |
 | `shapes/detect/` | The grammars, one pure module per family: `tables`, `fences`, `prose`, `listMarks`, `fileRefs`, `inlineMarks` (which name lives where is the barrel's header). None imports anything, a sibling included, so `tsx` loads the barrel with no browser |
 | `shapes/hast.ts` | `HastNode` and the text readers: `textOf`, `readTable`, `readListItems`, `readFactPairs`, `readCodeChildren`, `hasInlineFormatting` |
 | `shapes/tableData.ts` | What happens after a table trigger fires: `tableRung` (the ladder `ShapeTable` switches on and `LeadIn` asks about the table under a line), `tablePayload`, `dataTableKind`, `compareCells`, `sortedOrder`, `toCsv`, `barPercents` |
@@ -5507,7 +5510,7 @@ section: 08-rendered-shapes/002 The pieces/002 `shapes/useFilePreview.ts`
 | `shapes/FactCard.tsx` | `**Label:** value` pairs as a `<dl>` grid |
 | `shapes/VerdictBanner.tsx` | A `Banner` carrying the verdict word, and four `Chip`s for the counts |
 | `shapes/StatTiles.tsx` | One `Card` tile per `stats` line, the delta toned by its sign |
-| `shapes/DiffBlock.tsx` | A `diff` fence line by line, each line's `data-tone` from `splitDiffLine`, with a `+n −n` summary |
+| `shapes/DiffBlock.tsx` | A `diff` fence in a `ShapeFrame`: the lines are the kit's `DiffLines` (MAN-9274), inside this file's `-mx-3 -my-2 overflow-x-auto` scroller; the header carries a `+n −n` count (kinds from `splitDiffLine`, `src/shared/utils.ts`) and the copy action |
 | `shapes/LongOutput.tsx` | Clamps a fence over 25 lines to 12 under a fade, with a "Show all N lines" control |
 | `shapes/TabbedCode.tsx` | A plugin `tabbed-code` group as the shared `Tabs` over the rendered fences |
 | `shapes/ShapeSection.tsx` | A plugin `section` wrapper: the heading's words become its fold button. `SECTION_FLOW` restates Typography's positional margins |
@@ -5864,7 +5867,7 @@ does.
 **Every size inside a rendered shape or a carded surface is `em`, off five names**
 `tailwind.config.js`'s `fontSize` declares: `md-body` (`1em` — every shape's body AND its own title;
 a header is never smaller than what it heads), `md-meta` (`0.875em` — a shape's actions slot, a
-numbered badge, a footnote chip), `md-code` (`0.875em` — `DiffBlock`'s own line font, its first
+numbered badge, a footnote chip), `md-code` (`0.875em` — the line font of the kit's `DiffLines`, its first
 caller), `md-stat` (`1.75em` — a stat tile's figure, and nothing else), and `chat-tool`
 (`calc(var(--chat-font-size, 1rem) * 0.875)` — the base size of a tool's own markdown body, the same
 ratio `prose-sm` drew at the default 16px, now following the setting instead of a fixed px).

@@ -211,8 +211,13 @@ export function createDispatcherModule(): DispatcherModule {
     // A read waits, bounded, for this boot's first reading rather than being handed a picture nobody
     // has read; past the bound it is told so, and the landing's own frame fills the tab.
     current: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
-    runVerb: (verb: DispatcherVerb, plan: string, verbArgs?: readonly string[]) =>
-      runDispatcherVerb(verb, plan, commands, verbArgs),
+    // A verb the dispatcher took pokes the lane (`PolledLane.poke`, as the roadmap's writes do): the card, the Inbox and the
+    // station's rail redraw on the picture that follows the press, not up to two seconds later on the next poll.
+    runVerb: async (verb: DispatcherVerb, plan: string, verbArgs?: readonly string[]) => {
+      const result = await runDispatcherVerb(verb, plan, commands, verbArgs);
+      if (result.ok) watcher.poke();
+      return result;
+    },
     // The dispatcher's own `offpeak` verb prints the hour, so the card's `Resume at …` button shows the
     // moment this box will really start a plan.
     offpeak: createOffpeakClock({ bin, timeoutMs: VERB_TIMEOUT_MS }),
@@ -220,7 +225,15 @@ export function createDispatcherModule(): DispatcherModule {
   // The card's own door, beside the verbs and the reads: `POST /api/dispatcher/answer`. Mounted on
   // the lane's router rather than written into it because it answers through the PROMPTS root, whose
   // book owns the ask, and because that router is at its size ceiling already.
-  router.use(createDispatcherAnswerRouter({ answer: prompts.answer }));
+  router.use(createDispatcherAnswerRouter({
+    // An answer the dispatcher took pokes the lane for the same reason a verb does: an Accept answered from the card leaves the
+    // card, the Inbox and the station's rail on the next picture, which the poke brings within moments.
+    answer: async (ask, decision) => {
+      const reply = await prompts.answer(ask, decision);
+      if (reply.outcome === 'took') watcher.poke();
+      return reply;
+    },
+  }));
 
   return {
     router,

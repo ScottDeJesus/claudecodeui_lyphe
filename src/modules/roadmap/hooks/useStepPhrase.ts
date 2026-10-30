@@ -15,7 +15,8 @@ const PLAIN_STEPS: ReadonlySet<RoadmapFeatureStep> = new Set<RoadmapFeatureStep>
  * A feature's step in plain words: `being designed`, `waiting on you: Accept`, `waiting on The day
  * sheet`, `shipped Oct 3 · 3h 42m` (the time agents worked on it, once any did). Used by `FeatureFacts`
  * (`FeatureDialog`'s body), which hands it to `StateLine` for its label and shows it under the step line,
- * and by the tree's feature panel (`panel/FeaturePanel`), after the word in its State fact.
+ * by the tree's feature panel (`panel/FeaturePanel`), after the word in its State fact, and, through the
+ * roadmap barrel, by the station module's left rail (`RoadmapRows`), under each feature's title.
  *
  * `building` names no count: the panel's Tasks fact, right under it, carries "3 of 13 done", and the dialog's
  * task list does. A `waiting` feature names the first feature it waits on that has not shipped, found

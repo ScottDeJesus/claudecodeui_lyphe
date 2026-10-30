@@ -5,6 +5,7 @@ import { AppError } from '@/shared/utils.js';
 
 import type { CompanionToolDeps } from '../tools/companion-tools.js';
 
+import { LIST_ABOUT_NOTHING, NOTE_ABOUT_NOTHING } from './card-shapes.js';
 import { answerRead, whenWords } from './eyes-answer.js';
 import { clipLine, counted, fitLines, maskCredentials } from './line-words.js';
 
@@ -49,7 +50,11 @@ const noteLine = (note: Note): string => `${clipLine(note.title, TITLE_MAX)} · 
 function noteAnswer(deps: CompanionToolDeps, note: Note, panel: boolean, signal: AbortSignal | undefined): Promise<ToolTextResult> | ToolTextResult {
   const title = maskCredentials(note.title);
   const body = maskCredentials(note.description).trim();
-  return answerRead(deps, { panel, title, text: body === '' ? '(no text)' : body, label: 'note', brief: NOTE_BRIEF, intro: `${title} · updated ${whenWords(note.updatedAt)}` }, signal);
+  return answerRead(
+    deps,
+    { panel, title, text: body === '' ? '(no text)' : body, label: 'note', brief: NOTE_BRIEF, intro: `${title} · updated ${whenWords(note.updatedAt)}`, shape: NOTE_ABOUT_NOTHING },
+    signal
+  );
 }
 
 /** `read_notes`: see the file's head. */
@@ -75,7 +80,11 @@ export function readNotes(
   const notes = notesService.list(deps.userId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   if (lower === 'list') {
     if (notes.length === 0) return textResult('He has no notes.');
-    return answerRead(deps, { panel, title: 'His notes', text: fitLines(notes.map(noteLine)), label: 'notes', brief: LIST_BRIEF, intro: `${counted(notes.length, 'note')}, newest first:` }, signal);
+    return answerRead(
+      deps,
+      { panel, title: 'His notes', text: fitLines(notes.map(noteLine)), label: 'notes', brief: LIST_BRIEF, intro: `${counted(notes.length, 'note')}, newest first:`, shape: LIST_ABOUT_NOTHING },
+      signal
+    );
   }
 
   const exact = notes.filter((note) => note.title.toLowerCase() === lower);
@@ -84,7 +93,7 @@ export function readNotes(
   if (fits.length === 1) return noteAnswer(deps, fits[0], panel, signal);
   return answerRead(
     deps,
-    { panel, title: `Notes: ${scope}`, text: fitLines(fits.map(noteLine)), label: 'notes', brief: LIST_BRIEF, intro: `${counted(fits.length, 'note')} fit "${scope}":` },
+    { panel, title: `Notes: ${scope}`, text: fitLines(fits.map(noteLine)), label: 'notes', brief: LIST_BRIEF, intro: `${counted(fits.length, 'note')} fit "${scope}":`, shape: LIST_ABOUT_NOTHING },
     signal
   );
 }

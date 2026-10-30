@@ -2,14 +2,26 @@ import * as React from 'react';
 
 import { cn } from '@/shared/utils';
 
-type ScrollAreaProps = React.HTMLAttributes<HTMLDivElement>;
+type ScrollAreaProps = React.HTMLAttributes<HTMLDivElement> & {
+  /**
+   * The axis the pane scrolls along, which is also the one a finger pans. `vertical` (the default, every pane
+   * but two) scrolls down, and a sideways swipe on it pans nothing (`touch-action: pan-y`). `horizontal`
+   * scrolls sideways and never down: a finger pans it sideways (`pan-x`, which `pan-y` refuses outright, so a
+   * sideways list in a vertical pane does not move under a finger), and a swipe that reaches its end stops
+   * there (`overscroll-behavior-x: contain`) rather than handing the browser its back-and-forward swipe. Kaylee
+   * Station's two lines are the horizontal panes: "Since you last looked", the timeline across its bar, and her
+   * cards' shelf, the row over its stage.
+   */
+  orientation?: 'vertical' | 'horizontal';
+};
 
 /**
  * A pane's one scroll container, consistently styled. Used by the panes outside the chat transcript
  * that scroll a list of their own: the sidebar, the file tree, the app drawer, the chat gutter's widget
  * frame, the kanban lane and card drawer, and the Heal, Jev, Schedules, DeepSeek-spend, memory-intake,
  * Notes, agent-launch, Runner and Cerberus panels (the Cerberus tab's root scrolls its header, strip and
- * view as one).
+ * view as one), and by Kaylee Station: its stage's body, its narrow stack and, sideways, its strip's
+ * timeline and her cards' shelf.
  *
  * THE INNER SCROLLER IS `relative`, SO IT IS THE CONTAINING BLOCK OF EVERYTHING IT SCROLLS. A static
  * scroller handed every absolutely positioned descendant with no positioned ancestor nearer — an
@@ -21,21 +33,27 @@ type ScrollAreaProps = React.HTMLAttributes<HTMLDivElement>;
  * reach. (A focus does not reach the range: it scrolls the inner box to its end and stops.)
  */
 export const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
-  ({ className, children, ...props }, ref) => (
-    <div className={cn(className, 'relative overflow-hidden')} {...props}>
-      {/* Inner container keeps border radius while allowing momentum scrolling on touch devices. */}
-      <div
-        ref={ref}
-        className="relative h-full w-full overflow-auto rounded-[inherit]"
-        style={{
-          WebkitOverflowScrolling: 'touch',
-          touchAction: 'pan-y',
-        }}
-      >
-        {children}
+  ({ className, children, orientation = 'vertical', ...props }, ref) => {
+    const sideways = orientation === 'horizontal';
+    return (
+      <div className={cn(className, 'relative overflow-hidden')} {...props}>
+        {/* Inner container keeps border radius while allowing momentum scrolling on touch devices. */}
+        <div
+          ref={ref}
+          className={cn(
+            'relative h-full w-full rounded-[inherit]',
+            sideways ? 'overflow-x-auto overflow-y-hidden overscroll-x-contain' : 'overflow-auto',
+          )}
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            touchAction: sideways ? 'pan-x' : 'pan-y',
+          }}
+        >
+          {children}
+        </div>
       </div>
-    </div>
-  )
+    );
+  }
 );
 
 ScrollArea.displayName = 'ScrollArea';

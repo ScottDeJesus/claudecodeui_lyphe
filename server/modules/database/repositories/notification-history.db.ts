@@ -45,8 +45,9 @@ export const notificationHistoryDb = {
    * 301st-newest id through the `(user_id, id)` index and deletes it and everything older, so it never scans the table.
    * With `replaceRepeat`, the account's rows of the same code, chat, plan, title and body are deleted first (a missing chat
    * or plan matches a missing one, `IS`), so the row inserted is the only one of its news and carries the time it was last told.
+   * Answers the id of the row inserted, so the caller can hand the row on as stored (`onHistoryKept`).
    */
-  record(userId: number, row: NotificationHistoryInput, options: { replaceRepeat?: boolean } = {}): void {
+  record(userId: number, row: NotificationHistoryInput, options: { replaceRepeat?: boolean } = {}): number {
     const db = getConnection();
     const removeRepeat = db.prepare(
       `DELETE FROM notification_history
@@ -61,10 +62,11 @@ export const notificationHistoryDb = {
        WHERE user_id = ?
          AND id <= (SELECT id FROM notification_history WHERE user_id = ? ORDER BY id DESC LIMIT 1 OFFSET ?)`
     );
-    db.transaction(() => {
+    return db.transaction((): number => {
       if (options.replaceRepeat === true) removeRepeat.run(userId, row.code, row.title, row.body, row.session_id, row.plan);
-      insert.run(userId, row.at, row.code, row.kind, row.severity, row.title, row.body, row.session_id, row.plan);
+      const { lastInsertRowid } = insert.run(userId, row.at, row.code, row.kind, row.severity, row.title, row.body, row.session_id, row.plan);
       prune.run(userId, userId, NOTIFICATION_HISTORY_KEEP);
+      return Number(lastInsertRowid);
     })();
   },
 

@@ -10,6 +10,7 @@ import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
 import type { CompanionSettings } from '@/shared/companion-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
+import type { StationAskAnswer } from '@/shared/station-types';
 import { IS_PLATFORM, companionClientId, recordingFileName } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
@@ -638,8 +639,9 @@ export const api = {
     // from one device to another. `savePreferences` is a merge-patch: only the
     // keys it is given are written.
     preferences: () => get('/api/user/preferences'),
-    savePreferences: (updates: Record<string, unknown>) =>
-      patch('/api/user/preferences', updates),
+    // `options` is for the one save that must outlive its page: the station's look-away stamp goes with `keepalive`.
+    savePreferences: (updates: Record<string, unknown>, options?: ApiRequestOptions) =>
+      patch('/api/user/preferences', updates, options),
     drafts: () => get('/api/user/drafts'),
     /** Writes only the text; the scope's stored queued message is left as the server has it. */
     saveDraft: (scope: string, draft: { text: string }) =>
@@ -862,9 +864,21 @@ export const api = {
     // Sends the draft as it stands. Answers `{ outcome: 'started' | 'folded' }`; a refused send is a 409 carrying the reason.
     sendDraft: (mode: 'turn' | 'steer') => post('/api/companion/draft/send', { mode }, companionOptions()),
     dismissNote: (id: number) => del(`/api/companion/notes/${id}`, undefined, companionOptions()),
+    // His keep on a card: `pin` sets it pinned or not (a pinned card survives her Clear and she cannot take it down). Answers 204, or a 404
+    // `COMPANION_NOTE_NOT_FOUND` for a card that is no longer on his panel; the `companion_note_pinned` frame carries it to every page.
+    notes: {
+      pin: (id: number, pinned: boolean) => put(`/api/companion/notes/${id}/pin`, { pinned }, companionOptions()),
+    },
+    // His Back, Next and × on the one walk she holds: `move` puts its cursor on item `at` (from 1) and answers 204, or a 409
+    // `COMPANION_WALK_REFUSED` carrying the sentence (no walk held, or `at` past the last item); `end` ends it, 204 whether or not one was held.
+    // Her tool's own move arrives as the same `companion_walk` frame, and she is told of his by the shell's `<view>`, never by a push.
+    walk: {
+      move: (at: number) => put('/api/companion/walk', { at }, companionOptions()),
+      end: () => del('/api/companion/walk', undefined, companionOptions()),
+    },
     // Stops her own turn; the chat sessions she talks about are not touched.
     interrupt: () => post('/api/companion/interrupt', undefined, companionOptions()),
-    // Wipes her conversation, log, notes, draft, walk and focus. The wind-down of her process is awaited, so it can take a while.
+    // Wipes her conversation, log, unpinned cards, draft, walk and focus. The wind-down of her process is awaited, so it can take a while.
     clear: () => post('/api/companion/clear', undefined, { ...companionOptions(), timeoutMs: 90_000 }),
     // His talk press: the clip as multipart `audio` (named by its type, as the chat's mic names its upload) and the recorder's own
     // `durationMs` for it. Takes the floor for this page and answers 202 `{ text }` once the press has been heard and pushed to her;
@@ -888,12 +902,16 @@ export const api = {
     cut: (input: { turnId: string; heard: number | null; interrupted: number | null }) =>
       post('/api/companion/cut', input, companionOptions()),
     // Her memory: the docstore bank of what he told her to keep, which `clear` above never touches. Her bank is the account's and no page's,
-    // so these two name no client. `read` answers `CompanionMemoryReading`: how many memories it holds, or `count: null` with the door's
+    // so these name no client. `read` answers `CompanionMemoryReading`: how many memories it holds, or `count: null` with the door's
     // sentence as `reason` when the bank cannot be read (still a 200), and the id of her DocSpace page. `clear` is his act in Settings: it retires
     // every memory and answers `{ forgotten }`; a door that stops it is a 502 `COMPANION_MEMORY_UNREACHABLE` carrying the sentence, and some may
     // have been forgotten before it, so a caller reads again either way. The retires run one by one, so it gets the same ceiling as `clear`.
+    // `lines` is the same reading with each memory as a line (`CompanionMemoryLines`: kind, title, the moment he said it and his first words),
+    // for the station's "What I'm keeping" corner, which reads it at mount, on each `companion_memory` frame and on reconnect. It is still a 200
+    // when the bank cannot be read (`count: null` with the sentence as `reason`); a refusal of the route itself carries the app's envelope.
     memory: {
       read: () => get('/api/companion/memory'),
+      lines: () => get('/api/companion/memory/lines'),
       clear: () => del('/api/companion/memory', undefined, { timeoutMs: 90_000 }),
     },
     // Her face: the portrait her pages draw, made once from a photo and played from memory. Like her memory it is the account's and no
@@ -917,6 +935,25 @@ export const api = {
       sheet: (faceId: string, n: number) => get(`/api/companion/face/${encodeURIComponent(faceId)}/sheet/${n}`),
       // The contact sheet: every frame, named (`image/webp`). For him to read in Settings.
       contact: (faceId: string) => get(`/api/companion/face/${encodeURIComponent(faceId)}/contact`),
+    },
+    // Kaylee Station's reads. `sessions` is his chats as the station's left rail draws them, in the order and with the line she reads of each:
+    // 200 `{ sessions: StationSession[] }`, or a 503 `{ error }` carrying the sentence when the database or the approvals gateway cannot be read.
+    // The station's provider reads it at mount, on every `station_sessions_changed` hint and on reconnect.
+    station: {
+      sessions: () => get('/api/companion/station/sessions', companionOptions()),
+      // `landed` is what landed this week, the strip's line: 200 `{ landed: StationLanded[] }`, newest first, at most 60 of the account's
+      // last seven days (`[]` for none), or a 503 `{ error }` carrying the sentence when the history cannot be read. It is the account's, not
+      // a page's, so it names no `x-companion-client`. The station's landed provider reads it at mount and on reconnect, and folds each
+      // `station_landed` frame in between.
+      landed: () => get('/api/companion/station/landed'),
+      // `needs` is everything waiting on his word, in his order: 200 `{ needs: StationNeed[], faults: StationNeed['kind'][] }`, `faults` naming
+      // the kinds a reader could not read (left out of `needs`, said by the rail), or a 503 `{ error }` carrying the sentence when the read failed
+      // whole. The station's needs provider reads it at mount and on each of its five other events (`StationNeedsContext`). It names this page like
+      // every call of the group; the route reads no client (the list is the account's, not a page's).
+      needs: () => get('/api/companion/station/needs', companionOptions()),
+      // `answerAsk` is his word for one chat's waiting ask, sent from the ask's stage: the body is a `StationAskAnswer`. 200 `{ told }` is the
+      // sentence that says what was done; a 400 `{ error }` says what to answer instead, and a 409 `{ error }` that the ask is no longer waiting.
+      answerAsk: (body: StationAskAnswer) => post('/api/companion/station/asks', body, companionOptions()),
     },
   },
 

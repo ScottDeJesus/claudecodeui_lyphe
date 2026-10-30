@@ -8,6 +8,7 @@ import { isDeniedPath } from '../tools/dactyl-paths.js';
 import type { CompanionToolDeps } from '../tools/companion-tools.js';
 import { resolveProject, type HisProject } from '../tools/house-reads.js';
 
+import { aboutProject } from './card-shapes.js';
 import { answerRead, cappedLines } from './eyes-answer.js';
 import {
   changedFilesOf,
@@ -119,7 +120,8 @@ async function sectionOf(repo: Repo, file: ChangedFile, maxCharacters: number): 
 function statusAnswer(deps: CompanionToolDeps, repo: Repo, status: GitStatusOfRepository, files: ChangedFile[], panel: boolean, signal: AbortSignal | undefined) {
   const lines = files.map((file) => fileLine(file, isWithheld(repo, file)));
   const text = [statusSentence(status), files.length === 0 ? 'Nothing is uncommitted.' : cappedLines(lines, GIT_FILES_MAX)].join('\n');
-  return answerRead(deps, { panel, title: `${repo.project.name}: uncommitted work`, text, label: 'git-status', brief: STATUS_BRIEF, intro: '' }, signal);
+  const shape = aboutProject('list', repo.project.path);
+  return answerRead(deps, { panel, title: `${repo.project.name}: uncommitted work`, text, label: 'git-status', brief: STATUS_BRIEF, intro: '', shape }, signal);
 }
 
 /**
@@ -157,7 +159,8 @@ async function diffAnswer(deps: CompanionToolDeps, repo: Repo, files: ChangedFil
   ]
     .filter((line) => line !== '')
     .join('\n');
-  return answerRead(deps, { panel, title: `${repo.project.name}: uncommitted diff`, text: sections.join('\n\n'), label: 'git-diff', brief: DIFF_BRIEF, intro }, signal);
+  const shape = aboutProject('diff', repo.project.path);
+  return answerRead(deps, { panel, title: `${repo.project.name}: uncommitted diff`, text: sections.join('\n\n'), label: 'git-diff', brief: DIFF_BRIEF, intro, shape }, signal);
 }
 
 /** A changed file's path (or the end of one): its diff, or the sentence that says which files fit, none, or that it is withheld. */
@@ -174,7 +177,8 @@ async function fileAnswer(deps: CompanionToolDeps, repo: Repo, files: ChangedFil
   const [file] = found;
   if (isWithheld(repo, file)) return deps.refuse(withheldSentence(file.path));
   const diff = await sectionOf(repo, file, DIFF_OF_ONE_MAX_CHARACTERS);
-  return answerRead(deps, { panel, title: `${repo.project.name}: ${file.path}`, text: diff, label: 'git-file', brief: FILE_BRIEF, intro: '' }, signal);
+  const shape = aboutProject('diff', repo.project.path);
+  return answerRead(deps, { panel, title: `${repo.project.name}: ${file.path}`, text: diff, label: 'git-file', brief: FILE_BRIEF, intro: '', shape }, signal);
 }
 
 /** Whether `folder` is a folder on disk: a registered project can outlive its folder (the project list keeps it). */

@@ -3211,6 +3211,7 @@
     "panel": {
       "label": "{{name}}",
       "close": "Close {{name}}",
+      "station": "Open Kaylee Station",
       "loading": "Opening {{name}}'s conversation…",
       "loadingStatus": "Loading…",
       "readFailed": "Couldn't open {{name}}'s conversation: {{reason}}",
@@ -3271,7 +3272,7 @@
     "clear": "Clear",
     "clearLabel": "Clear {{name}}'s conversation",
     "clearTitle": "Clear {{name}}'s conversation?",
-    "clearMessage": "She forgets this conversation, her notes, the draft and the walkthrough, and starts fresh. What she keeps in her memory stays, and briefs she already sent stay in their chats.",
+    "clearMessage": "She forgets this conversation, her unpinned cards, the draft and the walkthrough, and starts fresh. Your pinned cards stay, and so does what she keeps in her memory; briefs she already sent stay in their chats.",
     "clearConfirm": "Clear the conversation",
     "clearRefused": "{{name}}'s conversation wasn't cleared",
     "cancel": "Cancel",
@@ -3395,7 +3396,9 @@
     "palette": {
       "group": "{{name}}",
       "talk": "Talk to {{name}}",
-      "keywords": "kaylee companion voice assistant talk draft brief"
+      "keywords": "kaylee companion voice assistant talk draft brief",
+      "station": "Open Kaylee Station",
+      "stationKeywords": "kaylee station watch floor dashboard monitor window"
     },
     "noteKind": {
       "note": "Note",
@@ -3461,15 +3464,227 @@
         "page": "Open CloudCLI"
       }
     },
+    "rail": {
+      "name": "Where things stand"
+    },
+    "sessions": {
+      "heading": "Sessions",
+      "state": {
+        "working": "Working",
+        "waiting": "Waiting on you",
+        "idle": "Idle",
+        "asleep": "Asleep"
+      },
+      "asleep": "Asleep · {{count}}",
+      "reading": "Reading your sessions…",
+      "retry": "Try again",
+      "none": {
+        "title": "No sessions yet",
+        "message": "A chat you start in CloudCLI stands here, with what it is doing."
+      },
+      "nothingRunning": {
+        "title": "Nothing is running",
+        "message_one": "One chat is asleep. A message wakes it.",
+        "message_other": "{{count}} chats are asleep. A message wakes any of them."
+      },
+      "her": {
+        "reading": "{{name}} is reading {{chat}}",
+        "drafting": "{{name}} is drafting for {{chat}}",
+        "walking": "{{name}} is walking {{chat}}"
+      }
+    },
+    "roadmap": {
+      "eyebrow": "Roadmap",
+      "reading": "Reading the roadmap…",
+      "none": "No roadmap yet. Make one on the Roadmap tab, and its open epics stand here.",
+      "noneOpen": "Nothing is open on this roadmap.",
+      "complete": "Complete · {{count}}"
+    },
+    "chat": {
+      "moved": "last moved {{when}}",
+      "open": "Open the chat",
+      "say": "Say “What is {{name}} doing?”"
+    },
+    "cards": {
+      "reading": "Reading her cards…",
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "dismiss": "Dismiss",
+      "pinned": "Pinned",
+      "putUp": "put up {{when}}",
+      "openCard": "Open its plan card",
+      "openChat": "Open the session",
+      "openInDocSpace": "Open in DocSpace",
+      "project": "Project",
+      "pinRefused": "Could not pin {{title}}",
+      "unpinRefused": "Could not unpin {{title}}",
+      "dismissRefused": "Could not dismiss {{title}}",
+      "walk": {
+        "refused": "The walkthrough did not move",
+        "endRefused": "The walkthrough did not end",
+        "reading": "Reading her walkthrough…",
+        "label": "The walkthrough of {{name}}",
+        "place": "Item {{at}} of {{total}}",
+        "notBegun": "Not begun",
+        "waiting_one": "{{count}} item, waiting to begin",
+        "waiting_other": "{{count}} items, waiting to begin",
+        "say": "Say “next”, or answer this one",
+        "sayBegin": "Say “next”, or press Next, to begin",
+        "items_one": "{{count}} item",
+        "items_other": "All {{count}} items",
+        "doneWord": ", done",
+        "now": "Now",
+        "back": "Back",
+        "next": "Next",
+        "end": "End the walkthrough"
+      },
+      "shelf": {
+        "label": "Her cards",
+        "pinnedWord": ", pinned",
+        "more": "+{{count}} more in the conversation"
+      }
+    },
     "gone": {
-      "chat": "{{label}} is no longer in CloudCLI",
+      "chat": "This session is no longer in your list.",
       "card": "{{label}} is no longer on the roadmap",
-      "ask": "{{label}} is no longer waiting",
+      "ask": "That ask was answered elsewhere.",
       "followups": "{{label}} has no open follow-ups now",
-      "check": "{{label}} is no longer failing",
-      "note": "{{label}} is no longer on her cards",
-      "walk": "{{label}} has ended",
+      "check": "{{label}} is no longer red",
+      "note": "{{label}} was taken down",
+      "walk": "The walkthrough ended",
       "page": "{{label}} is no longer in DocSpace"
+    },
+    "needs": {
+      "title": "What needs you",
+      "how": "Say the words: she reads each back, and your yes fires it.",
+      "reading": "Reading what needs you…",
+      "empty": "Nothing needs you.",
+      "retry": "Try again",
+      "fault": {
+        "plans": "Couldn’t read the Accepts and design questions just now",
+        "ask": "Couldn’t read the permissions just now",
+        "followups": "Couldn’t read the follow-ups just now",
+        "check": "Couldn’t read the checks just now"
+      },
+      "kind": {
+        "accept": "Accept",
+        "questions": "Questions",
+        "permission": "Permission",
+        "question": "Question",
+        "plan": "Plan",
+        "followups": "Follow-ups",
+        "check": "Red check"
+      },
+      "act": {
+        "queue": "Queue…",
+        "answer": "Answer…",
+        "allow": "Allow…",
+        "open": "Open"
+      },
+      "status": {
+        "failing": "Failing",
+        "denied": "Refused"
+      },
+      "facts": {
+        "epic_one": "Epic · {{count}} feature",
+        "epic_other": "Epic · {{count}} features",
+        "feature": "Feature",
+        "questions": "{{count}} to answer",
+        "more": "{{count}} more waiting",
+        "open": "{{count}} open"
+      },
+      "where": "{{node}} · since {{time}}",
+      "onStage": "On the stage",
+      "say": "Say “{{say}}”",
+      "openChat": "Open the chat",
+      "ask": {
+        "looking": "Looking for the ask…",
+        "wellPermission": "What it would run",
+        "wellQuestion": "What it asks",
+        "wellPlan": "The plan",
+        "more": "{{count}} more waiting behind it",
+        "answered": "Answered",
+        "allow": "Allow",
+        "deny": "Deny",
+        "always": "Always allow",
+        "rule": "Always allow also keeps <rule/> as a standing rule for every later chat of yours.",
+        "approve": "Approve",
+        "sendBack": "Send back",
+        "sendBackHint": "Send back returns the plan to its chat to revise.",
+        "options": "Its options",
+        "ownWords": "Or answer in your own words",
+        "yourAnswer": "Your answer",
+        "send": "Send the answer",
+        "sent": "Your answer was sent.",
+        "refused": "The answer could not be sent just now.",
+        "unreached": "The server could not be reached; the ask is still waiting."
+      },
+      "followups": {
+        "list": "{{chat}}’s follow-ups"
+      },
+      "check": {
+        "looking": "Looking for the check…",
+        "open": "Open the check",
+        "card": "{{label}} in Cerberus"
+      }
+    },
+    "strip": {
+      "name": "Since you last looked",
+      "timeline": "This week’s landings, oldest first",
+      "kind": {
+        "shipped": "Shipped",
+        "epic": "Epic complete",
+        "landed": "Landed",
+        "recovered": "Recovered"
+      },
+      "when": {
+        "today": "{{clock}}",
+        "yesterday": "yesterday {{clock}}",
+        "day": "{{day}}"
+      },
+      "by": "by {{chat}}",
+      "byHouse": "by the house",
+      "new": "New",
+      "newCount": "{{count}} new",
+      "seenLabel_one": "{{count}} new since you last looked: mark it seen",
+      "seenLabel_other": "{{count}} new since you last looked: mark them seen",
+      "rule": "You last looked",
+      "nothingNew": "Nothing new since you last looked",
+      "nothingNewShort": "Nothing new",
+      "quiet": "Nothing has landed this week",
+      "loading": "Reading what landed…",
+      "failed": "Couldn’t read what landed",
+      "retry": "Try again",
+      "expand": "Show the whole week",
+      "collapse": "Show only the newest"
+    },
+    "memory": {
+      "title": "What I'm keeping",
+      "toggle_one": "What I'm keeping, {{count}} memory",
+      "toggle_other": "What I'm keeping, {{count}} memories",
+      "toggleUnknown": "What I'm keeping, how many can't be read",
+      "kind": {
+        "rule": "rule",
+        "gotcha": "gotcha",
+        "landmine": "landmine",
+        "manual": "name"
+      },
+      "when": {
+        "today": "today {{clock}}",
+        "yesterday": "yesterday {{clock}}"
+      },
+      "youSaid": "You said",
+      "quoted": "“{{quote}}”",
+      "noWords": "No words of yours are kept with this one.",
+      "reading": "Reading her memory…",
+      "unreadable": "Her memory can't be read just now",
+      "retry": "Try again",
+      "empty": {
+        "title": "Nothing kept yet",
+        "message": "What she keeps of what you say shows here."
+      },
+      "page": "Open the full page",
+      "pageLabel": "Open the full page: her memory in DocSpace, in a new tab"
     }
   }
 }

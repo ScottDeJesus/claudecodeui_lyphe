@@ -20,6 +20,7 @@ import {
   summaryReading,
   type Reading,
 } from './card-scopes.js';
+import { aboutCard, LIST_ABOUT_NOTHING, type CardShape } from './card-shapes.js';
 import { answerRead, toPanel } from './eyes-answer.js';
 import { fitLines } from './line-words.js';
 
@@ -36,7 +37,7 @@ import { fitLines } from './line-words.js';
  * the rest), or a phrase over names, titles and goals.
  * `read_card(card, scope, panel)` answers by scope: `summary`, `prompt`, `questions`, `phases` and `history` from the pictures'
  * rows (`card-scopes.ts`); `design` and a phrase from the dispatcher's `show` text, handed over whole when short and else digested by
- * a dactyl under a fixed brief. `panel: true` puts the whole answer on his panel as a note. No answer says a cost, a token count, a
+ * a dactyl under a fixed brief. `panel: true` puts the whole answer on his panel as a card. No answer says a cost, a token count, a
  * paid vendor, a runtime or the pacer (ruling 1); every brief forbids it. Each description is her prompt's own line (`toolLine`).
  *
  * Consumers: `tools/companion-tools.ts` (`roadmapReads`, once per account) and the hands (`resolveCard`, which resolves every card an
@@ -165,7 +166,7 @@ function listRoadmap(deps: CompanionToolDeps, args: { scope: string; panel?: boo
     const { cards, empty } = scoped(book, scope);
     const lines = cards.map((card) => cardLine(card, book));
     const answer = textResult(lines.length === 0 ? empty : args.panel === true ? lines.join('\n') : fitLines(lines));
-    return args.panel === true ? toPanel(deps, `Roadmap: ${scope}`, answer) : answer;
+    return args.panel === true ? toPanel(deps, `Roadmap: ${scope}`, answer, LIST_ABOUT_NOTHING) : answer;
   });
 }
 
@@ -173,31 +174,35 @@ function listRoadmap(deps: CompanionToolDeps, args: { scope: string; panel?: boo
 
 //----------------- read_card ------------
 
-/** The scope's reading from the pictures' rows alone, or null for a scope that needs the dispatcher's text (`design`, or a phrase). */
-function rowsReading(keyword: string, card: Card, book: CardBook): Reading | null {
+/**
+ * The scope's reading from the pictures' rows alone, with the kind of card it is on his panel (MAN-9151's table: the questions, the
+ * tasks and the history are lists; the summary and the open prompt are one thing read), or null for a scope that needs the dispatcher's
+ * text (`design`, or a phrase).
+ */
+function rowsReading(keyword: string, card: Card, book: CardBook): { reading: Reading; kind: 'list' | 'note' } | null {
   switch (keyword) {
     case 'summary':
-      return summaryReading(card, book);
+      return { reading: summaryReading(card, book), kind: 'note' };
     case 'prompt':
-      return promptReading(card, book);
+      return { reading: promptReading(card, book), kind: 'note' };
     case 'questions':
-      return questionsReading(card, book);
+      return { reading: questionsReading(card, book), kind: 'list' };
     case 'phases':
-      return phasesReading(card, book);
+      return { reading: phasesReading(card, book), kind: 'list' };
     case 'history':
-      return historyReading(card);
+      return { reading: historyReading(card), kind: 'list' };
     default:
       return null;
   }
 }
 
-/** A reading as the answer: whole (or digested under its brief when it has one and is long), or on his panel whole (the longer `panel` text when the scope cut its own to fit). */
-function finish(deps: CompanionToolDeps, reading: Reading, panel: boolean, signal: AbortSignal | undefined): Promise<ToolTextResult> | ToolTextResult {
+/** A reading as the answer: whole (or digested under its brief when it has one and is long), or on his panel whole (the longer `panel` text when the scope cut its own to fit) as a card of `shape`. */
+function finish(deps: CompanionToolDeps, reading: Reading, shape: CardShape, panel: boolean, signal: AbortSignal | undefined): Promise<ToolTextResult> | ToolTextResult {
   if (reading.brief === null) {
     const joined = (text: string): ToolTextResult => textResult([reading.intro, text].filter((part) => part !== '').join('\n'));
-    return panel ? toPanel(deps, reading.title, joined(reading.panel ?? reading.text)) : joined(reading.text);
+    return panel ? toPanel(deps, reading.title, joined(reading.panel ?? reading.text), shape) : joined(reading.text);
   }
-  return answerRead(deps, { panel, title: reading.title, text: reading.text, label: reading.label, brief: reading.brief, intro: reading.intro }, signal);
+  return answerRead(deps, { panel, title: reading.title, text: reading.text, label: reading.label, brief: reading.brief, intro: reading.intro, shape }, signal);
 }
 
 /** `design` and a phrase: the dispatcher's `show` text, whole for a design, the paragraphs around the phrase for a phrase. */
@@ -205,13 +210,15 @@ async function designReading(deps: CompanionToolDeps, card: Card, scope: string,
   const shown = await deps.house.cardText(refName(card));
   if (!shown.ok) return deps.refuse(`The dispatcher has no text for ${card.spoken}: ${shown.sentence}.`);
   const text = designText(shown.text);
+  // A design, and the paragraphs of it around a phrase, are the card's plan: the stage draws them as a plan.
+  const shape = aboutCard('plan', card.name);
   if (scope.toLowerCase() === 'design') {
-    return finish(deps, { title: `${card.spoken}: design`, intro: `The design of ${card.spoken}:`, text, label: 'card-design', brief: DESIGN_BRIEF }, panel, signal);
+    return finish(deps, { title: `${card.spoken}: design`, intro: `The design of ${card.spoken}:`, text, label: 'card-design', brief: DESIGN_BRIEF }, shape, panel, signal);
   }
   const around = paragraphsAround(text, scope);
   if (around === null) return textResult(`The design of ${card.spoken} does not mention ${scope}.`);
   const reading = { title: `${card.spoken}: ${scope}`, intro: `The design of ${card.spoken}, around "${scope}":`, text: around, label: 'card-phrase', brief: phraseBrief(scope) };
-  return finish(deps, reading, panel, signal);
+  return finish(deps, reading, shape, panel, signal);
 }
 
 /** `read_card`: resolves the card, then reads the scope. Moves neither her focus nor her activity. */
@@ -224,15 +231,17 @@ function readCard(deps: CompanionToolDeps, args: { card: string; scope: string; 
     const found = resolveIn(book, args.card);
     if (!found.ok) return deps.refuse(found.sentence);
     const scope = args.scope.replace(/\s+/g, ' ').trim();
-    const reading = rowsReading(scope.toLowerCase(), found.card, book);
-    return reading === null ? designReading(deps, found.card, scope, args.panel === true, signal) : finish(deps, reading, args.panel === true, signal);
+    const rows = rowsReading(scope.toLowerCase(), found.card, book);
+    return rows === null
+      ? designReading(deps, found.card, scope, args.panel === true, signal)
+      : finish(deps, rows.reading, aboutCard(rows.kind, found.card.name), args.panel === true, signal);
   });
 }
 
 // ---------------------------
 
 /** The `panel` argument both tools take. */
-const panelFlag = z.boolean().optional().describe('true puts the whole answer on his panel as a note instead of in your context; you are then told only that it is there.');
+const panelFlag = z.boolean().optional().describe('true puts the whole answer on his panel as a card instead of in your context; you are then told only that it is there.');
 
 /**
  * The definitions of `list_roadmap` and `read_card` (the order her prompt lists them), built with the SDK's `tool()` and zod. Both

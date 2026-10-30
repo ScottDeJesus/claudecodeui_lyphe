@@ -43,10 +43,12 @@ type CheckSheetProps = {
   lookupAt?: number;
   /** The run a Needs-you card's strip or a What happened row opened the sheet on, which its Fix output shows until a Run now is pressed in the sheet. Omitted, the check's latest run within the hour. */
   run?: string;
-  /** Mute, pressed for the check the sheet shows. The root opens its Mute dialog in front of the sheet. */
-  onMute: (check: CerberusCheckView) => void;
-  /** Add to catalog, pressed on the diagnosis of the check the sheet shows. The root opens its Promote dialog in front of the sheet, as it does Mute. */
-  onPromote: (diagnosis: CerberusDiagnosisView, check: CerberusCheckView) => void;
+  /** Mute, pressed for the check the sheet shows. The root opens its Mute dialog in front of the sheet. Absent, no Mute is offered. */
+  onMute?: (check: CerberusCheckView) => void;
+  /** Add to catalog, pressed on the diagnosis of the check the sheet shows. The root opens its Promote dialog in front of the sheet, as it does Mute. Absent, no Add to catalog is offered. */
+  onPromote?: (diagnosis: CerberusDiagnosisView, check: CerberusCheckView) => void;
+  /** The sheet's width, any CSS width; omitted, the kit `Sheet`'s own (`min(600px, 100%)`). */
+  width?: string;
 };
 
 /**
@@ -66,16 +68,19 @@ type CheckSheetProps = {
  * the last good answer when there is one; a plain line when the check is gone.
  *
  * For the cerberus module's `CerberusPanel`, which hosts one and opens it from a service row's minute
- * and from Needs you.
+ * and from Needs you, with its Mute and Promote dialogs; and for the station module's check stage
+ * (`CheckStage`, through the barrel), which opens it on a red check over the station's right side, at
+ * the width that keeps it off her face, and hosts neither dialog, so its sheet offers no Mute and no
+ * Add to catalog.
  */
-export function CheckSheet({ open, onClose, node, service, check, lookupAt, run, onMute, onPromote }: CheckSheetProps) {
+export function CheckSheet({ open, onClose, node, service, check, lookupAt, run, onMute, onPromote, width }: CheckSheetProps) {
   // The fleet the provider keeps: it names the service and its node before the check is read.
   const { overview } = useCerberus();
   const nodeView = overview?.nodes.find((entry) => entry.id === node) ?? null;
   const serviceView = nodeView?.services.find((entry) => entry.service === service) ?? null;
 
   return (
-    <Sheet open={open} onClose={onClose} title={serviceView?.label ?? service}>
+    <Sheet open={open} onClose={onClose} title={serviceView?.label ?? service} width={width}>
       {/* Keyed by what the sheet opened on, so a sheet sent to another check or minute starts over:
           that row, that moment, the editor closed. */}
       <CheckSheetBody
@@ -94,7 +99,7 @@ export function CheckSheet({ open, onClose, node, service, check, lookupAt, run,
   );
 }
 
-type CheckSheetBodyProps = Omit<CheckSheetProps, 'open' | 'onClose'> & {
+type CheckSheetBodyProps = Omit<CheckSheetProps, 'open' | 'onClose' | 'width'> & {
   nodeView: CerberusNodeView | null;
   serviceView: CerberusServiceView | null;
 };
@@ -236,7 +241,7 @@ function CheckSheetBody({ node, service, check, lookupAt, run, nodeView, service
             ) : null}
             onName={() => setEditingId(selectedId)}
             // The root's Mute dialog opens in front of the sheet, which stands down for it.
-            onMute={() => onMute(shown)}
+            onMute={onMute && (() => onMute(shown))}
             // The note leaves when the fleet reads the lift.
             onUnmute={() => {
               if (shown.mute !== null) void liftMute(shown.mute.id);
@@ -253,7 +258,12 @@ function CheckSheetBody({ node, service, check, lookupAt, run, nodeView, service
       {outputRunId !== null && <FixOutput key={outputRunId} runId={outputRunId} />}
       {/* Keyed by the diagnosis, so a new one starts blank and its steps arrive as its own. */}
       {diagnosis !== null && shown !== null && (
-        <DiagnosisPanel key={diagnosis.id} diagnosisId={diagnosis.id} held={heldByOther} onPromote={(promoted) => onPromote(promoted, shown)} />
+        <DiagnosisPanel
+          key={diagnosis.id}
+          diagnosisId={diagnosis.id}
+          held={heldByOther}
+          onPromote={onPromote && ((promoted) => onPromote(promoted, shown))}
+        />
       )}
       {/* `?? []` and `?? null`: an older server's answer has neither field. */}
       {detail !== null && <CheckFixes fixes={detail.fixes ?? []} run={detail.run ?? null} onRunStarted={(runId) => followStartedRun(selectedId, runId)} />}

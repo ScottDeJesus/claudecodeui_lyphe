@@ -130,7 +130,7 @@ export type CompanionHeardRow = {
 /** One account's faces as the face service's start and prune read them: the face it draws and the one being made (each NULL for none). */
 export type CompanionFaceRow = Pick<CompanionStateRow, 'user_id' | 'face_id' | 'face_pending_id'>;
 
-/** What `clearAccount` removed and whether a state row was there to reset. */
+/** What `clearAccount` removed (`notesRemoved` counts the unpinned cards; the pinned stay) and whether a state row was there to reset. */
 export type CompanionClearResult = {
   logRemoved: number;
   notesRemoved: number;
@@ -365,7 +365,20 @@ export const companionDb = {
   },
 
   /**
-   * Clear: deletes the account's log and cards and empties its state's conversation (its id, shape and handover), focus, draft,
+   * Sets one of the account's cards pinned or not, reporting whether a row of that account was there: `false` for an id of another
+   * account or a card already taken down. A card already in the state asked for still answers `true` (the statement matches the
+   * row whether or not the value moves), so his press is idempotent.
+   */
+  setNotePinned(userId: number, id: number, pinned: boolean): boolean {
+    const result = getConnection()
+      .prepare('UPDATE companion_notes SET pinned = ? WHERE id = ? AND user_id = ?')
+      .run(pinned ? 1 : 0, id, userId);
+
+    return result.changes > 0;
+  },
+
+  /**
+   * Clear: deletes the account's log and its UNPINNED cards — a pinned card is his keep and survives it — and empties its state's conversation (its id, shape and handover), focus, draft,
    * pending action, unanswered messages and walkthrough — in one transaction. `floor` stays (which client holds the floor
    * is no part of her conversation), and so do her face columns (Clear wipes her memory, not her look), and so does `memory_forget_line`: log ids are AUTOINCREMENT and never reused, so the id of the line
    * the last forget of her memory used stays a true lower bound after the log it named is gone, and a line he says next always has a
@@ -384,7 +397,7 @@ export const companionDb = {
       const clearedAt = new Date().toISOString();
       db.prepare(`UPDATE companion_actions SET ended_at = ?, outcome = 'cancelled' WHERE user_id = ? AND outcome IS NULL AND said_log_id IS NULL`).run(clearedAt, userId);
       const logRemoved = db.prepare('DELETE FROM companion_log WHERE user_id = ?').run(userId).changes;
-      const notesRemoved = db.prepare('DELETE FROM companion_notes WHERE user_id = ?').run(userId).changes;
+      const notesRemoved = db.prepare('DELETE FROM companion_notes WHERE user_id = ? AND pinned = 0').run(userId).changes;
       const stateReset =
         db
           .prepare(

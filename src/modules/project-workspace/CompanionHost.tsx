@@ -14,7 +14,7 @@ const ARCHPULSE_APP_ID = 'archpulse';
 
 /**
  * Rendered by ProjectWorkspaceShell inside the chat host's and the application switcher's providers: holds Kaylee's provider
- * and answers her orders to open a chat, a card or a page on this page — the provider calls `onOpen(target, label)` only on the
+ * and answers her orders to open a chat, a card, a page or a check on this page — the provider calls `onOpen(target, label)` only on the
  * page that holds the floor, so every branch below acts without asking whose turn it is. The workspace has no use for the label
  * (the spoken name the door resolved, which the station's stage names a thing by) and ignores it.
  *
@@ -33,6 +33,9 @@ const ARCHPULSE_APP_ID = 'archpulse';
  * OPENING A PAGE IS ARCHPULSE'S OWN DEEP LINK, `/#page=<id>[&block=<id>]`, shown through the switcher's `useShowApplication`:
  * it puts ArchPulse up at the address, and when ArchPulse is already up it MOVES that pane there (the drawer's toggle would
  * take it down), the page resolving the fragment on its own `hashchange`.
+ *
+ * OPENING A CHECK BRINGS THE CERBERUS TAB FORWARD, `setActiveTab('cerberus')`, the workspace first when an application covers it (the
+ * tab would be drawn under it). The tab is the whole of Cerberus's health picture, so the check is found there, not singled out.
  *
  * The callback changes identity when an application comes or goes or the route moves; the provider reads the newest at the
  * moment a frame arrives, so nothing resubscribes.
@@ -61,6 +64,10 @@ export default function CompanionHost({ navigate, children }: Pick<ProjectWorksp
           return;
         case 'page':
           showApplication(ARCHPULSE_APP_ID, `/#page=${target.pageId}${target.blockId ? `&block=${target.blockId}` : ''}`);
+          return;
+        case 'check':
+          if (covered) backToWorkspace();
+          setActiveTab('cerberus');
           return;
       }
     },

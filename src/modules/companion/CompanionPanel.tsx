@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import { CompanionActionCard } from '@/modules/companion/CompanionActionCard';
 import { CompanionComposer } from '@/modules/companion/CompanionComposer';
@@ -11,7 +12,9 @@ import { CompanionWalkStrip } from '@/modules/companion/CompanionWalkStrip';
 import { useCompanion } from '@/modules/companion/context/CompanionContext';
 import { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
+import { openStation } from '@/shared/cloudcliDoors';
 import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
+import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import type { CompanionPresence, CompanionVoice, TalkPress } from '@/shared/types';
 import { Banner, Button, Card, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -45,6 +48,8 @@ type CompanionPanelViewProps = {
   onDismissNote: (id: number) => Promise<void>;
   /** Withdraws the action waiting for his word; a refusal rejects with the server's sentence. Absent, its card draws no ×. */
   onWithdraw?: () => Promise<void>;
+  /** The header's station button: opens Kaylee Station. Absent, the header draws no button. */
+  onOpenStation?: () => void;
 };
 
 /**
@@ -111,7 +116,7 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  */
 export function CompanionPanelView({
   picture, readFailure, onReread, open, targetWorking, presence, talk, voice, onClose, onSendText, onModelChange, onLiveChange, onInterrupt,
-  onClear, onEditDraft, onSendDraft, onClearDraft, onDismissNote, onWithdraw,
+  onClear, onEditDraft, onSendDraft, onClearDraft, onDismissNote, onWithdraw, onOpenStation,
 }: CompanionPanelViewProps) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -168,6 +173,7 @@ export function CompanionPanelView({
         onInterrupt={onInterrupt}
         onClear={onClear}
         onClose={close}
+        onOpenStation={onOpenStation}
       />
 
       {failed && (
@@ -253,6 +259,9 @@ export function CompanionPanel() {
     talk, voice,
   } = useCompanion();
   const presence = useCompanionPresence();
+  // The head's station button: the same door as the command palette's row, bound here to the router and to where the page stands.
+  const navigate = useNavigate();
+  const { isMobile, isPWA } = useDeviceSettings();
   // The page's own set of chats with a turn running: Send steer shows while the draft's target is in it, because only then is there a turn to fold into.
   const busySessionIds = useBusySessionIdSet();
   // The action on the card he sees: the × withdraws that one, whatever has been prepared since the press.
@@ -281,6 +290,7 @@ export function CompanionPanel() {
       onDismissNote={dismissNote}
       // His × on the action card: the provider calls the server and clears this action from the picture, so the card goes at once.
       onWithdraw={pendingId === null ? undefined : () => cancelAction(pendingId)}
+      onOpenStation={() => openStation(navigate, { phone: isMobile, pwa: isPWA })}
       talk={talk}
       voice={voice}
     />

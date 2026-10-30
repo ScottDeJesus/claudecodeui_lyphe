@@ -168,7 +168,8 @@ function wrapText(text: string, limit: number): string[] {
 /**
  * The state of one feature's dot. A shipped feature is done whatever stands above it; an unshipped one is
  * blocked when the nearest of its own, its epic's and its milestone's blocked reasons exists; any other
- * feature paints its word. Exported for `useRoadmapCard`, which hands an epic's panel the dots it draws off the stage.
+ * feature paints its word. Exported for `useRoadmapCard`, which hands an epic's panel the dots it draws off the stage,
+ * and, through the roadmap barrel, for the station module's left rail (`RoadmapRows`), which paints each feature's dot by it.
  */
 export function dotStateOf(feature: RoadmapFeature, epic: RoadmapEpic, milestone: RoadmapMilestone): RoadmapDotState {
   if (feature.word === 'shipped') return 'shipped';
