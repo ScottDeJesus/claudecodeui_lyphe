@@ -80,3 +80,10 @@ export { listColocatedNodeHosts, refreshColocatedNodeHosts } from './colocated-h
  * consumer: the websocket module's chat gateway, through the providers barrel
  */
 export { sessionHostLivenessSnapshot } from './host-liveness.js';
+
+/**
+ * A chat gaining or losing its last live host, as it happens — `live` or `asleep`, never the snapshot. The push to the pages
+ * is the same file's; this is the seam a listener of the server's own hears it through.
+ * consumer: the companion module's station hint, through the providers barrel
+ */
+export { onHostLivenessChanged } from './host-liveness.js';

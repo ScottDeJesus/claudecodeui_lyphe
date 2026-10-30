@@ -224,18 +224,19 @@ throws is answered with `INTERNAL_ERROR`.**
 | `chat.abort` | `sessionId` | Aborts the runtime and emits the terminal `complete` on its behalf (`:415-438`) |
 | `chat.subscribe` | `sessions: [{ sessionId, lastSeq }]` | Acks with `chat_subscribed`, attaches this socket to a running run, replays what was missed (`:448-504`) |
 | `chat.permission-response` | `requestId`, `allow`, `updatedInput?`, `message?`, `rememberEntry?` | Resolves one pending tool approval (`:511-522`) |
-| `chat.presence` | `sessionId`, `visible` | Records which session this socket is showing, for the notification channels' watched-session check (`:538-544`) |
+| `chat.presence` | `sessionId`, `visible`, `clientId?`, `focused?`, `view?` | Records which session this socket is showing, for the notification channels' watched-session check (`handleChatPresence` in `chat-websocket.service.ts`), and what is on his screen for Kaylee's `<view>`: `clientId` (1 to 200 characters) names the page, `focused` says its window has the keyboard, `view` is the station's `StationFocus`, kept only when whole (MAN-9057) |
 | `chat.ping` | — | Answers `pong`. The browser's liveness probe; `WebSocketContext.tsx` swallows the answer, so no feature ever sees it |
 
 Five of the first six are built in exactly two client files: the composer builds sends, aborts and
 permission answers (`useChatComposerState.ts:877`, `:1187`, `:1229`), and
 `chat.subscribe` is built in `useChatSessionState.ts:811` and
 `ChatInterface.tsx:330`. `chat.presence` has a third home of its own,
-`src/modules/chat/hooks/useSessionPresence.ts`, called once from `ChatInterface.tsx`, which
+`src/modules/chat/hooks/useSessionPresence.ts`, called once from `ChatInterface.tsx` (every report it sends carries the page's
+`clientId` and the host document's `hasFocus()` as `focused`, and no `view`), which
 passes the session only while the chat tab is the one showing (a hidden chat behind Files,
 Shell or Git reports `null`): it announces at mount, on every session or connection change,
-on `websocket_reconnected`, on `visibilitychange` and every 30 s while the tab is visible, and
-announces `sessionId: null` on the way out — which is how an event about a session you are
+on `websocket_reconnected`, on `visibilitychange`, on the host window's `focus` and `blur` and every 30 s while
+the tab is visible, and announces `sessionId: null` on the way out (`visible: false, focused: false`) — which is how an event about a session you are
 already watching goes unpushed
 ([docs/MANUAL.md (notifications)](../MANUAL.md) §"What gets pushed, and how loud", *Not while you are
 watching*).
@@ -6690,7 +6691,7 @@ Handled by `server/modules/websocket/services/chat-websocket.service.ts`.
 | `chat.abort` | Stop the running run. |
 | `chat.subscribe` | Watch one or more sessions, replaying from `lastSeq`. |
 | `chat.permission-response` | Answer a `permission_request`. |
-| `chat.presence` | Which session this socket is watching, and whether its tab is visible. |
+| `chat.presence` | Which session this socket is watching, whether its tab is visible, which page it is (`clientId`), whether its window has the keyboard (`focused`) and, from the station, what its stage holds (`view`). |
 
 Note the asymmetry, which trips people up: **server frames are discriminated by `kind`,
 client frames by `type`.**

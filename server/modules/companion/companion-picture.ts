@@ -5,13 +5,15 @@ import type { ProviderModelsDefinition } from '@/shared/types.js';
 import type { CompanionAccount } from './companion-account.js';
 import { withoutPin } from './companion-pending.js';
 import { COMPANION_MODELS, readCompanionSettings } from './companion-settings.js';
+import { faceService } from './face/face.service.js';
 
 /**
  * The whole of her as a page reads it (`GET /api/companion`): settings, the picker's models, her process, her
- * activity, the turn in flight, the focus, the draft, the action waiting for his word, the walk, the notes and the
- * newest 200 log lines. Every later change reaches a page as a frame, and a page that missed some reads this again,
- * so nothing here is derived from anything but what a frame would also have told it. The pending action is the
- * stored one WITHOUT its pin (`withoutPin`): what the prepare pinned is the server's alone and no picture carries it.
+ * activity, the turn in flight, the focus, the draft, the action waiting for his word, the walk, the notes, the
+ * newest 200 log lines, the floor (the page that holds her voice) and her face (the one her pages draw,
+ * `faceService.faceOf`: the account's own, else the original, with its bake if one is being made). Every later change
+ * reaches a page as a frame, and a page that missed some reads this again, so nothing here is derived from anything but
+ * what a frame would also have told it. The pending action is the stored one WITHOUT its pin (`withoutPin`): what the prepare pinned is the server's alone and no picture carries it.
  *
  * THE MODEL LABELS come from the installed CLI's own catalog (`readClaudeModelsDefinition`), not from a word this
  * app wrote: the catalog names each family's current generation, so the picker says "Sonnet 5.5" and says "Sonnet
@@ -71,5 +73,6 @@ export async function buildPicture(account: CompanionAccount): Promise<Companion
     notes: store.listNotes(),
     log: store.readLog(PICTURE_LOG_ROWS),
     floor,
+    face: faceService.faceOf(account.userId),
   };
 }

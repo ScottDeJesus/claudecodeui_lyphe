@@ -23,12 +23,21 @@ type PlacementViewport = { width: number; height: number; safe?: SafeInsets };
 const VIEWPORT_EDGE_PX = 8;
 
 /**
- * How far past an anchor's right edge the disc's CENTRE stands beside a row. The plan measures her by that centre ("within
- * 12 px of the row's right edge"), so the figure is the centre's and not a gap between boxes: the disc overlaps the row's
- * last few pixels, and the answer is the same at any disc size. Ten leaves the rail button's 44 px catch off the button's
- * own centre (20 px in from its edge, so 30 px from the disc's centre).
+ * The least the disc's CENTRE stands past an anchor's right edge beside a row, and what it is at 28 px. The plan measures her by
+ * that centre ("within 12 px of the row's right edge"), so the figure is the centre's and not a gap between boxes: the disc
+ * overlaps the row's last few pixels. Ten leaves the rail button's 44 px catch off the button's own centre (20 px in from its
+ * edge, so 30 px from the disc's centre). A larger disc stands further out, by `ROW_OVERLAP_PX`.
  */
 const ROW_CENTRE_PAST_EDGE_PX = 10;
+
+/** How far a LARGE disc overlaps a row: its left edge stands this far inside the row's right edge, however large it is. */
+const ROW_OVERLAP_PX = 12;
+
+/**
+ * How far a LARGE disc overlaps a box: its bottom edge stands this far below the box's top. At 28 px this is the disc's own
+ * radius, so the disc is centred on the box's corner; a larger disc stands back from the corner by the rest of its radius.
+ */
+const BOX_OVERLAP_PX = 14;
 
 /**
  * The tallest anchor that is a ROW (a sidebar row, a rail button) rather than a BOX (the composer, the file tree). Measured
@@ -56,13 +65,17 @@ const finiteOrZero = (value: number): number => (Number.isFinite(value) ? value 
  * Used by this module's CompanionFab, which turns the answer into the offset it draws her at while a target holds
  * (`useAvatarTarget` picks the anchor and measures its rect; this says where beside it she stands).
  *
+ * `size` is the disc's side as she is drawn NOW: 28 at rest and up to 120 while she is active (`useCompanionSize`). The disc
+ * stands clear of the anchor at any size, so the figures below are the CENTRE's and grow with the disc once it is larger than
+ * its overlap needs; at 28 px they are the numbers the plan first measured.
+ *
  * TWO SHAPES OF ANCHOR, told apart by height alone because the rect is all it is given:
  *   - A ROW (at most `ROW_MAX_HEIGHT_PX` tall: a chat's sidebar row, the rail's Files button) gets the disc with its centre
- *     `ROW_CENTRE_PAST_EDGE_PX` past the right edge, vertically centred on it — she stands beside the row like a finger on a
- *     line of a list.
- *   - A BOX (taller: the composer, the file tree) gets the disc centred on its top-right corner — she perches on the
- *     corner and leaves the words and the file names uncovered. A box's right edge is the middle of a wall, and a disc
- *     centred on that would sit on the text.
+ *     `max(ROW_CENTRE_PAST_EDGE_PX, size / 2 - ROW_OVERLAP_PX)` past the right edge, vertically centred on it — she stands
+ *     beside the row like a finger on a line of a list, and a large disc overlaps it by 12 px and no more.
+ *   - A BOX (taller: the composer, the file tree) gets the disc with its centre `max(0, size / 2 - BOX_OVERLAP_PX)` left of and
+ *     above its top-right corner — at 28 px, centred on the corner; a large disc perches on it overlapping the box by 14 px.
+ *     A box's right edge is the middle of a wall, and a disc centred on that would sit on the text.
  *
  * The clamp comes LAST and always applies, so an anchor against the right edge of the screen (a composer on a phone)
  * lands her on the anchor's own corner inside the screen rather than off it. The edges are the safe area plus
@@ -71,8 +84,10 @@ const finiteOrZero = (value: number): number => (Number.isFinite(value) ? value 
  */
 export function avatarPlacement(anchor: DOMRect, size: number, viewport: PlacementViewport): { left: number; top: number } {
   const isRow = anchor.height <= ROW_MAX_HEIGHT_PX;
-  const wantedLeft = isRow ? anchor.right + ROW_CENTRE_PAST_EDGE_PX - size / 2 : anchor.right - size / 2;
-  const wantedTop = isRow ? anchor.top + anchor.height / 2 - size / 2 : anchor.top - size / 2;
+  const rowCentrePast = Math.max(ROW_CENTRE_PAST_EDGE_PX, size / 2 - ROW_OVERLAP_PX);
+  const boxCentreBack = Math.max(0, size / 2 - BOX_OVERLAP_PX);
+  const wantedLeft = isRow ? anchor.right + rowCentrePast - size / 2 : anchor.right - boxCentreBack - size / 2;
+  const wantedTop = isRow ? anchor.top + anchor.height / 2 - size / 2 : anchor.top - boxCentreBack - size / 2;
 
   const safe = viewport.safe;
   const leftmost = finiteOrZero(safe?.left ?? 0) + VIEWPORT_EDGE_PX;

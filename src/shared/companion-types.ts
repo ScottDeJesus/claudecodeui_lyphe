@@ -149,11 +149,31 @@ export type CompanionLogEntry = {
 };
 
 /**
+ * What a card is, by `kind`: a plain `note`, a `list`, a `diff`, a DocSpace `plan` page, or a DocSpace `page`. Stored with
+ * the card (`CompanionNote.kind`), so a card she put up before kinds existed reads as a `note`. The center's inline cards and
+ * the stage draw a card's glyph and word by it.
+ */
+export type CompanionNoteKind = 'note' | 'list' | 'diff' | 'plan' | 'page';
+
+/**
+ * What a card is about, told apart by `kind`: a roadmap `card` by its plan's name, a `chat` by its app session id, a DocSpace
+ * `page` (and `blockId`, `null` for the page itself) or a `project` by its path. Stored with the card
+ * (`CompanionNote.ref`); `null` on a card about nothing.
+ */
+export type CompanionNoteRef =
+  | { kind: 'card'; plan: string }
+  | { kind: 'chat'; sessionId: string }
+  | { kind: 'page'; pageId: string; blockId: string | null }
+  | { kind: 'project'; path: string };
+
+/**
  * A card she put on the panel with `show_note` instead of saying it aloud: a `title` and its `text`.
  * `id` is the store's row id, and a note stays until the operator dismisses it or she takes it down with `dismiss_note`. Announced by
- * `companion_note` and withdrawn by `companion_note_removed`.
+ * `companion_note` and withdrawn by `companion_note_removed`. `kind` says what the card is, `ref` what it is about (`null` for a card
+ * about nothing) and `pinned` whether he pinned it to stay in view; a card held before the three existed reads as a `note`
+ * about nothing, unpinned. A pin change is announced by `companion_note_pinned`.
  */
-export type CompanionNote = { id: number; at: string; title: string; text: string };
+export type CompanionNote = { id: number; at: string; title: string; text: string; kind: CompanionNoteKind; ref: CompanionNoteRef | null; pinned: boolean };
 
 /**
  * The state of her CLI process: `asleep` (not running, started by the next message), `waking`,
@@ -196,7 +216,9 @@ export type CompanionCeremonyAction = Exclude<CompanionActionKind, 'open' | 'clo
  * an open lands on, `null` for the page); a `chat` is an app session id; a `followup` is one of his
  * follow-ups, `id` its number, `sessionId` the chat it belongs to and `text` its words as the card shows
  * them; a `memory` is her own bank, `spoken` the name he says it by ("your memory") and `count` the
- * memories it held when the action was prepared. Carried by `CompanionPendingAction.target`.
+ * memories it held when the action was prepared; a `check` is a service check by its `node` and `key`
+ * (`<service>/<id>`), `spoken` its label — what her open records for one, never the target of a pending action.
+ * Carried by `CompanionPendingAction.target`.
  */
 export type CompanionActionTarget =
   | { kind: 'card'; name: string; spoken: string; arc: string | null }       // a plan or an epic, by the dispatcher's name
@@ -204,7 +226,8 @@ export type CompanionActionTarget =
   | { kind: 'page'; pageId: string; blockId: string | null; spoken: string }
   | { kind: 'chat'; sessionId: string; spoken: string }
   | { kind: 'followup'; id: number; sessionId: string; spoken: string; text: string }
-  | { kind: 'memory'; spoken: string; count: number };
+  | { kind: 'memory'; spoken: string; count: number }
+  | { kind: 'check'; node: string; key: string; spoken: string };            // what her open records for a check (key `<service>/<id>`); never a pending action
 
 /**
  * One of his spoken lines, carried verbatim into an action: its `logId` in her log, its `at` time and its
@@ -236,10 +259,85 @@ export type CompanionPendingAction = {
 
 /**
  * Where an open lands, on the page that holds the floor: a `chat` by its app session id, a roadmap `card`
- * by its plan's name, or a DocSpace `page` (and `blockId`, `null` for the page itself). Carried by
+ * by its plan's name, a DocSpace `page` (and `blockId`, `null` for the page itself), or a service `check`
+ * by its `node` and its `key` (`<service>/<id>`), which only the station draws. Carried by
  * `companion_open`.
  */
-export type CompanionOpenTarget = { kind: 'chat'; sessionId: string } | { kind: 'card'; plan: string } | { kind: 'page'; pageId: string; blockId: string | null };
+export type CompanionOpenTarget =
+  | { kind: 'chat'; sessionId: string }
+  | { kind: 'card'; plan: string }
+  | { kind: 'page'; pageId: string; blockId: string | null }
+  | { kind: 'check'; node: string; key: string };                            // a service check, by its node and key `<service>/<id>`
+
+/**
+ * The nine looks of her face, one per mood. `neutral` is the resting face and the one any mood word the page does not
+ * know falls to; the others are the looks a sentence's leading mood word is gathered into. The key of
+ * `CompanionFaceManifest.moods`, and the mood a page draws while a sentence is said.
+ */
+export type CompanionFaceMood = 'neutral' | 'delighted' | 'playful' | 'gentle' | 'thoughtful' | 'brisk' | 'soft' | 'whispered' | 'mock_serious';
+
+/**
+ * How open her mouth is, and on which vowel: `closed`, then `a` ("ah"), `e` ("ee") and `o` ("oo"), each half open (`1`) or
+ * full (`2`). The key of `CompanionFaceManifest.moods[mood].mouths`; the page picks one from the loudness of her voice
+ * and the vowel of the word being said.
+ */
+export type CompanionFaceMouth = 'closed' | 'a1' | 'a2' | 'e1' | 'e2' | 'o1' | 'o2';
+
+/**
+ * Where her eyes look with her head still, in the eight directions of the screen. The key of `CompanionFaceManifest.gaze`;
+ * the page uses it for the glances she makes now and then.
+ */
+export type CompanionFaceGaze = 'left' | 'right' | 'up' | 'down' | 'up_left' | 'up_right' | 'down_left' | 'down_right';
+
+/**
+ * Where her head turns, her eyes following: a small turn and a larger one to the left or right (`left_10`, `left_20`) and
+ * up or down (`up_5`, `up_10`), the number being the turn's size in degrees. The key of `CompanionFaceManifest.poses`; the
+ * page turns her toward what she is looking at, the anchor beside which she stands.
+ */
+export type CompanionFacePose = 'left_10' | 'left_20' | 'right_10' | 'right_20' | 'up_5' | 'up_10' | 'down_5' | 'down_10';
+
+/**
+ * A sound or motion she makes that plays as a short run of frames rather than one: a `laugh`, a `giggle`, a `gasp` or a
+ * `sigh`. The key of `CompanionFaceManifest.clips`, and the name of the sound mark that starts it.
+ */
+export type CompanionFaceClip = 'laugh' | 'giggle' | 'gasp' | 'sigh';
+
+/**
+ * Every frame of a face and where each sits: the file a bake writes (`manifest.json` in the face's folder) and a page plays.
+ * The frames are cut `frameSize` pixels square and packed onto `sheets` (`sheet-0.webp` and on, at most 8 × 8 cells each);
+ * `frames[n]` says which sheet, column and row frame `n` is on. Everything else is an index into `frames`: each mood has its
+ * seven mouths and its half-closed and closed blink, `gaze` and `poses` are the neutral face looking or turned, `states`
+ * are the looks of listening, failing and surprise, and each clip is its frames in order with the rate to play them at.
+ * Directions are the screen's: `left` is toward the window's left edge. `faceId` is the face's own id, the one in
+ * `CompanionFace.id`, and `version` is the shape of this file.
+ */
+export type CompanionFaceManifest = {
+  version: 1;
+  faceId: string;
+  frameSize: number;                                                    // pixels per side of one cell: 256
+  sheets: Array<{ file: string; columns: number; rows: number }>;       // `sheet-0.webp` …, 8 × 8 cells at most
+  frames: Array<{ sheet: number; column: number; row: number }>;
+  moods: Record<CompanionFaceMood, { mouths: Record<CompanionFaceMouth, number>; blink: { half: number; closed: number } }>;
+  gaze: Record<CompanionFaceGaze, number>;
+  poses: Record<CompanionFacePose, number>;
+  states: { listening: number; failed: number; surprise: number };
+  clips: Record<CompanionFaceClip, { fps: number; frames: number[] }>;
+};
+
+/**
+ * Where the making of an uploaded photo's face stands: `queued` (another face is being made first), `baking` (`done` of
+ * `total` frames are made) or `failed` (`error` is the sentence for his screen). Carried by `CompanionFace.bake`.
+ */
+export type CompanionFaceBake = { state: 'queued' | 'baking'; done: number; total: number } | { state: 'failed'; error: string };
+
+/**
+ * The face an account's pages draw. `id` is the face to fetch: the original's id while he has uploaded nothing, his upload's
+ * once it is made, and `null` only while no face exists at all (a fresh box, before the seed photo's first bake), when the
+ * page draws her initial. `original` says whether `id` is the original. `bake` is his upload's bake while it is queued,
+ * running or failed, else `null`; her current face stays in `id` until the new one is ready. Carried by
+ * `CompanionPicture.face` and announced by `companion_face`.
+ */
+export type CompanionFace = { id: string | null; original: boolean; bake: CompanionFaceBake | null };
 
 /**
  * The whole of her as a page reads it with `GET /api/companion`: the `settings`, the models the
@@ -247,8 +345,8 @@ export type CompanionOpenTarget = { kind: 'chat'; sessionId: string } | { kind: 
  * current `activity`, the `turnId` of a running turn (`null` when none), the `focus` chat, the
  * `draft`, the `pending` action waiting for his word (`null` for none), the `walk`, the `notes`, the
  * newest 200 `log` entries (newest last) and the `floor` — the client id of the page that holds the
- * floor, `null` for none. Every later change reaches the page as a `CompanionFrame`, and a page that
- * missed some reads the picture again.
+ * floor, `null` for none — and her `face`, the one her pages draw. Every later change reaches the page as a
+ * `CompanionFrame`, and a page that missed some reads the picture again.
  */
 export type CompanionPicture = {
   settings: CompanionSettings;
@@ -263,6 +361,7 @@ export type CompanionPicture = {
   notes: CompanionNote[];
   log: CompanionLogEntry[];
   floor: string | null;
+  face: CompanionFace;
 };
 
 /**
@@ -272,14 +371,17 @@ export type CompanionPicture = {
  * `outcome` and `error` are set on `ended` only, `null` otherwise); `companion_activity`,
  * `companion_focus`, `companion_draft`, `companion_pending`, `companion_walk` and `companion_process` each
  * carry the new value of the matching picture field (`null` clears the focus, draft, pending action or
- * walk); `companion_note` adds a card and `companion_note_removed` withdraws one by `id`;
+ * walk); `companion_note` adds a card, `companion_note_removed` withdraws one by `id` and `companion_note_pinned` says whether
+ * the card with that `id` is pinned now; `companion_memory` says her memory changed, and a page that shows it reads it again;
  * `companion_settings` carries the new settings; `companion_open` tells the page whose client id equals
- * `floor` to bring `target` up (a chat, a roadmap card or a DocSpace page), for every open she makes,
- * the open of the chat a send went to included (`target.kind === 'chat'`); `companion_floor` says the
+ * `floor` to bring `target` up (a chat, a roadmap card, a DocSpace page or a service check), for every open she makes,
+ * the open of the chat a send went to included (`target.kind === 'chat'`), with `label` the spoken name the door resolved for it (the
+ * station's stage names what she opened by it; the workspace ignores it); `companion_floor` says the
  * floor moved: `floor` is the client id of the page that holds it now, so the page whose own id equals it
  * may play her voice and every other page shows the text only (sent on every write of the floor, whether
  * or not the holder changed); `companion_cleared` says the account's log, notes and pending action were
- * cleared, with her conversation, and the panel empties.
+ * cleared, with her conversation, and the panel empties; `companion_face` carries the account's face after an
+ * upload, a restore, each frame a bake renders and the bake's end.
  */
 export type CompanionFrame =
   | { kind: 'companion_log'; entry: CompanionLogEntry }
@@ -292,11 +394,28 @@ export type CompanionFrame =
   | { kind: 'companion_walk'; walk: CompanionWalk | null }
   | { kind: 'companion_note'; note: CompanionNote }
   | { kind: 'companion_note_removed'; id: number }
+  | { kind: 'companion_note_pinned'; id: number; pinned: boolean }
   | { kind: 'companion_settings'; settings: CompanionSettings }
   | { kind: 'companion_process'; process: CompanionProcess }
-  | { kind: 'companion_open'; target: CompanionOpenTarget; floor: string }
+  | { kind: 'companion_open'; target: CompanionOpenTarget; floor: string; label: string }
   | { kind: 'companion_floor'; floor: string }
-  | { kind: 'companion_cleared' };
+  | { kind: 'companion_face'; face: CompanionFace }
+  | { kind: 'companion_cleared' }
+  | { kind: 'companion_memory' };
 
 /** Her memory as Settings reads it: how many memories it holds (null when the bank cannot be read, `reason` saying why) and the DocSpace page that shows it. */
 export type CompanionMemoryReading = { count: number | null; pageId: string; reason: string | null };
+
+/**
+ * One memory of her own bank as the station's memory view draws it: its `token` (the docstore row that holds it), `title`, `kind`,
+ * when it was said (`saidAt`, ISO, `null` when the row records none), the `account` that said it (`null` when it records none) and a
+ * `quote` of its words (`null` when it holds none). Carried by `CompanionMemoryLines.lines`.
+ */
+export type CompanionMemoryLine = { token: string; title: string; kind: string; saidAt: string | null; account: string | null; quote: string | null };
+
+/**
+ * Her memory read as lines: `count` how many memories the bank holds (`null` when it cannot be read, `reason` saying why, as in
+ * `CompanionMemoryReading`), `pageId` the DocSpace page that shows it whole, and `lines` the memories the view draws, newest first.
+ * Read again when `companion_memory` is heard.
+ */
+export type CompanionMemoryLines = { count: number | null; pageId: string; reason: string | null; lines: CompanionMemoryLine[] };

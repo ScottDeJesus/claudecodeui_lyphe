@@ -77,7 +77,10 @@ function onScreen({ x, y }: FabPoint): CSSProperties {
 /**
  * The one place left/top come from: the held point, the dock's rect, or the stored x/y. Docked, the
  * FAB is CENTRED on the dock, so the dock's own size never has to repeat `--vv-fab-size`, and the
- * centre the snap measures to is the centre the FAB lands on.
+ * centre the snap measures to is the centre the FAB lands on. Docked is clamped inside the safe area
+ * as a floating point is: at the house's 28px the dock's centre is always far enough in for the clamp
+ * to do nothing, and an owner that sets a larger `--vv-fab-size` gets a disc that grows about the
+ * dock's centre and stops at the edge instead of leaving the screen.
  */
 function fabPlacement(
   position: DockableFabPosition,
@@ -90,8 +93,8 @@ function fabPlacement(
   const centreX = dockRect.left + dockRect.width / 2;
   const centreY = dockRect.top + dockRect.height / 2;
   return {
-    left: `calc(${centreX}px - var(--vv-fab-size) / 2)`,
-    top: `calc(${centreY}px - var(--vv-fab-size) / 2)`,
+    left: `clamp(${safeEdge('left')}, calc(${centreX}px - var(--vv-fab-size) / 2), calc(100vw - var(--vv-fab-size) - ${safeEdge('right')}))`,
+    top: `clamp(${safeEdge('top')}, calc(${centreY}px - var(--vv-fab-size) / 2), calc(100dvh - var(--vv-fab-size) - ${safeEdge('bottom')}))`,
   };
 }
 
@@ -123,13 +126,13 @@ function placedRect(node: HTMLButtonElement): DOMRect {
 
 /**
  * The held point, clamped so the whole button stays on screen. The point is the button's TOP-LEFT, so
- * the button's own live box is what the far edge is measured against — a full circle off the right
+ * the button's own placed box (`placedRect`) is what the far edge is measured against — a full circle off the right
  * edge is a way out of a pane with none of its hit area left. `onScreen` clamps again in CSS, which is
  * what keeps a STORED point honest against a window that has since changed size; this clamp is what
  * keeps the point the owner is handed worth storing.
  */
 function clampToViewport(point: FabPoint, node: HTMLButtonElement | null): FabPoint {
-  const rect = node?.getBoundingClientRect();
+  const rect = node ? placedRect(node) : null;
   const width = rect && rect.width > 0 ? rect.width : FAB_SIZE_PX;
   const height = rect && rect.height > 0 ? rect.height : FAB_SIZE_PX;
   const maxX = Math.max(VIEWPORT_EDGE_PX, window.innerWidth - width - VIEWPORT_EDGE_PX);
@@ -180,7 +183,9 @@ function overDock(release: FabPoint, dockRect: DOMRect | null): boolean {
  *
  * One size, in `surfaces.css`: 28px drawn, docked or floating, inside a 44px round catch that is a
  * pseudo-element — so every rect this file reads is the circle the reader sees, and a press up to
- * 22px from its centre still starts a drag.
+ * 22px from its centre still starts a drag. A FAB whose owner sets `--vv-fab-size` on it is drawn at
+ * that size, grows about its own centre wherever it rests, and stays inside the safe area docked as
+ * floating (the owner hands a floating point shifted back by half the growth).
  *
  * The press is the CLICK, never the pointer release. On a touch screen the browser dispatches the
  * tap's click after the release, hit-tested at the finger's point in whatever is on screen by then —
@@ -224,9 +229,10 @@ export function DockableFab({
   // rest do not. Rearmed on every press; a ref because nothing draws from it.
   const dragAnnounced = useRef(false);
 
-  // The top-left that keeps the grabbed point under the pointer, for whatever size the box is now.
+  // The top-left that keeps the grabbed point under the pointer, for whatever size the box is now. The box's PLACED size, not
+  // its painted one: while pressed `.vv-fab:active` paints it at 0.92, and half of that is not half of the box the point places.
   function heldFrom(x: number, y: number): FabPoint {
-    const rect = buttonRef.current?.getBoundingClientRect();
+    const rect = buttonRef.current ? placedRect(buttonRef.current) : null;
     const width = rect && rect.width > 0 ? rect.width : FAB_SIZE_PX;
     const height = rect && rect.height > 0 ? rect.height : FAB_SIZE_PX;
     return clampToViewport(
@@ -299,6 +305,24 @@ export function DockableFab({
     }
     window.addEventListener('resize', reportAfterResize);
     return () => window.removeEventListener('resize', reportAfterResize);
+  }, []);
+
+  // The button's own size changing — an owner that sets `--vv-fab-size` on it and eases the change — moves the placed rect with no
+  // prop of this file's changing (docked, `left` and `top` are the same text at every size), so each change reports too, frame by
+  // frame while the size eases. The observer's first delivery is the start of the observation, not a change.
+  useEffect(() => {
+    const node = buttonRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return undefined;
+    let started = false;
+    const observer = new ResizeObserver(() => {
+      if (!started) {
+        started = true;
+        return;
+      }
+      rectListener.current?.(placedRect(node));
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
   }, []);
 
   function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {

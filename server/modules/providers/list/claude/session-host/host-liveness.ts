@@ -22,7 +22,8 @@
  *
  * The frame is `SessionHostLivenessEvent`; the fan-out copies `kanban-broadcast.service.ts`.
  *
- * consumer: spawner.ts (`bindSocket`), node-transport.ts (a node's first host frame), the providers barrel (the snapshot)
+ * consumer: spawner.ts (`bindSocket`), node-transport.ts (a node's first host frame), the providers barrel (the snapshot and
+ * `onHostLivenessChanged`)
  */
 
 import { connectedClients, WS_OPEN_STATE } from '@/modules/websocket/index.js';
@@ -34,8 +35,36 @@ import type { Facade } from './facade.js';
 /** The hosts this process holds, per chat (app session id). A chat is live while its set is non-empty. */
 const hostsByChat = new Map<string, Set<string>>();
 
+type HostLivenessListener = (sessionIds: string[]) => void;
+
+/** Called with the chats of every `live` or `asleep` change that is broadcast; never for the snapshot. */
+const livenessListeners = new Set<HostLivenessListener>();
+
+/**
+ * Subscribes to chats gaining or losing their last host — the same moments the pushed `live` and `asleep` frames go
+ * out, and not the snapshot a connecting socket is sent; returns the unsubscribe. A listener that throws is logged and
+ * the rest still hear it.
+ *
+ * consumer: the companion module's station hint, through the providers barrel
+ */
+export function onHostLivenessChanged(listener: HostLivenessListener): () => void {
+  livenessListeners.add(listener);
+  return () => {
+    livenessListeners.delete(listener);
+  };
+}
+
 /** Puts one frame on every open gateway socket; a socket that throws costs only itself its frame. */
 function broadcastLiveness(event: SessionHostLivenessEvent): void {
+  for (const listener of livenessListeners) {
+    try {
+      listener([...event.sessionIds]);
+    } catch (error) {
+      console.error(
+        `[keepalive] a host-liveness listener failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
   const message = JSON.stringify(event);
   connectedClients.forEach((client) => {
     if (client.readyState !== WS_OPEN_STATE) return;

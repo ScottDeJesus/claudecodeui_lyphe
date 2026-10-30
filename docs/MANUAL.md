@@ -3337,7 +3337,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 ## MAN-1557 — The plan card
 section: dispatcher/010 The plan card
 
-`PlanCard` draws one plan the dispatcher carries, over the dispatcher's document. It is drawn in the Roadmap tab's In flight face and in the Runs widget, both in `src/modules/runner-tab` (MAN-642): INSIDE the card of its own arc
+`PlanCard` draws one plan the dispatcher carries, over the dispatcher's document. It is drawn in the Roadmap tab's In flight face and in the Runs widget, both in `src/modules/runner-tab` (MAN-642), and on Kaylee Station's stage (`CardStage`, `src/modules/station`: MAN-9228) for the one plan or epic in focus: INSIDE the card of its own arc
 where the store gives it one (`DispatchArcDeck`, §"The arc's deck" below), and on its own where it belongs to no arc: in the
 tab's wall under the decks, and in the widget's list (the open chat's items first, the card wearing `SessionPin`). Its phases are SHOWN in both, each as a node of the face's track (§"The face"); the card carries no `defaultOpen` at all. An owed word is the ASK BAND: a plan that owes the operator one draws its prompt between its head and its fold (`PlanAsk`, one per ask, drawn outside the fold so a fold keeps it — §"The frame", MAN-7537), and a plan inside an arc's deck draws none, because the arc's asks draw once on the deck, above its strip (§"The arc's deck").
 
@@ -3873,7 +3873,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 ## MAN-5707 — The arc deck's frame — One shape, two homes, two widths.
 section: dispatcher/015 The arc deck's frame/003 One shape, two homes, two widths.
 
-**One shape, two homes, two widths.** `DispatchArcDecks`' `home` prop (`'tab'` | `'gutter'`) changes no layout: it is written on the DOM as `data-dispatch-arcs`, so a reading is always taken from ONE home, and the width each home gives the deck is the whole of the difference — the tab's scroll body spans the pane (1440: a 1037px strip in a 1440px pane, `px-4 lg:px-6` and the scroll body's own edges; 390: the pane less 32px), the widget's card is a column a card wide (1920: a 320px deck in a 346px widget, a 294px strip, MAN-642 → "The gutter"). Nothing is drawn at zero arcs: no empty frame, no heading over nothing.
+**One shape, two homes, two widths.** `DispatchArcDecks`' `home` prop (`'tab'` | `'gutter'`) changes no layout: it is written on the DOM as `data-dispatch-arcs`, so a reading is always taken from ONE home, and the width each home gives the deck is the whole of the difference — the tab's scroll body spans the pane (1440: a 1037px strip in a 1440px pane, `px-4 lg:px-6` and the scroll body's own edges; 390: the pane less 32px), the widget's card is a column a card wide (1920: a 320px deck in a 346px widget, a 294px strip, MAN-642 → "The gutter"). Nothing is drawn at zero arcs: no empty frame, no heading over nothing. The station's stage (MAN-9228) draws one deck with the default `home` (`tab`), at the stage's width.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useSnapStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SnapStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 
@@ -11717,7 +11717,7 @@ The workspace's half of a tap on a plan's prompt. The server's half (`landingPat
 - A `urlPath` not starting with `/` (a message from a worker older than the field) falls through to `/session/<sessionId>`, else `/`. No `?runner=` then; no landing.
 - `ProjectEffects` sets `chat` first; the landing's `setActiveTab('runner')` follows from the URL it navigated to.
 - `?roadmap=<name>` takes and strips under rules 1–9 below exactly as `?runner=` does. Its name is `ROADMAP_LANDING_PARAM` (`src/shared/constants.ts`), written by the widget's `roadmap.widget.open` (MAN-7668). A name the picture lacks selects nothing and is retired; the tab opens on its Roadmap face, on the roadmap already on screen (MAN-7748).
-- The param's name is `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), read here. Written by the server's `landingPathOf` and by `useRevealCard` (MAN-7650), which navigates (`replace`) to `?runner=<plan>` from a roadmap press with no Roadmap tab above it and from Kaylee's open of a card (project-workspace's `CompanionHost`, MAN-9083).
+- The param's name is `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), read here. Written by the server's `landingPathOf` and by `useRevealCard` (MAN-7650), which navigates (`replace`) to `?runner=<plan>` from a roadmap press with no Roadmap tab above it and from Kaylee's open of a card (project-workspace's `CompanionHost`, MAN-9083). Also written by the station's `FocusFallback` into a card's path (`/?runner=<plan>`, MAN-9228).
 
 ## `useRunnerLanding` — rules
 1. The name is held from the commit that first sees it, with a project selected or not. why: every view's pane draws with no project (the Roadmap view among them), so nothing waits for a pick; and the pick (`handleProjectSelect`) rewrites the location to bare `/`, so the URL is no place to keep a name.
@@ -12578,14 +12578,14 @@ section: The roadmap module — RoadmapFeed and the roadmap:all topic, useRoadma
 Data layer
 | file | owns |
 |---|---|
-| `index.ts` | barrel: `RoadmapFeed`, lazy `RoadmapTab` (the `runner` tab's pane), `RoadmapWidgetBody`, `RoadmapWidgetFullscreenBody`, `useRoadmap` |
+| `index.ts` | barrel: `RoadmapFeed`, lazy `RoadmapTab` (the `runner` tab's pane), `RoadmapWidgetBody`, `RoadmapWidgetFullscreenBody`, `useRoadmap`, and for the station's stage (MAN-9228) `FeatureFacts`, `EpicPanel`, `RoadmapDialogHost` |
 | `lazyRoadmapTab.ts` | `RoadmapTab = lazy(() => import('RoadmapTab'))`: the one lazy door to the tab's pane, re-exported by the barrel for `WorkspaceMain` and drawn by `RoadmapWidgetFullscreenBody` |
 | `RoadmapFeed.tsx` | headless feed: the only client code naming the `roadmap_state` frame |
 | `hooks/useRoadmap.ts` | read side: `RoadmapView` = `{ picture, roadmaps, selected, select }` |
 | `hooks/useRoadmapWrites.ts` | write side: `RoadmapWrites` = `Record<RoadmapAct, (body: RoadmapWriteBody) => Promise<boolean>>` |
 | `caseMark.ts` | pure `caseMark(cases)` -> `{ key, count, tone } \| null`: the case-phrase rule `FeaturePanel` reads (MAN-7660) |
 | `hooks/useFeatureCases.ts` | `useFeatureCases(name, counts)` -> `{ cases, loading, failure }`: the dialog's read of `api.roadmap.cases` (MAN-7660) |
-| `faceContext.ts`, `hooks/useRevealCard.ts`, `modals/OpenDialog.tsx` | what a press under the face reaches (MAN-7650) |
+| `faceContext.ts`, `hooks/useRevealCard.ts`, `modals/OpenDialog.tsx`, `RoadmapDialogHost.tsx` | what a press under the face, or under a host on a page with no face, reaches (MAN-7650) |
 | `hooks/useTreeRoom.ts` | `useTreeRoom(bodyRef, active)` -> the px of height a viewport-fit face can give its tree, or `null` until measured (MAN-7829) |
 | `celebrationContext.ts` | `Moment`, `CelebrationActive`, `CelebrationContext` (module root, not `context/`) |
 | `hooks/useCelebrations.ts`, `utils/celebrationMoments.ts`, `utils/seenStamp.ts` | which moments play and when, and the seen stamp: MAN-7648, rules MAN-7656 |
@@ -12603,6 +12603,7 @@ Components (module root).
 | `RoadmapWidgetBody` | `RoadmapTreeFace` at `column` fit, `Button` (the foot's "Open the roadmap"); reads `useRoadmap` | MAN-7668 |
 | `RoadmapWidgetFullscreenBody` | `Suspense`, `Spinner`; the lazy `RoadmapTab` handed no landing (`revealPlan` and `openRoadmap` `null`, both callbacks a no-op): the Roadmap widget's body while its card is full screen | MAN-7668 |
 | `RoadmapTreeFace` | `Spinner`, `EmptyState`, `RoadmapPicker`, `UnplacedBanner`, `RoadmapTree`, `TreePanel`, `OpenDialog`, `CelebrationLayer`; provides `RoadmapFaceContext`, `CelebrationContext`; reads `useRoadmap`, `useCelebrations`, `useMilestoneMomentInView`, `useRevealCard`, `useTreeRoom`, `layoutTree` | MAN-7829 |
+| `RoadmapDialogHost` | `OpenDialog`; provides `RoadmapFaceContext`; holds its own one `FaceDialog`; drawn by the station's `CardStage` around `FeatureFacts` and `EpicPanel` | MAN-7650 |
 | `UnplacedBanner` | `Banner`, `Badge`, `Button` | MAN-7829 |
 | `RoadmapPicker` | `Select`; reads `useRoadmap`, `RoadmapFaceContext` | MAN-7640 |
 | `RoadmapTree` | `TreeGoal`, `TreeMilestoneNode`, `TreeEpicNode`, `TreeTip`; reads `useTreeWords`, `useTreePane`; its nodes read `CelebrationContext` | MAN-7827 |
@@ -13025,6 +13026,7 @@ Props and the rules every dialog shares: MAN-7643. Words: MAN-7634.
 - The feature is read off each frame by name (`placeOf`), so a follow-on's write already shows when it hands back; a frame without the feature closes this dialog and its follow-on.
 
 ## FeatureFacts
+- Drawn by `FeatureDialog` as its body and, exported by the roadmap barrel, by the station's `CardStage` for a feature the dispatcher no longer holds (MAN-9228), where `onWriteGoal` is `RoadmapDialogHost`'s `writeGoal` (MAN-7650).
 - Top to bottom: `StateLine` with the step phrase and the waits; the goal; the `cases` slot under the heading `roadmap.cases.heading` (`FeatureCases`, handed in by `FeatureDialog`; nothing when null); the tasks under a `Meter`; the dates; `Name for Claude`. why: a case is the goal's claim checked, and the tasks are history once a feature ships.
 - The step phrase is left out when `waiting_on_you` is set (the warn banner says it) and when `step` is `waiting` with `waits_on` (the waits say it). `building` wraps it in `Shimmer`.
 - A wait reads `dialog.feature.waitsOn` (title, word through `ROADMAP_FEATURE_WORD_KEYS`) from `roadmapFeatureIndex(picture)`. A check when its word is `shipped`, an hourglass otherwise. A name the index lacks reads `waitsOnAnother`, never the slug.
@@ -13149,11 +13151,12 @@ What every press under `RoadmapTreeFace` reaches. The face: MAN-7829. Dialogs: M
 ## RoadmapFaceContext — `faceContext.ts`
 `RoadmapFace` = `{ openDialog(dialog: FaceDialog): void }`: puts one dialog on the face; one is open at a time.
 - Provided by `RoadmapTreeFace` on every surface that draws the roadmap (the tab, the widget at full screen, the gutter's widget): one `useMemo` value `{ openDialog: setDialog }`.
+- Provided too by `RoadmapDialogHost` (`RoadmapDialogHost.tsx`, roadmap barrel), on a page that draws the roadmap's panels with no face: Kaylee Station's stage, where the station module's `CardStage` stands `EpicPanel` and `FeatureFacts` inside it. `RoadmapDialogHost({ onOpenCard, children })`: its own one `FaceDialog` state and `OpenDialog` in its own slot, the same `{ openDialog: setDialog }` value; a feature dialog's Open its card or Answer on its card closes the dialog, then calls `onOpenCard(plan)`; `children` is a function handed `{ writeGoal(feature) }`, which opens `edit` with `goalFirst` (the goal editor `FeatureDialog` opens), for `FeatureFacts`' `onWriteGoal`.
 - `openDialog` is read by `RoadmapPicker` (its New roadmap…) and the tree panel's four bodies (`RoadmapPanel`, `MilestonePanel`, `EpicPanel`, `FeaturePanel`: MAN-7841).
 - A feature's live card is not in the context: the face takes `openCard` as a prop (MAN-7829).
 - Default with no provider: `openDialog` calls `console.warn` `[roadmap] a press opened the <dialog> dialog with no dialog host above it`.
 
-`FaceDialog` is the one dialog state `RoadmapTreeFace` holds. `kind` is the dispatcher's word: `arc` an epic, `plan` a feature.
+`FaceDialog` is the one dialog state `RoadmapTreeFace` (or a `RoadmapDialogHost`) holds. `kind` is the dispatcher's word: `arc` an epic, `plan` a feature.
 | `dialog` | fields | `OpenDialog` draws |
 |---|---|---|
 | `add` | `kind: RoadmapKind`, `parent: { name, title } \| null` (roadmap for a milestone, milestone for an `arc`, epic for a `plan`, `null` for a roadmap) | `ItemDialog` adding |
@@ -13166,7 +13169,7 @@ What every press under `RoadmapTreeFace` reaches. The face: MAN-7829. Dialogs: M
 ## OpenDialog — `modals/OpenDialog.tsx`
 - `OpenDialog({ dialog, onClose, onOpenCard })`: a `switch` on `dialog.dialog`; mounts the one dialog it names with the target it carries.
 - Every dialog closes through the one `onClose`, written or not: the next picture shows a write, so the face has no use for the answer.
-- `RoadmapTreeFace` mounts it in its one slot (`dialog !== null`), after the scroller and before `CelebrationLayer`, closing with `setDialog(null)`.
+- `RoadmapTreeFace` mounts it in its one slot (`dialog !== null`), after the scroller and before `CelebrationLayer`, closing with `setDialog(null)`; `RoadmapDialogHost` mounts it after what it holds, the same way.
 - `PromoteDialog` is not a `FaceDialog`: `FeatureDialog` draws it as its own follow-on (MAN-7645).
 
 ## useRevealCard — `src/shared/hooks/useRevealCard.ts`
@@ -13178,10 +13181,10 @@ What every press under `RoadmapTreeFace` reaches. The face: MAN-7829. Dialogs: M
 | `WaitingAsks` | every Answer press | `reveal(plan)`, the same `?runner=<plan>` landing: the Roadmap view comes forward on In flight with that feature's card in view, with or without a project selected |
 | project-workspace's `CompanionHost` | Kaylee's `companion_open` for a card, on the page that holds the floor | `useBackToWorkspace()` first when an application covers the workspace, then `setActiveTab('runner')` and `reveal(plan)`: the same landing |
 - `replace: true`. why: the press is a redirection; Back must not find the same URL twice (`useRunnerLanding` strips the param the same way).
-- The param is `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), shared with `useRunnerLanding`.
+- The param is `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), shared with `useRunnerLanding` (reads it) and the station's `FocusFallback`, which writes it into a card's CloudCLI path (MAN-9228).
 - Needs a router above it (`useNavigate`).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/faceContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useRevealCard.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/faceContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapDialogHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useRevealCard.ts
 
 ## MAN-7654 — The Roadmap tab — its place on the rail, ungated, the In flight switch's pill and amber mark, two faces, palette row and landing (useWorkspaceViews, WorkspaceMain)
 

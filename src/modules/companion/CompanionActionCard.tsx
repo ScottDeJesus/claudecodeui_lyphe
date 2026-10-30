@@ -73,7 +73,8 @@ function hourMinute(iso: string): string {
  * The target's kind and the house's own names for it, beside the name he says: what tells it apart from a card of a like
  * name. A feature names its plan and its epic, an epic its name (the wire marks one `<name>.arc`), a run its plan and its
  * id (two runs of one task differ only at the id's end, so the line wraps rather than cut it), a page its id and the block
- * an open lands on, a follow-up its number, her memory how many things it keeps.
+ * an open lands on, a follow-up its number, her memory how many things it keeps, a check its node and its key. (A check is what
+ * her open records; no pending action holds one, so the card never draws this branch — the switch is closed for the type's sake.)
  */
 function targetFacts(target: CompanionActionTarget, t: TFunction): string {
   switch (target.kind) {
@@ -99,6 +100,8 @@ function targetFacts(target: CompanionActionTarget, t: TFunction): string {
       return t('companion.action.kind.followup', { id: target.id, defaultValue: 'Follow-up #{{id}}' });
     case 'memory':
       return t('companion.action.kind.memory', { count: target.count, defaultValue_one: 'Your memory, {{count}} thing kept', defaultValue_other: 'Your memory, {{count}} things kept' });
+    case 'check':
+      return [t('companion.action.kind.check', 'Check'), target.node, target.key].join(' · ');
   }
 }
 

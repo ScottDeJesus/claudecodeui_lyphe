@@ -22,11 +22,12 @@ import {
 import type { PressInput } from './companion-press.js';
 import { type CompanionSettingsPatch } from './companion-settings.js';
 import type { CompanionService } from './companion.service.js';
+import { createFaceRoutes } from './face/face.routes.js';
 import { createMemoryRoutes } from './memory/memory.routes.js';
 
 /**
  * Her door for the page: every route of the companion's table.
- * Mounted at `/api/companion` behind `authenticateToken` by the server entrypoint. `/memory` (Settings' "Her memory" card) is a router of its own, `memory/memory.routes.ts`, mounted at the foot.
+ * Mounted at `/api/companion` behind `authenticateToken` by the server entrypoint. `/memory` (Settings' "Her memory" card) and `/face` (her face, `face/face.routes.ts`) are routers of their own, mounted at the foot.
  *
  * ONLY TRANSPORT. A route here reads who is asking (`req.user`, which is her account) and which page (the
  * `x-companion-client` header), checks the SHAPE of what came (a body that is an object, a `text` of 1 to 8000
@@ -295,6 +296,7 @@ export function createCompanionRoutes(service: CompanionService): Router {
 
   // Her memory bank, for Settings' card: `GET` reads its count, `DELETE` clears it. Behind the same authentication as every route above.
   router.use('/memory', createMemoryRoutes());
+  router.use('/face', createFaceRoutes());
 
   return router;
 }

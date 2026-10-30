@@ -1,6 +1,6 @@
 import type { CompanionDraft, CompanionSessionRef, CompanionSettings, CompanionWalk } from '@/shared/companion-types.js';
 
-import { cutEnvelope, handoverEnvelope, registerEnvelope, sessionsEnvelope, stateEnvelope, viewEnvelope } from './companion-envelopes.js';
+import { cutEnvelope, handoverEnvelope, registerEnvelope, sessionsEnvelope, stateEnvelope, viewEnvelope, type ViewShown } from './companion-envelopes.js';
 import { fillRegister } from './companion-prompt.js';
 
 /**
@@ -13,7 +13,7 @@ import { fillRegister } from './companion-prompt.js';
  *      meanwhile at most one message carries it, and a launch that ends first leaves it for the next one;
  *   3. `<cut>`, owed once after he cut her off (`oweCut`, set by the companion's speech cut);
  *   4. `<sessions>`, on a wake, then only when its text differs from the last one sent;
- *   5. `<view>`, on the same rule;
+ *   5. `<view>`, on the same rule (it names what is on his screen, so a press on the station changes the text and rides the next message he sends: it never pushes or wakes);
  *   6. the body — an `<operator>`, one or more `<alert>`s, or a `<session>`;
  *   7. `<register>`, read from his settings EVERY time: he edits it, so it is never stale. The sounds it lists are
  *      the account's sound-tag list, read at the same moment.
@@ -27,7 +27,7 @@ import { fillRegister } from './companion-prompt.js';
 
 /**
  * What the assembler reads at push time: his settings (the register is filled from them), the facts
- * `<state>` restates, the roster body, the chat on his screen, the sounds she may make and the handover she is owed. Each is read when a
+ * `<state>` restates, the roster body, what is on his screen, the sounds she may make and the handover she is owed. Each is read when a
  * message is assembled and never earlier, so what she is told is how things stand as it reaches her.
  * `readSoundTags` is the account's one sound-tag list: the register teaches exactly the list the parse keeps
  * (the turn tracker reads the same reader when a turn begins). `readHandover` is the stored account of a dropped conversation (`null`
@@ -38,7 +38,7 @@ export type MessageReaders = {
   readSettings(): CompanionSettings;
   readState(): { focus: CompanionSessionRef | null; draft: CompanionDraft | null; walk: CompanionWalk | null };
   readRoster(): string;
-  readView(): Pick<CompanionSessionRef, 'sessionId' | 'name'> | null;
+  readView(): ViewShown | null;
   readSoundTags(): readonly string[];
   readHandover(): string | null;
 };

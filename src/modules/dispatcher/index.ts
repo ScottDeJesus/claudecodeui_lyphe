@@ -4,7 +4,8 @@ export { DispatcherFeed } from '@/modules/dispatcher/DispatcherFeed';
 // The lane's read side — every plan the store holds, this box's posture beside them, and which of
 // them the operator has hidden or dismissed. The In flight face reads it for the card list and the
 // `Hidden` list; the Roadmap tab's In flight switch reads the `count` and `waiting`
-// that mark it, and the Inbox's waiting count (`useInboxWaiting`) reads `waiting` as its Roadmap figure.
+// that mark it, and the Inbox's waiting count (`useInboxWaiting`) reads `waiting` as its Roadmap figure; the station
+// module's `CardStage` reads the plans, the arcs and `carriedNames` to find the card on Kaylee Station's stage.
 export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 // Both hands, one hook: the plan card's verbs and the arc header's three — stop, resume,
 // the arc's model word — relayed to the dispatcher's own binary and answered with its own
@@ -18,7 +19,8 @@ export { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerb
 export { useEpicQueueVerbs } from '@/modules/dispatcher/hooks/useEpicQueueVerbs';
 // The pure vocabulary of a plan, so a card never re-derives a tone or a progress count — and the
 // lane's own split, so the Roadmap tab's In flight face and the chat gutter's widget group the arcs'
-// plans and order every card by ONE rule instead of two.
+// plans and order every card by ONE rule instead of two. The station module's `CardStage` reads `byArc` for the one arc
+// on its stage, and `waitsOnSiblings` for a plan's waits.
 export {
   byArc,
   deckFocusIndex,
@@ -37,7 +39,8 @@ export { moveCard, useCardRanks } from '@/modules/dispatcher/cardOrderEntries';
 // The plan's card — head, action bar, glance face, the fold — and the arc's deck: the arc's head over
 // its plans, paged one card per view in a strip, in the tab and in the gutter alike. `DispatchArcDecks`
 // is the stack of decks, given the split that says which plans go under which arc. Drawn by both homes
-// in `src/modules/runner-tab`: the Roadmap tab's In flight face and the chat gutter's widget.
+// in `src/modules/runner-tab`: the Roadmap tab's In flight face and the chat gutter's widget; and by
+// `src/modules/station` (`CardStage`), for the feature or epic on Kaylee Station's stage.
 export { PlanCard } from '@/modules/dispatcher/PlanCard';
 export { DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
 // How full the planner lane is — `planners <out> of <lanes> out` — drawn from the frame's own route by
@@ -49,7 +52,8 @@ export { PlannerLanesReadout } from '@/modules/dispatcher/PlannerLanesReadout';
 // top of the chat gutter's Runs widget (one component, two mounts), and not at all when the frame states no census.
 export { MasterController } from '@/modules/dispatcher/MasterController';
 // The presses that put a card away: one plan's corner and an arc deck's (`usePutAway`), and `Dismiss done · N`.
-// A done card's is Dismiss, an entry in the operator's own list; an unfinished card's is Hide, the dispatcher's.
+// A done card's is Dismiss, an entry in the operator's own list; an unfinished card's is Hide, the dispatcher's. The
+// station module's `CardStage` presses the same corner for the plan card on its stage.
 export { doneDismiss } from '@/modules/dispatcher/hiddenPlans';
 export { usePutAway } from '@/modules/dispatcher/hooks/usePutAway';
 // Where the keyboard lands once a press has taken its own control away with the card.

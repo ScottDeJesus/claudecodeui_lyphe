@@ -17,6 +17,8 @@
 // `drain()` is the one place events go out, in the order the sentences were enqueued, `start` before `end`, whichever order
 // the browser delivered the callbacks in.
 
+import type { CompanionSoundProgress } from '@/shared/types';
+
 /** Her voice's sample rate, fixed by the speech route. */
 const PCM_SAMPLE_RATE = 24_000;
 /** How far past `currentTime` a new run begins: time for the audio thread to take the schedule, and a small cushion for the next chunk. */
@@ -33,7 +35,7 @@ type SentenceEvent = { turnId: string; index: number; phase: 'start' | 'end' };
 /**
  * Used by this module's CompanionProvider and its voice hooks: the provider holds the page's one player, the pull loop
  * (`useCompanionVoice`) feeds it each sentence's body and follows its events, the talk press (`useTalkPress`) stops it and reads
- * what was heard, the panel's log marks the playing sentence, and the avatar's mouth reads `level()`.
+ * what was heard, the panel's log marks the playing sentence, and the avatar's mouth reads `level()` and `progress()`.
  */
 export type PcmPlayer = {
   /** Plays the sentence after those already enqueued, reading `body` as it arrives; a chunk may end mid-sample. */
@@ -46,6 +48,12 @@ export type PcmPlayer = {
   lastEnded(): { turnId: string; index: number } | null;
   /** The analyser's RMS over its last 43 ms, 0..1; 0 when nothing sounds, and 0 from the instant of `stop()` (the cut audio is hidden, not left to fade). */
   level(): number;
+  /**
+   * The sentence sounding now (`playing()`'s): `elapsed` seconds since its first sample on the audio clock, 0 until that sample is reached,
+   * and its `duration` in seconds once its body has ended and every sample is scheduled, else null (still arriving). Null when no sentence
+   * sounds. Read on the audio clock, like `level()`, so the two agree on what is sounding. The face's vowel is the text at `elapsed / duration`.
+   */
+  progress(): CompanionSoundProgress | null;
   /** Reports each sentence's `start` (its first buffer begins sounding) and `end` (its last ends); returns the unsubscribe. */
   onSentence(listener: (event: SentenceEvent) => void): () => void;
   /** Creates or resumes the AudioContext; call it inside a gesture, without awaiting anything first. */
@@ -64,6 +72,9 @@ type Sentence = {
   /** How many real buffers have been scheduled for it, and how many of those have ended. */
   scheduled: number;
   ended: number;
+  /** Where its first sample sits on the audio clock (context seconds; null until a buffer is scheduled) and how many samples are scheduled: `progress()` reads both. */
+  firstSampleAt: number | null;
+  scheduledSamples: number;
   /** Set by the audio clock; `drain()` turns them into events, in order. */
   startReached: boolean;
   endReached: boolean;
@@ -219,6 +230,8 @@ export function createPcmPlayer(): PcmPlayer {
     }
     const startAt = runStart + runSamples / PCM_SAMPLE_RATE;
     runSamples += samples.length;
+    if (sentence.firstSampleAt === null) sentence.firstSampleAt = startAt;
+    sentence.scheduledSamples += samples.length;
 
     const buffer = context.createBuffer(1, samples.length, PCM_SAMPLE_RATE);
     buffer.copyToChannel(samples, 0);
@@ -303,7 +316,7 @@ export function createPcmPlayer(): PcmPlayer {
         return;
       }
       const sentence: Sentence = {
-        turnId, index, reader, waiting: [], streamDone: false, scheduled: 0, ended: 0,
+        turnId, index, reader, waiting: [], streamDone: false, scheduled: 0, ended: 0, firstSampleAt: null, scheduledSamples: 0,
         startReached: false, endReached: false, cancelled: false,
       };
       queue.push(sentence);
@@ -332,6 +345,18 @@ export function createPcmPlayer(): PcmPlayer {
       let sumOfSquares = 0;
       for (const sample of graph.levelWindow) sumOfSquares += sample * sample;
       return Math.min(1, Math.sqrt(sumOfSquares / graph.levelWindow.length));
+    },
+
+    progress() {
+      if (!graph || !current || current.firstSampleAt === null) return null;
+      // Its length is known when nothing more can arrive: the body is over and nothing waits behind an earlier sentence.
+      const lengthKnown = current.streamDone && current.waiting.length === 0;
+      return {
+        turnId: current.turnId,
+        index: current.index,
+        elapsed: Math.max(0, graph.context.currentTime - current.firstSampleAt),
+        duration: lengthKnown ? current.scheduledSamples / PCM_SAMPLE_RATE : null,
+      };
     },
 
     onSentence(listener) {

@@ -144,6 +144,10 @@ function decorateAndRecordEvent(run: ChatRun, message: NormalizedMessage): Norma
     run.events.splice(0, run.events.length - MAX_BUFFERED_EVENTS_PER_RUN);
   }
 
+  // Told after the event is in the log, so a listener that reads the run finds it there. A completion reaches
+  // here whether the runtime sent it or `completeRun`'s synthetic one did (`writer.sendComplete` decorates too).
+  announceRunChanged(run.appSessionId, STATE_MOVING_EVENT_KINDS.has(message.kind));
+
   return outbound;
 }
 
@@ -276,6 +280,37 @@ type RunCompletedListener = (appSessionId: string, outcome: { aborted: boolean; 
 /** Called once per run, as its terminal `complete` is recorded. */
 const runCompletedListeners = new Set<RunCompletedListener>();
 
+type RunChangedListener = (appSessionId: string, change: { states: boolean }) => void;
+
+/** Called for a run's start and for every event the run records. */
+const runChangedListeners = new Set<RunChangedListener>();
+
+/**
+ * The event kinds that move what a chat IS rather than what it is saying: the turn ending, and a permission asked,
+ * answered or withdrawn (a chat waiting on his word is a different state from one working). Every other streamed
+ * line is activity only.
+ */
+const STATE_MOVING_EVENT_KINDS: ReadonlySet<string> = new Set([
+  'complete',
+  'permission_request',
+  'permission_resolved',
+  'permission_cancelled',
+]);
+
+/** Tells each run-changed listener on its own try: one that throws is logged and the rest still hear it. */
+function announceRunChanged(appSessionId: string, states: boolean): void {
+  for (const listener of runChangedListeners) {
+    try {
+      listener(appSessionId, { states });
+    } catch (error) {
+      console.error('[ChatRunRegistry] Run-changed listener failed', {
+        appSessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
+
 /**
  * Registry of live provider runs keyed by the stable app session id.
  *
@@ -295,6 +330,19 @@ export const chatRunRegistry = {
     runCompletedListeners.add(listener);
     return () => {
       runCompletedListeners.delete(listener);
+    };
+  },
+
+  /**
+   * Subscribes to a run changing; returns the unsubscribe. Heard once at a run's start (`states: true`) and once for
+   * each event the run records — `states: true` for the `complete` and for a permission asked, answered or withdrawn,
+   * `false` for every other streamed line. The station's hint coalesces these into the one frame that tells the page a
+   * chat changed.
+   */
+  onRunChanged(listener: RunChangedListener): () => void {
+    runChangedListeners.add(listener);
+    return () => {
+      runChangedListeners.delete(listener);
     };
   },
 
@@ -350,6 +398,7 @@ export const chatRunRegistry = {
     });
 
     runs.set(input.appSessionId, run);
+    announceRunChanged(input.appSessionId, true);
     return run;
   },
 

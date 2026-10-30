@@ -72,7 +72,8 @@ function TaskMark({ status }: { status: RoadmapTask['status'] }) {
  * waits under it. Each wait carries its word, so a met one reads as met; a wait the picture cannot name
  * reads "another feature", never its slug.
  *
- * Used by the roadmap module's `FeatureDialog`, as its scrolling body.
+ * Used by the roadmap module's `FeatureDialog`, as its scrolling body, and by the station module's `CardStage`, which
+ * draws it on the stage for a feature the dispatcher no longer holds (the roadmap barrel exports it for that).
  */
 export function FeatureFacts({ feature, picture, onWriteGoal, cases }: FeatureFactsProps) {
   const { t } = useTranslation();

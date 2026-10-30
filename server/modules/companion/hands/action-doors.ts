@@ -108,11 +108,11 @@ async function relayCardAction(deps: CompanionToolDeps, pending: CompanionStored
 
 /**
  * An open: `companion_open` to the page that holds the floor, answered at once. With no page holding it nothing is sent. `spoken` is
- * the name the answer says it by. Consumed by `direct-tools.ts` (`open`).
+ * the name the answer says it by, and the label the frame carries for the page's stage. Consumed by `direct-tools.ts` (`open`).
  */
 export function openOnFloor(deps: CompanionToolDeps, open: CompanionOpenTarget, spoken: string): RelayAnswer {
   if (deps.store.readState().floor === null) return refused(NO_FLOOR);
-  deps.openOnFloor(open);
+  deps.openOnFloor(open, spoken);
   return { outcome: 'took', said: `${spoken} is up on the screen he is using.` };
 }
 

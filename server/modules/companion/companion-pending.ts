@@ -66,6 +66,7 @@ const isTarget = (value: unknown): value is CompanionActionTarget => {
     case 'memory':
       return isCount(value.count);
     default:
+      // A `check` is a kind of the contract (what her open records for one) and is refused here on purpose: a check is never a pending action.
       return false;
   }
 };

@@ -1,34 +1,41 @@
 /*
- * Kaylee's face (CompanionAvatar.tsx). Drawn in a 100-unit square on Verve's tokens and nothing else, so it follows the theme
- * on the same frame every token does. WARM, NEVER BUSY: one orb of light, one accent at a time.
+ * Kaylee's face (CompanionAvatar.tsx): her PORTRAIT (CompanionPortrait.tsx) with her MARKS drawn over it. The portrait is two
+ * canvases of one photographed frame; the marks are one SVG in a 100-unit square on Verve's tokens, which follows the theme on
+ * the same frame every token does. Both fill the square they are given, by CSS, so they follow the disc's own size frame by frame.
  *
- * HOW A STATE IS BUILT. The markup always holds every part; `[data-state]` turns on that state's accent and sets the face's
- * POSE (a tilt, where the eyes look, which brows lift). That is the state's LOOK, and it is a still frame. Everything that
- * MOVES is added inside `@media (prefers-reduced-motion: no-preference)` at the foot, so reduced motion keeps every look
- * and drops the movement without a rule of its own, and no look depends on an animation having run.
+ * THE PORTRAIT'S MOTION IS CSS, ON THE COMPOSITOR. The page redraws a canvas only when its frame changes (CompanionPortrait.tsx);
+ * everything continuous is a transform here: a breath and a sway always, her lean (`--kaylee-tilt`, written per state and mood),
+ * and the clips' motions (`data-motion`). The hair canvas takes every one of them 90 ms after the face canvas, on a softer ease,
+ * and where the two differ the face layer's feathered mask blends them: her face leads and her hair follows.
  *
- * Pose uses the individual transform properties (`rotate`, `scale`, `translate`) rather than `transform`, so a keyframe that
- * breathes (`scale`) never fights the tilt (`rotate`) a state holds.
+ * HOW A STATE IS BUILT. The marks' markup always holds every part; `[data-state]` turns on that state's accent (her ears pulsing,
+ * three dots turning, a page, a pencil, the walk ring), which is the state's LOOK, a still frame. Everything that MOVES is added
+ * inside `@media (prefers-reduced-motion: no-preference)` at the foot, so reduced motion keeps every look and drops the movement
+ * without a rule of its own, and no look depends on an animation having run. Her lean stands under reduced motion; its easing does not.
+ *
+ * Pose uses the individual transform properties (`rotate`, `scale`, `translate`) rather than `transform` where a keyframe
+ * moves the same part, so a keyframe never fights the pose a state holds.
  */
+
+/* The square she fills: the button's disc, or the card's 96px. Her initial (a fresh box has no face yet) centres in it. */
+.kaylee-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
 
 .kaylee {
   display: block;
   flex: none;
-  /* The orb breathes and the dots orbit past the viewBox's edge by a hair; nothing of hers is cut. */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* The dots orbit past the viewBox's edge by a hair; nothing of hers is cut. */
   overflow: visible;
 
-  /* THE MOUTH: 0 closed smile .. 1 open wide. Written by whatever drives her voice; at rest the smile. */
-  --kaylee-mouth: 0;
-
-  /* The light's palette, all Verve. Features are the theme's ink on a warm orb. */
-  --kaylee-skin-hi: color-mix(in srgb, var(--chart-2) 38%, #fff);
-  --kaylee-skin: color-mix(in srgb, var(--chart-2) 72%, var(--garnish));
-  --kaylee-skin-lo: color-mix(in srgb, var(--garnish) 82%, var(--chart-2));
-  --kaylee-rim: color-mix(in srgb, var(--garnish) 40%, var(--ink));
-  --kaylee-glow: var(--chart-2);
-  --kaylee-feature: var(--ink);
-  --kaylee-cheek: color-mix(in srgb, var(--danger-dot) 30%, transparent);
-  --kaylee-tongue: color-mix(in srgb, var(--danger-dot) 55%, var(--garnish));
   /* Paper she holds, and the lines on it. */
   --kaylee-paper: var(--surface);
   --kaylee-paper-edge: var(--ink-muted);
@@ -42,17 +49,45 @@
   --kaylee-track: color-mix(in srgb, var(--ink) 16%, transparent);
 }
 
-/* In dark the orb is the lamp: amber, lit from inside, its features the page's own ground. */
 .dark .kaylee {
-  --kaylee-skin-hi: color-mix(in srgb, var(--garnish) 55%, #fff);
-  --kaylee-skin: var(--garnish);
-  --kaylee-glow: var(--garnish);
-  --kaylee-skin-lo: color-mix(in srgb, var(--garnish) 86%, var(--garnish-soft));
-  --kaylee-rim: color-mix(in srgb, var(--garnish) 40%, var(--canvas));
-  --kaylee-feature: var(--canvas);
-  --kaylee-cheek: color-mix(in srgb, var(--danger-dot) 34%, transparent);
-  --kaylee-tongue: color-mix(in srgb, var(--danger-dot) 60%, var(--garnish));
   --kaylee-track: color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+/* ---------------------------------------------------------------- the portrait */
+
+/* The disc's circle, over her ground (the button's own); her photographed face fills it. */
+.kaylee-portrait {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+/* Each canvas rides a layer drawn 6% larger than the disc and clipped to its circle, so a lean, a bounce or a breath never
+   shows the ground at the rim. The layer carries her lean and the clips' motions; the canvas inside carries the breath and the sway. */
+.kaylee-portrait__layer {
+  position: absolute;
+  left: -3%;
+  top: -3%;
+  width: 106%;
+  height: 106%;
+  transform: rotate(var(--kaylee-tilt, 0deg));
+  will-change: transform;
+  /* The face leads; the hair follows by this much. */
+  --kaylee-lag: 0ms;
+}
+.kaylee-portrait__layer canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.kaylee-portrait__layer--hair { --kaylee-lag: 90ms; }
+
+/* The face layer shows only the inner part of her frame, feathered into the hair canvas beneath it: a circle round her face (the bake frames
+   her face to the middle of the frame, a little below its centre, cheek to cheek within 32% of its width), opaque over her features and
+   fading out over the hair beside them, so where the two layers differ in motion the blend falls on hair and not on her cheek. */
+.kaylee-portrait__layer--face {
+  mask-image: radial-gradient(ellipse 46% 46% at 50% 61%, #000 70%, transparent 100%);
 }
 
 /* Every part turns about its own middle unless a rule below says otherwise. */
@@ -60,69 +95,10 @@
   transform-box: fill-box;
   transform-origin: center;
 }
-.kaylee__body,
 .kaylee__ears,
-.kaylee__dots,
-.kaylee__halo {
+.kaylee__dots {
   transform-box: view-box;
   transform-origin: 50px 50px;
-}
-
-/* ---------------------------------------------------------------- the orb */
-
-.kaylee__skin-hi { stop-color: var(--kaylee-skin-hi); }
-.kaylee__skin { stop-color: var(--kaylee-skin); }
-.kaylee__skin-lo { stop-color: var(--kaylee-skin-lo); }
-.kaylee__glow-in { stop-color: var(--kaylee-glow); stop-opacity: 0.4; }
-.kaylee__glow-out { stop-color: var(--kaylee-glow); stop-opacity: 0; }
-
-.kaylee__head {
-  stroke: var(--kaylee-rim);
-  stroke-width: 1.6;
-}
-.kaylee__sheen {
-  fill: none;
-  stroke: #fff; /* a sheen is white in both modes, as Verve draws the switch's knob */
-  stroke-opacity: 0.55;
-  stroke-width: 3;
-  stroke-linecap: round;
-}
-.kaylee__cheek { fill: var(--kaylee-cheek); }
-
-/* ---------------------------------------------------------------- the features */
-
-.kaylee__pupil { fill: var(--kaylee-feature); }
-.kaylee__glint { fill: #fff; } /* the sparkle in her eye is white in both modes, on the dark pupil */
-
-.kaylee__brow {
-  fill: none;
-  stroke: var(--kaylee-feature);
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  opacity: 0;
-}
-
-.kaylee__lip {
-  fill: none;
-  stroke: var(--kaylee-feature);
-  stroke-width: 2.8;
-  stroke-linecap: round;
-}
-/* The open mouth hangs from the lip. Its scale is the variable, remapped so the first sliver of an opening already clears
-   the lip's own width (an opening under ~.33 of the raw scale would hide behind the curve), and it is hidden outright at 0.
-   THE VARIABLE IS HEARD ONLY WHILE SHE SPEAKS: in every other state the open mouth is off, so a value the voice loop left
-   behind in its last frame can never open her mouth on a face that is not speaking. */
-.kaylee__mouth-open {
-  transform-origin: 50px 59px;
-  scale: 1 calc(0.4 + var(--kaylee-mouth) * 0.6);
-  opacity: clamp(0, calc(var(--kaylee-mouth) * 40), 1);
-}
-.kaylee:not([data-state='speaking']) .kaylee__mouth-open { opacity: 0; }
-.kaylee__throat { fill: var(--kaylee-feature); }
-.kaylee__tongue { fill: var(--kaylee-tongue); }
-.kaylee__surprise {
-  fill: var(--kaylee-feature);
-  display: none;
 }
 
 /* ---------------------------------------------------------------- the accents, off until their state */
@@ -207,90 +183,77 @@
   opacity: 1;
 }
 
-/* ---------------------------------------------------------------- the states: what is on, and the pose of the face */
 
-/* idle: the orb as it is, with a breath and a blink (below). Nothing else is on. Asleep and loading draw exactly this look. */
+/* ---------------------------------------------------------------- the states: what is on over the portrait */
 
-/* listening: her head tilts toward the sound, her brows lift, and the arcs at her ears are on. */
+/* idle, asleep, loading, speaking and cut: the portrait alone (the engine draws each state's face: CompanionPortrait.tsx). */
+
+/* listening: the arcs at her ears are on. */
 .kaylee[data-state='listening'] .kaylee__ears { display: inline; }
-.kaylee[data-state='listening'] .kaylee__body { rotate: -5deg; }
-.kaylee[data-state='listening'] .kaylee__brow { opacity: 1; translate: 0 -1.5px; }
 
-/* transcribing: she looks down, as at a page she is writing, with the dots turning. */
+/* transcribing: the dots turning. */
 .kaylee[data-state='transcribing'] .kaylee__dots { display: inline; }
-.kaylee[data-state='transcribing'] .kaylee__eyes { translate: 0 1.8px; }
 
-/* thinking: her eyes go up and away, one brow cocked, a small crooked smile, with the dots turning. Waking draws exactly this look. */
+/* thinking: the dots turning. Waking draws exactly this look. */
 .kaylee:is([data-state='thinking'], [data-state='waking']) .kaylee__dots { display: inline; }
-.kaylee:is([data-state='thinking'], [data-state='waking']) .kaylee__eyes { translate: 3.2px -3px; }
-.kaylee:is([data-state='thinking'], [data-state='waking']) .kaylee__brow--right { opacity: 1; translate: 0 -2.5px; rotate: -6deg; }
-.kaylee:is([data-state='thinking'], [data-state='waking']) .kaylee__lip { rotate: -9deg; scale: 0.72 1; translate: 3px 0; }
-.kaylee:is([data-state='thinking'], [data-state='waking']) .kaylee__body { rotate: 3deg; }
 
-/* speaking: the mouth is the variable's; the rest of her is happy to be heard. Nothing else is on. */
-
-/* reading a chat: a bubble at her side, her eyes along its lines. */
+/* reading a chat: a bubble at her side. */
 .kaylee[data-state='reading_session'] .kaylee__bubble { display: inline; }
-.kaylee[data-state='reading_session'] .kaylee__eyes { translate: 2.4px 2.2px; }
-.kaylee[data-state='reading_session'] .kaylee__lip { scale: 0.8 1; }
 
-/* reading code: a small page at her side, her eyes across it. */
+/* reading code: a small page at her side. */
 .kaylee[data-state='reading_code'] .kaylee__page { display: inline; }
-.kaylee[data-state='reading_code'] .kaylee__eyes { translate: 2.6px 2.6px; }
-.kaylee[data-state='reading_code'] .kaylee__lip { scale: 0.8 1; }
 
-/* drafting: a pencil writing a stroke under her chin, her eyes on it. */
+/* drafting: a pencil writing a stroke under her chin. */
 .kaylee[data-state='drafting'] .kaylee__draft { display: inline; }
-.kaylee[data-state='drafting'] .kaylee__eyes { translate: 2.2px 3.4px; }
-.kaylee[data-state='drafting'] .kaylee__lip { scale: 0.8 1; }
-.kaylee[data-state='drafting'] .kaylee__body { rotate: 3deg; }
 
-/* walking: the ring is on, and the halo gives it the room. Failed has the ring and no halo too (its look is below). */
+/* walking: the ring is on. Failed has the ring too (its look is below). */
 .kaylee:is([data-state='walking'], [data-state='failed']) .kaylee__walk { display: inline; }
-.kaylee:is([data-state='walking'], [data-state='failed']) .kaylee__halo { display: none; }
 
-/* cut: surprised, eyes wide, brows high and a small round mouth. */
-.kaylee[data-state='cut'] .kaylee__eye { scale: 1.16; }
-.kaylee[data-state='cut'] .kaylee__brow { opacity: 1; translate: 0 -4px; }
-.kaylee[data-state='cut'] .kaylee__lip,
-.kaylee[data-state='cut'] .kaylee__mouth-open { display: none; }
-.kaylee:is([data-state='cut'], [data-state='failed']) .kaylee__surprise { display: inline; }
-
-/* failed: her process has stopped, and she does not pretend otherwise. She is still, her eyes level and a little lowered, her
-   mouth a level line where the smile was, and the status line's amber is a closed ring that stands clear of the orb, so it reads
-   on the lamp's amber in dark as on the light's ground. The ring is the walk's own, with no arc and no numbers, and no halo to crowd it. */
+/* failed: her process has stopped, and she does not pretend otherwise. The status line's amber is a closed ring that stands clear of
+   her face, so it reads on the photograph in light as in dark. The ring is the walk's own, with no arc and no numbers. */
 .kaylee[data-state='failed'] .kaylee__track { stroke: var(--kaylee-stopped); stroke-width: 4; }
-.kaylee[data-state='failed'] :is(.kaylee__progress, .kaylee__count, .kaylee__lip) { display: none; }
-.kaylee[data-state='failed'] .kaylee__eye { scale: 1 0.84; }
-.kaylee[data-state='failed'] .kaylee__surprise { scale: 1.3 0.22; }
-
-/* Reduced motion keeps the speaking mouth, but still: half open, the look of someone mid-word, never flapping on the voice. */
-@media (prefers-reduced-motion: reduce) {
-  .kaylee[data-state='speaking'] .kaylee__mouth-open {
-    scale: 1 0.78;
-    opacity: 1;
-  }
-}
+.kaylee[data-state='failed'] :is(.kaylee__progress, .kaylee__count) { display: none; }
 
 /* ---------------------------------------------------------------- the movement, for those who want it */
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Every state: she breathes and she blinks. */
-  .kaylee__body { animation: kaylee-breath 4.2s ease-in-out infinite alternate; }
-  .kaylee__halo { animation: kaylee-glow 4.2s ease-in-out infinite alternate; }
-  .kaylee__eye { animation: kaylee-blink 5.6s ease-in-out infinite; }
-  .kaylee__mouth-open { transition: scale 70ms linear; }
+  /* Her face arrives: the sheets decode after the button is drawn, and her ground gives way to her. */
+  .kaylee-portrait { animation: kaylee-portrait-in var(--dur-move) ease-out backwards; }
+
+  /* Her lean eases to the state's or the mood's, the hair behind the face on a softer curve. */
+  .kaylee-portrait__layer--face { transition: transform 220ms var(--ease-enter); }
+  .kaylee-portrait__layer--hair { transition: transform 320ms ease-in-out 90ms; }
+
+  /* Every state: she breathes and she sways. */
+  .kaylee-portrait__layer canvas {
+    animation:
+      kaylee-breath 4.2s ease-in-out var(--kaylee-lag) infinite alternate,
+      kaylee-sway 9s ease-in-out var(--kaylee-lag) infinite alternate;
+  }
+
+  /* A clip's motion, on the whole layer while its frames run (the engine writes `data-motion`). A clip's length is its frames at the bake's
+     rate (laugh 6 at 12 fps, giggle 4), or the motion's own; the portrait leaves the attribute on for the hair's lag past the engine's end, so the
+     hair finishes the motion it started late instead of snapping to rest. The tsk's shake is its frames alone: it names no keyframe, so the variable
+     stays unset and the layer is left unanimated. */
+  .kaylee-portrait[data-motion='laugh'] { --kaylee-clip: kaylee-laugh; --kaylee-clip-ms: 500ms; }
+  .kaylee-portrait[data-motion='giggle'] { --kaylee-clip: kaylee-giggle; --kaylee-clip-ms: 333ms; }
+  .kaylee-portrait[data-motion='gasp'] { --kaylee-clip: kaylee-gasp; --kaylee-clip-ms: 420ms; }
+  .kaylee-portrait[data-motion='sigh'] { --kaylee-clip: kaylee-sigh; --kaylee-clip-ms: 1000ms; }
+  .kaylee-portrait[data-motion='nod'] { --kaylee-clip: kaylee-nod; --kaylee-clip-ms: 600ms; }
+  .kaylee-portrait[data-motion='breath'] { --kaylee-clip: kaylee-swell; --kaylee-clip-ms: 1600ms; }
+  .kaylee-portrait[data-motion] .kaylee-portrait__layer { animation: var(--kaylee-clip) var(--kaylee-clip-ms) ease-in-out var(--kaylee-lag); }
+
+  /* failed: she holds still, with no breath and no sway. Her ring arrives with the same small pop as any accent, and then nothing about her moves. */
+  .kaylee-portrait[data-state='failed'] canvas { animation: none; }
 
   /* An accent arrives with a small pop, so a change of state is a welcome and not a cut. */
   .kaylee__ears,
   .kaylee__bubble,
   .kaylee__page,
   .kaylee__draft,
-  .kaylee__walk,
-  .kaylee__surprise {
+  .kaylee__walk {
     animation: kaylee-pop var(--dur-move) var(--ease-spring) backwards;
   }
-  .kaylee__eyes { transition: translate var(--dur-move) var(--ease-enter); }
   .kaylee__count { transition: opacity var(--dur-quick) ease; }
   .kaylee__progress { transition: stroke-dasharray var(--dur-move) var(--ease-enter); }
 
@@ -302,27 +265,38 @@
   .kaylee[data-state='transcribing'] .kaylee__dots { animation: kaylee-pop var(--dur-move) var(--ease-spring) backwards, kaylee-orbit 1.1s linear infinite; }
   .kaylee:is([data-state='thinking'], [data-state='waking']) .kaylee__dots { animation: kaylee-pop var(--dur-move) var(--ease-spring) backwards, kaylee-orbit 1.9s linear infinite; }
 
-  /* reading: her eyes sweep a line, drop to the next and sweep back. The code is read faster than the chat. */
-  .kaylee[data-state='reading_session'] .kaylee__eyes { animation: kaylee-read 4.4s ease-in-out infinite; transition: none; }
-  .kaylee[data-state='reading_code'] .kaylee__eyes { animation: kaylee-read 2.6s ease-in-out infinite; transition: none; }
-
   /* drafting: the stroke draws itself, left to right, with the pencil riding its tip; then a breath, and again. */
   .kaylee[data-state='drafting'] .kaylee__stroke { animation: kaylee-write 2.8s linear infinite; }
   .kaylee[data-state='drafting'] .kaylee__pencil { animation: kaylee-pencil 2.8s linear infinite; }
-
-  /* cut: a quick blink of surprise. */
-  .kaylee[data-state='cut'] .kaylee__eye { animation: kaylee-startle 0.5s ease-in-out; }
-
-  /* failed: she holds still, with no breath, no glow and no blink loop. Her ring and mouth arrive with the same small pop as any
-     accent, and then nothing about her moves. */
-  .kaylee[data-state='failed'] :is(.kaylee__body, .kaylee__halo, .kaylee__eye) { animation: none; }
 }
 
-@keyframes kaylee-breath { from { scale: 1; } to { scale: 1.03; } }
-@keyframes kaylee-glow { from { opacity: 0.75; scale: 0.98; } to { opacity: 1; scale: 1.03; } }
-@keyframes kaylee-blink {
-  0%, 92%, 100% { scale: 1; }
-  95% { scale: 1 0.08; }
+@keyframes kaylee-portrait-in { from { opacity: 0; } }
+@keyframes kaylee-breath { from { scale: 1; } to { scale: 1.015; } }
+@keyframes kaylee-sway { from { rotate: -0.8deg; } to { rotate: 0.8deg; } }
+/* The clips lift and drop the whole layer by a share of its own height. */
+@keyframes kaylee-laugh {
+  0%, 33%, 67%, 100% { translate: 0 0; }
+  17%, 50%, 83% { translate: 0 -3%; }
+}
+@keyframes kaylee-giggle {
+  0%, 50%, 100% { translate: 0 0; }
+  25%, 75% { translate: 0 -2%; }
+}
+@keyframes kaylee-gasp {
+  0%, 100% { translate: 0 0; }
+  29% { translate: 0 -3%; }
+}
+@keyframes kaylee-sigh {
+  0%, 100% { translate: 0 0; }
+  40% { translate: 0 2%; }
+}
+@keyframes kaylee-nod {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 2%; }
+}
+@keyframes kaylee-swell {
+  0%, 100% { scale: 1; }
+  50% { scale: 1.03; }
 }
 @keyframes kaylee-pop { from { opacity: 0; scale: 0.6; } }
 @keyframes kaylee-hear {
@@ -331,13 +305,6 @@
   100% { opacity: 0.15; translate: 0 0; }
 }
 @keyframes kaylee-orbit { to { rotate: 360deg; } }
-@keyframes kaylee-read {
-  0%, 6% { translate: -2.4px -1.8px; }
-  38% { translate: 3.4px -1.8px; }
-  48%, 54% { translate: -2.4px 1.6px; }
-  86% { translate: 3.4px 1.6px; }
-  100% { translate: -2.4px -1.8px; }
-}
 @keyframes kaylee-write {
   0% { stroke-dashoffset: 1; opacity: 1; }
   80% { stroke-dashoffset: 0; opacity: 1; }
@@ -353,8 +320,4 @@
   66.7% { translate: 61px 89px; }
   80%, 92% { translate: 66px 92px; opacity: 1; }
   100% { translate: 66px 92px; opacity: 0; }
-}
-@keyframes kaylee-startle {
-  0%, 100% { scale: 1.16; }
-  40% { scale: 1.16 0.08; }
 }

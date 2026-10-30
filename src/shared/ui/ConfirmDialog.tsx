@@ -31,7 +31,7 @@ type ConfirmDialogProps = {
  * (opening another file, or editing in another project, while a file has unsaved changes), the jev
  * module (clearing the replay cache), the dispatcher module (deleting a plan from the store) and the
  * companion module (clearing her conversation from her panel, clearing her memory in Settings,
- * clearing her draft, restoring her original register).
+ * clearing her draft, restoring her original register, restoring her original face).
  * Verve draws it (`Verve Design System.dc.html`, ConfirmDialog), which is why it lives here rather
  * than being composed at each site.
  *

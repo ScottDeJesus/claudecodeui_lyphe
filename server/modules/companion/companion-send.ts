@@ -116,7 +116,7 @@ type SenderDeps = {
   store: CompanionStore;
   runtime: ProviderRuntimeGateway;
   setFocus(chat: CompanionSessionRef): void;
-  openOnFloor(target: CompanionOpenTarget): void;
+  openOnFloor(target: CompanionOpenTarget, label: string): void;
 };
 
 /** Consumed by `tools/tool-deps.ts`: one sender per account. */
@@ -170,7 +170,7 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
   function afterSend(chat: CompanionSessionRef, sent: CompanionDraft): void {
     if (store.readState().draft?.updatedAt === sent.updatedAt) store.setDraft(null);
     deps.setFocus(chat);
-    deps.openOnFloor({ kind: 'chat', sessionId: chat.sessionId });
+    deps.openOnFloor({ kind: 'chat', sessionId: chat.sessionId }, chat.name);
   }
 
   async function sendToChat(chat: CompanionSessionRef, draft: CompanionDraft, words: string, mode: 'turn' | 'steer', model: ClaudeModelAlias | undefined): Promise<DraftSendOutcome> {

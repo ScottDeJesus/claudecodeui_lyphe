@@ -1,5 +1,5 @@
 import type {
-  CompanionActionTarget, CompanionActivity, CompanionCarriedLine, CompanionDraft, CompanionLogEntry, CompanionNote,
+  CompanionActionTarget, CompanionActivity, CompanionCarriedLine, CompanionDraft, CompanionFace, CompanionLogEntry, CompanionNote,
   CompanionPendingAction, CompanionPicture, CompanionProcess, CompanionSessionRef, CompanionSettings, CompanionWalk,
 } from '@/shared/companion-types';
 
@@ -106,10 +106,12 @@ const NOTES: CompanionNote[] = [
   {
     id: 41, at: ago(200), title: 'Files the lane drag touched',
     text: 'src/modules/kanban/KanbanBoard.tsx\nsrc/modules/kanban/hooks/useLaneDrag.ts\nsrc/shared/ui/KanbanLane.tsx',
+    kind: 'note', ref: null, pinned: false,
   },
   {
     id: 42, at: ago(90), title: 'Where the migration stands',
     text: 'Three of five tables are copied and checked. The last two wait on the sessions backfill, which the migration chat says finishes tonight.',
+    kind: 'note', ref: null, pinned: false,
   },
 ];
 
@@ -284,12 +286,14 @@ const CLEAR = prepared(41, {
 
 const IDLE: CompanionActivity = { phase: 'idle', session: null, files: null, walk: null };
 const AWAKE: CompanionProcess = { state: 'awake', error: null };
+/** The face of an account for which none is made, the value the server's picture answers until its face service does: every fixture draws as it did before faces. */
+const NO_FACE: CompanionFace = { id: null, original: true, bake: null };
 const FAILED_SENTENCE = "Kaylee couldn't start: the Claude login on this box has expired. Sign in again from Settings > Account.";
 
 /** A picture: the defaults of an awake, idle companion with an empty panel, and whatever a state changes. */
 const picture = (change: Partial<CompanionPicture>): CompanionPicture => ({
   settings: FAKE_SETTINGS, models: MODELS, process: AWAKE, activity: IDLE, turnId: null, focus: null,
-  draft: null, pending: null, walk: null, notes: [], log: [], floor: 'fixture-page', ...change,
+  draft: null, pending: null, walk: null, notes: [], log: [], floor: 'fixture-page', face: NO_FACE, ...change,
 });
 
 /** One state of the panel: her picture, whether the draft's target is working, and the page's open state. */

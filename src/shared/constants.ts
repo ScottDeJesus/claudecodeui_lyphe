@@ -10,10 +10,23 @@ import {
   MonitorPlay,
   Palette,
   Plug,
+  ClipboardList,
+  FileDiff,
+  FileText,
+  Footprints,
+  List,
+  MessageCircleQuestion,
+  MessageSquare,
+  Route,
+  ShieldCheck,
+  StickyNote,
+  type LucideIcon,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
+import type { CompanionNoteKind } from '@/shared/companion-types';
 import type { RoadmapEpicWord, RoadmapFeatureWord, RoadmapMilestoneWord } from '@/shared/roadmap-types';
+import type { StationFocusKind } from '@/shared/station-types';
 import type { AffectedAreasTrouble, FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, RoadmapDotState, SettingsMainTab } from '@/shared/types';
 import type { UserPreferenceKey } from '@/shared/userSettings';
 
@@ -318,7 +331,7 @@ export const CHAT_TOGGLE_KEY = '.';
  * is what draws; keep the two equal (the radial's proof measures a disc against the FAB itself).
  *
  * Used by the DockableFab kit piece, the app-switcher module's radial layout and labels, the chat-host module's
- * floating panel, and the companion module's disc (the square her face is drawn in).
+ * floating panel, and the companion module's disc (her size at rest, which her disc grows from while she is active).
  */
 export const FAB_SIZE_PX = 28;
 
@@ -493,7 +506,8 @@ export const ROADMAP_DOT_PAINT: Record<RoadmapDotState, { fill: string; stroke: 
 /**
  * The query parameter a landing names a plan in (`?runner=<plan>`): the key one side writes and the other
  * reads. Used by the project-workspace module's `useRunnerLanding`, which reads it, and the shared
- * `useRevealCard`, which writes it from a surface that has no Roadmap tab above it.
+ * `useRevealCard`, which writes it from a surface that has no Roadmap tab above it, as does the station module's
+ * `FocusFallback` (its way to a card in CloudCLI).
  */
 export const RUNNER_LANDING_PARAM = 'runner';
 
@@ -597,3 +611,42 @@ export const PAGE_ANCHOR = {
   filesView: 'files-view',
   railFiles: 'rail:files',
 } as const;
+
+// ---------------------------
+
+//----------------- COMPANION NOTE KINDS ------------
+
+/**
+ * The glyph and the word of each kind of card Kaylee puts up (`CompanionNote.kind`): `icon` is the lucide mark and `wordKey` the
+ * i18n key of its word (`companion.noteKind.<kind>`: Note, List, Diff, Plan page, DocSpace page). A kind is always drawn with its
+ * word beside the mark, never the mark alone. Read by the companion module's inline cards in her conversation and by the
+ * stage and shelf that draw a card.
+ */
+export const COMPANION_NOTE_KIND_GLYPHS: Record<CompanionNoteKind, { icon: LucideIcon; wordKey: string }> = {
+  note: { icon: StickyNote, wordKey: 'companion.noteKind.note' },
+  list: { icon: List, wordKey: 'companion.noteKind.list' },
+  diff: { icon: FileDiff, wordKey: 'companion.noteKind.diff' },
+  plan: { icon: ClipboardList, wordKey: 'companion.noteKind.plan' },
+  page: { icon: FileText, wordKey: 'companion.noteKind.page' },
+};
+
+// ---------------------------
+
+//----------------- STATION FOCUS KINDS ------------
+
+/**
+ * The glyph and the word of each kind of thing the station's stage can hold (`StationFocus.kind`): `icon` is the lucide mark and
+ * `wordKey` the i18n key of its word (`station.focusKind.<kind>`: Session, Feature or epic, Waiting ask, Follow-ups, Check, Card,
+ * Walkthrough, Page). A kind is always drawn with its word beside the mark, never the mark alone. Read by the station's stage
+ * head, by its fallback for a view that has not landed, and by every region's press, which names its kind by them.
+ */
+export const STATION_FOCUS_GLYPHS: Record<StationFocusKind, { icon: LucideIcon; wordKey: string }> = {
+  chat: { icon: MessageSquare, wordKey: 'station.focusKind.chat' },
+  card: { icon: Route, wordKey: 'station.focusKind.card' },
+  ask: { icon: MessageCircleQuestion, wordKey: 'station.focusKind.ask' },
+  followups: { icon: ListChecks, wordKey: 'station.focusKind.followups' },
+  check: { icon: ShieldCheck, wordKey: 'station.focusKind.check' },
+  note: { icon: StickyNote, wordKey: 'station.focusKind.note' },
+  walk: { icon: Footprints, wordKey: 'station.focusKind.walk' },
+  page: { icon: FileText, wordKey: 'station.focusKind.page' },
+};

@@ -1,5 +1,6 @@
 import { getConnection } from '@/modules/database/connection.js';
 import { companionActionsDb } from '@/modules/database/repositories/companion-actions.db.js';
+import type { CompanionNoteKind, CompanionNoteRef } from '@/shared/companion-types.js';
 import { isStoreStamp } from '@/shared/utils.js';
 
 /**
@@ -57,6 +58,15 @@ export type CompanionStateRow = {
    * lower bound. A log id, never a memory: CloudCLI keeps none. Read and written only by `memory-verbs.ts`.
    */
   memory_forget_line: number | null;
+  /**
+   * The face her pages draw (`<photoId>-<recipeId>`, `server/modules/companion/face/`); NULL for the original. Survives Clear: Clear wipes her
+   * memory, not her look. Written only by the face service.
+   */
+  face_id: string | null;
+  /** The face being made from his upload, which a restart resumes; NULL when none is being made. Survives Clear. Written only by the face service. */
+  face_pending_id: string | null;
+  /** The sentence of the last bake that failed, shown in Settings until the next upload or restore; NULL for none. Survives Clear. Written only by the face service. */
+  face_error: string | null;
   updated_at: string;
 };
 
@@ -93,13 +103,19 @@ export type CompanionLogInput = {
   sounds_json?: string | null;
 };
 
-/** One `companion_notes` row, exactly as the table stores it. */
+/**
+ * One `companion_notes` row, exactly as the table stores it: `kind` is the card's kind as text (the store reads one it does not
+ * know as a `note`), `ref_json` what the card is about as JSON text (NULL for nothing) and `pinned` 1 or 0.
+ */
 export type CompanionNoteRow = {
   id: number;
   user_id: number;
   at: string;
   title: string;
   text: string;
+  kind: string;
+  ref_json: string | null;
+  pinned: number;
 };
 
 /** One log line as the check of his word reads it: who said it, how and when, with its words. Only his lines (`operator`) and hers (`kaylee`) are ever read this way. */
@@ -111,6 +127,9 @@ export type CompanionHeardRow = {
   text: string;
 };
 
+/** One account's faces as the face service's start and prune read them: the face it draws and the one being made (each NULL for none). */
+export type CompanionFaceRow = Pick<CompanionStateRow, 'user_id' | 'face_id' | 'face_pending_id'>;
+
 /** What `clearAccount` removed and whether a state row was there to reset. */
 export type CompanionClearResult = {
   logRemoved: number;
@@ -119,11 +138,11 @@ export type CompanionClearResult = {
 };
 
 /** Every state column the table holds besides the key: what a read returns and `writeState` may name. */
-const STATE_PATCH_COLUMNS = ['provider_session_id', 'session_shape', 'handover', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor', 'memory_forget_line'] as const;
+const STATE_PATCH_COLUMNS = ['provider_session_id', 'session_shape', 'handover', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor', 'memory_forget_line', 'face_id', 'face_pending_id', 'face_error'] as const;
 
 const STATE_COLUMNS = `user_id, ${STATE_PATCH_COLUMNS.join(', ')}, updated_at`;
 const LOG_COLUMNS = 'id, user_id, at, role, via, turn_id, turn_index, text, mood, sounds_json';
-const NOTE_COLUMNS = 'id, user_id, at, title, text';
+const NOTE_COLUMNS = 'id, user_id, at, title, text, kind, ref_json, pinned';
 
 export const companionDb = {
   /** The account's state row, or `null` before anything of hers has been stored. */
@@ -164,6 +183,22 @@ export const companionDb = {
       .all() as Array<{ user_id: number }>;
 
     return rows.map((row) => row.user_id);
+  },
+
+  /**
+   * EVERY account with its face and pending face (each NULL for none), ascending by account — an account that has never
+   * touched Kaylee has no state row and is listed on the original. The face service reads it at start, to resume the bakes and to
+   * bring a face whose recipe is no longer current up to date; after the original's face changes, to tell each account on the
+   * original; and for each prune, to know which faces are named.
+   */
+  listFaces(): CompanionFaceRow[] {
+    return getConnection()
+      .prepare(
+        `SELECT users.id AS user_id, companion_state.face_id AS face_id, companion_state.face_pending_id AS face_pending_id
+         FROM users LEFT JOIN companion_state ON companion_state.user_id = users.id
+         ORDER BY users.id`
+      )
+      .all() as CompanionFaceRow[];
   },
 
   /**
@@ -296,15 +331,18 @@ export const companionDb = {
     return row ?? null;
   },
 
-  /** Inserts one card for the account, stamped now, and answers the row as stored. */
-  addNote(userId: number, note: { title: string; text: string }): CompanionNoteRow {
+  /**
+   * Inserts one card for the account, stamped now, unpinned, and answers the row as stored. `kind` is a `note` unless given and
+   * `ref` (what the card is about) is NULL unless given; `ref` is the one object this file serializes, written as `ref_json`.
+   */
+  addNote(userId: number, note: { title: string; text: string; kind?: CompanionNoteKind; ref?: CompanionNoteRef | null }): CompanionNoteRow {
     const row = getConnection()
       .prepare(
-        `INSERT INTO companion_notes (user_id, at, title, text)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO companion_notes (user_id, at, title, text, kind, ref_json)
+         VALUES (?, ?, ?, ?, ?, ?)
          RETURNING ${NOTE_COLUMNS}`
       )
-      .get(userId, new Date().toISOString(), note.title, note.text) as CompanionNoteRow | undefined;
+      .get(userId, new Date().toISOString(), note.title, note.text, note.kind ?? 'note', note.ref ? JSON.stringify(note.ref) : null) as CompanionNoteRow | undefined;
 
     if (!row) throw new Error(`Could not insert companion note "${note.title}".`);
     return row;
@@ -329,7 +367,7 @@ export const companionDb = {
   /**
    * Clear: deletes the account's log and cards and empties its state's conversation (its id, shape and handover), focus, draft,
    * pending action, unanswered messages and walkthrough — in one transaction. `floor` stays (which client holds the floor
-   * is no part of her conversation), and so does `memory_forget_line`: log ids are AUTOINCREMENT and never reused, so the id of the line
+   * is no part of her conversation), and so do her face columns (Clear wipes her memory, not her look), and so does `memory_forget_line`: log ids are AUTOINCREMENT and never reused, so the id of the line
    * the last forget of her memory used stays a true lower bound after the log it named is gone, and a line he says next always has a
    * greater id. `relayed_sends` and `companion_actions` are never deleted from:
    * those rows are facts about chats and about the house. The one write Clear makes to

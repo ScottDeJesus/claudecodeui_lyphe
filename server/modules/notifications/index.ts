@@ -43,9 +43,9 @@ export {
   isSessionWatched,
   markPresence,
 } from '@/modules/notifications/services/session-presence.service.js';
-// viewOf: used by the companion module's view — the chat on the account's freshest visible tab, named in
-// the message she is pushed so "this one" means the chat he is looking at.
-export { viewOf } from '@/modules/notifications/services/session-presence.service.js';
+// viewTargetOf: used by the companion module's view — what the account's one speaking page shows (its chat, or the station's
+// stage), named in the message she is pushed so "this one" means what he is looking at.
+export { viewTargetOf } from '@/modules/notifications/services/session-presence.service.js';
 // onNotification: used by the companion module's alert feed, which hears every event the orchestrator is handed
 // — before any push preference or dedupe — and turns the few that are her business into what she says unasked.
 export { onNotification } from '@/modules/notifications/services/notification-listeners.service.js';

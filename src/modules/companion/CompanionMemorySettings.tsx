@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCompanionMemorySettings } from '@/modules/companion/hooks/useCompanionMemorySettings';
-import { resolveDocSpaceOrigin } from '@/modules/widgets';
+import { docSpacePageUrl } from '@/modules/widgets';
 import { Banner, Button, ConfirmDialog, SettingRow, SettingsCard, Spinner, buttonVariants } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -178,7 +178,7 @@ export function CompanionMemorySettings({ name }: { name: string }) {
     <CompanionMemorySettingsView
       name={name}
       reading={reading}
-      pageHref={reading === null ? '' : `${resolveDocSpaceOrigin()}/#page=${reading.pageId}`}
+      pageHref={reading === null ? '' : docSpacePageUrl(reading.pageId, null)}
       clearing={clearing}
       onClear={() => { void clear(); }}
     />

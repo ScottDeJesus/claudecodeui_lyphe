@@ -6,6 +6,7 @@ import { useCompanionVoice } from '@/modules/companion/hooks/useCompanionVoice';
 import { useTalkBinding } from '@/modules/companion/hooks/useTalkBinding';
 import { useTalkPress } from '@/modules/companion/hooks/useTalkPress';
 import { isCompanionPicture, isOpenTarget, reduceCompanion } from '@/modules/companion/utils/companionReducer';
+import type { PcmPlayer } from '@/modules/companion/utils/pcmPlayer';
 import { api, refusalSentence } from '@/shared/api';
 import type { CompanionFrame, CompanionOpenTarget, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
@@ -89,6 +90,8 @@ type CompanionContextValue = {
   setFabAway: (away: boolean) => void;
   /** The page player's `level()`, 0..1: what her face's mouth follows while she speaks. Stable for the page's life. */
   level: () => number;
+  /** The page player's `progress()`: the sounding sentence's seconds elapsed and, once its body has ended, its length — what picks the vowel of her mouth. Stable for the page's life. */
+  progress: PcmPlayer['progress'];
 };
 
 const CompanionContext = createContext<CompanionContextValue | null>(null);
@@ -131,8 +134,9 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  * lands, so a frame the answer predates is not lost; the reducer folds a frame twice without harm. A clear is the exception:
  * it drops the queue and discards a read that was out, because the read that follows it is the one that counts.
  *
- * AN OPEN IS ANSWERED ONLY BY THE PAGE THAT HOLDS THE FLOOR. `companion_open` carries a target (a chat, a card or a page) and
- * the `floor` it is addressed to; `onOpen(target)` is called only when that is this page's client id. Every other page of the
+ * AN OPEN IS ANSWERED ONLY BY THE PAGE THAT HOLDS THE FLOOR. `companion_open` carries a target (a chat, a card or a page), the
+ * `floor` it is addressed to and the spoken `label` the door resolved for it; `onOpen(target, label)` is called only when that is
+ * this page's client id (the workspace ignores the label; the station's stage names what she opened by it). Every other page of the
  * account hears the frame too and does nothing with it, so she opens a thing where he is, not on every screen he has open;
  * every page does note a chat open (`recentSend`), which is what the button's look reads, and a card's or a page's open is
  * noted by no one.
@@ -150,7 +154,7 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  * the picture's `floor` is this page's client id. The press is handed the voice, so it can cut her off. The player is unlocked in
  * the first gesture: opening her panel, typing to her, or a talk press. A Stop and a Clear silence the page's voice as well as her turn.
  */
-export function CompanionProvider({ onOpen, children }: { onOpen: (target: CompanionOpenTarget) => void; children: ReactNode }) {
+export function CompanionProvider({ onOpen, children }: { onOpen: (target: CompanionOpenTarget, label: string) => void; children: ReactNode }) {
   const { subscribe } = useWebSocket();
   // The picture this page draws. State, not a ref: the panel, the door and the palette all render from it.
   const [picture, setPicture] = useState<CompanionPicture | null>(null);
@@ -284,7 +288,8 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
         recentSendTimerRef.current = window.setTimeout(() => setRecentSend(null), RECENT_SEND_MS);
       }
       // Only the page that holds the floor acts: the host answers each target.
-      if (frame.floor === clientId) onOpenRef.current(target);
+      // A server a moment older than this page sends no label; the open still lands, named by nothing.
+      if (frame.floor === clientId) onOpenRef.current(target, typeof frame.label === 'string' ? frame.label : '');
       return;
     }
     fold(frame);
@@ -375,10 +380,11 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
       picture, readFailure: picture === null ? readFailure : null, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft,
       clearDraft, cancelAction, dismissNote, interrupt, clear, talk,
       voice: speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
+      progress: speech.progress,
     }),
     [
       picture, readFailure, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, interrupt, clear,
-      talk, speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level,
+      talk, speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress,
     ],
   );
 

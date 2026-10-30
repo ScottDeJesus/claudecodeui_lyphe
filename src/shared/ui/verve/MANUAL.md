@@ -49,7 +49,9 @@ section: README/001 The rules that keep it one source
    needed names of its own. `tone-soft`,
    `tone-ink` and `tone-dot` joined as names over the tone swap's own properties, not over a palette
    token: each is `color-mix` over `--tone-soft`, `--tone-ink` or `--tone-dot`, which the
-   `[data-tone]` rules of rule 4 hand to everything inside a container. `bg-tone-dot` is the dot of
+   `[data-tone]` rules of rule 4 hand to everything inside a container. `garnish` joined for Kaylee
+   Station's title word (`text-garnish` on the italic "Station"): `color-mix` over `--garnish`, the
+   warm accent, never a wall. `bg-tone-dot` is the dot of
    whichever of the five tones the nearest `data-tone` chose, and resolves to nothing with none above
    it. `--tone-glyph` has no name: it holds a string, not a colour. A name whose
    `var()` points at no existing token is rule 2's second palette in a Tailwind spelling.

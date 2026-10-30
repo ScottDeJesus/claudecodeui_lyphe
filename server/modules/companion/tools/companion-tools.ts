@@ -76,7 +76,8 @@ export type ToolActivityPhase = Exclude<CompanionPhase, 'idle' | 'thinking'>;
  * `withActivity` sets her activity to `phase` about `chat` and `files` (each `null` when the phase has no such
  * subject) for as long as `run` takes, then puts her back to `thinking` (or to a parallel tool still running) — unless
  * the turn ended meanwhile (she was stopped), in which case the turn's own `idle` stands. `openOnFloor` sends `companion_open` for
- * `target` to the page that holds the floor, and is a no-op while no page holds it. Consumed by every tool file of this folder; built
+ * `target` to the page that holds the floor, with `label` the spoken name the door resolved, and is a no-op while no page holds it.
+ * Consumed by every tool file of this folder; built
  * by `companion-account.ts`.
  */
 export type CompanionToolDeps = {
@@ -86,7 +87,7 @@ export type CompanionToolDeps = {
   house: CompanionHouse;
   setFocus(chat: CompanionSessionRef): void;
   withActivity<T>(phase: ToolActivityPhase, chat: CompanionSessionRef | null, files: string[] | null, run: () => Promise<T>): Promise<T>;
-  openOnFloor(target: CompanionOpenTarget): void;
+  openOnFloor(target: CompanionOpenTarget, label: string): void;
   refuse(sentence: string): ToolTextResult;
   /** Sends the held draft as it stands (`companion-send.ts`): the one door `send_to_session` and `create_session` go through. */
   sendDraft: DraftSender;

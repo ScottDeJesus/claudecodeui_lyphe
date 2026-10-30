@@ -636,6 +636,33 @@ const addCompanionMemoryForgetLineColumn = (db: Database): void => {
 };
 
 /**
+ * Adds the three columns of an account's face to `companion_state`: `face_id`, the face her pages draw (NULL for the original);
+ * `face_pending_id`, the face being made from his upload, which a restart resumes; and `face_error`, the sentence of the last
+ * bake that failed. All NULL for every row before these columns, which is the original face with nothing being made. Clear leaves
+ * them (`clearAccount` names only the conversation's columns): Clear wipes her memory, not her look.
+ */
+const addCompanionFaceColumns = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'face_id', 'TEXT');
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'face_pending_id', 'TEXT');
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'face_error', 'TEXT');
+};
+
+/**
+ * Adds the three columns of a card's shape to `companion_notes`: `kind` (what the card is: `note`, `list`, `diff`, `plan` or `page`),
+ * `ref_json` (what it is about, as the wire's `CompanionNoteRef`, or NULL for nothing) and `pinned` (1 when he pinned it). Every
+ * card held before these columns reads, truthfully, as a note about nothing, unpinned: the defaults say so, so no backfill is run.
+ */
+const addCompanionNoteShapeColumns = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_notes').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_notes', columnNames, 'kind', "TEXT NOT NULL DEFAULT 'note'");
+  addColumnToTableIfNotExists(db, 'companion_notes', columnNames, 'ref_json', 'TEXT');
+  addColumnToTableIfNotExists(db, 'companion_notes', columnNames, 'pinned', 'INTEGER NOT NULL DEFAULT 0');
+};
+
+/**
  * Adds `companion_actions.armed_from`: when the action's ceremony began. A prepare that re-arms an action which lapsed (the same
  * action on the same target) carries the first prepare's stamp here, so her read-back from before the lapse and his yes since
  * still count. NULL means the ceremony began at the row's own `prepared_at`, which is every row before this column.
@@ -859,10 +886,12 @@ export const runMigrations = (db: Database) => {
     addRelayedSendMessageUuidColumn(db);
     addCompanionPendingColumn(db);
     addCompanionMemoryForgetLineColumn(db);
+    addCompanionFaceColumns(db);
     addCompanionUnansweredColumn(db);
     addCompanionSessionShapeColumn(db);
     addCompanionHandoverColumn(db);
     addCompanionActionArmedFromColumn(db);
+    addCompanionNoteShapeColumns(db);
     // What the house told each account, kept: one row per notification the orchestrator was handed, written at
     // the listener seam. It references `users` alone, so it sits beside the companion's script, which reads it.
     db.exec(NOTIFICATION_HISTORY_SCHEMA_SQL);

@@ -7,6 +7,8 @@ import type {
   CompanionFrame,
   CompanionLogEntry,
   CompanionNote,
+  CompanionNoteKind,
+  CompanionNoteRef,
   CompanionPendingAction,
   CompanionSessionRef,
   CompanionSound,
@@ -131,8 +133,8 @@ export type CompanionStore = {
   readSentence(turnId: string, index: number): CompanionLogEntry | null;
   /** The newest `limit` lines, oldest first. */
   readLog(limit: number): CompanionLogEntry[];
-  /** `companion_note`. */
-  addNote(note: { title: string; text: string }): CompanionNote;
+  /** `companion_note`. A card is a `note` about nothing unless it is given its `kind` and the `ref` it is about. */
+  addNote(note: { title: string; text: string; kind?: CompanionNoteKind; ref?: CompanionNoteRef | null }): CompanionNote;
   listNotes(): CompanionNote[];
   /** `companion_note_removed`, only when this account had the note. Answers whether it did. */
   removeNote(id: number): boolean;
@@ -208,8 +210,37 @@ function toLogEntry(userId: number, row: CompanionLogRow): CompanionLogEntry {
   };
 }
 
-function toNote(row: CompanionNoteRow): CompanionNote {
-  return { id: row.id, at: row.at, title: row.title, text: row.text };
+/** Keyed by the contract's union, so a kind added to `CompanionNoteKind` without a word here is a compile error rather than a card read back as a `note`. */
+const NOTE_KINDS: Record<CompanionNoteKind, true> = { note: true, list: true, diff: true, plan: true, page: true };
+
+const isNoteKind = (value: string): value is CompanionNoteKind => Object.hasOwn(NOTE_KINDS, value);
+
+const isNoteRef = (value: unknown): value is CompanionNoteRef => {
+  if (!isRecord(value)) return false;
+  switch (value.kind) {
+    case 'card': return isText(value.plan);
+    case 'chat': return isText(value.sessionId);
+    case 'page': return isText(value.pageId) && (value.blockId === null || isText(value.blockId));
+    case 'project': return isText(value.path);
+    default: return false;
+  }
+};
+
+/**
+ * One card row as the wire's note. A `ref_json` that does not parse (or is not a ref) reads as no ref, with the one line
+ * `readJsonColumn` logs; a `kind` the contract does not know reads as a `note`, with one line of its own.
+ */
+function toNote(userId: number, row: CompanionNoteRow): CompanionNote {
+  if (!isNoteKind(row.kind)) console.warn(`[Companion] Reading companion_notes.kind "${row.kind}" of account ${userId} (row ${row.id}) as a note: it is not a kind of card`);
+  return {
+    id: row.id,
+    at: row.at,
+    title: row.title,
+    text: row.text,
+    kind: isNoteKind(row.kind) ? row.kind : 'note',
+    ref: readJsonColumn(userId, `companion_notes.ref_json (row ${row.id})`, row.ref_json, isNoteRef),
+    pinned: row.pinned === 1,
+  };
 }
 
 /**
@@ -295,12 +326,12 @@ export function createCompanionStore(userId: number): CompanionStore {
     },
 
     addNote(input) {
-      const note = toNote(companionDb.addNote(userId, input));
+      const note = toNote(userId, companionDb.addNote(userId, input));
       send({ kind: 'companion_note', note });
       return note;
     },
 
-    listNotes: () => companionDb.listNotes(userId).map(toNote),
+    listNotes: () => companionDb.listNotes(userId).map((row) => toNote(userId, row)),
 
     removeNote(id) {
       const removed = companionDb.removeNote(userId, id);

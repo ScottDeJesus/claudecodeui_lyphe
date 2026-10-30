@@ -14,8 +14,9 @@ const ARCHPULSE_APP_ID = 'archpulse';
 
 /**
  * Rendered by ProjectWorkspaceShell inside the chat host's and the application switcher's providers: holds Kaylee's provider
- * and answers her orders to open a chat, a card or a page on this page — the provider calls `onOpen(target)` only on the
- * page that holds the floor, so every branch below acts without asking whose turn it is.
+ * and answers her orders to open a chat, a card or a page on this page — the provider calls `onOpen(target, label)` only on the
+ * page that holds the floor, so every branch below acts without asking whose turn it is. The workspace has no use for the label
+ * (the spoken name the door resolved, which the station's stage names a thing by) and ignores it.
  *
  * OPENING A CHAT HERE IS THREE THINGS, in this order. The Chat view comes forward (as a notification's landing does: the
  * route alone leaves a page on Files or Git looking at Files or Git). The route moves to `/session/<id>`. And when an
@@ -46,7 +47,7 @@ export default function CompanionHost({ navigate, children }: Pick<ProjectWorksp
   const revealCard = useRevealCard();
 
   const openOnThisPage = useCallback(
-    (target: CompanionOpenTarget) => {
+    (target: CompanionOpenTarget, _label: string) => {
       switch (target.kind) {
         case 'chat':
           setActiveTab('chat');

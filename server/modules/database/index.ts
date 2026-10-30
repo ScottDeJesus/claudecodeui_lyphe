@@ -121,6 +121,7 @@ export type { FollowupKind, FollowupRow } from '@/modules/database/repositories/
 export { companionDb } from '@/modules/database/repositories/companion.db.js';
 export type {
   CompanionClearResult,
+  CompanionFaceRow,
   CompanionHeardRow,
   CompanionLogInput,
   CompanionLogRow,

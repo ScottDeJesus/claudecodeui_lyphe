@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { AnimationEvent, ReactNode, TransitionEvent } from 'react';
+import type { AnimationEvent, CSSProperties, ReactNode, TransitionEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionAvatar } from '@/modules/companion/CompanionAvatar';
@@ -7,9 +7,14 @@ import '@/modules/companion/CompanionFab.css';
 import { useCompanion } from '@/modules/companion/context/CompanionContext';
 import { useAvatarTarget } from '@/modules/companion/hooks/useAvatarTarget';
 import { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
+import { useCompanionSize } from '@/modules/companion/hooks/useCompanionSize';
+import { useFaceInputs } from '@/modules/companion/hooks/useFaceInputs';
+import { useReducedMotion } from '@/modules/companion/hooks/useReducedMotion';
+import { useSizeEasing } from '@/modules/companion/hooks/useSizeEasing';
 import { avatarPlacement } from '@/modules/companion/utils/avatarPlacement';
+import { restFor, storedFrom } from '@/modules/companion/utils/fabGrowth';
 import { presenceWords } from '@/modules/companion/utils/presenceWords';
-import { FAB_CATCH_PX, FAB_DEFAULT_INSET_X, FAB_DEFAULT_INSET_Y, FAB_SIZE_PX } from '@/shared/constants';
+import { FAB_CATCH_PX, FAB_DEFAULT_INSET_X, FAB_DEFAULT_INSET_Y } from '@/shared/constants';
 import { DockableFab } from '@/shared/ui';
 import type { DockableFabPosition } from '@/shared/ui';
 
@@ -19,8 +24,11 @@ type FabPoint = { x: number; y: number };
 /** Where she is drawn while she looks at something: the disc's top-left in viewport px, keyed by the anchor it stands beside. */
 type CompanionFabTarget = { key: string; left: number; top: number };
 
-/** Her face's square: the disc less its 1px rim on either side, so the face fills the circle inside the kit's accent rim. */
-const FACE_PX = FAB_SIZE_PX - 2;
+/** The look the disc is drawing: the anchor's key, and whether her glide to it has ended (she stands beside it now). */
+type CompanionFabLookDrawn = { key: string; landed: boolean };
+
+/** What the kit's 1px accent rim takes of the disc's side, both edges together: her face is the disc less this, filling the circle inside the rim. */
+const FACE_RIM_PX = 2;
 
 /**
  * Her own corner on a phone, as the inset from the window's bottom-right corner to the disc's top-left: on the applications
@@ -62,8 +70,10 @@ const readViewportHeight = () => window.innerHeight;
 type CompanionFabViewProps = {
   /** Her name and what she is doing, in words ("Kaylee, reading Bugfixes"): the disc's accessible name and its tooltip. */
   label: string;
-  /** Her face, drawn `FACE_PX` square. The disc frames it on her own ground, inside the kit's accent rim. */
+  /** Her face, filling the disc inside the kit's accent rim by CSS (it follows the disc's size as it eases). The disc frames it on her own ground. */
   face: ReactNode;
+  /** The disc's side in px as she is drawn now: 28 at rest, larger while she is active (`useCompanionSize`). It grows about her centre. */
+  size: number;
   /** Where she rests, as he left her: docked, or a point. */
   position: DockableFabPosition;
   /** The rail cell's rect while the rail is docked (md and up) and on screen, else null: on a phone she rests in her corner. */
@@ -81,6 +91,12 @@ type CompanionFabViewProps = {
    * stands at home, so a look never sends her to an anchor she is already standing on (`useAvatarTarget`'s `buttonRect`).
    */
   onRestChange: (rect: DOMRect) => void;
+  /**
+   * The look the disc is drawing, reported from an effect each time it changes: null when none is drawn (none holds, a drag is in hand, or
+   * a drag set the look aside), else its key and whether her glide to it has ended. The face turns toward her anchor only while one is
+   * drawn, and from where she stands only once she has landed. Never called during render.
+   */
+  onLookDrawn?: (drawn: CompanionFabLookDrawn | null) => void;
 };
 
 /**
@@ -108,6 +124,11 @@ type CompanionFabViewProps = {
  * placed rect, after every placement and on every resize) less this layer's drawn offset at that instant, and handed on
  * through `onRestChange`.
  *
+ * HOW BIG. `size` is the disc's side (`useCompanionSize`), written on this layer as `--companion-fab-size`, which CompanionFab.css hands
+ * the kit as its own `--vv-fab-size`: only her disc grows. The rest is stored for the 28 px disc, so a point is handed to the kit
+ * shifted back by half the growth (`restFor`) and a drop is stored shifted forward (`storedFrom`), and the disc grows about its centre.
+ * The disc eases its geometry only while the size changes (`data-resizing`, `useSizeEasing`); the kit reports its rect as it eases.
+ *
  * A DRAG CANCELS ANY MOTION. From the first move the offset drops at once, with no glide to trail the finger, and the
  * look in hand is set aside until another begins, so the drop is where she stays. The drop sets her new rest.
  *
@@ -119,17 +140,20 @@ type CompanionFabViewProps = {
  * the controls of its rows stay his to press. While a look holds her she is at 59 at every width, so a look into the open
  * drawer is drawn over it. Below lg her panel is a sheet at 61 that covers both discs and carries its own close.
  */
-export function CompanionFabView({ label, face, position, dockRect, active, target, onPress, onPositionChange, onRestChange }: CompanionFabViewProps) {
+export function CompanionFabView({ label, face, size, position, dockRect, active, target, onPress, onPositionChange, onRestChange, onLookDrawn }: CompanionFabViewProps) {
   const layerRef = useRef<HTMLDivElement>(null);
+  const resizing = useSizeEasing(size);
 
   // Docked with nowhere to dock — the rail tucked away — she rests in her corner, which follows the window's size.
   const inCorner = position.docked && dockRect === null;
   const listen = inCorner ? listenToResize : listenToNothing;
   const viewportWidth = useSyncExternalStore(listen, readViewportWidth);
   const viewportHeight = useSyncExternalStore(listen, readViewportHeight);
-  const rest: DockableFabPosition = inCorner
-    ? { docked: false, x: viewportWidth - CORNER_INSET.x, y: viewportHeight - CORNER_INSET.y }
-    : position;
+  // Her rest, stored for the 28 px disc, handed to the kit shifted back by half the growth so the larger disc grows about the same centre.
+  const rest: DockableFabPosition = restFor(
+    inCorner ? { docked: false, x: viewportWidth - CORNER_INSET.x, y: viewportHeight - CORNER_INSET.y } : position,
+    size,
+  );
 
   // Her rest as the kit placed it: the disc's box in viewport px, before this layer's offset. State because the offset is
   // drawn from it, and only the kit knows it — docked it is the cell's centre, floating it is a CSS clamp against the safe
@@ -152,6 +176,10 @@ export function CompanionFabView({ label, face, position, dockRect, active, targ
   if (landed !== null && shown === null) setLanded(null);
   // Landed at the look she is drawn at: its new measurements apply at once, so she stays on her anchor while it moves.
   const tracking = landed !== null && shown !== null && landed.key === shown.key;
+  const drawnKey = shown?.key ?? null;
+  useEffect(() => {
+    onLookDrawn?.(drawnKey === null ? null : { key: drawnKey, landed: tracking });
+  }, [drawnKey, tracking, onLookDrawn]);
 
   // Where the layer draws her from her rest: nothing at rest, nor before the kit has placed her.
   const offset: FabPoint = shown !== null && placed !== null ? { x: shown.left - placed.x, y: shown.top - placed.y } : { x: 0, y: 0 };
@@ -173,9 +201,10 @@ export function CompanionFabView({ label, face, position, dockRect, active, targ
     setCancelledKey(target?.key ?? null);
   }
 
+  // The kit reports a drop as the top-left of the disc as large as it is; what is stored is the 28 px disc's about the same centre.
   function handlePositionChange(next: DockableFabPosition) {
     setDragging(false);
-    onPositionChange(next);
+    onPositionChange(storedFrom(next, size));
   }
 
   // Her own glide ending, not one of the disc's or her face's that bubbled up: a hop where she arrives at a new look.
@@ -196,10 +225,11 @@ export function CompanionFabView({ label, face, position, dockRect, active, targ
       data-companion-fab=""
       data-target={shown?.key}
       data-dragging={dragging ? '' : undefined}
+      data-resizing={resizing ? '' : undefined}
       data-landing={landed?.hopping ? '' : undefined}
       data-tracking={tracking ? '' : undefined}
       className="companion-fab pointer-events-none fixed inset-0 z-[49] data-[target]:z-[59] md:z-[59]"
-      style={{ translate: `${offset.x}px ${offset.y}px` }}
+      style={{ translate: `${offset.x}px ${offset.y}px`, '--companion-fab-size': `${size}px` } as CSSProperties}
       onTransitionEnd={handleTransitionEnd}
       onAnimationEnd={handleAnimationEnd}
     >
@@ -248,8 +278,9 @@ function readSafeInsets() {
  * look, and toggles the panel; CompanionFabView draws it.
  *
  * THE LABEL is her name and her presence in words, the sentence her face carries as its own accessible name
- * (`presenceWords`); her name is the one he set, the default while the page has not read it. Her face is told the page
- * player's `level` and nothing else of the voice.
+ * (`presenceWords`); her name is the one he set, the default while the page has not read it. Her face is told her `picture.face.id`, the
+ * page player's `level` and `progress` (stable functions, so a level sixty times a second redraws nothing in React), the sentences she
+ * says and the look (`useFaceInputs`).
  *
  * THE LOOK'S PLACE. `useAvatarTarget` picks the anchor and measures it; `avatarPlacement` says where beside it she stands,
  * clamped inside the window's safe area. Both depend on the window's size, which the placement reads, so the size is
@@ -258,8 +289,9 @@ function readSafeInsets() {
  */
 export function CompanionFab() {
   const { t } = useTranslation();
-  const { picture, open, setOpen, fabPosition, moveFab, dockRect, setFabAway, level } = useCompanion();
+  const { picture, open, setOpen, fabPosition, moveFab, dockRect, setFabAway, level, progress, voice, clientId } = useCompanion();
   const presence = useCompanionPresence();
+  const size = useCompanionSize(presence);
   const name = picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
 
   // Her rest's box, as the view reports it: `useAvatarTarget` skips an anchor she already stands on. State because the
@@ -267,6 +299,10 @@ export function CompanionFab() {
   const [restRect, setRestRect] = useState<DOMRect | null>(null);
   const look = useAvatarTarget(presence, restRect);
   const holding = look !== null;
+  // The look her disc is drawing, as it reports it. State because the disc's glide ends inside the view and a drag sets the look aside there:
+  // her face turns toward the anchor only while the disc draws it, and from where she stands only once she has landed.
+  const [drawn, setDrawn] = useState<CompanionFabLookDrawn | null>(null);
+  const reducedMotion = useReducedMotion();
 
   const viewportWidth = useSyncExternalStore(holding ? listenToResize : listenToNothing, readViewportWidth);
   const viewportHeight = useSyncExternalStore(holding ? listenToResize : listenToNothing, readViewportHeight);
@@ -279,8 +315,15 @@ export function CompanionFab() {
   );
   const target = useMemo<CompanionFabTarget | null>(() => {
     if (look === null || viewport === null) return null;
-    return { key: look.key, ...avatarPlacement(look.rect, FAB_SIZE_PX, viewport) };
-  }, [look, viewport]);
+    return { key: look.key, ...avatarPlacement(look.rect, size, viewport) };
+  }, [look, viewport, size]);
+
+  // Under reduced motion she jumps: no glide ends and the view never lands, so a drawn look counts as landed at once.
+  const faceLook = look !== null && drawn !== null && drawn.key === look.key ? { rect: look.rect, landed: drawn.landed || reducedMotion } : null;
+  const faceInputs = useFaceInputs({
+    picture, voice, clientId, anchor: faceLook?.rect ?? null, rest: restRect, target, size, landed: faceLook?.landed ?? false,
+  });
+  const faceVoice = useMemo(() => ({ level, progress }), [level, progress]);
 
   useEffect(() => {
     setFabAway(holding);
@@ -291,7 +334,13 @@ export function CompanionFab() {
   return (
     <CompanionFabView
       label={presenceWords(t, name, presence)}
-      face={<CompanionAvatar presence={presence} level={level} size={FACE_PX} name={name} />}
+      face={
+        <CompanionAvatar
+          presence={presence} faceId={picture?.face.id ?? null} voice={faceVoice} sentences={faceInputs.sentences} look={faceInputs.look}
+          size={size - FACE_RIM_PX} name={name}
+        />
+      }
+      size={size}
       position={fabPosition}
       dockRect={dockRect}
       active={open}
@@ -299,6 +348,7 @@ export function CompanionFab() {
       onPress={() => setOpen(!open)}
       onPositionChange={moveFab}
       onRestChange={setRestRect}
+      onLookDrawn={setDrawn}
     />
   );
 }

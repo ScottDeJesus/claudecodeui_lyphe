@@ -128,8 +128,20 @@ export function docspaceEmbedUrl(origin: string, ref: DocSpaceBlockRef, dark: bo
  * belt-and-braces reason `docspaceEmbedUrl` spells out below.
  */
 export function docspaceStudioUrl(pageId: string, blockId: string): string {
-  const origin = resolveDocSpaceOrigin();
-  return `${origin}/#page=${encodeURIComponent(pageId)}&block=${encodeURIComponent(blockId)}`;
+  return docSpacePageUrl(pageId, blockId);
+}
+
+/**
+ * The ONE builder of a link into ArchPulse's studio: DocSpace's origin (`resolveDocSpaceOrigin`), `/#page=<id>`, and
+ * `&block=<id>` when a block is named (`blockId` null opens the page itself). Both ids are percent-encoded, for the same
+ * belt-and-braces reason `docspaceStudioUrl` states.
+ *
+ * Read by `docspaceStudioUrl` (a block, from the transcript), by the companion module's Settings ("Open her memory", the
+ * memory page) and by the station module's page stage; the cards plan's page card and the memory corner will read it too.
+ */
+export function docSpacePageUrl(pageId: string, blockId: string | null): string {
+  const page = `${resolveDocSpaceOrigin()}/#page=${encodeURIComponent(pageId)}`;
+  return blockId === null ? page : `${page}&block=${encodeURIComponent(blockId)}`;
 }
 
 /**

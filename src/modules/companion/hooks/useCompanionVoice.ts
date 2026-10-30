@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPcmPlayer } from '@/modules/companion/utils/pcmPlayer';
+import type { PcmPlayer } from '@/modules/companion/utils/pcmPlayer';
 import { createSpeechPull } from '@/modules/companion/utils/speechPull';
 import type { CompanionPicture } from '@/shared/companion-types';
 import type { CompanionSentenceRef, CompanionVoice } from '@/shared/types';
@@ -41,6 +42,8 @@ type CompanionVoiceHook = {
   silence: () => void;
   /** The player's `level()` — its RMS over the last 43 ms, 0..1, and 0 when nothing sounds — for her face's mouth. One function for the page's life. */
   level: () => number;
+  /** The player's `progress()` — the sounding sentence's seconds elapsed and, once its body has ended, its length — for the vowel her mouth shapes. One function for the page's life. */
+  progress: PcmPlayer['progress'];
 };
 
 /**
@@ -125,7 +128,7 @@ export function useCompanionVoice({ picture, clientId }: { picture: CompanionPic
   const release = useCallback(() => engine.release(), [engine]);
 
   const voice = useMemo<CompanionVoice>(() => ({ on, setOn, speaking, cut }), [on, setOn, speaking, cut]);
-  // The player's `level` closes over the player's own graph and never reads `this`, so it is handed out as it stands and keeps one identity.
-  const { level } = player;
-  return useMemo(() => ({ voice, unlock, cutOff, release, silence, level }), [voice, unlock, cutOff, release, silence, level]);
+  // The player's `level` and `progress` close over the player's own graph and never read `this`, so they are handed out as they stand and keep one identity.
+  const { level, progress } = player;
+  return useMemo(() => ({ voice, unlock, cutOff, release, silence, level, progress }), [voice, unlock, cutOff, release, silence, level, progress]);
 }

@@ -64,6 +64,10 @@ export type { LiveHost } from './list/claude/session-host/index.js';
 // (host-liveness.ts) keep it there.
 export { sessionHostLivenessSnapshot } from './list/claude/session-host/index.js';
 
+// onHostLivenessChanged: used by the companion module's station hint, which hears a chat gain or lose its last live host
+// (the `live` and `asleep` pushes, never the snapshot) and tells the station a chat changed.
+export { onHostLivenessChanged } from './list/claude/session-host/index.js';
+
 // readClaudeTranscriptBySessionId: used by the dispatch-souls module to read a launched soul's own
 // Claude transcript from the session id its launch recorded. A soul has no app session row, so its
 // provider session id is the only handle on the file, and this module is the one that knows where

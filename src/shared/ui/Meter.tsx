@@ -41,8 +41,9 @@ type MeterProps = {
 /**
  * A labelled horizontal bar with its figure and a line of context under it — or, as `variant="ring"`, a small ring.
  * Used by the accounts module (Phase 13) for the usage windows on the signed-in account (the bars in its panel, and the
- * two rings at the foot of the project-workspace rail), by the file manager for an upload in flight, and by
- * TaskMaster's task card for its subtask progress; all of them need the same treatment of a figure nobody has yet.
+ * two rings at the foot of the project-workspace rail), by the file manager for an upload in flight, by
+ * TaskMaster's task card for its subtask progress, and by the companion module's face card in Settings for the frames of
+ * her new face made so far; all of them need the same treatment of a figure nobody has yet.
  *
  * THE RING takes its arc's colour from `--tone-dot`, which the nearest `data-tone` container hands down (README rule 4:
  * tone is a token swap), and names no colour of its own: with no container it falls back to the meter's own accent, or

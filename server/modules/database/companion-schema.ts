@@ -28,8 +28,11 @@
  * launch's own before the conversation is resumed. So is `companion_state.handover` (`addCompanionHandoverColumn`), the short account of
  * the conversation that refusal dropped: written before the fresh start, carried once by the first message after it, then emptied when the launch that was handed that message reports `init`.
  * So is `companion_state.memory_forget_line` (`addCompanionMemoryForgetLineColumn`),
- * the id of the log line of his that the last forget of her memory used; Clear leaves it. And `companion_actions.armed_from`
- * (`addCompanionActionArmedFromColumn`).
+ * the id of the log line of his that the last forget of her memory used; Clear leaves it. So are `companion_state.face_id`, `face_pending_id` and
+ * `face_error` (`addCompanionFaceColumns`), the face her pages draw, the one being made from his upload and the last bake's failure; Clear leaves them too. And `companion_actions.armed_from`
+ * (`addCompanionActionArmedFromColumn`), and the three columns of a card's shape, `companion_notes.kind`, `ref_json` and `pinned`
+ * (`addCompanionNoteShapeColumns`): what the card is, what it is about and whether he pinned it, defaulting to a note about nothing,
+ * unpinned, which is every card held before them.
  *
  * WHY `relayed_sends` HANGS ON `sessions`. A relayed send is a fact about a CHAT'S history — "this
  * message came to the chat through Kaylee" — so it follows the chat, keyed on the app session id

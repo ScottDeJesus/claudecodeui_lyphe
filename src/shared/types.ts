@@ -6,7 +6,7 @@ import type { NavigateFunction } from 'react-router-dom';
 import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
-import type { CompanionSessionRef } from '@/shared/companion-types';
+import type { CompanionLogEntry, CompanionSessionRef } from '@/shared/companion-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
 
@@ -1062,6 +1062,34 @@ export type CompanionSentenceRef = { turnId: string; index: number };
  * `useCompanionPresence` reads `speaking` and `cut` as Speaking and Cut.
  */
 export type CompanionVoice = { on: boolean; setOn: (on: boolean) => void; speaking: CompanionSentenceRef | null; cut: boolean };
+
+// ---------------------------
+
+//----------------- HER FACE'S INPUTS ON THE PAGE ------------
+
+/**
+ * The sentence this page's player is sounding, as `progress()` says it: its place (`turnId`, `index`), `elapsed` seconds since its
+ * first sample on the audio clock, and its `duration` in seconds once its body has ended and every sample is scheduled (else null,
+ * still arriving). The companion module's player gives it, and her face reads it to pick the vowel of her mouth.
+ */
+export type CompanionSoundProgress = { turnId: string; index: number; elapsed: number; duration: number | null };
+
+/**
+ * What her face reads of the page's voice: `level()` is the loudness of what sounds, 0..1, and `progress()` the sentence sounding.
+ * Both are functions, never props that change, so a level sixty times a second never redraws React. Null where a face hears no voice
+ * (Settings' preview). Handed by the companion module's CompanionFab to CompanionAvatar and on to CompanionPortrait.
+ */
+export type CompanionFaceVoice = { level: () => number; progress: () => CompanionSoundProgress | null };
+
+/**
+ * The sentences her face reads from her log: `playing` the one this page's player is sounding (its mood, text and sounds), `newest` the
+ * newest of hers in the running turn, read only by a page that plays no voice, and `turnRunning` whether a turn is under way. Derived by
+ * the companion module's `useFaceInputs`; handed through CompanionAvatar to CompanionPortrait.
+ */
+export type CompanionFaceSentences = { playing: CompanionLogEntry | null; newest: CompanionLogEntry | null; turnRunning: boolean };
+
+/** Where the anchor she looks at lies from her disc's centre, in screen pixels (`dx` rightward, `dy` downward). Her face turns toward it. */
+export type CompanionFaceLook = { dx: number; dy: number };
 
 // ---------------------------
 
@@ -3897,3 +3925,37 @@ export type ClaudeApiCardView = {
   remove: (slot: number) => Promise<void>;
   refresh: () => Promise<void>;
 };
+
+// ---------------------------
+
+//----------------- KAYLEE STATION ------------
+
+/**
+ * Which arrangement of the station's regions fits the window: `wide`, `laptop` (a small laptop's window) or `narrow` (a phone).
+ * Read from the window's width on `resize` by the station's context and handed to every region as `StationRegionProps.tier`.
+ */
+export type StationTier = 'wide' | 'laptop' | 'narrow';
+
+/**
+ * The named places of the station's layout that a region fills: `strip`, `sessions`, `corner`, `head`, `conversation`, `dock`,
+ * `talk` and `needs`. A slot nothing fills draws nothing. Keys the layout's slot map and the fixtures' slices.
+ */
+export type StationSlot = 'strip' | 'sessions' | 'corner' | 'head' | 'conversation' | 'dock' | 'talk' | 'needs';
+
+/**
+ * Every place the station remembers a scroll position for: the slots, the `roadmap` and the `stage`. The key of the station's
+ * scroll memory, written when a region scrolls and put back when the page reloads or the layout moves a region.
+ */
+export type StationRegion = StationSlot | 'roadmap' | 'stage';
+
+/**
+ * The station's own preferences, remembered per window by `useStationPref`: `stripCollapsed` (the strip is folded),
+ * `cornerOpen` (the corner is open) and `compact` (the regions draw in their denser form).
+ */
+export type StationPrefKey = 'stripCollapsed' | 'cornerOpen' | 'compact';
+
+/**
+ * The props every region of the station's layout takes: the `tier` it is drawn in. A region draws itself for the tier it is given
+ * and never reads the window's width on its own.
+ */
+export type StationRegionProps = { tier: StationTier };

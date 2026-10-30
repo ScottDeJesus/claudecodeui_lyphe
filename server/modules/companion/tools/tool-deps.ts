@@ -18,8 +18,8 @@ import type { CompanionToolDeps } from './companion-tools.js';
  *   - `withActivity`: while a tool runs her activity is the tool's (what the panel's status line says), and
  *     when it ends she is `thinking` again (or back at a parallel tool still running);
  *   - `openOnFloor`: "the app brings that chat, card or page up" is told to the page that holds the floor ALONE
- *     (`companion_open` carries its client id; every other page ignores it), and to nobody while no page
- *     holds the floor;
+ *     (`companion_open` carries its client id and the spoken `label` the door resolved; every other page ignores it),
+ *     and to nobody while no page holds the floor;
  *   - `refuse`: a refusal is `isError` text that says what to do next, never a throw;
  *   - `sendDraft`: the one door the draft goes out by (`companion-send.ts`), built on the two helpers above.
  *
@@ -62,9 +62,9 @@ export function createToolDeps(input: {
   const setFocus = (chat: CompanionSessionRef): void => {
     if (!sameRef(chat, store.readState().focus)) store.setFocus(chat);
   };
-  const openOnFloor = (target: CompanionOpenTarget): void => {
+  const openOnFloor = (target: CompanionOpenTarget, label: string): void => {
     const { floor } = store.readState();
-    if (floor !== null) store.emit({ kind: 'companion_open', target, floor });
+    if (floor !== null) store.emit({ kind: 'companion_open', target, floor, label });
   };
   return {
     userId,

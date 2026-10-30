@@ -125,8 +125,8 @@ function significantWordsOf(name: string, action?: CompanionCeremonyAction): str
 /**
  * The names a target is known by: what he says it by (`spoken`) and its house name read as words — a card's `name`, a run's `plan`
  * when it has one and else its `runId`, a page's `pageId`, her memory's the one word "memory" (so "Clear my memory." names it as
- * surely as "Clear your memory."; "your" is the one significant word of `spoken` that "my" is not, and "memory" is the other). A chat
- * and a follow-up are named by `spoken` alone.
+ * surely as "Clear your memory."; "your" is the one significant word of `spoken` that "my" is not, and "memory" is the other). A chat,
+ * a follow-up and a check are named by `spoken` alone (a check by its label).
  */
 function namesOf(target: CompanionActionTarget): string[] {
   switch (target.kind) {
@@ -140,6 +140,7 @@ function namesOf(target: CompanionActionTarget): string[] {
       return [target.spoken, 'memory'];
     case 'chat':
     case 'followup':
+    case 'check':
       return [target.spoken];
   }
 }

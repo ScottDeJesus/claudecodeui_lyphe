@@ -896,6 +896,28 @@ export const api = {
       read: () => get('/api/companion/memory'),
       clear: () => del('/api/companion/memory', undefined, { timeoutMs: 90_000 }),
     },
+    // Her face: the portrait her pages draw, made once from a photo and played from memory. Like her memory it is the account's and no
+    // page's, so these name no client. Every answer is the Response itself, for the caller to read. A face id names its bytes for ever, so
+    // `manifest`, `sheet` and `contact` are cached for a year by the browser, and carry the token because an `<img src>` to an
+    // authenticated route would not. A refusal is the app's envelope: 400 `COMPANION_FACE_INVALID` (its message is the sentence the card shows),
+    // 404 `COMPANION_FACE_NOT_FOUND` (a face this account may not read, or one not made), 503 `COMPANION_STOPPING`.
+    face: {
+      // His photo as multipart `photo` (JPEG, PNG or WebP, at most 15 MB). 200 `{ face }` when that photo's face was already made and is now
+      // hers, 202 `{ face }` while it is made: its progress comes as `companion_face` frames. An upload has no deadline of its own.
+      upload: (file: Blob) => {
+        const body = new FormData();
+        body.append('photo', file);
+        return authenticatedFetch('/api/companion/face', { method: 'POST', body });
+      },
+      // Back to the original: 200 `{ face }`. The face made from his photo is removed.
+      restore: () => del('/api/companion/face'),
+      // The face's `CompanionFaceManifest` (JSON): where every frame sits in the sheets.
+      manifest: (faceId: string) => get(`/api/companion/face/${encodeURIComponent(faceId)}/manifest`),
+      // Sheet `n` of the face (`image/webp`, `manifest.sheets[n]`), for `createImageBitmap`.
+      sheet: (faceId: string, n: number) => get(`/api/companion/face/${encodeURIComponent(faceId)}/sheet/${n}`),
+      // The contact sheet: every frame, named (`image/webp`). For him to read in Settings.
+      contact: (faceId: string) => get(`/api/companion/face/${encodeURIComponent(faceId)}/contact`),
+    },
   },
 
   system: {

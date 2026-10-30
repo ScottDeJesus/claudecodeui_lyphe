@@ -1,4 +1,5 @@
 import type { CompanionDraft, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
+import type { StationFocus } from '@/shared/station-types.js';
 import { oneLine } from '@/shared/tool-call-hint.js';
 
 /**
@@ -127,12 +128,47 @@ export function sessionsEnvelope(at: Date, body: string): string {
 }
 
 /**
- * `<view session="…" sessionId="…"/>`: the chat on his screen, or `<view>none</view>` when no chat is.
- * Consumed by the companion session, which reads the view at the moment a message is pushed.
+ * What she is shown of his screen: the station's `StationFocus`, in the two members whose words are hers and not the page's. A
+ * `chat` carries in `label` the name she calls the chat by (the house's, never the page's wording), so "this one" resolves to a
+ * chat she can act on. The `walk` carries the place reached in HER walkthrough (`at` of `total`, 0 when not begun) and the item's
+ * words, read from her store when the message is assembled: the page only says "walk". Consumed by `companion-account.ts`, which
+ * builds it, `companion-message.ts`'s reader and `viewEnvelope` below.
  */
-export function viewEnvelope(view: Pick<CompanionSessionRef, 'sessionId' | 'name'> | null): string {
-  if (view === null) return '<view>none</view>';
-  return `<view${attributesText([['session', view.name], ['sessionId', view.sessionId]])}/>`;
+export type ViewShown =
+  | Exclude<StationFocus, { kind: 'walk' }>
+  | { kind: 'walk'; label: string; at: number; total: number; item: string };
+
+/** The attributes `<view>` carries for one kind, in the order she reads them; every value is escaped by the caller. */
+function viewAttributes(shown: ViewShown): ReadonlyArray<readonly [string, string]> {
+  switch (shown.kind) {
+    case 'chat':
+      return [['kind', 'chat'], ['session', shown.label], ['sessionId', shown.sessionId]];
+    case 'card':
+      return [['kind', 'card'], ['card', shown.label], ['name', shown.plan]];
+    case 'ask':
+      return [['kind', 'ask'], ['session', shown.label], ['sessionId', shown.sessionId], ['request', shown.requestId]];
+    case 'followups':
+      return [['kind', 'followups'], ['session', shown.label], ['sessionId', shown.sessionId]];
+    case 'check':
+      return [['kind', 'check'], ['check', shown.label], ['node', shown.node], ['key', shown.key]];
+    case 'note':
+      return [['kind', 'note'], ['card', shown.label], ['note', String(shown.id)]];
+    case 'walk':
+      return [['kind', 'walk'], ['item', `${shown.at} of ${shown.total}: ${shown.item}`]];
+    case 'page':
+      return [['kind', 'page'], ['page', shown.label], ['pageId', shown.pageId]];
+  }
+}
+
+/**
+ * `<view kind="…" …/>`: what is on his screen, one tag whose `kind` names which of eight things it is (a chat, a feature or
+ * epic's card, a waiting ask, a chat's follow-ups, a check, one of her cards, her walkthrough's item or a DocSpace page) and whose
+ * other attributes name it; or `<view>none</view>` when nothing is. Consumed by the companion session, which reads the view at
+ * the moment a message is pushed.
+ */
+export function viewEnvelope(shown: ViewShown | null): string {
+  if (shown === null) return '<view>none</view>';
+  return `<view${attributesText(viewAttributes(shown))}/>`;
 }
 
 /**
