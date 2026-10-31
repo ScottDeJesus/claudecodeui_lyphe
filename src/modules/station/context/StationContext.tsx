@@ -27,6 +27,13 @@ type StationContextValue = {
    * Back never returns to what is already on the stage.
    */
   setFocus: (next: StationFocus | null) => void;
+  /**
+   * How many times `setFocus` has been handed the thing that already stands on the stage (it changes nothing there). A press on
+   * what is already staged still asks to be shown it, and a focus that did not change cannot say so: the one-column station
+   * reads this count to select its Stage section (`useStationSection`). Counts calls, never time; a caller that only keeps the
+   * stage current (her walk moving while it stands) does not call `setFocus` with what stands, so it never counts.
+   */
+  restaged: number;
   /** Puts the most recent replaced focus back on the stage and pops it. Nothing when the back-stack is empty. */
   back: () => void;
   /** Whether Back has a focus to return to. */
@@ -98,6 +105,9 @@ export function StationProvider({ children }: { children: ReactNode }) {
   const [stage, setStage] = useState<StageState>({ focus: initial.focus, stack: initial.stack });
   // The regions' preferences. State, because a region draws from its preference and a change must re-draw it.
   const [prefs, setPrefs] = useState<StationRecord['prefs']>(initial.prefs);
+  // How many presses have been made on what already stood on the stage. State, because the one-column station's section must
+  // answer each press; the stage itself does not change, so nothing else would re-draw it.
+  const [restaged, setRestaged] = useState(0);
 
   // The stage as the last press left it: the truth `setFocus` and `back` decide from, so they never decide from a render
   // that predates the previous press.
@@ -121,7 +131,10 @@ export function StationProvider({ children }: { children: ReactNode }) {
   const setFocus = useCallback((next: StationFocus | null) => {
     const held = stageRef.current;
     const same = next === null ? held.focus === null : held.focus !== null && focusKey(held.focus) === focusKey(next);
-    if (same) return;
+    if (same) {
+      if (next !== null) setRestaged((count) => count + 1);
+      return;
+    }
     const pushed = held.focus === null ? held.stack : [...held.stack, held.focus].slice(-BACK_STACK_DEPTH);
     commit({ focus: next, stack: backableFrom(pushed, next) });
   }, [commit]);
@@ -174,8 +187,8 @@ export function StationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<StationContextValue>(
-    () => ({ focus: stage.focus, setFocus, back, canGoBack: stage.stack.length > 0, tier, phone, scrollMemory }),
-    [stage, setFocus, back, tier, phone, scrollMemory],
+    () => ({ focus: stage.focus, setFocus, restaged, back, canGoBack: stage.stack.length > 0, tier, phone, scrollMemory }),
+    [stage, setFocus, restaged, back, tier, phone, scrollMemory],
   );
   const prefsValue = useMemo<StationPrefs>(() => ({ prefs, setPref }), [prefs, setPref]);
 

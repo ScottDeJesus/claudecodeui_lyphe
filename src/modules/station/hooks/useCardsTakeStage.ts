@@ -22,7 +22,8 @@ function newestId(notes: CompanionNote[]): number {
  * steals the stage from the focus the page restores. After that, a card with a higher id than any seen puts
  * `{ kind: 'note', id, label: title }` on the stage (the highest, when several arrive together), and a walk whose `updatedAt`
  * is not the one seen puts `{ kind: 'walk', label }` there. A walk and a card that land in one picture leave the walk on top.
- * Staging what already stands on the stage changes nothing (`setFocus`), so his own Next on the walk stage is not a new focus.
+ * A walk that already stands on the stage is left alone: his own Next on it is not a new focus, and `setFocus` would count it as
+ * a press on the standing thing (`restaged`), pulling the one-column station to its Stage section.
  * A card taken down, a walk ended and his Clear are noted too, and put nothing on the stage.
  *
  * It runs on the picture her frames fold, so no timer and no poll stand behind it.
@@ -31,7 +32,10 @@ function newestId(notes: CompanionNote[]): number {
  */
 export function useCardsTakeStage(): void {
   const { picture } = useCompanion();
-  const { setFocus } = useStation();
+  const { focus, setFocus } = useStation();
+  // Whether her walk is the thing on the stage. Read as a flag so the effect below runs again only when it flips, and that run finds
+  // nothing new (`seen` already holds this picture).
+  const walkStands = focus?.kind === 'walk';
   // What this page has seen of her picture; null until the first picture lands. A ref: the effect decides from it, nothing is drawn from it.
   const seen = useRef<Seen | null>(null);
 
@@ -47,8 +51,8 @@ export function useCardsTakeStage(): void {
       const card = picture.notes.find((note) => note.id === now.noteId);
       if (card) setFocus({ kind: 'note', id: card.id, label: card.title });
     }
-    if (picture.walk !== null && now.walkAt !== before.walkAt) {
+    if (picture.walk !== null && now.walkAt !== before.walkAt && !walkStands) {
       setFocus({ kind: 'walk', label: picture.walk.session.name || picture.walk.session.sessionId });
     }
-  }, [picture, setFocus]);
+  }, [picture, setFocus, walkStands]);
 }

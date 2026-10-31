@@ -1,7 +1,7 @@
 import type { RelayedPress } from '@/shared/relayed-press-types.js';
 
 /**
- * The record of his spoken word that kaylee--press's doors read from `--relay`, as ONE argv string: the JSON of
+ * The record of his word, spoken or typed, that kaylee--press's doors read from `--relay`, as ONE argv string: the JSON of
  * `{ by: "app:kaylee", account, said_at, target, words, press }` and, when the press carries one, `token`.
  *
  * Its keys come in kaylee--press's order (`dispatcher shapes relay` prints the shape), and `token` is left out when it is `null` —

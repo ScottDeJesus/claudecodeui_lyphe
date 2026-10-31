@@ -7,7 +7,7 @@ import { useStation } from '@/modules/station/context/StationContext';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
 import { useDockFloor } from '@/modules/station/hooks/useDockFloor';
 import type { CompanionDraft } from '@/shared/companion-types';
-import type { StationRegionProps, StationTier } from '@/shared/types';
+import type { StationDensity, StationRegionProps, StationTier } from '@/shared/types';
 import { EmptyState } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -16,10 +16,13 @@ type DraftCardProps = ComponentProps<typeof CompanionDraftCard>;
 
 type StationDockViewProps = {
   /**
-   * The arrangement. In the columns the dock takes at most 45% of her column wide and 40% on a laptop (`DOCK_CAP`); in the
-   * `narrow` stack it holds itself to the frame that ends above the on-screen keyboard (`NARROW_FRAME_HOLD`).
+   * The window's tier. In the columns the dock takes at most 45% of her column wide and 40% on a laptop (`DOCK_CAP`); at the
+   * `narrow` tier (compact's Conversation section) it holds itself to the frame that ends above the on-screen keyboard
+   * (`NARROW_FRAME_HOLD`).
    */
   tier: StationTier;
+  /** Taken and passed by every region; the dock draws the same at both, on the width it is given. */
+  density: StationDensity;
   /** Her draft as her picture holds it, or null while she holds none: the dock is then its one quiet line. */
   draft: CompanionDraft | null;
   /** Her name, for the card's words that say she changed the draft. */
@@ -42,11 +45,11 @@ type StationDockViewProps = {
 };
 
 /**
- * THE NARROW STACK'S HOLD ON THE FRAME. The shell's frame ends its foot at `--keyboard-height`, so while he edits the brief the
- * frame is the screen above the keyboard; the dock is held to 60% of that frame (the rest is the bar over the stack, with room
- * to spare), so the card always fits whole inside it, the field giving way first, and the shell sticks the dock's slot to the
- * foot of the stack's view while the focus is inside it (`DOCK_EDITING_IN_THE_STACK`): the field he types in, its target and
- * its sends stand above the keys together. A height, never a fixed or absolute box of its own.
+ * THE NARROW TIER'S HOLD ON THE FRAME. The shell's frame ends its foot at `--keyboard-height`, so while he edits the brief the
+ * frame is the screen above the keyboard; the dock is held to 60% of that frame (the rest is the bar and her head, with room to
+ * spare), so the card always fits whole inside it, the field giving way first: the field he types in, its target and its sends
+ * stand above the keys together (the Conversation section lifts its own 45% cap while the field holds the focus). A height,
+ * never a fixed or absolute box of its own.
  */
 const NARROW_FRAME_HOLD = 'max-h-[calc((100dvh-var(--keyboard-height,0px))*0.6)]';
 
@@ -59,10 +62,10 @@ const NARROW_FRAME_HOLD = 'max-h-[calc((100dvh-var(--keyboard-height,0px))*0.6)]
 const DOCK_CAP: Record<StationTier, string> = { wide: 'max-h-[45cqh]', laptop: 'max-h-[40cqh]', narrow: NARROW_FRAME_HOLD };
 
 /**
- * Keeps the field's focus through a press on one of the card's buttons, so the on-screen keyboard stays up and the dock stays
- * stuck to the frame's foot (`:focus-within`, the shell's `DOCK_EDITING_IN_THE_STACK`) until the press lands. WebKit gives a
- * tapped button no focus and blurs the field on the tap's mousedown: the dock fell out of the frame's foot mid-tap, and the
- * release went to whatever stood there next, so his first Send on an iPhone was lost. A press that takes the focus itself
+ * Keeps the field's focus through a press on one of the card's buttons, so the on-screen keyboard stays up and the dock keeps
+ * the room the section lifted its cap to (`has-[textarea:focus]`) until the press lands. WebKit gives a tapped button no focus
+ * and blurs the field on the tap's mousedown: the dock fell back to its cap mid-tap, and the release went to whatever stood
+ * there next, so his first Send on an iPhone was lost. A press that takes the focus itself
  * (Clear's question) still takes it; the send still saves his edit first.
  */
 function keepFieldFocus(event: MouseEvent<HTMLElement>) {
@@ -89,7 +92,7 @@ function keepFieldFocus(event: MouseEvent<HTMLElement>) {
  * floor. The budget reads that floor as the card measures it (`useDockFloor` hands it to the slot). On a phone
  * every press of the card is a 44px catch under a finger (the card's own: its sends, Clear and the target's press), the words
  * stay in the field, never behind a hover, and while he edits the brief the dock stands whole in the frame above the keyboard
- * (`NARROW_FRAME_HOLD`, the shell's slot sticking to the stack's foot, and `keepFieldFocus` holding that through a press).
+ * (`NARROW_FRAME_HOLD`, the section's lifted cap, and `keepFieldFocus` holding that through a press).
  *
  * `data-station-dock` reads the state: `empty`, `session` or `new`. A pure view: `StationDock` below binds it, and
  * `.verify/kaylee-station-shots.mjs` draws it on the fixtures' pictures (`fake/dock.ts`).
@@ -143,7 +146,7 @@ export function StationDockView({ tier, draft, name, targetWorking, onEdit, onSe
  * nothing on a clock: a new draft, a cleared one and the target starting or ending a turn each arrive as her picture's frames
  * and the station's session events.
  */
-export function StationDock({ tier }: StationRegionProps) {
+export function StationDock({ tier, density }: StationRegionProps) {
   const { t } = useTranslation();
   const { picture, editDraft, sendDraft, clearDraft } = useCompanion();
   // Null until the rail's first read answers; the target is then found among its rows by `sessionId`.
@@ -161,6 +164,7 @@ export function StationDock({ tier }: StationRegionProps) {
   return (
     <StationDockView
       tier={tier}
+      density={density}
       draft={draft}
       name={name}
       targetWorking={targetWorking}

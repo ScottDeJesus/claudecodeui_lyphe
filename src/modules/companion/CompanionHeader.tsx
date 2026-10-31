@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { CompanionControls } from '@/modules/companion/CompanionControls';
 import { CompanionStatus } from '@/modules/companion/CompanionStatus';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
-import type { CompanionPresence, CompanionVoice } from '@/shared/types';
+import type { CompanionEars, CompanionPresence, CompanionVoice } from '@/shared/types';
 import { Button, Tooltip } from '@/shared/ui';
 
 type CompanionHeaderProps = {
@@ -23,6 +23,8 @@ type CompanionHeaderProps = {
    * row.
    */
   voice?: Pick<CompanionVoice, 'on' | 'setOn'>;
+  /** This page's ears: drawn in a row of its own under the voice row, "Listen for her name on this device". Absent, there is no row. */
+  ears?: CompanionEars;
   onModelChange: (model: CompanionModel) => Promise<void>;
   onLiveChange: (live: boolean) => Promise<void>;
   onInterrupt: () => Promise<void>;
@@ -44,9 +46,9 @@ type CompanionHeaderProps = {
  * command palette is two presses away behind the drawer) and the panel's own close. ROW TWO, only while she holds one: the
  * focus chat, "Focus · Kanban lanes · its project", the chat "it" and "this" mean in what she says. Then `CompanionControls`:
  * ROW THREE, the model picker, the Live switch and Clear behind its question; ROW FOUR, given `voice`, "Voice on this
- * device".
+ * device"; ROW FIVE, given `ears`, "Listen for her name on this device", and while it is on what her ears are doing.
  */
-export function CompanionHeader({ name, picture, presence, voice, onModelChange, onLiveChange, onInterrupt, onClear, onClose, onOpenStation }: CompanionHeaderProps) {
+export function CompanionHeader({ name, picture, presence, voice, ears, onModelChange, onLiveChange, onInterrupt, onClear, onClose, onOpenStation }: CompanionHeaderProps) {
   const { t } = useTranslation();
   // The node row one keeps for Stop. The controls own Stop (its busy state and its refusal toast) and draw it here, so it stands
   // beside the way out as it always has; a DOM node only exists once the row has mounted, hence state, set by the ref.
@@ -111,6 +113,7 @@ export function CompanionHeader({ name, picture, presence, voice, onModelChange,
         picture={picture}
         presence={presence}
         voice={voice}
+        ears={ears}
         layout="rows"
         onModelChange={onModelChange}
         onLiveChange={onLiveChange}

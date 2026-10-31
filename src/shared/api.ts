@@ -883,13 +883,19 @@ export const api = {
     // His talk press: the clip as multipart `audio` (named by its type, as the chat's mic names its upload) and the recorder's own
     // `durationMs` for it. Takes the floor for this page and answers 202 `{ text }` once the press has been heard and pushed to her;
     // a hearing that came to nothing is a 409 `COMPANION_SPEECH_REFUSED` or a 502 `COMPANION_SPEECH_FAILED` carrying the sentence,
-    // and the system line in her log. An upload has no deadline of its own (see `timeoutSignal`).
-    press: (blob: Blob, mimeType: string, durationMs: number) => {
+    // and the system line in her log. An upload has no deadline of its own (see `timeoutSignal`). `opened` says what began the press: his
+    // button (the default, sent as nothing) or her name, heard by this page's ears, which is the multipart field `opened=name`; the
+    // server strips her name and the closing "over to you" from a name press's words before they are logged or pushed.
+    press: (blob: Blob, mimeType: string, durationMs: number, opened: 'button' | 'name' = 'button') => {
       const body = new FormData();
       body.append('audio', blob, recordingFileName(mimeType));
       body.append('durationMs', String(Math.round(durationMs)));
+      if (opened === 'name') body.append('opened', 'name');
       return authenticatedFetch('/api/companion/press', { method: 'POST', body, ...companionOptions() });
     },
+    // Where the page's ears (the worker in `useEars`) read their models from: this server's own `GET /api/companion/ears/files/<repo>/<path>`,
+    // an absolute URL on the page's origin (the worker refuses any other). Nothing is fetched here; the worker asks, with the page's sign-in.
+    earsFilesBase: () => `${window.location.origin}/api/companion/ears/files/`,
     // One of her sentences as raw PCM (24 kHz, mono, signed 16-bit little-endian), asked by the page that holds the floor. Answers the
     // Response itself, its body still arriving, for the player to read: 200 audio, 204 nothing to say, 404 `COMPANION_NO_SENTENCE`,
     // 409 `COMPANION_NOT_FLOOR` or `COMPANION_SPEECH_REFUSED` (Google's refusal in a sentence; the server has written the panel's line),

@@ -15,7 +15,7 @@ import type {
  *
  * The actions waiting for his word are put as the hands put them (hands/action-recipe.ts): an Accept's prompt is the lock's
  * header and the census, a round's its questions numbered with their options, a card's `spoken` its title, a follow-up's
- * the first five words of its text, `say` the verb and that name, every carried line one of his spoken rows, by its id.
+ * the first five words of its text, `say` the verb and that name, every carried line one of his rows, by its id.
  */
 
 const NOW = Date.now();

@@ -1,6 +1,6 @@
 import { ArrowLeft, Focus, X } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
-import type { ComponentType, ReactNode, Ref } from 'react';
+import { useId, useState } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useStation } from '@/modules/station/context/StationContext';
@@ -30,8 +30,6 @@ type StationStageViewProps = {
   shelf?: ReactNode;
   /** The body scroller's ref: the station's scroll memory on the page. Absent on a fixture, which remembers nothing. */
   scrollRef?: (node: HTMLElement | null) => void;
-  /** The stage's frame while a thing stands on it, for the page to bring it into view (`StationStage`). Absent on a fixture. */
-  frameRef?: Ref<HTMLElement>;
 };
 
 /** The two presses of the head: 32 px to look at on a desk, a 44 px catch under a finger below 768 px (the touch law). */
@@ -46,12 +44,12 @@ const HEAD_ACTS =
   'order-last flex basis-full flex-wrap items-center gap-2 empty:hidden [@container(min-width:40rem)]:order-none [@container(min-width:40rem)]:basis-auto';
 
 /**
- * The foot's box (`StageFoot`): under the body and outside its scroller, so a long body never scrolls its presses away; in
- * the phone's one scrolling stack it sticks to the screen's foot while the stage is in view, where the thumb is. Its own
- * width is a query container, so what stands in it lays out by the stage's width. Out of the layout while empty.
+ * The foot's box (`StageFoot`): under the body and outside its scroller, so a long body never scrolls its presses away, at the
+ * stage's foot where the thumb is. Its own width is a query container, so what stands in it lays out by the stage's width. Out of
+ * the layout while empty.
  */
 const FOOT_BOX =
-  'sticky bottom-0 z-10 shrink-0 border-t border-border bg-background px-3 py-3 [container-type:inline-size] empty:hidden lg:px-4';
+  'shrink-0 border-t border-border bg-background px-3 py-3 [container-type:inline-size] empty:hidden lg:px-4';
 
 /**
  * THE STAGE: the one thing in focus, drawn large ("one focus at a time").
@@ -65,7 +63,7 @@ const FOOT_BOX =
  * THE KIND'S OWN ACTS AND FOOT. The frame keeps two boxes the kind's view draws into (`stageSlots.tsx`): the head's acts
  * (her card's Pin and Dismiss, her walk's End), between the label and ✕ on a stage 40rem wide or more and on a row of
  * their own under the label on a narrower one; and the foot (her walk's Back and Next), under the body and outside its
- * scroller, sticking to the screen's foot in the phone's stack. Each stays out of the layout while nothing is in it, so a
+ * scroller. Each stays out of the layout while nothing is in it, so a
  * kind with no acts draws the stage exactly as before.
  *
  * HER CARDS' SHELF stands above the head (`shelf`), and above the empty stage too: a pinned card is his keep, and it stays
@@ -82,7 +80,7 @@ const FOOT_BOX =
  * stage away where her own regions fill her column. A pure view: `StationStage` below binds it to the station's
  * focus, and `.verify/kaylee-station-shots.mjs` draws it on the fixtures' pictures.
  */
-export function StationStageView({ focus, view, canGoBack, onBack, onClear, shelf, scrollRef, frameRef }: StationStageViewProps) {
+export function StationStageView({ focus, view, canGoBack, onBack, onClear, shelf, scrollRef }: StationStageViewProps) {
   const { t } = useTranslation();
   const labelId = useId();
   // The head's acts box once mounted, which the kind's view portals its own acts into (`StageSlotsProvider`). State and not a
@@ -112,7 +110,7 @@ export function StationStageView({ focus, view, canGoBack, onBack, onClear, shel
   const clearLabel = t('station.stage.clear', { defaultValue: 'Clear the stage' });
 
   return (
-    <section ref={frameRef} data-station-stage={focus.kind} aria-labelledby={labelId} className="flex min-h-0 flex-1 flex-col">
+    <section data-station-stage={focus.kind} aria-labelledby={labelId} className="flex min-h-0 flex-1 flex-col">
       {shelf}
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-3 [container-type:inline-size] lg:px-4">
         {canGoBack && (
@@ -127,7 +125,13 @@ export function StationStageView({ focus, view, canGoBack, onBack, onClear, shel
             <KindIcon aria-hidden="true" className="size-3.5 shrink-0" />
             <span className="truncate">{t(glyph.wordKey)}</span>
           </p>
-          <h2 id={labelId} className="mt-1 break-words font-serif text-[22px] font-normal leading-tight text-foreground md:text-2xl">
+          {/* Takes a programmatic focus and no Tab stop: the one-column station hands the keyboard here when a pull to Stage strands it. */}
+          <h2
+            id={labelId}
+            tabIndex={-1}
+            data-station-stage-label=""
+            className="mt-1 break-words font-serif text-[22px] font-normal leading-tight text-foreground md:text-2xl"
+          >
             {focus.label}
           </h2>
         </div>
@@ -153,31 +157,15 @@ export function StationStageView({ focus, view, canGoBack, onBack, onClear, shel
  * The stage on the page: what `StationShell` draws in the stage's place. It reads the focus, the back-stack and the
  * kind's view from the station and hands them to `StationStageView`, which draws every state, with her cards' shelf above.
  *
- * IT BRINGS ITSELF INTO VIEW when a different thing is put on it, below laptop: there the stage stands in the one scrolling
- * stack under the pinned bar, and a press made elsewhere (the bar's strip, a row in a rail, her own door) while the stack was
- * scrolled away from it would otherwise read as a press that did nothing. This is the one cure for every region whose press
- * stages a thing, so no region scrolls on its own. The stack is scrolled to the stage's START, its head under the bar: a stage
- * taller than the screen is never left showing its foot (`nearest` would align a taller-than-screen stage's bottom edge, and the
- * head, which says what stands here, would be cut). The mount that restores a focus on a reload does not scroll, only a change after it.
+ * IT NEVER BRINGS ITSELF INTO VIEW: in the one-column arrangement the stage is a section, and a different thing put on it
+ * pulls the switch to it (`useStationSection`, once, for every region's press); in the columns it is always on screen.
  */
 export function StationStage() {
-  const { focus, canGoBack, setFocus, back, scrollMemory, tier } = useStation();
+  const { focus, canGoBack, setFocus, back, scrollMemory } = useStation();
   // The registry keys each component to the kind it takes, so the one looked up by `focus.kind` takes this `focus`.
   const View = focus === null ? undefined : (STAGE_VIEWS[focus.kind] as ComponentType<{ focus: StationFocus }> | undefined);
   // Keyed by the thing, so a different thing in the same kind starts its view afresh, state and all.
   const view = focus === null ? null : View === undefined ? <FocusFallback key={focusKey(focus)} focus={focus} /> : <View key={focusKey(focus)} focus={focus} />;
-
-  // The stage's frame once a thing stands on it. A ref: it is only handed to the browser's scroll.
-  const frame = useRef<HTMLElement | null>(null);
-  // What stood on the stage when this effect last looked, as its key (null for an empty stage): the first look is the mount, so a
-  // restored focus is the baseline and never scrolled to. A ref: nothing is drawn from it.
-  const stoodKey = useRef<string | null>(focus === null ? null : focusKey(focus));
-  useEffect(() => {
-    const key = focus === null ? null : focusKey(focus);
-    if (key === stoodKey.current) return;
-    stoodKey.current = key;
-    if (key !== null && tier === 'narrow') frame.current?.scrollIntoView({ block: 'start' });
-  }, [focus, tier]);
 
   return (
     <StationStageView
@@ -188,7 +176,6 @@ export function StationStage() {
       onClear={() => setFocus(null)}
       shelf={<StageShelf />}
       scrollRef={scrollMemory('stage')}
-      frameRef={frame}
     />
   );
 }

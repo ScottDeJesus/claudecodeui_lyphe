@@ -189,6 +189,16 @@ export function emptyPressEnvelope(): string {
 }
 
 /**
+ * `<operator via="spoken" heard="name"></operator>`: he said her name and nothing more, so she answers as someone called by
+ * name does. Consumed by the companion session's `pushOperatorCalled`, which the press door (`companion-press.ts`) calls for
+ * a name press with nothing left once her name and the close are cut, and by the session's replay of his unanswered words
+ * (`wordsEnvelope`), which tells a called press from the empty one by the entry's `heard: 'name'`.
+ */
+export function calledEnvelope(): string {
+  return `${openTag('operator', [['via', 'spoken'], ['heard', 'name']])}</operator>`;
+}
+
+/**
  * `<alert kind="…" session="…" sessionId="…" project="…">`: one house notification, as the title and
  * body, then "Follow-ups it filed for him: …" and "Waiting on him: …", each line only when there is
  * something to say. `followups` are the texts of the open follow-ups the chat filed, `waiting` the

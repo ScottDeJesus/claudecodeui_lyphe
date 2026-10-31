@@ -25,7 +25,7 @@ type CheckFound = { kind: 'loading' } | { kind: 'unread' } | { kind: 'needs'; ne
  * THE CHECK SHEET'S WIDTH in each arrangement: over the station's right side, never over her face. Wide, the kit's own
  * `min(600px, 100%)` from the right edge covers the rail and the stage and stops short of her column (it begins at 708 px at
  * most, and the sheet at 760 px at the narrowest wide window, 1360 px). On a laptop the stage stands in her column under her
- * face, so the sheet takes the right rail's own 296 px. In the narrow stack a sheet takes the screen, as every sheet does there.
+ * face, so the sheet takes the right rail's own 296 px. Below 1024 px (compact) a sheet takes the screen, as every sheet does there.
  */
 const CHECK_SHEET_WIDTH: Readonly<Record<StationTier, string | undefined>> = {
   wide: undefined,

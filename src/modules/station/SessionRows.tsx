@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { RailEyebrow, RailFold, RailRow } from '@/modules/station/RailRow';
 import type { StationFocus, StationSession, StationSessionState } from '@/shared/station-types';
-import type { StationHerMark, StationTier, Tone } from '@/shared/types';
+import type { StationDensity, StationHerMark, StationTier, Tone } from '@/shared/types';
 import { Badge, Banner, Button, EmptyState, Spinner, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -58,9 +58,13 @@ function HerMark({ her, wrap = false }: { her: StationHerMark; wrap?: boolean })
   );
 }
 
+/** A row's tooltip box: as wide as its words up to 28rem, wrapping; never drawn where nothing hovers (a tap would leave it standing). */
+const TIP = 'max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere] [@media(hover:none)]:hidden';
+
 type SessionRowProps = {
   session: StationSession;
   tier: StationTier;
+  density: StationDensity;
   current: boolean;
   /** Her mark, when she looks at this chat. */
   her: StationHerMark | null;
@@ -73,18 +77,50 @@ type SessionRowProps = {
  * read whole on the stage this row's press opens, which is how a finger reads it; the `Tooltip` over the row only repeats it for
  * a pointer, and for a keyboard as the row takes the focus. It is not drawn where nothing hovers (`hover:none`): a tap's
  * compatibility mouse events would open it and leave it standing over the stage the press has just opened. On the columns the
- * tip opens to the row's right, over her column; in the narrow stack, above the row.
+ * tip opens to the row's right, over her column; at the narrow tier and at compact density, above the row.
+ *
+ * AT COMPACT DENSITY the row is ONE line: its name, cut at 60% of the line so a long one never pushes out what follows it, the
+ * line she reads of it cut to what is left (in the warn ink while it waits on him), and its state chip at the line's end, where
+ * every row's chip stands in one column to scan; the tip then repeats the name with the line. The project is the stage's to
+ * say. Her mark is her initial's disc beside the chip: her words are said by her status line in her head, which compact keeps
+ * in view, and once more to a reader of the row.
  */
-function SessionRow({ session, tier, current, her, onPress }: SessionRowProps) {
+function SessionRow({ session, tier, density, current, her, onPress }: SessionRowProps) {
   const press = () => onPress({ kind: 'chat', sessionId: session.sessionId, label: session.name });
+  if (density === 'compact') {
+    const waiting = session.state === 'waiting';
+    const tip = session.activity === '' ? session.name : `${session.name} · ${session.activity}`;
+    return (
+      <li className="flex min-w-0 flex-col">
+        <Tooltip content={tip} position="top" showOnFocus className={TIP}>
+          <RailRow kind="session" name={session.sessionId} current={current} onPress={press}>
+            {/* Centred in the row, which a finger's 44 px makes taller than its one line. */}
+            <span className="flex min-w-0 flex-1 items-center gap-2 self-center leading-5">
+              <span data-station-session-name="" className="min-w-0 max-w-[60%] shrink truncate text-sm font-medium">{session.name}</span>
+              <span
+                data-station-session-line=""
+                className={cn('min-w-0 flex-1 truncate text-xs', waiting ? 'text-warn-ink' : 'text-muted-foreground')}
+              >
+                {session.activity}
+              </span>
+              {her !== null && (
+                <span data-station-her={her.sessionId} className="flex shrink-0">
+                  <Badge as="span" tone="info" aria-hidden="true" className="vv-badge--compact size-4 justify-center rounded-full px-0 font-bold">
+                    {her.initial}
+                  </Badge>
+                  <span className="sr-only">{her.words}</span>
+                </span>
+              )}
+              <SessionStateChip state={session.state} />
+            </span>
+          </RailRow>
+        </Tooltip>
+      </li>
+    );
+  }
   return (
     <li className="flex min-w-0 flex-col">
-      <Tooltip
-        content={session.activity}
-        position={tier === 'narrow' ? 'top' : 'right'}
-        showOnFocus
-        className="max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere] [@media(hover:none)]:hidden"
-      >
+      <Tooltip content={session.activity} position={tier === 'narrow' ? 'top' : 'right'} showOnFocus className={TIP}>
         <RailRow kind="session" name={session.sessionId} current={current} onPress={press}>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex min-w-0 items-start gap-2">
@@ -110,6 +146,8 @@ function SessionRow({ session, tier, current, her, onPress }: SessionRowProps) {
 
 type SessionRowsProps = {
   tier: StationTier;
+  /** `compact`: each chat's row on one line (`SessionRow`); the asleep fold as in full. */
+  density: StationDensity;
   /** His chats in her order (waiting on you, working, idle, asleep), or null until the first read has landed. */
   sessions: StationSession[] | null;
   /**
@@ -138,7 +176,7 @@ type SessionRowsProps = {
  *
  * Used by this module's `WhereThingsStandView`.
  */
-export function SessionRows({ tier, sessions, failure, onReread, focus, her, asleepOpen, onAsleepOpen, onPress }: SessionRowsProps) {
+export function SessionRows({ tier, density, sessions, failure, onReread, focus, her, asleepOpen, onAsleepOpen, onPress }: SessionRowsProps) {
   const { t } = useTranslation();
   const headingId = useId();
   const up = (sessions ?? []).filter((session) => session.state !== 'asleep');
@@ -153,6 +191,7 @@ export function SessionRows({ tier, sessions, failure, onReread, focus, her, asl
           key={session.sessionId}
           session={session}
           tier={tier}
+          density={density}
           current={session.sessionId === onStage}
           her={markOf(session)}
           onPress={onPress}

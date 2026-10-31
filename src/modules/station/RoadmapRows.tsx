@@ -6,7 +6,7 @@ import { RailEyebrow, RailFold, RailRow } from '@/modules/station/RailRow';
 import { ROADMAP_EPIC_WORD_KEYS } from '@/shared/constants';
 import type { Roadmap, RoadmapEpic, RoadmapEpicWord, RoadmapFeature, RoadmapMilestone } from '@/shared/roadmap-types';
 import type { StationFocus } from '@/shared/station-types';
-import type { RoadmapDotState, StationTier } from '@/shared/types';
+import type { RoadmapDotState, StationDensity, StationTier } from '@/shared/types';
 import { Spinner, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -26,6 +26,7 @@ type FeatureRowProps = {
   feature: RoadmapFeature;
   dot: RoadmapDotState;
   tier: StationTier;
+  density: StationDensity;
   current: boolean;
   onPress: (focus: StationFocus) => void;
 };
@@ -36,31 +37,43 @@ type FeatureRowProps = {
  * signal (the tree's tip says it so). A feature that waits on him has its phrase in the warn ink, and the phrase says "waiting on
  * you" itself. The phrase is cut to one line: it stands whole on the card the press opens, and the `Tooltip` repeats it for a
  * pointer and a keyboard (it is not drawn where nothing hovers, so a tap leaves none standing over the stage).
+ *
+ * AT COMPACT DENSITY the row is ONE line: the dot, its title cut to what is left, and its phrase at the line's end, its own
+ * width up to 45% of the line (so "waiting on you", in the warn ink, is never the part a long title pushes out); the tip
+ * then repeats both, above the row.
  */
-function FeatureRow({ feature, dot, tier, current, onPress }: FeatureRowProps) {
+function FeatureRow({ feature, dot, tier, density, current, onPress }: FeatureRowProps) {
   const { t } = useTranslation();
   const phrase = useStepPhrase(feature);
   const said = dot === 'blocked' ? [phrase, t('roadmap.tree.blocked')].join(JOIN) : phrase;
+  const compact = density === 'compact';
+  const phraseInk = feature.waiting_on_you !== null ? 'text-warn-ink' : 'text-muted-foreground';
   return (
     <li className="flex min-w-0 flex-col">
       <Tooltip
-        content={said}
-        position={tier === 'narrow' ? 'top' : 'right'}
+        content={compact ? [feature.title, said].join(JOIN) : said}
+        position={compact || tier === 'narrow' ? 'top' : 'right'}
         showOnFocus
         className="max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere] [@media(hover:none)]:hidden"
       >
         <RailRow kind="feature" name={feature.name} current={current} onPress={() => onPress(cardOf(feature.name, feature.title))}>
-          {/* The dot sits on the title's first line: h-5 is the title's own line height. */}
-          <span className="flex h-5 shrink-0 items-center"><PanelDot state={dot} /></span>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="line-clamp-2 break-words text-sm leading-5">{feature.title}</span>
-            <span
-              data-station-feature-phrase=""
-              className={cn('truncate text-xs', feature.waiting_on_you !== null ? 'text-warn-ink' : 'text-muted-foreground')}
-            >
-              {said}
+          {compact ? (
+            // One line, centred in the row, which a finger's 44 px makes taller than it.
+            <span className="flex min-w-0 flex-1 items-center gap-2 self-center leading-5">
+              <span className="flex shrink-0 items-center"><PanelDot state={dot} /></span>
+              <span data-station-feature-title="" className="min-w-0 flex-1 truncate text-sm">{feature.title}</span>
+              <span data-station-feature-phrase="" className={cn('max-w-[45%] shrink-0 truncate text-xs', phraseInk)}>{said}</span>
             </span>
-          </span>
+          ) : (
+            <>
+              {/* The dot sits on the title's first line: h-5 is the title's own line height. */}
+              <span className="flex h-5 shrink-0 items-center"><PanelDot state={dot} /></span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="line-clamp-2 break-words text-sm leading-5">{feature.title}</span>
+                <span data-station-feature-phrase="" className={cn('truncate text-xs', phraseInk)}>{said}</span>
+              </span>
+            </>
+          )}
         </RailRow>
       </Tooltip>
     </li>
@@ -70,6 +83,7 @@ function FeatureRow({ feature, dot, tier, current, onPress }: FeatureRowProps) {
 type EpicRowProps = {
   placed: PlacedEpic;
   tier: StationTier;
+  density: StationDensity;
   focus: StationFocus | null;
   onPress: (focus: StationFocus) => void;
   /** Whether its features stand under it: an open epic's do; a folded (complete or empty) epic is its row alone. */
@@ -79,9 +93,10 @@ type EpicRowProps = {
 /**
  * One epic's row: its title over its word and "<shipped> of <features> shipped" (the word alone while it holds no feature, and
  * " · Blocked" while it carries its own blocked reason: the tree's line, spelled by the roadmap's keys). An open epic's features
- * stand under it on a guide rule, each a row of its own, in the epic's own order.
+ * stand under it on a guide rule, each a row of its own, in the epic's own order. The same at compact density: its two lines
+ * head its features' one-line rows.
  */
-function EpicRow({ placed: { epic, milestone }, tier, focus, onPress, withFeatures }: EpicRowProps) {
+function EpicRow({ placed: { epic, milestone }, tier, density, focus, onPress, withFeatures }: EpicRowProps) {
   const { t } = useTranslation();
   const word = t(ROADMAP_EPIC_WORD_KEYS[epic.word]);
   const { features, shipped } = epic.standing;
@@ -104,6 +119,7 @@ function EpicRow({ placed: { epic, milestone }, tier, focus, onPress, withFeatur
               feature={feature}
               dot={dotStateOf(feature, epic, milestone)}
               tier={tier}
+              density={density}
               current={feature.name === onStage}
               onPress={onPress}
             />
@@ -116,6 +132,8 @@ function EpicRow({ placed: { epic, milestone }, tier, focus, onPress, withFeatur
 
 type RoadmapRowsProps = {
   tier: StationTier;
+  /** `compact`: each feature's row on one line (`FeatureRow`); the epics and the complete fold as in full. */
+  density: StationDensity;
   /** The roadmap he selected: undefined until the roadmap's picture has landed, null once it has and holds no roadmap. */
   roadmap: Roadmap | null | undefined;
   focus: StationFocus | null;
@@ -134,7 +152,7 @@ type RoadmapRowsProps = {
  * eyebrow: the rail's sessions above may already stand in their own empty frame, and a second frame would overrun a laptop's rail),
  * NOTHING OPEN (every epic folded: a quiet line over the fold), and the epics. Used by this module's `WhereThingsStandView`.
  */
-export function RoadmapRows({ tier, roadmap, focus, completeOpen, onCompleteOpen, onPress }: RoadmapRowsProps) {
+export function RoadmapRows({ tier, density, roadmap, focus, completeOpen, onCompleteOpen, onPress }: RoadmapRowsProps) {
   const { t } = useTranslation();
   const headingId = useId();
   const eyebrow = t('station.roadmap.eyebrow', { defaultValue: 'Roadmap' });
@@ -168,7 +186,7 @@ export function RoadmapRows({ tier, roadmap, focus, completeOpen, onCompleteOpen
   const rowsOf = (list: PlacedEpic[], withFeatures: boolean) => (
     <ul className="flex min-w-0 flex-col gap-1">
       {list.map((placed) => (
-        <EpicRow key={placed.epic.name} placed={placed} tier={tier} focus={focus} onPress={onPress} withFeatures={withFeatures} />
+        <EpicRow key={placed.epic.name} placed={placed} tier={tier} density={density} focus={focus} onPress={onPress} withFeatures={withFeatures} />
       ))}
     </ul>
   );

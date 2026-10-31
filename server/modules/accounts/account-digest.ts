@@ -34,8 +34,9 @@ import { isRecord } from './usage-windows.js';
  * is a poll route that is forbidden to fail.
  *
  * THE PATH IS FIXED, and not environment-redirectable. A variable that moved it could name an
- * account whose token this process is not holding — the same reason `credentialsPath` in
- * `usage.service.ts` is not.
+ * account whose token this process is not holding. The meter's credentials path DOES follow
+ * `CLAUDE_CONFIG_DIR`, so `usage.service.ts` asks for this digest only while that directory is the
+ * default `~/.claude` and answers `''` otherwise.
  */
 
 /** How many hex of the sha256 stand for an account — `claude_account.DIGEST_HEX`. */

@@ -77,7 +77,7 @@ const DOOR_DOWN: CompanionMemoryLines = {
 const NO_PRESS = () => {};
 
 /** The corner's drawing: closed, nothing open, her seven, unless `over` says otherwise. */
-function drawing(over: Partial<Omit<ComponentProps<typeof MemoryCornerView>, 'tier'>>) {
+function drawing(over: Partial<Omit<ComponentProps<typeof MemoryCornerView>, 'tier' | 'density'>>) {
   return {
     view: MemoryCornerView,
     props: {
@@ -90,7 +90,7 @@ function drawing(over: Partial<Omit<ComponentProps<typeof MemoryCornerView>, 'ti
       onOpenLine: NO_PRESS,
       pageUrl: docSpacePageUrl(PAGE_ID, null),
       ...over,
-    } satisfies Omit<ComponentProps<typeof MemoryCornerView>, 'tier'>,
+    } satisfies Omit<ComponentProps<typeof MemoryCornerView>, 'tier' | 'density'>,
   };
 }
 

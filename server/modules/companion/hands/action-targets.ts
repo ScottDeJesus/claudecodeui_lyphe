@@ -18,7 +18,7 @@ import { resolveChat } from '../tools/house-reads.js';
  * thing whether she reads it or acts on it. A target that is not found, or fits several, is refused with the resolver's own
  * sentence, which says what to do next.
  *
- * Every target carries `spoken`, the name HE says it by: the card draws it and the check of his word requires it. A card's is the
+ * Every target carries `spoken`, the name HE says it by: the card draws it and her read-back must say it. A card's is the
  * title when it is six words or fewer, else its name read as words; a run's is its slug read as words; a check's is its label (its
  * key when it has none); a follow-up's is the first words of its text (its number is nothing anyone says).
  *

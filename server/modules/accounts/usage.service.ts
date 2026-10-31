@@ -1,8 +1,9 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 
+import { renewSavedLogin } from '@/modules/providers/index.js';
 import type { ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types.js';
+import { claudeConfigDir, claudeConfigDirIsDefault } from '@/shared/utils.js';
 
 import { liveAccountDigest } from './account-digest.js';
 import { note, paceOf, status as pacerStatus } from './pacer-door.js';
@@ -26,10 +27,12 @@ import { isRecord, markRolled, parseWindows } from './usage-windows.js';
  *
  *   1. ONE READER. `readCredentials` is the only token read in this module, and the only one in the
  *      server.
- *   2. NEVER LOGGED. No line here takes the token. It is handed to `fetchUsage` and to nothing else,
- *      and it is never kept in module state.
+ *   2. NEVER LOGGED. No line here takes the token. It is handed to `fetchUsage` and, as the value a
+ *      renewed pass is compared against, to `renewLogin`, and to nothing else; it is never kept in
+ *      module state.
  *   3. NEVER PERSISTED. Nothing here writes a file, a database or `state/`: the token is never
- *      persisted, and every good reading is filed by `pacer-door.ts` and outlives this process.
+ *      persisted, and every good reading is filed by `pacer-door.ts` and outlives this process. The
+ *      credentials file is rewritten by the `claude` CLI the renewal runs, never by this module.
  *   4. NEVER IN AN ERROR. Every failure collapses to a FIXED reason vocabulary and a status int, so
  *      no exception text, request object or credential can ride out on an error path. That is
  *      stronger than scrubbing a message after the fact: there is nothing here to scrub.
@@ -38,13 +41,26 @@ import { isRecord, markRolled, parseWindows } from './usage-windows.js';
  *      a hostile or hijacked upstream could re-send the whole credential to another host. The hop
  *      answers nothing here, and the reading degrades to `upstream`.
  *
- * AN EXPIRED TOKEN IS NEVER SENT. `expiresAt` is a clock this file can read without an answer from
- * anybody, so a stamp already behind us degrades to `credentials` with no fetch at all: the endpoint
- * would answer a 401, and `auth` reads as a refusal when the truth is an expiry. A 401 or a dead
- * network KEEPS THE LAST GOOD NUMBER ON SCREEN, with `degraded:true` and `staleSince` saying how old
- * it is — "64 %, as of twenty minutes ago" beats a blank gauge. The last good reading is SURRENDERED
- * when the credential stamp moves, because a stale number under another account's name is the one
- * thing worse than an empty gauge.
+ * AN EXPIRED TOKEN IS NEVER SENT, IT IS RENEWED. `expiresAt` is a clock this file can read without an
+ * answer from anybody, so a stamp already behind us sends nothing: the endpoint would answer a 401, and
+ * `auth` reads as a refusal when the truth is an expiry. The pass is renewed first — the providers
+ * module's `renewSavedLogin` runs `claude auth status` on the saved login, which makes the CLI renew
+ * the pass from its refresh token and rewrite the file — and the fetch goes on in the same call with
+ * the new one, because nothing else here runs the CLI on that login: chats ride saved long-lived
+ * tokens, so without this the pass dies every few hours and the gauge with it. A pass that could not
+ * be renewed degrades to `expired`, and so does a login the CLI itself cleared (`accessToken: ""`, what
+ * it writes when the vendor refuses the refresh token) — nothing can renew that one, and `expired` is the
+ * word that tells the operator to sign in. A login file that cannot be read is `credentials`. A 401 or
+ * 403 on a pass the clock still trusts earns the same renewal once, and one retry only when the file then
+ * holds a different token.
+ *
+ * A 401 or a dead network KEEPS THE LAST GOOD NUMBER ON SCREEN, with `degraded:true` and `staleSince`
+ * saying how old it is — "64 %, as of twenty minutes ago" beats a blank gauge. The last good reading is
+ * SURRENDERED when the credential stamp moves, because a stale number under another account's name is
+ * the one thing worse than an empty gauge. The one move that is not a change of login is the CLI's own
+ * rewrite of the file it was asked to renew: a new pass, or the cleared mark, on the SAME login. After a
+ * renewal attempt the last good reading is re-filed under the stamp the CLI left (`reboundTo`), so a
+ * fetch that fails right after a renewal, or the poll after a cleared login, still shows the numbers.
  *
  * NOTHING HERE FAILS. Every path answers a `ClaudeUsage` with `reachable: true`: there is no upstream
  * here to be unreachable, only a reading that is older than we would like.
@@ -87,6 +103,7 @@ type UsageReason =
   | 'pending'
   | 'shape'
   | 'credentials'
+  | 'expired'
   | 'auth'
   | 'network'
   | 'throttled'
@@ -102,7 +119,7 @@ type UsageReason =
  */
 type Reading = {
   windows: ClaudeUsageWindow[];
-  /** The login these figures belong to — `liveAccountDigest()`, read beside the token, `''` when it
+  /** The login these figures belong to — `meteredAccountDigest()`, read beside the token, `''` when it
    *  cannot be told — so the answer can say whose numbers they are. */
   account: string;
   degraded: boolean;
@@ -122,10 +139,22 @@ type LastGood = { windows: ClaudeUsageWindow[]; at: number; stamp: number | null
 /** A reading in the cache, and WHEN it was taken — the other half of the TTL question. */
 type Cached = { at: number; reading: Reading; stamp: number | null };
 
-/** Where the live login's credential bytes live. Deliberately NOT environment-redirectable:
- *  a variable that moved this path could meter an account nobody named. */
+/** Where the live login's credential bytes live: the `claude` CLI's own config directory, the one
+ *  the Claude provider reads the same file in and the one `renewSavedLogin` runs the CLI against —
+ *  the readers and the writer of one file must agree on where it is. */
 function credentialsPath(): string {
-  return path.join(os.homedir(), '.claude', '.credentials.json');
+  return path.join(claudeConfigDir(), '.credentials.json');
+}
+
+/**
+ * The account digest these figures are named and filed under: `liveAccountDigest()`'s answer — read
+ * from `~/.claude.json` — only while the credentials file is the default config directory's. With
+ * `CLAUDE_CONFIG_DIR` moved, the CLI keeps its identity file in that directory too, so `~/.claude.json`
+ * would name (and the pacer would file) the token's readings under another login. `''` is "could not
+ * be told", which every consumer already treats as no evidence.
+ */
+function meteredAccountDigest(): string {
+  return claudeConfigDirIsDefault() ? liveAccountDigest() : '';
 }
 
 /**
@@ -141,8 +170,13 @@ function credentialsPath(): string {
  * secret. It is what makes a new login honest: the live file carries its own expiry, so signing in
  * again moves it and the cache misses. An unreadable file is
  * not an error — it is "no login", which is one fact to a gauge.
+ *
+ * `cleared` is the one other fact the file can hold: the CLI's own mark for a login whose refresh token
+ * the vendor refused — it writes `accessToken: ""`, an empty refresh token and `expiresAt: 0`, and exits
+ * 0. That is an expired pass nothing can renew, not an unreadable file, and it is a boolean about the
+ * file, never a part of it.
  */
-function readCredentials(): { token: string | null; stamp: number | null } {
+function readCredentials(): { token: string | null; stamp: number | null; cleared: boolean } {
   try {
     const parsed: unknown = JSON.parse(fs.readFileSync(credentialsPath(), 'utf8'));
     const oauth = isRecord(parsed) && isRecord(parsed.claudeAiOauth) ? parsed.claudeAiOauth : {};
@@ -150,9 +184,10 @@ function readCredentials(): { token: string | null; stamp: number | null } {
     return {
       token: typeof token === 'string' && token ? token : null,
       stamp: asStamp(oauth.expiresAt),
+      cleared: token === '',
     };
   } catch {
-    return { token: null, stamp: null }; // absent, unreadable or not JSON — all one fact here
+    return { token: null, stamp: null, cleared: false }; // absent, unreadable or not JSON — all one fact here
   }
 }
 
@@ -311,6 +346,56 @@ function toWire(reading: Reading): ClaudeUsage {
   };
 }
 
+/** A clock time for the log, in the server's local time — `20:13`, the one the operator reads. */
+function clockTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+/** What a renewal attempt left in the file: a NEW pass to go on with, or none — and either way the
+ *  stamp the file holds now, which the CLI may have rewritten (`null` when it cannot be read). */
+type Renewal = { fresh: true; token: string; stamp: number | null } | { fresh: false; stamp: number | null };
+
+/**
+ * Asks for the saved login's pass to be renewed, logs the one line the attempt earns, and answers what
+ * the file holds now.
+ *
+ * ⚠ NEW MEANS A DIFFERENT TOKEN than the one that just failed, not merely a live stamp: when the
+ * endpoint refuses a pass the clock still trusts, the CLI hands back the same one, and fetching with it
+ * again would only be refused again. `staleToken` is compared and never logged or kept. The log line
+ * is per ATTEMPT — an answer from the renewal's cooldown started no CLI and says nothing — and its
+ * detail is the verb's own words, which carry no token. Total: the verb never rejects.
+ */
+async function renewLogin(why: string, staleToken: string): Promise<Renewal> {
+  const renewal = await renewSavedLogin();
+  const { token, stamp } = readCredentials();
+  const isNewPass = renewal.renewed && token !== null && token !== staleToken;
+  if (renewal.attempted) {
+    const outcome = isNewPass
+      ? `renewed, valid until ${stamp === null ? 'an unknown time' : clockTime(stamp)}`
+      : `not renewed (${renewal.detail})`;
+    console.log(`[usage] ${why}; renewing with claude auth status → ${outcome}`);
+  }
+  return isNewPass ? { fresh: true, token, stamp } : { fresh: false, stamp };
+}
+
+/**
+ * The last good reading, re-filed under the stamp a renewal attempt left in the file — or `null` when
+ * there is none to move.
+ *
+ * ⚠ A RENEWAL MOVES THE STAMP WITHOUT CHANGING THE LOGIN: the CLI hands the same account a new pass,
+ * or writes its cleared mark (`stamp` 0). `degraded` keeps the last good numbers only while the stamps
+ * agree, so without this a fetch that failed right after a renewal — and every poll after a cleared
+ * login — drew an empty gauge where the numbers were still the right account's. `readUnder` is the
+ * stamp the figures were read under; a last good reading filed under any OTHER stamp is another
+ * login's and stays where it is, to be surrendered. The caller hands the copy back to be installed
+ * under the generation check, like every other snapshot.
+ */
+function reboundTo(readUnder: number | null, leftBehind: number | null): LastGood | null {
+  const good = lastGood;
+  if (good === null || readUnder === null || leftBehind === null || good.stamp !== readUnder) return null;
+  return { ...good, stamp: leftBehind };
+}
+
 /**
  * One measurement → the reading, the stamp it belongs to, and a new last-good or `null`.
  *
@@ -320,21 +405,58 @@ function toWire(reading: Reading): ClaudeUsage {
  * exactly one writer. Every leg is total; nothing here raises.
  */
 async function measure(): Promise<{ reading: Reading; stamp: number | null; good: LastGood | null }> {
-  const now = Date.now();
-  const { token, stamp } = readCredentials();
+  let now = Date.now();
+  const first = readCredentials();
+  let token = first.token;
+  let stamp = first.stamp;
   // WHICH LOGIN these figures will belong to, read beside the token and before the fetch. The
   // credential stamp is the witness for the pair: a whole-box swap moves it, so a swap that lands
   // while the request is out leaves a different stamp to compare below.
-  const digest = liveAccountDigest();
+  let digest = meteredAccountDigest();
+  // No token is no login: nothing to send and nothing for the CLI to renew. Except the CLI's own
+  // cleared mark, which is an expiry nothing can renew — it reads as `expired`, the words that tell
+  // the operator to sign in, and starts no CLI to learn what the file already says.
+  if (token === null) {
+    return { reading: degraded(first.cleared ? 'expired' : 'credentials', 0, now, stamp, digest), stamp, good: null };
+  }
+  // The stamp the figures on screen were read under. A renewal moves `stamp` (the same login, a new
+  // pass) and does not move this; `carried` is the last good reading re-filed under what the CLI left.
+  const readUnder = stamp;
+  let carried: LastGood | null = null;
   // ⚠ A STAMP ALREADY BEHIND US IS NOT SENT. `expiresAt` is epoch MILLISECONDS, the same clock as
   // `now`; the endpoint would answer 401 and the reading would say `auth` — a refusal — when the
-  // truth is an expiry. No request leaves this process with a dead token.
-  const expired = stamp !== null && stamp <= now;
-  if (token === null || expired) {
-    return { reading: degraded('credentials', 0, now, stamp, digest), stamp, good: null };
+  // truth is an expiry. No request leaves this process with a dead token: the pass is renewed
+  // first, and the fetch below goes on in this same call with the new one.
+  if (stamp !== null && stamp <= now) {
+    const renewal = await renewLogin(`the saved login's pass expired at ${clockTime(stamp)}`, token);
+    now = Date.now(); // a renewal is a CLI run of up to 30 s; the reading is dated by when it ends
+    carried = reboundTo(readUnder, renewal.stamp);
+    if (!renewal.fresh) {
+      // The CACHE is keyed by the file as it stands, which a CLI that failed may have rewritten.
+      return {
+        reading: degraded('expired', 0, now, readUnder, digest),
+        stamp: renewal.stamp,
+        good: carried,
+      };
+    }
+    token = renewal.token;
+    stamp = renewal.stamp;
+    digest = meteredAccountDigest(); // read beside the new token, as above
   }
 
-  const { status, payload } = await fetchUsage(token);
+  let { status, payload } = await fetchUsage(token);
+  if (status === 401 || status === 403) {
+    // A pass the clock trusts that the endpoint refuses: one renewal, and one retry if it came back new.
+    const renewal = await renewLogin(`the usage endpoint answered ${status} to the saved login's pass`, token);
+    now = Date.now();
+    carried = reboundTo(readUnder, renewal.stamp);
+    if (renewal.fresh) {
+      token = renewal.token;
+      stamp = renewal.stamp;
+      digest = meteredAccountDigest();
+      ({ status, payload } = await fetchUsage(token));
+    }
+  }
   if (status !== 200) {
     const reason: UsageReason =
       status === 401 || status === 403
@@ -344,7 +466,7 @@ async function measure(): Promise<{ reading: Reading; stamp: number | null; good
           : status === 429
             ? 'throttled'
             : 'upstream';
-    return { reading: degraded(reason, status, now, stamp, digest), stamp, good: null };
+    return { reading: degraded(reason, status, now, readUnder, digest), stamp, good: carried };
   }
 
   const windows = parseWindows(payload);
@@ -357,7 +479,7 @@ async function measure(): Promise<{ reading: Reading; stamp: number | null; good
         staleSince: null, checkedAt: now, pace: null,
       },
       stamp,
-      good: null,
+      good: carried,
     };
   }
   // ⚠ EVERY GOOD READING IS FILED WITH THE PACER, under the login it came from — but only while
@@ -409,7 +531,7 @@ export async function readUsage(): Promise<ClaudeUsage> {
     // A pending answer names the login ASKED NOW, never a cache entry's: a moved stamp means the
     // old entry belongs to another account.
     return toWire(served(
-      sameCredential && cached ? cached.reading : pending(now, liveAccountDigest()),
+      sameCredential && cached ? cached.reading : pending(now, meteredAccountDigest()),
       now,
     ));
   }
@@ -424,7 +546,7 @@ export async function readUsage(): Promise<ClaudeUsage> {
   } catch {
     // A belt. `measure`'s legs are already total, so this is unreachable by construction — but the
     // route is forbidden to fail, and a fuel gauge is not worth a traceback.
-    outcome = { reading: degraded('network', 0, now, stamp, liveAccountDigest()), stamp, good: null };
+    outcome = { reading: degraded('network', 0, now, stamp, meteredAccountDigest()), stamp, good: null };
   }
 
   if (generation === mine) {

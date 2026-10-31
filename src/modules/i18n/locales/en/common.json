@@ -3370,8 +3370,6 @@
         "other": "Your words · sent word for word"
       },
       "quoted": "“{{text}}”",
-      "say": "Say:",
-      "aloud": "Aloud, not typed",
       "lapses": "Lapses at {{time}}",
       "withdraw": "Withdraw",
       "withdrawHint": "Withdraw: {{name}} won't do it",
@@ -3391,6 +3389,15 @@
     },
     "voice": {
       "label": "Voice on this device"
+    },
+    "ears": {
+      "label": "Listen for her name on this device",
+      "waiting": "Listening for {{name}}",
+      "readying": "Getting her ears ready",
+      "needsTouch": "Touch the page to let her listen",
+      "elsewhere": "She listens on the page you last talked to her from",
+      "hearing": "Listening",
+      "unavailable": "She can't listen on this page"
     },
     "door": {
       "label": "{{name}}"
@@ -3415,6 +3422,10 @@
     "conversation": {
       "openCard": "Open {{kind}} {{title}} on the stage"
     },
+    "head": {
+      "controls": "Her controls",
+      "menu": "Her controls and CloudCLI"
+    },
     "talk": {
       "orPress": "or press",
       "bindHint": "Bind a key in Settings"
@@ -3433,6 +3444,25 @@
       "title": "Kaylee <accent>Station</accent>",
       "back": "CloudCLI",
       "backLabel": "Back to CloudCLI"
+    },
+    "compact": {
+      "switch": "Compact",
+      "switchLabel": "Section",
+      "section": {
+        "conversation": "Conversation",
+        "needs": "Needs you",
+        "where": "Where things stand",
+        "stage": "Stage"
+      },
+      "needsPressUnread": "Open Needs you",
+      "needsPress_zero": "Nothing needs you: open Needs you",
+      "needsPress_one": "1 needs you: open Needs you",
+      "needsPress_other": "{{count}} need you: open Needs you"
+    },
+    "phone": {
+      "bar": "Sections",
+      "needsPress": "Needs you · {{count}}",
+      "stagePress": "Stage: {{label}}"
     },
     "stage": {
       "name": "Stage",
@@ -3568,7 +3598,6 @@
     },
     "needs": {
       "title": "What needs you",
-      "how": "Say the words: she reads each back, and your yes fires it.",
       "reading": "Reading what needs you…",
       "empty": "Nothing needs you.",
       "retry": "Try again",
@@ -3607,7 +3636,6 @@
       },
       "where": "{{node}} · since {{time}}",
       "onStage": "On the stage",
-      "say": "Say “{{say}}”",
       "openChat": "Open the chat",
       "ask": {
         "looking": "Looking for the ask…",

@@ -12,6 +12,9 @@ const END_SLACK = 48;
  */
 export const FOLLOWS_END: ReadonlySet<StationRegion> = new Set<StationRegion>(['conversation']);
 
+/** What a reader does to a scroller that moves it: a press (a scrollbar's included), a wheel turn, a touch, a key. Any of them ends a place's wait. */
+const READER_INPUTS = ['pointerdown', 'wheel', 'touchstart', 'keydown'] as const;
+
 /**
  * Follows one region's scroller for the station's scroll memory: puts the remembered `scrollTop` back and reports each
  * newer one. Returns the release, which the region's ref callback calls as the node leaves.
@@ -19,8 +22,11 @@ export const FOLLOWS_END: ReadonlySet<StationRegion> = new Set<StationRegion>(['
  * A REGION THAT HAS NOT YET GROWN TALL ENOUGH is not clamped: setting `scrollTop` past the content's end lands on its
  * end, and the scroll event that follows would report that end as the reader's place and overwrite the remembered one. So
  * the remembered place is applied only once the content can honour it, and until then it waits — retried when the node's
- * subtree changes (a list landing, a card drawing in) — and the wait ends at once when the reader scrolls or presses
- * (their place is theirs from then on) or when it was honoured. `onScroll` hears nothing while the wait stands.
+ * subtree changes (a list landing, a card drawing in) — and the wait ends at once when the reader acts on the node (a press, a
+ * wheel turn, a touch, a key: their place is theirs from then on) or when it was honoured. `onScroll` hears nothing while the wait
+ * stands: a scroll the content makes by itself meanwhile is no place of theirs. That is the case that matters when the station
+ * changes arrangement: the conversation's log mounts in a column too short for the place remembered from the other (the wide
+ * column's 12,000 px is 7,000 in compact's), pins to its newest line, and must not forget the place the other column will want back.
  *
  * A NODE THAT ALREADY STANDS BELOW ITS TOP WHEN IT IS FOLLOWED was put there by its reader (nothing else moves a scroller that is
  * not yet followed), who scrolled before the region bound its memory (the left rail binds it once its two sections are drawn): the
@@ -61,8 +67,9 @@ export function followScroll(
     }
   };
   const heardScroll = () => {
-    // A scroll while the place still waits is the reader's own (our write is the only other, and it ends the wait first).
-    if (waiting) stopWaiting();
+    // A scroll while the place still waits is not the reader's: his own input would have ended the wait first, and our write ends it
+    // before its scroll event. It is the content moving by itself (a log pinning to its end), and no place.
+    if (waiting) return;
     onScroll(placeOf(node));
   };
 
@@ -70,7 +77,7 @@ export function followScroll(
   // A reader who scrolled before the bind: his place is the one to remember, whether or not he scrolls again.
   if (!waiting && node.scrollTop !== 0) onScroll(placeOf(node));
   if (waiting) {
-    node.addEventListener('pointerdown', stopWaiting, { once: true, passive: true });
+    for (const input of READER_INPUTS) node.addEventListener(input, stopWaiting, { once: true, passive: true });
     tryRestore();
     if (waiting) {
       watcher = new MutationObserver(tryRestore);
@@ -80,7 +87,7 @@ export function followScroll(
 
   return () => {
     node.removeEventListener('scroll', heardScroll);
-    node.removeEventListener('pointerdown', stopWaiting);
+    for (const input of READER_INPUTS) node.removeEventListener(input, stopWaiting);
     watcher?.disconnect();
   };
 }

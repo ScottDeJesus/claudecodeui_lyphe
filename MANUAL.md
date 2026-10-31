@@ -4821,11 +4821,12 @@ section: server/modules/companion — the door: routes, input limits, refusals, 
 
 - The send itself is `companion-send.ts`, shared with `send_to_session` and `create_session`: checks, fold or turn, options, new chat, what clears — MAN-9072. The route adds the floor only (`sendDraft` takes it first).
 - Her face has five routes of its own, `POST` and `DELETE /face` and `GET /face/:faceId/manifest`, `/sheet/:n`, `/contact`, in `face/face.routes.ts` (`createFaceRoutes`), mounted by one line, `router.use('/face', createFaceRoutes())`: MAN-9236. Like `/memory`, no client id.
+- Her ears' model files are `GET /ears/files/<repo>/<path>` in `ears/ears.routes.ts` (`createEarsRoutes`), mounted by one line at the foot beside `/face`, `router.use('/ears', createEarsRoutes())`. ONLY TRANSPORT: the rest of the path is looked up in the pinned manifest of `ears/ears-files.ts` (`earsFile`) by string equality, so only Moonshine base's and Silero VAD's pinned files can be named. A hit is `sendFile` (it answers the one-byte range the page's transformers.js asks first) with `Cache-Control: private, max-age=31536000, immutable` and `dotfiles: 'allow'` (the root is `COMPANION_EARS_DIR`, else `~/.cloudcli/companion-ears`); a name outside the manifest is 404 `COMPANION_EARS_NOT_FOUND`, a fetch from Hugging Face that was refused (unreachable with its cause named, silent for 60 s, a file that did not match its pinned SHA-256) or a file the disk would not keep or read is 502 `COMPANION_EARS_UNREACHABLE` carrying the sentence, and a range that starts past the end of a file is 416 with `Content-Range` naming its size. A file is fetched once, on first use, into a part of its own (`<file>.<uuid>.part`, so a second process fetching the same file never truncates it), and kept; nothing is downloaded until a page asks. No client id. Shown by `.verify/kaylee-ears-files.sh` under `.verify/kaylee-eyes-scratch.sh`.
 - The station's sessions list is `GET /station/sessions` in `station/sessions.routes.ts` (`createStationSessionsRoutes`), mounted by one line, `router.use('/station/sessions', createStationSessionsRoutes())`, before the other `/station` routers: MAN-9268. No client id, no account. 200 `{ sessions: StationSession[] }`; a read that throws is a 503 `{ error }`.
 - What needs him is `GET /station/needs` and one chat's ask is answered by `POST /station/asks`, both in `station/needs.routes.ts` (`createNeedsRoutes(service)`), mounted by one line, `router.use('/station', createNeedsRoutes(service))`, after the sessions router: MAN-9273. No client id. `GET /needs` answers `{ needs: StationNeed[], faults }` (`service.stationNeeds`; `faults` names the kinds whose reader threw, and a whole read that throws is a 503 `{ error }`). `POST /asks` takes the zod body `{ sessionId 1–200, requestId 1–200, answer 1–2000 (trimmed) }` and answers 200 `{ told }`, 400 `{ error }` (a body of another shape, naming the first field; or a word that is no answer to that ask, with the words that are), 409 `{ error: 'That ask was answered elsewhere.' }` (the `requestId` is no longer among the chat's pending asks), or 500 `{ error }` when the answer could not be sent and the ask still waits (`service.answerStationAsk`).
 - What landed is `GET /station/landed` in `station/landed.routes.ts` (`createStationLandedRoutes(service)`), mounted at the foot by `router.use('/station', createStationLandedRoutes(service))`: MAN-9269. No client id (the history is the account's). 200 `{ landed: StationLanded[] }`; a read that throws is a 503 `{ error }`. Verb `landed`.
 - An answer is the thing itself, never wrapped (`{ settings }`, `{ data }`). The face's `POST` and `DELETE` answer `{ face }`.
-- `POST /messages`, `/floor`, `/press` and `/draft/send` REQUIRE the client id header (the page that pressed takes the floor); `GET /speech/…` REQUIRES it too (it names the page asking for her voice and takes no floor); every other route validates it if present and does not need it, except `/memory`, `/face`, `/station/sessions`, `/station/needs`, `/station/asks` and `/station/landed`, which read no client id at all.
+- `POST /messages`, `/floor`, `/press` and `/draft/send` REQUIRE the client id header (the page that pressed takes the floor); `GET /speech/…` REQUIRES it too (it names the page asking for her voice and takes no floor); every other route validates it if present and does not need it, except `/memory`, `/face`, `/ears`, `/station/sessions`, `/station/needs`, `/station/asks` and `/station/landed`, which read no client id at all.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts
 
@@ -4870,7 +4871,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/compani
 ## MAN-9190 — server/modules/companion — the door: routes, input limits, refusals, module — Probe
 section: server/modules/companion — the door: routes, input limits, refusals, module wiring/003 Probe
 
-`.verify/companion-module.mjs`: see the service row. The speech door and the cut: `.verify/kaylee-speech-door.sh` (no Gemini call) and `.verify/kaylee-speech-door-live.mjs` (MAN-9110). The press door: `.verify/kaylee-press-refused.sh` (no key in reach, the door's 400s, a stand-in for Gemini's 500 and 403; no Gemini request) and `.verify/kaylee-press-live.sh` (curl as account 1 on :3011, haiku, one Gemini call) — MAN-9059.
+`.verify/companion-module.mjs`: see the service row. The speech door and the cut: `.verify/kaylee-speech-door.sh` (no Gemini call) and `.verify/kaylee-speech-door-live.mjs` (MAN-9110). The press door: `.verify/kaylee-press-refused.sh` (no key in reach, the door's 400s, a stand-in for Gemini's 500 and 403; no Gemini request) and `.verify/kaylee-press-live.sh` (curl as account 1 on :3011, haiku, one Gemini call) — MAN-9059. The press her name opened (`opened=name`, and the 400 for any other `opened`): `.verify/kaylee-wake-door.sh` under the stager — MAN-9341.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/index.ts
 
@@ -4922,7 +4923,7 @@ section: server/modules/companion — the service verbs, one account's wiring, t
 | `chatDeleted(sessionId)` | a chat row was deleted (`feeds/deleted-chat-feed.ts` rides `onSessionsDeleted`, announced by `sessions.db.ts`' `deleteSessionById` and `deleteSessionsByProjectPath`, so the sidebar's delete, the synchronizer pruning a vanished transcript and a project's delete all reach it; the duplicate merge does not: the chat lives on under the app row). For each account whose stored focus is the chat (`companionDb.userIdsFocusedOn`) it calls `store.setFocus(null)`, so the pages hear `companion_focus` null. One account that fails is logged and does not hold the rest. why: the focus kept naming a chat nobody could open, and only her Clear emptied it. Her draft's target and her walk are left: a deleted chat there is refused in words when she is asked to send to it, and `walk` 0 ends the walk without resolving the chat. Proof: `.verify/companion-focus-deleted.mjs` (live), `.verify/chat-deletion-announce-direct.mjs` (every door, on a copy). |
 
 ### Clear
-0. `speechCache.end()`: every synthesis aborted, every turn unspeakable until the next turn starts (MAN-9111).
+0. `speechCache.end()`: every synthesis aborted, every cached sentence and the current turn forgotten; step 2 wipes the log, so every sentence answers 404 (MAN-9110, MAN-9111).
 1. `session.clear()` runs SYNCHRONOUSLY: detaches her process and forgets her CLI conversation. why: a message landing mid-clear wakes a fresh conversation, never a resume.
 2. `store.clearAccount()` wipes log, the UNPINNED notes (a pinned card is his keep and stays), draft, pending action, unanswered words, walk, focus; every page empties at once and keeps the pinned cards. A standing action's row in `companion_actions` is ended `cancelled` in the same transaction and kept, unless a take has claimed it (MAN-9082).
 3. Awaits the old process's wind-down (up to the CLI grace).
@@ -5152,14 +5153,14 @@ Three surfaces. Each is a VIEW that draws every state from props and a thin wrap
 | her door | `CompanionDoorView` (`CompanionDock.tsx`) | `CompanionDock`: draws it in her rail cell whenever her disc is out of its seat; the door's press is the disc's own (MAN-9125, MAN-9129) | `WorkspaceRail`'s foot, after `UsageRings`, above the Inbox |
 | her Settings section | `CompanionSettingsView` (`CompanionSettingsSection.tsx`) | `CompanionSettingsSection`: `useCompanionSettings` fetches `GET /api/companion` (her settings and `picture.face`), saves `PUT /api/companion/settings`; `useTalkBindingCapture` takes the next key or mouse button when Bind is pressed and saves it as `talkBinding` (MAN-9101); `CompanionFaceSettings` (her face card, MAN-9220, over `useCompanionFaceSettings`: the face from that same read, then the account's `companion_face` frames, his upload, his restore and the contact sheet) is the view's `face` slot, drawn directly after the talk button's card once the read has landed; `CompanionMemorySettings` (her memory card, MAN-9184) is the `memory` slot, drawn after the face card and above her four fields | `VoiceSettingsTab`, after its own sections, voice on or off |
 
-- Parts under the panel: `CompanionHeader` (the title row: her mark, her name, `CompanionStatus` (the status line: `CompanionStatus.tsx`, MAN-9089), the slot Stop is drawn into, given `onOpenStation` (`CompanionPanelView` takes it as an optional prop and hands it on; the fixture picture passes none and so draws none) the station button (`LayoutDashboard`, `aria-label` and tooltip "Open Kaylee Station" = `companion.panel.station`; the close's own ghost icon button with its transparent `::before` catch, 44 px under a finger, stepped 2 px aside under a finger so the two catches meet; `CompanionPanel`'s wrapper binds it to `openStation` with `useNavigate()` and `useDeviceSettings()`, so on a phone, where her panel is the full-screen sheet, the door is one press), close; the focus row; then `CompanionControls` (`CompanionControls.tsx`; its props are a union on `layout`: `rows`, the panel's, described here, and `line`, the station's head's, after it): Stop, drawn by portal into the title row's slot (`stopSlot`, a required prop, so Stop stands beside the way out), model `Select`, Live `Switch`, Clear (her conversation: MAN-9195) behind a `ConfirmDialog`, with every rule of MAN-9090; given `voice`, a row of its own under them, `CompanionVoiceSwitch`: "Voice on this device", the kit `Switch` closing the row under Clear, a `Volume2` / `VolumeX` glyph following it, the whole row its label; `layout: 'line'`, with `align?: 'start' | 'center'` and no `stopSlot`: every control in one `div[data-companion-controls=line]` that wraps rather than cut a word (`flex-wrap gap-x-3 gap-y-2`; `center` centres each line), in this order: Stop while her turn runs, the model `Select` in a fixed `w-36` box (the line does not move as the model's name changes), Live, then "Voice on this device" (given `voice`) and Clear as one unit, so Clear never stands alone on a line; each control keeps its words and its 44 px catch below 768 px AND under a coarse pointer (`max-md:` beside `(pointer:coarse)`, the touch law being keyed on width, INV-10275: Stop, the Select, the Live and voice rows' labels, Clear; the composer's send takes it in its `::before`; the log's "Newest" is `max-md:h-11`); the station's head draws `line`: MAN-9314), `CompanionLog` (entries newest last; alerts and system lines in their tone; given `speaking`, the one sentence whose `turnId` and `index` both equal `speaking`'s alone wrapped in `[data-companion-speaking-sentence][data-tone=info]`: a band `bg-tone-ink/20` widened by `ring-2 ring-tone-ink/20`, a 2px bar of the full ink in the ring's left edge (`shadow-[-2px_0_0_0] shadow-tone-ink`, the mark's 3:1: 5.3:1 light, 10.3:1 dark against the canvas, where the band alone is 1.32:1 / 1.51:1), `box-decoration-clone`, `forced-colors:underline`; ring and bar are shadows, so no word moves; given `cards` (`{ notes, onOpen }`: the station's conversation, her panel passes none) each card stands as a `CompanionCardChip` (MAN-9325) after the last block at or before the moment she put it up, and the log's content key counts the cards; given `scrollRef`, the log's one scroller is also handed to the caller, one callback binding the log's own ref first, which must keep its identity across renders; `useFollowNewest` keeps a place put back: a scroller standing more than 48 px above its end at its first pin starts not following, and "Newest" brings him down), `CompanionWalkStrip`, `CompanionNotes`, `CompanionDraftCard` (target, editable `TextArea`, Send turn, Send steer, Clear; two homes: her panel's dock, and the station's draft dock, MAN-9321; given `onTargetPress` (the station's) a session draft's chat name is a link-styled kit `Button` in `text-accent-ink`, `aria-label` `companion.draft.showOnStage` "Show <chat> on the stage", with "For" kept as text by `<Trans i18nKey="companion.draft.forChatPress">` "For <chat/>"; its catch is a `::before` 4 px past the name each way and, below 768 px or under a coarse pointer (`max-md:` beside `(pointer:coarse)`, the touch law being keyed on width, INV-10275), 28 px up and none down, so the row stays as tall; Send turn, Send steer and Clear are `h-11` on the same terms; a new chat's target stays words; her panel passes none and is unchanged), `CompanionComposer` (`PromptInput`, Enter sends; `touchField` stands its field at 44 px below 768 px, the station's talk row, absent it keeps the panel's 40 px), `CompanionSentence` (her sounds drawn as marks at their offsets), `CompanionSettingsForm` (her name, his name, the register in a monospace `TextArea` with "Restore the original", the delivery note).
+- Parts under the panel: `CompanionHeader` (the title row: her mark, her name, `CompanionStatus` (the status line: `CompanionStatus.tsx`, MAN-9089), the slot Stop is drawn into, given `onOpenStation` (`CompanionPanelView` takes it as an optional prop and hands it on; the fixture picture passes none and so draws none) the station button (`LayoutDashboard`, `aria-label` and tooltip "Open Kaylee Station" = `companion.panel.station`; the close's own ghost icon button with its transparent `::before` catch, 44 px under a finger, stepped 2 px aside under a finger so the two catches meet; `CompanionPanel`'s wrapper binds it to `openStation` with `useNavigate()` and `useDeviceSettings()`, so on a phone, where her panel is the full-screen sheet, the door is one press), close; the focus row; then `CompanionControls` (`CompanionControls.tsx`; its props are a union on `layout`: `rows`, the panel's, described here, and `line`, the station's head's, after it): Stop, drawn by portal into the title row's slot (`stopSlot`, a required prop, so Stop stands beside the way out), model `Select`, Live `Switch`, Clear (her conversation: MAN-9195) behind a `ConfirmDialog`, with every rule of MAN-9090; given `voice`, a row of its own under them, `CompanionVoiceSwitch`: "Voice on this device", the kit `Switch` closing the row under Clear, a `Volume2` / `VolumeX` glyph following it, the whole row its label; given `ears`, a row of its own under the voice row, `CompanionEarsSwitch` (MAN-9342); `layout: 'line'`, with `align?: 'start' | 'center'` and no `stopSlot`: every control in one `div[data-companion-controls=line]` that wraps rather than cut a word (`flex-wrap gap-x-3 gap-y-2`; `center` centres each line), in this order: Stop while her turn runs, the model `Select` in a fixed `w-36` box (the line does not move as the model's name changes), Live, then "Voice on this device" (given `voice`) and Clear as one unit, so Clear never stands alone on a line (given `ears`, the voice switch stands alone and "Listen for her name on this device" and Clear are the unit); each control keeps its words and its 44 px catch below 768 px AND under a coarse pointer (`max-md:` beside `(pointer:coarse)`, the touch law being keyed on width, INV-10275: Stop, the Select, the Live, voice and ears rows' labels, Clear; the composer's send takes it in its `::before`; the log's "Newest" is `max-md:h-11`); the station's head draws `line`: MAN-9314), `CompanionLog` (entries newest last; alerts and system lines in their tone; given `speaking`, the one sentence whose `turnId` and `index` both equal `speaking`'s alone wrapped in `[data-companion-speaking-sentence][data-tone=info]`: a band `bg-tone-ink/20` widened by `ring-2 ring-tone-ink/20`, a 2px bar of the full ink in the ring's left edge (`shadow-[-2px_0_0_0] shadow-tone-ink`, the mark's 3:1: 5.3:1 light, 10.3:1 dark against the canvas, where the band alone is 1.32:1 / 1.51:1), `box-decoration-clone`, `forced-colors:underline`; ring and bar are shadows, so no word moves; given `cards` (`{ notes, onOpen }`: the station's conversation, her panel passes none) each card stands as a `CompanionCardChip` (MAN-9325) after the last block at or before the moment she put it up, and the log's content key counts the cards; given `scrollRef`, the log's one scroller is also handed to the caller, one callback binding the log's own ref first, which must keep its identity across renders; `useFollowNewest` keeps a place put back: a scroller standing more than 48 px above its end at its first pin starts not following, and "Newest" brings him down), `CompanionWalkStrip`, `CompanionNotes`, `CompanionDraftCard` (target, editable `TextArea`, Send turn, Send steer, Clear; two homes: her panel's dock, and the station's draft dock, MAN-9321; given `onTargetPress` (the station's) a session draft's chat name is a link-styled kit `Button` in `text-accent-ink`, `aria-label` `companion.draft.showOnStage` "Show <chat> on the stage", with "For" kept as text by `<Trans i18nKey="companion.draft.forChatPress">` "For <chat/>"; its catch is a `::before` 4 px past the name each way and, below 768 px or under a coarse pointer (`max-md:` beside `(pointer:coarse)`, the touch law being keyed on width, INV-10275), 28 px up and none down, so the row stays as tall; Send turn, Send steer and Clear are `h-11` on the same terms; a new chat's target stays words; her panel passes none and is unchanged), `CompanionComposer` (`PromptInput`, Enter sends; `touchField` stands its field at 44 px below 768 px, the station's talk row, absent it keeps the panel's 40 px), `CompanionSentence` (her sounds drawn as marks at their offsets), `CompanionSettingsForm` (her name, his name, the register in a monospace `TextArea` with "Restore the original", the delivery note).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionActionCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionStatus.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useActionLapse.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useWithdraw.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-action-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
 
 ## MAN-9186 — src/modules/companion — Kaylee's panel, rail door and Settings section: the — `CompanionActionCard` (the action waiting for his word, `picture.pending`): in the dock above the
 section: src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the stance, the status line, the rules and the fixture/001 `CompanionActionCard` (the action waiting for his word, `picture.pending`): in the dock above the
 
-- `CompanionActionCard` (the action waiting for his word, `picture.pending`): in the dock above the draft, keyed by `pending.id`, a `role="region"` named by its head. Its second home is the head of the station's right rail, "What needs you" (`WhatNeedsYouView`, MAN-9281, through the module's barrel), above the items: the same card, keyed by `pending.id`, with `name` and a `onWithdraw` of `() => cancelAction(<the pending id>)`. The card's own rules hold there (the head, the wells, his lines whole, the foot, the ×, the lapse deadline); the dock's do not, since the rail has no log, notes or draft: the room taken from the log down to its floor, the dock's scroll, and `empty:hidden` on a lapsed card alone. A lapsed card leaves the rail's items where they were (MAN-9281). The rail's scroller is a size container (`[container-type:size]`), as the panel's dock is, so the `cqh` caps below are shares of the rail; in the narrow stack there is no scroller and the sticky foot measures against the window. The head "Waiting for your word" in the warn tone with the Roadmap's amber pulse; the action as a sentence (`companion.action.verb.*`: the verb, then the target's `spoken` in its weight) over the target's kind and house names (a run's whole id, a page's id and block; her memory, "Your memory, N things kept": `companion.action.kind.memory_one` / `_other`; `targetFacts` also has a `check` branch, `Check · <node> · <key>`, that the card never draws: a check is what her open records and no pending action holds one), wrapping to two lines (`line-clamp-2`; the `title` holds the whole line); the prompt, or a follow-up's words, through `QuestionText` (as the Roadmap draws the census) in a well capped at 30cqh, 12cqh beside his lines; his carried lines quoted, each with its 24-hour time, under each question's label, in a well of their own. HIS LINES ARE THE LAST TO GIVE WAY: they travel word for word, so their well has no cap, no scroll and no tab stop and they stand whole at any length; while the card stands the dock has no cap, so the room comes first from the log (down to its 3.5rem floor), then from the notes and the draft's field, and past that the dock scrolls as one region with the sticky foot in sight. The prompt gives way instead: 12cqh beside his lines, and in a round (`answer`) the questions with their options fold behind "The questions, with their options" (kit `Collapsible`, `CardFoldBody`: inert while folded; 24cqh opened), since each question heads his answers to it; a labelled group with no lines is a question he left unanswered, said as "No answer — it goes as “(no answer)”" with ▲ (the hands send one group per question of the round). Groups are keyed by their place. The foot in the tone's wash, "Say: “<say>”" beside the mic and "Aloud, not typed · Lapses at HH:MM" (the clock her prepare answer says it in), is sticky to the dock's bottom edge (`-bottom-1`, a ring of `--surface` masking what passes under it), so in a dock too short for the card (a phone's keyboard up, a phone on its side) the words that fire it, its lapse and a refused Withdraw (said inside the foot) stay in sight. The Withdraw × (`aria-label` "Withdraw") is drawn only given `onWithdraw` (optional on the view and the card; the live `CompanionPanel` passes `() => cancelAction(<the pending id>)`, so the × withdraws the action on screen and none is passed while there is none); its hint stands to its left. It is 28 px to look at, with a 40 px catch under a mouse and a 44 px catch under a coarse pointer (a transparent `::before`). A press (`hooks/useWithdraw.ts`) calls `onWithdraw()` once: the × is busy while it is out, and a refusal is said inside the foot (`companion.action.withdrawRefused` with the server's sentence, else — no sentence, or no answer — `withdrawRefusedPlain`); withdrawn, the provider clears that action from the picture (only while it still holds it) and the card goes with it. It stands whole (`shrink-0`). THE LAPSE IS A DEADLINE, NOT A CLOCK (`hooks/useActionLapse.ts`): one `window.setTimeout` to `pending.expiresAt`, set when the card mounts and cleared when it unmounts or the deadline changes (the panel keys the card by `pending.id`, so a new action is a new card); from that moment the card draws nothing, and an action already past its time never draws. A stamp that is not a time sets no timer. The server closes the row itself at the next prepare, take or cancel. A lapsed card alone in the dock closes it (`empty:hidden`). Every word is a `t()` with its English default (`companion.action.*`). Fixtures: `FAKE_PANEL.action*`; `actionRound` is a three-question round at the length he really speaks (his spoken lines average 96 characters), its third question unanswered.
+- `CompanionActionCard` (the action waiting for his word, `picture.pending`): in the dock above the draft, keyed by `pending.id`, a `role="region"` named by its head. Its second home is the head of the station's right rail, "What needs you" (`WhatNeedsYouView`, MAN-9281, through the module's barrel), above the items: the same card, keyed by `pending.id`, with `name` and a `onWithdraw` of `() => cancelAction(<the pending id>)`. The card's own rules hold there (the head, the wells, his lines whole, the foot, the ×, the lapse deadline); the dock's do not, since the rail has no log, notes or draft: the room taken from the log down to its floor, the dock's scroll, and `empty:hidden` on a lapsed card alone. A lapsed card leaves the rail's items where they were (MAN-9281). The rail's scroller is a size container (`[container-type:size]`), as the panel's dock is, so the `cqh` caps below are shares of the rail, in a column and in compact's Needs you section alike (MAN-9329). The head "Waiting for your word" in the warn tone with the Roadmap's amber pulse; the action as a sentence (`companion.action.verb.*`: the verb, then the target's `spoken` in its weight) over the target's kind and house names (a run's whole id, a page's id and block; her memory, "Your memory, N things kept": `companion.action.kind.memory_one` / `_other`; `targetFacts` also has a `check` branch, `Check · <node> · <key>`, that the card never draws: a check is what her open records and no pending action holds one), wrapping to two lines (`line-clamp-2`; the `title` holds the whole line); the prompt, or a follow-up's words, through `QuestionText` (as the Roadmap draws the census) in a well capped at 30cqh, 12cqh beside his lines; his carried lines quoted, each with its 24-hour time, under each question's label, in a well of their own. HIS LINES ARE THE LAST TO GIVE WAY: they travel word for word, so their well has no cap, no scroll and no tab stop and they stand whole at any length; while the card stands the dock has no cap, so the room comes first from the log (down to its 3.5rem floor), then from the notes and the draft's field, and past that the dock scrolls as one region with the sticky foot in sight. The prompt gives way instead: 12cqh beside his lines, and in a round (`answer`) the questions with their options fold behind "The questions, with their options" (kit `Collapsible`, `CardFoldBody`: inert while folded; 24cqh opened), since each question heads his answers to it; a labelled group with no lines is a question he left unanswered, said as "No answer — it goes as “(no answer)”" with ▲ (the hands send one group per question of the round). Groups are keyed by their place. The foot (`data-companion-action-foot`) in the tone's wash, "Lapses at HH:MM" (the clock her prepare answer says it in) and, under it, a refused Withdraw's sentence, is sticky to the dock's bottom edge (`-bottom-1`, a ring of `--surface` masking what passes under it), so in a dock too short for the card (a phone's keyboard up, a phone on its side) its lapse and a refused Withdraw stay in sight. The card gives him no phrase to say, and no mic stands on it: she reads the action back in her own words and judges from the conversation whether he agreed; the talk button is the composer's and the station's (MAN-9324). The Withdraw × (`aria-label` "Withdraw") is drawn only given `onWithdraw` (optional on the view and the card; the live `CompanionPanel` passes `() => cancelAction(<the pending id>)`, so the × withdraws the action on screen and none is passed while there is none); its hint stands to its left. It is 28 px to look at, with a 40 px catch under a mouse and a 44 px catch below 768 px and under a coarse pointer (a transparent `::before`; `max-md:` beside `(pointer:coarse)`, the station's touch law being keyed on width, INV-10275), as its fold of the questions is 44 px tall on the same terms. A press (`hooks/useWithdraw.ts`) calls `onWithdraw()` once: the × is busy while it is out, and a refusal is said inside the foot (`companion.action.withdrawRefused` with the server's sentence, else — no sentence, or no answer — `withdrawRefusedPlain`); withdrawn, the provider clears that action from the picture (only while it still holds it) and the card goes with it. It stands whole (`shrink-0`). THE LAPSE IS A DEADLINE, NOT A CLOCK (`hooks/useActionLapse.ts`): one `window.setTimeout` to `pending.expiresAt`, set when the card mounts and cleared when it unmounts or the deadline changes (the panel keys the card by `pending.id`, so a new action is a new card); from that moment the card draws nothing, and an action already past its time never draws. A stamp that is not a time sets no timer. The server closes the row itself at the next prepare, take or cancel. A lapsed card alone in the dock closes it (`empty:hidden`). Every word is a `t()` with its English default (`companion.action.*`). Fixtures: `FAKE_PANEL.action*`; `actionRound` is a three-question round at the length he really speaks (his spoken lines average 96 characters), its third question unanswered.
 - Hooks: `useFollowNewest` (the log follows the newest line until he scrolls up; `jumpToNewest`; a place a caller put back, as the station's scroll memory does through the log's `scrollRef` on a reload, is kept: a scroller more than 48 px above its end at its FIRST pin stays where it stands and starts not following, so "Newest" stands; the scroller is marked pinned only where it is pinned, so the answer is the same when StrictMode runs the mount's layout effect twice; her panel puts no place back and pins as ever), `useGrowingField` (textarea sized to its words, measured only while drawn), `useCardFloor` (the draft card's `min-height`), `useTalkBinding(binding, toggle)` (below).
 - The talk button's binding (`TalkBinding`, MAN-9086; stored as `CompanionSettings.talkBinding`, MAN-9087):
 
@@ -5265,7 +5266,7 @@ node .verify/companion-panel-scaffold.mjs [--states awakeIdle,dense,...] [--evid
 - Gitignored (`.verify/`): exists on disk only. Live client `:5183`. Exits 1 on any FAIL; zero console errors required.
 - Mounts the three VIEWS on `companion-fake.ts` pictures through `lib/companion-kit.mjs`: panel in the workspace shell's fixed box (`.pwa-status-clear.fixed`), door (`CompanionDoorView`, imported from `CompanionDock.tsx`) in the rail's foot above the Inbox, section in a Settings-modal-width column at `z-9999`. Every press is recorded in `window.__companionKit.events`, none acted on.
 - Photographs 1440×900 and 390×844, light and dark: states `loading asleepEmpty waking awakeIdle thinking readingSession readingCode drafting walking failed longLog draftWorking draftNew walk notes dense closed`, the seven action states (`actionQueue actionAnswer actionRound actionRework actionOpen actionClose actionDraft`, spread in from `lib/companion-action-kit.mjs`'s `ACTION_EXPECT`; `actionRound` a three-question round at his real length, its third question unanswered), the door lit and unlit, the Settings states.
-- The action card's checks live in `lib/companion-action-kit.mjs` (`readActionCard`, `actionChecks`, re-exported through `lib/companion-kit.mjs`): its words in light (the head, the sentence, the facts, the well — folded in a round — his lines by group with their HH:MM, "Say: “…”", "Lapses at HH:MM", the Withdraw ×, the dock closing when left empty, a question he left unanswered said as "No answer — it goes as “(no answer)”" under it), and at every width and theme its place (whole in the dock above the composer with the dock not scrolling; above the draft in `actionDraft`; at his real length in `actionRound` the dock may scroll as one region with "Say:" and the lapse in sight), his lines whole in their well (it has no cap and never scrolls), and its words' contrast on their computed ground (≥ 4.5:1; 4.67 the lowest, "Say:" and the lapse on the warn wash in light). `actionsAtPhoneHeight` then mounts every action state at 390×664 (an iPhone's Safari with its bars showing), photographed, with his lines whole and the card whole in sight in the dock — above its draft for `actionDraft`; for `actionRound`, at his real length, the dock scrolls as one region and "Say:" and the lapse stay in sight.
+- The action card's checks live in `lib/companion-action-kit.mjs` (`readActionCard`, `actionChecks`, re-exported through `lib/companion-kit.mjs`): its words in light (the head, the sentence, the facts, the well — folded in a round — his lines by group with their HH:MM, "Lapses at HH:MM", the Withdraw ×, the dock closing when left empty, a question he left unanswered said as "No answer — it goes as “(no answer)”" under it), and at every width and theme its place (whole in the dock above the composer with the dock not scrolling; above the draft in `actionDraft`; at his real length in `actionRound` the dock may scroll as one region with the lapse in sight), his lines whole in their well (it has no cap and never scrolls), and its words' contrast on their computed ground (≥ 4.5:1; 4.67 the lowest, the lapse on the warn wash in light). `actionsAtPhoneHeight` then mounts every action state at 390×664 (an iPhone's Safari with its bars showing), photographed, with his lines whole and the card whole in sight in the dock — above its draft for `actionDraft`; for `actionRound`, at his real length, the dock scrolls as one region and the lapse stays in sight.
 - Checks: status line per state; the stance and layers above; no sideways scroll; dock ≤ 55% with the draft whole; Escape claimed inside, ignored outside; draft saved before send; refusals keep words; settings limits; Restore asks first; a short panel (`--keyboard-height` 380px, 390×844) with a draft and a 12-line message cuts nothing; the card keeps its bottom padding, re-checked after narrowing to 320px with no render between.
 - 2026-10-28: 558 of 558 checks with the seven action states and their 390×664 pass, 144 photographs, zero console errors; the unanswered line 4.90:1 in light. The model check lists the fixture's four labels (Fable 5.1 among them since 372b8eb8). The door checks read the fixture's door inside `#companion-door`: below md the live dock draws its own door in the open drawer.
 - The script is 300 lines (the ceiling): any new check goes in `lib/companion-kit.mjs` or `lib/companion-action-kit.mjs`.
@@ -5802,7 +5803,7 @@ section: server/modules/companion/session — what she is pushed: the order of a
 - Fills run in ONE pass (`fillSlots`): a value that contains `{name}` is never filled again, `$` in a value is not a replacement pattern, a slot the template invents is left as written, a slot it lacks is not filled.
 - The prompt's TOOLS section lists every tool she holds; the registry: MAN-9070.
 - `THE HOUSE, WHEN HE POINTS AT IT` (after WHAT YOU MUST NOT DO, before TOOLS): the rule (call the panel's tool before saying a word about it; every one takes `panel: true`), then one pointer line per panel naming its tool, in the TOOLS section's order. A new eyes tool adds its pointer line and its TOOLS line together: `toolLine` throws on a missing TOOLS line; a pointer line is read only by the probe of its own tool (`.verify/companion-doc-reads.mjs`: DocSpace's; `.verify/companion-run-reads.mjs`: the runs', and that it stands after the roadmap's and before DocSpace's).
-- `ON HIS WORD` (after THE HOUSE, before TOOLS): the hands' rule in her words. She does nothing in the house on her own judgment. `open` and `close_followup` are the harmless two and take no ceremony (MAN-9207): the moment he asks for a card, run, page, chat or Cerberus check to come up, in any phrasing, a question included ("can you pull up", "show me", "bring up", "open"), she calls `open`; to tick off a follow-up, `close_followup`. A polite question is an order. She says in one sentence what she opened or closed, and asks him a question only when she cannot tell which page or chat he means. The eleven others (queue, hide, show, rework, answer, recut, stop, resume, kick, resume_run and clear_memory, named in the paragraph) she puts on his panel with `prepare_action`, which tells her what to do next: she reads it back, the action and its name (for an Accept, the head of the prompt), and stops; his next spoken yes, or a line that names it and says the action, fires it, and she calls `take_action` with his newest spoken line exactly as he spoke it, never before her read-back. A bare yes counts only as the first thing he says after her newest read-back. For these a typed line, a no or a question is not his word. An action waits thirty minutes. When it lapsed she calls `prepare_action` again with the same action and target: that re-arms it, and a bare yes he said since then still counts, so when his newest spoken line is that yes she passes it to `take_action` at once and does not ask him again; anything else, she reads it back again (MAN-9208). Notes, answers and rulings travel in his own spoken words; `cancel_action` when he changes his mind. The server holds the line whatever she says (MAN-9171, INV-10099). Its tools' lines are in TOOLS; `toolLine` throws on a missing one. The paragraph is plain text: it imports nothing from `hands/`. The TOOLS line of `open` names the five things it brings up: "open(target): bring a card, run, page, chat or Cerberus check up on the screen he is using, at once, the moment he asks, however he asks. target is its name, id or title; a check is its label or its path, <node>/<service>/<check>." (resolution and refusals: MAN-9172 §Targets).
+- `ON HIS WORD` (after THE HOUSE, before TOOLS): the hands' rule in her words. She does nothing in the house on her own judgment. `open` and `close_followup` are the harmless two and take no ceremony (MAN-9207): the moment he asks for a card, run, page, chat or Cerberus check to come up, in any phrasing, a question included ("can you pull up", "show me", "bring up", "open"), she calls `open`; to tick off a follow-up, `close_followup`. A polite question is an order. She says in one sentence what she opened or closed, and asks him a question only when she cannot tell which page or chat he means. The eleven others (queue, hide, show, rework, answer, recut, stop, resume, kick, resume_run and clear_memory, named in the paragraph) she puts on his panel with `prepare_action`, which tells her what to do next: she reads it back, the action and its name (for an Accept, the head of the prompt), and stops. She decides from the conversation whether he agreed, and no one else does: there are no set words, a line he typed counts as much as one he spoke, a yes, a go-ahead or an order in any phrasing can each be his yes, and a no, a question or a change of subject is not (operator, 2026-10-30). When he agreed she calls `take_action` with his line exactly as her log holds it, after her read-back and never before it, and never on her own words; if he declines, or she judges he does not want it, `cancel_action`. An action waits thirty minutes. When it lapsed, or the house refused it, she calls `prepare_action` again with the same action and target: that re-arms it and her read-back from before still stands, so when she has already judged that he agreed and nothing since changes that, she calls `take_action` at once and does not ask him again; otherwise she reads it back again (MAN-9208). Notes, answers and rulings travel in his own words; `cancel_action` when he changes his mind. The server confirms she read it back and records his line (MAN-9171, INV-10099). Its tools' lines are in TOOLS; `toolLine` throws on a missing one. The paragraph is plain text: it imports nothing from `hands/`. The TOOLS line of `open` names the five things it brings up: "open(target): bring a card, run, page, chat or Cerberus check up on the screen he is using, at once, the moment he asks, however he asks. target is its name, id or title; a check is its label or its path, <node>/<service>/<check>." (resolution and refusals: MAN-9172 §Targets).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-message.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts
 
@@ -5855,7 +5856,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 - `index` of a sentence in its turn counts only sentences that were not `null`.
 
 ## Proof
-- `.verify/companion-wire-contract.mjs`: `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-wire-contract.mjs` — parse (prints each parse and `utteranceOf` of its row), stream and fills on real strings; no server, no model call.
+- `.verify/companion-wire-contract.mjs`: `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-wire-contract.mjs` — parse (prints each parse and `utteranceOf` of its row), stream, fills and every envelope of `session/companion-envelopes.ts` on real strings (`calledEnvelope` prints `<operator via="spoken" heard="name"></operator>`); no server, no model call.
 - `.verify/kaylee-sentence-replay.mjs`: `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-sentence-replay.mjs` — her recorded replies (`assistant` text blocks under `~/.claude/projects/-home-lyphe--claude-state-companion-*/`) through the cut at `f82d09c7` and the tree's; prints each text cut differently and whether the tree's cut is the same at delta sizes 1, 3, 7, 50 and whole; no server, no model call. 2026-10-28: 384 text blocks; 3 cut differently (`"Tea or coffee?"` once, `"…PONG."` twice), each now one sentence (1581 sentences → 1578), same words; 0 cut differently at any delta size.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-wire-contract.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-sentence-replay.mjs
@@ -5895,8 +5896,8 @@ section: server/modules/companion — storage: the five tables, companionDb, rel
 | `readLog(userId, limit)` | newest `limit` rows, oldest first; `limit` clamped to 0..400, non-finite = 400 |
 | `addNote`, `listNotes`, `removeNote(userId, id)` | `addNote(userId, { title, text, kind?, ref? })` inserts the card unpinned (`kind` is `'note'` unless given; `ref` is NULL unless given, and is the one object this file serializes, as `ref_json`) and answers the row (`NOTE_COLUMNS`: `id, user_id, at, title, text, kind, ref_json, pinned`; `CompanionNoteRow.kind` is text, `pinned` is 1 or 0). `listNotes` oldest first; `removeNote` is false for another account's id |
 | `setNotePinned(userId, id, pinned)` | `UPDATE companion_notes SET pinned = ? WHERE id = ? AND user_id = ?`; true when a row matched, so a card already in that state still answers true, and false for a card taken down or another account's |
-| `heardSince(userId, since)` | his (`operator`) and her (`kaylee`) log lines with `at` after `since`, oldest first, at most 400 (the whole log the account keeps): `{ id, at, role, via, text }`. What `take_action` checks his word against (`heardSince(userId, pending.armedFrom)`, MAN-9174). THROWS when `since` is not a stored stamp (`isStoreStamp`, `server/shared/utils.ts`: fixed-width ISO-8601 UTC with milliseconds that parses as a date; `''` would read as before every line) — pass `pending.armedFrom` through unchanged |
-| `newestOperatorLine(userId)` | his (`operator`, spoken or typed) newest log line as `{ id, at, role, via, text }`, else `null`. The trigger a direct `open` / `close_followup` row carries as its `said` (`direct-tools.ts`, MAN-9207): a record, never a check |
+| `heardSince(userId, since)` | his (`operator`) and her (`kaylee`) log lines with `at` after `since`, oldest first, at most 400 (the whole log the account keeps): `{ id, at, role, text }`. What `take_action` finds her read-back in and picks the record of his word from (`heardSince(userId, pending.armedFrom)`, MAN-9174), and what a carried line is looked up in (`carried-lines.ts`). THROWS when `since` is not a stored stamp (`isStoreStamp`, `server/shared/utils.ts`: fixed-width ISO-8601 UTC with milliseconds that parses as a date; `''` would read as before every line) — pass `pending.armedFrom` through unchanged |
+| `newestOperatorLine(userId, withWords = false)` | his (`operator`, spoken or typed) newest log line as `{ id, at, role, text }`, else `null`. With `withWords`, a row whose text is blank (only space, tab, CR, LF) is skipped. The trigger a direct `open` / `close_followup` row carries as its `said` (`direct-tools.ts`, MAN-9207): a record, never a check; and, `withWords`, the last-resort record of a `take_action` (`hands-tools.ts`, MAN-9171 §The record) |
 | `openAction`, `claimAction`, `noteRefusal`, `endAction`, `newestCeremonyAction`, `listActions` | the record of actions (`repositories/companion-actions.db.ts`, spread into `companionDb`). `openAction(userId, row)` inserts a row with no outcome and answers it; `row.armed_from` is optional (NULL: the ceremony began at `prepared_at`; a re-arm writes the first prepare's stamp, MAN-9208). `newestCeremonyAction(userId)` answers the account's newest row (`prepared_at DESC, rowid DESC`) whose action is not `open` or `close_followup`, else `null`: what `rearmOf` reads. `claimAction(userId, id, { said, said_at, said_log_id })` writes the firing line on a row with no outcome and no claim, in ONE statement, so of two takes exactly one wins; answers whether this call did. `noteRefusal(userId, id, sentence)` writes `answer` on a row still waiting (no outcome, unclaimed): the newest refusal of a take. `endAction(userId, id, end)` writes `ended_at` (now by default), `outcome` and, when given, `said`, `said_at`, `said_log_id`, `answer` — only to a row with no outcome, and a CLAIMED row only for a call carrying that claim's `said_log_id`; answers whether this call ended it. `listActions(userId, limit)` answers the newest `limit` (≤ 1000) by `prepared_at`, newest first |
 | `clearAccount(userId)` | one transaction: ends every `companion_actions` row of the account that has no outcome and no claim as `cancelled` (a row a take has claimed is spared: the take ends it with the door's outcome); deletes the account's log and its UNPINNED notes (`pinned = 0`); resets `provider_session_id`, `session_shape`, `handover`, `focus_json`, `draft_json`, `walk_json`, `pending_json`, `unanswered_json` to NULL. `floor`, `memory_forget_line` and the three face columns STAY; `relayed_sends` and every row of `companion_actions` are kept; no state row is created for an account with none. Answers `{ logRemoved, notesRemoved, stateReset }`; `notesRemoved` counts the unpinned cards |
 Every statement names its account in `WHERE`/`VALUES`: an id of another account reads as no row.
@@ -5949,7 +5950,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/compani
 The views are MAN-9062. This row is the state they draw from and the places the workspace mounts them. Shapes: `src/shared/companion-types.ts`, mirrored field for field with `server/shared/companion-types.ts` (MAN-9086). Server side: MAN-9058, MAN-9059.
 
 ## Barrel (`src/modules/companion/index.ts`) — everything else is private
-`CompanionProvider`, `useCompanion`, `CompanionPanel`, `CompanionFab`, `CompanionDock`, `CompanionSettingsSection`, `CompanionActionCard` (her action waiting for his word: the panel's dock, and the head of the station's right rail, "What needs you": MAN-9186), `CompanionDraftCard` (her draft: the panel's dock, and the station's dock, which hands it `onTargetPress`: MAN-9090, MAN-9321), and the pieces the station composes: `useCompanionPresence` (the one state of hers, MAN-9089: the panel, the button and the face read it, and the station's head reads it for its status line), `CompanionFace` (her face bound to the provider: drawn by `CompanionFab` and the station), `CompanionStatus` (her state in words: `CompanionHeader` and the station), `CompanionControls` (Stop, model, Live, Clear, this device's voice: `CompanionHeader` and the station), `CompanionLog` (given `cards` it stands her cards in the log as chips; given `scrollRef` it hands the scroller to the caller beside its own, for the station's scroll memory), `CompanionTalkButton` (`size: 'large'` is the station's) and `CompanionComposer` (the panel's, and the station's conversation and talk control), `CompanionAvatar` (her face on fixture presences, for the station's fixtures). The barrel's consumers are the project-workspace module, the settings module and the station module (MAN-9250: its route mounts a provider of its own; the rail `WhatNeedsYou` reads `useCompanion` for her pending action and `cancelAction`, `FocusFallback`, `useTakeHerFloor` and `useUnlockHerVoice` read it too, and her head (MAN-9314), conversation (MAN-9325), talk control (MAN-9324) and draft dock (MAN-9321) read it for her picture, her verbs, her voice, her one talk press and her draft with its edit, send and clear verbs).
+`CompanionProvider`, `useCompanion`, `CompanionPanel`, `CompanionFab`, `CompanionDock`, `CompanionSettingsSection`, `CompanionActionCard` (her action waiting for his word: the panel's dock, and the head of the station's right rail, "What needs you": MAN-9186), `CompanionDraftCard` (her draft: the panel's dock, and the station's dock, which hands it `onTargetPress`: MAN-9090, MAN-9321), and the pieces the station composes: `useCompanionPresence` (the one state of hers, MAN-9089: the panel, the button and the face read it, and the station's head reads it for its status line), `CompanionFace` (her face bound to the provider: drawn by `CompanionFab` and the station), `CompanionStatus` (her state in words: `CompanionHeader` and the station), `CompanionControls` (Stop, model, Live, Clear, this device's voice and, given `ears`, her ears: MAN-9342; `CompanionHeader` and the station), `CompanionLog` (given `cards` it stands her cards in the log as chips; given `scrollRef` it hands the scroller to the caller beside its own, for the station's scroll memory), `CompanionTalkButton` (`size: 'large'` is the station's) and `CompanionComposer` (the panel's, and the station's conversation and talk control), `CompanionAvatar` (her face on fixture presences, for the station's fixtures). The barrel's consumers are the project-workspace module, the settings module and the station module (MAN-9250: its route mounts a provider of its own; the rail `WhatNeedsYou` reads `useCompanion` for her pending action and `cancelAction`, `FocusFallback`, `useTakeHerFloor` and `useUnlockHerVoice` read it too, and her head (MAN-9314), conversation (MAN-9325), talk control (MAN-9324) and draft dock (MAN-9321) read it for her picture, her verbs, her voice, her one talk press and her draft with its edit, send and clear verbs).
 
 ## Where each is mounted
 | surface | mounted by |
@@ -6098,7 +6099,7 @@ section: server/shared/companion-types.ts — the wire contract: the types, the 
 | `CompanionActionKind` | the thirteen things she does in the house: `queue` \| `hide` \| `show` \| `rework` \| `answer` \| `recut` \| `stop` \| `resume` \| `kick` \| `resume_run` \| `open` \| `close_followup` \| `clear_memory` |
 | `CompanionCeremonyAction` | `Exclude<CompanionActionKind, 'open' \| 'close_followup'>`: the eleven that wait for his word (MAN-9174); `open` and `close_followup` are done at once (MAN-9207). Typed by the hands, `ACTION_KINDS` and the stored pending (`CompanionStoredPending`) |
 | `CompanionActionTarget` | what an action acts on, by `kind`, each with `spoken` (the name he says it by): `card` `{ name, arc }` (a plan or epic), `run` `{ runId, plan }`, `page` `{ pageId, blockId }`, `chat` `{ sessionId }`, `followup` `{ id, sessionId, text }`, `memory` `{ count }` (her own bank: `spoken` is `your memory`, `count` the memories held when it was prepared; MAN-9194), `check` `{ node, key }` (a service check, key `<service>/<id>`, `spoken` its label: what her open records for one; `isTarget` in `companion-pending.ts` refuses it, so it is never a pending action) |
-| `CompanionCarriedLine` | `{ logId, at, text }`: one of his spoken lines, carried verbatim |
+| `CompanionCarriedLine` | `{ logId, at, text }`: one of his lines, spoken or typed, carried verbatim |
 | `CompanionPendingAction` | the one action waiting for his word: `{ id, action, target, prompt: string \| null, carried: [{ label: string \| null, lines }], say, preparedAt, expiresAt }`. `expiresAt` is `preparedAt` + 30 minutes. The pin the prepare took (ask and lock token, chain) and `armedFrom` (MAN-9208) are never part of it |
 | `CompanionOpenTarget` | where an open lands: `{ kind: 'chat', sessionId }` \| `{ kind: 'card', plan }` \| `{ kind: 'page', pageId, blockId }` \| `{ kind: 'check', node, key }` (key `<service>/<id>`; her `open` sends it for a Cerberus check, MAN-9172 §Targets; the station draws it on the stage, the workspace brings the Cerberus tab forward, MAN-9083) |
 | `CompanionFaceMood` | `neutral` \| `delighted` \| `playful` \| `gentle` \| `thoughtful` \| `brisk` \| `soft` \| `whispered` \| `mock_serious`: the nine looks, one per mood word (MAN-9239); the key of `CompanionFaceManifest.moods` |
@@ -6265,6 +6266,7 @@ section: Probing Kaylee — the rules every probe of her keeps, the hidden-chat 
 | `companion-panel-scaffold.mjs` | the views on fixture pictures (MAN-9062) |
 | `kaylee-talk-scaffold.sh` (`.mjs`) | the talk press, binding row, chat-mic picker and Gemini section on fixtures; her panel and Settings > Voice against an untouched client; no model turn, no Gemini call (MAN-9095) |
 | `kaylee-clip.mjs`, `kaylee-press-refused.sh`, `kaylee-press-live.sh`, `kaylee-talk-chat-mic.mjs`, `kaylee-talk-whole.mjs`, `mic-recorder-move.mjs`, `kaylee-talk-binding-hook.mjs`, `kaylee-talk-binding-rule.ts` | the spoken probes: their one fixture clip, which of them calls Gemini and how often (MAN-9100) |
+| `kaylee-wake-door.sh` (under `kaylee-eyes-scratch.sh`) | the press door's name press (`opened=name`) on a scratch server and the 400 for `opened=other`; 3 Gemini calls (MAN-9341) |
 | `companion-lands.mjs`, `companion-lands-page.mjs`, `companion-reducer.mjs` | the page (MAN-9083) |
 | `kaylee-voice-speech.mjs` | `synthesizeSentence`, the three voice settings and the sound-tag readers: ONE paid sentence on `gemini-3.8-flash-lite-tts` and its transcription back, the rest free (MAN-9105) |
 | `kaylee-speech-door.sh` (`.mjs`) | the speech door and the cut with NO Gemini call: no key in reach, Google's host a stand-in (MAN-9110, MAN-9111) |
@@ -6388,7 +6390,7 @@ The views of the page's one talk press: the talk button in her composer, the bin
 | `talkBinding?: ReactNode` | `CompanionSettingsView` | nothing drawn. Present, it stands in a `SettingsCard` above her fields once settings are read |
 
 ## `CompanionTalkButton` — props `state`, `error`, `onToggle`, `name`, and `size`
-Props are a union on `size`: `size?: 'default'` (absent too) draws what this section describes; `size: 'large'` takes a required `bindingLabel: string | null | undefined` and draws §"`size: 'large'`".
+Props are a union on `size`: `size?: 'default'` (absent too) draws what this section describes; `size: 'large'` takes a required `bindingLabel: string | null | undefined` and an optional `compact?: boolean` (44 px tall) and draws §"`size: 'large'`".
 | state | look | accessible name |
 |---|---|---|
 | `idle` | `ghost` icon, mic in `text-muted-foreground` | `companion.talk.start` — `Talk to {{name}}` |
@@ -6414,6 +6416,7 @@ The same press and the same three states, drawn larger and labelled, so the word
 | `idle` | kit `outline` `Button` 56 px tall (`h-14 w-full`), the mic in `text-muted-foreground` and the words `companion.talk.start`. why: alone beside the typing box a ghost reads as plain words |
 | `listening` | `tonal` + `ring-2 ring-primary` pulse; `Stop and send` |
 | `transcribing` | `Spinner` (30) round the mic; `Transcribing · press to talk again`; still pressable |
+- `compact` (the station's compact head, MAN-9324): the button is 44 px tall (`h-11 py-1`, not `h-14`) and its words `leading-tight` instead of `leading-snug`, so their two lines stand inside it; every state keeps its words.
 - The words wrap to a second line and no further (`line-clamp-2`), never cut. A 12rem box leaves them 121 px; "press to talk again" needs 119.
 - Its line (`p`), one per state:
 | line | when |
@@ -6450,7 +6453,7 @@ Settings > Voice > Companion's "Talk button" row (`voiceSettings.companion.talkB
 | `CompanionPanel` | `talk` from `useCompanion()` → `CompanionPanelView talk={talk}` → `CompanionComposer talk`; `useCompanionPresence()` → `CompanionPanelView presence` → `CompanionHeader` |
 | `CompanionComposer` | `{talk && <CompanionTalkButton state error onToggle name />}` in `[data-companion-talk-slot]`; `talk.error` in `p[data-companion-talk-error]` |
 | `CompanionSettingsSection` | `useTalkBindingCapture((talkBinding) => save({ talkBinding }))` (MAN-9101) → `talkBinding={<TalkBindingField label={settings?.talkBinding?.label ?? null} … />}` |
-| `StationTalkView` | `<CompanionTalkButton size="large" state error onToggle name bindingLabel />` beside a `CompanionComposer` given no `talk` (MAN-9324) |
+| `StationTalkView` | `<CompanionTalkButton size="large" compact={density === 'compact'} state error onToggle name bindingLabel />` beside a `CompanionComposer` given no `talk` (MAN-9324) |
 - The talk button, the bound key or mouse button, and a press in the floating chat's picture-in-picture window are the SAME press: one `talk`, one mic.
 
 ## Proof
@@ -6941,10 +6944,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-scaffold.mj
 
 ## Checks, in this order (`serve`)
 1. The request's client is not `store.readState().floor` → 409 `COMPANION_NOT_FLOOR`.
-2. `speechCache.isCurrent(turnId)` is false → 404 `COMPANION_NO_SENTENCE`. The current turn is in memory: a server restart, Clear and shutdown leave none, so every sentence answers 404 until the next turn starts.
-3. `speechCache.find(turnId, index)` holds an entry (finished, or still being synthesized) → joined: no second call, logged `(cache)`.
-4. Otherwise `store.readSentence(turnId, index)` is `null` → 404. `utteranceOf` is `null` → 204, no entry cached, no call. Else `startSynthesis`: an entry put in the cache, `synthesizeSentence(userId, { text, style, signal: entry.abort.signal })`, logged `(gemini)`.
-5. The request joins the entry (`joinEntry`) and waits for `entry.opened`: the first audio, or the refusal, thrown before a byte.
+2. `speechCache.find(turnId, index)` holds an entry (finished, or still being synthesized) → joined: no second call, logged `(cache)`.
+3. Otherwise `store.readSentence(turnId, index)` is `null` → 404 `COMPANION_NO_SENTENCE`. The row was written over `SENTENCE_SPEAKABLE_MS` (5 min) ago and `speechCache.isCurrent(turnId)` is false → 404. `utteranceOf` is `null` → 204, no entry cached, no call. Else `startSynthesis`: an entry put in the cache, `synthesizeSentence(userId, { text, style, signal: entry.abort.signal })`, logged `(gemini)`.
+4. The request joins the entry (`joinEntry`) and waits for `entry.opened`: the first audio, or the refusal, thrown before a byte.
+- The freshness window binds only a turn that is not current (`isCurrent`: the one `startTurn` named last, none after a restart or Clear). why: a turn that begins while she is heard, and a restart, must leave the rest of that reply speakable; the window bounds what a page can spend to the last five minutes' sentences. Clear wipes the log, so every sentence answers 404 then.
 
 ## Answers
 | status | `code` | when | body |
@@ -6952,7 +6955,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-scaffold.mj
 | 200 | – | first audio arrived | PCM, little-endian Int16, mono, 24 kHz, whole samples per write; `Content-Type: audio/l16; rate=24000; channels=1`, `Cache-Control: no-store`, `X-Accel-Buffering: no` |
 | 204 | – | nothing to say | none |
 | 400 | `COMPANION_INPUT_INVALID` | a malformed param, or no client id | the field's sentence |
-| 404 | `COMPANION_NO_SENTENCE` | not the current turn, an index the log holds no `kaylee` row for, or a cleared log | `She has no such sentence to say: it is not in her current turn.` |
+| 404 | `COMPANION_NO_SENTENCE` | an index the log holds no `kaylee` row for, a cleared log, or a sentence of a turn that is not current written over five minutes ago | `She has no such sentence to say: it is unknown or too old to speak.` |
 | 409 | `COMPANION_NOT_FLOOR` | check 1 | `Another page holds the floor, so her voice plays there; this page shows her words only.` |
 | 409 | `COMPANION_SPEECH_REFUSED` | `synthesizeSentence` answered `no_key` or `refused` | Google's sentence, e.g. `No Gemini key: set one in Settings → Voice` |
 | 502 | `COMPANION_SPEECH_FAILED` | `synthesizeSentence` answered `failed` before the first byte | its sentence (key redacted) |
@@ -6976,14 +6979,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-scaffold.mj
 - One `[voice] gemini speech …` line per call (MAN-9105). A probe counts requests and calls by these two.
 
 ## Proof
-- `bash .verify/kaylee-speech-door.sh`: no Gemini call. `GEMINI_API_KEY` unset, `GEMINI_ENV_FILE` an empty file, `DATABASE_PATH` a `.backup` copy of `auth.db`, all under one `mktemp -d`. The real routes, door, cache, store and `synthesizeSentence`; stand-ins for her session (records `oweCut` and `interrupt`) and Google's host (a wrapped `fetch` answering server-sent events). Eight legs: no key and the 204s; the guards; a sentence streamed, then from the cache; the text and style Gemini was given, and a follower; a hang-up; the cut; refusals and failures; the 4 MB bound, the expiry, a new turn, shutdown. 2026-10-27: 50 of 50 checks passed.
+- `bash .verify/kaylee-speech-door.sh`: no Gemini call. `GEMINI_API_KEY` unset, `GEMINI_ENV_FILE` an empty file, `DATABASE_PATH` a `.backup` copy of `auth.db`, all under one `mktemp -d`. The real routes, door, cache, store and `synthesizeSentence`; stand-ins for her session (records `oweCut` and `interrupt`) and Google's host (a wrapped `fetch` answering server-sent events). Eight legs: no key and the 204s; the guards; a sentence streamed, then from the cache; the text and style Gemini was given, and a follower; a hang-up; the cut; refusals and failures; the 4 MB bound, the expiry, a new turn (an old turn's fresh sentence answers 200; the same sentence six minutes on, `Date.now` shifted for the call, answers 404), shutdown. 2026-10-30: 51 of 51 checks passed.
 - `node .verify/kaylee-speech-door-live.mjs`: curl against :3011 as account 1 with a `/ws` socket printing the `companion_*` frames; Kaylee on `haiku` (stops otherwise); exits 2 when account 1 holds a Gemini key of its own (`key.source` `stored`), since leg 3 stores a made-up key and deletes it; at most 2 Gemini calls on `gemini-3.8-flash-lite-tts`; the spend-ledger listing before and after.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-utterance.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-speech-door-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-speech-door.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-speech-door.sh
 
 ## MAN-9111 — server/modules/companion — the speech cache and the cut: the bounds, POST /cut, oweCut and <cut heard interrupted/>
 
-The door's audio is kept per account for the current turn (`companion-speech-cache.ts`), and a talk press while she speaks is the cut (`POST /cut`, `cut` in `companion-speech.ts`). The door: MAN-9110. The page's side of the cut: MAN-9113. What she is pushed: MAN-9080. Rules: INV-9939.
+The door's audio is kept per account (`companion-speech-cache.ts`) and freed when the next turn starts or ten minutes pass, and a talk press while she speaks is the cut (`POST /cut`, `cut` in `companion-speech.ts`). The door: MAN-9110. The page's side of the cut: MAN-9113. What she is pushed: MAN-9080. Rules: INV-9939.
 
 ## The cache — one per account
 - Made by `createCompanionAccount` (`speechCache` on `CompanionAccount`, MAN-9070). Shape: `Map<turnId, Map<index, SpeechEntry>>`.
@@ -6993,8 +6996,8 @@ The door's audio is kept per account for the current turn (`companion-speech-cac
 
 | verb | does |
 |---|---|
-| `startTurn(turnId)` | frees the audio of every earlier turn; `turnId` is the only speakable turn from now. Called by `onTurnStarted` BEFORE the `companion_turn` frame. why: a page pulls sentence 0 the moment its frame arrives |
-| `isCurrent`, `find`, `put`, `remove` | the door's reads and writes; `remove` takes an entry out only while it is still the one held for that sentence |
+| `startTurn(turnId)` | frees the audio of every earlier turn; `turnId` is the current turn from now. An earlier turn's sentence is still asked for while fresh (MAN-9110): synthesized anew and cached under its own turn. Called by `onTurnStarted` BEFORE the `companion_turn` frame. why: a page pulls sentence 0 the moment its frame arrives |
+| `isCurrent`, `find`, `put`, `remove` | the door's reads and writes; `isCurrent(turnId)` is true for the turn `startTurn` named last (until `end()`), which the door exempts from its five-minute freshness window; `remove` takes an entry out only while it is still the one held for that sentence |
 | `trim()` | keeps the byte bound; called after each chunk lands |
 | `abortTurn(turnId)` | the cut: aborts every unfinished synthesis of the turn, the freed ones (orphans) of that turn included, and answers how many it stopped. Finished sentences stay |
 | `end()` | aborts every synthesis, forgets every turn AND the current one: Clear (`companionService.clear`, before the session is told) and `stopAll`. why: a sentence streaming to a page would hold the HTTP drain open |
@@ -7100,14 +7103,14 @@ Plain closures; the only clocks are a picture, an answer and the player's `start
 |---|---|
 | what it asks | `api.companion.speech(turnId, index, signal)` for the smallest index at or after `next` whose `kaylee` row is in `picture.log` for the running turn: "the frame has arrived" |
 | how far ahead | `pending` holds the request from its ask until the player STARTS that sentence (`onSentence` `start`). So: the one sounding, plus one asked or queued. Sentence k is asked when its frame has arrived and nothing is pending: at once when the player is idle, else when k-1 starts. So the silence between two sentences is k's synthesis latency minus k-1's length, when positive: about 360 ms after a one-word sentence (reported by the fill review, 2026-10-27; no fix designed) |
-| joining mid-turn | `arm()` begins after the last sentence the log holds, so a page that takes the floor mid-turn starts with the next frame to arrive |
-| a new turn | `picture.turnId` changed → `follow(turnId, 0)`: an unanswered request is hung up, what the player already holds plays out. With no turn running, the newest sentence's turn the page never followed is joined after its last sentence (not read out late) |
+| joining mid-turn | `arm()` begins after the last sentence the log holds, so a page that takes the floor mid-turn starts with the next frame to arrive; it empties the queue |
+| a new turn | `picture.turnId` is not the pull's turn → QUEUED (`queued`, oldest first), never followed at once: an alert pushed while she speaks does not cut her off. The heard turn's remaining sentences are asked first. `pump()` then hands the pull to the oldest queued turn, from its first sentence (`follow(turnId, 0)`: a request still in flight is hung up, what the player holds plays out), once the heard turn is no longer running and has nothing left to ask, or is `stopped` (a 404, a 409). `silence()`, `arm()` and `disarm()` empty the queue; `release()` lands on the newest turn. With no turn running and nothing queued, the newest sentence's turn the page never followed is joined after its last sentence (not read out late). A turn that began and ended inside ONE folded picture (a re-seed, a one-commit flush) while the heard turn plays is never queued, so never read out (open, 2026-10-30) |
 | 200 `audio/l16` with a body | `player.enqueue`; `next` = index + 1 |
 | 204; any 5xx; a 200 that is not `audio/l16`; a failed fetch | skipped (`next` = index + 1); the last three warn |
-| 409 (`COMPANION_SPEECH_REFUSED`, `COMPANION_NOT_FLOOR`), 404, any other refusal | `stopped` for the turn; the next turn starts again. The refusal's sentence is NOT shown by the page: the server wrote it as a `system` line (MAN-9110) |
+| 409 (`COMPANION_SPEECH_REFUSED`, `COMPANION_NOT_FLOOR`), 404, any other refusal | `stopped` for the turn; a queued turn is followed next, else the next turn to begin. The refusal's sentence is NOT shown by the page: the server wrote it as a `system` line (MAN-9110) |
 | a socket reconnect | the picture is re-seeded and `see()` runs; the pull keeps its place |
 | `speaking` | set at a sentence's `start`, held until the next one starts, `null` only when the player is silent and nothing is pending: never between two sentences |
-| `silence()` | hang up, `stopped` for the turn, `player.stop()`, `speaking` null; the floor is kept. Called by Stop (`interrupt`, before the request) and the `companion_cleared` frame |
+| `silence()` | hang up, empty the queue, `stopped` for the turn, `player.stop()`, `speaking` null; the floor is kept. When a turn other than the pull's is running (`seen.turnId`), the pull hops onto it stopped, so its sentences are not read out either. Called by Stop (`interrupt`, before the request), the cut and the `companion_cleared` frame |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/speechPull.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-kit.mjs
 
@@ -7119,7 +7122,7 @@ section: src/modules/companion — her voice on the page: useCompanionVoice, the
    - If `player.playing()` or a request is pending: `turnId` = the playing sentence's, else the pending one's; `heard` = `player.lastEnded().index` when it is of that turn, else `null`; `interrupted` = the playing index when of that turn, else `null`. Then `silence()` and `POST /api/companion/cut { turnId, heard, interrupted }` (MAN-9111). `cutOff` answers that request's settling, never rejecting. Nothing sounding and nothing on its way: `null`, no request, the press only holds the pull.
    - `voice.cut` is true for `CUT_SHOWN_MS` = 900 ms.
 3. The mic opens at once; the clip's upload awaits the cut's settling (`cutOwedRef`), so the cut is owed before the press is pushed.
-4. The press that ends the recording, a mic that never opened and a device that went away each call `release()`: `held` false, `next` = at least one past every sentence in the log, then the pull resumes. What she said while his mic was open is not read out afterwards.
+4. The press that ends the recording, a mic that never opened and a device that went away each call `release()`: `held` false, the queue is emptied, the pull lands on the newest turn (the last queued, else its own) after that turn's last sentence, then resumes. What she said while his mic was open, a turn that began meanwhile included, is not read out afterwards.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/speechPull.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-kit.mjs
 
@@ -7653,7 +7656,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionF
 **Write doors, handles of the same house** (the hands fire through them: MAN-9173):
 | Handle | Is | Built by |
 |---|---|---|
-| `relay(order)` | one act on his spoken word for the dispatcher lane: the answers to an open prompt go through the ask book's third door `kaylee`, every other verb is the dispatcher's own, each carrying kaylee--press's record of his word. An act the dispatcher took pokes the lane, as the card's verbs and answers do, so the picture (the card, the Inbox, the station's rail) follows his yes and not the next two-second poll. Never throws: a refusal is a `RelayAnswer` (MAN-9152) | `createDispatcherModule().relay` |
+| `relay(order)` | one act on his word for the dispatcher lane: the answers to an open prompt go through the ask book's third door `kaylee`, every other verb is the dispatcher's own, each carrying kaylee--press's record of his word. An act the dispatcher took pokes the lane, as the card's verbs and answers do, so the picture (the card, the Inbox, the station's rail) follows his yes and not the next two-second poll. Never throws: a refusal is a `RelayAnswer` (MAN-9152) | `createDispatcherModule().relay` |
 | `resumeRun(order)` | a chain resumed with his rulings, `plan-runner chain --resume`; answered the same way (MAN-9152) | `createDispatchSoulsModule().resumeRun` |
 
 **Plumbing, one argument at a time:** `createCompanionModule({ runtime, house })` → `companionService.attachRuntime(gateway, house)` → `createCompanionAccount(userId, runtime, house)` → `createToolDeps({ …, house })` → `CompanionToolDeps.house`. An account made before both are attached throws (a verb called early is refused, as it was for the gateway alone).
@@ -8165,61 +8168,60 @@ Strings and rows in, strings out, no I/O. The tools that use them are MAN-9165. 
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/card-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/card-scopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/followup-plans.ts
 
-## MAN-9171 — server/modules/companion/hands — the check of his word (action-word.ts): the assent, the checks and their sentences, the read-back, the probe
+## MAN-9171 — server/modules/companion/hands — the check of his word (action-word.ts): who decides, the read-back, the record of his line, the checks and their sentences, the probe
 
-`hands/action-word.ts` is the check of his word: the pure judgment `take_action` makes before anything in the house moves (protocol and ruling 3: MAN-9174). It judges the eleven actions that wait for his word (`CompanionCeremonyAction`: every kind but `open` and `close_followup`, which are done at once and never reach it: MAN-9207). No I/O, no clock of its own (the caller passes `now`), no import but the contract's types. The words it judges a line by (action words, the name rule, the head of a long title, the order words): MAN-9204. The lapse and the re-arm that give it `armedFrom`: MAN-9208. Shown by replaying rows: `.verify/kaylee-action-word.mjs`.
+`hands/action-word.ts` is the check of `take_action`: the pure judgment made before anything in the house moves (protocol: MAN-9174). It judges the eleven actions that wait for his word (`CompanionCeremonyAction`: every kind but `open` and `close_followup`, which are done at once and never reach it: MAN-9207). No I/O, no clock of its own (the caller passes `now`); imports the contract's types and `clockOf` (`action-prompts.ts`). Names and the read-back detector: MAN-9204. The lapse and the re-arm that give it `armedFrom`: MAN-9208. Shown by replaying rows: `.verify/kaylee-action-word.mjs`.
 
-## What counts as his word
-- A PRESS: a log row with `role: 'operator'` and `via: 'spoken'`. A typed line neither fires an action nor is carried; the empty press (`''`) names nothing.
-- A NAMED ORDER: a line that names the target, holds the action's word beside the name and is no no or question (MAN-9204).
-- AN ASSENT, `isAssent(said)`: a yes run carried by nothing but `please`, `it`, `that`, `now`. Yes runs: yes, yeah, yep, yup, sure, okay, ok, alright, correct, `go ahead`, `do it`, `fire it`, `send it`, `please do`, `that's right`. It is his word for the one action on the panel: it needs neither the name nor the action's word, and a `?` still refuses it ("Yes?").
-  - Assents: "Yes.", "Sure, go ahead.", "Do it now.", "Yes please.".
-  - Never assents: the action's own word beside `it`, `that` or `this` ("Forget it.", "Stop it.", "Pause it.", "Cut it.", "Kick it.", "Queue it.", "Open it."). why: they are what he says to decline.
-  - Not assents: "Go on.", "Okay, so.", "Yeah, so.", "Yes, but wait.", "Go ahead and do it.", "Hey.", "Please.", "Stop.", "Open.". "Yes, queue it." is no bare assent: it goes through the name and verb checks as a named order.
-- Every time comparison is written as the thing that must hold, so a stamp that does not parse fails. The stamps are the store's own (`isStoreStamp`, `server/shared/utils.ts`).
-- A line is compared trimmed, every run of whitespace one space; a blank `said` matches no line.
+## Who decides
+- Whether a line of his was a yes, and when, is Kaylee's judgment, made in conversation. Operator, 2026-10-30: "He definitely wants Kaylee to decide, and no one else; no scripted word"; "a typed line on her panel counts too".
+- The server compares no word of his: no yes list, no no list, no name or action-word match against a line of his. A typed line is as good as a spoken one. Cancelling is hers (`cancel_action`).
+- The server checks that the action was read back and records which line of his is the word. Her sentences are logged as she produces them, so her read-back and her `take_action` can be one turn with nothing of his since the card went up: the read-back detector is the whole server-side check (operator, 2026-10-30: no floor).
 
-## `checkHisWord({ pending, said, now, lines })`: the checks, in order
-`lines`: rows of her log from `heardSince(armedFrom)` (his and hers), oldest first (`hands-tools.ts`, MAN-9146). `pending` is the action's `action`, `target`, `preparedAt`, `armedFrom`, `expiresAt`, `say`, or `null`. `armedFrom` is `preparedAt` for a fresh ceremony and the first prepare's stamp across a re-arm (MAN-9208). The first failing check answers `{ ok: false, sentence }`; none failing answers `{ ok: true, line: { id, at, text } }`.
+## `checkHisWord({ pending, said, now, lines, newestLine })`: the checks, in order
+- `pending`: `action`, `target`, `armedFrom`, `expiresAt`, or `null`. `armedFrom` is `preparedAt` for a fresh ceremony and the first prepare's stamp across a re-arm (MAN-9208).
+- `lines`: rows of her log from `heardSince(armedFrom)`, his (`operator`, spoken or typed) and hers (`kaylee`), oldest first (`hands-tools.ts`). A lapsed action is handed none.
+- `newestLine`: `companionDb.newestOperatorLine(userId, true)`: his newest line with words in it, of any age; `null` when there is none.
+- The first failing check answers `{ ok: false, sentence }`; none failing answers `{ ok: true, line: { id, at, text } }`, the record.
+
 | # | fails when | sentence |
 |---|---|---|
-| 1 | `pending` is `null` | `Nothing is waiting for his word; prepare it first.` |
-| 1 | `canBeNamed` is false | `No line of his can fire this: "<spoken>" has no word of its own that is not the action itself or a filler word. Cancel it and tell him it cannot be done by voice.` |
-| 2 | `now` is not at or before `expiresAt` | `It lapsed at <HH:MM>. Prepare it again: that re-arms it, and his yes since then still counts.` |
-| 3 | no firing line (§Check 3) | `That is not a line he spoke after the card went up. He must say it aloud: <say>.` and the pointer |
-| 4 | no read-back of hers stands before the firing line | `You have not read it back to him yet. Say it back first: <say>.` |
-| 4 | a read-back stands only after it (an assent: her NEWEST read-back stands after it) | `He asked before you read it back. Read it back, then pass what he says next.` and, when a spoken line of his follows that read-back, ` He has spoken since: his newest line is logged as "<text>"; if that is his yes, pass it to take_action exactly so.` |
-| 4 | an assent that is not his first spoken line after her newest read-back, or with a spoken line of his after it | `A bare yes counts only as his first spoken line after your newest read-back, with none of his after it. Read it back again, then pass what he says next.` |
-| 5 | `takesItBack` (MAN-9204) | `That is a no or a question, not an order. He must say the order itself, aloud: <say>.` |
-| 5 | no assent, and `said` does not name the target | `His words do not name <spoken>.` |
-| 6 | no assent, and `said` holds none of the action's words besides the name | `His words do not say <first action word>.` |
-| 6 | no assent, `clear_memory`, and `said` does not open with its word | the no-or-question sentence |
-- `HH:MM` is the box's local clock; a stamp that does not parse reads `an unknown time`.
-- The probe prints a refusal's class by its sentence: the name sentence is `check 5`; the verb sentence and the no-or-question sentence are `check 6`.
-- `take_action` passes `said` as logged. A transcript that heard "queue" as "cue" is passed as logged, not asked again; check 6 then refuses it with its sentence.
+| 1 | `pending` is `null` | `Nothing is on his panel; prepare it first.` |
+| 1 | `canBeNamed` is false (MAN-9204) | `Nothing you say can be recognised as reading this back: "<spoken>" has no word of its own that is not the action itself or a filler word. Cancel it and tell him it cannot be done from here.` |
+| 2 | `now` is not at or before `expiresAt` | `It lapsed at <HH:MM>. Prepare it again: that re-arms it, and your read-back from before the lapse still stands.` |
+| 3 | no row of hers after `armedFrom` passes `readsBack` | `You have not read it back to him yet. Read it back to him plainly in your own words first: what you will do, and to what, naming "<spoken>" in full. Then call again.` |
+| record | his log holds no line with words in it | `Nothing of his stands in the log to record as his word. Ask him, then call again.` |
+- `HH:MM` is the box's local clock (`clockOf`); a stamp that does not parse reads `an unknown time`.
+- Every time comparison is written as the thing that must hold, so a stamp that does not parse fails (reads as lapsed). The stamps are the store's own (`isStoreStamp`, `server/shared/utils.ts`).
+- A line is compared trimmed, every run of whitespace one space.
 
-### Check 3 — the firing line
-- The NEWEST spoken line of his after `armedFrom`, at or before `expiresAt`, equal to `said`. A typed line, a line before the ceremony began and a blank `said` match none. A request made before the prepare is no word.
-- THE POINTER follows the sentence, only for a line the check would take if she passed it: his newest spoken line since the ceremony began, ` His newest spoken line since then is logged as "<text>"; if that is what he meant, pass it to take_action exactly so.` With no such line, nothing.
+### Check 3 — the read-back (`readsBack(text, target, action)`)
+- A READ-BACK is a row of hers (`role: 'kaylee'`), in ANY of her turns, logged strictly after `armedFrom`, that names the target (`namesTarget` with the action: MAN-9204). A re-arm keeps the read-back from before the lapse.
+- For her memory, whose house name is the common word `memory`, it must also hold one of the action's words or every significant word of `your memory`: "Let me check my memory for that." is no read-back.
+- The check reads the log, not what she says she did: her sentences are rows of the same log.
+- `readsBack` is exported for the drivers under `.verify/`, which find her read-back in a log with it; no server file imports it.
 
-### Check 4 — the read-back
-- A READ-BACK (`readsBack`) is a row of hers (`role: 'kaylee'`), in ANY of her turns, that names the target (`namesTarget` with the action). For her memory, whose house name is the common word `memory`, it also holds an action word or says `your memory` ("Let me check my memory for that." is no read-back). The check reads the log, not what she says she did: her sentences are rows of the same log.
-- Read from: an ASSENT, `armedFrom` (a re-arm keeps the read-back from before the lapse); a named order, `preparedAt` (this prepare's own stamp: an order is a line of its own and needs a read-back of this prepare, MAN-9208). A fresh ceremony has one stamp.
-- A named order keeps the newest-line rule of check 3.
-- An assent counts only as his FIRST spoken line after her NEWEST read-back, with no spoken line of his after it. Two yes presses after one read-back: the second is refused. why: a stray yes to something else is not his word for this action.
+### The record
+Past check 3 the take passes. The record is the first of:
+1. his newest line since `armedFrom` that equals `said` once folded;
+2. his newest line since `armedFrom`;
+3. `newestLine`.
+- Only lines with words count in all three: a press that heard nothing is a log row with empty text, and the dispatcher's relay refuses empty `words`.
+- The relay door requires an integer `press`, and the row's claim (`claimAction`) is written with the same id, so the record is always a real log row.
+- `said` differing from the log refuses nothing. A take with no line of his since the read-back is not refused.
+- A fired take answers with `Recorded as his word: “<line, at most 160 characters>”.` (`recordedAs`, MAN-9203), so she sees when it is not the line she passed.
 
 ## Probe
-`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-action-word.mjs` prints each case with its answer and the check that refused it, `UNEXPECTED` and exit 1 when a case answers otherwise. No store, no model. 2026-10-29: 125 cases, 0 unexpected. Run it before editing `ACTION_WORDS`, the not-significant list, the yes runs, the negators or checks 3–6.
-| case group | shows |
+```
+D=$(mktemp -d /tmp/kaylee-word.XXXXXX) || exit 1
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-action-word.mjs "$D"
+```
+Works on a read-only `sqlite3 .backup` copy of `~/.cloudcli/auth.db` placed in `$D`; no model, the live store is never written. Prints each case PASS or UNEXPECTED, then `ALL AS THE RULE SAYS` (exit 0) or `<n> UNEXPECTED` (exit 1). 2026-10-30: 27 cases, 0 unexpected. Run it before editing `checkHisWord`, `readsBack` or `rearmOf`.
+
+| part | shows |
 |---|---|
-| the first incident of 2026-10-29 | rows 2055–2064 of `companion_log` as logged: a `queue` of the page refused with the "asked before you read it back" sentence, and `said` = row 2061 "Yes." fires |
-| the second incident (rows 2149–2155) | the take at the lapse; the re-arm and his `Yes.` of 20:16:07 fires; another spoken line after the yes is refused by the binding; another action or target is a fresh ceremony; a second re-arm counts from the first prepare; an order after the lapse needs a read-back of the re-arm |
-| thirty minutes | a yes at 29 minutes fires; the same yes at 31 lapses; a question ("Can you queue Kaylee's eyes?", "Could you…", "Should I…") is no order, the plain order after it fires |
-| a request before the prepare | his order 10 s before the prepare, a `show` on his request: refused (no word before the ceremony) |
-| the yes after a read-back, the decline, the binding | "Yes." after a read-back fires; "Forget it." and "Stop it." fire nothing; a yes before her newest read-back or a second yes is refused |
-| the pointer; a long title has a head | the pointer said only for a line the check would take; the head rule cases (MAN-9204) |
-| `clear_memory` | named orders and read-backs that fire or are refused, with the check that refuses: "Clear it." at check 5; "My memory is clear." and "You could wipe your memory later." at check 6; a read-back of "Let me check my memory for that." at check 4 |
-| the verb beside the name | MAN-9204's examples, as cases |
+| 1: the account's real rows of 2026-10-30 | "Thank you, Kaylee. It's a yes." after her read-back fires and is the record; a `said` that matches nothing is not refused; before her read-back, after the lapse and with nothing pending are refused; a read-back and no line of his since passes; "Yes please." spoken before a re-prepare the door's refusal forced fires on the re-armed action and is refused on the same prepare as a fresh ceremony |
+| 2: `rearmOf` matrix | `expired`, `refused`, `replaced` and still waiting re-arm; `cancelled`, `took`, `already` and `refused` with `MAY_HAVE_GONE_THROUGH` do not; another target, prompt or pin is fresh; 61 minutes after the first prepare is fresh, 59 re-arms |
+| 3: lines appended to the copy | a line of his with no read-back is refused; a typed line is the record; the line `said` equals wins over his newest; a `said` that matches nothing records his newest |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-action-word.mjs
 
@@ -8232,7 +8234,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/a
 |---|---|
 | `words` on queue, hide, show, answer, recut, stop, resume, kick or clear_memory | `<action> carries no words of his; leave words out.` (`answer`: `answer carries his lines in answers, one group per question; words are not taken. Leave words out.`) |
 | `answers` on any action but `answer` | `Only answer carries answers; <action> does not. Leave answers out.` |
-| a prepared target for which `canBeNamed(target, action)` is false (MAN-9204) | `No line of his can fire this: "<spoken>" has no word of its own that is not the action itself or a filler word. Tell him it cannot be done by voice.` |
+| a prepared target for which `canBeNamed(target, action)` is false (MAN-9204) | `"<spoken>" has no word of its own that is not the action itself or a filler word, so no read-back of it can be recognised. Tell him it cannot be done from here.` |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-recipe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/carried-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-recipes.ts
 
@@ -8245,7 +8247,7 @@ The card actions read the roadmap and dispatcher pictures once (`findCard`, `hou
 | `queue` | an open Accept prompt | no prompt: `There is no Accept prompt open on <spoken>. No prompt is open on it; read_card with scope prompt shows what it waits on.`; a questions round: `… It has a questions round open, not an Accept; …` | `ask` | `acceptPrompt` | `Queue <spoken>: <acceptHead>.` |
 | `hide` | an open Accept prompt (Hide approves it and holds it out of the queue), else an approved card | no prompt and: the dispatcher does not hold it; it is already hidden; it is not approved | `ask` at a prompt, else none | `acceptPrompt` at a prompt | at a prompt as `queue`; else `Hide <spoken>: it is approved, so this holds it out of the queue, paused, until he shows it.` |
 | `show` | a hidden card the dispatcher holds | the dispatcher does not hold it; it is not hidden | none | none | `Show <spoken>: it is hidden now, and this puts it back in the queue.` |
-| `rework` | `words` (his notes) | no `words`: `A Rework carries his notes, in his own spoken words. Ask him what to change, let him say it aloud, then prepare again with words: his lines exactly as he said them.`; a questions round open (`answer` takes those); no Accept open and the dispatcher does not hold the card (no designer) | `ask` at an Accept, else none | `acceptPrompt` at an Accept | `Rework <spoken> with his notes: "<line>" …; <acceptHead>.`; with no Accept `… There is no Accept prompt open, so the notes go to its designer as a message.` |
+| `rework` | `words` (his notes) | no `words`: `A Rework carries his notes, in his own words. Ask him what to change, let him say it, then prepare again with words: his lines exactly as he said them.`; a questions round open (`answer` takes those); no Accept open and the dispatcher does not hold the card (no designer) | `ask` at an Accept, else none | `acceptPrompt` at an Accept | `Rework <spoken> with his notes: "<line>" …; <acceptHead>.`; with no Accept `… There is no Accept prompt open, so the notes go to its designer as a message.` |
 | `answer` | a questions round and `answers` | no round: `No questions round is open on <spoken>; read_card with scope questions shows whether there is one.`; no `answers`; a question number above the round's count; two groups naming one number | `ask` and `questions` (the question number each carried group answers, in group order) | `questionsPrompt` | `Send the answers to <spoken>: question 1, "<line>"; question 2, no answer.` |
 | `recut`, `stop`, `resume`, `kick` | a card the dispatcher holds | not held; finished (`complete`), except `kick` | none | none | `Re-cut <spoken>: this sends its design to be cut into tasks again.` · `Stop …: this pauses it and ends its running work.` · `Resume …: this lets it run again.` · `Kick …: this wakes the dispatcher.` |
 | `resume_run` | `words` (his rulings) and a chain that stopped | no `words`; the run is one soul's launch (`list_runs` shows the chain it belongs to); no record of the chain; status `running`; status `done` or `nothing-changed` | `chainId` | none | `Resume the run <spoken> with his rulings: "<line>" ….` |
@@ -8263,7 +8265,7 @@ section: server/modules/companion/hands — the recipes (action-recipe.ts, actio
 - An `answer` carries a group per question of the round: a question he left unanswered gets an empty group, on his card and in her read-back, and `(no answer)` in the brief (MAN-9173).
 
 ## Targets — `action-targets.ts`
-Each resolves through the resolver her eyes use, so a name means one thing whether she reads or acts. Every target carries `spoken`, the name HE says it by; the card draws it and the check of his word requires it (MAN-9171).
+Each resolves through the resolver her eyes use, so a name means one thing whether she reads or acts. Every target carries `spoken`, the name HE says it by; the card draws it and her read-back must say it (MAN-9171).
 | target kind | resolved by | `spoken` |
 |---|---|---|
 | `card` | `resolveCard` (MAN-9165): name, title or a unique fragment. The name of an epic carries `.arc` (`<name>.arc`), which is how a door tells an epic from a plan of the same name; `arc` is the epic's name for a plan | the title when six words or fewer, else the name with dashes as spaces |
@@ -8281,9 +8283,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/a
 ## MAN-9279 — server/modules/companion/hands — the recipes (action-recipe.ts — Carried lines — `carried-lines.ts` (`resolveCarriedLines`)
 section: server/modules/companion/hands — the recipes (action-recipe.ts, action-targets.ts, carried-lines.ts): what each of the eleven actions takes, checks and pins at prepare; the targets open and close_followup resolve/003 Carried lines — `carried-lines.ts` (`resolveCarriedLines`)
 
-- Notes, an answer round's answers and rulings are HIS words. A line she passes in `words` or `answers` must equal one of his SPOKEN lines of the last 30 minutes (`CARRIED_WINDOW_MS`; `heardSince`), compared trimmed with whitespace folded. A typed line is not carried.
-- Each entry takes the newest spoken line equal to it that no earlier entry took: two entries equal one line only when he said it twice. An answer round resolves ONE list across every group.
-- A line not found refuses, naming it (cut at 120 characters): `"<line>" is not a line he spoke in the last 30 minutes, so it cannot travel as his words. Ask him to say it aloud, then prepare the action again with his line exactly as he said it.`
+- Notes, an answer round's answers and rulings are HIS words. A line she passes in `words` or `answers` must equal one of his lines of the last 30 minutes, spoken or typed (`CARRIED_WINDOW_MS`; `heardSince`, rows of `role: 'operator'`), compared trimmed with whitespace folded.
+- Each entry takes the newest line equal to it that no earlier entry took: two entries equal one line only when he said it twice. An answer round resolves ONE list across every group.
+- A line not found refuses, naming it (cut at 120 characters): `"<line>" is not a line of his in the last 30 minutes, so it cannot travel as his words. Ask him to say it again, then prepare the action again with his line exactly as he said it.`
 - `inOrderSaid` puts a group in the order he said the lines (by log id); that is the order they are joined in, whatever order she listed them.
 - A carried group is `{ label, lines: [{ logId, at, text }] }`: `label` null for notes and rulings, the question's text for an answer round. The card draws each line with its time.
 
@@ -8330,21 +8332,23 @@ section: server/modules/companion/hands — the doors (action-doors.ts): where e
 
 `.verify/kaylee-eyes-scratch.sh` stages a scratch CloudCLI server over a copied auth database and a scratch `DISPATCHER_HOME`; it never touches :3011, :5183, the live dispatcher home or the live auth database. `KAYLEE_EYES_PLANS` (a list of `accept`, `second`, `questions`; default `accept second`) says which plans it loads: `accept` and `second` have their Accept prompt raised; `questions` loads in state `questions` with two questions open and no cut (phases load only on a designed plan), and the server raises its questions round.
 
-`.verify/kaylee-eyes-hands.mjs` (the default command, over `accept second`): typed "Get probe eyes accept ready to queue." → the card and her read-back; the fixture clip "Queue probe eyes accept." (`.verify/kaylee-eyes-clips.mjs`, one `gemini-3.8-flash-lite-tts` call per clip, only when the file is absent) played as a press; a typed "Queue probe eyes second." fires nothing. `.verify/kaylee-eyes-recipes.ts` drives the other recipes through the real handlers with the two doors stood in (they record the order and answer `took`). The same clips list (`CLIPS`) holds the four memory clips (`brief-three-lines`, `brief-no-limit`, `forget-brief`, `clear-memory`) that the memory showings press (MAN-9192, MAN-9194).
+`.verify/kaylee-eyes-hands.mjs` (the default command, over `accept second`): typed "Get probe eyes accept ready to queue." → the card and her read-back; typed "Queue probe eyes accept." → she judges it his yes and takes it: the scratch store's `approved` by `app:kaylee`, the `relayed` record carrying that typed line exactly, the `companion_actions` row `took` and her "On your word: queued …" line; then a typed prepare of the second plan, taken down by his ×. The record is read against the log: its `press` and `said_at` are the typed row's id and `at`, its `account`, `target`, `act` and `token` the account, the plan, `accept-queue` and the Accept's lock token. Every line is typed: no clip and no Gemini call. `.verify/kaylee-eyes-recipes.ts` drives the other recipes through the real handlers with the two doors stood in (they record the order and answer `took`). The clips list (`CLIPS`, `.verify/kaylee-eyes-clips.mjs`, one `gemini-3.8-flash-lite-tts` call per clip, only when the file is absent) holds the four memory clips (`brief-three-lines`, `brief-no-limit`, `forget-brief`, `clear-memory`) that the memory showings press (MAN-9192, MAN-9194), and seven hands clips (`queue-accept`, `yes`, `answer-one`, `answer-two`, `send-answers`, `open-accept`, `close-followup`) that no driver presses.
 
-`.verify/kaylee-eyes-whole.mjs` (`KAYLEE_EYES_PLANS="accept questions" bash .verify/kaylee-eyes-scratch.sh node .verify/kaylee-eyes-whole.mjs`) is the whole arc on one stack. A Playwright page on the scratch client opens her panel, so it holds the floor, and every press is posted with that page's `x-companion-client` (read from the tab's `sessionStorage`). It runs a queue (typed prepare, the clip, the store's `approved` and `relayed` events); a second action (a hide) with a typed "Hide probe eyes accept." that fires nothing, taken down by her `cancel_action`; an answer round (two answer clips pressed first, a typed prepare that carries those two lines, the send clip, the queued designer outing's brief); an open of the card (the page lands on the Roadmap tab's In flight face, on that card); a close (a follow-up filed through a scratch chat's command door, `closed_by = 'user'`). It prints her panel's lines, her tool calls, the store's rows and `companion_actions`.
+`.verify/kaylee-eyes-whole.mjs` (`KAYLEE_EYES_PLANS="accept questions" bash .verify/kaylee-eyes-scratch.sh node .verify/kaylee-eyes-whole.mjs`) is the whole arc on one stack. A Playwright page on the scratch client opens her panel, so it holds the floor, and every line is posted with that page's `x-companion-client` (read from the tab's `sessionStorage`). It runs a queue (typed prepare, typed "Queue probe eyes accept.", the store's `approved` and `relayed` events); a second action (a hide) taken down by her `cancel_action` with nothing fired; an answer round (his two answers typed first, a typed prepare that carries those two lines, typed "Send the answers to probe eyes questions.", the queued designer outing's brief); an open of the card (typed "Open probe eyes accept.": no card waits, and the page lands on the Roadmap tab's In flight face, on that card); a close (a follow-up filed through a scratch chat's command door, typed "Close the follow-up on update the sticky header.": no card waits, `closed_by = 'user'`). It prints her panel's lines, her tool calls, the store's rows and `companion_actions`. No Gemini call.
 - The page's voice is switched off before her panel opens: `companion-voice` is set to `off` in the scratch client's localStorage and the page reloaded (the switch is read when the page starts), and the probe checks the panel's switch reads `off`. why: a page that holds the floor with the switch on, the default, pulls each sentence of hers through `GET /api/companion/speech/…`, a Gemini synthesis apiece and outside the plan's meter; six runs of this probe measured on the order of two hundred. A rebuilt page step must keep it.
-- The typed "Hide probe eyes accept." step says which thing held. Nothing fires either because she declined to call `take_action` or because the server refused her call, and only the second is the server's rule. The probe counts her `take_action` calls before and after the typed line: with one, the row's `answer` must hold the server's sentence ("That is not a line he spoke after the card went up"); with none, it prints that the refusal was NOT exercised by this step (the pure check is replayed on recorded rows by `kaylee-action-word.mjs`, MAN-9171).
-- The two checks that carry "his words verbatim" are equalities on his log, not substring tests on the card's name: the `relayed` event must hold his firing line exactly as the log row holds it (plain or JSON-escaped), and the queued outing's brief must hold the whole `Q: <question>\nA: <his logged lines joined by a space>` blocks, in order and joined by blank lines, as `action-doors.ts` composes them (a card's group label is the question), with no relay record in it. Both stay `BLOCKED` until the door lands.
+- An open and a close act at once and never wait on his panel, so their steps assert `pending === null` and an `open` / `close_followup` row `took`. Haiku sometimes asks again instead of taking, so the yes of a queue or a send is typed once more when the same action still stands (`typeYes`), and a prepare that does not stand is typed once more (`typePrepare`); no line is typed a third time.
+- The two checks that carry "his words verbatim" are equalities on his log, not substring tests on the card's name: the `relayed` event must hold his firing line exactly as the log row holds it (plain or JSON-escaped), and the queued outing's brief must hold the whole `Q: <question>\nA: <his logged lines joined by a space>` blocks, in order and joined by blank lines, as `action-doors.ts` composes them (a card's group label is the question), with no relay record in it. They print `BLOCKED` only while `dispatcher accept --help` lists no `--relay`; the door is there, so a run prints none.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-clips.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-whole.mjs
+`.verify/kaylee-no-say-shots.mjs` (`KAYLEE_EYES_PLANS="accept second" bash .verify/kaylee-eyes-scratch.sh node .verify/kaylee-no-say-shots.mjs`): her model on Haiku prepares a queue on the scratch plan from a typed line (once more if none stands), and the page draws the action card in her dock and on `/station`'s rail at 1440×900 and 390×844. It asserts that the card and the rail carry no "Say" line (no `data-companion-action-say`, no `data-station-need-say`, no quoted order, no how-line in the rail's head), that the card keeps its foot (`data-companion-action-foot`, "Lapses at HH:MM") and its Withdraw ×, and photographs `.verify/shots/kaylee-no-say-{card,card-dock,rail-1440x900,rail-390x844}.png`, the rail's card scrolled into view; then his × takes the action off the scratch panel. No Gemini call.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-clip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-clips.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-hands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-no-say-shots.mjs
 
 ## MAN-9179 — server/modules/companion/hands — the doors (action-doors.ts): where each action — The checks that want kaylee--press's `--relay` door print `BLOCKED`, not `PASS`, while `dispatcher
 section: server/modules/companion/hands — the doors (action-doors.ts): where each action goes, the briefs his lines make, the rulings file/002 The checks that want kaylee--press's `--relay` door print `BLOCKED`, not `PASS`, while `dispatcher
 
-- The checks that want kaylee--press's `--relay` door print `BLOCKED`, not `PASS`, while `dispatcher accept --help` does not list `--relay`, and the exit code is 3 when only those are missing. Measured 2026-10-28 on that tree: the queue ends `refused` with `usage: dispatcher accept [-h] [--hidden] [--lock TOKEN]`, the answers round `refused` with `usage: dispatcher [-h]`, nothing is approved and no outing is queued; the typed take, her cancel, the open and the close pass. The probe also asserts that refusal is the dispatcher's own and wrote nothing.
-- A chat's account is known only while it has a run or a live host (`accountOfChat`), so the follow-up is filed after the scratch chat's one Haiku turn, as its CLI would file it (a chat that never ran is refused 403). That chat's session host lives in tmux and outlives both the chat's deletion and the scratch server, so the probe ends the tmux sessions named for its chat id (`tmux -L cloudcli-sessions`) when it is done. A follow-up is spoken of by the first five words of its text (`findFollowup`), so its clip says ordinary words: "probe eyes wait on" was heard "ProbeEyes wait on", and "retest the lane drag" "lean drag", neither naming the follow-up.
-- The speech-to-text is not steady on these clips: "Queue probe eyes accept." was heard "queue probe eyes accept", "cue probe eyes accept" and "cue probe eyes except"; one answer clip was blocked outright (`request was blocked (OTHER)`). Each press is heard once, with one exception: a press that was not heard, or that was meant to fire the standing action and fired nothing, is pressed once more, as he would say it again, and a typed prepare that leaves nothing of its kind on his panel is typed once more (a second time with its own wording for the answers round, where Haiku read "probe eyes questions" as the accept card and "questions" as read_card's scope). No clip is pressed a third time. "cue probe eyes accept" fires nothing: the plan's own name holds `accept`, so the verb must stand outside the name (MAN-9171, check 6), and that line says none. A clip's `style` (the queue clip is spoken slowly) is passed to `kaylee-clip.mjs` as `KAYLEE_CLIP_STYLE`.
+- The checks that want kaylee--press's `--relay` door print `BLOCKED`, not `PASS`, while `dispatcher accept --help` does not list `--relay`; the exit code is 3 when only those are missing. With the door absent, the probe also asserts the refusal is the dispatcher's own (`usage:`) and wrote nothing.
+- A chat's account is known only while it has a run or a live host (`accountOfChat`), so the follow-up is filed after the scratch chat's one Haiku turn, as its CLI would file it (a chat that never ran is refused 403). That chat's session host lives in tmux and outlives both the chat's deletion and the scratch server, so the probe ends the tmux sessions named for its chat id (`tmux -L cloudcli-sessions`) when it is done. A follow-up is spoken of by the first five words of its text, so the typed close line says ordinary words that name it.
+- A typed prepare that leaves nothing of its kind on his panel is typed once more (a second time with its own wording for the answers round, where Haiku read "probe eyes questions" as the accept card and "questions" as read_card's scope); the yes of a queue or a send is typed once more when the same action still stands. No line is typed a third time. The plan's own name holds `accept`, so the verb of a firing line must stand outside the name (MAN-9171, check 6).
 
 `.verify/kaylee-eyes-reads.mjs` (the dev server, account 1's Kaylee on Haiku, put back as found): the fifteen typed questions of her eyes, each in a fresh conversation (the pair "Find the DocSpace page about the voice companion." and "Give me its outline." shares one). It prints the tool she called, read back from her CLI transcript (the JSONL under `~/.claude/projects/`, in the folder her working directory encodes), the first line of its answer and her sentences, then `grep -c -i -E "cost|token|usage|spend"` over her sentences of the run (0). A line a server restart cut in two is asked again once.
 
@@ -8353,13 +8357,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/a
 ## MAN-9174 — server/modules/companion/hands — prepare_action, take_action and cancel_action: the protocol, the claim, the lapse and the ending (hands-tools.ts, action-end.ts, action-prompts.ts)
 
 Her hands for the actions that change the house: `prepare_action`, `take_action`, `cancel_action` (`hands/hands-tools.ts`, `handsTools(deps)`, built by `buildCompanionTools`, MAN-9070). `handsTools` also hands over `open` and `close_followup` (`hands/direct-tools.ts`, MAN-9207), which wait for nothing. Each description is its prompt line (`toolLine`). None is `readOnlyHint`.
-Ruling 3, the operator's: "only on my explicit spoken word for that specific card, never on her own judgment". Re-ruled 2026-10-29:
+Operator, 2026-10-30: "He definitely wants Kaylee to decide, and no one else; no scripted word"; "a typed line on her panel counts too". She decides whether and when he agreed; the server confirms she read the action back and records his line (MAN-9171 §Who decides). Rulings 2026-10-29:
 - "Make it accept a read-back that names the target in plain words, in any of her turns since the prepare."
-- "My 'yes' should count. When the action on the panel is the only one and I say yes, that is my word for it."
 - "Keep the full ceremony only for the actions that change the house: queue, hide, show, rework, answer, recut, stop, resume, kick, resume_run, clear_memory." `show` is `dispatcher unhide`: it puts a held, approved card back in the queue.
 - `open` and `close_followup`: "no prepare, no yes, no lapse" (MAN-9207).
-- "raise the lapse from five minutes to thirty, and when it does lapse, let her re-arm it and accept my next yes without me having to say the title" (MAN-9208).
-The server holds it. Prepare pins what he is shown; take fires only when `checkHisWord` passes on her log (MAN-9171). Recipes: MAN-9172. Doors: MAN-9173. The words of an action: MAN-9203. `clear_memory`: MAN-9194. Rules an edit must keep: INV-10099.
+- "raise the lapse from five minutes to thirty, and when it does lapse, let her re-arm it" (MAN-9208).
+The server holds what it can. Prepare pins what he is shown; take fires only when `checkHisWord` passes on her log: a read-back of hers stands since the ceremony began (MAN-9171). Recipes: MAN-9172. Doors: MAN-9173. The words of an action: MAN-9203. `clear_memory`: MAN-9194. Rules an edit must keep: INV-10099.
 
 ## Inputs (zod)
 | tool | field | rule |
@@ -8368,25 +8371,25 @@ The server holds it. Prepare pins what he is shown; take fires only when `checkH
 | | `target` | string, trimmed, 1–300; resolved per action (MAN-9172) |
 | | `words` | optional, 1–20 lines of 1–8000; `rework` and `resume_run` only (required there) |
 | | `answers` | optional, ≤20 `{ question: int ≥ 1, words: 1–20 lines }`; `answer` only (required there) |
-| `take_action` | `said` | string, trimmed, 1–8000: his newest spoken line, as logged, after her read-back (`SAID_DESCRIPTION`) |
+| `take_action` | `said` | string, trimmed, 1–8000: his line as her log holds it, spoken or typed, passed when she judges he agreed (`SAID_DESCRIPTION`) |
 | `cancel_action` | none | |
 
 ## `prepare_action`, in order
 1. `endLapsedAction` (§Ending below): a standing action past its `expiresAt` ends `expired`. A take of this process carrying the standing action out → refused `The action on his panel is being carried out now; wait for its answer.`
 2. `prepareRecipe` (MAN-9172): the sentence that refuses, or the action with its pin, prompt, carried lines, `say` and read-back.
 3. Step 1's carrying-out check again: the recipe awaited, and a take may have begun.
-4. `rearmOf` (MAN-9208): the lapsed ceremony this prepare re-arms, else none.
+4. `rearmOf` (MAN-9208): the ceremony this prepare re-arms (one that lapsed, was refused by the door or was replaced, of the same thing, within the hour), else none.
 5. `id` = `randomUUID()`; `preparedAt` = now; `expiresAt` = `preparedAt` + 30 min (`WAIT_MS`); `armedFrom` = the re-armed ceremony's, else `preparedAt`.
 6. `companionDb.openAction` writes the row of `companion_actions` (MAN-9082) with no outcome and `armed_from` (the re-arm's, else NULL). A standing action, if any, ends `replaced`. `store.setPending(pending)` writes `pending_json` WITH the pin and `armedFrom` and sends `companion_pending` WITHOUT them. A `setPending` that throws ends the new row `cancelled`.
-7. Answers: `On his panel, waiting for his word: <SAY_VERB lower-cased> <spoken>. <next step> A line he typed never fires it. It lapses at <HH:MM>.` and, when one was standing, ` That replaced "<its say>", which was waiting.` The next step is `nextStepFor`, or `rearmStepFor` for a re-arm (MAN-9203).
+7. Answers: `On his panel, waiting for his answer: <SAY_VERB lower-cased> <spoken>. <next step> It lapses at <HH:MM>.` and, when one was standing, ` That replaced "<its say>", which was waiting.` The next step is `nextStepFor(readBack)`, or `rearmStepFor(readBack, endedAs)` for a re-arm (MAN-9203).
 
 ## `take_action`, in order
 1. `endLapsedAction`. A take of this process carrying the standing action out → refused (same sentence as above).
-2. `checkHisWord` on `companionDb.heardSince(userId, armedFrom)` (no rows for a lapsed action, so the check answers the lapse). A refusal: `companionDb.noteRefusal` keeps its sentence as the row's `answer`, the action STAYS on his panel, and the answer is that sentence. The pointer at his newest spoken line is part of the check's sentence (MAN-9171 §Check 3).
+2. `checkHisWord` on `companionDb.heardSince(userId, armedFrom)` (no rows for a lapsed action, so the check answers the lapse) and `companionDb.newestOperatorLine(userId, true)`. A refusal: `companionDb.noteRefusal` keeps its sentence as the row's `answer`, the action STAYS on his panel, and the answer is that sentence.
 3. `carryOut(userId, id, …)` holds the id in this process; `claimAction` writes `said`, `said_at`, `said_log_id` on the row, only while it has no outcome and no claim. A false → refused `That action is no longer waiting for his word: it has ended, or another call is carrying it out. Look at his panel, and prepare it again if he still wants it.`
 4. `fireAction` (MAN-9173) with the record of his word: `RelayedPress { account: { id: userId, name: users.username }, saidAt: line.at, words: line.text, press: line.id, token }`; `token` = the pinned ask's lock token for an Accept, else `null`. `words` is the log's text, never her argument.
 5. `endAction` with the door's `outcome` and `answer` (`said`, `said_at`, `said_log_id` again); a `system` line on her panel; `setPending(null)` only when the pending action is still this one.
-6. Answers `Done on his word: <done>[ (it was already so)]. <door's line>`; a refused door is an error `Not done: <door's line>`.
+6. Answers `Done on his word: <done>[ (it was already so)]. <door's line> Recorded as his word: “<the record, at most 160 characters>”.` (`recordedAs`, MAN-9203); a refused door is an error `Not done: <door's line>`.
 
 `<done>` is `doneOf(action, spoken)` (`action-prompts.ts`): `<DONE_VERB> <spoken>`, except `clear_memory`, whose `DONE_VERB` `cleared her memory` already names its target and stands alone.
 
@@ -8420,8 +8423,10 @@ Exports `isCarryingOut`, `carryOut`, `withdrawStandingAction`, `endLapsedAction`
 - A withdrawal ends the row before the state clears, and the state clears even when the row was already ended (a Clear got there first), so a page is never left drawing an action no row waits on.
 
 ## Proof
-`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-yes-counts.mjs`: the real tools over a FRESH scratch database (nothing of `~/.cloudcli/auth.db`), a loopback ArchPulse, the bank stand-in (`lib/kaylee-bank-standin.mjs`) and an `openOnFloor` that records; no model. Exit 1 on a FAIL. 2026-10-29: 43 PASS, 0 FAIL.
-- A–D: `open` and `close_followup` (MAN-9207). E: `clear_memory`: a yes with no read-back, a yes before it, "Yes?" and "Hey." are refused; his yes after her read-back clears both memories. F, F2, F3: the lapse and the re-arm (MAN-9208).
+`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-yes-counts.mjs`: the real tools over a FRESH scratch database (nothing of `~/.cloudcli/auth.db`), a loopback ArchPulse, the bank stand-in (`lib/kaylee-bank-standin.mjs`) and an `openOnFloor` that records; no model. Exit 1 on a FAIL. 2026-10-30: 41 PASS, 0 FAIL.
+- A–D: `open` and `close_followup` (MAN-9207).
+- E: `clear_memory`: a take with no read-back since the prepare is refused whatever he said; after her read-back the take fires with the line she passed as the record, a typed line included, and with no line of his since the read-back it records his newest.
+- F: the lapse and the re-arm (MAN-9208): her read-back from before the lapse stands; a cancel, another action, another target is a fresh ceremony; an `open` between does not end the lapse.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-yes-counts.mjs
 
@@ -8482,7 +8487,7 @@ RULING 4: a memory is never her paraphrase of him. The server writes the body fr
 | `quotesAlike(a, b)` | `boolean` | two bodies quote the same words |
 
 ## `findHisLine`
-`rows` are the log's own shape (`{ id, at, role, via, text }`), any order. Texts are compared trimmed with every run of whitespace one space (`checkHisWord`'s fold). The match is the WHOLE row: a talk press is logged as one row whose text is the whole transcript (`companion-press.ts`), so `said` must be a whole press, and a sentence cut out of a longer press equals no row and gets the absent sentence.
+`rows` are the log's own shape (`{ id, at, role, via, text }`), any order. Texts are compared trimmed with every run of whitespace one space. The match is the WHOLE row: a talk press is logged as one row whose text is the whole transcript (`companion-press.ts`), so `said` must be a whole press, and a sentence cut out of a longer press equals no row and gets the absent sentence.
 
 | rows | answer |
 | --- | --- |
@@ -8774,7 +8779,7 @@ Ruling 4: he clears her whole memory only by his own act. One word of his forget
 | `{ kind: 'word', account, line }` | `He said (<account>, <at>): “<text>”`, the firing line |
 - Lists the bank once and retires every row, in order. Then it sends the hint `companion_memory` once (MAN-9308 §`announceMemoryChanged()`), also over an empty bank (nothing retired; the page's one extra read), and after a clear that stopped part way once some rows were retired or the retire that stopped it went unanswered.
 - Answers `{ ok: true, forgotten }`, or `{ ok: false, sentence }`: `Your memory can't be reached just now: <sentence>.` when the list fails; else `[<n> of <total> were forgotten before it: ]<sentence>[ That one may have been forgotten too.]`.
-- TWO CALLERS ONLY, each his own act: `clearMemoryFromSettings(userId)` (`kind: 'settings'`, `account` = `accountName(userId)`, `at` = now as ISO), behind `DELETE /api/companion/memory` (MAN-9188); and the hands' `clear_memory` on his spoken word (`hands/action-doors.ts`, `kind: 'word'`: MAN-9194). No tool of hers reaches it.
+- TWO CALLERS ONLY, each his own act: `clearMemoryFromSettings(userId)` (`kind: 'settings'`, `account` = `accountName(userId)`, `at` = now as ISO), behind `DELETE /api/companion/memory` (MAN-9188); and the hands' `clear_memory` on his word (`hands/action-doors.ts`, `kind: 'word'`: MAN-9194). No tool of hers reaches it.
 - It never touches `memory_forget_line`.
 - `readMemory()` is `list()` counted: `{ count, pageId: BANK_PAGE_ID, reason: null }`; a door that stops it is `{ count: null, pageId, reason: <the door's sentence> }`, never a count of 0. Never throws. The card that draws it: MAN-9184.
 
@@ -8792,9 +8797,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/
 
 ## MAN-9194 — server/modules/companion/hands — the thirteenth action, clear_memory: his words, its recipe, its door, its card
 
-`clear_memory` is the last of the eleven actions that wait for his word: it retires every memory of her own bank, on his spoken word, read back first. The protocol is MAN-9174; this row holds what is its own. The check of his word: MAN-9171; the other recipes and doors: MAN-9172, MAN-9173. What it calls: `clearMemory` (MAN-9193).
+`clear_memory` is the last of the eleven actions that wait for his word: it retires every memory of her own bank, read back first and fired when she judges he agreed. The protocol is MAN-9174; this row holds what is its own. The check of his word: MAN-9171; the other recipes and doors: MAN-9172, MAN-9173. What it calls: `clearMemory` (MAN-9193).
 
-Ruling 4: he clears her whole memory only by his own act. This is the one tool-side way to it, and a press fires it.
+Ruling 4: he clears her whole memory only by his own act. This is the one tool-side way to it: it is read back to him, and it fires when she judges he agreed and calls `take_action` (MAN-9171 §Who decides).
 
 ## The wire
 - `CompanionActionKind` gains `'clear_memory'`; `CompanionActionTarget` gains `{ kind: 'memory'; spoken: string; count: number }`: `spoken` is `your memory`, `count` the memories held when it was prepared. Both in `server/shared/companion-types.ts` and its mirror `src/shared/companion-types.ts` (MAN-9086).
@@ -8804,10 +8809,10 @@ Ruling 4: he clears her whole memory only by his own act. This is the one tool-s
 | what | value |
 |---|---|
 | `ACTION_WORDS.clear_memory` | clear, wipe, erase, empty, forget everything |
-| `SAY_VERB` | `Clear`; `say` = `Clear your memory` |
+| `SAY_VERB` | `Clear`; the order (`say`) = `Clear your memory` |
 | `DONE_VERB` | `cleared her memory`; `doneOf(action, spoken)` adds no target after it |
 | names the target | `your memory`, or its house name, the word `memory` |
-| ordered by | read back first (MAN-9171). Then a named order that OPENS with an action word after the lead-ins, or a bare yes (`isAssent`) that is his first spoken line after her newest read-back; a statement holding both words is refused (rules: MAN-9204) |
+| read back by | a sentence of hers that names the target and holds an action word or says `your memory` (`readsBack`, MAN-9171): "Let me check my memory for that." is none. Then her `take_action`; the server reads no word of his |
 
 ## The prepare — `prepareClearMemory` in `action-recipe.ts`, in order
 | check | refused with |
@@ -8834,7 +8839,7 @@ Ruling 4: he clears her whole memory only by his own act. This is the one tool-s
 - `prepare_action` (`hands-tools.ts`): `ACTIONS` includes `clear_memory`; the `action` description says `clear_memory forgets every memory you keep`; the `target` description gains `your memory as "your memory"`. Her prompt line: MAN-9080.
 
 ## Prove it
-- `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-action-word.mjs`: `checkHisWord` on a `clear_memory` pending. "Clear your memory." fires after a read-back, and so does a bare "Yes." as his first spoken line after her newest read-back; "Clear it." and "Forget it." are refused at check 5 (they name nothing, and an own word beside "it" is no assent).
+- `.verify/kaylee-yes-counts.mjs` section E (MAN-9174 §Proof): the real tools on a scratch database. A take with no read-back since the prepare is refused; after her read-back it fires, with the line she passed (typed too) as the record, and both memories are forgotten.
 - `.verify/kaylee-memory-clear-hands.mjs`: `prepare_action`, `take_action` and `cancel_action` for it, every sentence above, over a copy of `auth.db` and a stand-in door; no model.
 - `.verify/kaylee-memory-clear.mjs` (scratch stack, MAN-9193): typed "Get ready to clear your memory." prepares it, the card draws, the press "Clear your memory." empties the bank, and the scratch store's `history` keeps every row.
 
@@ -8903,7 +8908,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-model-choice.mjs
 `hands/action-prompts.ts`: strings in, strings out, no I/O. Consumers: `action-recipe.ts` (the prepare), `hands-tools.ts` and `direct-tools.ts` (the answers to her and the panel's line), `action-doors.ts` (the answers and the briefs a door carries). Protocol: MAN-9174.
 
 ## `SAY_VERB` and `DONE_VERB`
-| action | `SAY_VERB` (what he says first) | `DONE_VERB` |
+| action | `SAY_VERB` (the verb of the order) | `DONE_VERB` |
 |---|---|---|
 | `queue` | Queue | queued |
 | `hide` | Hide | hid |
@@ -8918,17 +8923,20 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-model-choice.mjs
 | `open` | Open | opened |
 | `close_followup` | Close the follow-up on | closed the follow-up on |
 | `clear_memory` | Clear | cleared her memory |
-- `say` = `<SAY_VERB> <target.spoken>` (`sayOf`). Each of the eleven verbs holds one of the action's own words (`ACTION_WORDS`, MAN-9204), so saying `say` aloud always passes the word check. The `open` and `close_followup` verbs serve the panel's lines alone: no word of his is checked for them.
+- `say` = `<SAY_VERB> <target.spoken>` (`sayOf`): the action as one order, stored with the pending action and named in her answers and the panel's system lines. It is never a phrase for him to say: she reads the action back in her own words, naming the target in full, which `readsBack` looks for, and judges from the conversation whether he agreed. No page draws it. The `open` and `close_followup` verbs serve the panel's lines alone.
 - `doneOf(action, spoken)` = `<DONE_VERB> <spoken>`, except `clear_memory`, whose `DONE_VERB` `cleared her memory` already names its target and stands alone.
 - `NO_FLOOR` = `No page of his holds the floor; he must open your panel first.` (`direct-tools.ts`, `openOnFloor`)
 - `clockOf(stamp)`: the stamp's local `HH:MM`; a stamp that does not parse reads `an unknown time`.
+- `recordedAs(lineText)` = `Recorded as his word: “<line, whitespace folded, at most 160 characters>”.` Ends a fired take's answer (MAN-9174), so she sees when the record is not the line she passed (MAN-9171 §The record).
 
-## `nextStepFor(action, target, say, readBack)` — what the prepare tells her next
-`<short>` = `shortNameOf(target)` (MAN-9204), the shortest name the check takes, never a longer title. `<first>` = the first of `ACTION_WORDS[action]`. `<read-back>` = the recipe's sentence (MAN-9172). `<take>` = `Then call take_action with his newest spoken line, exactly as logged; a line that came before your read-back is not his answer to it, and a bare yes counts only as the first thing he says after your newest read-back: if he said anything else first, read it back again.` The prepare's answer is `On his panel, waiting for his word: <SAY_VERB lower-cased> <spoken>. <this text> A line he typed never fires it. It lapses at <HH:MM>.` (MAN-9174).
-`Read it back to him in plain words, then stop: <read-back> His next spoken yes fires it, and so do words of his own naming <short> and saying <first>, or "<say>". <take>`
+## `nextStepFor(readBack)` — what the prepare tells her next
+`<read-back>` = the recipe's sentence (MAN-9172). `<decides>` (`SHE_DECIDES`) = `Whether he agreed, and when, is your call from the conversation: there are no set words, and a line he typed counts as much as one he spoke. When you judge he agreed, call take_action with his line exactly as logged, which is the record of what he said. When he declines, or you judge he does not want it, call cancel_action. The server only confirms that you read it back and records the logged line that equals the one you pass (his newest line when none does, and the answer names it); never call take_action on your own words.`
+`Read it back to him in plain words, then stop: <read-back> <decides>`
+The prepare's answer is `On his panel, waiting for his answer: <SAY_VERB lower-cased> <spoken>. <this text> It lapses at <HH:MM>.` (MAN-9174).
 
-## `rearmStepFor(action, target, say, readBack, lapsedAt)` — the same, after a re-arm (MAN-9208)
-`Re-armed: it lapsed at <HH:MM of lapsedAt> and this takes its place. Your read-back from before the lapse still stands for a yes he has said since, and for nothing else. If his newest spoken line is a bare yes, call take_action now with his newest spoken line, exactly as logged, and ask him nothing. If it is anything else (an order that names it, other talk) or he has said nothing since, read it back to him again and stop: <read-back> His next spoken yes fires it, and so do words of his own naming <short> and saying <first>, or "<say>". <take>`
+## `rearmStepFor(readBack, endedAs)` — the same, after a re-arm (MAN-9208)
+`<ended>` by `endedAs`: `expired` → `it lapsed`; `refused` → `the house refused it when you took it`; `replaced` → `it was already on his panel`.
+`Re-armed: <ended>, and this takes its place. Your read-back from before still stands. If you have already judged that he agreed to what you read back, and nothing he said since changes that, call take_action now with his line exactly as logged and ask him nothing. If he has not answered yet, or you are unsure, read it back to him again and stop: <read-back> <decides>`
 
 ## `systemLine(done, outcome, said)` — the panel's line after an action went through its door
 `done` = `{ action, target, say }`; the sentence and its `Source` rule are in MAN-9174 §`take_action`. Consumers: `hands-tools.ts` (a take), `direct-tools.ts` (an open and a close).
@@ -8939,11 +8947,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-model-choice.mjs
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts
 
-## MAN-9204 — server/modules/companion/hands — the words the check of his word reads (action-word.ts): the action words, the name rule, the head of a long title, the verb beside the name, the order words
+## MAN-9204 — server/modules/companion/hands — the words the check reads (action-word.ts): the action words, the name rule, the head of a long title
 
-What `checkHisWord` (MAN-9171) reads his line against, in `hands/action-word.ts`: the action words, the name rule, the head of a long title, the verb beside the name, the order words. Pure functions, shown one by one by `.verify/kaylee-action-word.mjs`.
+What `canBeNamed` and `readsBack` (MAN-9171) judge her sentences by, in `hands/action-word.ts`: the action words, the name rule, the head of a long title. The server compares no word of his (MAN-9171 §Who decides). Pure functions, driven by `.verify/kaylee-action-word.mjs` through the checks.
 
-## `ACTION_WORDS` (the eleven that wait for his word; the first of each is the one a refusal names and the prepare tells her to listen for)
+## `ACTION_WORDS` (the eleven that wait for his word; private)
 | action | words |
 |---|---|
 | `queue` | queue, accept, approve |
@@ -8957,28 +8965,19 @@ What `checkHisWord` (MAN-9171) reads his line against, in `hands/action-word.ts`
 | `kick` | kick, wake |
 | `resume_run` | resume, rerun, re run, continue |
 | `clear_memory` | clear, wipe, erase, empty, forget everything |
-- `wordsOf(text)`: NFC, lower case, apostrophes (`' ‘ ’ ʼ`) dropped, every other run of non-letters and non-digits one space; `''` and punctuation are no words.
-- `holdsActionWord(said, action)`: one of the action's words stands in his words as a run, side by side, in order. "restart" does not hold "start"; "re cut" is held as the run `re cut`. The plain predicate; the check asks `holdsActionWordBesidesName`.
+- Read for two things: `canBeNamed` (a name made only of an action's own words names nothing) and the read-back of her memory (`holdsActionWord`).
+- `wordsOf(text)` (exported; `action-recipe.ts` asks it of the clear's target): NFC, lower case, apostrophes (`' ‘ ’ ʼ`) dropped, every other run of non-letters and non-digits one space; `''` and punctuation are no words.
+- `holdsActionWord(text, action)` (private): one of the action's words stands in the text as a run, side by side, in order. "restart" does not hold "start"; "re cut" is held as the run `re cut`.
 
-## The name — `namesTarget(said, target, action?)`
-- Every significant word of one of the target's names is among his words, in any order. Names (`namesOf`): its `spoken` and its house name read as words — a card's `name`, a run's `plan` (else its `runId`), a page's `pageId`, her memory's the word `memory` ("Clear my memory." names it as surely as "Clear your memory."); a chat, a follow-up and a check have `spoken` alone (a check's is its label; a check is never a pending action, so only a record of an open reaches this). why: "Kaylee's eyes" heard as "Kaylee eyes" must still fire.
+## The name — `namesTarget(text, target, action?)` (private; `readsBack` asks it)
+- Every significant word of one of the target's names is among the words of `text`, in any order. Names (`namesOf`): its `spoken` and its house name read as words — a card's `name`, a run's `plan` (else its `runId`), a page's `pageId`, her memory's the word `memory` ("Clear my memory." names it as surely as "Clear your memory."); a chat, a follow-up and a check have `spoken` alone (a check's is its label; a check is never a pending action, so only a record of an open reaches this). why: her read-back need not repeat a title word for word.
 - NOT SIGNIFICANT (never required): the, a, an, of, to, for, on, in, at, and, card, plan, feature, epic, run, page, chat, session, follow, up, followup, please, it, its, my, this, that.
-- A name with no significant word names nothing. With an `action`, a name whose every significant word is one of the action's own words names nothing either (the card "Epic queue" under `queue`): `canBeNamed(target, action)` is false and the prepare refuses it at once (MAN-9172) instead of putting a card up that only lapses.
-- KNOWN LIMIT, SIBLINGS: the check holds ONE target and cannot see the cards beside it. "Queue kaylee eyes." fires a pending card `kaylee`; `restorly--chat` is covered by "restorly" alone. What holds the line is the full name in `say` and, for a FULL action, in her read-back, which he hears first. The head rule below widens naming.
+- A name with no significant word names nothing. With an `action`, a name whose every significant word is one of the action's own words names nothing either (the card "Epic queue" under `queue`): `canBeNamed(target, action)` (exported) is false and the prepare refuses it at once (MAN-9172) instead of putting a card up that only lapses.
+- KNOWN LIMIT, SIBLINGS: the read-back detector holds ONE target and cannot see the cards beside it. A sentence of hers that says the words of a shorter-named pending card in passing ("kaylee" for a card `kaylee`) counts as its read-back; `restorly--chat` is covered by "restorly" alone. What holds the line is the full name, which the prepare's answer tells her to read back in her own words. The head rule below widens naming.
 
 ## The head of a long title (`spoken` only; a house name has none)
-- A `spoken` with a tail is also named by its HEAD (`headOf`): the text before the first of ` — `, ` – `, `: `, ` (`, when it holds at least two significant words. The full name still names it. "Technician intake form for the scheduler — skills, certifications, …" is named by "open scheduler technician intake form". why: nobody says a tail.
+- A `spoken` with a tail is also named by its HEAD (`headOf`): the text before the first of ` — `, ` – `, `: `, ` (`, when it holds at least two significant words. The full name still names it. "Technician intake form for the scheduler — skills, certifications, …" is named by a read-back that says "open scheduler technician intake form". why: she reads a title back without its tail.
 - A trailing prepositional phrase of the head (opens with for, of, to, on, in, at, with, from, by, about, under; `shortHeadOf`) is optional while two significant words remain without it: cut at the first preposition that leaves two. "Open the technician intake form" names that page; "Open the technician form" and "Open the scheduler" do not. A head with fewer than two significant words without its phrase needs the phrase ("Report on the scheduler — details": "open the report" names nothing, "open the report on the scheduler" does). A head of one significant word is no head: the whole name.
-- `shortNameOf(target)`: the head less its phrase, else the head, else `spoken`. What the prepare's answer tells her to listen for (`nextStepFor`, MAN-9203), never a title the server takes shorter.
-
-## The verb beside the name — `holdsActionWordBesidesName(said, target, action)` (private)
-- The significant words of each name of the target (head forms included) that his words cover are taken out of his line, one occurrence each, and an action word must stand in what is left; the name covered most fully decides, so it fails closed. why: a name can hold an action word beside others (the card "Probe eyes accept" under a queue, `accept` being a queue word) and would be its own verb.
-- "Queue probe eyes accept." fires. The bare name, a misheard "Cue probe eyes accept." and "Open probe eyes accept." under a queue are refused with `His words do not say queue.`. A name that is the verb as well ("Queue queue drying") is ordered by saying the verb once more.
-
-## An order, not a no or a question — `takesItBack(said, target, assent)`
-- Refused when the line ends in `?` (an assent too: "Yes?"). For a non-assent also when it opens with should, can, could, would, do, does, is, are or will, or holds a negator: no, nope, not, never, without, cannot, dont, doesnt, didnt, cant, couldnt, wont, wouldnt, shouldnt, isnt, arent, wasnt, werent, havent, hasnt. The target's own name words are set aside first ("No more polling" can be ordered).
-- It can refuse a plain order that says "no" ("Queue it, no problem"); it never accepts a refusal. The cure for a false refusal is to say the order again.
-- `clear_memory` (`ORDERED_VERB_FIRST`, `opensWithActionWord`): a NAMED order needs the line's first word after the lead-ins (please, okay, ok, alright, yes, yeah, yep, sure, now, go, ahead, and, so, then, just, hey) to be one of its action words. "Please clear your memory." and "Forget everything in your memory." fire; "My memory is clear." and "You could wipe your memory later." are refused with the no-or-question sentence. why: `clear` and `empty` are adjectives and the name is one common word, so a statement holds both as a bag of words. A bare yes (`isAssent`, MAN-9171) fires it with no word said.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts
 
@@ -9025,42 +9024,41 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/d
 
 ## MAN-9208 — server/modules/companion/hands — the lapse and the re-arm (action-rearm.ts): thirty minutes, what a prepare inherits, what it never does
 
-`hands/action-rearm.ts` (`rearmOf(userId, prepared)`): asked by `prepare_action` (MAN-9174) before it starts a ceremony of one of the eleven (`CompanionCeremonyAction`). Reads her record of actions only. The caller has already ended a standing lapse (`endLapsedAction`, `action-end.ts`), which is what puts that row here as `expired`.
-Rulings 2026-10-29: "raise the lapse from five minutes to thirty, and when it does lapse, let her re-arm it and accept my next yes without me having to say the title."
+`hands/action-rearm.ts` (`rearmOf(userId, prepared, nowMs = Date.now())`): asked by `prepare_action` (MAN-9174) before it starts a ceremony of one of the eleven (`CompanionCeremonyAction`). Reads her record of actions only. The caller has already ended a standing lapse (`endLapsedAction`, `action-end.ts`), which is what puts that row here as `expired`.
+Ruling 2026-10-29: "raise the lapse from five minutes to thirty, and when it does lapse, let her re-arm it". Since 2026-10-30 a card the door refused or a newer prepare replaced re-arms too; whether he agreed is hers (MAN-9171 §Who decides).
 
 ## The wait
 - `WAIT_MS` = 30 minutes (`hands-tools.ts`): `expiresAt` = `preparedAt` + 30 min. The page's fixture (`companion-fake.ts`) lapses at the same 30.
 - Nothing times a lapse out: the next prepare, take or cancel ends it `expired` (MAN-9174 §Ending).
 - A stored pending carries `armedFrom` beside `preparedAt` and `expiresAt` (`CompanionStoredPending`, server-only; `isStoredPending` requires all three as store stamps). The row's `armed_from` is NULL for a fresh ceremony.
 
-## `rearmOf` → `{ armedFrom, lapsedAt }` or `null`
-`prepared` = `{ action, target, prompt, carried, pin }` as the recipe fixed them. The lapsed ceremony is `companionDb.newestCeremonyAction(userId)`: the account's newest `companion_actions` row by `prepared_at`, then `rowid`, whose action is not `open` or `close_followup`.
-| condition | answers |
+## `rearmOf` → `{ armedFrom, endedAs }` or `null`
+`prepared` = `{ action, target, prompt, carried, pin }` as the recipe fixed them. The ceremony before it is `companionDb.newestCeremonyAction(userId)`: the account's newest `companion_actions` row by `prepared_at`, then `rowid`, whose action is not `open` or `close_followup`.
+| the newest ceremony row | `endedAs` |
 |---|---|
-| no such row, or its `outcome` is not `expired` | `null`: a fresh ceremony |
-| `action`, `target_json`, `pin_json`, `prompt`, `carried_json` each equal the row's column as written (`JSON.stringify` of the prepared value) | `{ armedFrom: row.armed_from ?? row.prepared_at, lapsedAt: row.expires_at }` |
-| any one differs | `null`: a fresh ceremony |
-- why the comparison is the stored record: his yes answered one read-back. Memories counted again (the `clear_memory` target holds the count), an Accept raised again (the pin's ask and lock token), other notes or answers (`carried`) or another prompt text is another read-back. A difference costs one more yes and never fires one.
+| `outcome` NULL: still waiting on his panel (this prepare ends it `replaced`) | `replaced` |
+| `expired` | `expired` |
+| `replaced` | `replaced` |
+| `refused`, `answer` not `MAY_HAVE_GONE_THROUGH` (`action-end.ts`): the door refused the fire | `refused` |
+| `refused` with `MAY_HAVE_GONE_THROUGH` (the server stopped mid-fire), `took`, `already`, `cancelled` | `null`: a fresh ceremony |
+- Written as the outcomes that re-arm, so an outcome added later re-arms nothing until `endedAsOf` names it.
+- Then `action`, `target_json`, `pin_json`, `prompt`, `carried_json` each equal the row's column as written (`JSON.stringify` of the prepared value), else `null`. why: her read-back covered one thing. Memories counted again (the `clear_memory` target holds the count), an Accept raised again (the pin's ask and lock token), other notes or answers (`carried`) or another prompt text is another read-back. A difference costs one more read-back and never fires one.
+- Then the age: `armedFrom` = the row's `armed_from ?? prepared_at`; a ceremony that began more than `READ_BACK_STANDS_MS` (one hour: two waits) before `nowMs` is a fresh ceremony, however it ended. A stamp that does not parse reads as too old. why: the read-back is the only thing the server checks before a fire, so it must be about THIS request; lengthening the window widens the only protection `clear_memory` has.
 - A re-arm keeps `armedFrom` (a second re-arm still counts from the first prepare), has its own `preparedAt` and a fresh `expiresAt`, and writes `armed_from` on its row.
-- A ceremony of another action or target since the lapse, a take or a cancel is a newer row: the lapse no longer stands.
+- A ceremony of another action or target since the lapse, a take or a cancel is a newer row: the earlier one no longer stands.
 - A direct `open` or `close_followup` row is skipped (MAN-9207): it is no ceremony.
-- No outer bound on the age of the lapse.
 
 ## What a re-arm carries — `checkHisWord` (MAN-9171)
-| his line | read-back it needs |
-|---|---|
-| a bare yes (`isAssent`) | one of hers after `armedFrom`: the one from before the lapse stands |
-| a named order | one of hers after this prepare (`preparedAt`), as under a fresh ceremony |
-- `take_action` reads the log from `armedFrom` (`companionDb.heardSince(userId, pending.armedFrom)`), so a yes spoken after the lapse and before the re-arm is in view.
-- The binding holds across a re-arm: a bare yes is his first spoken line after her newest read-back, with none of his after it. why: a decline is a spoken line after the read-back, so the old yes cannot fire a card he declined.
-- Her sentences (MAN-9203): the take at a lapse says `It lapsed at <HH:MM>. Prepare it again: that re-arms it, and his yes since then still counts.`; the prepare of a re-arm answers `rearmStepFor`, which tells her to pass his newest spoken line at once when it is a bare yes.
-- A card withdrawn past its `expiresAt` by his × or `cancel_action` ends `expired`, not `cancelled` (MAN-9174 §`cancel_action`), so a prepare after it can re-arm. The binding stops a yes from before his decline; an order needs a read-back of the re-arm.
+- Her read-back from before the lapse stands: the check looks for a read-back of hers after `armedFrom`.
+- `take_action` reads the log from `armedFrom` (`companionDb.heardSince(userId, pending.armedFrom)`); the record is picked from the lines since (MAN-9171 §The record).
+- Her sentences (MAN-9203): the take at a lapse says `It lapsed at <HH:MM>. Prepare it again: that re-arms it, and your read-back from before the lapse still stands.`; the prepare of a re-arm answers `rearmStepFor(readBack, endedAs)`.
+- A card withdrawn past its `expiresAt` by his × or `cancel_action` ends `expired`, not `cancelled` (MAN-9174 §`cancel_action`), so a prepare after it can re-arm.
 
 ## The column
 `companion_actions.armed_from TEXT` (`companion-schema.ts`), added by `addCompanionActionArmedFromColumn` (`migrations.ts`), once, when the column is first added: also ends every unclaimed waiting row `cancelled` with `How an action waits for his word changed while this waited; it was taken off his panel and nothing was done.` and sets every `companion_state.pending_json` to NULL. why: a pending stored before it has no `armedFrom` (and may be an `open`, which has no pending action now), and the store would drop it with a warning at every read. A claimed row is left to its take or the orphan sweep (MAN-9174 §Ending).
 
 ## Proof
-`.verify/kaylee-action-word.mjs` (MAN-9171): the second incident of 2026-10-29 and the thirty-minute cases. `.verify/kaylee-yes-counts.mjs` sections F, F2, F3 (MAN-9174 §Proof): the lapse, the re-arm and what is no re-arm, over real tools on a scratch database.
+`.verify/kaylee-action-word.mjs` (MAN-9171): the `rearmOf` matrix and the age cases on a copy of the account's rows. `.verify/kaylee-yes-counts.mjs` section F (MAN-9174 §Proof): the lapse, the re-arm and what is no re-arm, over real tools on a scratch database.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-rearm.ts
 
@@ -9348,20 +9346,19 @@ Kaylee Station's stage: the one thing in focus, drawn large. Frame: MAN-9230, ba
 | `onClear` | `() => void` | ✕ |
 | `shelf` | `ReactNode` (optional) | her cards' shelf (`StageShelf`, MAN-9297), drawn above the head and above the empty stage; draws nothing while she has no cards; absent on a fixture that shows none |
 | `scrollRef` | `(node: HTMLElement \| null) => void` (optional) | bound to the body `ScrollArea`; absent on a fixture, which remembers nothing |
-| `frameRef` | `Ref<HTMLElement>` (optional) | bound to the focus's `<section>` (not the empty one), so `StationStage` can bring it into view; absent on a fixture |
 
 ### States
 | state | when | draws |
 |---|---|---|
 | empty | `focus === null` | `<section data-station-stage="empty">` (`aria-label` `station.stage.name` "Stage") holding `shelf`, then `[data-station-stage-empty-message]` with an `EmptyState` (`Focus` icon, `station.stage.empty.title` "Nothing on the stage", `station.stage.empty.message` "Press anything on either side, or ask her to show you something."). No head |
-| a focus | otherwise | `<section data-station-stage=<kind>>` labelled by its `h2`: `shelf`, a `<header>`, then a `ScrollArea` body (`[data-station-stage-body]`, `p-3 lg:p-4`) holding `view`, keyed by `focusKey(focus)` so a different thing starts at the top, then the foot box `[data-station-stage-foot]` |
+| a focus | otherwise | `<section data-station-stage=<kind>>` labelled by its `h2` (`[data-station-stage-label]`, `tabIndex={-1}`: a programmatic focus and no Tab stop, which the one-column station hands the keyboard to when a pull to Stage strands it, MAN-9337): `shelf`, a `<header>`, then a `ScrollArea` body (`[data-station-stage-body]`, `p-3 lg:p-4`) holding `view`, keyed by `focusKey(focus)` so a different thing starts at the top, then the foot box `[data-station-stage-foot]` |
 
 ### The head, left to right
 1. Back: `[data-station-stage-back]`, a ghost icon `Button` with `ArrowLeft`, drawn only while `canGoBack`.
 2. The kind's glyph AND word (`STATION_FOCUS_GLYPHS[kind]`, `src/shared/constants.ts`; colour and shape are never the whole signal, MAN-578) over `focus.label` in the serif: the `h2`, 22 px, 24 px from `md` (the page-title size the bar uses).
 3. The acts box `[data-station-stage-actions]` (`stageSlots.tsx`, MAN-9298): the kind's view portals its own acts into it with `StageHeadActions` (her card's Pin/Unpin and Dismiss, her walk's End), each named in words. The head is a query container: on a head 40rem or wider the acts stand here, before ✕; narrower, on a row of their own under the label (`order-last basis-full`). `empty:hidden`: a kind with no acts draws the head as before.
 4. ✕: `[data-station-stage-clear]`, a ghost icon `Button` with `X`.
-- The foot box `[data-station-stage-foot]`, under the body and outside its scroller: the kind's view portals into it with `StageFoot` (her walk's Back and Next). `sticky bottom-0`, so in the phone's stack it stays at the screen's foot while the stage is in view; a query container of its own; `empty:hidden`.
+- The foot box `[data-station-stage-foot]`, under the body and outside its scroller: the kind's view portals into it with `StageFoot` (her walk's Back and Next). at the stage's foot where the thumb is; a query container of its own; `empty:hidden`.
 - Back and ✕: 32 px on a desk, 44 px below 768 px (`max-md:h-11 max-md:w-11`). Their tooltips (`showOnFocus`) only repeat their names.
 - Words: `station.stage.back` "Back", `station.stage.clear` "Clear the stage", `station.stage.name`; the kind's word `station.focusKind.<kind>`.
 
@@ -9381,17 +9378,20 @@ Reads `useStation()` (MAN-9249): `focus`, `canGoBack`, `back()`, `setFocus(null)
 - `view` = `STAGE_VIEWS[focus.kind]` (MAN-9264) drawn as `<View focus={focus} />`, else `<FocusFallback focus={focus} />`, each keyed by `focusKey(focus)`: a different thing in the same kind starts afresh, state and all.
 - `shelf` = `<StageShelf />`, her cards' shelf over the stage (`StageShelf.tsx`).
 - Any focus change deletes the remembered `stage` scroll (MAN-9249).
-- BRINGS ITSELF INTO VIEW when a different thing is put on it, in the `narrow` tier only: there the stage stands in the one scrolling stack under the pinned bar, so a press made elsewhere (the bar's strip, a rail row, her own door) with the stack scrolled away from the stage would otherwise read as a press that did nothing. One `useEffect` on the focus's key calls `scrollIntoView({ block: 'start' })` on the frame (`frameRef`), so the stage's head stands just under the bar: the one cure for every region whose press stages a thing, so no region scrolls on its own. `start` and not `nearest`, because a stage taller than the screen is entirely above the port after a long scroll and `nearest` then aligns its BOTTOM edge, cutting the head that says what stands there (measured: an epic's stage 20 px taller than the port lost its kind's word). The mount that restores a focus on a reload is the baseline and never scrolls, only a change after it.
+- NEVER BRINGS ITSELF INTO VIEW. In the one-column arrangement the stage is a section, and a different thing put on it pulls the switch to it, once, for every region whose press stages a thing (`useStationSection`, MAN-9344); in the columns it is always on screen. No region scrolls on its own. The mount that restores a focus on a reload pulls nothing, only a change after it.
 - The empty stage draws no head, so no Back after ✕: the cleared focus stays on the stack and returns as the Back of the next focus.
 
 ## Empty state
-`focus === null`: her cards' shelf when she has cards, then "Nothing on the stage" and how to put something there. `StationShellView` folds an empty stage away wherever her column or the stack holds a region of its own, and while the shelf has cards keeps the shelf alone there (MAN-9230).
+`focus === null`: her cards' shelf when she has cards, then "Nothing on the stage" and how to put something there. `StationShellView` folds an empty stage away on a laptop wherever her column holds a region of its own, and while the shelf has cards keeps the shelf alone there (MAN-9230).
+
+## Compact form
+The stage takes no `density`: it is not a region. In the one-column arrangement it is the Stage section, the whole section under her head, drawn as in the columns, its body scrolling under its head (MAN-9335); a different thing put on it pulls the switch there (`useStationSection`, MAN-9344). It is never an overlay on her.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationStage.tsx
 
 ## MAN-9229 — src/modules/station — the fixture pictures, the stage's data and the shots probe (station-fake.ts, fake/stage.ts, kaylee-station-shots.mjs)
 
-Kaylee Station drawn on fixtures: the four pictures, the stage's data and the shots probe. Layout: MAN-9230 · bar: MAN-9259 · stage: MAN-9228 · card, fallback and page views: MAN-9261, MAN-9260, MAN-9262 · her cards' views: MAN-9295, MAN-9296, MAN-9297, MAN-9298 · her cards' fixtures and probe: MAN-9299 · her head, conversation and talk control: MAN-9314, MAN-9325, MAN-9324, their fixtures and probe: MAN-9315 · her draft dock: MAN-9321, its fixtures and probe: MAN-9322 · landing a region's slice: MAN-9264 · the right rail's slice and probe: MAN-9284 · the left rail's: MAN-9292 · touch law: INV-10275.
+Kaylee Station drawn on fixtures: the four pictures, the stage's data and the shots probe. Layout: MAN-9230 · bar: MAN-9259 · stage: MAN-9228 · card, fallback and page views: MAN-9261, MAN-9260, MAN-9262 · her cards' views: MAN-9295, MAN-9296, MAN-9297, MAN-9298 · her cards' fixtures and probe: MAN-9299 · her head, conversation and talk control: MAN-9314, MAN-9325, MAN-9324, their fixtures and probe: MAN-9315 · her draft dock: MAN-9321, its fixtures and probe: MAN-9322 · landing a region's slice: MAN-9264 · the right rail's slice and probe: MAN-9284 · the left rail's: MAN-9292 · every region at compact density, its probe: MAN-9328 · the compact arrangement: MAN-9337, its probe: MAN-9336 · touch law: INV-10275.
 
 ## station-fake.ts — the pictures
 Prototype only: nothing in the app imports `station-fake.ts`, `fake/stage.ts` or any other `fake/*.ts`; `.verify/kaylee-station-shots.mjs` does. A picture is a data condition, never a mode.
@@ -9404,8 +9404,8 @@ Prototype only: nothing in the app imports `station-fake.ts`, `fake/stage.ts` or
 - Exports: `FAKE_STATION: Record<StationPicture, StationFixture>` (`{ focus, slots, bus }`), `FAKE_STAGE: Record<StationPicture, { view, props, canGoBack, shelf } | null>` (`shelf`: her cards' shelf as `{ view, props }`, null where she has none; the probe draws it above the stage's head) and `REGION_STATES`.
 - Her cards' fixtures: `fake/cards.ts` (the walk, each picture's shelf by `shelfFor(picture, focus)`, `CARDS_STAGE_FAKE`) and `fake/cardLines.ts` (MAN-9299).
 - `bus`: the live-bus topics a picture holds (`ROADMAP_ALL_TOPIC`, from `fake/sessions.ts`), published by the probe before the station draws, so a hook that reads the bus (a feature's step phrase) reads the picture's data.
-- A drawing is `{ view, props }`: a region's VIEW component and the props one picture draws it with. The probe draws a slot as `createElement(view, { ...props, tier })`, so it draws any region unaware of it.
-- Each region plan adds (steps: MAN-9264) `fake/<slot>.ts` exporting `<SLOT>_FAKE`: one drawing per picture (null where the region draws nothing there), props `satisfies Omit<ComponentProps<typeof TheView>, 'tier'>`; plus one line `<slot>: <SLOT>_FAKE` in `REGION_FAKES`. A slot with no line draws nothing in any picture.
+- A drawing is `{ view, props }`: a region's VIEW component and the props one picture draws it with. The probe draws a slot as `createElement(view, { ...props, tier, density: 'full' })`, so it draws any region unaware of it; the density probe hands `density: 'compact'` (MAN-9328).
+- Each region plan adds (steps: MAN-9264) `fake/<slot>.ts` exporting `<SLOT>_FAKE`: one drawing per picture (null where the region draws nothing there), props `satisfies Omit<ComponentProps<typeof TheView>, 'tier' | 'density'>`; plus one line `<slot>: <SLOT>_FAKE` in `REGION_FAKES`. A slot with no line draws nothing in any picture.
 - States no picture shows: `<SLOT>_STATES` in the same file (drawings by name) and one line `<slot>: <SLOT>_STATES` in `REGION_STATES`. The probe draws each over `home` with that slot's drawing in its place.
 | slot | file |
 |---|---|
@@ -9426,61 +9426,73 @@ Prototype only: nothing in the app imports `station-fake.ts`, `fake/stage.ts` or
 ## .verify/kaylee-station-shots.mjs
 ```bash
 node .verify/kaylee-station-shots.mjs
-STATION_SHOTS_SIZES=390x844 node .verify/kaylee-station-shots.mjs   # one size, or several comma-separated
+STATION_SHOTS_SIZES=1440x900 node .verify/kaylee-station-shots.mjs   # one size, or several comma-separated
 ```
 - Gitignored (`.verify/`). Live client `:5183`. PASS/FAIL per line, `REPORT` lines never fail; exit 1 on any FAIL.
 - Mounts `StationShellView` on each picture inside the app's own `ThemeProvider`, `ToastProvider`, `LiveBusProvider` (specifiers read from `App.tsx` as served: `lib/mountReact.mjs`). Theme pinned dark by `lib/prefs-pin.mjs`, never written. Reduced motion emulated. The page opens with no project (`project: false`): on a loaded box its list times out. Hot updates are held off it (`hotUpdates: false`): a soul's save of `src/` reloads a page that takes them and kills a run mid-way. Sends no turn, presses nothing but the recovered landing, writes nothing.
-- Sizes: 1440×900 (`wide`), 1280×800 (`laptop`), 390×844 (`narrow`: the iPhone 13 descriptor at its whole screen; the descriptor's own 390×664 is Safari with toolbars).
-- Shots: `.verify/shots/station-<picture>-<size>.png` (twelve), the same `-folded`, `station-home-<size>-recovered-open.png`, `station-<slot>-<state>-<size>.png` per `REGION_STATES` line (the dock's `refused` shot is taken again after its send is pressed), the dock with the phone's keyboard up `station-dock-keyboard-<home|walkthrough>-390x844[-rising].png` and `station-dock-keyboard-home-390x844-pressed.png`, the right rail's three stages `station-stage-<ask|followups|check>-<1440x900|390x844>.png`, the chat stage's two `station-stage-<chat-gone|chat-reading>-<1440x900|390x844>.png`, and her cards' own `station-<card-…|walk…|shelf>-<1440x900|390x844>.png` with `station-walk-1280x800.png`, and her head's fourteen presences side by side, `station-head-presences-1440x1100.png`. On the phone each region of the stack is also shot alone, `…-<slot>.png`; a region taller than the screen (the left rail runs to three screens and more) is shot from its start a screen at a time, `…-<slot>-2.png` and on, four at most. A later tall region gets the same.
-- Checks: `frame` (tier, `html.dark` canvas, bar across the top with "Kaylee Station", page never scrolls as a document); `stage` (per picture: `waiting` the census first line to lock line plus Queue, Hide, Rework; `home` the chat; `walkthrough` her walk at item 4 of 15 with Back and Next at the stage's foot; `empty` the empty stage, or folded away on a phone whose stack holds a region, the shell's own rule; Back exactly where the picture's back-stack holds a focus, ✕ wherever a focus stands); `touch`; `errors` (console silent); one check per region: `strip` (`lib/station-strip.mjs`, MAN-9286), `corner` (`lib/station-corner.mjs`), `needs` (`lib/station-needs.mjs`, MAN-9284), `rail` (`lib/station-rail.mjs`, MAN-9292); `center` (`lib/station-center.mjs`, MAN-9315): her head, conversation and talk control in each picture and in each state no picture shows; `dock` (`lib/station-dock.mjs`, MAN-9322): her draft dock in each picture and each `DOCK_STATES` state, and on the phone with the keyboard up; and `cards` (`lib/station-cards.mjs`, MAN-9299): each picture's shelf, then `CARDS_STAGE_FAKE`'s shots; at 1280×800 the walk alone.
-- `touch` (`lib/station-touch.mjs`) below 768 px: a press's catch = the larger of its box and the extent `elementFromPoint` hits along each axis (a transparent `::before` counts; a checkbox, a radio or a switch inside a `<label>` is measured by its `<label>`). FAIL under 44 px: the shell's own presses (`[data-station-back-to-cloudcli]`, `-stage-back`, `-stage-clear`, `-fallback-open`, `-page-open`), every region's, every press on the rail's three stages (`[data-station-ask]`, `[data-station-followups]`, `[data-station-check]`), the followups module's and Cerberus's parts included, and every press of her cards (`[data-station-note]`, `[data-station-walk]`, the stage's acts and foot boxes, `[data-station-shelf]`). REPORTED, not failed: presses inside another module's drawing elsewhere on the stage.
+- Sizes: 1440×900 (`wide`) and 1280×800 (`laptop`), the columns, the bar drawing his "Compact" switch off as the live bar does from 1024 px up. Eight more sizes, named `compact-<w>x<h>`, draw the compact arrangement and nothing else (`lib/station-compact.mjs`, MAN-9336); `STATION_SHOTS_SIZES=compact-600x900,…` runs them alone. `compact-390x844` is the iPhone 13 descriptor at its whole screen (the descriptor's own 390×664 is Safari with toolbars). A compact size draws each picture on the section it is about: `home` Conversation, `waiting` Needs you, `walkthrough` Stage, `empty` Conversation; shots `station-<picture>-compact-<size>.png`, and again on Where things stand, `…-where.png` (MAN-9336).
+- Shots: `.verify/shots/station-<picture>-<size>.png` (eight: 1440×900 and 1280×800), the same `-folded`, `station-home-<size>-recovered-open.png`, `station-<slot>-<state>-<size>.png` per `REGION_STATES` line (the dock's `refused` shot is taken again after its send is pressed), the right rail's three stages `station-stage-<ask|followups|check>-1440x900.png`, the chat stage's two `station-stage-<chat-gone|chat-reading>-1440x900.png`, and her cards' own `station-<card-…|walk…|shelf>-1440x900.png` with `station-walk-1280x800.png`, and her head's fourteen presences side by side, `station-head-presences-1440x1100.png`. The compact arrangement's own shots are MAN-9336's.
+- Checks: `frame` (the root's `data-station-arrangement` = the tier, or `compact` at a compact size; `html.dark` canvas, bar across the top with "Kaylee Station", page never scrolls as a document); `stage` (per picture: `waiting` the census first line to lock line plus Queue, Hide, Rework; `home` the chat; `walkthrough` her walk at item 4 of 15 with Back and Next at the stage's foot; `empty` the empty stage, or folded away on a laptop whose her column holds a region, the shell's own rule; Back exactly where the picture's back-stack holds a focus, ✕ wherever a focus stands); `touch`; `errors` (console silent); one check per region: `strip` (`lib/station-strip.mjs`, MAN-9286), `corner` (`lib/station-corner.mjs`), `needs` (`lib/station-needs.mjs`, MAN-9284), `rail` (`lib/station-rail.mjs`, MAN-9292); `center` (`lib/station-center.mjs`, MAN-9315): her head, conversation and talk control in each picture and in each state no picture shows; `dock` (`lib/station-dock.mjs`, MAN-9322): her draft dock in each picture and each `DOCK_STATES` state; and `cards` (`lib/station-cards.mjs`, MAN-9299): each picture's shelf, then `CARDS_STAGE_FAKE`'s shots; at 1280×800 the walk alone.
+- `touch` (`lib/station-touch.mjs`) below 768 px: a press's catch = the larger of its box and the extent `elementFromPoint` hits along each axis (a transparent `::before` counts; a checkbox, a radio or a switch inside a `<label>` is measured by its `<label>`; a disabled press is measured with its `pointer-events` lifted: the kit's `disabled:pointer-events-none` hid its 44 px catch from `elementFromPoint` under a mouse and read its 32 px box). FAIL under 44 px: the shell's own presses (`[data-station-back-to-cloudcli]`, `-stage-back`, `-stage-clear`, `-fallback-open`, `-page-open`, and compact's: `[data-station-compact-sections] [role="radio"]`, `[data-station-compact-grid] button`, `[data-station-compact-needs]`, the bar's `[data-station-compact-toggle]`), every region's, every press on the rail's three stages (`[data-station-ask]`, `[data-station-followups]`, `[data-station-check]`), the followups module's and Cerberus's parts included, and every press of her cards (`[data-station-note]`, `[data-station-walk]`, the stage's acts and foot boxes, `[data-station-shelf]`). REPORTED, not failed: presses inside another module's drawing elsewhere on the stage.
 - 2026-10-29 REPORT at 390×844: 18 of 21 presses of the dispatcher's `PlanCard` under 44 px (Queue, Hide, Rework 32 px tall; task dots 24×24). The module's drawing, not the station's.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/stage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/station-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-shots.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-touch.mjs
 
-## MAN-9230 — src/modules/station — StationShellView and StationShell: the layout in three tiers, its slots and the phone's root box
+## MAN-9230 — src/modules/station — StationShellView and StationShell: the layout in three arrangements (wide, laptop, compact), its slots and the phone's root box
 
-Kaylee Station's layout: `StationShellView` (a pure view) and `StationShell` (its live binding), `StationShell.tsx`. The bar it draws: MAN-9259. The stage in it: MAN-9228. Her head, conversation and talk control: MAN-9314, MAN-9325, MAN-9324. Her draft dock: MAN-9321. Slots and the registry that fills them: MAN-9264. Types: `StationTier`, `StationSlot`, `StationRegionProps` (MAN-9256). The frame (status bar, notch, keyboard, home indicator): MAN-9258. Touch law: INV-10275.
+Kaylee Station's layout: `StationShellView` (a pure view) and `StationShell` (its live binding), `StationShell.tsx`. The bar it draws: MAN-9259. The stage in it: MAN-9228. Her head, conversation and talk control: MAN-9314, MAN-9325, MAN-9324. Her draft dock: MAN-9321. Slots and the registry that fills them: MAN-9264. The compact arrangement: MAN-9337, its body MAN-9335. Types: `StationTier`, `StationArrangement`, `StationCompactSwitch`, `StationSlot`, `StationRegionProps` (MAN-9256). The frame (status bar, notch, keyboard, home indicator): MAN-9258. Touch law: INV-10275.
 
 ## StationShellView — props
 | prop | type | meaning |
 |---|---|---|
-| `tier` | `StationTier` | the arrangement: `wide` ≥ 1360 px, `laptop` 1024–1359 px, `narrow` below 1024 px (a phone included) |
-| `slots` | `Partial<Record<StationSlot, ReactNode>>` | each slot's region, drawn for this tier. A slot with no region (`undefined`, `null`, `false`) draws nothing |
-| `stage` | `ReactNode` | the stage, drawn: `StationStage` live, `StationStageView` on a fixture |
+| `arrangement` | `StationArrangement` | `wide` ≥ 1360 px, `laptop` 1024–1359 px, or `compact` (below 1024 px, and wherever his switch is on: the body is `compact`) |
+| `slots` | `Partial<Record<StationSlot, ReactNode>>` | each slot's region, drawn for the window's tier at the arrangement's density. A slot with no region (`undefined`, `null`, `false`) draws nothing. The columns draw them here; compact draws its own |
+| `stage` | `ReactNode` | the stage, drawn: `StationStage` live, `StationStageView` on a fixture. Compact's Stage section holds its own |
+| `compact` | `ReactNode` | the compact arrangement, drawn (`StationCompact` live, `StationCompactView` on a fixture): the body while `arrangement` is `compact`; null otherwise |
+| `compactSwitch` | `StationCompactSwitch \| null` | the bar's "Compact" switch (`{ on, onChange }`), or null where it changes nothing (below 1024 px) and the bar draws none |
 | `onBackToCloudcli` | `() => void` | the bar's "CloudCLI" press |
 
 ## The root box — the phone's frame
-`<div data-station-shell data-station-tier=<tier>>` = the workspace frame's own box: `pwa-status-clear fixed inset-0 flex flex-col bg-background`, `style={{ bottom: 'var(--keyboard-height, 0px)' }}`. In the home-screen app it clears the status bar and the notch (`pwa-status-clear`) and lifts over the on-screen keyboard (`--keyboard-height`); `<main data-station-body>` pads `pb-[var(--safe-area-inset-bottom)]` to clear the home indicator. Hooks and variables: MAN-9258.
+`<div data-station-shell data-station-arrangement=<arrangement>>` = the workspace frame's own box: `pwa-status-clear fixed inset-0 flex flex-col bg-background`, `style={{ bottom: 'var(--keyboard-height, 0px)' }}`. In the home-screen app it clears the status bar and the notch (`pwa-status-clear`) and lifts over the on-screen keyboard (`--keyboard-height`); `<main data-station-body>` pads `pb-[var(--safe-area-inset-bottom)]` to clear the home indicator. Hooks and variables: MAN-9258.
 - The page never scrolls as a document; regions scroll inside it.
 - A sheet, dialog or menu the station opens never takes `pwa-status-clear`: an overlay covers the screen and pads its own content.
 
-## States — the tier
-| tier | body |
+## States — the arrangement
+| arrangement | body |
 |---|---|
 | `wide` | grid `288px · minmax(360px,420px) · minmax(0,1fr) · 336px` = left (`sessions`, `corner`), her (`head`, `conversation`, `dock`, `talk`), stage, right (`needs`) |
 | `laptop` | grid `256px · minmax(0,1fr) · 296px` = left, her, right; the stage sits inside her column between `head` and `conversation`, so it never covers her face |
-| `narrow` | one `ScrollArea` column (`max-w-3xl`, `data-station-column=stack`): `head`, the stage, then `conversation dock talk needs sessions corner` |
-- `data-station-column=<left\|her\|stage\|right\|stack>`; a piece of a column is `data-station-slot=<slot>` or `data-station-stage-cell`. A hairline `border-t border-border` parts the pieces of a column, `border-r`/`border-l` the columns. The regions paint themselves.
+| `compact` | `compact` (`StationCompactView`, MAN-9337): her head always in view, the strip's line, one switch, a section (`StationSectionsView`, MAN-9335). The bar holds no strip there. The only arrangement below 1024 px |
+- `data-station-column=<left\|her\|stage\|right>` (the columns'); a piece of a column is `data-station-slot=<slot>` or `data-station-stage-cell`. A hairline `border-t border-border` parts the pieces of a column, `border-r`/`border-l` the columns. The regions paint themselves.
 - `SLOT_BOX`: `sessions`, `needs` `min-h-0 flex-1` (take the room); `conversation` `min-h-14 flex-1` (her panel's floor: her newest line stays in sight); `dock` `min-h-0 flex-[0_1_auto]`; `corner` `mt-auto shrink-0 border-t border-border` (the rail's foot, its hairline its own); `head`, `talk` `shrink-0`. In her column `conversation` and `dock` take the budget below.
-- Her column's one budget (`wide` and `laptop`): `[data-station-column=her]` is a size container named `her` (`HER_CONTAINER` `[container-name:her] [container-type:size]`; never on the narrow stack). Order things give way as it runs short: the stage beside her on a laptop (shrink 10000) to its floor; the dock's field to its 88 px floor (the dock's basis is its card at that floor, `flex-[10000_1_var(--station-dock-floor,14.25rem)]` `max-h-max`: it grows to its words only into the room her conversation's share leaves; `--station-dock-floor` = the card's measured floor + the dock's padding + the slot's hairline, written on the dock's slot by `useDockFloor` (its one writer, MAN-9321), 14.25rem until written, so a refused send's sentence or a notice under the sends raises the basis); her conversation (`flex-[1_100_30%]`, a 30% share) down to its 3.5rem floor; last the dock (shrink 1) below its card's floor, the card scrolling whole inside it. The dock's own cap is `StationDock`'s, in `cqh` of this column. Readers of `her`: her head (face 200 px while the column is ≥ 62rem tall: MAN-9314) and her talk control (its line beside the button while the column is ≥ 38rem across: MAN-9324).
-- The dock while he edits it in the stack (`:focus-within`) is `sticky bottom-0 z-10` (`DOCK_EDITING_IN_THE_STACK`): it rides the frame's foot above the on-screen keyboard.
+- Her column's one budget (`wide` and `laptop`): `[data-station-column=her]` is a size container named `her` (`HER_CONTAINER` `[container-name:her] [container-type:size]`). Order things give way as it runs short: the stage beside her on a laptop (shrink 10000) to its floor; the dock's field to its 88 px floor (the dock's basis is its card at that floor, `flex-[10000_1_var(--station-dock-floor,14.25rem)]` `max-h-max`: it grows to its words only into the room her conversation's share leaves; `--station-dock-floor` = the card's measured floor + the dock's padding + the slot's hairline, written on the dock's slot by `useDockFloor` (its one writer, MAN-9321), 14.25rem until written, so a refused send's sentence or a notice under the sends raises the basis); her conversation (`flex-[1_100_30%]`, a 30% share) down to its 3.5rem floor; last the dock (shrink 1) below its card's floor, the card scrolling whole inside it. The dock's own cap is `StationDock`'s, in `cqh` of this column. Readers of `her`: her head (face 200 px while the column is ≥ 62rem tall: MAN-9314) and her talk control (its line beside the button while the column is ≥ 38rem across: MAN-9324).
 - Laptop, the stage beside her regions: `max-h-[55%] min-h-[7.5rem] flex-[0_10000_auto]` (first to give way). The floor grows with what the stage draws: a foot (`[data-station-stage-foot]:not(:empty)`: her walk's Back and Next) `min-h-[11.5rem]`; her cards' shelf over a stage that has a body `12rem`; shelf and foot `16rem`. The shelf's two floors hold only where her column is tall enough: container query `her` at `(min-height:45rem) and (min-width:38rem)`, or `(min-height:48rem)` (the 1024 px band, where head and talk row stand taller); in a shorter column the stage keeps `7.5rem` (`11.5rem` with the foot), so the dock's sends stay in sight (at 1280×720 the 12rem floor scrolled them away); 1280×800 holds the floors (her column 733 px tall, 728 px wide). why: at 1280×800 with head, conversation, dock and talk drawn, the 7.5rem floor stood the walk's foot 23 px over her conversation; with the shelf it was all shelf and head, no word of the chat. With none of `head`, `conversation`, `dock`, `talk` drawn it takes the whole column (`min-h-0 flex-1`). why: capped at 55% with nothing beside it, the plan card was cut off above empty space.
 - Columns carry keys (`left`, `her`, `stage`, `right`). why: unkeyed, laptop's right rail lands at the index wide's stage held and remounts.
-- A tier change re-parents what moves (the stage wide↔laptop; everything into the narrow stack). A region keeps its state in the station's context or its scroll memory (`StationRegion`), never only in itself.
+- A change of arrangement re-parents what moves (the stage wide↔laptop; everything into compact's sections and back). A region keeps its state in the station's context or its scroll memory (`StationRegion`), never only in itself.
+
+## The arrangement — when it is compact
+`StationShell` computes it: `compact` when the tier is `narrow` (the window under 1024 px, read on `resize` by `useStationWindow`) or his switch is on (the station pref `compact`, `useStationPref('compact', false)`, per device, written by the bar's "Compact" switch, MAN-9259); else the tier. A portrait monitor 1080 px wide is the laptop tier by width, so the switch is how he asks for compact there.
+- Below 1024 px compact is the only arrangement: there is no scrolling-stack arrangement, and the switch is not drawn (`compactSwitch` is null while `tier === 'narrow'`: it would change nothing).
+- A phone's window is under 1024 px, so until the phone's own arrangement lands compact is a phone's arrangement too; the phone's wrapper picks its own before this rule when `useStation().phone` is true.
+- It follows `resize` and his switch, never a timer.
+- Every region's `density` is `compact` in the compact arrangement and `full` in the columns: `StationShell` hands `<Region tier density />` to each registered region. A region takes `density` where it draws differently and passes it through where it does not (MAN-569: the same components, one prop); no compact copy of a region exists. Each region's row says its compact form.
+- Flipping the switch, or a resize across 1024 px, re-parents everything into compact's sections (or back into the columns) with the same focus, the same scroll of each region (the scroll memory, MAN-9248) and the same preferences.
 
 ## Empty state
 - A slot with no region draws nothing and the layout closes up around it.
-- An empty stage (`[data-station-stage=empty]`) folds away wherever her column (laptop) or the stack (narrow) holds a region of its own (`[&:has([data-station-stage=empty]):not(:has([data-station-shelf]))]:hidden`). With none it stays, and alone it takes the screen's height (`flex-1`). A data condition, never a mode.
+- Touch: the layout holds no press of its own; the bar's (MAN-9259) and compact's (MAN-9337) are 44 px catches below 768 px (INV-10275).
+- An empty stage (`[data-station-stage=empty]`) folds away on a laptop wherever her column holds a region of its own (`[&:has([data-station-stage=empty]):not(:has([data-station-shelf]))]:hidden`). With none it stays. A data condition, never a mode.
 - While her cards' shelf (`[data-station-shelf]`, `StageShelf`) stands on an empty stage beside her regions, the cell stays with the shelf alone: the empty stage's words are hidden (`[data-station-stage-empty-message]`), the cell lets go of the laptop's `min-h-[7.5rem]` floor (`min-h-0`) so it stands at the shelf's height, and the shelf drops its bottom hairline for the next piece's own. A pinned card stays one press away.
 - With no region registered the stage stands alone under the bar.
 
 ## StationShell() — the live binding
 | prop | from |
 |---|---|
-| `tier` | `useStation().tier` |
-| `slots` | each line of `STATION_REGIONS` drawn as `<Region tier={tier} />`; a slot with no line is left out |
-| `stage` | `<StationStage />` |
+| `arrangement` | `compact` when `tier === 'narrow'` or the pref `compact` is on, else `tier` |
+| `slots` | each line of `STATION_REGIONS` drawn as `<Region tier={tier} density={density} />`, `density` = `compact` while the arrangement is `compact`, else `full`; a slot with no line is left out |
+| `stage` | `<StationStage />`, one element for the columns and compact's Stage section |
+| `compact` | `<StationCompact slots stage tier />` while `arrangement` is `compact`, else null |
+| `compactSwitch` | `{ on, onChange }` of `useStationPref('compact', false)`; null while `tier === 'narrow'` |
 | `onBackToCloudcli` | `backToCloudcli(navigate, { phone, pwa })` (MAN-9247); `phone` = `useStation().phone`, `pwa` = `useDeviceSettings({ trackMobile: false }).isPWA` |
 - The way back is bound here, never in `StationBar`. why: a bar that bound its own press would run router hooks inside the shots probe and break every later region's shots.
 
@@ -10089,7 +10101,7 @@ Kaylee Station's one stored record and the helpers that read and write it. Consu
 ### readStationRecord — what is dropped
 - Missing key, unparsable JSON (`console.warn('[Station] Could not read the stored record; …')`) or a non-object → empty record.
 - `scroll`: kept per entry only when a finite number ≥ 0.
-- `prefs`: only `PREF_KEYS` = `stripCollapsed`, `cornerOpen`, `compact`, `asleepOpen`, `completeOpen`, and only when stored as a boolean; any other value reads as no preference, so its region keeps its default.
+- `prefs`: the flags `FLAG_PREF_KEYS` = `stripCollapsed`, `cornerOpen`, `compact`, `asleepOpen`, `completeOpen`, only when stored as a boolean; `compactSection`, only when it is one of `conversation`, `needs`, `where`, `stage`; and `compactSectionAside`, only when it is one of `conversation`, `needs`, `where` (never `stage`, the section it is pulled to). Any other value reads as no preference, so its region keeps its default. why `compactSection` is read apart: a section is a word, and a read that kept only booleans dropped it on every reload.
 - `focus`: kept only when `isStationFocus`.
 - `stack`: `filter(isStationFocus)`, last 10, then `backableFrom(stack, focus)`. A dead Back already stored (the same thing as the focus) is cleaned on read.
 
@@ -10098,7 +10110,7 @@ Restores one region's scroll and reports each newer one; returns the release the
 1. `scroll` listener (passive) reports `node.scrollTop`, or `null` (no place) for a scroller that `followsEnd` while it stands within `END_SLACK` (48 px, the log's own `AT_END_SLACK`) of its end. `FOLLOWS_END` names those regions: `conversation` alone. `scrollMemory` answers `null` by deleting the region's entry. why: a `scrollTop` stored at the end is only "the end" while the content is unchanged; a log that grew while he was away (her answer, an alert) put him that many lines above its new end, with "Newest" showing. A list that starts at its top keeps an end place as the offset it is.
 2. A remembered place is applied only once `scrollHeight - clientHeight >= remembered` (a region not yet tall enough would clamp to its end and report that end as the reader's place).
 3. Until then it waits, retried on a `MutationObserver` (`childList`, `subtree`).
-4. The wait ends at once on the reader's `scroll` or `pointerdown`, or when honoured.
+4. The wait ends at once on the reader's input on the node (`pointerdown`, `wheel`, `touchstart`, `keydown`), or when honoured. A `scroll` event while it waits is not the reader's (his input would have ended the wait first, and our own write ends it before its event): it is the content moving by itself, and it reports nothing. why: the conversation's log mounts in compact's column, too short for the place remembered from the wide column (12,000 px against 7,000), pins to its newest line and, read as the reader's, reported "no place" and deleted the place the wide column came back for.
 5. A node that already stands below its top when it is followed was put there by its reader (nothing else moves an unfollowed scroller): the remembered place is not put back over his, the node is followed from where he left it, and his place is reported at once. why: the left rail binds its memory only once both sections are drawn, and a reader who scrolled before then was thrown back to the remembered place when the chats landed.
 - Event-driven: no timer, no polling.
 
@@ -10113,6 +10125,7 @@ The station's state: the focus and its back-stack, the tier, `phone`, the scroll
 |---|---|
 | `focus` | the one `StationFocus` on the stage, or `null` |
 | `setFocus(next)` | puts `next` on the stage; the focus it replaces is pushed on the back-stack (ten deep) |
+| `restaged` | how many times `setFocus` has been handed the thing already on the stage (it changes nothing there): a count of calls, never of time. The one-column station reads it to answer a press on what already stands (`useStationSection`, MAN-9344) |
 | `back()` | puts the newest stacked focus on the stage and pops it; nothing when the stack is empty |
 | `canGoBack` | `stack.length > 0` |
 | `tier` | `wide` ≥ 1360 px, `laptop` ≥ 1024 px, else `narrow` |
@@ -10120,21 +10133,25 @@ The station's state: the focus and its back-stack, the tier, `phone`, the scroll
 | `scrollMemory(region)` | ref callback for a region's scroller; the same callback comes back for the same region |
 
 ### setFocus / back rules
-- `setFocus(x)` with the key of the focus already there (or `null` over an empty stage) changes nothing.
+- `setFocus(x)` with the key of the focus already there (or `null` over an empty stage) changes nothing on the stage and leaves the back-stack alone; given a focus (not `null`) it adds one to `restaged`. A caller that only keeps the stage current must not call it with what stands (`useCardsTakeStage` skips a walk that already stands).
 - `setFocus(null)` (the stage's ✕) empties the stage and leaves the old focus on the stack; the empty stage draws no Back, so it is the Back of the next different thing staged.
 - Staging a thing that stands on the end of the stack takes it off (`backableFrom`): the stack's top is never the thing on the stage.
 - `setFocus`/`back` decide from `stageRef`, the stage as the last press left it, so two presses inside one event see each other.
 - Every focus change deletes the remembered `stage` scroll: a new thing starts at the top.
 
 ## useStationPref(key, initial) → `[value, set]`
-- Reads the stored `prefs[key]`, else `initial`; `set` stores it on this device. Keys: `stripCollapsed`, `cornerOpen`, `compact`, `asleepOpen`, `completeOpen`; each belongs to one region (the last two, the left rail's two folds).
+- Reads the stored `prefs[key]`, else `initial`; `set` stores it on this device. Keys: `stripCollapsed`, `cornerOpen`, `compact`, `asleepOpen`, `completeOpen`, `compactSection`, `compactSectionAside`; each belongs to one reader: `compact` is `StationShell`'s (his switch), `compactSection` and `compactSectionAside` are `useStationSection`'s (the one-column station's section, and the section the stage's pull came from, MAN-9337), `asleepOpen` and `completeOpen` are the left rail's two folds.
 - Its own context (`StationPrefsContext`): a preference change does not re-render what only reads `useStation()`.
 - A pref write that is `Object.is`-equal changes nothing.
 
 ## useStationWindow() — `hooks/useStationWindow.ts`
 - Reads `{ tier, phone }` on `resize` and on the `(pointer: coarse)` query's `change`; no timer. A read that moves neither value keeps the held object, so a drag across the window does not re-render per frame.
 
-## StationSessionsProvider / useStationSessions() — `context/StationSessionsContext.tsx`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationNeedsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationSessionsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-needs-reads-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-needs-routed-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-needs-provider.mjs
+
+## MAN-9345 — src/modules/station — the context: StationProvider, useStation, useStationPref — StationSessionsProvider / useStationSessions() — `context/StationSessionsContext.tsx`
+section: src/modules/station — the context: StationProvider, useStation, useStationPref and useStationWindow/001 StationSessionsProvider / useStationSessions() — `context/StationSessionsContext.tsx`
+
 His chats as the rail draws them: one `GET /api/companion/station/sessions` (`api.companion.station.sessions()`; the house reads of MAN-9055 served as they are), held for every region. `StationRoute` mounts it inside `StationProvider` and outside her provider (MAN-9250). `useStationSessions()` → `{ sessions: StationSession[] | null, failure: string | null, reread() }`; it throws outside the provider.
 - `sessions` is `null` until the first read lands; `[]` is a read that found no chat.
 - Read on events only, nothing polls: at mount, on every `station_sessions_changed` hint (whatever its `states`) and on `websocket_reconnected`. Try again (`reread`) is the one press.
@@ -10144,7 +10161,11 @@ His chats as the rail draws them: one `GET /api/companion/station/sessions` (`ap
 - Readers: every region of the station that draws or names one of his chats (`grep -rn 'useStationSessions()' src/modules/station` lists them; the rail and the chat's stage among them). The list is the grep's, not this row's. The `@/modules/station` barrel does not export it, so a reader outside the module is added with the export.
 - Probe: `.verify/station-sessions-provider.mjs`.
 
-## StationNeedsProvider / useStationNeeds() — `context/StationNeedsContext.tsx`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationNeedsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationSessionsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-needs-reads-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-needs-routed-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-needs-provider.mjs
+
+## MAN-9346 — src/modules/station — the context: StationProvider, useStation, useStationPref — StationNeedsProvider / useStationNeeds() — `context/StationNeedsContext.tsx`
+section: src/modules/station — the context: StationProvider, useStation, useStationPref and useStationWindow/002 StationNeedsProvider / useStationNeeds() — `context/StationNeedsContext.tsx`
+
 Everything that needs him: one `GET /api/companion/station/needs` (`api.companion.station.needs()`, which carries `x-companion-client`; `stationNeeds` and `needs.routes.ts` on the server), held for every region. `StationRoute` mounts it inside `StationProvider` (MAN-9250). `useStationNeeds()` → `{ needs: StationNeed[] | null, faults: StationNeed['kind'][], failure: string | null, reread() }`; it throws outside the provider. The ask's answer, `api.companion.station.answerAsk(body)` (`POST /api/companion/station/asks`), is in the same group and is sent from the ask's stage, never from here.
 - `needs` is `null` until the first read lands; `[]` is a read that found nothing waiting. `faults` names the kinds the server could not read: they are left out of `needs` and the rail says so, and they come from the same read as `needs`, never a newer one.
 - Read on SIX events, nothing polls: the mount; `websocket_reconnected`; `station_sessions_changed` when its `states` is `true` (an ask raised, answered or cancelled, a run started or ended; `states` false is a chat merely talking and costs no read); the dispatcher lane's picture changing (`useDispatcherPlans()`, the live bus's `dispatcher:all`); `followups_changed`; `cerberus_changed`. Try again (`reread`) is the one press.
@@ -10155,7 +10176,11 @@ Everything that needs him: one `GET /api/companion/station/needs` (`api.companio
 - Readers: `WhatNeedsYou` (MAN-9281) and `AskStage` (MAN-9282). The `@/modules/station` barrel does not export it, so a reader outside the module is added with the export.
 - Probe: `.verify/station-needs-provider.mjs` on the dev client :5183 against :3011 as account 1 (leg A: a probe chat's follow-up, its permission and the live lane's next move, each followed within a second by one GET; leg B: the counts on a routed socket; leg C: the failures). Legs B and C: `.verify/lib/station-needs-routed-legs.mjs`; the page's own record of reads and frames, the provider's value read off the React tree and the judge: `.verify/lib/station-needs-reads-kit.mjs`.
 
-## States and empty state
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationNeedsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationSessionsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-needs-reads-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-needs-routed-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-needs-provider.mjs
+
+## MAN-9347 — src/modules/station — the context: StationProvider, useStation, useStationPref — States and empty state
+section: src/modules/station — the context: StationProvider, useStation, useStationPref and useStationWindow/003 States and empty state
+
 | state | focus | stack | draws (MAN-9228) |
 |---|---|---|---|
 | first visit, or a record that could not be read | `null` | empty | the empty stage ("Nothing on the stage"), no Back |
@@ -10206,7 +10231,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/Stat
 THE STATION'S FIRST PRESS UNLOCKS HER VOICE. A browser plays nothing before a gesture, and the station is a page she speaks on unasked, so the page's first `pointerdown` or `keydown` anywhere calls the provider's `setOpen(true)` once more: the door that unlocks the page's audio (MAN-9113), as her panel's opening does in the workspace, and the same call that takes her floor (`POST /api/companion/floor`). Both listeners are on `window` in the capture phase, so a press a region stops from bubbling still counts, and both go off at the first gesture of either kind: ONE call, then none. `sendText` unlocks the page's audio too, as it always has. No second unlock path exists. Event-driven; nothing polls. Proof: `node .verify/kaylee-station-center-live.mjs` counts the floor calls (one on the first pointerdown, none on the next key or pointer; after a reload, one on the first key, none on the pointer after it).
 
 ## useCardsTakeStage — `hooks/useCardsTakeStage.ts`
-HER NEW CARD AND HER WALK TAKE THE STAGE ("one focus at a time"). It reads `useCompanion().picture` and calls `setFocus` of the station, so the focus they replace goes onto the back-stack and Back returns him to what he was reading. The first picture that lands is only NOTED (its newest card id, its walk's `updatedAt`), so a reload, or a station opened on a conversation that already holds cards and a walk, never steals the stage from the focus the page restores. After that, a card with a higher id puts `{ kind: 'note', id, label: title }` on the stage (the highest when several arrive together), and a walk whose `updatedAt` is not the one seen (it starts or moves) puts `{ kind: 'walk', label }` there, the label the chat's name; a walk and a card in one picture leave the walk on top. Staging what already stands there changes nothing (`setFocus`), so his own Next on the walk stage is not a new focus. A card taken down, a walk ended and his Clear are noted and put nothing on the stage. Ids only grow (AUTOINCREMENT), so the newest seen never steps back. why: her tools write the card and the walk, and the stage is where he reads them; it runs on the picture her frames fold, never on a timer.
+HER NEW CARD AND HER WALK TAKE THE STAGE ("one focus at a time"). It reads `useCompanion().picture` and calls `setFocus` of the station, so the focus they replace goes onto the back-stack and Back returns him to what he was reading. The first picture that lands is only NOTED (its newest card id, its walk's `updatedAt`), so a reload, or a station opened on a conversation that already holds cards and a walk, never steals the stage from the focus the page restores. After that, a card with a higher id puts `{ kind: 'note', id, label: title }` on the stage (the highest when several arrive together), and a walk whose `updatedAt` is not the one seen (it starts or moves) puts `{ kind: 'walk', label }` there, the label the chat's name; a walk and a card in one picture leave the walk on top. A walk that already stands on the stage is left alone (the hook reads whether the focus is the walk and does not call `setFocus`): his own Next on it is not a new focus, and a `setFocus` with what stands would count as a press on it (`restaged`, MAN-9249) and pull the one-column station to its Stage section. A card taken down, a walk ended and his Clear are noted and put nothing on the stage. Ids only grow (AUTOINCREMENT), so the newest seen never steps back. why: her tools write the card and the walk, and the stage is where he reads them; it runs on the picture her frames fold, never on a timer.
 
 ## States and empty state
 | state | when | draws |
@@ -10214,6 +10239,7 @@ HER NEW CARD AND HER WALK TAKE THE STAGE ("one focus at a time"). It reads `useC
 | loading | the lazy chunk has not arrived | the dark `Suspense` fallback |
 | mounted | | the layout (MAN-9230) with whatever regions `STATION_REGIONS` holds and the stage |
 - Empty state: no focus on the stage and no region registered = the empty stage alone under the bar.
+- Compact form and touch: none of its own. It mounts providers and `StationShell`; the shell's arrangement is `compact` below 1024 px and its presses are the shell's (MAN-9230, MAN-9337, INV-10275).
 
 ## Words and links
 - `station.title` in `en/common.json`. The DocSpace page link is `docSpacePageUrl` (MAN-485), read by `PageStage` (MAN-9262), `NoteStage`'s page card (MAN-9295), Settings' "Open her memory" (`CompanionMemorySettings`, MAN-9184) and the memory corner's "Open the full page" (`MemoryCorner`).
@@ -10265,7 +10291,7 @@ node .verify/kaylee-station-live.mjs --turn   # + one typed Haiku turn
 4. Plan card: the lane given an Accept ask by the page's own lane (`lib/ask-lane.mjs`; the store is never asked or written; nothing pressed): the census whole with Queue, Hide, Rework; only `POST /api/companion/floor` and `POST /api/auth/refresh` were written.
 5. Settings → Voice: "Open her memory" = `<DocSpace origin>/#page=page-kaylee-memory`, `target=_blank`.
 6. Doors out (desktop): the bar's "CloudCLI" calls the opener's `focus()` and opens no page; with no opener it opens `/` in a new tab, whose `companion-client-id` differs from the station's. The probe's own `window.open('/station', 'kaylee-station')` stands in for the future door and shares the workspace's id (INV-10258).
-7. Phone (iPhone 13 descriptor, 390×844, touch): `narrow`, dark, the bar's and the stage's presses 44 px tall; "CloudCLI" goes home in this window.
+7. Phone (iPhone 13 descriptor, 390×844, touch): `compact`, dark, the bar's and the stage's presses 44 px tall; "CloudCLI" goes home in this window.
 - Final check: no page of the run logged a console error. `session.errors` covers the console's page only, so every page of every context (popups, second pages, the phone's) is watched by the context's `page` event. Lines matching `ArchPulse|:8005|favicon|ERR_CONNECTION_REFUSED|pre-auth` are ignored.
 
 ## What `kaylee-station-turn.mjs` checks (`--turn`, exports `run(ctx)`)
@@ -10453,7 +10479,7 @@ Kaylee Station's wire types in one home: `server/shared/station-types.ts` (group
 | `StationSessionState` | `working` \| `waiting` \| `live` \| `asleep`: chat-activity's `ChatState` | `StationSessionsProvider` (MAN-9249) refuses a row whose `state` is outside the four |
 | `StationSession` | `{ sessionId, name, project, state, activity, updatedAt: string \| null }`: one row of the sessions list | `GET /api/companion/station/sessions` serves `{ sessions: StationSession[] }` (MAN-9268); `StationSessionsProvider` (MAN-9249) reads it |
 | `StationAskKind` | `permission` \| `question` \| `plan` | `askKindOf` (`station/need-readers.ts`, MAN-9273) |
-| `StationNeed` | by `kind`; every member has `id` and `say` (`string \| null`: what he says aloud to answer it; `null` when it has no spoken answer — a question, a usage-family check — or when her resolvers would refuse the phrase: a card or chat name two things share, a name that is only filler or the action's word, a check label that fits several checks, an ask that is `cut`). `accept` `{ card, epic, title, headline, features }`; `questions` `{ card, title, headline, count }`; `ask` `{ sessionId, requestId, chat, ask: StationAskKind, tool, what, cut: boolean, rule: string \| null, options: string[], more }` (`cut`: `what` is less than the whole of what the ask would do — it carries the `… (N more characters not shown)` marker, or the tool is `Edit`, `MultiEdit` or `Write`, whose body the line never holds; never true for a question; a page that draws a cut ask offers no Allow, Always allow or Approve, only Deny, Send back and "Open the chat"); `followups` `{ sessionId, chat, count, newest }`; `check` `{ node, key, label, status: 'failing' \| 'denied', value: string \| null, since: number \| null }` | `GET /api/companion/station/needs` serves `{ needs: StationNeed[], faults }` (MAN-9273); `StationNeedsProvider` (MAN-9249) reads it; the rail's `WhatNeedsYouView` draws it (MAN-9281) |
+| `StationNeed` | by `kind`; every member has `id`, and no phrase for him to say. `accept` `{ card, epic, title, headline, features }`; `questions` `{ card, title, headline, count }`; `ask` `{ sessionId, requestId, chat, ask: StationAskKind, tool, what, cut: boolean, rule: string \| null, options: string[], more }` (`cut`: `what` is less than the whole of what the ask would do — it carries the `… (N more characters not shown)` marker, or the tool is `Edit`, `MultiEdit` or `Write`, whose body the line never holds; never true for a question; a page that draws a cut ask offers no Allow, Always allow or Approve, only Deny, Send back and "Open the chat"); `followups` `{ sessionId, chat, count, newest }`; `check` `{ node, key, label, status: 'failing' \| 'denied', value: string \| null, since: number \| null }` | `GET /api/companion/station/needs` serves `{ needs: StationNeed[], faults }` (MAN-9273); `StationNeedsProvider` (MAN-9249) reads it; the rail's `WhatNeedsYouView` draws it (MAN-9281) |
 | `StationAskAnswer` | `{ sessionId, requestId, answer }` | `POST /api/companion/station/asks` takes it (MAN-9273) |
 | `StationLandedKind` | `shipped` \| `epic` \| `landed` \| `recovered` | `LANDED_KIND_BY_CODE` (MAN-9269) |
 | `StationLanded` | `{ id, at, kind, title, plan: string \| null, sessionId: string \| null, chat: string \| null }`: `id` is the notification history's row id | `GET /api/companion/station/landed` serves `{ landed: StationLanded[] }` (MAN-9269); `StationLandedProvider` (MAN-9285) reads it |
@@ -10463,11 +10489,15 @@ Kaylee Station's wire types in one home: `server/shared/station-types.ts` (group
 Two files or more read each, so they sit in the shared types.
 | type | shape | read by |
 |---|---|---|
-| `StationTier` | `wide` \| `laptop` \| `narrow` | `useStationWindow`, `StationShellView`, `StationBar`, every region (`StationRegionProps`) |
+| `StationTier` | `wide` \| `laptop` \| `narrow` | `useStationWindow`, `StationShellView`, every region (`StationRegionProps`) |
+| `StationArrangement` | `wide` \| `laptop` \| `compact`: how the shell arranges its regions. `StationShell` computes it: `compact` when the tier is `narrow` or his `compact` pref is on, else the tier (MAN-9230) | `StationShellView`, `StationBar` |
+| `StationCompactSwitch` | `{ on: boolean; onChange: (on: boolean) => void }`: the bar's Compact switch; null where it changes nothing (below 1024 px) | `StationShell` → `StationShellView` → `StationBar` |
+| `StationCompactSection` | `conversation` \| `needs` \| `where` \| `stage`: the section the one-column body shows | `useStationSection` (holds it, MAN-9344), `StationCompactView`, `StationSectionsView` (MAN-9337, MAN-9335), the phone's arrangement later |
+| `StationDensity` | `full` \| `compact`: `compact` in the compact arrangement, `full` in the columns | `StationRegionProps`, every region's view |
 | `StationSlot` | `strip` \| `sessions` \| `corner` \| `head` \| `conversation` \| `dock` \| `talk` \| `needs` | `StationShellView` slots, `STATION_REGIONS`, the fixtures' `slots` |
 | `StationRegion` | `StationSlot` \| `roadmap` \| `stage`: the keys of the scroll memory | `scrollMemory`, `StationRecord.scroll` |
-| `StationPrefKey` | `stripCollapsed` \| `cornerOpen` \| `compact` \| `asleepOpen` \| `completeOpen`: a flag each; `asleepOpen` and `completeOpen` are the left rail's two folds (his asleep chats, the roadmap's complete epics), both closed until he opens one | `useStationPref`, the stored `prefs` (`PREF_KEYS`, MAN-9248); `WhereThingsStand` reads the last two |
-| `StationRegionProps` | `{ tier: StationTier }`: the props every registered region takes | `STATION_REGIONS`, the fixtures |
+| `StationPrefKey` | `stripCollapsed` \| `cornerOpen` \| `compact` \| `asleepOpen` \| `completeOpen` \| `compactSection` \| `compactSectionAside`: `compact` is his switch for the one-column arrangement (the bar's Compact label); `asleepOpen` and `completeOpen` are the left rail's two folds (his asleep chats, the roadmap's complete epics), both closed until he opens one; `compactSection` is the section the one-column body shows; `compactSectionAside` is the section he was in when the stage pulled him to `stage` (never `stage`), which clearing the stage returns him to | `useStationPref`, the stored `prefs` (`readStationRecord`, MAN-9248); `StationShell` reads `compact`, `useStationSection` reads `compactSection` and `compactSectionAside`, `WhereThingsStand` reads `asleepOpen` and `completeOpen` |
+| `StationRegionProps` | `{ tier: StationTier; density: StationDensity }`: the props every registered region takes; a region draws differently only where it reads `density` (MAN-569) | `STATION_REGIONS`, the fixtures |
 | `LocaleWords` | `{ key: string; english: string }`: a locale key with its English, drawn `t(words.key, words.english)` | the station's tables of words: `STATION_NEED_KINDS`, the rail's fault lines and status words, the ask's wells |
 | `StationNeedKind` | `Exclude<StationNeed['kind'], 'ask'> \| StationAskKind`: seven (`accept`, `questions`, `permission`, `question`, `plan`, `followups`, `check`); a chat's ask is told apart by its own kind | the key of `STATION_NEED_KINDS`; `NeedItem`, `AskStageView` |
 | `StationHerMark` | `{ sessionId, initial, words }`: the chat her activity names (reading, drafting for or walking it), her name's first letter, her words for it | built by `WhereThingsStand` (`herMarkOf`, MAN-9305); drawn by `SessionRows` (MAN-9289); held by `fake/sessions.ts` for `walkthrough` |
@@ -10535,13 +10565,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Pr
 
 ## MAN-9259 — src/modules/station — StationBar: the title, the strip slot and the way back to CloudCLI
 
-`StationBar` (`StationBar.tsx`): the bar across the top of every tier. A pure view: the press is the caller's. Drawn by `StationShellView` (MAN-9230) above the body. Touch law: INV-10275. The way back it carries: MAN-9247.
+`StationBar` (`StationBar.tsx`): the bar across the top of every arrangement. A pure view: the press is the caller's. Drawn by `StationShellView` (MAN-9230) above the body. Touch law: INV-10275. The way back it carries: MAN-9247.
 
 ## Props
 | prop | type | meaning |
 |---|---|---|
-| `tier` | `StationTier` | `narrow` drops the strip to a line of its own |
-| `strip` | `ReactNode` | the `strip` slot's region (MAN-9287), drawn across the middle; `undefined`, `null` or `false` = no region fills it |
+| `strip` | `ReactNode` | the `strip` slot's region (MAN-9287), drawn across the middle; `undefined`, `null` or `false` = no region fills it. In compact the shell hands null: the strip is a row of compact's own |
+| `compactSwitch` | `StationCompactSwitch \| null` | his "Compact" switch (`{ on, onChange }`), drawn before "CloudCLI"; null where it would change nothing (below 1024 px) and none is drawn. `StationShell` binds it: `on` is `useStationPref('compact', false)`'s value and `onChange` its setter (per device, kept across a reload); null while the window is under 1024 px, where compact is the only arrangement |
 | `onBackToCloudcli` | `() => void` | the press on "CloudCLI". `StationShell` binds it (`backToCloudcli`). why not here: a bar that bound its own press would run router hooks inside the shots probe and break every later region's shots |
 
 ## What it draws
@@ -10549,21 +10579,22 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Pr
 | part | markup | words |
 |---|---|---|
 | title | the page's one `<h1>` (serif, 22 px, `font-normal`) | `station.bar.title` = "Kaylee <accent>Station</accent>"; the accent word is `<em className="text-garnish">`, Verve's `--garnish` through the `garnish` colour name in `tailwind.config.js` (MAN-739 rule 3) |
-| strip | `[data-station-slot=strip]`, `flex-1`; at `narrow` `order-last basis-full` | whatever the `strip` region draws |
-| back | `[data-station-back-to-cloudcli]`, an outline `sm` `Button`, `ml-auto`, `AppLogo` + word | `station.bar.back` "CloudCLI"; `aria-label` `station.bar.backLabel` "Back to CloudCLI" |
+| strip | `[data-station-slot=strip]`, `flex-1` | whatever the `strip` region draws |
+| compact | `<label data-station-compact-toggle=on\|off>`, `ml-auto`: the word (`aria-hidden`) and the kit `Switch`, which carries the name | `station.compact.switch` "Compact" |
+| back | `[data-station-back-to-cloudcli]`, an outline `sm` `Button`, `ml-auto` when no Compact switch stands, `AppLogo` + word | `station.bar.back` "CloudCLI"; `aria-label` `station.bar.backLabel` "Back to CloudCLI" |
 
 ## States
 | state | when | draws |
 |---|---|---|
 | strip drawn | a region fills `strip` | title, the strip, "CloudCLI" |
 | no strip | no region fills it | title and "CloudCLI" only; no strip box |
-| narrow | `tier === 'narrow'` | the strip takes a line of its own, so the title and the way back keep the first line whatever the strip holds |
+| compact | the shell hands no strip | no strip (compact's own row, MAN-9337); the Compact switch on when it is his switch that made it compact, and none below 1024 px |
 
 ## Empty state
 No strip: no box is drawn. The bar never draws empty: the title and the way back stand always.
 
 ## Touch
-"CloudCLI" is 44 px tall below 768 px (`max-md:h-11`). It has no tooltip: its name says where it goes.
+"CloudCLI" is 44 px tall below 768 px (`max-md:h-11`). It has no tooltip: its name says where it goes. The Compact label is a 44 px catch below 768 px and on any touch screen (`max-md:min-h-11 [@media(pointer:coarse)]:min-h-11`): a press anywhere on it presses the kit's 30 px switch.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationBar.tsx
 
@@ -10617,6 +10648,9 @@ Press words (`station.fallback.open.<kind>`): `chat` "Open the chat in CloudCLI"
 ## Empty state
 `gone` is the empty state of every kind the fallback draws.
 
+## Compact form
+None of its own: it takes no `density`. In the one-column arrangement the Stage section draws it as the columns' stage does, the whole section, its body scrolling under the stage's head (MAN-9335).
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/FocusFallback.tsx
 
 ## MAN-9261 — src/modules/station — CardStageView and CardStage: a feature or an epic on the stage, in its six states
@@ -10657,6 +10691,13 @@ Stands `CardStageView` INSIDE `RoadmapDialogHost` (roadmap barrel, MAN-7650), so
 ## Empty state
 A name neither the dispatcher nor the roadmap holds: `gone`. Before either has landed: `loading`.
 
+## Touch
+- The presses are the owners': the dispatcher's `PlanCard` (Queue, Hide, Rework), `FeatureFacts` and `EpicPanel` bring their own up to 44 px below 768 px, or not. The shots probe REPORTS the ones under 44 px and never fails on them; 2026-10-29 at 390×844, 18 of 21 presses of `PlanCard` were under (INV-10275).
+- The stage's own Back and ✕ are 44 px catches below 768 px (MAN-9228).
+
+## Compact form
+None of its own: it takes no `density`. In the one-column arrangement the Stage section draws it as the columns' stage does, the whole section, its body scrolling under the stage's head (MAN-9335).
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/cardLabel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/CardStage.tsx
 
 ## MAN-9262 — src/modules/station — PageStage: a DocSpace page, or one block, on the stage with its link
@@ -10683,6 +10724,9 @@ No wrapper: it reads nothing from the station, so the one component is the view 
 
 ## Empty state
 None: the card always draws. A page that no longer exists is DocSpace's to say once the link is followed; the station holds no reader of DocSpace pages, so `StageGone` is never drawn for `page` today.
+
+## Compact form
+None of its own: it takes no `density`. In the one-column arrangement the Stage section draws it as the columns' stage does, the whole section, its body scrolling under the stage's head (MAN-9335).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/PageStage.tsx
 
@@ -10727,27 +10771,28 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useSta
 The station's two registries and how a later plan lands its component on them. A line added to either is LIVE the moment it lands: no flag, no switch-over. The layout: MAN-9230. The stage: MAN-9228. Fixtures: MAN-9229. The touch law: INV-10275. The inventory of components: MAN-9265.
 
 ## `STATION_REGIONS` — `stationRegions.ts`
-`Partial<Record<StationSlot, ComponentType<StationRegionProps>>>`. Holds `sessions` → `WhereThingsStand` (`WhereThingsStand.tsx`, MAN-9288), `corner` → `MemoryCorner` (`MemoryCorner.tsx`, MAN-9312), `strip` → `SinceYouLastLooked` (`SinceYouLastLooked.tsx`, MAN-9287) and `needs` → `WhatNeedsYou` (`WhatNeedsYou.tsx`, MAN-9281), `head` → `StationHead`, `conversation` → `StationConversation` and `talk` → `StationTalk` (`StationHead.tsx`, `StationConversation.tsx`, `StationTalk.tsx`, MAN-9314, MAN-9325, MAN-9324) and `dock` → `StationDock` (`StationDock.tsx`, MAN-9321); each other region's plan adds its own line. `StationShell` draws each line as `<Region tier={tier} />` in its slot; a slot with no line draws nothing and the layout closes up around it.
+`Partial<Record<StationSlot, ComponentType<StationRegionProps>>>`. Holds `sessions` → `WhereThingsStand` (`WhereThingsStand.tsx`, MAN-9288), `corner` → `MemoryCorner` (`MemoryCorner.tsx`, MAN-9312), `strip` → `SinceYouLastLooked` (`SinceYouLastLooked.tsx`, MAN-9287) and `needs` → `WhatNeedsYou` (`WhatNeedsYou.tsx`, MAN-9281), `head` → `StationHead`, `conversation` → `StationConversation` and `talk` → `StationTalk` (`StationHead.tsx`, `StationConversation.tsx`, `StationTalk.tsx`, MAN-9314, MAN-9325, MAN-9324) and `dock` → `StationDock` (`StationDock.tsx`, MAN-9321); each other region's plan adds its own line. `StationShell` draws each line as `<Region tier={tier} density={density} />` in its slot, `density` = `compact` in the compact arrangement and `full` in the columns (MAN-9230); a slot with no line draws nothing and the layout closes up around it.
 | slot | the body places it | box (`SLOT_BOX`) |
 |---|---|---|
-| `strip` | the bar's middle (`StationBar`) | the bar's |
-| `sessions` | `wide`/`laptop`: left rail, top; `narrow`: the stack, after `needs` | `min-h-0 flex-1` |
-| `corner` | left rail, foot | `shrink-0` |
-| `head` | her column, top | `shrink-0` |
-| `conversation` | her column | `min-h-14 flex-1`; in her column `flex-[1_100_30%]` |
-| `dock` | her column | `min-h-0 flex-[0_1_auto]`; in her column `max-h-max flex-[10000_1_var(--station-dock-floor,14.25rem)]`; the budget: MAN-9230 |
-| `talk` | her column, foot | `shrink-0` |
-| `needs` | right rail; `narrow`: the stack, after `talk` | `min-h-0 flex-1` |
+| `strip` | the bar's middle (`StationBar`); compact: the strip's line under her head | the bar's |
+| `sessions` | `wide`/`laptop`: left rail, top; compact: Where things stand, top | `min-h-0 flex-1` |
+| `corner` | left rail, foot; compact: Where things stand, foot | `shrink-0` |
+| `head` | her column, top; compact: her head row | `shrink-0` |
+| `conversation` | her column; compact: Conversation, top | `min-h-14 flex-1`; in her column `flex-[1_100_30%]` |
+| `dock` | her column; compact: Conversation, under the log | `min-h-0 flex-[0_1_auto]`; in her column `max-h-max flex-[10000_1_var(--station-dock-floor,14.25rem)]`; the budget: MAN-9230 |
+| `talk` | her column, foot; compact: the button in her head row, the box in Conversation (`part`, MAN-9324) | `shrink-0` |
+| `needs` | right rail; compact: Needs you | `min-h-0 flex-1` |
+- Compact draws a slot's region from the same registry line, never a copy: the sections set `density` (and the talk control's `part`) on the region's element (`StationSectionsView`, MAN-9335).
 
 ## `STAGE_VIEWS` — `stageViews.ts`
 `{ [Kind in StationFocusKind]?: ComponentType<{ focus: Extract<StationFocus, { kind: Kind }> }> }`. Holds `chat` → `ChatStage` (MAN-9291), `card` → `CardStage` (MAN-9261), `page` → `PageStage` (MAN-9262), `ask` → `AskStage` (MAN-9282), `followups` → `FollowupsStage` and `check` → `CheckStage` (MAN-9283). `note` → `NoteStage` (MAN-9295) and `walk` → `WalkStage` (MAN-9296), so every kind of focus has its line and `FocusFallback` draws only a kind a later plan adds to `StationFocusKind`. `StationStage` draws `STAGE_VIEWS[focus.kind]` keyed by `focusKey(focus)`, else `FocusFallback` (MAN-9260). A kind's line replaces its fallback the moment it lands.
 
 ## Landing a region — the steps
-1. A pure VIEW taking `StationRegionProps` (`{ tier }`) and its own props, drawing every state from them, plus a thin wrapper bound to live data. The region never reads the window's width.
+1. A pure VIEW taking `StationRegionProps` (`{ tier, density }`: `density` is `full` or `compact`) and its own props, drawing every state from them; a region whose compact drawing differs draws it from `density`, every other passes it through untouched, plus a thin wrapper bound to live data. The region never reads the window's width.
 2. One line in `STATION_REGIONS`: `<slot>: TheWrapper`.
-3. State lives in the station's context, never only in the region: its scroller's ref is `useStation().scrollMemory(region)` (a `StationRegion`); a remembered flag is `useStationPref(key, initial)` (a `StationPrefKey`: `stripCollapsed`, `cornerOpen`, `compact`, `asleepOpen`, `completeOpen`; one key per region, its only reader); a thing for the stage is `setFocus(...)`.
+3. State lives in the station's context, never only in the region: its scroller's ref is `useStation().scrollMemory(region)` (a `StationRegion`); a remembered flag is `useStationPref(key, initial)` (a `StationPrefKey`: `stripCollapsed`, `cornerOpen`, `compact`, `asleepOpen`, `completeOpen`, `compactSection`, `compactSectionAside`; one key per region or hook, its only reader); a thing for the stage is `setFocus(...)`.
 4. Words `t('station.*', { defaultValue })` in `en/common.json`. Presses keep the touch law (INV-10275). Other modules only through their barrels.
-5. Fixtures: `fake/<slot>.ts` exports `<SLOT>_FAKE: Record<StationPicture, { view, props } | null>` (props `satisfies Omit<ComponentProps<typeof TheView>, 'tier'>`), and one line `<slot>: <SLOT>_FAKE` goes in `REGION_FAKES` (`station-fake.ts`, MAN-9229). The shots probe then draws it in all four pictures at three sizes.
+5. Fixtures: `fake/<slot>.ts` exports `<SLOT>_FAKE: Record<StationPicture, { view, props } | null>` (props `satisfies Omit<ComponentProps<typeof TheView>, 'tier' | 'density'>`), and one line `<slot>: <SLOT>_FAKE` goes in `REGION_FAKES` (`station-fake.ts`, MAN-9229). The shots probe then draws it in all four pictures, in the columns at 1440×900 and 1280×800 and in the compact arrangement at its sizes (MAN-9336).
 6. Docs: one manual row for the component with its props, its states and its empty state, beside the rows of MAN-9265, and its line in that row's first table. The row governs the component's file.
 
 ## Landing a stage view
@@ -10757,65 +10802,68 @@ The station's two registries and how a later plan lands its component on them. A
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stageViews.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stationRegions.ts
 
-## MAN-9265 — src/modules/station — the component inventory: one row per component with its props, states and empty state, and where the rest of the station is documented
+## MAN-9265 — src/modules/station — the component inventory: one row per component with its props, states, empty state, compact form and touch form, and where the rest of the station is documented
 
-The component inventory of Kaylee Station (`src/modules/station/`): ONE manual row per component, each with its props, its states and its empty state. A state is a data condition, never a mode.
+The component inventory of Kaylee Station (`src/modules/station/`): ONE manual row per component, each with its props, its states, its empty state, its compact form and its touch form. A state is a data condition, never a mode. This row's parts: MAN-9316 and MAN-9317 (each component's row, file, empty state and compact form), MAN-9318 (the rest of the module and the shape of a component's row), MAN-9319 (module rules).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/lazyStationRoute.ts
 
 ## MAN-9316 — src/modules/station — the component inventory: one row per component with its — Components
 section: src/modules/station — the component inventory: one row per component with its props, states and empty state, and where the rest of the station is documented/001 Components
 
-| component | file | row | empty state |
-|---|---|---|---|
-| `StationRoute` | `StationRoute.tsx` | MAN-9250 | the empty stage; before its chunk loads, a dark blank |
-| `StationProvider`, `useStation`, `useStationPref` | `context/StationContext.tsx` | MAN-9249 | no focus, an empty back-stack |
-| `StationSessionsProvider`, `useStationSessions` | `context/StationSessionsContext.tsx` | MAN-9249 | `sessions` `null` until the first read lands, `[]` for a read that found no chat; `failure` set only while `sessions` is `null` (a later failed read keeps the rows). Reads at mount, on `station_sessions_changed` and on `websocket_reconnected`: one in flight, one queued |
-| `StationNeedsProvider`, `useStationNeeds` | `context/StationNeedsContext.tsx` | MAN-9249 | `needs` `null` until the first read lands, `[]` for nothing waiting; `failure` set only while `needs` is `null`; `faults` names the kinds the server could not read |
-| `StationShellView`, `StationShell` | `StationShell.tsx` | MAN-9230 | a slot with no region draws nothing |
-| `StationBar` | `StationBar.tsx` | MAN-9259 | no strip: title and "CloudCLI" only |
-| `StationHeadView`, `StationHead` | `StationHead.tsx` | MAN-9314 | `loading`: her initial, "Loading…", model, Live and Clear waiting; failed process: a warn banner under the status |
-| `StationConversationView`, `StationConversation`; `CompanionCardChip` | `StationConversation.tsx`; `companion/CompanionCardChip.tsx` | MAN-9325 | `loading`; `failed` (the reason and Try again); the log's `empty` ("Nothing said yet") before her first hello |
-| `StationTalkView`, `StationTalk` | `StationTalk.tsx` | MAN-9324 | the line under the button empty until his settings are read; Send disabled until her picture is |
-| `useUnlockHerVoice` | `hooks/useUnlockHerVoice.ts` | MAN-9250 | none: it draws nothing; its first `pointerdown` or `keydown` calls `setOpen(true)` once, then no listener stands |
-| `StationDockView`, `StationDock` (the `dock` line of `STATION_REGIONS`); `useDockFloor` | `StationDock.tsx`; `hooks/useDockFloor.ts` | MAN-9321 | `empty`: the one quiet line "When she drafts a brief for a session, it waits here for your Send." (kit `EmptyState` `size="sm"`, MAN-9320) |
-| `SinceYouLastLookedView`, `SinceYouLastLooked`, `LandedTimeline`, `LandedEntry`, `StripLines` | `SinceYouLastLooked.tsx`, `LandedTimeline.tsx`, `LandedEntry.tsx`, `StripLines.tsx` | MAN-9287 | "Nothing has landed this week"; `reading` before the first read; `failed` (the read's sentence and Try again) |
-| `StationLandedProvider`, `useStationLanded` | `context/StationLandedContext.tsx` | MAN-9285 | `landed` `[]`; `null` until the first read settles |
-| `StationStageView`, `StationStage` | `StationStage.tsx` | MAN-9228 | "Nothing on the stage" |
-| `CardStageView`, `CardStage` | `CardStage.tsx` | MAN-9261 | `gone`; `loading` before the pictures land |
-| `NoteStageView`, `NoteStage`, `NoteBody`, `ListBody`, `PlanBody`, `PageBody` | `NoteStage.tsx`, `cardBodies.tsx` | MAN-9295 | `gone`: "<title> was taken down"; `reading` before her picture is read; `failed` when that read failed (the sentence and Try again) |
-| `WalkStageView`, `WalkStage` | `WalkStage.tsx` | MAN-9296 | `ended`: "The walkthrough ended"; `reading` before her picture is read; `failed` when that read failed (the sentence and Try again) |
-| `StageShelfView`, `StageShelf` | `StageShelf.tsx` | MAN-9297 | no cards: draws nothing |
-| `StageSlotsProvider`, `StageHeadActions`, `StageFoot` | `stageSlots.tsx` | MAN-9298 | a box nothing is drawn into stays out of the layout |
-| `FocusFallbackView`, `FocusFallback`, `StageGone` | `FocusFallback.tsx` | MAN-9260 | `gone` |
-| `WhereThingsStandView`, `WhereThingsStand` | `WhereThingsStand.tsx` | MAN-9288 | "No sessions yet" over "No roadmap yet"; `reading` before the first read |
-| `RailRow`, `RailFold`, `RailEyebrow` | `RailRow.tsx` | MAN-9288 | none: the rail's shared pieces |
-| `SessionRows`, `SessionStateChip` | `SessionRows.tsx` | MAN-9289 | "No sessions yet"; "Nothing is running" when every chat sleeps; `reading`, `failed` |
-| `RoadmapRows` | `RoadmapRows.tsx` | MAN-9290 | "No roadmap yet"; "Nothing is open on this roadmap."; `reading` |
-| `ChatStageView`, `ChatStage` | `ChatStage.tsx` | MAN-9291 | `gone`; `reading` before his sessions are read, or while an answer that came before the chat was staged lacks it; `failed` when the first read failed |
-| `PageStage` | `PageStage.tsx` | MAN-9262 | none: always a card |
-| `WhatNeedsYouView`, `WhatNeedsYou`, `NeedItem` | `WhatNeedsYou.tsx`, `NeedItem.tsx` | MAN-9281 | "Nothing needs you."; `reading` before the first read |
+| component | file | row | empty state | compact form |
+|---|---|---|---|---|
+| `StationRoute` | `StationRoute.tsx` | MAN-9250 | the empty stage; before its chunk loads, a dark blank | none: the route draws the shell, whose arrangement is compact below 1024 px |
+| `StationProvider`, `useStation`, `useStationPref` | `context/StationContext.tsx` | MAN-9249 | no focus, an empty back-stack | none; it holds his switch (`compact`) and the section (`compactSection`) as prefs |
+| `StationSessionsProvider`, `useStationSessions` | `context/StationSessionsContext.tsx` | MAN-9249 | `sessions` `null` until the first read lands, `[]` for a read that found no chat; `failure` set only while `sessions` is `null` (a later failed read keeps the rows). Reads at mount, on `station_sessions_changed` and on `websocket_reconnected`: one in flight, one queued | none |
+| `StationNeedsProvider`, `useStationNeeds` | `context/StationNeedsContext.tsx` | MAN-9249 | `needs` `null` until the first read lands, `[]` for nothing waiting; `failure` set only while `needs` is `null`; `faults` names the kinds the server could not read | none; its items plus her pending action are compact's count (MAN-9337) |
+| `StationShellView`, `StationShell` | `StationShell.tsx` | MAN-9230 | a slot with no region draws nothing | the `compact` arrangement: one column, her head always in view (MAN-9230) |
+| `StationBar` | `StationBar.tsx` | MAN-9259 | no strip: title and "CloudCLI" only | holds no strip; his Compact switch is drawn from 1024 px up, none below |
+| `StationCompactView`, `StationCompact` | `StationCompact.tsx` | MAN-9337 | no `strip`: no strip box; no `talk`: no talk slot; `focusLabel` null: three sections, no Stage; `needsCount` 0: a muted `0`, no count on Needs you; `needsCount` null (the first read not landed): the icon alone, named "Open Needs you" | it is the compact arrangement: her head, the strip's line, one switch, a section |
+| `StationSectionsView` | `StationSections.tsx` | MAN-9335 | a place with nothing in it draws nothing and the section closes up | it is compact's body: four sections drawn, one shown, every region at `compact` density |
+| `useStationSection` | `hooks/useStationSection.ts` | MAN-9344 | a stored `stage` with no focus is released to the section held aside (`compactSectionAside`), else `conversation` | none: it is compact's section and the stage's pull on it |
+| `StationHeadView`, `StationHead` | `StationHead.tsx` | MAN-9314 | `loading`: her initial, "Loading…", model, Live and Clear waiting; failed process: a warn banner under the status | face 64 px, her controls behind one `Menu` press (MAN-9314) |
+| `StationConversationView`, `StationConversation`; `CompanionCardChip` | `StationConversation.tsx`; `companion/CompanionCardChip.tsx` | MAN-9325 | `loading`; `failed` (the reason and Try again); the log's `empty` ("Nothing said yet") before her first hello | the same; it fills the Conversation section |
+| `StationTalkView`, `StationTalk` | `StationTalk.tsx` | MAN-9324 | the line under the button empty until his settings are read; Send disabled until her picture is | the button 44 px tall in her head's row, its words kept; the box to type in the Conversation section |
+| `useUnlockHerVoice` | `hooks/useUnlockHerVoice.ts` | MAN-9250 | none: it draws nothing; its first `pointerdown` or `keydown` calls `setOpen(true)` once, then no listener stands | none: it draws nothing |
+| `StationDockView`, `StationDock` (the `dock` line of `STATION_REGIONS`); `useDockFloor` | `StationDock.tsx`; `hooks/useDockFloor.ts` | MAN-9321 | `empty`: the one quiet line "When she drafts a brief for a session, it waits here for your Send." (kit `EmptyState` `size="sm"`, MAN-9320) | the same; the Conversation section caps it at 45% and lifts the cap while its field holds the focus with the keys up |
+| `SinceYouLastLookedView`, `SinceYouLastLooked`, `LandedTimeline`, `LandedEntry`, `StripLine`, `StripReadingLine`, `StripQuietLine`, `StripFailedLine` | `SinceYouLastLooked.tsx`, `LandedTimeline.tsx`, `LandedEntry.tsx`, `StripLines.tsx` | MAN-9287 | "Nothing has landed this week"; `reading` before the first read; `failed` (the read's sentence and Try again) | always the folded line; its fold opens and shuts the whole week over the body (`week`) |
+| `StationLandedProvider`, `useStationLanded` | `context/StationLandedContext.tsx` | MAN-9285 | `landed` `[]`; `null` until the first read settles | none |
+| `StationStageView`, `StationStage` | `StationStage.tsx` | MAN-9228 | "Nothing on the stage" | the Stage section: the stage as the columns draw it, the whole section; the empty stage stands there as in the columns |
+| `CardStageView`, `CardStage` | `CardStage.tsx` | MAN-9261 | `gone`; `loading` before the pictures land | none of its own (no `density`): the Stage section draws it as the columns' stage does, the whole section, its body scrolling under its head (MAN-9335) |
+| `NoteStageView`, `NoteStage`, `NoteBody`, `ListBody`, `PlanBody`, `PageBody` | `NoteStage.tsx`, `cardBodies.tsx` | MAN-9295 | `gone`: "<title> was taken down"; `reading` before her picture is read; `failed` when that read failed (the sentence and Try again) | none of its own (no `density`): the Stage section draws it as the columns' stage does, the whole section, its body scrolling under its head (MAN-9335) |
+| `WalkStageView`, `WalkStage` | `WalkStage.tsx` | MAN-9296 | `ended`: "The walkthrough ended"; `reading` before her picture is read; `failed` when that read failed (the sentence and Try again) | none of its own (no `density`): the Stage section draws it as the columns' stage does, the whole section, its body scrolling under its head (MAN-9335) |
+| `StageShelfView`, `StageShelf` | `StageShelf.tsx` | MAN-9297 | no cards: draws nothing | none of its own (no `density`): the Stage section draws it as the columns' stage does, the whole section, its body scrolling under its head (MAN-9335) |
+| `StageSlotsProvider`, `StageHeadActions`, `StageFoot` | `stageSlots.tsx` | MAN-9298 | a box nothing is drawn into stays out of the layout | none of its own (no `density`): the Stage section draws it as the columns' stage does, the whole section, its body scrolling under its head (MAN-9335) |
+| `FocusFallbackView`, `FocusFallback`, `StageGone`, `StageReadFailed` | `FocusFallback.tsx` | MAN-9260 | `gone`; `StageReadFailed` is a read that did not land: a warn sentence and Try again, where "Reading…" would wait for ever | none of its own (no `density`): the Stage section draws it as the columns' stage does, the whole section, its body scrolling under its head (MAN-9335) |
+| `WhereThingsStandView`, `WhereThingsStand` | `WhereThingsStand.tsx` | MAN-9288 | "No sessions yet" over "No roadmap yet"; `reading` before the first read | one-line rows (sessions and features); the folds as in full; fills its section and scrolls inside itself |
+| `RailRow`, `RailFold`, `RailEyebrow` | `RailRow.tsx` | MAN-9288 | none: the rail's shared pieces | takes a row's words as they come; the rows it holds draw one line at compact density |
+| `SessionRows`, `SessionStateChip` | `SessionRows.tsx` | MAN-9289 | "No sessions yet"; "Nothing is running" when every chat sleeps; `reading`, `failed` | one line per chat: its name, the line she reads of it, its state chip |
+| `RoadmapRows` | `RoadmapRows.tsx` | MAN-9290 | "No roadmap yet"; "Nothing is open on this roadmap."; `reading` | one line per feature; the epic's head as in full |
+| `ChatStageView`, `ChatStage` | `ChatStage.tsx` | MAN-9291 | `gone`; `reading` before his sessions are read, or while an answer that came before the chat was staged lacks it; `failed` when the first read failed | none of its own (no `density`): the Stage section draws it as the columns' stage does, the whole section, its body scrolling under its head (MAN-9335) |
+| `PageStage` | `PageStage.tsx` | MAN-9262 | none: always a card | none of its own (no `density`): the Stage section draws it as the columns' stage does, the whole section, its body scrolling under its head (MAN-9335) |
+| `WhatNeedsYouView`, `WhatNeedsYou`, `NeedItem` | `WhatNeedsYou.tsx`, `NeedItem.tsx` | MAN-9281 | "Nothing needs you."; `reading` before the first read | one-line items with the words under them; her action card unchanged, his lines word for word (MAN-9186) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/lazyStationRoute.ts
 
 ## MAN-9317 — src/modules/station — the component inventory: one row per component with its — `AskStageView`, `AskStage`, `AskAnswers`
 section: src/modules/station — the component inventory: one row per component with its props, states and empty state, and where the rest of the station is documented/002 `AskStageView`, `AskStage`, `AskAnswers`
 
-| component | file | row | empty state |
-|---|---|---|---|
-| `AskStageView`, `AskStage`, `AskAnswers` | `AskStage.tsx`, `AskAnswers.tsx` | MAN-9282 | `gone`; `loading` before the needs are read; `unread` when they could not be |
-| `FollowupsStageView`, `FollowupsStage` | `FollowupsStage.tsx` | MAN-9283 | `gone`: no open follow-ups |
-| `CheckStageView`, `CheckStage` | `CheckStage.tsx` | MAN-9283 | `gone`; `loading` before Cerberus's overview is read; `unread` when it could not be |
-| `MemoryCornerView`, `MemoryCorner`, `MemoryLine` | `MemoryCorner.tsx`, `MemoryLine.tsx` | MAN-9312 | "Nothing kept yet"; `reading` before the first read; `unreadable` (`· —`, the sentence, Try again) when her bank cannot be read. Closed until his press: never auto-expanded (INV-10328) |
-| the waiting-on-you state (a data condition of `WhatNeedsYouView`, not a component): two Accepts, an epic's counted once, and a red check, with her action at the head | `fake/needs.ts` `NEEDS_FAKE.waiting`; live, whatever `GET /station/needs` holds | MAN-9281 §"The waiting-on-you state", fixture MAN-9284 | none: it is the rail with items; with none, "Nothing needs you." |
-| `useStationPresence` | `hooks/useStationPresence.ts` | MAN-9263 | empty stage: `view: null` |
-| `useTakeHerFloor` | `hooks/useTakeHerFloor.ts` | MAN-9250 | |
-| `useCardsTakeStage` | `hooks/useCardsTakeStage.ts` | MAN-9250 | no new card and no moved walk: nothing staged; the first picture is only noted |
-| `useKeepFocusWhenGone` | `hooks/useKeepFocusWhenGone.ts` | MAN-9295 | the stage opens already gone: no focus taken |
-| `useStationWindow` | `hooks/useStationWindow.ts` | MAN-9249 | |
-| `useLandOnStageControl` | `hooks/useLandOnStageControl.ts` | MAN-9303 | no control found: the keyboard stays |
-| `useOpenChatInCloudcli` | `hooks/useOpenChatInCloudcli.ts` | MAN-9282 | |
-| `useMemoryLines` | `hooks/useMemoryLines.ts` | MAN-9293 | `lines` `null` until the first read lands |
+| component | file | row | empty state | compact form |
+|---|---|---|---|---|
+| `AskStageView`, `AskStage`, `AskAnswers` | `AskStage.tsx`, `AskAnswers.tsx` | MAN-9282 | `gone`; `loading` before the needs are read; `unread` when they could not be | none of its own (no `density`): the Stage section draws it as the columns' stage does, the whole section, its body scrolling under its head (MAN-9335) |
+| `FollowupsStageView`, `FollowupsStage` | `FollowupsStage.tsx` | MAN-9283 | `gone`: no open follow-ups | none of its own (no `density`): the Stage section draws it as the columns' stage does, the whole section, its body scrolling under its head (MAN-9335) |
+| `CheckStageView`, `CheckStage` | `CheckStage.tsx` | MAN-9283 | `gone`; `loading` before Cerberus's overview is read; `unread` when it could not be | none of its own (no `density`): the Stage section draws it as the columns' stage does, the whole section, its body scrolling under its head (MAN-9335) |
+| `MemoryCornerView`, `MemoryCorner`, `MemoryLine` | `MemoryCorner.tsx`, `MemoryLine.tsx` | MAN-9312 | "Nothing kept yet"; `reading` before the first read; `unreadable` (`· —`, the sentence, Try again) when her bank cannot be read. Closed until his press: never auto-expanded (INV-10328) | the same; at the foot of Where things stand, closed until his press, open never more than half the section |
+| the waiting-on-you state (a data condition of `WhatNeedsYouView`, not a component): two Accepts, an epic's counted once, and a red check, with her action at the head | `fake/needs.ts` `NEEDS_FAKE.waiting`; live, whatever `GET /station/needs` holds | MAN-9281 §"The waiting-on-you state", fixture MAN-9284 | none: it is the rail with items; with none, "Nothing needs you." | as `WhatNeedsYouView`: one-line items |
+| `useStationPresence` | `hooks/useStationPresence.ts` | MAN-9263 | empty stage: `view: null` | none: it draws nothing |
+| `useTakeHerFloor` | `hooks/useTakeHerFloor.ts` | MAN-9250 | none: it takes her floor once as the station mounts and again on each window focus; nothing holds it against his own acts | none: it draws nothing |
+| `useCardsTakeStage` | `hooks/useCardsTakeStage.ts` | MAN-9250 | no new card and no moved walk: nothing staged; the first picture is only noted | none: it draws nothing |
+| `useKeepFocusWhenGone` | `hooks/useKeepFocusWhenGone.ts` | MAN-9295 | the stage opens already gone: no focus taken | none: it draws nothing |
+| `useStationWindow` | `hooks/useStationWindow.ts` | MAN-9249 | none: a resize that moves neither the tier nor `phone` keeps the held object, so a drag across the window does not re-render the station | none: it draws nothing |
+| `useLandOnStageControl` | `hooks/useLandOnStageControl.ts` | MAN-9303 | no control found: the keyboard stays | none: it draws nothing |
+| `useOpenChatInCloudcli` | `hooks/useOpenChatInCloudcli.ts` | MAN-9282 | none: it holds no state; a press opens `/session/<id>` in the window named `cloudcli` (this window on a phone or in the home-screen app) | none: it draws nothing |
+| `useMemoryLines` | `hooks/useMemoryLines.ts` | MAN-9293 | `lines` `null` until the first read lands | none: it draws nothing |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/lazyStationRoute.ts
 
@@ -10830,6 +10878,7 @@ section: src/modules/station — the component inventory: one row per component 
 | the history's seam `onHistoryKept`, which the feed rides, and `record`'s id | `server/modules/notifications/services/notification-history.service.ts` | MAN-9153 |
 | his last look: the preference `stationSeenAt`, written whole on look-away events and the "<n> new" press, never on a timer | `src/shared/userSettings.ts`, `context/StationLandedContext.tsx` | MAN-663, MAN-9285 |
 | the fixtures: four pictures, `FAKE_STAGE`, `fake/`, the shots probe | `station-fake.ts`, `fake/` | MAN-9229; the strip's slice and probe MAN-9286; the right rail's MAN-9284; the left rail's MAN-9292; her cards' MAN-9299; the corner's MAN-9312; her head's, conversation's and talk control's fixtures MAN-9315; the dock's MAN-9322 |
+| the one-column arrangement: `StationCompactView`, `StationCompact`; its body `StationSectionsView`; its section and the stage's pull, `useStationSection` | `StationCompact.tsx`, `StationSections.tsx`, `hooks/useStationSection.ts` | MAN-9337, MAN-9344, MAN-9335 |
 | the touch law, `phone` | rule | INV-10275 |
 | the theme hold | `src/shared/context/ThemeContext.tsx` | MAN-9251 |
 | the doors in and the way back | `src/shared/cloudcliDoors.ts`; the palette's row, her panel's head | MAN-9247, MAN-9083, MAN-9062 |
@@ -10839,11 +10888,13 @@ section: src/modules/station — the component inventory: one row per component 
 | the hint that a chat changed | `server/modules/companion/station/` | MAN-9257 |
 | her memory: the bank's read (`readMemoryLines`), the hint after each write (`companion_memory`), the route `GET /api/companion/memory/lines` | `server/modules/companion/memory/` | MAN-9308, MAN-9188 |
 | his chats for the left rail and the chat's stage: `stationSessions()` over `chatRows()` and `activityLine()`, `GET /api/companion/station/sessions` | `server/modules/companion/station/station-sessions.ts`, `sessions.routes.ts`; `tools/house-reads.ts`, `tools/chat-activity.ts` | MAN-9268, MAN-9055 |
-| the probes | `.verify/` | MAN-9229 (shots), MAN-9252 (live pages and a turn), MAN-9253 (doors, phone frame), MAN-9255 (whole), MAN-9257 (hint), MAN-9294 (the memory corner), MAN-9308 (her memory's lines and the corner whole, on the scratch stack), MAN-9315 (her head, conversation and talk control live: a typed turn, the place kept, the first press, a phone), MAN-9306 (the left rail: live page and a turn), MAN-9307 (the left rail: a chat's whole life), MAN-9249 (the sessions and needs providers' reads) |
+| the probes | `.verify/` | MAN-9229 (shots), MAN-9336 (the compact arrangement at eight sizes), MAN-9340 (the compact arrangement live: the window resized, his switch, the section and the stage's pull), MAN-9252 (live pages and a turn), MAN-9253 (doors, phone frame), MAN-9255 (whole), MAN-9257 (hint), MAN-9294 (the memory corner), MAN-9308 (her memory's lines and the corner whole, on the scratch stack), MAN-9315 (her head, conversation and talk control live: a typed turn, the place kept, the first press, a phone), MAN-9306 (the left rail: live page and a turn), MAN-9307 (the left rail: a chat's whole life), MAN-9249 (the sessions and needs providers' reads) |
 
 ## A component's row — the shape
 - Title `src/modules/station — <Component>: <what it draws>`; the row governs the component's file.
-- Sections, in this order: Props (a table `prop | type | meaning`), States (`state | when | draws`), Empty state, Touch (its 44 px presses), Words (its `station.*` keys) when it has any, the live binding when a view has a wrapper.
+- Sections, in this order: Props (a table `prop | type | meaning`), States (`state | when | draws`), Empty state, Compact form (what `density: 'compact'` draws; where a region takes the prop and draws the same, or has none, the row says so in one line), Touch (its 44 px presses), Words (its `station.*` keys) when it has any, the live binding when a view has a wrapper. The inventory's tables (MAN-9316, MAN-9317) carry each component's empty state and compact form in a column; its touch form is its row's Touch section.
+- A component that draws nothing (a hook, a provider) has no Compact form or Touch section: its inventory line says "none: it draws nothing". A state table that holds the no-data case (`gone`, `reading`, `quiet`, `empty`) is the Empty state. A view whose presses are another module's names them in Touch and says whose they are (MAN-9261).
+- A component with no row gets one in the same pass that adds it: a new row per component, its line in MAN-9316 or MAN-9317, its file in the row's `governs`.
 - One fact per line. Names are the real ones, in backticks. A view is a pure component drawing every state from props; its wrapper binds live data.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/lazyStationRoute.ts
@@ -10956,7 +11007,7 @@ Every other code (an ask, a failure, a pause, the usage family, `dispatcher.limi
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/landed.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/station-landed-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/station-landed.ts
 
-## MAN-9273 — server/modules/companion/station — the needs route: GET /station/needs, POST /station/asks, stationNeeds, the four readers, the say rule and answerStationAsk
+## MAN-9273 — server/modules/companion/station — the needs route: GET /station/needs, POST /station/asks, stationNeeds, the four readers and answerStationAsk
 
 `GET /api/companion/station/needs` serves the station's rail "what needs you": every item that waits on him. `POST /api/companion/station/asks` answers one chat's waiting ask. Transport: `station/needs.routes.ts` (`createNeedsRoutes(service)`). Read and answer: `station/station-needs.ts` (`stationNeeds`, `answerStationAsk`). Readers: `station/need-readers.ts`. Wire types `StationNeed`, `StationAskAnswer`: MAN-9256. Mounted by `companion.routes.ts`: MAN-9188. Service verbs `stationNeeds`, `answerStationAsk`: MAN-9270. Touches no account of hers.
 
@@ -10987,7 +11038,7 @@ Four readers run together (`Promise.allSettled`); their answers join in this ord
 - `planNeeds` throws while `house.dispatcher()` is `null` (the lane has not landed its first reading this boot): `accept` and `questions` are in `faults`, not "nothing waits".
 
 ## The items, by kind
-| kind | `id` | one per | fields beyond `say` |
+| kind | `id` | one per | fields |
 |---|---|---|---|
 | `accept` | `accept:<asked.id>-<asked.at>` | ask, by its `asked` identity: a lock over several features is one item | `card` (dispatcher name), `epic` (a lock over more than one feature names the lead plan's epic), `title`, `headline` (the question's first non-blank line, else the ask's header), `features` |
 | `questions` | `questions:<asked.id>-<asked.at>` | round | `card` = the plan the round is on (the ask's `target` is a designer target, not a card), `title`, `headline` (first question's first line), `count` |
@@ -10996,14 +11047,7 @@ Four readers run together (`Promise.allSettled`); their answers join in this ord
 | `check` | `check:<node>/<key>` | Cerberus check `failing` or `denied`, in the tab's worst-first order (yellow is a warning) | `node`, `key`, `label` (`checkName`), `status`, `value` (`clipLine` to 600), `since` |
 - A plan the operator hid (`plan.hidden !== null`) draws no card: its ask is left out (`list_alerts`' rule).
 - `ask` fields: `what` of a permission is `describeToolInput` whole; of a question its first question's text plus ` (and N more)`; of a plan its text. A question's or plan's text goes through `describeToolInput`'s Bash cut: one line (a break is ` ↵ `), 600 characters, then `… (N more characters not shown)`. `rule` = `buildClaudeToolPermissionEntry` for a permission, else `null`. `options` = the only question's options when there is exactly one question, else `[]`. `cut` = `isCut(kind, tool, what)`: true when a permission or plan's `what` carries the `… (N more characters not shown)` marker (`CUT_MARKER`), or a permission's tool is `Edit`, `MultiEdit` or `Write` (`BODY_HIDDEN_TOOLS`: the line shows the file's path, never the body); always false for a question. why: a press fires only what it shows whole, so a page withholds Allow, Always allow and Approve on a cut ask. A chat whose ask carries no request id cannot be answered and is left out. Chats of hidden roots follow his own (a probe chat lives under `/tmp`).
-- `StationNeed.say` is nullable on every kind, and it is one rule: built by `sayOf` (`hands/action-prompts.ts`), the same builder her check of his word uses, and offered only when her resolver FOR THE ITEM'S OWN KIND takes the phrase to THIS item; else `null`, and the rail shows no spoken words. No reader tests the other kinds: her `open` tries a card, a run, a page, a chat and a check, and refuses a name two kinds share (`"cerberus" fits 2 kinds of thing: the card Cerberus; the chat cerberus`; measured 2026-10-30 on the live house, two chats named like a card's spoken name), so the rail can show words her `open` refuses until the kind is written in front (`chat: cerberus`). The rail only shows the words and fires nothing.
-  | kind | `say` | `null` when |
-  |---|---|---|
-  | `accept` | `sayOf('queue', spoken)` | `canBeNamed`, `namesTarget`, `holdsActionWord` or `resolveCard` (same kind and name) refuses it |
-  | `questions` | `sayOf('answer', spoken)` | the same four |
-  | `ask` | `Allow <chat>` | the ask is a question (its words are its option), or is `cut` (its stage offers Deny alone) |
-  | `followups` | `Open <chat>` | `resolveChat(chat)` is not this chat: a shared name (`Untitled Session`) or an archived chat |
-  | `check` | `Open <label>` | a usage-family check (`withoutUsageChecks`), or `findChecksToOpen` (her `open`'s matcher) over the overview without the usage family finds the label in more than one check |
+- `StationNeed` carries no `say`: the rail offers him no phrase to say, on any kind. She reads an action back in her own words and judges from the conversation whether he agreed (MAN-9171), and her `open` and `answer_session` take any phrasing. The rail only shows each item and fires nothing.
 
 ## `answerStationAsk(userId, answer, runtime)` — the page's own decision
 The steps `answer_session` takes (MAN-9065), so an answer from her and one from his hand settle an ask alike:
@@ -11017,7 +11061,7 @@ The steps `answer_session` takes (MAN-9065), so an answer from her and one from 
 ## Proof — `.verify/kaylee-station-needs.mjs`
 | mode | runs | shows |
 |---|---|---|
-| `read` | `node .verify/kaylee-station-needs.mjs read`, live :3011 as account 1 | every item as `kind · title or chat · say`; Accepts and rounds served = the drawn plans' open asks once each; red checks served = the Cerberus tab's failing and refused, in its order; `faults` empty |
+| `read` | `node .verify/kaylee-station-needs.mjs read`, live :3011 as account 1 | every item as `kind · title or chat`; Accepts and rounds served = the drawn plans' open asks once each; red checks served = the Cerberus tab's failing and refused, in its order; `faults` empty |
 | `ask` | `node .verify/kaylee-station-needs.mjs ask` | a probe chat on Haiku in a project of its own whose settings ASK about `Bash(date:*)` (this box's `Bash(*)` allow never asks): the permission is listed whole; `maybe` is 400; an unknown request id is 409; `allow` is 200 `{ told }`; the turn finishes; the item leaves; the same POST is 409; `claudePermissions` unchanged. The chat is deleted |
 | `plans` | `bash .verify/kaylee-eyes-scratch.sh node .verify/kaylee-station-needs.mjs plans` | the same read on the hands' scratch stack, whose dispatcher holds an Accept and a round: a live plan of his is never asked for |
 - 2026-10-30, live :3011 as account 1: `node .verify/kaylee-station-needs.mjs read` ALL PASS: `GET /needs` 200, 10 items, all `check` (10 of the 18 that need him; the rest are yellow), `faults []`; `POST /asks` with `{}` 400 `sessionId: Invalid input: expected string, received undefined`; no token 401.
@@ -11178,7 +11222,7 @@ The `needs` slot: everything waiting on his word, read at a glance and acted on 
 ## `WhatNeedsYouView` — props
 | prop | type | meaning |
 |---|---|---|
-| `tier` | `StationTier` | `wide`/`laptop`: the body scrolls inside a `ScrollArea`; `narrow`: the page scrolls |
+| `density` | `StationDensity` | `compact`: each item on one line (§"`NeedItem` at compact"); the rail scrolls inside itself at either density (a column or compact's section: a size container, so her card's caps are shares of it); her action card is unchanged |
 | `pending` | `CompanionPendingAction \| null` | her action waiting for his word; `CompanionActionCard` keyed by `pending.id` |
 | `needs` | `StationNeed[] \| null` | in the server's order; null until the first read answers |
 | `faults` | `StationNeed['kind'][]` | kinds whose read failed; each is absent from `needs` |
@@ -11188,7 +11232,7 @@ The `needs` slot: everything waiting on his word, read at a glance and acted on 
 | `onPress` | `(focus) => void` | an item's press: its whole onto the stage, and the keyboard to the control that fires it |
 | `onWithdraw` | `() => Promise<void>` | the card's ×; a refusal rejects with the server's sentence |
 | `name` | `string` | her name, the card's × hint |
-| `scrollRef?` | ref callback | the scroller, for `scrollMemory('needs')`; unused in the stack |
+| `scrollRef?` | ref callback | the scroller, for `scrollMemory('needs')`; absent on a fixture |
 
 ## States — `data-station-needs` is `reading` or the item count
 | state | when | draws |
@@ -11197,14 +11241,19 @@ The `needs` slot: everything waiting on his word, read at a glance and acted on 
 | failed | `failure` set | warn `Banner` with the sentence and Try again, over the last good list if `needs` is set |
 | waiting | `needs` non-empty | count badge in the head (`data-station-needs-count`); a `NeedItem` per need, in order |
 | empty | `needs` is `[]` | `EmptyState` "Nothing needs you." (`data-station-needs-empty`), no count; hidden by `:has([data-companion-action])` while her card stands, so a card lapsing on its deadline gives the line back |
-| action | `pending` set | her `CompanionActionCard` first in the body: act and target, prompt or carried words, "Say “…”", when it lapses, ×; MAN-9186's rules |
+| action | `pending` set | her `CompanionActionCard` first in the body: act and target, prompt or carried words, when it lapses, ×; MAN-9186's rules |
 | faults | `faults` non-empty | one warn line per distinct text under the rest, "▲ " + words (`data-station-needs-fault`); `accept` and `questions` share `station.needs.fault.plans` ("Couldn’t read the Accepts and design questions just now"), said once; others `fault.ask`, `fault.followups`, `fault.check` |
 
-## Head and body
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NeedItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhatNeedsYou.tsx
+
+## MAN-9329 — src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs — Head and body
+section: src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs you"/001 Head and body
+
 - Head: `<h2>` "What needs you" (`station.needs.title`) and a warn `Badge` of the count when `needs.length > 0`. The count says what the fold hides.
-- How-line `station.needs.how` ("Say the words: she reads each back, and your yes fires it.") only while `pending` is set or some need has `say`. Absent on the empty, reading and failed rail unless her action stands: it is drawn whenever `pending` is set.
-- Padding: 12 px a side up to 1360 px, 16 above. why: her card's head stands whole at 12 on the laptop's 296 px rail.
-- Columns: the scroller is a size container (`[container-type:size]`), so her card's height caps are shares of the rail, as in her panel. Narrow stack: no scroller; the card measures against the window and its foot is sticky to the bottom edge.
+- The head carries nothing else: no how-line, no phrase to say. She reads an action back in her own words and judges from the conversation whether he agreed (MAN-9171), so there is no set phrase to teach.
+- Padding: 12 px a side up to 1360 px, 16 above; at compact, 12 at every width (the one column is not the wide rail). why: her card's head stands whole at 12 on the laptop's 296 px rail.
+- Compact: the list's gap is `gap-2` (full `gap-2.5`). Her action card is exactly as in full: his lines are the last to give way and travel word for word (MAN-9186).
+- Columns: the scroller is a size container (`[container-type:size]`), so her card's height caps are shares of the rail, as in her panel. In compact's Needs you the same: the rail's own scroller fills the section and is the size container.
 - Order in the body: failed banner, her card, the items (or reading, or empty), fault lines.
 
 ## `focusOf` — where a press goes
@@ -11221,16 +11270,21 @@ The `needs` slot: everything waiting on his word, read at a glance and acted on 
 | prop | type | meaning |
 |---|---|---|
 | `need` | `StationNeed` | the thing, as the server answers it |
+| `density` | `StationDensity` | `compact`: one line (§"`NeedItem` at compact"); `data-station-need-density=<density>` on the `<li>` |
 | `current` | `boolean` | on the stage: `aria-current`, accent edge, "On the stage" at the row's end |
 | `onPress` | `() => void` | the act and the card body are the same press |
-| `tooltipSide` | `left \| top` | `left` in the columns, `top` in the stack |
+| `tooltipSide` | `left \| top` | `left` in the columns, `top` at compact density, where the item spans the column |
 
-## `NeedItem` — what it draws
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NeedItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhatNeedsYou.tsx
+
+## MAN-9330 — src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs — `NeedItem` — what it draws
+section: src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs you"/002 `NeedItem` — what it draws
+
 `<li data-station-need=<kind> data-station-need-id data-tone="warn"?>` where `<kind>` is `StationNeedKind` (an ask's own kind). Top to bottom:
 1. Kind glyph and word in caps (`STATION_NEED_KINDS[kind]`), then the facts after `· `.
 2. Title, two lines max (`titleOf`): `accept`/`questions` `title`; `ask`/`followups` `chat`; `check` `label`.
 3. One line, cut at one (`lineOf`), whole in a `Tooltip` for a pointer; the tooltip is not drawn where nothing hovers (`[@media(hover:none)]:hidden`). A permission's is mono 11.5 px; a question's and a plan's are prose in the body face.
-4. The act, a kit `Button` (`data-station-need-act`, described by the title), and when `need.say !== null` the mic and `Say “<say>”` (`data-station-need-say`), always drawn, never on hover. A permission or plan with `cut !== false` (MAN-9256) reads `station.needs.act.open` ("Open"), not "Allow…": its stage offers no Allow (MAN-9282).
+4. The act, a kit `Button` (`data-station-need-act`, described by the title). No phrase to say stands beside it. A permission or plan with `cut !== false` (MAN-9256) reads `station.needs.act.open` ("Open"), not "Allow…": its stage offers no Allow (MAN-9282).
 - `accept` and `check` (`warn`): `data-tone="warn"`, a 4 px bar down the left edge, the kind word in the tone's ink. Amber, never red.
 - The card body is one `<button data-station-need-press tabIndex={-1}>`: a finger presses anywhere on the words; the act is the keyboard's one stop.
 
@@ -11242,17 +11296,30 @@ The `needs` slot: everything waiting on his word, read at a glance and acted on 
 | `followups` | `N open` | `newest` |
 | `check` | `Failing`, or `Refused` for `denied` | `<value> · <node> · since HH:MM` (24-hour; a day before today adds the date, "Oct 28 14:02"); `since` null → node only; `value` null → no value |
 
-## The waiting-on-you state — a data condition, never a mode
+## `NeedItem` at compact — `density: 'compact'`
+| line | draws |
+|---|---|
+| 1 | the kind's glyph and word, `·`, the title cut to one line (`truncate`), the act (`h-8`, `max-md:h-11`) |
+| 2 | "On the stage" at this line's end, only while `current` (the line is not drawn otherwise) |
+- Line 1's words are `<button data-station-need-press tabIndex={-1}>` (`max-md:min-h-11`): a press anywhere on them is the act's press; the act is the keyboard's one stop. The warn bar and `data-tone="warn"` are as in full.
+- The facts and the one `lineOf` line are the stage's to say whole. One `Tooltip`, at `top` over line 1, repeats the title, the facts and the line ("<title> · <facts> · <line>") for a pointer; it is not drawn where nothing hovers.
+- Claims: every need's press ≤ 45 px and its title ≤ 21 px (one line), its act ≥ 44 px below 768 px, her card word for word as in full (`.verify/kaylee-station-density.mjs`, MAN-9328).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NeedItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhatNeedsYou.tsx
+
+## MAN-9331 — src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs — The waiting-on-you state — a data condition, never a mode
+section: src/modules/station — WhatNeedsYou and NeedItem: the right rail, "What needs you"/003 The waiting-on-you state — a data condition, never a mode
+
 - The rail is in it when `needs` holds Accepts and a red check, whatever else stands. No prop, flag or branch names it: `WhatNeedsYouView` draws what `needs` holds, live (`GET /needs`) and on the fixture (`fake/needs.ts`, `NEEDS_FAKE.waiting`, MAN-9284) alike.
 - The fixture's story: two Accepts, the waiting feature's (current: its plan card is on the stage) and an epic's over three features, which is ONE item naming the epic ("Kaylee’s desk"; the Inbox's rule, MAN-9013); one red check ("Session is valid", failing, `eis1`); and her `queue` action for the epic at the head.
-- It draws, top to bottom: head "What needs you" with the count 3 and the how-line; her action card; the three items in the server's order (Accept · Feature, Accept · Epic · 3 features, Red check · Failing); the two Accepts and the check toned warn (`data-tone="warn"`, the bar and the kind word in the tone's ink); acts `Queue…`, `Queue…`, `Open`; each `Say “…”` always drawn; `aria-current` on the feature's item alone; no "Nothing needs you.".
+- It draws, top to bottom: head "What needs you" with the count 3; her action card; the three items in the server's order (Accept · Feature, Accept · Epic · 3 features, Red check · Failing); the two Accepts and the check toned warn (`data-tone="warn"`, the bar and the kind word in the tone's ink); acts `Queue…`, `Queue…`, `Open`; no `Say “…”` line on any item; `aria-current` on the feature's item alone; no "Nothing needs you.".
 - A card that lapses on its deadline leaves the three items as they were; the count never includes the card.
-- Shots: `station-waiting-<1440x900|1280x800|390x844>.png`. At 390×844 every item's act measures 44 px (INV-10275). Live, each event that changes the list reaches the rail by one `GET /needs` (MAN-9249).
+- Shots: `station-waiting-<1440x900|1280x800>.png`, and `station-waiting-compact-<size>.png` on Needs you (MAN-9336). At compact 390×844 every item's act measures 44 px (INV-10275, MAN-9328). Live, each event that changes the list reaches the rail by one `GET /needs` (MAN-9249).
 
 ## Empty state, touch, words
 - Empty: "Nothing needs you." with no count and no how-line.
 - Touch (INV-10275): below 768 px the act, the press body (`max-md:min-h-11`) and Try again are 44 px; her card's × is the companion's. The probe measures them.
-- Words: `station.needs.*` in `en/common.json`: `title`, `how`, `retry`, `reading`, `empty`, `onStage`, `say`, `where`, `facts.*`, `fault.*`, `kind.*`, `act.*`, `status.*`.
+- Words: `station.needs.*` in `en/common.json`: `title`, `retry`, `reading`, `empty`, `onStage`, `where`, `facts.*`, `fault.*`, `kind.*`, `act.*`, `status.*`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NeedItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhatNeedsYou.tsx
 
@@ -11318,6 +11385,9 @@ The `ask` stage view: a chat's waiting permission, question or plan, answered he
 - Touch (INV-10275): every answer, Try again and "Open the chat" `max-md:h-11`; option rows `max-md:min-h-11` in the kit's `QuestionOptionRow`.
 - Words: `station.needs.ask.*`, `station.needs.fault.ask`, `station.needs.openChat`, `station.needs.retry`, `station.gone.ask`.
 
+## Compact form
+None of its own: it takes no `density`. In the one-column arrangement the Stage section draws it as the columns' stage does, the whole section, its body scrolling under the stage's head (MAN-9335).
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/AskAnswers.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/AskStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useOpenChatInCloudcli.ts
 
 ## MAN-9283 — src/modules/station — FollowupsStage and CheckStage: a chat's follow-ups and a red check on the stage, drawn by their owners
@@ -11365,6 +11435,9 @@ Both views are pure; both wrappers are live, registered for `followups` and `che
 ## Words
 `station.needs.followups.list`, `station.needs.check.{card,looking,open}`, `station.needs.fault.check`, `station.needs.retry`, `station.needs.openChat`, `station.gone.{followups,check}`.
 
+## Compact form
+None of its own: it takes no `density`. In the one-column arrangement the Stage section draws it as the columns' stage does, the whole section, its body scrolling under the stage's head (MAN-9335).
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/CheckStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/FollowupsStage.tsx
 
 ## MAN-9284 — src/modules/station — fake/needs.ts and lib/station-needs.mjs: the rail's fixtures, the three stages' shots and the needs probe
@@ -11401,24 +11474,24 @@ The `needs` slot's slice of the fixtures (MAN-9229) and the claims `.verify/kayl
 | `followups` | `home` | four open follow-ups (three next steps, a known gap) and two done, as `useFollowups` reads them |
 | `check` | `waiting` | the red check as Cerberus's "Needs you" holds it: fix "Refresh the session", no run, no diagnosis; `onRetry` a no-op |
 
-- Every item is a `StationNeed` as `GET /api/companion/station/needs` answers it (MAN-9273): ids in the readers' own form, `say` built as `sayOf` builds it, an ask's `what` as `describeToolInput` prints a command. Request ids and ids above 900000, made-up chat ids: nothing names a real chat, ask or check. Times are relative to when the module loads.
+- Every item is a `StationNeed` as `GET /api/companion/station/needs` answers it (MAN-9273): ids in the readers' own form, an ask's `what` as `describeToolInput` prints a command. Request ids and ids above 900000, made-up chat ids: nothing names a real chat, ask or check. Times are relative to when the module loads.
 - No fixture draws a cut ask (`cut: true`, the `data-station-ask-cut` note), the ask stage's `unread` or the check stage's `unread`.
 - Nothing in the app imports the file; the probe does.
 
 ## `lib/station-needs.mjs` — the needs probe (called by `kaylee-station-shots.mjs`)
 | export | does |
 |---|---|
-| `readNeeds(page, hostId)` | the mounted rail: head, how-line, count, her card, empty, reading, banner, fault lines, each item (kind, eyebrow, act, say, current, tone, cut); `null` when no rail stands |
-| `needsClaims(picture, n)` | per picture, against `RAIL_PICTURES`, the fixture's story written down in the probe: kinds in the server's order, acts, spoken words, current item, her card |
+| `readNeeds(page, hostId)` | the mounted rail: head, the head's second line (read to be absent), count, her card (its sentence), how many "Say" lines are drawn (read to be none), empty, reading, banner, fault lines, each item (kind, eyebrow, act, current, tone, cut); `null` when no rail stands |
+| `needsClaims(picture, n)` | per picture, against `RAIL_PICTURES`, the fixture's story written down in the probe: kinds in the server's order, acts, current item, her card |
 | `needsStateClaims(state, n)` | `reading`, `failed`, `faults` |
 | `readNeedsStage`, `stageClaims(stage, s, { phone })` | the mounted stage: the controls and words each owes |
 | `needsStageRun({ page, hostId, sizeName, phone, draw, claims, touchClaims, unmount })` | draws each stage over its picture's rail with the focus set, judges the stage, then the rail (its item, and only it, current), then on a phone every press |
 - The oracle is never read back from the view: kinds, acts and words are literals in the probe.
-- Claims per picture: head "What needs you" with the how-line only where a card stands or an item has `say`; items in order; each kind in words, `accept` and `check` toned warn; each act; each `Say “…”` always drawn; the count; the current item alone; no "Nothing needs you." beside items. `walkthrough`: the command cut to one line. `empty`: the quiet line, no count, no card. `waiting`: her card at the head ("Queue Kaylee’s desk") with its ×.
+- Claims per picture: head "What needs you" alone (no how-line, no phrase to say); items in order; each kind in words, `accept` and `check` toned warn; each act; no "Say …" line on any item; the count; the current item alone; no "Nothing needs you." beside items. `walkthrough`: the command cut to one line. `empty`: the quiet line, no count, no card. `waiting`: her card at the head ("Queue Kaylee’s desk") with its ×.
 - Stage claims: `ask`: the 223-character command whole in a well that wraps inside itself (3 lines or more on a phone); Allow, Deny, Always allow; the keyboard's landing is a `role=group`, `tabindex=-1`, described by the well, never Allow; the rule written under it; "Open the chat"; the page never pans sideways. `followups`: the module's own body, 4 open rows and the Done fold; "Open the chat". `check`: the card for "Session is valid", `failing`, with `Run “Refresh the session”` and Diagnose and no Mute; "Open the check".
-- The stages run at 1440×900 and 390×844, not at 1280×800 (`tier !== 'laptop'`). Shots: `station-stage-<ask|followups|check>-<size>.png`; the rail's states `station-needs-<reading|failed|faults>-<size>.png`.
+- The stages run at 1440×900 alone: `tier !== 'laptop'` skips 1280×800, and a compact size draws the compact arrangement and nothing else (MAN-9336). Shots: `station-stage-<ask|followups|check>-<size>.png`; the rail's states `station-needs-<reading|failed|faults>-<size>.png`.
 - The `check` stage mounts inside `CerberusProvider` over a `WebSocketContext.Provider` that hears nothing, because `NeedCard` reads the provider App mounts.
-- On the phone each stage's every press, owner-drawn parts included, must be a 44 px catch (`lib/station-touch.mjs`, MAN-9229).
+- The `phone` leg (below 768 px each stage's every press, owner-drawn parts included, a 44 px catch: `lib/station-touch.mjs`, MAN-9229) is written and runs at no size: the stage runs draw at 1440×900 alone, and compact's sizes do not draw the three stages.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/needs.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-needs.mjs
 
@@ -11484,7 +11557,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/Stat
 The strip's fixtures and the shots probe's claims. Component: MAN-9287. Pictures and the probe's frame: MAN-9229. The strip on the live client: MAN-9300.
 
 ## `fake/strip.ts` — fixtures
-Prototype only: nothing in the app imports it. Exports `STRIP_FAKE` (one drawing per picture, `REGION_FAKES.strip`) and `STRIP_STATES` (`REGION_STATES.strip`). A drawing is `{ view: SinceYouLastLookedView, props }`, props `satisfies Omit<ComponentProps<typeof SinceYouLastLookedView>, 'tier'>`, `collapsed: false`, every press a no-op.
+Prototype only: nothing in the app imports it. Exports `STRIP_FAKE` (one drawing per picture, `REGION_FAKES.strip`) and `STRIP_STATES` (`REGION_STATES.strip`). A drawing is `{ view: SinceYouLastLookedView, props }`, props `satisfies Omit<ComponentProps<typeof SinceYouLastLookedView>, 'tier' | 'density'>`, `collapsed: false`, every press a no-op.
 | picture | landings (ids, oldest first) | new | head |
 |---|---|---|---|
 | `home` | 900101..900105: epic (4 days ago), shipped (yesterday 19:34), recovered (150 min), landed (38 min), epic (9 min) | 2 | chip "2 new" |
@@ -11522,7 +11595,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/strip.t
 
 ## MAN-9287 — src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and StripLines: the bar's strip, "Since you last looked"
 
-The `strip` slot: "Since you last looked", one line across the bar's middle (MAN-9259): what landed this week and where he last looked; its fold is the pref `stripCollapsed`. Files: `SinceYouLastLooked.tsx` (view, the one map of kinds, wrapper), `LandedTimeline.tsx`, `LandedEntry.tsx`, `StripLines.tsx`. Data and the last look: MAN-9285. Wire (`StationLanded`): MAN-9256. Route: MAN-9269. Fixtures and probe: MAN-9286. Live probes: MAN-9300, MAN-9302. Registries: MAN-9264. Touch law: INV-10275.
+The `strip` slot: "Since you last looked", one line across the bar's middle (MAN-9259): what landed this week and where he last looked; its fold is the pref `stripCollapsed` in the columns and the arrangement's `week` at compact (§"`SinceYouLastLooked()`"). Files: `SinceYouLastLooked.tsx` (view, the one map of kinds, wrapper), `LandedTimeline.tsx`, `LandedEntry.tsx`, `StripLines.tsx`. Data and the last look: MAN-9285. Wire (`StationLanded`): MAN-9256. Route: MAN-9269. Fixtures and probe: MAN-9286. Live probes: MAN-9300, MAN-9302. Registries: MAN-9264. Touch law: INV-10275.
 
 ## Status
 - LIVE. `SinceYouLastLookedView` and its parts are pure and drawn by the shots probe on fixtures; `SinceYouLastLooked` (the wrapper) is the `strip` line of `STATION_REGIONS` (MAN-9264), bound as below.
@@ -11531,19 +11604,27 @@ The `strip` slot: "Since you last looked", one line across the bar's middle (MAN
 | view prop | bound to |
 |---|---|
 | `landed`, `seenAt`, `failure`, `onReread` | `useStationLanded()` (MAN-9285): the week's landings (a `station_landed` frame joins one on the history's own write, within a second), his last look, the read's failure, `reread` |
-| `collapsed`, `onCollapse` | `useStationPref('stripCollapsed', false)`: the fold, per device, written by his press alone |
+| `density` | the region's own prop (`StationRegionProps`, MAN-9264) |
+| `collapsed`, `onCollapse` | with no `week`: `useStationPref('stripCollapsed', false)`, the columns' fold, per device, written by his press alone; at compact, `collapsed: true` and a no-op: compact never writes the pref. With `week`: the week's, `collapsed = !week.open` and `onCollapse(shut) = week.onOpen(!shut)` |
 | `onSeen` | `markSeen` of the same hook: his last look written now and flushed at once |
-| `onPress` | `setFocus(stageOf(entry))`, below |
+| `onPress` | `setFocus(stageOf(entry))`, below; then `week?.onOpen(false)`: a landing put on the stage shuts the week |
 | `scrollRef` | `useStation().scrollMemory('strip')`: it follows `scrollTop` only, so it remembers nothing of the sideways line; bound so the region is registered with the memory like every other |
 - `stageOf(entry, sessions)`: `shipped` and `epic` put `{ kind: 'card', plan, label: title }` on the stage; `landed` puts `{ kind: 'chat', sessionId, label }`, the label the name `useStationSessions()` holds for the chat now, else the entry's `chat`, else its title (a frame's `chat` is the name the chat had when the history kept the row, "Untitled Session" for a chat not yet named, and the stage stores its label). The kind decides first (a shipped feature whose lane also named its chat still shows its card) and the other is the fallback; `null` only for a landing that names neither, which the view opens in place and never asks about.
-- A press marks nothing seen: the look-aways of the provider and "<n> new" do. The stage brings itself into view in the narrow stack (MAN-9228), so the press needs nothing more. A recovered check never reaches `onPress`: it opens its line in place.
+- A press marks nothing seen: the look-aways of the provider and "<n> new" do. The one-column arrangement pulls the stage into view (`useStationSection`, MAN-9337), so the press needs nothing more; at compact it also shuts the week. A recovered check never reaches `onPress`: it opens its line in place.
 
-## `SinceYouLastLookedView` — props
+`SinceYouLastLooked({ density, week? })`: `week?: { open: boolean; onOpen(open: boolean): void }` is the compact arrangement's input for the week it holds open over its body. Handed, it replaces the pref at either density: the line at compact opens the week with its fold button; the strip drawn at full density over the body shows the week open whatever the pref says, and its fold button shuts it. The arrangement hands the SAME `week` to both (MAN-9230). Without `week`, compact's fold button does nothing.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedEntry.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedTimeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/SinceYouLastLooked.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StripLines.tsx
+
+## MAN-9332 — src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and — `SinceYouLastLookedView` — props
+section: src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and StripLines: the bar's strip, "Since you last looked"/001 `SinceYouLastLookedView` — props
+
 | prop | type | meaning |
 |---|---|---|
+| `density` | `StationDensity` | `compact`: always the folded line (`folded` = `collapsed \|\| density === 'compact'`), its fold press opening and closing the week the arrangement draws over its body |
 | `landed` | `StationLanded[] \| null` | newest first as the read answers; `null` while the first read is out. The view sorts them itself (oldest first, by `at`, then `id`) |
 | `seenAt` | `string \| null` | his last look; `null` = none on record: every landing new, no rule |
-| `collapsed` | `boolean` | folded to the head and the newest landing |
+| `collapsed` | `boolean` | folded to the head and the newest landing; at compact, the week shut (the fold press's words and glyph follow it) |
 | `onCollapse` | `(collapsed: boolean) => void` | receives the NEXT fold, so `setCollapsed` binds directly |
 | `onSeen` | `() => void` | the "<n> new" press |
 | `onPress` | `(entry) => void` | fires only for a landing the stage can hold (a `plan` or a `sessionId`, kind not `recovered`) |
@@ -11558,7 +11639,7 @@ The `strip` slot: "Since you last looked", one line across the bar's middle (MAN
 | `reading` | `landed` null | `StripReadingLine`: `role="status"` "Reading what landed…" (sr-only) and skeleton boxes of the real shapes (one when folded, three open) |
 | `quiet` | `landed` is `[]` | `StripQuietLine`: `CalendarClock` + "Nothing has landed this week"; no fold |
 | `timeline` | landings, `collapsed` false | head, `LandedTimeline`, fold press |
-| `folded` | landings, `collapsed` true | head, the newest landing as `oneLine`, fold press |
+| `folded` | landings, `collapsed` true or `density` `compact` | head, the newest landing as `oneLine`, fold press |
 - Order of tests: `failure`, then `landed === null`, then empty. `data-strip-fresh` carries the new count.
 
 ## Head of the line
@@ -11578,7 +11659,11 @@ The `strip` slot: "Since you last looked", one line across the bar's middle (MAN
 | `recovered` | `ShieldCheck` | Recovered | positive |
 - Drawn as the compact kit `Badge`, glyph beside word. A kind is never colour alone (MAN-578). The provider holds its own `LANDED_KINDS` set (MAN-9285): two things, one name.
 
-## `LandedTimeline` — the open week
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedEntry.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedTimeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/SinceYouLastLooked.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StripLines.tsx
+
+## MAN-9333 — src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and — `LandedTimeline` — the open week
+section: src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and StripLines: the bar's strip, "Since you last looked"/002 `LandedTimeline` — the open week
+
 - Props: `entries` (oldest first), `firstFresh`, `lastLook` (words on his clock, `null` = no rule), `entryOf(entry, at, { tabbable })`, `scrollRef?`.
 - A horizontal `ScrollArea` (`orientation="horizontal"`: `pan-x`, `overscroll-x-contain`; `data-strip-timeline`) holding an `<ol aria-label="This week’s landings, oldest first">`. Each `<li>` is `max-w-52`, `md:max-w-72`.
 - The rule (`data-strip-rule`): dashed garnish left edge, "You last looked" over his last look's time, before the first new landing, and with nothing new at the line's end, after the newest (he has looked at everything: the "<n> new" press and every look-away move it there; the next landing joins after it, and the rule then stands before it); none only when `lastLook` is null (no last look on record: every landing is new). 44 px tall below 768 px.
@@ -11604,7 +11689,11 @@ The `strip` slot: "Since you last looked", one line across the bar's middle (MAN
 - The title is cut to one line; its `Tooltip` repeats it (`showOnFocus`) and the stage or the open line shows it whole. The bubble is `[@media(hover:none)]:hidden`: where there is no hover a tap's compatibility mouse events would leave it over the stage head or the opened line.
 - `opensInPlace(entry)`: kind `recovered`, or no `plan` and no `sessionId`. Its press toggles `openId` (view state, one at a time, never stored) and shows `<p data-landed-line>` full width under the strip; a `FoldChevron` ends its title. Folded, the line is drawn only while the open landing is the newest.
 
-## Touch and words
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedEntry.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedTimeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/SinceYouLastLooked.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StripLines.tsx
+
+## MAN-9334 — src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and — Touch and words
+section: src/modules/station — SinceYouLastLookedView, LandedTimeline, LandedEntry and StripLines: the bar's strip, "Since you last looked"/003 Touch and words
+
 - Below 768 px: each landing, the chip, the fold press (`size-11`), Try again and the rule are 44 px catches. Nothing is said on hover alone.
 - No cost figure reaches the strip: the title is the history's, and nothing else of a row is read.
 - Words: `station.strip.*` in `en/common.json`: `name`, `timeline`, `kind.{shipped,epic,landed,recovered}`, `when.{today,yesterday,day}`, `by`, `byHouse`, `new`, `newCount`, `seenLabel_one/_other`, `rule`, `nothingNew`, `nothingNewShort`, `quiet`, `loading`, `failed`, `retry`, `expand`, `collapse`.
@@ -11616,13 +11705,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedEntry.
 The `sessions` slot: his chats over the roadmap he selected, one rail. Every row is a press that puts its thing on the stage; the thing on the stage is lit. Sections: sessions MAN-9289, roadmap MAN-9290. The chat's stage: MAN-9291. Fixtures and probe: MAN-9292. Registries: MAN-9264. Inventory: MAN-9265. Touch law: INV-10275. Wire (`StationSession`): MAN-9256; route: MAN-9268.
 
 ## Status
-- `WhereThingsStandView`, `SessionRows`, `RoadmapRows`, `RailRow` are pure and drawn by the shots probe on fixtures. `WhereThingsStand` (the wrapper) is LIVE: bound to `useStationSessions()`, `useRoadmap()`, `useCompanion()`, `useStation()` and two `useStationPref`s, registered as `sessions: WhereThingsStand` in `STATION_REGIONS` (MAN-9264). `StationPrefKey` (`src/shared/types.ts`) and `PREF_KEYS` (`stationMemory.ts`) hold `asleepOpen` and `completeOpen`.
+- `WhereThingsStandView`, `SessionRows`, `RoadmapRows`, `RailRow` are pure and drawn by the shots probe on fixtures. `WhereThingsStand` (the wrapper) is LIVE: bound to `useStationSessions()`, `useRoadmap()`, `useCompanion()`, `useStation()` and two `useStationPref`s, registered as `sessions: WhereThingsStand` in `STATION_REGIONS` (MAN-9264). `StationPrefKey` (`src/shared/types.ts`) and `FLAG_PREF_KEYS` (`stationMemory.ts`) hold `asleepOpen` and `completeOpen`.
 - Shown live by `.verify/kaylee-station-rail-live.mjs` (`--turn` adds her mark): the rows in the server's order with each chip's word; a feature's press puts its plan card (the dispatcher's, else the roadmap's facts) on the stage and lights only its row; a session's press puts its chat's stage there, she is told (`chat.presence`), "Open the chat" opens the window named `cloudcli`; the asleep fold and the rail's scroll survive a reload; at 390×844 with touch every row and fold is ≥ 44 px (the folds exactly 44) and the stage is up with the line whole; one typed Haiku turn ("read the last turn of <probe chat>") draws her mark on the probe chat's row (a stand-in row: a probe's chat is in a hidden root, so `chatRows()` never lists it) and the mark leaves when she looks away.
 
 ## `WhereThingsStandView` — props
 | prop | type | meaning |
 |---|---|---|
-| `tier` | `StationTier` | `wide`/`laptop`: a column of its own; `narrow`: a part of the one stack |
+| `tier` | `StationTier` | `wide`/`laptop`: a column of its own; `narrow`: a section of the one column |
+| `density` | `StationDensity` | `compact`: a chat and a feature each on one line, the epics and the two folds as in full, the sections `gap-4` instead of `gap-6`; the one scroller fills the section it is given (MAN-9289, MAN-9290) |
 | `sessions` | `StationSession[] \| null` | his chats in her order; null until the first read lands |
 | `failure` | `string \| null` | the first read's failure, the server's sentence; null while none |
 | `onReread` | `() => void` | Try again |
@@ -11635,9 +11725,10 @@ The `sessions` slot: his chats over the roadmap he selected, one rail. Every row
 | `scrollRef?` | ref callback | the one scroller, for `scrollMemory('sessions')`; absent on a fixture |
 
 ## Draws
-- `ScrollArea[data-station-rail]`, `role="region"`, `aria-label` `station.rail.name` ("Where things stand"), `min-h-0 flex-1`; inside `flex flex-col gap-6 px-2 py-3`: `SessionRows`, then `RoadmapRows`.
+- `ScrollArea[data-station-rail]`, `role="region"`, `aria-label` `station.rail.name` ("Where things stand"), `min-h-0 flex-1`; inside `flex flex-col gap-6 px-2 py-3` (`gap-4` at compact): `SessionRows`, then `RoadmapRows`.
 - ONE SCROLLER. The design gave sessions and roadmap a scroller each (`scrollMemory('sessions')`, `scrollMemory('roadmap')`); the rail is one, remembered under `sessions`. why: beside the corner the column is 380–780 px tall; two scrollers split it between a chat list and twenty-odd features. Cost: the chats scroll away under the roadmap. No `roadmap` region is registered; `StationRegion` still has the member.
-- Narrow stack: the rail's scroller is inside the stack's one scroller; the page scrolls.
+- Compact: the rail fills the Where things stand section (`StationSectionsView`, MAN-9335) and scrolls inside itself; the page never scrolls.
+- States and empty state: the rail draws none of its own; its two sections draw theirs (MAN-9289: reading, failed, none, nothing running, rows; MAN-9290: reading, none, nothing open, epics). Touch: MAN-9306.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RailRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhereThingsStand.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-turn.mjs
 
@@ -11646,6 +11737,7 @@ section: src/modules/station — WhereThingsStand and RailRow: the left rail, "W
 
 | field | `live` reads |
 |---|---|
+| `tier`, `density` | the props the station hands every region (`StationRegionProps`, MAN-9264) |
 | `sessions`, `failure`, `reread` | `useStationSessions()` (`context/StationSessionsContext.tsx`) |
 | `roadmap` | `useRoadmap()`: `picture` null → `undefined`; `picture.roadmaps` empty → `null`; else `selected ?? undefined` |
 | `her` | `herMarkOf(t, activity, name)` from `useCompanion().picture.activity` and `.settings.name` |
@@ -11659,7 +11751,7 @@ section: src/modules/station — WhereThingsStand and RailRow: the left rail, "W
 | `drafting` | `station.sessions.her.drafting` | {{name}} is drafting for {{chat}} |
 | `walking` | `station.sessions.her.walking` | {{name}} is walking {{chat}} |
 - Any other phase, or `activity.session` null (a draft for a chat not yet started): no mark. `initial` = first letter of her name, upper-cased.
-- A press only stages its thing. Below laptop width the stage stands above every rail in the stack: bringing it into view on a focus change is `StationStage`'s work (once, for every region), never this rail's.
+- A press only stages its thing. In compact the stage is a section: a different thing put on it pulls the switch to Stage (`useStationSection`, once, for every region), never this rail's work.
 
 ## `RailRow.tsx` — the shared pieces
 | export | what |
@@ -11682,7 +11774,7 @@ section: src/modules/station — WhereThingsStand and RailRow: the left rail, "W
 - A CLOSED FOLD WHOSE HIDDEN ROW IS ON THE STAGE is lit on its head (`current`: the lit look and `aria-current="true"`, only while closed). why: the lit row is inert inside the closed fold, so without the head the rail would say nothing of which chat or complete epic the stage holds. An open fold lights the row itself.
 
 ## Touch
-Every row and fold head: `max-md:min-h-11`. The failed banner's Try again: `max-md:h-11`. Probe: the `touch` check at 390×844 measures all of them (MAN-9229).
+Every row and fold head: `max-md:min-h-11`. The failed banner's Try again: `max-md:h-11`. Probe: the `touch` check measures all of them at compact 390×844, in the `-where` shots (MAN-9336).
 The rows' `Tooltip` (the line, or the feature's phrase, whole on the stage the press opens) carries `[@media(hover:none)]:hidden` (INV-10275): a tap's compatibility mouse events would open it and leave it standing over the stage; with a pointer and a keyboard it is unchanged.
 
 ## The live probes — `.verify/kaylee-station-rail-live.mjs` and `kaylee-station-rail-turn.mjs`
@@ -11691,6 +11783,7 @@ The rows' `Tooltip` (the line, or the feature's phrase, whole on the stage the p
 - F (`rail-turn`): sets her model to `haiku` and puts back what it read; makes a probe chat with one Haiku turn; routes the page's sessions answer to append ONE stand-in row for it (a probe's chat is in a hidden root and `chatRows()` never lists it); holds the `companion_activity` frames behind her `reading_session` frame inside the page's own socket until the photograph is taken, then lets them through in order; types "read the last turn of <id>" and reads the mark's words; deletes the probe chat.
 - Errors: the station's own console errors are the gate; a `Failed to fetch` within 3 s of the script moving a page, and the errors of the chat pages the door opened, are counted apart and printed.
 - Not run by it: seam J, which `station-rail-whole.mjs` below runs.
+- Known edge: leg E asserts `data-station-arrangement` = `narrow` and reads the rail's rows on the page's first section. A phone draws `compact` on Conversation (MAN-9337), so the leg fails until it reads `compact` and presses Where things stand first.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RailRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhereThingsStand.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-whole-recorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-rail-whole.mjs
 
@@ -11720,6 +11813,7 @@ The rail's first section (MAN-9288): "Sessions" over his chats in her order. Cha
 | prop | type | meaning |
 |---|---|---|
 | `tier` | `StationTier` | the row tooltip's side: `narrow` `top`, else `right` |
+| `density` | `StationDensity` | `compact`: each chat's row on one line (§"One row at compact"); the asleep fold as in full |
 | `sessions` | `StationSession[] \| null` | in her order; null until the first read |
 | `failure` | `string \| null` | the FIRST read's failure; set only while `sessions` is null |
 | `onReread` | `() => void` | Try again |
@@ -11743,6 +11837,18 @@ The rail's first section (MAN-9288): "Sessions" over his chats in her order. Cha
 - Name `line-clamp-2` (`text-sm font-medium`), the state chip at the right of the name's first line, the project (`truncate`, muted), the line she reads of it (`data-station-session-line`, `truncate`, omitted when `activity` is `''`), her mark when she looks at this chat.
 - A `waiting` chat's line is in `text-warn-ink`; every other line is muted.
 - The line is cut to one line on the rail and stands whole on the chat's stage (MAN-9291), which is how a finger reads it. The `Tooltip` over the row repeats it for a pointer and, with `showOnFocus`, for a keyboard; class `max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere]`.
+
+## One row at compact (`density: 'compact'`)
+One line, centred in the row (a finger's 44 px makes the row taller than the line), left to right:
+| part | draws |
+|---|---|
+| name | `[data-station-session-name]`, `text-sm font-medium`, `truncate`, at most 60% of the line: a long name never pushes out what follows |
+| line | `[data-station-session-line]`, `flex-1 truncate`: `activity`, cut to what is left; `text-warn-ink` while the chat is `waiting` |
+| her mark | only on the chat she looks at: her initial in a 16 px `info` disc (`[data-station-her=<sessionId>]`, `aria-hidden`) and her words in `sr-only`. Her status line in her head says them in view |
+| chip | `SessionStateChip` at the line's end, so every row's chip stands in one column |
+- No project line: the stage says it.
+- The row's `Tooltip` is at `top` and reads "<name> · <activity>" (the name alone when `activity` is `''`).
+- Claims: every row ≤ 45 px, its name ≤ 21 px (`.verify/kaylee-station-density.mjs`, MAN-9328).
 
 ## State chip words
 | state | tone | chip | key |
@@ -11787,6 +11893,7 @@ A feature's dot on the rail and on the tree never disagree. `ROADMAP_EPIC_WORD_K
 | prop | type | meaning |
 |---|---|---|
 | `tier` | `StationTier` | the feature tooltip's side: `narrow` `top`, else `right` |
+| `density` | `StationDensity` | `compact`: each feature's row on one line (§"Rows"); the epics and the complete fold as in full |
 | `roadmap` | `Roadmap \| null \| undefined` | `undefined` = picture not landed; `null` = it holds no roadmap |
 | `focus` | `StationFocus \| null` | a `card` focus lights the epic or feature of that `plan` |
 | `completeOpen`, `onCompleteOpen` | `boolean`, `(open) => void` | the fold |
@@ -11810,6 +11917,7 @@ A feature's dot on the rail and on the tree never disagree. `ROADMAP_EPIC_WORD_K
 |---|---|---|
 | epic | `epic` | title (`line-clamp-2`, `font-medium`) over its line: the word alone while it holds no feature, else `roadmap.tree.epicLine` ("<word> · <shipped> of <count> shipped"); `" · Blocked"` (`roadmap.tree.blocked`) appended while `epic.blocked` is set |
 | feature | `feature` | `PanelDot` on the title's first line (`h-5` = its line height), the title (`line-clamp-2`), under it `[data-station-feature-phrase]` (`truncate`): the step phrase, `" · Blocked"` appended while the dot is `blocked` (red is never the whole signal) |
+- A feature at `density: 'compact'` is ONE line, centred in its row: `PanelDot`, `[data-station-feature-title]` (`flex-1 truncate`), and `[data-station-feature-phrase]` at the line's end, `max-w-[45%] shrink-0 truncate`. why: "waiting on you" (warn ink) is never the part a long title pushes out. Its `Tooltip` is at `top` and reads "<title> · <phrase>". The epic row is as in full and heads its features' one-line rows.
 - A feature with `waiting_on_you` set has its phrase in `text-warn-ink`; the phrase says "waiting on you" itself. No feature word is drawn: the phrase carries it.
 - The phrase is cut to one line; it stands whole on the card the press opens. The `Tooltip` over a feature row repeats it for a pointer and a keyboard (`showOnFocus`).
 
@@ -11862,6 +11970,9 @@ A chat on the stage, drawn whole from the very `StationSession` row the left rai
 
 ## Words
 `station.chat.*`: `moved`, `open`, `say`.
+
+## Compact form
+None of its own: it takes no `density`. In the one-column arrangement the Stage section draws it as the columns' stage does, the whole section, its body scrolling under the stage's head (MAN-9335).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/ChatStage.tsx
 
@@ -11924,8 +12035,8 @@ The `sessions` slot's slice of the fixtures (MAN-9229) and the claims `.verify/k
 - Per picture: `home` the pressed chat's line cut on the rail and whole on the stage, with its chip, open and the "Say …" line; `waiting` the chat waiting on a permission first with its ask in the warn ink, two features at "waiting on you: Accept"; `walkthrough` the head row is the chat the RIGHT rail asks about (read from `NEEDS_FAKE`), waiting, ask in the warn ink; `empty` "No sessions yet" and "No roadmap yet".
 - States: `reading` "Reading your sessions…" and "Reading the roadmap…", no row; `failed` the sentence + Try again and no row, the roadmap still drawn; `nothingRunning` "Nothing is running" + "11 chats are asleep. A message wakes any of them."; `herFolded` her mark on the closed fold's head.
 - Stage claims: `chat-gone` the line "This session is no longer in your list." and no rail row lit; `chat-reading` "Reading your sessions…" on the stage and on the rail.
-- Shots: `station-stage-chat-gone-<size>.png`, `station-stage-chat-reading-<size>.png` at 1440×900 and 390×844 (the stages do not run at 1280×800); the rail's states `station-sessions-<reading|failed|nothingRunning|herFolded>-<size>.png`.
-- On the phone every press of the rail (rows, fold heads, Try again) and of the stage must be a 44 px catch (`lib/station-touch.mjs`, MAN-9229).
+- Shots: `station-stage-chat-gone-<size>.png`, `station-stage-chat-reading-<size>.png` at 1440×900 (the stages run at no other size: not at 1280×800, and a compact size draws the compact arrangement alone); the rail's states `station-sessions-<reading|failed|nothingRunning|herFolded>-<size>.png`.
+- Below 768 px every press of the rail (rows, fold heads, Try again) and of the stage must be a 44 px catch (`lib/station-touch.mjs`, MAN-9229): the rail's rows are measured in compact's `-where` shots at 390×844 (MAN-9336); the stage's `phone` leg waits for a phone-sized window the stage runs are drawn in, and none is.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/roadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/sessions.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-rail.mjs
 
@@ -12075,6 +12186,9 @@ Binds `useCompanion()` (`picture`, `readFailure`, `reread`, `pinNote`, `dismissN
 ## Proof
 `.verify/lib/station-cards.mjs` `CARD_SHOTS` (MAN-9299): each kind at 1440 and 390: word, pin, ref, body text at 16 px on a 72-character measure; the diff's 27 lines and a real swipe on the phone. On the live page, with her typed turns and his presses: MAN-9301.
 
+## Compact form
+None of its own: it takes no `density`. In the one-column arrangement the Stage section draws it as the columns' stage does, the whole section, its body scrolling under the stage's head (MAN-9335).
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/cardBodies.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useKeepFocusWhenGone.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NoteStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stageRefusal.ts
 
 ## MAN-9296 — src/modules/station — WalkStageView and WalkStage: her walkthrough on the stage, its place, its list and Back and Next
@@ -12132,6 +12246,9 @@ Binds `useCompanion()` (`picture`, `readFailure`, `reread`, `moveWalk`, `endWalk
 ## Proof
 `.verify/lib/station-cards.mjs` `WALK_SHOTS` (MAN-9299): the walk at 4 of 15, at 0, at 15, ended; at 1440 beside her face (a stand-in the probe draws), at 1280 under it, at 390 Back and Next two 179×44 halves at the screen's foot. On the live page, Next by click and by touch, End, and the typed word carrying the walk's `<view>`: MAN-9301.
 
+## Compact form
+None of its own: it takes no `density`. In the one-column arrangement the Stage section draws it as the columns' stage does, the whole section, its body scrolling under the stage's head (MAN-9335).
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WalkStage.tsx
 
 ## MAN-9297 — src/modules/station — StageShelfView and StageShelf: her cards' shelf over the stage
@@ -12167,7 +12284,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WalkStage.ts
 
 ## The row's scroll
 - The kit's `ScrollArea` with `orientation="horizontal"`: `touch-action: pan-x`, `overscroll-behavior-x: contain` (a swipe that reaches the end never becomes the browser's Back). A plain mouse wheel scrolls it sideways only with Shift held, as the strip does.
-- The lit chip is brought into view in a `useLayoutEffect` on `[onStage, order]` (the stage's card id, the chips' ids in order), by the row's own `scrollLeft` with a 16 px margin (`LIT_MARGIN`), never `scrollIntoView`, which moves the phone's page stack.
+- The lit chip is brought into view in a `useLayoutEffect` on `[onStage, order]` (the stage's card id, the chips' ids in order), by the row's own `scrollLeft` with a 16 px margin (`LIT_MARGIN`), never `scrollIntoView`, which moves the section's and the page's scrollers.
 
 ## `StageShelf()` — the live binding
 Binds `useCompanion()` and `useStation()`. `notes` is `picture?.notes ?? []` (a picture not yet read holds none, so the shelf draws nothing), folded live by `companion_note`, `companion_note_removed`, `companion_note_pinned` and `companion_cleared` (his pinned cards survive her Clear). `focus` is `useStation().focus`. A chip's press is `setFocus({ kind: 'note', id: note.id, label: note.title })`: the card takes the stage and what stood there goes one Back away.
@@ -12177,6 +12294,9 @@ Binds `useCompanion()` and `useStation()`. `notes` is `picture?.notes ?? []` (a 
 
 ## Proof
 `.verify/lib/station-cards.mjs` `shelfClaims` and `FULL_SHELF` (MAN-9299): each picture's shelf, then the shelf of two pinned and three newest with "+2": order, lit chip, sideways scroll under a finger at 390, every chip 44 px.
+
+## Compact form
+None of its own: it takes no `density`. In the one-column arrangement the Stage section draws it as the columns' stage does, the whole section, its body scrolling under the stage's head (MAN-9335).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StageShelf.tsx
 
@@ -12196,10 +12316,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StageShelf.t
 | box | selector | where | layout |
 |---|---|---|---|
 | acts | `[data-station-stage-actions]` | the head, between the label and ✕ | in the head's row at 40rem or wider (the head is the query container); below that `order-last basis-full` on a row of its own under the label. `empty:hidden` |
-| foot | `[data-station-stage-foot]` | under the body, outside its scroller | `sticky bottom-0 z-10 shrink-0 border-t bg-background`, a query container of its own; in the phone's one stack it sticks to the screen's foot while the stage is in view. `empty:hidden` |
+| foot | `[data-station-stage-foot]` | under the body, outside its scroller | `shrink-0 border-t bg-background`, a query container of its own, at the stage's foot. `empty:hidden` |
 - The frame holds each box as state (`useState` with the box as a callback ref), not a ref: the view can portal only after the box exists, so its arrival draws the view again.
 - A box nothing is drawn into stays out of the layout, so a kind with no acts draws the stage as before.
 - Kinds that draw into them: `note` (Pin or Unpin, Dismiss), `walk` (End the walkthrough; Back and Next in the foot).
+
+## Compact form
+None of its own: it takes no `density`. In the one-column arrangement the Stage section draws it as the columns' stage does, the whole section, its body scrolling under the stage's head (MAN-9335).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stageSlots.tsx
 
@@ -12240,7 +12363,7 @@ Her cards' slice of the fixtures (MAN-9229) and the claims `.verify/kaylee-stati
 - Card claims: kind in words, head acts (`Pin`/`Unpin`, `Dismiss`: beside ✕ on a stage 40rem or wider, on a row of their own under it narrower), "Pinned" with its glyph or absent, the ref's words, the shelf, the page never sideways, then by kind: paragraphs; list rows, children and foot; plan headings and the quiet lead at 14 px; "Open in DocSpace"; the diff's 27 lines painted by kind and scrolling inside the card; body text at 16 px on a 72-character measure; a list's rows wrapping (its scroller `overflow-x: auto`, `overscroll-behavior-x: contain`).
 - Walk claims: place, words, say line, the 15 items (done checked and ", done", the current `aria-current="step"` and "Now", the rest plain), "End the walkthrough", Back and Next side by side at the stage's foot, refused only at the ends with `ArrowLeft ArrowRight`, the stage beside her face at `wide`, under it at the other tiers, never over it. Phone: Back and Next two halves of the foot, each 44 px tall.
 - Gone, reading and ended: "<title> was taken down" with no acts; "Reading her cards…" and nothing called gone; "The walkthrough ended" with no acts and no foot.
-- Shelf shot: wide keeps the empty stage's words under the shelf's own hairline; narrow, where the stack holds regions beside the empty stage, keeps the shelf alone with no hairline of its own (`0px`).
+- Shelf shot: wide keeps the empty stage's words under the shelf's own hairline; laptop, where her column holds regions beside the empty stage, keeps the shelf alone with no hairline of its own (`0px`).
 - Phone swipes are real touches (CDP `Input.dispatchTouchEvent`), 150 px from the pane's middle: the diff's scroller and the shelf's row must move at least 40 px, and the same swipe with the pane set to `pan-y` 0 px; the page never moves sideways.
 - Her face in the walk shots is her head's own (`[data-station-head-face]`, `fake/head.ts`, MAN-9315): every shot draws the picture's head in her column, and the walk claim measures the stage against it.
 - Shots: `station-<card-note|card-list|card-inbox|card-diff|card-plan|card-page|card-gone|card-reading|walk|walk-begin|walk-last|walk-ended|shelf>-<size>.png`.
@@ -12252,7 +12375,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/cardLin
 Live probe of the strip (`SinceYouLastLooked`, MAN-9287) on the dev client. Fixtures and the shots probe's claims: MAN-9286. Data and the last look: MAN-9285. The whole journey in one script: MAN-9302. Touch law: INV-10275.
 
 ## Run it
-`node .verify/station-strip-live.mjs` on :5183 at /station as account 1 against the live API, no fixture. Files: `.verify/station-strip-live.mjs` (the legs), `.verify/lib/station-strip-live.mjs` (readers: `readStrip`, `readStage`, `readStack`, `readRecord`; `WATCH_ENTRIES`, the page's record of when each landing's box first stood: it also notes a changed `data-landed-entry`, as a folded strip reuses one box for its newest landing), `.verify/lib/station-strip-pages.mjs` (the pages harness). Photographs: `.verify/shots/station-strip-live-*.png`.
+`node .verify/station-strip-live.mjs` on :5183 at /station as account 1 against the live API, no fixture. Files: `.verify/station-strip-live.mjs` (the legs), `.verify/lib/station-strip-live.mjs` (readers: `readStrip`, `readStage`, `readRecord`; `WATCH_ENTRIES`, the page's record of when each landing's box first stood: it also notes a changed `data-landed-entry`, as a folded strip reuses one box for its newest landing), `.verify/lib/station-strip-pages.mjs` (the pages harness). Photographs: `.verify/shots/station-strip-live-*.png`.
 
 ## What is real, what is dispatched
 | part | how |
@@ -12261,8 +12384,7 @@ Live probe of the strip (`SinceYouLastLooked`, MAN-9287) on the dev client. Fixt
 | kinds the week holds none of | two history rows, `dispatcher.finished` and `cerberus.recovered`, titled "strip probe", inserted and deleted by id at the end with the probe chat's rows and the chat |
 | his last look | read first, put back last, after the pages close (a closing station page writes one) |
 | the look-away | `visibilitychange` dispatched with `visibilityState` forced hidden: headless never hides a tab (measured) |
-| presses | real click at 1440x900, real tap at 390x844 with touch |
-| the swipe | real touch events (`Input.dispatchTouchEvent`); `Input.synthesizeScrollGesture` leaves a stuck gesture that resets later scrolls |
+| presses | real click at 1440x900 |
 - Layout boxes are read by `offsetHeight`, never the painted box: a press's `active:scale` is mid-transition just after a tap.
 
 ## Claims
@@ -12272,8 +12394,7 @@ Live probe of the strip (`SinceYouLastLooked`, MAN-9287) on the dev client. Fixt
 4. "<n> new" clears the mark and moves the keyboard's focus to the "Nothing new" words.
 5. A shipped feature's and an epic's press put their card on the stage (label = title; the epic has Back); a landing's puts its chat (label = the chat's name now); a recovered check's opens its line in place and a second press folds it.
 6. The fold survives a reload, folded and open.
-7. At 390x844: every entry, the chip and the fold are 44 px or more; a touch swipe moves the timeline; a tap on a recovered entry opens its line; a tap on the epic from a stack scrolled away puts the stage's head at gap 0 under the bar (`StationStage` scrolls it to `start`, MAN-9228).
-8. A navigated-away page leaves his last look on the server.
+7. A navigated-away page leaves his last look on the server.
 
 ## Measured 2026-10-30
 33 checks ALL PASS, run before the fix-pass of the same day (the press label, the tooltip on touch, `markSeen` with nothing drawn) and before `LandedTimeline` drew the rule after the newest with nothing new and rested on `newestPlace` (MAN-9287); not re-run since. A landing was in the strip 12-44 ms after its frame and 47-124 ms after the history kept it. Swipe 958 to 791. Box load 35 made `/api/projects` take 11-13 s, so the probe drives turns over the socket.
@@ -12466,7 +12587,7 @@ Scratch CloudCLI server over a COPIED auth database, a scratch dispatcher home h
 The stager has no Cerberus, so this leg stands on the live house. Nothing is run, diagnosed or muted. It reads `GET /api/companion/station/needs`, takes a `check` item (preferring a value over 40 characters), and exits 3 with `BLOCKED` when Cerberus holds no failing or refused check.
 | size | shows |
 |---|---|
-| 1440×900 | the item has its kind, status word and `Say “Open …”`; "Open" puts Cerberus's own `NeedCard` on the stage, label and value whole, a status word, no Mute, the keyboard on the card (`data-station-fire`, not a button); "Open the check" opens `CheckSheet` with its left edge no further left than the stage's (the columns beside the stage stay clear); Escape shuts it |
+| 1440×900 | the item has its kind and status word, and no phrase to say; "Open" puts Cerberus's own `NeedCard` on the stage, label and value whole, a status word, no Mute, the keyboard on the card (`data-station-fire`, not a button); "Open the check" opens `CheckSheet` with its left edge no further left than the stage's (the columns beside the stage stay clear); Escape shuts it |
 | 390×844, touch | the act is 44 px; every press on the check's stage is 44 px |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-needs-check-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-needs-live.mjs
@@ -12527,7 +12648,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/
 
 ## MAN-9312 — src/modules/station — MemoryCornerView, MemoryCorner and MemoryLine: "What I'm keeping", her memory at the left rail's foot, never auto-expanded
 
-`MemoryCornerView` (pure) and `MemoryCorner` (its live binding) in `MemoryCorner.tsx`, and `MemoryLine` in `MemoryLine.tsx`: "What I'm keeping", her memory as short titled lines, closed until he opens it. Registered for `corner` in `STATION_REGIONS` (MAN-9264): the left rail's foot on `wide` and `laptop`, the stack's last box on `narrow` (MAN-9230). Her lines: `useMemoryLines` (MAN-9293), read from the bank: MAN-9308. Touch law: INV-10275. Rules an edit keeps: INV-10328. Live probe: MAN-9294.
+`MemoryCornerView` (pure) and `MemoryCorner` (its live binding) in `MemoryCorner.tsx`, and `MemoryLine` in `MemoryLine.tsx`: "What I'm keeping", her memory as short titled lines, closed until he opens it. Registered for `corner` in `STATION_REGIONS` (MAN-9264): the left rail's foot on `wide` and `laptop`, the foot of Where things stand in compact (MAN-9335). Her lines: `useMemoryLines` (MAN-9293), read from the bank: MAN-9308. Touch law: INV-10275. Rules an edit keeps: INV-10328. Live probe: MAN-9294.
 
 ## The rule — never auto-expanded
 His words, the station arc's goal 6: "Never auto-expanded."
@@ -12540,6 +12661,7 @@ His words, the station arc's goal 6: "Never auto-expanded."
 | prop | type | meaning |
 |---|---|---|
 | `tier` | `StationTier` | `wide`, `laptop`: at the rail's foot, its line stays at the foot and the corner opens upward (`flex-col-reverse`), the lines scroll in at most 256 px (`max-h-64`). `narrow`: opens downward, the lines take their height |
+| `density` | `StationDensity` | taken and passed by every region; the corner draws the same at `compact`, on the width it is given |
 | `reading` | `CompanionMemoryLines \| null` | her memory as last read, newest said first; `null` while the first read is out; `count: null` + `reason` = the bank cannot be read |
 | `failure` | `string \| null` | why the page's own read failed; stands over `reading` |
 | `onReread` | `() => void` | Try again |
@@ -12548,7 +12670,7 @@ His words, the station arc's goal 6: "Never auto-expanded."
 | `openLine` | `string \| null` | token of the line whose words stand open; one at a time |
 | `onOpenLine` | `(token: string \| null) => void` | a line pressed: its token opens it and folds any other, `null` folds |
 | `pageUrl` | `string \| null` | her memory's DocSpace page; `null` until a reading names it |
-| `scrollRef` | `(node) => void`, optional | the list's scroller, for the station's scroll memory; absent on a fixture |
+| `scrollRef` | `(node) => void`, optional | the list's scroller, for the station's scroll memory; bound only where the corner is a rail (`wide`, `laptop`: `max-h-64`, the list scrolls). At `narrow` the list takes its own height and the section that holds the corner is the scroller, bound to `corner` by `StationSectionsView`'s `scrollRefs` (MAN-9335): one binder per memory key. Absent on a fixture |
 
 ## States — `section[data-station-corner=<state>]`
 | state | when | the count | draws below the line when open |
@@ -12592,7 +12714,7 @@ A `Map` (a kind spelled `constructor` is a word, not a prototype key). `[data-st
 ## Words — `station.memory.*` (`en/common.json`)
 `title`, `toggle_one/_other`, `toggleUnknown`, `kind.rule/gotcha/landmine/manual`, `when.today/yesterday`, `youSaid`, `quoted`, `noWords`, `reading`, `unreadable`, `retry`, `empty.title/message`, `page`, `pageLabel`.
 
-## `MemoryCorner({ tier })` — the live binding
+## `MemoryCorner({ tier, density })` — the live binding
 `useMemoryLines()` (`lines`, `failure`, `reread`), `useStationPref('cornerOpen', false)`, `useStation().scrollMemory('corner')`, `useState<string \| null>` for `openLine`. `pageUrl` is `docSpacePageUrl(lines.pageId, null)`, `null` while `lines` is `null` or `pageId` is `''`.
 
 ## Fixtures — `fake/corner.ts`
@@ -12608,47 +12730,12 @@ A `Map` (a kind spelled `constructor` is a word, not a prototype key). `[data-st
 | `reading` | open, "Reading her memory…" |
 | `unreadable` | `the docstore door at http://127.0.0.1:8006 did not answer` |
 | `failed` | `failure` "Failed to fetch" over the seven: a stand-in string for the shots only; the live hook never says a browser's words (MAN-9293 §failure) |
-- Shots: `.verify/kaylee-station-shots.mjs` draws each at 1440×900, 1280×800 and 390×844, claims `.verify/lib/station-corner.mjs` (`readCorner`, `cornerClaims`, `cornerStateClaims`): closed or open as the picture says, the foot of the left rail, the lines in the fixture's order, each kind's word and glyph, each moment on the browser's clock, one line's words open and painted inside the list, the link, `tooltips === 0`. The oracle is the fixture's props; nothing is read back from the view.
+- Shots: `.verify/kaylee-station-shots.mjs` draws each at 1440×900 and 1280×800 (and in compact's Where things stand section at its sizes, `-where` shots: MAN-9336), claims `.verify/lib/station-corner.mjs` (`readCorner`, `cornerClaims`, `cornerStateClaims`): closed or open as the picture says, the foot of the left rail, the lines in the fixture's order, each kind's word and glyph, each moment on the browser's clock, one line's words open and painted inside the list, the link, `tooltips === 0`. The oracle is the fixture's props; nothing is read back from the view.
+
+## Compact form
+`density` is taken and the corner draws the same at both, on the width it is given. In compact it stands at the foot of Where things stand, closed until his press, and open never takes more than half the section, so his sessions keep the rest (MAN-9335). At the narrow tier it opens downward and its lines take their own height, so the section holds it in a scroller.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/corner.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/MemoryCorner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/MemoryLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-corner.mjs
-
-## MAN-9313 — Probing the station's rail by voice — station-needs-voice.mjs: his spoken Accept from the rail's words to the rail's emptying
-
-Seam J of `kaylee-station--what-needs-you`: the rail's whole path by voice, once, on the hands' stager and its one probe plan `probe-eyes-accept`. The stager: MAN-9178. The relay the yes rides: MAN-9152, MAN-9142. The rail: MAN-9281. Rules every probe of her keeps: MAN-9197.
-
-```bash
-KAYLEE_EYES_PLANS="accept" bash .verify/kaylee-eyes-scratch.sh node .verify/station-needs-voice.mjs
-```
-- Gitignored (`.verify/`). Exit 2 unless `PROBE_API`, `PROBE_APP`, `PROBE_TOKEN`, `DATABASE_PATH`, `PROBE_DISPATCHER_HOME`, `PROBE_PLAN_ACCEPT`, `PROBE_SERVER_LOG` are set, `DATABASE_PATH` is not `~/.cloudcli/auth.db` and `PROBE_DISPATCHER_HOME` starts `/tmp/heph-eyes.`: run it only through the stager.
-- Stack: scratch server on a COPY of the auth database, a scratch dispatcher home, a scratch Vite. why: no relayed record reaches the live store (kaylee--press).
-- Account 1's Kaylee on the copy, model `haiku` (`PUT /api/companion/settings`, checked), `companion-voice` `off` on the page. First step on the copy: `UPDATE companion_state SET provider_session_id = NULL, session_shape = NULL WHERE user_id = 1`. why: the copy holds her LIVE conversation's id.
-- The station has no talk control (the `talk` slot is unregistered): every press is `POST /api/companion/press` from inside the `/station` page with that page's `x-companion-client`. why: it is the door the talk control will post to.
-- `page.setDefaultNavigationTimeout(240_000)`. why: the scratch Vite's dependency cache is new every run; the first `/station` load passes 30 s.
-- Gemini spend: two transcriptions (one per clip) and, only when absent, one TTS call for `.verify/fixtures/kaylee-eyes-yes.wav` (`yes` entry of `CLIPS`, `kaylee-eyes-clips.mjs`). A press is never repeated: an order that puts no card up FAILS the run.
-
-## Steps and what each checks
-| step | does | checks |
-|---|---|---|
-| model | sets `haiku` | read back `haiku` |
-| 1 before | `/station`, floor held, `POST /api/companion/clear`; waits for the `accept` item | its words equal `Say “Queue probe eyes accept”` (lower-cased: her word check reads words, not case); no action card; the head says `your yes fires it`; the plan is `loaded`, store holds 0 `approved` events |
-| 2 order | press `queue-accept`; waits for her turn to end | logged as `role` operator, `via` spoken, naming the plan; `pending` is a `queue` on `probe-eyes-accept` with 0 `approved`; her lines name the plan (read back) |
-| 3 card | waits for `[data-companion-action]` | stands at the rail's head, above every item; its words contain `queue probe eyes accept`; the item stays beside it |
-| 4 yes | press `yes`; polls the store's `approved` count and the rail every 80 ms | heard `yes` (202); the last `companion_actions` row of the run is `queue`, `took`, said `yes`; her log carries `On your word: queued`; `approved by: app:kaylee`; exactly one `approved` event; exactly one `relayed` event |
-| record | the `relayed` detail against the log row of the yes and the picture read just before it | `words` = the yes row's text; `press` = the yes row's id (not the order's); `said_at` = its `at`; `by` `app:kaylee`; `account` `{id: 1, name: 'verve'}`; `target` the plan; `act` `accept-queue`; `token` = the Accept's `asking.token` from `/api/dispatcher/plans` |
-| 5 after | rail again | item gone; card gone; each left 0 to 1000 ms after the `approved` was seen (a lower bound too: one that left first fails) |
-| end | tool calls from her JSONL by id | `prepare_action` before `take_action`; transcriptions in the scratch server log `=== 2`; no request to `/api/companion/speech` by the page and no `[companion] speech` line in the log; no console error |
-
-- Prints: the rail at each step, the lane's `dispatcher_state` frame latency (approval → frame → item gone), the `GET /api/companion/station/needs` count from the yes, `dispatcher show probe-eyes-accept`'s who-pressed lines, the `approved`/`relayed` events, her log, `companion_actions`, her tool calls.
-- Photographs: `.verify/shots/station-needs-voice-<before|read-back|after>-1440x900.png`.
-- Ends `ALL PASS` or `FAILED: …`, exit 1 on any FAIL.
-- Measured 2026-10-30: the first version (259 lines) passed every check; the item left 246 ms after the approval, 31 ms after the lane's frame, one `GET /needs`. The record, lower-bound, speech and `=== 2` checks came after that run and have not run.
-
-## Traps
-- The transcriber hears `queue-accept` as `cue probe eyes accept` (runs 3 and 4; run 2 heard `queue`). The order only puts the card up, so the check is the plan's name, not `queue`; the yes fires it.
-- A relay that left the rail on the lane's next 2 s poll was found by this probe (run 2: 1571 ms): `relay` did not poke the lane. It pokes on `took` since (335 ms, 246 ms): MAN-9142.
-- The scratch store cannot see a trigger in the LIVE `dispatcher.db`. A showing that fires a relayed act on the live house first needs `select name from sqlite_master where type = 'trigger'` to hold no `no_relayed` (it makes every relayed `INSERT` abort, and she reports `refused`).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-needs-voice.mjs
 
 ## MAN-9314 — src/modules/station — StationHeadView and StationHead: her face, her name, her one state in words, the failed process's banner and her controls
 
@@ -12658,24 +12745,38 @@ Her head on Kaylee Station: the `head` line of `STATION_REGIONS` (MAN-9264), the
 ## `StationHeadView` — `tier`, `name`, `presence`, `face`, `controls`, `failure`
 | prop | type | meaning |
 |---|---|---|
-| `tier` | `StationTier` | `wide`, `laptop` or `narrow`: the arrangement (below) |
+| `tier` | `StationTier` | `wide`, `laptop` or `narrow`: the arrangement at full density (§"Tiers") |
+| `density` | `StationDensity` | `full`, or `compact`: the one form of the one-column arrangement, at every tier (§"Compact density") |
 | `name` | `string` | her name as he set it; `companion.defaultName` while her picture loads |
 | `presence` | `CompanionPresence` | `useCompanionPresence()`: the status line reads it as her face does (MAN-9089) |
 | `face` | `(px: number) => ReactNode` | her face at the px the view draws its box |
-| `controls` | `(align: 'start' \| 'center') => ReactNode` | `CompanionControls` with `layout: 'line'` (MAN-9062) |
+| `controls` | `(align: 'start' \| 'center') => ReactNode` | `CompanionControls` with `layout: 'line'` (MAN-9062; given `ears`, MAN-9342); at compact, drawn inside the "Her controls" panel while it is open |
 | `failure` | `{ sentence: string \| null } \| null` | her process failed (`sentence` = the server's, null when it gave none); null while it runs |
 - `face` and `controls` are slots, so a fixture draws `CompanionAvatar` and `CompanionControls` on a fixture's presence (MAN-9315).
 
-## Tiers
+## Tiers — `density: 'full'`
 | tier | form |
 |---|---|
 | `wide`, her column ≥ 62rem tall | face 200 px centred over name and status; controls under, centred |
-| `wide`, shorter (1440×900) | face 132 px beside name and status, the two centred as one; controls centred under, two lines in the 420 px column |
+| `wide`, shorter (1440×900) | face 132 px beside name and status, the two centred as one; controls centred under, two lines in the 420 px column (three given her ears) |
 | `laptop` | face 132 px beside name, status and controls (`start`) |
-| `narrow` (a phone) | face 72 px beside name and status; controls under, across |
-- The 62rem rule is the container query `her` on her column (`[@container_her_(min-height:62rem)]`, MAN-9230), never a mode. why: measured 1440×900, the 200 px form stood 402 px = 48% of her column and held the conversation at its floor with a draft docked; the 132 px form stands 260 px.
+| `narrow` | face 72 px beside name and status; controls under, across. The live page draws compact below 1024 px (MAN-9230), so only the density probe at `STATION_DENSITY=full` draws this form (MAN-9328) |
+- The 62rem rule is the container query `her` on her column (`[@container_her_(min-height:62rem)]`, MAN-9230), never a mode. why: measured 1440×900, the 200 px form stood 402 px = 48% of her column and held the conversation at its floor with a draft docked; the 132 px form stands 260 px, 294 px given her ears and 322 px while their `unavailable` sentence runs three lines (the ears scaffold's fixtures, 2026-10-30).
 - `FACE` (px and box per tier) and `NAME` (type per tier) are the tables in `StationHead.tsx`. Face box `[data-station-head-face]` (`bg-accent-soft`: the ground under her portrait while its sheets decode). The view reads the box's drawn width (`ResizeObserver` via `resizeObserverIn`) and calls `face(drawnPx)`, so her initial fills its disc at 132 and 200 alike.
 - Hooks: `[data-station-head=<tier>]`, `[data-station-head-name]`, `[data-station-head-failed]`. Status line: `CompanionStatus` `emphasis="station"`.
+
+## Compact density — `density: 'compact'`
+`data-station-head="compact"`, one form at every tier:
+| part | draws |
+|---|---|
+| face | 64 px (`COMPACT_FACE`) beside her words: one column has no height for a larger one |
+| name and state | one line where both fit; the state wraps under the name, its words whole, where they do not |
+| controls | ONE press `[data-station-head-controls]`, "Her controls" (`station.head.controls`), under her words: the kit `Menu` `{ panel, label }` (MAN-9016) holding `controls('start')`. Every rule of `CompanionControls`' line holds (MAN-9090); Stop leads it while her turn runs |
+| failure | the warn `Banner` across the head's full width, under the rest |
+- The panel hangs from the press's left edge, under her words, so it never stands over her face at any width. `CONTROLS_PANEL_PX` = 380: two lines of the line at 44 px catches, three given her ears. It is a most: the window less 16 px comes first and the controls wrap (`.vv-menu__panel--controls`).
+- A pick in the model list (a `Select` drawn on `body`) leaves the panel open; Escape closes the list, then the panel.
+- Stop is one press deeper than at full: it sits inside "Her controls".
+- Claims: `.verify/kaylee-station-density.mjs` (MAN-9328).
 
 ## States
 | state | when | draws |
@@ -12688,14 +12789,14 @@ Her head on Kaylee Station: the `head` line of `STATION_REGIONS` (MAN-9264), the
 - No look turns her toward a rail: she faces him (`CompanionFace` is given no `look`).
 
 ## Touch
-- The head holds no press of its own. Its presses are `CompanionControls`' `line`, each with the panel's catch: Stop `max-md:h-11`; the model `Select` (`size="sm"`) 44 px below 768 px by the kit (`.vv-select--sm`, `verve/controls.css`); the Live and voice rows' labels `max-md:min-h-11`, the label being the press that presses the switch; Clear `max-md:h-11`. Each also stands 44 px under a coarse pointer.
-- The line wraps rather than cut a word; voice and Clear wrap as one unit (MAN-9062).
-- `narrow` is the phone's form.
+- At full density the head holds no press of its own; at compact it holds one, "Her controls", `max-md:h-11`. Its presses are `CompanionControls`' `line` (at compact, in the open panel), each with the panel's catch: Stop `max-md:h-11`; the model `Select` (`size="sm"`) 44 px below 768 px by the kit (`.vv-select--sm`, `verve/controls.css`); the Live, voice and ears rows' labels `max-md:min-h-11`, the label being the press that presses the switch; Clear `max-md:h-11`. Each also stands 44 px under a coarse pointer.
+- The line wraps rather than cut a word; voice and Clear wrap as one unit; given her ears the voice switch stands alone and the ears' switch and Clear wrap as one (MAN-9062, MAN-9342).
+
 
 ## Live binding — `StationHead`
-`presence` = `useCompanionPresence()`, the one value her status line reads and her face reads too (`CompanionFace` calls the hook itself): MAN-9089. `face` = `(px) => <CompanionFace size={px} />` (a render slot: a fixture cannot mount the bound face). `controls` = `CompanionControls` `line` with `voice`, `onModelChange` = `saveSettings({ model })`, `onLiveChange` = `saveSettings({ live })`, `onInterrupt` = `interrupt`, `onClear` = `clear`. `failure` = `picture?.process.state === 'failed' ? { sentence: picture.process.error } : null`. `name` = `picture?.settings.name`, else `companion.defaultName`.
+`tier` and `density` = the props the station hands every region (`StationRegionProps`, MAN-9264). `presence` = `useCompanionPresence()`, the one value her status line reads and her face reads too (`CompanionFace` calls the hook itself): MAN-9089. `face` = `(px) => <CompanionFace size={px} />` (a render slot: a fixture cannot mount the bound face). `controls` = `CompanionControls` `line` with `voice`, `onModelChange` = `saveSettings({ model })`, `onLiveChange` = `saveSettings({ live })`, `onInterrupt` = `interrupt`, `onClear` = `clear`. `failure` = `picture?.process.state === 'failed' ? { sentence: picture.process.error } : null`. `name` = `picture?.settings.name`, else `companion.defaultName`.
 - The press rules of the controls are the panel's (MAN-9090): a choice shows at once and is restored with a toast when its save is refused; Clear asks first.
-- Words: none of its own; `companion.*` (`defaultName`, `panel.failedUnknown`, the controls', the status').
+- Words: `station.head.controls` ("Her controls"); the rest are `companion.*` (`defaultName`, `panel.failedUnknown`, the controls', the status').
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationHead.tsx
 
@@ -12724,6 +12825,8 @@ Nothing in the app imports them; the probe does (MAN-9229). One line each in `RE
 | `talk` `listening`, `transcribing` | the press lit; the spinner |
 | `talk` `refused` | `error: 'Your recording could not be sent.'` |
 | `talk` `loading` | no picture: `ready` false |
+| `TALK_COMPACT` | at compact density: the button alone (`part: 'button'`) in each of the four pictures; the density probe hands `density: 'compact'` (MAN-9328) |
+| `TALK_COMPACT_STATES` | at compact density over `home`: `composer` (the box alone, `part: 'composer'`), and the button alone in `listening`, `transcribing`, `refused` and `loading` |
 - Her face on a fixture is `CompanionAvatar` on the picture's presence with no face id: her initial. The probe lays the account's own face id (`GET /api/companion`) over it. Controls are `CompanionControls` `line` with `voice` on and presses that do nothing.
 
 ## `.verify/lib/station-center.mjs` — the center probe (called by `kaylee-station-shots.mjs`)
@@ -12751,6 +12854,7 @@ Nothing in the app imports them; the probe does (MAN-9229). One line each in `RE
 - THE PLACE KEPT: scrolled up, "Newest" stands; after a reload the stored `scrollTop` is put back, still not following; "Newest" follows again, a place at the end follows the newest line after a reload, and a log that grew while he was away (eight lines added by the page's own route to `GET /api/companion`, nothing written) opens at its newest line.
 - A phone (390×844, iPhone 13 touch): the narrow head (face 72 px beside her status, the controls under them), and every press of the head, every chip, the composer's send and the log's "Newest" a 44 px catch (a switch is caught by its label row, the send by its `::before`), the talk button ≥ 44, the field 44; a tap on the chip reaches the stage. A 390 px window with a mouse: the same catches (the law is keyed on width, INV-10275). The catches measured are those of the controls drawn while she is idle: Stop stands only while her turn runs, and neither narrow leg runs a turn, so its catch is not measured by the probe; nor does the probe press the head's Select, Stop or Clear.
 - Shots `station-center-live-*.png` (thinking, turn, chip pressed, place before and kept, the phone's head and its stage).
+- Known edge: the phone and narrow-window legs assert the narrow head (`data-station-arrangement` = `narrow`, `data-station-head` = `narrow`, face 72 px, the controls line in view, the talk button and box in one `[data-station-talk]`). A phone draws `compact` (MAN-9337): the head is `compact` (face 64 px, the controls behind "Her controls"), the talk control two halves (MAN-9324), so those legs fail until they read that.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/conversation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/head.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/talk.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-center-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-center.mjs
 
@@ -12787,7 +12891,7 @@ Her draft dock, `dock` slot of Kaylee Station: her one draft at the foot of her 
 - Seam L, shown by `.verify/kaylee-station-dock-live.mjs` (§"Live probe"): a typed line to her, her brief in the dock, the target's name on the stage, his edit, Send turn, the chat answering on Haiku, the chat on the stage, the dock its quiet line; and with the chat working, Send steer leading and the brief folded into the running turn.
 
 ## `StationDock` — the live binding
-`StationDock({ tier })` adds no state of its own; every value is derived from what the page already holds, and nothing is read on a clock:
+`StationDock({ tier, density })` adds no state of its own; every value is derived from what the page already holds, and nothing is read on a clock:
 | prop of the view | read from |
 |---|---|
 | `draft` | `useCompanion().picture?.draft ?? null` (her picture's `companion_draft` frames) |
@@ -12799,20 +12903,25 @@ Her draft dock, `dock` slot of Kaylee Station: her one draft at the foot of her 
 | `scrollRef` | `useStation().scrollMemory('dock')` |
 - A chat in a hidden root (the probe's scratch project) has no row in the station's sessions, so `targetWorking` is `false` for it and its stage has no row to draw: the live probe answers the page's sessions read with a stand-in row for it, its state read off the real run registry (`.verify/kaylee-station-dock-live.mjs`). What that leaves unshown: the server's own row for a working chat (`chatRows()` → `chatStates()`: `waiting` on a pending approval, else `working` while `chatRunRegistry` holds a run, the test `sendToChat` folds on) is read in the code, never shown live, and the stage's activity line in the probe's shots is the stand-in's literal `working`, not the station's own line for the chat.
 
-## Live probe — `.verify/kaylee-station-dock-live.mjs`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useDockFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-dock-live.mjs
+
+## MAN-9338 — src/modules/station — StationDockView, StationDock and useDockFloor: her draft — Live probe — `.verify/kaylee-station-dock-live.mjs`
+section: src/modules/station — StationDockView, StationDock and useDockFloor: her draft dock, its states, its room and the phone keyboard/001 Live probe — `.verify/kaylee-station-dock-live.mjs`
+
 `node .verify/kaylee-station-dock-live.mjs` runs every leg; `LEGS=turn,steer,ends,phone` picks. A name outside those four, or an empty list, prints `LEGS names unknown leg(s) …` and exits 2 before sign-in; any FAIL line exits 1. Account 1 on the live client (:5183) and API (:3011), voice off, her model set to `haiku` and put back, every model call Haiku, no Gemini. Shots: `.verify/shots/station-dock-live-*.png`.
 | leg | shows |
 |---|---|
 | `turn` (seam L) | one typed line to her; the dock shows the brief; the target's name puts the chat on the stage; his edit typed at the field's end; Send turn pressed with the field focused; the chat's turn is his edited words; the reply comes from Haiku; the chat stands on the stage by the send's own open; the dock is back to its quiet line |
 | `steer` (seam J) | the chat running a 100-second loop: Send steer leads; the brief is folded into the running turn (the transcript's `queued_command` attachment, which only a fold writes: the press's `queue-operation` row and a brief that ran as its own turn do not count); the run's merged result names both messages |
 | `ends` (seam J's edge) | the chat running a 40-second loop with her brief already on screen, Send steer leading and "Working now" up; the chat's turn ends under the draft and the dock drops Send steer by itself (the sessions hint, no reload): Send turn alone and leading, "Working now" gone, the brief still in the field; the leg then drops its unsent draft so the next leg starts with none |
-| `phone` | 390×844 touch: every press a 44 px catch; with `--keyboard-height` 336 px and the field focused the dock bottom is the keyboard's top; Clear's question answered by a tap |
+| `phone` | 390×844 touch: every press a 44 px catch; with `--keyboard-height` 336 px and the field focused the dock bottom is the keyboard's top; Clear's question answered by a tap. Known edge: it asserts `data-station-arrangement` = `narrow`; a phone draws `compact` (MAN-9337), so its first check fails until it reads `compact` |
 - The probe chat is stood in on the sessions read (see the hidden-root bullet above); every chat a leg makes has its run stopped (`chat.abort`) and is then deleted at the end, so no turn writes a transcript back into the scratch project, and a run that will not stop turns that chat's "taken down again" line red; a stand-in read that fails is answered to the page as a dropped connection and named in the closing line.
 
 ## StationDockView — props
 | prop | type | meaning |
 |---|---|---|
 | `tier` | `StationTier` | picks `DOCK_CAP[tier]` |
+| `density` | `StationDensity` | taken and passed by every region; the dock draws the same at `compact`, on the width it is given |
 | `draft` | `CompanionDraft \| null` | her draft; `null` = she holds none |
 | `name` | `string` | her name, for the card's "she changed the draft" words |
 | `targetWorking` | `boolean` | the target chat's row in the station's sessions is `working` or `waiting`; only then Send steer shows, and leads |
@@ -12829,7 +12938,11 @@ Her draft dock, `dock` slot of Kaylee Station: her one draft at the foot of her 
 - Section `aria-label` = `station.dock.label` ("{{name}}’s draft").
 - Every rule of the card holds here (MAN-9090): edit saved on blur and before any send; a refused send keeps everything and shows the server's sentence; Clear asks first. Nothing of the brief is drawn twice.
 
-## Room
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useDockFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-dock-live.mjs
+
+## MAN-9339 — src/modules/station — StationDockView, StationDock and useDockFloor: her draft — Room
+section: src/modules/station — StationDockView, StationDock and useDockFloor: her draft dock, its states, its room and the phone keyboard/002 Room
+
 - `DOCK_CAP`: `wide` `max-h-[45cqh]` (at most 45% of her column), `laptop` `max-h-[40cqh]` (40%; the stage beside her takes up to 55%). `cqh` = the height of the `her` container (MAN-9230). `narrow`: `NARROW_FRAME_HOLD` `max-h-[calc((100dvh-var(--keyboard-height,0px))*0.6)]`.
 - Give-way inside the cap, in order (her column's whole budget: MAN-9230 §"Her column's one budget"; on a laptop the stage beside her gives way before all of these):
   1. the card's field, to its 88 px floor (`useCardFloor`); the target, the notice, the sends and a refusal never fold;
@@ -12840,7 +12953,7 @@ Her draft dock, `dock` slot of Kaylee Station: her one draft at the foot of her 
 - Section classes: `flex min-h-0 min-w-0 flex-[0_1_auto] flex-col overflow-y-auto bg-background px-4 py-3`; a flex-column wrapper `min-h-0` around the card, so inside the card only the field shrinks (its 88 px floor, `useCardFloor`).
 
 ## Phone — the keyboard
-- While the focus is inside the dock in the stack, the shell sticks its slot to the stack's foot (`DOCK_EDITING_IN_THE_STACK`, MAN-9230); the frame ends at `--keyboard-height`, so field, target and sends stand above the keys whichever rose first.
+- While the focus is inside the dock in the Conversation section on a touch screen with the keys up, the section lifts the dock's cap (`has-[textarea:focus]`, MAN-9335); the frame ends at `--keyboard-height`, so field, target and sends stand above the keys whichever rose first.
 - `keepFieldFocus` (`onMouseDown` on the section): a press on a `button` while the focus is in the card's `TEXTAREA` is `preventDefault`ed. why: WebKit blurs the field on a button's mousedown; the dock fell out of the foot mid-tap and the release hit what stood there; first Send on an iPhone lost. Clear's question still takes the focus.
 - Every press of the card is a 44 px catch below 768 px (the card's own: sends, Clear, the target's press via `before:` insets).
 - The brief's words stand in the field (a `TextArea`, scrolling inside), never cut behind a hover.
@@ -12851,6 +12964,9 @@ Her draft dock, `dock` slot of Kaylee Station: her one draft at the foot of her 
 - Runs in `useLayoutEffect` on `[sectionRef, carded]`; a `MutationObserver` on the card's `style` attribute rewrites it on each new floor (no poll, no timer); cleanup disconnects and removes the property.
 - why: a fixed 14.25rem basis never saw the floor grow when a refusal or a notice appeared; the sentence scrolled out of the dock while her conversation kept its share.
 - `StationDockView` binds the section through one stable `useCallback` that sets `sectionRef` and calls `scrollRef`, so the scroll memory is not detached every render.
+
+## Compact form
+`density` is taken and the dock draws the same at both. In the Conversation section it takes at most 45% of the section and scrolls itself; on a touch screen, with the keys up (the column under 36rem tall) and its field focused, the section lifts that cap and folds her box, so the card, its target and its sends stand whole above the keys (MAN-9335). At the narrow tier its own hold is 60% of the frame above the keyboard.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useDockFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-dock-live.mjs
 
@@ -12885,16 +13001,16 @@ The `dock` slot's slice of the fixtures (MAN-9229) and the claims `.verify/kayle
 | `readDock(page, hostId)` | the mounted dock and its column: state, label, boxes (dock, slot, column, conversation slot, card, field, target, sends, refusal), cap, scroll, press name, sends and the lead, the quiet line's words/ink/size; `null` when no dock stands |
 | `dockClaims(picture, d, { tier })` | per picture, from `readDock` |
 | `dockStateRun(page, hostId, state, { tier, shoot })` | draws a `DOCK_STATES` state; for `refused` presses the lead send, waits for `[role="alert"]`, 300 ms for the floor hand-off, re-takes the shot, then judges |
-| `dockKeyboardRun({ page, hostId, sizeName, draw, claims, unmount, shoot })` | phone only: the keyboard cases and the press run below |
+| `dockKeyboardRun({ page, hostId, sizeName, draw, claims, unmount, shoot })` | phone only: the keyboard cases and the press run below. Called by nothing: the keyboard cases run in compact (`lib/station-compact.mjs`, MAN-9336), and the press run waits for the phone's plan |
 - The oracle is the fixture's story, written in the probe (`DOCK_PICTURES`, `DOCK_STATES`, `EMPTY_LINE`); nothing is read back from the view as its own expectation.
 - Constants: `COLUMN_SHARE` `{ wide: 0.45, laptop: 0.4 }`; `CONVERSATION_FLOOR` 57 px (3.5rem + hairline); `KEYBOARD_HEIGHT` 336 px; `TOUCH_FLOOR` 44 px.
 - Claims, a draft: the card for its target; the target's name a press with its `aria-label`, or words with no press for a new chat; the sends in order, the first leading; the card whole, never under its floor; the field gives way before the dock scrolls.
 - Claims, no draft: the one quiet line in the muted ink (`--ink-muted`) at 13.5 px, not italic, the dock non-zero in height.
 - Claims, columns (`wide`, `laptop`): at most 45% / 40% of her column, capped there; `sightClaims`: the target, 20 px of the brief, every press and a refusal's sentence whole inside the dock's visible box, unless her conversation is at its 57 px floor; her newest line in sight above the dock.
 - `refused` also claims: the sentence under the sends equals the server's, everything else still on screen.
-- Phone, keyboard (`dockKeyboardRun`): `home` and `walkthrough`, each in both orders (keyboard raised then field focused; field focused then keyboard), 336 px on `--keyboard-height`: the frame ends at the keyboard's top; the field focused and in sight above the keys; the card whole above the keys with target and sends; each press a 44 px catch (`elementFromPoint` extent, a `::before` counts).
-- Phone, press run (`pressRun`, `home`): a `mousedown` listener models Safari's rule (blur the field on a button's mousedown unless default was prevented); with the keys up, taps Send steer (`['edit', words]` then `['send','steer']`), Send turn (`['send','turn']`), the target's name (`['show']`), each with the field still focused and the slot still `position: sticky`; Clear asks "Clear the draft?" and its answer records `['clear']`.
-- Shots: `station-dock-keyboard-<home|walkthrough>-390x844.png`, `…-rising.png` (field first), `station-dock-keyboard-home-390x844-pressed.png`; `station-dock-<newChat|refused>-<size>.png` per `REGION_STATES`.
+- Phone, keyboard (`dockKeyboardRun`, not run now; compact's keyboard run is MAN-9336's): `home` and `walkthrough`, each in both orders (keyboard raised then field focused; field focused then keyboard), 336 px on `--keyboard-height`: the frame ends at the keyboard's top; the field focused and in sight above the keys; the card whole above the keys with target and sends; each press a 44 px catch (`elementFromPoint` extent, a `::before` counts).
+- Phone, press run (`pressRun`, `home`, called by `dockKeyboardRun`, so not run now): a `mousedown` listener models Safari's rule (blur the field on a button's mousedown unless default was prevented); with the keys up, taps Send steer (`['edit', words]` then `['send','steer']`), Send turn (`['send','turn']`), the target's name (`['show']`), each with the field still focused and the slot still `position: sticky`; Clear asks "Clear the draft?" and its answer records `['clear']`.
+- Shots: `station-dock-<newChat|refused>-<size>.png` per `REGION_STATES`. The keyboard shots are compact's: `station-<home|walkthrough>-compact-390x844-keyboard-dock[-rising].png` (MAN-9336).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/dock.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-dock.mjs
 
@@ -12904,10 +13020,12 @@ Her talk control on Kaylee Station: the `talk` line of `STATION_REGIONS` (MAN-92
 - `StationTalkView` draws every state from props. `StationTalk` binds it and adds no state: the bound key and mouse button reach the same press through the provider's `useTalkBinding` (MAN-9101).
 - The station's first press anywhere unlocks her voice (`useUnlockHerVoice`, MAN-9250); `sendText` unlocks it too (MAN-9113). The control holds no unlock of its own.
 
-## `StationTalkView` — `tier`, `talk`, `name`, `bindingLabel`, `onSend`, `ready`
+## `StationTalkView` — `tier`, `density`, `part?`, `talk`, `name`, `bindingLabel`, `onSend`, `ready`
 | prop | type | meaning |
 |---|---|---|
 | `tier` | `StationTier` | `narrow` stacks the button over the box; `wide` and `laptop` stand them in one row |
+| `density` | `StationDensity` | `compact`: the button 44 px tall, its words kept (§"Compact density"); the box is the same at both |
+| `part?` | `'both' \| 'button' \| 'composer'` | which halves to draw; `both` when absent (`TalkPart`, in `StationTalk.tsx`) |
 | `talk` | `TalkPress` | `{ state, toggle, error }`: the page's one press (MAN-9093); a press while she speaks cuts her (MAN-9133) |
 | `name` | `string` | her name as he set it; `companion.defaultName` while her picture loads: "Talk to Kaylee", the box's "Message Kaylee…" |
 | `bindingLabel` | `string \| null` | the key or mouse button he bound, as Settings names it ("F8", "Mouse back"); null when none |
@@ -12925,18 +13043,28 @@ Her talk control on Kaylee Station: the `talk` line of `STATION_REGIONS` (MAN-92
 - Failed send: `companion.composer.refused` under the box, "Couldn't reach Kaylee. Your message is back in the box; send it again."
 - Empty (`ready` false): the line stands empty and Send is disabled. The button is pressable.
 
+## Compact density — `density: 'compact'`
+- The button is 44 px tall (`CompanionTalkButton` `compact`, MAN-9093): `h-11 py-1`, `leading-tight`, its words (`line-clamp-2`) kept in every press state: "Talk to Kaylee", "Stop and send", "Transcribing · press to talk again".
+- `part` splits the one control: the compact arrangement draws `button` in her head and `composer` in its Conversation section. Each half is `[data-station-talk=<state>][data-station-talk-part=<part>]`, `min-w-0 bg-background`, and fills the box its caller gives it:
+| `part` | draws |
+|---|---|
+| `both` | the row or the stack of §"Layout" (`data-station-talk-part="both"`) |
+| `button` | `CompanionTalkButton` alone, no padding of its own: the head places it |
+| `composer` | `CompanionComposer` alone, padding itself; no talk button in it |
+- Claims: `.verify/kaylee-station-density.mjs` (MAN-9328); fixtures `TALK_COMPACT`, `TALK_COMPACT_STATES` (MAN-9315).
+
 ## Layout
 - `wide`, `laptop`: one row, tops in line (`items-start`): the button's cell `w-48` (12rem), the box taking the rest. Where her column is ≥ 38rem across (`[@container_her_(min-width:38rem)]`: a laptop window of 1152 px and up) the cell is `w-[22rem]` and the line stands beside the button: the row is 76 px, not 106, the 30 px going to the conversation. why 12rem: the button's words get 121 px and "press to talk again" needs 119; at 1440 her column is 420 px and holds no button, key and usable box in one row, so the line stands under the button.
-- `narrow`: the button across the column, the box under it.
+- `narrow` with `part` `both`: the button across the column, the box under it. The live page draws the halves instead (§"Compact density"); the density probe at `STATION_DENSITY=full` draws this form (MAN-9328).
 - The cell's `pt-2` matches the composer's own padding so the two tops meet.
 
 ## Touch
-- The button is `h-14`, 56 px at every width.
+- The button is `h-14`, 56 px at every width at full density; 44 px at compact (`h-11`).
 - The box's Send keeps the panel's 44 px catch (a `::before` under 768 px and under a coarse pointer); its field stands 44 px below 768 px (`touchField`: `max-md:py-2.5`; the panel's own stays 40).
 - The binding line is a hint and holds no press; a phone hides it and its reader is never told "or press F8".
 
 ## Live binding
-`talk` = the provider's `talk`; `bindingLabel` = `picture?.settings.talkBinding?.label ?? null`; `onSend` = `sendText`; `ready` = `picture !== null`; `name` = `picture?.settings.name`, else `companion.defaultName`. `StationTalkView` hands the button `bindingLabel` only when `ready`, else `undefined`.
+`tier`, `density` = the props the station hands every region (MAN-9264); `part` passes through from the caller (`StationTalk` takes it beside `StationRegionProps`). `talk` = the provider's `talk`; `bindingLabel` = `picture?.settings.talkBinding?.label ?? null`; `onSend` = `sendText`; `ready` = `picture !== null`; `name` = `picture?.settings.name`, else `companion.defaultName`. `StationTalkView` hands the button `bindingLabel` only when `ready`, else `undefined`.
 - Words: `station.talk.orPress`, `station.talk.bindHint` (`en/common.json`); the rest are the panel's `companion.talk.*` and `companion.composer.*`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationTalk.tsx
@@ -12946,10 +13074,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationTalk.
 Her conversation on Kaylee Station: the `conversation` line of `STATION_REGIONS` (MAN-9264), under her head (MAN-9314). The log is the companion module's own `CompanionLog`, drawn through its barrel with `cards` and `scrollRef` (MAN-9062), so her panel and the station draw one log (MAN-569). Layout: MAN-9230. Fixtures: MAN-9315. Touch law: INV-10275.
 - `StationConversationView` draws every state from props. `StationConversation` binds it and adds no state.
 
-## `StationConversationView` — `tier`, `picture`, `readFailure`, `onReread`, `name`, `speaking`, `onOpenCard`, `scrollRef?`
+## `StationConversationView` — `density`, `picture`, `readFailure`, `onReread`, `name`, `speaking`, `onOpenCard`, `scrollRef?`
 | prop | type | meaning |
 |---|---|---|
-| `tier` | `StationTier` | `narrow`: a window `h-[min(32rem,60dvh)]` in every state, so the stack does not jump when her picture lands; else `flex-1` in her column (it takes what head, dock and talk leave, down to the shell's 3.5rem floor: MAN-9230) |
+| `density` | `StationDensity` | taken and passed by every region; the conversation draws the same at every density and tier: `flex-1`, the room it is given (in her column what head, dock and talk leave, down to the shell's 3.5rem floor: MAN-9230; in compact's Conversation section what the dock and the box leave) |
 | `picture` | `CompanionPicture \| null` | her picture as the page holds it (log, notes, `turnId`); null until the first read lands |
 | `readFailure` | `string \| null` | why that read failed, while there is no picture |
 | `onReread` | `() => void` | Try again |
@@ -12993,4 +13121,608 @@ Props `note: CompanionNote`, `onOpen(note)`. Drawn only by `CompanionLog` given 
 `picture`, `readFailure`, `reread` and `voice.speaking` come from `useCompanion()`; `onOpenCard` = `(note) => setFocus({ kind: 'note', id: note.id, label: note.title })` (the `note` stage, MAN-9295); `scrollRef` = `useStation().scrollMemory('conversation')`, which keeps its identity across renders: an unstable callback is bound again every render and loops.
 - Words: `station.conversation.openCard` (`en/common.json`); the rest are the panel's `companion.*`.
 
+## Compact form
+`density` is taken and the view draws the same at every density and tier: it fills the room it is given and scrolls inside, so in compact it is the Conversation section's body, over the dock and the box to type in (MAN-9335).
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionCardChip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationConversation.tsx
+
+## MAN-9328 — src/modules/station — kaylee-station-density.mjs: every region at compact density on the four pictures
+
+Draws each region's own view at `density: 'compact'` on the four fixture pictures (MAN-9229), stacked in one column, and measures it. Not the compact arrangement (`StationCompactView`, MAN-9337): the regions only, each as the arrangement draws it. The regions' compact forms: head MAN-9314, talk control MAN-9324, sessions MAN-9289, features MAN-9290, needs MAN-9281, strip MAN-9287. Touch law: INV-10275.
+
+## Run
+```bash
+node .verify/kaylee-station-density.mjs
+STATION_DENSITY_SIZES=390x844 node .verify/kaylee-station-density.mjs                                  # one size, or several comma-separated
+STATION_DENSITY=full STATION_DENSITY_SIZES=1440x900,390x844 node .verify/kaylee-station-density.mjs   # the same column at full density
+```
+- Gitignored (`.verify/`). Live client `:5183`. PASS/FAIL per line, exit 1 on any FAIL. Sends no turn and writes nothing (a fixture's presses do nothing). Dark, reduced motion, no project, hot updates held off: the shots probe's frame (MAN-9229).
+- Sizes: `600x900` (a mouse), `390x844` (iPhone 13 at its whole screen, touch); `1440x900` only at `STATION_DENSITY=full`. Each size carries `section`, the body height a section has in the compact arrangement there (640, 520; 780 at 1440): what a region that fills a section is given.
+
+## The column — `mountColumn`
+- Boxes top to bottom, each `[data-density-box=<name>][data-station-slot=<slot>]` in `[data-station-shell]`: `head`, `talk-button`, `strip`, `needs`, `where`, `corner`, `conversation`, `dock`, `talk-composer`.
+- `needs`, `where` and `conversation` are `section` px tall and scroll inside themselves.
+- Every drawing is `createElement(view, { ...props, tier, density })`. `talk-button` = `TALK_COMPACT[picture]` and `talk-composer` = `TALK_COMPACT_STATES.composer` (MAN-9315). At full density `talk` is the picture's own and `talk-composer` is absent.
+
+## Claims at compact — per picture and size
+| claim | measured |
+|---|---|
+| head | `data-station-head="compact"`, face 64×64 |
+| "Her controls" | its left edge ≥ the face's right edge |
+| name and state | one line (the 600 px column, `home` and `waiting`) |
+| talk button | 44 px tall, its words whole (`scrollHeight`) |
+| talk box | `[data-station-talk-part=composer]` holds a textarea and no `[data-companion-talk]` |
+| strip | its folded line (`data-station-strip` neither `timeline` nor absent) though the fixture is open |
+| sessions, features | each row ≤ 45 px and its name or title ≤ 21 px: one line |
+| needs | `data-station-need-density=compact`, each press ≤ 45 px, its title ≤ 21 px |
+| action card | `innerText` equals the full-density rail's, word for word |
+| controls open (`controlsRun`) | the panel holds `[data-companion-controls=line]`; never over the face (left ≥ face right, or top ≥ face bottom); inside the window; a pick in its model list leaves it open; Escape closes it |
+| region states | `REGION_STATES` of `head`, `sessions`, `needs`, `strip`, each over `home`; a head state keeps the 64 px face and the trigger clear of it |
+| talk states | `listening`, `transcribing`, `refused`, `loading` (`TALK_COMPACT_STATES`): 44 px, words whole |
+| errors | the console stays silent |
+- Below 768 px (`600x900`, `390x844`) every press is measured by its catch (`lib/station-touch.mjs`, INV-10275): on each picture, with "Her controls" open, and in each state above. The box's Send is measured after one typed letter: empty, it is disabled and the kit takes its pointer events away.
+- At full density: shots, touch below 768 px, console.
+
+## Shots — `.verify/shots/`
+`station-density-<picture>-<size>.png` (the column), `station-density-<picture>-<box>-<size>.png` (each box), `station-density-<picture>-controls-<size>.png` ("Her controls" open), `station-density-talk-<state>-<size>.png`, `station-density-<slot>-<state>-<size>.png`; `station-density-full-…` at full density.
+- 2026-10-30: 216 PASS at compact (600×900, 390×844); ALL PASS at full density (1440×900, 390×844).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-density.mjs
+
+## MAN-9335 — src/modules/station — StationSectionsView: the one-column station's body, four sections drawn and one shown (StationSections.tsx)
+
+`StationSectionsView` (`StationSections.tsx`): the body of the one-column station, the section he chose at full height, its regions as `SECTIONS` stands them. A pure view; the compact arrangement draws it (`StationCompactView`, MAN-9337) and the phone's arrangement will draw it again; which section shows, and the stage's pull on it, is `useStationSection` (MAN-9337). Layout: MAN-9230. Touch law: INV-10275.
+
+## Props
+| prop | type | meaning |
+|---|---|---|
+| `section` | `StationCompactSection` | `conversation`, `needs`, `where` or `stage`: the section shown |
+| `slots` | `Partial<Record<SectionPlace, ReactNode>>` | what each place holds: the shell's region elements and the stage, drawn. A place left out draws nothing |
+| `density` | `StationDensity` | handed to every region: `compact` in compact's arrangement |
+| `scrollRefs` | `Partial<Record<SectionPlace, (node) => void>>` (optional) | the scroller of a `held` place, for the station's scroll memory on the page; absent on a fixture. Bound only where the region draws no scroller of its own, so a place has one binder: compact binds `corner` at the narrow tier (the corner opened there takes its own height, `MemoryCornerView`'s `rail` false), and the corner's own list is the one bound at `wide`/`laptop` |
+- `SectionPlace` = `conversation` \| `dock` \| `talk` \| `needs` \| `sessions` \| `corner` \| `stage`.
+- Each region is its OWN ELEMENT, never wrapped (no boundary, no provider). why: the sections clone it with `density`, and the talk control with `part: 'composer'`; a wrapper would take both props and draw the talk button a second time under her head's. The stage is drawn as handed.
+
+## Sections — `SECTIONS`
+| section | pieces, top to bottom (box) | notes |
+|---|---|---|
+| `conversation` | `conversation` (`min-h-0 flex-1`); `dock` (`max-h-[45%] min-h-0 flex-[0_1_auto]`); `talk` (`shrink-0`) | the dock scrolls itself, so a long draft never squeezes her log; `talk` is the composer half, the box to type to her (its button is in her head) |
+| `needs` | `needs` (`min-h-0 flex-1`, held) | the whole section |
+| `where` | `sessions` (`min-h-0 flex-1`); `corner` (`mt-auto max-h-[50%] min-h-0 flex-[0_1_auto]`, held) | the corner closed until he opens it, never more than half the section |
+| `stage` | `stage` (`min-h-0 flex-1`) | its body scrolls inside it, under its head |
+- Held: the piece is a `ScrollArea` holding `flex h-full min-w-0 flex-col`; a region that scrolls itself fills it and the box never moves, a region of its own height (the memory corner opened at the narrow tier) scrolls in it.
+- A hairline `border-t border-border` parts a piece from the one above. A piece with nothing in it is not drawn and the rest close up.
+
+## What it draws
+`<div data-station-sections=<section>>` (`relative min-h-0 flex-1`) holds all four `[data-station-section=<name>]` (`group/section absolute inset-0 flex min-w-0 flex-col`). The ones not shown are `invisible`, `inert` and `aria-hidden`. why: a switch away and back loses no half-typed words, no scroll place and no open fold; each region's scroller is also the station's scroll memory under its own key.
+- A piece carries the shell's `data-station-slot=<place>`; the stage's cell `data-station-stage-cell`. A probe finds a region here as in the columns.
+
+## States
+| state | when | draws |
+|---|---|---|
+| shown | `section` is the section's name | its pieces, visible and in the tab order |
+| hidden | the other three | still drawn: `invisible`, `inert`, `aria-hidden` |
+- A section is a state of one drawing, never a mode of a region: every region gets `density` and nothing else from it.
+
+## Empty state
+A place with nothing in `slots` draws nothing and its section closes up. A section with no drawn piece is an empty box (a fixture without a `stage`: the Stage section holds nothing).
+
+## Touch
+The sections add no press: each piece's presses are its region's, and the hairlines carry none. The regions keep their 44 px catches below 768 px at `density: 'compact'` (INV-10275, MAN-9337 §"Touch").
+
+## The folds while he types
+On a touch screen, the column (`station-column`, MAN-9337) under 36rem tall, and a field focused:
+| fold | class | when |
+|---|---|---|
+| the dock's cap lifts (`max-h-none`) | `…:has-[textarea:focus]` on the dock | her draft's own field focused |
+| her box folds (`hidden`) | `…:group-has-[[data-station-slot=dock]_textarea:focus]/section` on `talk` | her draft's field focused |
+- why: the card, its target and its sends stand whole above the keys (the dock's own hold, 60% of the frame); her conversation takes what is left.
+- A press of one of the dock's buttons, or a mouse window of any height, folds nothing. A phone arrangement drawing these sections must name its column `station-column`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationSections.tsx
+
+## MAN-9336 — src/modules/station — lib/station-compact.mjs: the compact arrangement on the four pictures, at eight sizes, typed in
+
+The compact arrangement drawn on the four fixture pictures at eight sizes, measured, and photographed. Run by `.verify/kaylee-station-shots.mjs` for a size whose `compact` key is set (MAN-9229); the arrangement: MAN-9337; its body: MAN-9335. Every region at compact density, without the arrangement: MAN-9328. Touch law: INV-10275.
+
+## Run
+```bash
+STATION_SHOTS_SIZES=compact-600x900,compact-700x900,compact-600x620,compact-1280x600,compact-479x900,compact-480x900,compact-1080x1920,compact-390x844 node .verify/kaylee-station-shots.mjs
+```
+- Gitignored (`.verify/`). Live client `:5183`. PASS/FAIL per line, exit 1 on any FAIL. Sends no turn, writes nothing.
+- A compact size draws the compact pictures and nothing else. The probe mounts `StationShellView` with `arrangement: 'compact'`, `compact: StationCompactView` over `StationSectionsView`, every region at `density: 'compact'` (specifiers read from `StationShell.tsx` as served). `compactSwitch` is null where `switchOn` is null, else `{ on: switchOn, onChange }` doing nothing. `needsCount` and `focusLabel` are read off the picture's fixtures (`compactPropsOf`).
+
+## Sizes
+| size | window | switch | pictures | extra run |
+|---|---|---|---|---|
+| `compact-600x900` | mouse; compact by width | not drawn | all four | mouse typing |
+| `compact-700x900` | mouse | not drawn | `home` | mouse typing |
+| `compact-600x620` | mouse, short | not drawn | `home` | mouse typing |
+| `compact-1280x600` | mouse, short | on | `home` | mouse typing |
+| `compact-479x900`, `compact-480x900` | the switch's own edge | not drawn | `home` | |
+| `compact-1080x1920` | portrait monitor: laptop by width, compact by his switch | on | all four | |
+| `compact-390x844` | iPhone 13 whole screen, touch | not drawn | `home` | keyboard up |
+- Each picture on its section: `home` Conversation, `waiting` Needs you, `walkthrough` Stage, `empty` Conversation. `home` is drawn once more with the strip's week opened.
+- Every picture a size draws is drawn once more on Where things stand, the one section no picture is about, so his sessions, the roadmap and her memory corner stand in the arrangement on every picture (`-where`); the phone's touch law is measured there too.
+
+## Claims — per picture
+| claim | measured |
+|---|---|
+| head | `[data-station-compact-head]` right under the bar; her face 64 px, whole and uncovered; the talk button in the row; the count says the picture's number; the row does not move when the section scrolls to its end |
+| column | the window's width up to 768 px; from 800 px, 768 px centred with 1 px edges (`1px/1px`), none below |
+| bar | the Compact label's state `on`/`off` where `switchOn` is set, absent where null |
+| switch | the sections offered (Stage only while a focus stands, with its label), the picture's one chosen; from 480 px segments with every label whole (`.vv-segmented__label` not cut) and no buttons, below it the buttons two to a row, `aria-current` on one, none spilling, no segments |
+| body | the picture's section shown, the other three hidden and inert, its regions drawn in it |
+| the whole | every region the picture's fixtures hold is drawn in the arrangement, in the section `StationSectionsView` stands it in, shown or hidden: her head and the strip's line in the head, the talk control twice (its button in her head's row, its box in Conversation), the stage in its section |
+| strip | one line under her head; opened, the week stands over the body from the line's top, the line inert under it, the switch covered whole and inert, and nothing under it moves |
+| touch | below 768 px every press a 44 px catch (`lib/station-touch.mjs`), the switch's, the count's and the bar's Compact label included |
+
+## Typing — the folds
+| run | window | claims |
+|---|---|---|
+| mouse (`compactRun` `typing: 'mouse'`) | the four mouse sizes above | her box, her draft and the dock's Send turn each focused: the talk row, the strip's line and the switch stand; the section, her draft and her box keep their positions |
+| keyboard (`keyboard: true`) | 390×844, touch, `--keyboard-height` 336 px | her draft (`home`, `walkthrough`), keyboard first and field first, then her box (`home`): the frame ends at the keys; the talk row, strip line and switch folded; her face whole above the keys; the field in sight; her draft's card, target and sends above the keys, each a 44 px catch; her conversation keeps ≥ 96 px |
+- Not drawn by any run: the ask stage's "Other" field (a `textarea`, so the fold covers it).
+
+## Shots — `.verify/shots/`
+`station-<picture>-compact-<size>.png`; `station-<picture>-compact-<size>-where.png`; `station-home-compact-<size>-week.png`; `station-home-compact-<size>-typing-<box|draft|button>.png` (mouse); `station-<home|walkthrough>-compact-390x844-keyboard-dock[-rising].png`, `station-home-compact-390x844-keyboard.png`.
+
+## Measured
+- 2026-10-30: all eight sizes with the every-region claim and the `-where` run 759 PASS; two `errors` lines (600×620, 390×844) were the app's own boot reads (`/api/projects`, the sidebar's archived sessions) failing on a box at load 30, and both sizes passed alone, 168 PASS, 0 FAIL.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-compact.mjs
+
+## MAN-9337 — src/modules/station — StationCompactView and StationCompact: the station in one column, her head, the strip's line, one switch, a section (StationCompact.tsx)
+
+`StationCompactView` and `StationCompact` (`StationCompact.tsx`): the station in one column under the bar, the `compact` arrangement of `StationShellView` (MAN-9230). A pure view drawn by the shell's `compact` prop; `StationCompact` binds it, whenever the arrangement is `compact`: below 1024 px, and wherever his switch is on (the rule: MAN-9230). The body it holds: MAN-9335. The section and the stage's pull on it: `useStationSection`, MAN-9344. The bar's Compact switch: MAN-9259. The probe: MAN-9336. Touch law: INV-10275. Breakpoint units: INV-10383. The kit's switch: MAN-8580.
+
+## StationCompactView — props
+| prop | type | meaning |
+|---|---|---|
+| `head` | `ReactNode` | the `head` slot's region at compact density (`StationHead`: face 64 px, controls behind one press, MAN-9314) |
+| `talk` | `ReactNode` | the talk control's button half (`StationTalk` `part: 'button'`, words kept, MAN-9324). The box to type to her is in the Conversation section |
+| `strip` | `ReactNode` | the `strip` slot's region at compact density: always its folded one line (MAN-9332) |
+| `openStrip` | `ReactNode` | the strip's whole week, laid over the strip's line and the switch; null while shut |
+| `sections` | `ReactNode` | the body: `StationSectionsView` at compact density |
+| `section` | `StationCompactSection` | the section the body shows |
+| `onSection` | `(next) => void` | a section chosen: by the switch, or by the count of what needs him (`needs`) |
+| `needsCount` | `number \| null` | how many things need him: the rail's items and her pending action; null until the first read of the items has landed |
+| `focusLabel` | `string \| null` | the label of what stands on the stage; null while it is empty |
+
+## What it draws — top to bottom
+`<div data-station-compact=<section>>` (`COLUMN`): `mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col`, the size container `station-column` (`[container-name:station-column] [container-type:size]`, its height the frame's less the bar). From 800 px (`[@media(min-width:50rem)]`) it keeps 768 px centred with `border-x border-border`; narrower it is the window's width.
+| part | markup | notes |
+|---|---|---|
+| her head row | `[data-station-compact-head]`, grid `HEAD_ROW`; `[data-station-slot=head]`, `[data-station-slot=talk]` (only while `talk` is drawn) and the count | from 640 px one line: head, talk (12–16rem), count. Below 640 px (`max-sm`): head and count on line one, talk across line two. Never scrolls away |
+| the count | `[data-station-compact-needs=<n>]`, outline `sm` `Button`, `Inbox` icon and a `warn` `Badge` of the number (a muted `0` at none; nothing at null, `data-station-compact-needs=unread`); `aria-label` `station.compact.needsPress`, or `station.compact.needsPressUnread` "Open Needs you" at null | presses `onSection('needs')`; `max-md:h-11 max-md:min-w-11` |
+| the strip line | `[data-station-compact-strip=line\|open]` around `[data-station-slot=strip]`; not drawn without a `strip` | `open` while `openStrip` is drawn: the line is then `inert` and `aria-hidden` |
+| the switch | `[data-station-compact-switch]`: `[data-station-compact-sections]` from 480 px, `[data-station-compact-grid]` below it; exactly one stands at every width | below |
+| the week | `[data-station-compact-week]`, `absolute inset-x-0 top-0 z-10 min-h-full bg-background shadow-lift` in the box that holds the line and the switch | covers both whole, both `inert` under it, so no press is half covered; nothing under it moves |
+| the body | `sections` | |
+- Her face is never covered: the stage is a section of the body under her head, never an overlay.
+
+## States
+| state | when | draws |
+|---|---|---|
+| section | `section` = `conversation`, `needs`, `where` or `stage` | `data-station-compact=<section>`; the body shows it, the other three hidden and inert (MAN-9335) |
+| stage offered | `focusLabel` non-null | the fourth section, Stage, with the label; null: three sections |
+| count | `needsCount` n > 0 / 0 / null | `warn` badge of n / a muted `0` / the icon alone (`unread`) |
+| week open | `openStrip` drawn | the week over the strip's line and the switch, both `inert` under it |
+| keys up | touch screen, a body field focused, the column under 36rem tall | the strip's line, the switch and, below 640 px, the talk row fold away (MAN-9343) |
+- Empty state: MAN-9343 §"Empty state". Touch: MAN-9343 §"Touch".
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationSection.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx
+
+## MAN-9343 — src/modules/station — StationCompactView and StationCompact: the station in one — The switch — one set of sections, two drawings
+section: src/modules/station — StationCompactView and StationCompact: the station in one column, her head, the strip's line, one switch, a section (StationCompact.tsx)/001 The switch — one set of sections, two drawings
+
+| width | drawing |
+|---|---|
+| ≥ 480 px | kit `SegmentedControl` (MAN-8580), `label` `station.compact.switchLabel`; the four need about 440 px. `count` on Needs you (> 0 only); `detail` on Stage = `focusLabel`: the one word that gives way |
+| < 480 px | kit `Button`s two to a row, `max-md:h-11`: the shown one `tonal` and `aria-current="true"`, the rest `outline`; the word and a count hold, the Stage label truncates |
+- Offered: Conversation, Needs you, Where things stand; Stage only while `focusLabel !== null`.
+- One breakpoint for both, an arbitrary `@media(min-width:480px)` (INV-10383).
+
+## The folds while he types
+| class | folds | when |
+|---|---|---|
+| `FOLDS_FOR_THE_KEYS` | the box holding the strip line and the switch | all three: a touch screen (`@media(pointer:coarse)`); the column under 36rem tall (`@container station-column (max-height:36rem)`); a `textarea` in `[data-station-sections]` focused (`group-has-[…]/compact`) |
+| `TALK_FOLDS_FOR_THE_KEYS` | the talk slot | the same, below 640 px only (`max-sm`): on one row with her head it would leave a hole |
+- why: the keys take the room; his field and her last lines stand above them, her face and state stay.
+- Measured: the column is 447 px at 390×844 with a 336 px keyboard, 783 px without.
+- A mouse folds nothing at any window size (a tiled window, a laptop's 600 px). Nothing folds before the keys rise.
+- Known edge: a touch laptop in a very short window typing on a hardware keyboard folds; `pointer: coarse` cannot tell whether on-screen keys show.
+- Known edge (INV-10415): a phone on its side, 844×390 touch with no keys up, has a 117 px body: the dock (46) and the box (71) take it and the Conversation section's log is 0 px tall.
+- The dock's cap lift and her box's fold in the sections read the same container: MAN-9335. A phone arrangement drawing the sections must name its column `station-column`.
+
+## Touch
+Below 768 px every press is a 44 px catch: the switch's segments (the kit's rule, MAN-8580), the section buttons, the count, the regions' own. The count's words are its name; nothing is said only on hover.
+
+## Words — `station.compact.*`
+| key | english |
+|---|---|
+| `switch` | Compact (the bar's, MAN-9259) |
+| `switchLabel` | Section |
+| `section.<conversation\|needs\|where\|stage>` | Conversation · Needs you · Where things stand · Stage |
+| `needsPress_zero` / `_one` / `_other` | Nothing needs you: open Needs you · 1 needs you: open Needs you · {{count}} need you: open Needs you |
+| `needsPressUnread` | Open Needs you (the count's name before the first read has landed) |
+
+## Empty state
+- No `strip`: no strip box. No `talk`: no talk slot. `focusLabel` null: three sections, no Stage.
+- `needsCount` 0: the count shows a muted `0`; Needs you carries no count.
+- `needsCount` null (the first read of what needs him is in flight, or failed): the count draws the icon alone and its name is "Open Needs you", never "Nothing needs you"; the rail says in its own words why it has no items. A `0` is a read's answer.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationSection.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx
+
+## MAN-9344 — src/modules/station — StationCompact and useStationSection: the live binding, the section and the stage's pull (StationCompact.tsx, hooks/useStationSection.ts)
+section: src/modules/station — StationCompactView and StationCompact: the station in one column, her head, the strip's line, one switch, a section (StationCompact.tsx)/002 StationCompact — the live binding
+
+`StationCompact({ slots, stage, tier })`, drawn by `StationShell` while the arrangement is `compact`.
+| prop of the view | from |
+|---|---|
+| `head` | `slots.head`, the head region drawn at compact density |
+| `strip` | `slots.strip` (the region's own element, cloned with the arrangement's `week` `{ open, onOpen }`, the input of `SinceYouLastLooked`, MAN-9287); not drawn without a `strip` slot |
+| `talk` | `<StationTalk tier density="compact" part="button" />` |
+| `sections` | `<StationSectionsView section slots={{ ...slots, stage }} density="compact" />` |
+| `section`, `onSection` | `useStationSection()`, below |
+| `needsCount` | `useStationNeeds().needs.length` plus one while her picture holds a pending action (`useCompanion().picture.pending`); null while `needs` is null |
+| `sections`' `scrollRefs` | `{ corner: scrollMemory('corner') }` at the narrow tier, else none: the memory corner opened at the narrow tier draws no scroller of its own, so the section's held one is the place `corner` remembers (MAN-9335) |
+| `focusLabel` | `useStation().focus.label`; null while the stage is empty |
+| `openStrip` | while `weekOpen`: the strip region cloned at `density: 'full'` with `week: { open: true }`, its timeline; null while shut |
+- The week. `weekOpen` is state of `StationCompact`, never stored (a reload starts with the line). The line's fold opens it (`week.onOpen(true)`); the week's own fold, or a landing put on the stage, shuts it. At compact density the strip draws its folded line whatever `collapsed` says, and `week` replaces the columns' pref `stripCollapsed` as the fold; compact never writes that pref.
+- The focus follows the press. The line goes `inert` under the week, so a layout effect on `weekOpen` hands the focus to the week's fold on open and back to the line's fold on shut, each found by `[data-strip-fold]` inside a `contents` box the binding holds a ref to. It acts only when the browser dropped the focus to the page (or it was still on the line): a focus he put elsewhere is his.
+
+## `useStationSection()` — the section and the stage's pull
+`hooks/useStationSection.ts`: `[section, setSection]`, the one home of the rule, read by this arrangement and by the phone's. The section is the station pref `compactSection` (`useStationPref('compactSection', 'conversation')`, per device; a stored value outside the four words is dropped on read, MAN-9248).
+- A change of `useStation().focus` to a different thing (a different `focusKey`) selects `stage`, whoever put it there: his press on a row or a need, her card, her open, a landing in the strip, Back.
+- The section he was in when the stage pulled him is held aside in the station pref `compactSectionAside` (a pref, not a ref, so it outlives a remount: the window dragged across 1024 px and back, his switch flipped, a reload); clearing the stage (✕) returns him to it while he is still on `stage`, else leaves him where he is, and drops it either way. With none held (a device that never pulled) clearing falls back to `conversation`. Pulled again while on `stage`, the held section stays.
+- Back is a change to a different thing too, so it keeps `stage`.
+- A press on the thing that already stands on the stage selects `stage` too. The context drops a same-key `setFocus` (the focus does not change), so it counts it (`useStation().restaged`, MAN-9249) and the hook answers each count made after the one the column opened on. why: the row is drawn as what is on the stage, and with the stage out of view a dead press was the one gesture that should have shown it. Her walk moving while it stands is not a press: `useCardsTakeStage` (MAN-9250) does not restage it.
+- It reads the focus's CHANGE and the presses made after the hook mounted: a focus already standing as the column opens (a reload, a window that grew narrow) pulls nothing. A stored `stage` with no focus is released the same way, so the switch never rests on a section it does not offer.
+- The keyboard goes with the pull. The section he pulled from is hidden and `inert`, and a focus left in it falls to `<body>`. A second layout effect, once `stage` is the section drawn, finds the focus inside an `inert` ancestor and moves it to the stage's heading (`[data-station-stage-label]`, the `h2` of `StationStageView`: `tabIndex={-1}`, a programmatic focus and no Tab stop). A control the rail's press then lands the keyboard on (`useLandOnStageControl`, MAN-9303) takes it from the heading; a focus that stood outside the sections (her head, the strip) or already on `<body>` is not moved.
+- Layout effects on the focus's key, the press count, the section and the held section: the pull lands before the paint of the render that brought the focus. No timer, no poll.
+- Every section stays drawn (MAN-9335), so a switch loses no place; each region keeps its scroll under its own key in the station's scroll memory (`conversation`, `needs`, `sessions`, `roadmap`, `corner`, `stage`, MAN-9248).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationSection.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx
+
+## MAN-9340 — Probing the compact arrangement live — kaylee-station-compact-live.mjs: the window resized, his switch, the section and the stage's pull on /station
+
+`/station` in the compact arrangement on the live client: the window resized, his switch, the section and the stage's pull on it. The arrangement: MAN-9230, MAN-9337; the section hook: MAN-9344; the sections MAN-9335, the bar's switch MAN-9259, the memory MAN-9248. The fixtures' probe of the same arrangement: MAN-9336. The live page and its typed turn: MAN-9252.
+
+```bash
+node .verify/kaylee-station-compact-live.mjs             # the whole run, with its one typed Haiku turn
+node .verify/kaylee-station-compact-live.mjs --no-turn   # everything but the turn: no model call
+```
+- Gitignored (`.verify/`). Signed in as account 1 (`verve`) on `:5183` against `:3011`, dark. Her voice switch is `off` on every page (`companion-voice`), so nothing is synthesized and no Gemini is spent. The page's own HMR socket is blocked (`hotUpdates: false`): a save elsewhere in `src/` must not reload the page from under it. Exit 1 on any FAIL; ends `ALL PASS` or `FAILED: …`.
+- ONE typed Haiku turn, "put a note on my screen that says hi", typed in her box in the page (never sent from a script). Her model is set to `haiku` first and put back to what it was after (AGENTS.md's probe rule). Her floor is one window's and her log the account's own, which other sessions' probes write to while this one runs: before typing, the probe waits for her to be idle and fires the window's `focus` event, which takes her floor back as it does for a person (a floor another page held made a turn typed here vanish, never reaching her log). The turn puts one "Hi" note on her panel, the account's own. The probe records her cards' ids before it types, checks that the card on the stage is the note her turn made (its id, its text "hi" as a word of its own, drawn on the stage), and when the run ends, pass or fail, dismisses what the run made as a person does (`DELETE /api/companion/notes/<id>`, one check line per note).
+- Shots: `.verify/shots/station-live-compact-*.png`.
+- A request in flight when the probe navigates or reloads is aborted and the page logs `TypeError: Failed to fetch`: those lines are dropped once the page has settled (`forgetAborted`); any other error fails the run, and a failure names the 5xx answers the page saw by path.
+
+## What it checks
+1. 1440×900: the four columns, the bar's Compact switch drawn and off; a press on a chat puts it on the stage; the conversation scrolled up from its newest line. Resized to 900 wide: compact (one column, no switch drawn), Stage offered with the chat's label. Back to 1440: the four columns, the same focus on the stage, the conversation at the same `scrollTop`.
+2. His switch flipped on at 1440×900: compact, the column 768 px centred with its 1 px edges; a reload keeps it on; flipped off: the four columns, the focus where it was.
+3. 600×900: compact with no switch drawn. Needs you scrolled, a visit to Where things stand, back: the same `scrollTop`. A press on a session row pulls the switch to Stage; back to Conversation. The turn: her note takes the stage, the switch moves to Stage by itself, the stage stands under her face; Back returns the chat and keeps Stage; a reload keeps the section and the focus. A need pressed in Needs you pulls to Stage and ✕ returns to Needs you, Stage no longer offered. The strip's week: the line's fold opens it over the body, the line and the switch inert under it and whole, the body not moving, the focus on the week's fold; the week's fold shuts it and the focus is back on the line's; a landing pressed in the week goes on the stage, shuts the week and pulls to Stage, the focus not on the page.
+4. 390×844 with touch (a second context carrying the account's storage): compact inside the shell's frame (the shell at `0,0` the screen's size, her head under the bar), the page not scrolling as a document, no switch drawn; the touch law measured as the fixtures' probe measures it (`lib/station-touch.mjs`, run on the page's `#root`) on Conversation, Needs you and Where things stand: every press a 44 px catch. The count of what needs him opens Needs you.
+5. Neither page logs an error.
+
+## Measured
+- The last full run read 63 PASS and `ALL PASS`; the conversation's place is compared as the LINE standing at the top of its view, because a log other sessions write to moves pixels the line does not.
+- The conversation's place round trip (12,000+ px at 1440 against a shorter column at 900) held only after `followScroll` stopped reading the log's own pin to its newest line as the reader's scroll (MAN-9248): before, the place the wide column came back for was deleted by compact's mount.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-compact-live.mjs
+
+## MAN-9341 — Probing Kaylee — the name press: .verify/kaylee-wake-door.sh, its steps and what each asserts
+
+`.verify/kaylee-wake-door.sh` (`.verify/` is gitignored: on disk only): a press her NAME opened — `POST /api/companion/press` with `opened=name` (MAN-9190) — on the stager's scratch server over a copy of the auth database. 3 Gemini calls (one per accepted press); the refused presses cost none. Her model is set to `haiku` first.
+
+## Run it
+`SUNSET_SLOT=5 KAYLEE_EYES_PLANS="" bash .verify/kaylee-eyes-scratch.sh bash .verify/kaylee-wake-door.sh`
+- The stager (MAN-9178) boots the scratch server and hands the script `PROBE_API`, `PROBE_TOKEN`, `DATABASE_PATH`; the script exits 1 without them.
+- Exit 0 = `ALL OK`. Exit 1 = a `FAIL` line, or `stop()`.
+- Clips: `.verify/fixtures/kaylee-wake-what-chats.wav` ("Hey Kaylee, what chats are working?"), `.verify/fixtures/kaylee-wake-name.wav` ("Kaylee.").
+
+## Refusals before any press
+| when | does | why |
+|---|---|---|
+| `PROBE_API` is on port 3011 | exit 1 | step 1 clears Kaylee |
+| the clear answers other than HTTP 204 | `stop()`: exit 1 | the copy names the LIVE Kaylee's session and the scratch server shares her working directory: an uncleared session would resume the operator's own conversation and write this driver's lines into it |
+| `companion_state.provider_session_id` of user 1 in the copy is not empty after the clear | `stop()` | same |
+| the settings answer is not `Kaylee haiku` | `stop()` | her turns would run on the copy's stored model |
+- The two session guards hold while `clearAccount` (`server/modules/database/repositories/companion.db.ts`) resets `provider_session_id`.
+
+## Steps
+| step | press | asserts |
+|---|---|---|
+| 1 | none | `POST /api/companion/clear` → 204; `PUT /api/companion/settings` `{"name":"Kaylee","model":"haiku"}` |
+| 2 | what-chats clip, `opened=name` | 202; text `What chats are working?`, or by structure when Gemini heard it differently (capital start, no greeting, no `kaylee`; the difference is printed); her log gains the line and her answer |
+| 3 | name clip, `opened=name` | 202; text `Kaylee` or `Kaylee.` (Gemini has dropped the full stop in every run); right after the press `companion_state.unanswered_json` holds `"heard":"name"`; her log keeps the line as heard |
+| 3b | what-chats clip, no `opened` | 202; the text keeps greeting and name |
+| 4 | none | her transcript (`~/.claude/projects/*/<provider_session_id>.jsonl`) holds the step-2 words as `<operator via="spoken">…</operator>` and exactly one `<operator via="spoken" heard="name"></operator>`; the reply after it is one line and does not match `UNHEARD` |
+| 5 | name clip, `opened=other`, scratch | 400 with `"field":"opened"`; her log length unchanged |
+| 6 | name clip, `opened=other`, live :3011 as the dev account (`loginToken` of `.verify/lib/whole-check-kit.mjs`) | 400 naming `opened`; the log length, floor and turn as they were |
+- `UNHEARD` matches "didn't/did not/couldn't/could not catch/hear", "missed that/what", "say/repeat it/that again", "repeat that", "once more", "no words". Narrow on purpose: "nothing" is not in it, her real answer to a call has been "Nothing's running right now".
+
+## Step 6 — `live_runs_the_door`
+- Posts to :3011 only when its listener (`ss -ltnp`; age by `ps -o etimes`) started after the newest mtime of `companion.routes.ts` and `companion-press.ts`; else `FAIL live: …` and nothing posted. why: an older process runs the route before `opened`, where the same post is a real button press (a Gemini call, a log line, the floor).
+- No listener, or an unreadable age: the same refusal. A touched but unchanged file refuses until the next handover (fails safe).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/fixtures/kaylee-wake-name.wav, /home/lyphe/.claude/claudecodeui_lyphe/.verify/fixtures/kaylee-wake-what-chats.wav, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-wake-door.sh
+
+## MAN-9342 — src/modules/companion — her ears' switch: CompanionEarsSwitch, "Listen for her name on this device", its states in words, where CompanionControls draws it and the probe
+
+"Listen for her name on this device": the switch row of her ears and the words of what they are doing. The provider's side is not in this row. Views and controls: MAN-9062; the page: MAN-9083; the voice row it follows: MAN-9113; touch law: INV-10275.
+- Types (`src/shared/types.ts`, beside `CompanionVoice`): `CompanionEars` = `{ on: boolean; setOn: (on: boolean) => void; state: CompanionEarsState; reason: string | null }`; `CompanionEarsState` = `off` | `needs-touch` | `elsewhere` | `readying` | `waiting` | `hearing` | `unavailable`. `reason` is the sentence for `unavailable`, null otherwise.
+- 2026-10-30: no live caller passes `ears`. `CompanionPanel.tsx` and `StationHead.tsx` each carry two `FILL(page): ears` markers, where the provider's `ears` is read and where it is passed. The live panel and station draw no ears row.
+
+## `CompanionEarsSwitch` — props `ears`, `name`
+| prop | type | meaning |
+|---|---|---|
+| `ears` | `CompanionEars` | the page's ears |
+| `name` | `string` | her name as he set it, `companion.defaultName` while the picture loads; `waiting` reads it |
+- Private to the module: not in the barrel. Read by `CompanionControls` only.
+
+## States in words — `companion.ears.*` in `en/common.json`
+| state | words |
+|---|---|
+| `off` | none: the row is the label and the switch |
+| `waiting` | `waiting` "Listening for {{name}}" |
+| `readying` | `readying` "Getting her ears ready" |
+| `needs-touch` | `needsTouch` "Touch the page to let her listen" |
+| `elsewhere` | `elsewhere` "She listens on the page you last talked to her from" |
+| `hearing` | `hearing` "Listening" |
+| `unavailable` | `ears.reason`; else `unavailable` "She can't listen on this page" |
+- The label is `companion.ears.label`. Every `t()` carries its `defaultValue`.
+- The words show only while `ears.on`. They are a `Record<CompanionEarsState, string | null>`: a state added to the type without words fails to compile.
+- `hearing` is her name having opened a recording; the status line then says Listening, then Transcribing, as for his button.
+
+## Drawing
+- `<label data-companion-ears=<state | off>>`: the whole row is the label and the kit `Switch` (`label` = the label's words) closes it. `max-md:min-h-11` and `[@media(pointer:coarse)]:min-h-11`, each with `py-1.5` so words of three lines stand 12 px from the row's edges.
+- Glyph `Ear` while on, `EarOff` while off, 14 px, `aria-hidden`: the position is never the switch's colour alone.
+- Words: `[data-companion-ears-state]`, `text-xs text-muted-foreground`, under the label. `w-0 min-w-full`: as wide as the label and no wider, so the switch stands where the label puts it whatever they say. The words span is `min-w-0 break-words`: a forty-letter name breaks rather than run under the switch.
+- A 14 px column (`w-3.5`, the ear's width) leads the words so they stand under the label's. A future state-line glyph goes in that column.
+- `unavailable`: `data-tone="warn"` with `text-tone-ink` (the companion's warn texts all spell it so; measured identical to `text-warn-ink`), `role="alert"`, ▲ (`aria-hidden`) in the leading column. The node is keyed `alert` against `state`, so it is inserted fresh and announced.
+- The other states announce nothing: the status line already announces Listening and Transcribing (MAN-9089).
+- A press on the words does nothing (`keepFromSwitch`: `preventDefault` on the click, which stops the label handing it to the switch). why: "Touch the page to let her listen" asks for a touch that must not turn the ears off; the touch's `pointerdown` still reaches the page.
+
+## Where `CompanionControls` draws it — `ears?: CompanionEars`
+| layout | place |
+|---|---|
+| `rows` (the panel's) | `[data-companion-ears-row]`: a row of its own under the voice row, `border-t`, its switch closing the row. `py-1.5`; `max-md:py-0` and the same under a coarse pointer; `py-1.5` back while `[data-companion-ears-state]` stands |
+| `line` (the station's) | the voice switch stands alone; the ears' switch and Clear are the one wrapping unit (`lastSwitch`): "Stop · model · Live" / "Voice on this device" / "Listen for her name on this device · Clear" |
+- Absent `ears`: the DOM is what it was; Clear still wraps with the voice switch.
+- `CompanionHeader` (row five) and `CompanionPanelView` take `ears?` and hand it on.
+
+## Proof — `.verify/kaylee-ears-scaffold.mjs [--evidence <dir>] [--only fixtures|live]`
+- On :5183, evidence in `.verify/shots/kaylee-ears-scaffold/`. Parts: `lib/ears-kit.mjs` (mounts the components through `lib/mountReact.mjs`), `lib/ears-fixtures.mjs` (walks them), `lib/ears-read.mjs` (reads them), `lib/ears-live.mjs`.
+- Fixtures at 1440×900 and 390×844, light and dark: the panel's `rows`; the station's `line` in its columns (1440 only: below 1024 px the station is compact); the compact head's "Her controls" panel. Off, and on in each of six states (`unavailable` twice: the secure-context sentence, "Microphone access denied.").
+- Checks: the label and switch named; the ear open or struck; no words off; no word cut and nothing outside the panel or her column; 44 px under a finger on the phone; the switch centred on the words; presses on the switch and the label hand the other position and the words hand nothing; without `ears` nothing of hers.
+- Live half: her panel from her door, and /station, as the wired client draws them: nothing of her ears, the voice row where it was.
+- `holdWrites` (`lib/ears-live.mjs`) guards his account (the probe signs in as account 1): preference writes answered `{ success: true }`, takes of her floor (`POST /api/companion/floor`) answered with the server's own empty 204, neither sent; any other write is listed in `sent` and fails the run.
+- why `holdWrites`: /station stamps `stationSeenAt` as its page hides (MAN-9285), and opening her panel, mounting the station and each focus of its window take her floor. A probe that lets them through moves his "since you last looked" and may leave her voice on a closed page. Both happened on 2026-10-30 before the guard.
+- `kaylee-station-live.mjs` lets the floor take and the `stationSeenAt` write through by design (its check "nothing was written by drawing it" lists them); `kaylee-station-center-live.mjs` has no guard. Each run of either moves his last look.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionEarsSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ears-fixtures.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ears-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ears-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ears-read.mjs
+
+## MAN-9351 — src/modules/companion/utils — her ears' engine: createEarsEngine (arm, attach, detach, tell, end), the worker protocol and the capture worklet
+
+The page's side of her ears, without React: one worker, one capture. The decisions are the machine's (MAN-9352); the worker's models and the sound (MAN-9353); what a caller must do (INV-10433). No caller exists yet: `useEars` (the page phase of `kaylee--wake-word`) is the one caller. The switch's words: MAN-9342.
+
+## `createEarsEngine(input): EarsEngine` — `earsEngine.ts`
+| input | type | meaning |
+|---|---|---|
+| `context` | `AudioContext` | the page's; the worklet module is added to it once (`workletAdded`) |
+| `name` | `string` | her name as set; each `arm` builds the machine for it |
+| `filesBase` | `string` | the ears' files route, e.g. `${location.origin}/api/companion/ears/files/` |
+| `token` | `string \| null` | the sign-in token the files route is asked with |
+| `onMessage` | `(EarsFromWorker) => void` | hears every worker message, `ready` and `failed` included, except the `ready` of an abandoned arm |
+
+## `EarsEngine`
+| verb | does |
+|---|---|
+| `arm(): Promise<void>` | first call makes the worker (`new Worker(new URL('./earsWorker.ts', import.meta.url), { type: 'module' })`), loads the models, opens a fresh frames channel; resolves on `ready`. A call while one is out returns the same promise. |
+| `attach(stream)` | needs an armed channel (else throws "Her ears are not armed…"); adds the worklet module, builds `AudioWorkletNode('kaylee-ears')`, hands it the frames port, connects `createMediaStreamSource(stream)` to it; resumes a suspended context without waiting |
+| `detach()` | takes the capture apart, closes the unattached port, rejects a waiting `arm` ("Her ears were disarmed before they were ready."), tells the worker `disarm` (an open press closes `gone`, its clip still posted). The stream is the caller's to stop. |
+| `tell(message)` | `her-voice` / `button` / `finish`, passed on as they are; the last `her-voice` and `button` state is kept and re-sent after each `arm` message (a worker drops what it is told while not armed) |
+| `end()` | takes the capture apart, rejects a waiting `arm` ("Her ears were ended before they were ready."), terminates the worker. An open press is dropped: no `closed`. |
+- Node options of the capture: `numberOfInputs: 1`, `numberOfOutputs: 0`, `channelCount: 1`, `channelCountMode: 'explicit'`. why: nothing of the microphone is ever played; Chromium pulls a node with no outputs (frames flowed, 2026-10-30).
+- `attach` that was undone by a `detach` or `end` while the worklet module loaded connects nothing (`undone` counter).
+- `unanswered` counts `arm` messages the worker has not answered with `ready`; it answers in order, so only the answer that brings it to 0 resolves the waiting caller. An abandoned arm's `ready` is swallowed (not passed to `onMessage`).
+- `discardWorker(sentence)` (why: INV-10432): terminate, drop, `unanswered = 0`, reject the waiting arm. Runs at every `failed` and at `worker.onerror` (a script or import that did not load; the page hears `failed` "Her ears could not start (<message>)."). A message from a discarded worker is ignored.
+- The worklet is imported as `earsCapture.worklet.ts?worker&url` (Vite bundles its imports into one self-contained file); the one `eslint-disable-next-line import/default` beside it is why.
+
+## `earsProtocol.ts` — the messages
+| to the worker (`EarsToWorker`) | fields |
+|---|---|
+| `arm` | `name`, `filesBase`, `token`, `frames: MessagePort` (transferred; 16 kHz `Int16Array` frames of 512 samples) |
+| `her-voice` | `sounding: boolean` |
+| `button` | `recording: boolean` |
+| `finish` | his button ends the press |
+| `disarm` | closes an open press, drops the session |
+
+| from the worker (`EarsFromWorker`) | fields |
+|---|---|
+| `ready` | models loaded, frames are being read |
+| `opened` | her name opened a press |
+| `closed` | `cause: EarsCloseCause`, `wav: ArrayBuffer` (transferred; 16 kHz mono 16-bit), `durationMs` |
+| `failed` | `sentence` |
+- `arm` carries no WebAssembly path: the worker takes the runtime from the app's own Vite asset URLs.
+- A first `arm` loads the models; a later one after `disarm` connects the new `frames` and answers `ready` at once (0 ms, 2026-10-30).
+- A `failed` ends the worker; a press open at that moment gets no `closed`. The engine starts a fresh worker at the next `arm`.
+
+## `earsCapture.worklet.ts` — processor `kaylee-ears`
+- `AudioWorkletProcessor` on the audio thread: reads channel 0 of input 0 at the context's `sampleRate`, runs `createFrameMaker(sampleRate)` (MAN-9353), posts each frame, transferred, to the port the page handed it.
+- Frames made before the port arrives are dropped. `process` returns `true`.
+- The globals `sampleRate`, `AudioWorkletProcessor`, `registerProcessor` are `declare`d: the app's DOM lib lacks them.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts
+
+## MAN-9352 — src/modules/companion/utils — her ears' machine: createEarsMachine, every number of EARS, the waiting, open and closed rules
+
+`earsMachine.ts`: the decisions of her ears, PURE. Frames and Silero's probabilities and Moonshine's words go in; actions come out. Time is the audio's own frame count: no timer, so a recorded stream replays to the same actions (`.verify/ears-replay.mjs`). Nothing is imported through `@/`. The one import is `../../../../shared/wake-words` (`endsWithClose`, `endsWithHold`, `opensWithName`), relative with an `oxlint-disable-next-line no-restricted-imports`: `shared/` is outside `src/` and plain Node follows only the relative path.
+
+## `createEarsMachine(name): { step(input): EarsAction[]; frame(): number }`
+- `frame()` = frames stepped so far. Frames number from 0; a range `[from, to)`.
+- After `disarm` the machine is done: every later input answers `[]`. The worker builds a fresh machine at each `arm`.
+
+| input (`EarsInput`) | meaning |
+|---|---|
+| `frame` `p` | one frame with Silero's probability |
+| `heard` `check`, `text` | Moonshine's words for a check asked earlier |
+| `her-voice` `sounding` | her player started or stopped |
+| `button` `recording` | his talk button's press is recording or not |
+| `finish` | his button ends an open press → `closed` `press` |
+| `disarm` | an open press → `closed` `gone`; then done |
+
+| action (`EarsAction`) | meaning |
+|---|---|
+| `check` `check`, `purpose: 'name' \| 'tail'`, `from`, `to` | words wanted for frames `[from, to)` |
+| `opened` `from` | a press opened; its sound starts at `from` |
+| `closed` `cause`, `from`, `to` | the press closed with its clip `[from, to)` |
+
+## `EARS` — every number (ms unless the name says frames)
+`framesOf(ms) = ceil(ms / 32)`: a rule of "at least this long" never fires early.
+| name | value | frames | meaning |
+|---|---|---|---|
+| `frameMs` | 32 | | one frame (512 samples at 16 kHz) |
+| `startP` | 0.5 | | speech starts at a frame with probability ≥ this |
+| `keepP` | 0.35 | | speech goes on while ≥ this |
+| `endFrames` | 20 | 20 | a segment ends this many frames after its last speech frame (640 ms) |
+| `preRollMs` | 320 | 10 | a check and a press start this long before the segment |
+| `firstCheckMs` | 1600 | 50 | first name check at the earlier of the segment's end or this after its start |
+| `secondCheckMs` | 3200 | 100 | second check (after an `unsure`) at the earlier of the end or this |
+| `tailCheckMs` | 3000 | 94 | a tail check reads the last this-long of a segment |
+| `quietMs` | 3500 | 110 | no speech this long closes an open press (`quiet`) |
+| `holdMaxMs` | 60 000 | 1875 | a hold phrase suspends the quiet rule for at most this long after its segment's end |
+| `pressMaxMs` | 300 000 | 9375 | an open press closes `limit` this long after its start |
+| `herTailMs` | 600 | 19 | a segment that begins within this long after her voice stops is not his to her |
+| `keepAfterSpeechMs` | 300 | 10 | a clip runs this long past the last speech frame |
+| `ringSeconds` | 5 | | the worker's sound ring (the last 5 s, overwritten) |
+
+## WAITING
+1. A segment is `checkable` only if it began while waiting, after the last press closed (`waitingSince`), while her voice is silent and outside `herTailMs`, and while no button press records. Any other is never checked.
+2. A checkable segment is asked ONCE for its name: words for frames from `preRollMs` before it, at the earlier of its end or `firstCheckMs` after its start.
+3. `opensWithName(text, name)`: `yes` → open (`opened` at `preRollMs` before the segment). `unsure` → ask again at the earlier of its end or `secondCheckMs`; a segment already ended gets nothing more. `no` → nothing.
+4. A name check asked while a button press records is not asked: the segment is given up. A `yes` that arrives while a button press records opens nothing.
+5. A segment that had already ended when its `yes` came (a short "Kaylee, hold on") asks a `tail` check at once, so its hold phrase is read (one extra Moonshine run, ~100–190 ms).
+
+## OPEN
+1. Each segment end asks a `tail` check of its last `tailCheckMs`, never reaching back before the press.
+2. `endsWithClose(text, name)` → `closed` `phrase` at that segment's end, whether or not newer speech has begun: the rule has no condition.
+3. `endsWithHold(text)` → the quiet rule is suspended until the next speech starts, at most `holdMaxMs` after that end. Only if that segment is still the newest: a hold set after newer speech began would outlive it and close the press `quiet` over his voice.
+4. Otherwise `quietMs` with no speech closes it (`quiet`), once no tail check of the newest segment is out.
+5. `pressMaxMs` after its start → `limit`. `finish` → `press`. `disarm` → `gone`.
+
+## CLOSED
+- The clip is the press's frames up to `keepAfterSpeechMs` after the last speech frame, never past the closing frame; a `phrase` close runs to the segment's end (up to `endFrames` = 640 ms of trailing silence).
+- Segments that began before the close are never checked.
+- `EarsCloseCause` = `quiet` | `phrase` | `limit` | `press` | `gone`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts
+
+## MAN-9353 — src/modules/companion/utils — her ears' worker and sound: earsWorker.ts (the queue, the models, the files route) and earsAudio.ts (createFrameMaker, createSoundRing, encodeWav)
+
+## `earsWorker.ts` — where the page decides whether a sentence opens with her name
+Nothing leaves the browser before it does. For each 16 kHz frame the worker keeps the last `EARS.ringSeconds` (5 s) in memory, asks Silero VAD for the frame's speech probability, and steps the machine (MAN-9352). The machine asks for words; Moonshine base writes them. Made by the engine (MAN-9351) with `new Worker(…, { type: 'module' })`.
+
+### The queue
+- ONE inference at a time: one onnxruntime WebAssembly instance serves both models, so every frame, check and page message goes through ONE queue, in arrival order.
+- A check's audio is copied out of the ring (or the open press) when the check is asked, and transcribed in its turn.
+- `enqueue(job, always)`: a throw becomes ONE `failed` ("Her ears stopped: <message>."), sets `broken`; every later job is skipped until the next `arm`. `arm` and `disarm` are `always` jobs.
+- `disarm` is a job like any other: it waits for an `arm` still loading and then undoes it; a frame after it finds no session.
+- `tell` (`her-voice`, `button`, `finish`) is a job; with no session it does nothing.
+
+### Messages handled
+| in | does |
+|---|---|
+| `arm` | `broken = false`; keeps `token`; `models ??= loadModels(filesBase)`; a rejected load throws "the models could not be loaded (<cause>)" (the worker is then finished: INV-10432); closes the previous session's port; builds the session (machine for `name`, ring, zero Silero state `[2,1,128]`, the new `frames`); posts `ready` |
+| `disarm` | `machine.step(disarm)` (an open press posts `closed` `gone` with its clip), closes `frames`, drops the session |
+| `her-voice`, `button`, `finish` | `machine.step` in the queue |
+| port `frames` message | ring push, press push, Silero, `machine.step({kind:'frame'})` |
+
+### Models
+| model | repo | options |
+|---|---|---|
+| Silero VAD | `onnx-community/silero-vad` | `AutoModel.from_pretrained`, `config: { model_type: 'custom' }`, `dtype: 'fp32'`, `device: 'wasm'`; inputs `input` `[1,512]` float32, `sr` int64 16000, `state` |
+| Moonshine base | `onnx-community/moonshine-base-ONNX` | `pipeline('automatic-speech-recognition')`, `dtype: 'q8'`, `device: 'wasm'`, `max_new_tokens: 48` |
+- Loaded once by the first `arm` and kept across `disarm`s. Both repos are pinned in `EARS_FILES` (`server/modules/companion/ears/ears-files.ts`).
+- `env` set in `loadModels`: `allowLocalModels = true`, `allowRemoteModels = false`, `localModelPath = <filesBase pathname>`, `useBrowserCache = false` (the route's immutable header and the HTTP cache keep the one copy), `backends.onnx.wasm.wasmPaths = { mjs, wasm }` from `onnxruntime-web/ort-wasm-simd-threaded.asyncify.{mjs,wasm}?url` (the app's own build), `numThreads = 1`.
+- `filesBase` on another origin than `self.location` → throws "the files route <href> is not on the page's own origin".
+- `env.fetch` adds `Authorization: Bearer <token>` only to URLs under `filesBase`, never to a request for the runtime.
+- Transformers.js defaults overridden: `allowLocalModels` is false inside a worker; `wasmPaths` points at jsDelivr.
+- The clip: `closed` posts `encodeWav` of the press's frames `[from, to)`, transferred; `durationMs = round(samples / 16)`.
+
+## `earsAudio.ts` — pure (no `@/` import, no browser API): the worklet, the worker and the Node replay run this very code
+| export | does |
+|---|---|
+| `EARS_FRAME_SAMPLES` | 512 (32 ms at 16 kHz, Silero's frame) |
+| `createFrameMaker(rate)` | `push(Float32Array)` of any length (a render quantum is 128) → the complete `Int16Array` frames of 512, oldest first; a part-frame waits for the next push. `RangeError` on a rate that is not a positive finite number. |
+| `createSoundRing(seconds)` | `push(frame)` (512 samples, else `RangeError`), `since(frame)` copies what the ring still holds from that frame (the oldest held when overwritten: the answer is shorter), `frame()` = frames pushed |
+| `encodeWav(Int16Array)` | 16 kHz mono 16-bit PCM in a 44-byte RIFF header (little-endian platforms only) |
+- `createFrameMaker` at 16 000 Hz passes samples straight through. Any other rate: windowed-sinc low-pass (`FILTER_LOBES` 8, `KERNEL_STEPS` 256, `CUTOFF_SHARE` 0.9 of the output Nyquist = 7.2 kHz; Blackman window; normalised to unit gain at every phase), read at its 16 kHz positions: 24, 44.1 and 48 kHz take one path.
+- 2026-10-30, synthetic tones at 24, 44.1 and 48 kHz: 1 and 4 kHz gain 1.0; 7 kHz 0.59; 10 kHz removed.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts
+
+## MAN-9354 — her ears — dependencies and the build: @huggingface/transformers, onnxruntime-web, optimizeDeps, the build-only showing config
+
+## Dependencies (`package.json`, both exact; `dependencies`)
+| package | version | used by |
+|---|---|---|
+| `@huggingface/transformers` | `4.3.2` | `earsWorker.ts` (pipeline, `AutoModel`, `env`, `Tensor`); `.verify/ears-replay.mjs` (its Node build) |
+| `onnxruntime-web` | `1.31.0-dev.20260914-8d85527a0` | `earsWorker.ts` imports its two asyncify files as `onnxruntime-web/ort-wasm-simd-threaded.asyncify.{mjs,wasm}?url`; the pin is the one transformers carries |
+- transformers' web build imports `onnxruntime-web/webgpu`; its WebAssembly defaults to jsDelivr unless `wasmPaths` is set (the worker sets it). Its Node build brings `onnxruntime-node` and `sharp ^0.35`, which the replay uses.
+- A version change of either is a re-run of the replay and the browser showing (MAN-9355). `onnxruntime-web` stays at the pin transformers carries.
+- 2026-10-30: `npm install` left 4 extraneous packages in `node_modules`: the lockfile re-nested some of sharp's optional platform packages under transformers.
+
+## `vite.config.js` — `optimizeDeps.include` holds `@huggingface/transformers`
+- why: the ears' worker is its own chunk (reached through `new Worker(new URL(…))`) and first imports the package when the ears arm; a dev server that had not pre-bundled it discovers it then and reloads the page.
+- A change to `vite.config.js` restarts the live :5183 once and reloads its open tabs. The stager's scratch Vite extends this config (`.verify/lib/vite-scratch.config.mjs`), so an entry reaches it.
+
+## The build — what a plain `vite build` holds
+- While nothing under `src/` imports `earsEngine.ts` (before `useEars`), a plain `npx vite build --outDir "$D/dist"` has no ears assets.
+- `.verify/lib/vite-ears-build.config.mjs`: the app's own config with `earsEngine.ts` as a second entry beside `index.html` (`input: { index, ears }`); `npx vite build --config .verify/lib/vite-ears-build.config.mjs --outDir "$D/dist"`. Once something in the app imports the engine, the plain build shows the same and this config is not needed.
+- 2026-10-30, with that config: `earsWorker-*.js` 561 kB with onnxruntime inside it; `ort-wasm-simd-threaded.asyncify-*.wasm` 26.9 MB and its `.mjs`; the worklet 1.4 kB, self-contained. No `index-*` chunk holds onnxruntime.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package.json, /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/vite-ears-build.config.mjs, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js
+
+## MAN-9355 — Probing her ears' engine — .verify/ears-replay.mjs (Node) and .verify/kaylee-ears-engine.mjs (Chromium): run, checks, measurements of 2026-10-30
+
+`.verify/` is gitignored: on disk only. Neither showing makes a Gemini call or sends a press.
+
+## `.verify/ears-replay.mjs` — the machine and the frame maker in Node
+`COMPANION_EARS_DIR=<dir> npx tsx .verify/ears-replay.mjs`
+- Feeds composed streams (`composeWake`, `.verify/lib/wake-compose.mjs`; clips `.verify/fixtures/kaylee-wake-{what-chats,passing,hold,close,name}.wav`) through `createFrameMaker` in render quanta of 128, Silero VAD, `createEarsMachine('Kaylee')`, and Moonshine base where the machine asks for words. Prints every action with its stream time; no verdict, exit 1 only when a model file cannot be had.
+- Models: `earsRoot()` (`COMPANION_EARS_DIR`, else `~/.cloudcli/companion-ears`), remote models off; any manifest file missing is fetched first by `earsFile` (`server/modules/companion/ears/ears-files.ts`). Node runs onnxruntime-node (`cpu`), the page WebAssembly.
+- Times printed are the stream's: the moment the action came out (the end of the frame that produced it).
+- Prints per stream: opened/closed counts, whether the ring equalled the stream on every name check, Moonshine's total ms.
+- 2026-10-30:
+| stream | result |
+|---|---|
+| 2 s, what-chats, 5 s | name check "Hey kaylee what you" → yes; OPENED, sound starting 1.98 s, decided 3.94 s; CLOSED `quiet` 8.35 s, clip 3.17 s |
+| 2 s, passing, 5 s | one check, "I asked Kaylee about that" → no; nothing else |
+| 2 s, hold, 6 s, close, 5 s | OPENED; hold phrase seen 6.62 s; no close through the 6 s; CLOSED `phrase` 16.35 s ("Arc over to you, gaily") |
+| 2 s, name, 5 s | OPENED, CLOSED `quiet`, clip 1.06 s |
+| what-chats, her voice over the first 2.5 s | no checks, no open |
+- The what-chats clip is 3.17 s: speech 2.53 s + 0.32 s pre-roll + 0.32 s kept after speech. The TTS hold clip splits at pauses into 3 segments, the close clip into 2; "the closing segment's end" is 16.35 s.
+
+## `.verify/kaylee-ears-engine.mjs` — `earsEngine.ts` in Chromium, without React
+```
+D=$(mktemp -d)
+COMPANION_EARS_DIR="$D/ears" SUNSET_SLOT=7 KAYLEE_EYES_PLANS="" bash .verify/kaylee-eyes-scratch.sh node .verify/kaylee-ears-engine.mjs
+```
+- Through the stager only (needs `PROBE_APP`, `PROBE_SERVER_LOG`, `COMPANION_EARS_DIR`; exit 2 without them or on :5183). Exit 1 on any FAIL.
+- Imports `/src/modules/companion/utils/earsEngine.ts` in a page signed in on the scratch client (`openConsole`, `.verify/lib/console.mjs`), arms it with the page's token, fed by Chromium's fake microphone (`--use-file-for-fake-audio-capture=<wav>%noloop`) playing [2 s silence, what-chats clip, 5 s silence]. A touch comes first so the context runs.
+- An empty `$D/ears` makes the stager's server fetch all 8 manifest files from Hugging Face (about 69 MB; the first `ready` takes the load).
+| check | asserts |
+|---|---|
+| 1 | order `ready`, `opened`, `closed` (`quiet`), then the second `ready`; `opened` and `closed` within −0.7 s / +1.5 s of the replay's 3.94 s / 8.35 s |
+| 2 | the WAV header: RIFF/WAVE, PCM, 1 channel, 16000 Hz, 16-bit, `data` length agreeing with the header and `durationMs`; length within 0.25 s of 3.17 s |
+| 3 | a second `arm()` after `detach()` answers `ready` in under 250 ms |
+| 4 | every request went to the page's own origin (`blob:` and `data:` aside); the asyncify `.wasm` came from the app; none to jsDelivr, unpkg or huggingface.co |
+| 5 | every `/api/companion/ears/files/` answer is 2xx; all 8 manifest files served; the scratch server's log has no `ears: refused` |
+| 6 | no console error after the sign-in |
+- 2026-10-30 (before the fix-pass: unanswered count, discard at `failed`, replayed tells; that pass ran typecheck and lint only): `ready` after 7.1 s; `opened` 4.56 s, `closed (quiet)` 8.36 s on the microphone's clock; clip 101 420 bytes, 3.17 s; second arm 0 ms; 33 requests, all same-origin; 12 answers under the files route, all 2xx, covering the 8 files; 8 of 8 fetched from Hugging Face; no console error. Chromium only.
+- The build half of the evidence: MAN-9354.
+- `REPLAY` in `kaylee-ears-engine.mjs` holds the replay's 3.94 / 8.35 / 3.17 s. A change to a rule or number of the machine (MAN-9352) moves them: re-run the replay and update `REPLAY`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs

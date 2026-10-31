@@ -157,7 +157,7 @@ function createCompanionService() {
     /** A press of the talk button: the page `client` takes the floor, the clip is heard, and what he said (`''` for the empty press) is answered once it has been pushed. */
     press,
 
-    /** One sentence of her current turn as streamed PCM for the floor page; an `AppError` refusal comes before the first byte (`companion-speech.ts`). */
+    /** One sentence of hers, her current turn's or a fresh earlier one's, as streamed PCM for the floor page; an `AppError` refusal comes before the first byte (`companion-speech.ts`). */
     speech: speech.speak,
     /** The press while she speaks: stops the turn's syntheses and her turn, and owes her next message a `<cut>` (`companion-speech.ts`). */
     cut: speech.cut,

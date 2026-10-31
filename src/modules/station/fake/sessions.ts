@@ -87,7 +87,7 @@ const HOME_ROADMAP = lyphecliRoadmap();
 const WAITING_ROADMAP = lyphecliRoadmap({ 'kaylee-station--what-needs-you': 'accept', 'kaylee-station--cards': 'accept' });
 
 /** The rail's props in one picture: its sessions, its roadmap and its focus, with every press doing nothing and both folds shut. */
-type RailProps = Omit<ComponentProps<typeof WhereThingsStandView>, 'tier'>;
+type RailProps = Omit<ComponentProps<typeof WhereThingsStandView>, 'tier' | 'density'>;
 const rail = (props: Pick<RailProps, 'sessions' | 'roadmap' | 'focus'> & Partial<RailProps>) => ({
   view: WhereThingsStandView,
   props: {

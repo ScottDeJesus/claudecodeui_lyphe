@@ -15,9 +15,8 @@ import type { Followup } from '@/shared/types';
  * app imports this file.
  *
  * Every item is a `StationNeed` as `GET /api/companion/station/needs` answers it (`server/modules/companion/station/
- * need-readers.ts`): its id in the reader's own form, its words built as `sayOf` builds them (an Accept's "Queue <the name he
- * says it by>", a title of six words or fewer, else the plan's name with its dashes read as spaces; "Allow <chat>"; "Open
- * <chat>"; "Open <check label>"), an ask's `what` as `describeToolInput` prints a command. The pending action is a
+ * need-readers.ts`): its id in the reader's own form, a title of six words or fewer (else the plan's name with its dashes read
+ * as spaces), an ask's `what` as `describeToolInput` prints a command. The pending action is a
  * `CompanionPendingAction` as her picture holds one. Ids and request ids no store holds (above 900000, as `fake/stage.ts`
  * keeps them), and made-up chat ids: nothing here names a real chat, ask or check. Times are relative to when it loads.
  *
@@ -54,7 +53,6 @@ const FEATURE_ACCEPT: Extract<StationNeed, { kind: 'accept' }> = {
   title: 'What needs you: the right rail and the waiting-on-you state',
   headline: 'kaylee-station--what-needs-you — 7 tasks',
   features: 1,
-  say: 'Queue kaylee station what needs you',
 };
 
 /** The epic's census, as the dispatcher prints a lock over several features: every plan named, each phase line owned. */
@@ -85,7 +83,6 @@ const EPIC_ACCEPT: StationNeed = {
   title: 'Kaylee’s desk',
   headline: 'kaylee-desk--notes + kaylee-desk--pins + kaylee-desk--clock — 7 tasks',
   features: 3,
-  say: 'Queue Kaylee’s desk',
 };
 
 /** The red check, failing 23 minutes. */
@@ -99,7 +96,6 @@ const RED_CHECK: StationNeed = {
   status: 'failing',
   value: '401 from the shadow connector: the session token expired at 13:52',
   since: CHECK_SINCE,
-  say: 'Open Session is valid',
 };
 
 /** Her action waiting for his word: he asked her to queue the epic, she read it back, and the card waits for his yes. */
@@ -127,7 +123,6 @@ const FOLLOWUPS: StationNeed = {
   ...FOLLOWUPS_CHAT,
   count: 4,
   newest: 'Check the drag on an iPad in landscape before it ships: the lane scrolled under the finger last time.',
-  say: `Open ${FOLLOWUPS_CHAT.chat}`,
 };
 
 /** A permission whose command is long enough to wrap at 390 px, with one more ask waiting behind it. */
@@ -143,7 +138,6 @@ const PERMISSION: Extract<StationNeed, { kind: 'ask' }> = {
   rule: 'Bash(rsync:*)',
   options: [],
   more: 1,
-  say: `Allow ${DEPLOY_CHAT.chat}`,
 };
 
 /** What else a drawing of the rail may hold: the kinds the server could not read, and a read that failed whole. */
@@ -166,7 +160,7 @@ function drawing(needs: StationNeed[] | null, pending: CompanionPendingAction | 
       onPress: NO_PRESS,
       onWithdraw: NO_WITHDRAW,
       name: 'Kaylee',
-    } satisfies Omit<ComponentProps<typeof WhatNeedsYouView>, 'tier'>,
+    } satisfies Omit<ComponentProps<typeof WhatNeedsYouView>, 'tier' | 'density'>,
   };
 }
 

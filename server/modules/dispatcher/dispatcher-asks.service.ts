@@ -32,7 +32,7 @@ import type { AskRaisedMemory } from './dispatcher-raised-asks.service.js';
  * verdict comes back on the reply (`DispatcherCardAnswer`) — the dispatcher's own first line, or the
  * lane's sentence for why the word never reached it.
  *
- * THE THIRD DOOR IS KAYLEE'S (`answerOnHisWord`): his SPOKEN word for that specific card, carried with
+ * THE THIRD DOOR IS KAYLEE'S (`answerOnHisWord`): his word, spoken or typed, for that specific card, carried with
  * kaylee--press's record of it (who, when, what he said). It finds the book's record of the ask by the ask's name
  * exactly as the card's door does, led by nothing else the order carries, so a prompt re-cut or answered since he
  * heard it read back is refused, never carried; a carried one is retracted and held down as a card press is.
@@ -157,7 +157,7 @@ export type DispatcherAsks = {
   gateway: ProviderRuntimePermissionGateway;
   /** The card's door: the ask exactly as the card drew it, and the operator's decision. Never throws. */
   answer(ask: DispatcherAsk, decision: ProviderPermissionDecision): Promise<DispatcherCardAnswer>;
-  /** Kaylee's door: the ask as she read it back, the reply his spoken word makes, and his press. Never throws. */
+  /** Kaylee's door: the ask as she read it back, the reply his word makes, and his press. Never throws. */
   answerOnHisWord(ask: DispatcherAsk, reply: AskReply, press: RelayedPress): Promise<CarriedAnswer>;
 };
 

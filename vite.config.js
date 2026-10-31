@@ -47,6 +47,8 @@ export default defineConfig(({ mode }) => {
     // imported when a pano opens, which is the discovery above. Measured on a cold cache (`.verify/sphere-cold-start.mjs`):
     // the start-up scan follows SphereView's literal import() and finds the four anyway, so the first sphere opens in one
     // document load with or without them here; naming them keeps it so should that import ever be computed.
+    // Her ears' worker first imports `@huggingface/transformers` when the ears arm (the worker is its own chunk, reached through
+    // `new Worker(new URL(...))`), so a dev server that had not bundled it would discover it then and reload the page.
     optimizeDeps: {
       include: [
         '@codemirror/lang-css',
@@ -56,6 +58,7 @@ export default defineConfig(({ mode }) => {
         '@codemirror/lang-markdown',
         '@codemirror/lang-python',
         '@codemirror/lang-yaml',
+        '@huggingface/transformers',
         '@photo-sphere-viewer/core',
         '@photo-sphere-viewer/cubemap-adapter',
         '@photo-sphere-viewer/markers-plugin',

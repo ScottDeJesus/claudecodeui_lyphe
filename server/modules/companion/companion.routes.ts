@@ -24,6 +24,7 @@ import type { PressInput } from './companion-press.js';
 import { type CompanionSettingsPatch } from './companion-settings.js';
 import type { CompanionService } from './companion.service.js';
 import { createCardsRoutes } from './cards.routes.js';
+import { createEarsRoutes } from './ears/ears.routes.js';
 import { createFaceRoutes } from './face/face.routes.js';
 import { createMemoryRoutes } from './memory/memory.routes.js';
 import { createStationLandedRoutes } from './station/landed.routes.js';
@@ -32,7 +33,7 @@ import { createStationSessionsRoutes } from './station/sessions.routes.js';
 
 /**
  * Her door for the page: every route of the companion's table.
- * Mounted at `/api/companion` behind `authenticateToken` by the server entrypoint. `/memory` (Settings' "Her memory" card), `/face` (her face, `face/face.routes.ts`), `/station/sessions` (the station's rail, `station/sessions.routes.ts`), `/station/needs` and `/station/asks` (what needs him and one chat's ask answered, `station/needs.routes.ts`) and `/station/landed` (the station's strip, `station/landed.routes.ts`) are routers of their own, mounted at the foot, and so is `cards.routes.ts` (`PUT /notes/:id/pin`, `PUT` and `DELETE /walk`: his pin on a card and his walk), which mounts at the root.
+ * Mounted at `/api/companion` behind `authenticateToken` by the server entrypoint. `/memory` (Settings' "Her memory" card), `/face` (her face, `face/face.routes.ts`), `/ears` (the models her ears load, `ears/ears.routes.ts`), `/station/sessions` (the station's rail, `station/sessions.routes.ts`), `/station/needs` and `/station/asks` (what needs him and one chat's ask answered, `station/needs.routes.ts`) and `/station/landed` (the station's strip, `station/landed.routes.ts`) are routers of their own, mounted at the foot, and so is `cards.routes.ts` (`PUT /notes/:id/pin`, `PUT` and `DELETE /walk`: his pin on a card and his walk), which mounts at the root.
  *
  * ONLY TRANSPORT. A route here reads who is asking (`req.user`, which is her account) and which page (the
  * `x-companion-client` header), checks the SHAPE of what came (a body that is an object, a `text` of 1 to 8000
@@ -45,9 +46,10 @@ import { createStationSessionsRoutes } from './station/sessions.routes.js';
  * `PUT /draft` the draft, so a page folds them straight into what it holds. A write that has nothing to
  * say answers 204 — `DELETE /draft` and `DELETE /action` (his × on the card of the action waiting for his word) among them.
  *
- * THE PRESS DOOR, `POST /press`, is the one multipart route: the clip as `audio` and the page's own clock for it as
- * `durationMs`. It answers 202 `{ text }` — what he said as heard, `''` for the empty press — or the 409/502 of a
- * hearing that came to nothing (`companion-press.ts`).
+ * THE PRESS DOOR, `POST /press`, is the one multipart route: the clip as `audio`, the page's own clock for it as
+ * `durationMs`, and `opened`, what opened the press — absent for his talk button, `name` for a clip the page's ears
+ * cut after hearing her name (anything else is the 400 naming `opened`). It answers 202 `{ text }` — what was logged
+ * for him, `''` for the empty press — or the 409/502 of a hearing that came to nothing (`companion-press.ts`).
  *
  * THE SPEECH DOOR is two routes (`companion-speech.ts`). `GET /speech/:turnId/:index` answers one of her sentences as raw
  * PCM — 200 `audio/l16; rate=24000; channels=1`, streamed as it is synthesized — to the page that holds the floor, 204 for a
@@ -63,6 +65,17 @@ const PRESS_DURATION_MAX_MS = 3_600_000;
 
 /** Audio/L16 at 24 kHz mono: the format of `synthesizeSentence`'s PCM, with the parameters a player needs to read it. */
 const SPEECH_CONTENT_TYPE = 'audio/l16; rate=24000; channels=1';
+
+/**
+ * The press's `opened` field: absent is his talk button, `name` is a press her name opened, and anything else (a second
+ * `opened`, `button` spelled out, another word) is the 400 naming `opened`, so a page that misspells it is told.
+ */
+function readOpened(fields: Record<string, unknown>): PressInput['opened'] {
+  const { opened } = fields;
+  if (opened === undefined) return 'button';
+  if (opened === 'name') return 'name';
+  throw inputInvalid('opened must be "name" for a press her name opened; leave it out for a press of the talk button.', 'opened');
+}
 
 const pressUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: PRESS_AUDIO_MAX_BYTES } }).single('audio');
 
@@ -85,6 +98,7 @@ async function readPress(request: Request, response: Response): Promise<PressInp
   return {
     audio: { bytes: file.buffer, mimeType: file.mimetype || 'audio/webm', fileName: file.originalname || 'recording.webm' },
     durationMs: readBodyWholeNumber(fields, 'durationMs', 0, PRESS_DURATION_MAX_MS),
+    opened: readOpened(fields),
   };
 }
 
@@ -295,6 +309,7 @@ export function createCompanionRoutes(service: CompanionService): Router {
   // Her memory bank, for Settings' card: `GET` reads its count, `DELETE` clears it. Behind the same authentication as every route above.
   router.use('/memory', createMemoryRoutes());
   router.use('/face', createFaceRoutes());
+  router.use('/ears', createEarsRoutes()); // the pinned model files the page's ears load: from this server only, fetched once, kept under ~/.cloudcli
   router.use(createCardsRoutes(service)); // his pin on a card and his Back, Next and × on the walk
   router.use('/station/sessions', createStationSessionsRoutes()); // the station's rail: his chats as she reads them
   router.use('/station', createNeedsRoutes(service)); // the station's rail: what needs him, and one chat's ask answered

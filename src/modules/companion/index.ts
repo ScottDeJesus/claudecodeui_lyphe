@@ -3,7 +3,8 @@
 // station module (its route mounts the page's other `CompanionProvider`, with an `onOpen` that puts what she opens on the
 // stage; its fallback and its floor hook read `useCompanion`; its right rail draws her action card; its dock draws her draft
 // card; its head, conversation and talk control compose her face, state words, controls, log, talk button and composer rather
-// than rebuild them). Everything else in this module is private.
+// than rebuild them; its phone arrangement draws her round talk button in its bottom bar and her action line over it).
+// Everything else in this module is private.
 export { CompanionProvider, useCompanion } from '@/modules/companion/context/CompanionContext';
 export { CompanionPanel } from '@/modules/companion/CompanionPanel';
 export { CompanionFab } from '@/modules/companion/CompanionFab';
@@ -12,6 +13,9 @@ export { CompanionSettingsSection } from '@/modules/companion/CompanionSettingsS
 // The action waiting for his word, as her panel draws it in her dock; its second home is the head of the station's right
 // rail, "What needs you" (`WhatNeedsYou`), with every rule of MAN-9186.
 export { CompanionActionCard } from '@/modules/companion/CompanionActionCard';
+// The same action in one line, the card's words and deadline: the station module's phone arrangement stands it over its bottom
+// bar while the action waits, and its press opens the whole card in Needs you (it never carries his lines, MAN-9186).
+export { CompanionActionLine } from '@/modules/companion/CompanionActionLine';
 // Her draft, its one editor, as her panel draws it last in her dock; its second home is the station's dock (`StationDock`), at
 // the foot of her column over the talk control, which hands it `onTargetPress` so the target's name puts its session on the
 // stage, with every rule of MAN-9090.
@@ -23,11 +27,12 @@ export { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPres
 export { CompanionFace } from '@/modules/companion/CompanionFace';
 // her state in words with its dot: this module's panel header (CompanionHeader), and the station's head.
 export { CompanionStatus } from '@/modules/companion/CompanionStatus';
-// her controls (Stop, model, Live, Clear, this device's voice): this module's panel header (CompanionHeader), and the station's head.
+// her controls (Stop, model, Live, Clear, this device's voice and ears): this module's panel header (CompanionHeader), and the station's head.
 export { CompanionControls } from '@/modules/companion/CompanionControls';
 // her exchange with him: this module's panel (CompanionPanel), and the station's conversation.
 export { CompanionLog } from '@/modules/companion/CompanionLog';
-// the talk press: this module's composer (CompanionComposer), and the station's talk control.
+// the talk press: this module's composer (CompanionComposer), the station's talk control (`size: 'large'`), and the round button
+// in the center of the station's phone bar (`size: 'round'`).
 export { CompanionTalkButton } from '@/modules/companion/CompanionTalkButton';
 // the box to type to her: this module's panel (CompanionPanel), and the station's talk control.
 export { CompanionComposer } from '@/modules/companion/CompanionComposer';

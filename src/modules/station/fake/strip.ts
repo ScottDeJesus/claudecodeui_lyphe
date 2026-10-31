@@ -52,7 +52,7 @@ function drawing(landed: StationLanded[] | null, seenAt: string | null, over: { 
       onPress: NO_PRESS,
       failure: over.failure ?? null,
       onReread: NO_PRESS,
-    } satisfies Omit<ComponentProps<typeof SinceYouLastLookedView>, 'tier'>,
+    } satisfies Omit<ComponentProps<typeof SinceYouLastLookedView>, 'tier' | 'density'>,
   };
 }
 

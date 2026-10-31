@@ -9,7 +9,7 @@ import { useMemoryLines } from '@/modules/station/hooks/useMemoryLines';
 import { MemoryLine } from '@/modules/station/MemoryLine';
 import { docSpacePageUrl } from '@/modules/widgets';
 import type { CompanionMemoryLines } from '@/shared/companion-types';
-import type { StationRegionProps, StationTier } from '@/shared/types';
+import type { StationDensity, StationRegionProps, StationTier } from '@/shared/types';
 import { Banner, Button, buttonVariants, CardFoldBody, Collapsible, CollapsibleTrigger, EmptyState, FoldChevron, ScrollArea, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -55,10 +55,12 @@ type CornerState = 'reading' | 'unreadable' | 'empty' | 'kept';
 type MemoryCornerViewProps = {
   /**
    * The arrangement. In the rail's columns (wide, laptop) the corner stands at the rail's foot: its line stays at the foot
-   * and the corner opens upward over it, so the press stays under the pointer, and its lines scroll in a short list. In the
-   * narrow stack it opens downward, as a page that scrolls does, and its lines take their own height.
+   * and the corner opens upward over it, so the press stays under the pointer, and its lines scroll in a short list. At the
+   * narrow tier (compact below 1024 px) it opens downward, as a page that scrolls does, and its lines take their own height.
    */
   tier: StationTier;
+  /** Taken and passed by every region; the corner draws the same at both, on the width it is given. */
+  density: StationDensity;
   /**
    * Her memory as the page last read it, newest said first: `count: null` with the door's own `reason` when her bank could
    * not be read. Null while the first read is out.
@@ -81,7 +83,11 @@ type MemoryCornerViewProps = {
   onOpenLine: (token: string | null) => void;
   /** Her memory's full page in DocSpace (`page-kaylee-memory`), opened in a new tab; null until a reading names it. */
   pageUrl: string | null;
-  /** The list's scroller, for the station's scroll memory on the page. Absent on a fixture, which remembers nothing. */
+  /**
+   * The list's scroller, for the station's scroll memory on the page, bound where the corner is a rail (`wide`, `laptop`) and so
+   * scrolls its list. At the narrow tier the list takes its own height and the section that holds the corner scrolls it
+   * (`StationSectionsView`'s `scrollRefs`). Absent on a fixture, which remembers nothing.
+   */
   scrollRef?: (node: HTMLElement | null) => void;
 };
 
@@ -166,7 +172,7 @@ export function MemoryCornerView({
     );
   } else {
     body = (
-      <ScrollArea ref={scrollRef} className={cn('flex min-h-0 flex-col', rail && 'max-h-64')}>
+      <ScrollArea ref={rail ? scrollRef : undefined} className={cn('flex min-h-0 flex-col', rail && 'max-h-64')}>
         <ul aria-labelledby={labelId} className="flex min-w-0 flex-col gap-0.5">
           {(reading?.lines ?? []).map((line) => (
             <MemoryLine
@@ -234,7 +240,7 @@ export function MemoryCornerView({
  *
  * It reads and never writes her memory.
  */
-export function MemoryCorner({ tier }: StationRegionProps) {
+export function MemoryCorner({ tier, density }: StationRegionProps) {
   const { lines, failure, reread } = useMemoryLines();
   const [open, setOpen] = useStationPref('cornerOpen', false);
   const { scrollMemory } = useStation();
@@ -247,6 +253,7 @@ export function MemoryCorner({ tier }: StationRegionProps) {
   return (
     <MemoryCornerView
       tier={tier}
+      density={density}
       reading={lines}
       failure={failure}
       onReread={reread}

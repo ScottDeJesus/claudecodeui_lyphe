@@ -1,5 +1,4 @@
 import { readFile } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
 import { liveAccountEmail } from '@/modules/accounts/index.js';
@@ -7,7 +6,7 @@ import { commandRuns } from '@/modules/providers/shared/auth/command-runs.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import type { IProviderAuth } from '@/shared/interfaces.js';
 import type { ProviderAuthStatus } from '@/shared/types.js';
-import { claudeConfigDir, readObjectRecord, readOptionalString } from '@/shared/utils.js';
+import { claudeConfigDir, claudeConfigDirIsDefault, readObjectRecord, readOptionalString } from '@/shared/utils.js';
 
 type ClaudeCredentialsStatus = {
   authenticated: boolean;
@@ -19,13 +18,6 @@ type ClaudeCredentialsStatus = {
 const hasErrorCode = (error: unknown, code: string): boolean => (
   error instanceof Error && 'code' in error && error.code === code
 );
-
-/**
- * The account door names the identity in `~/.claude.json` and assumes the default config dir. With
- * `CLAUDE_CONFIG_DIR` pointing elsewhere the tokens read here belong to another login than that file's,
- * so the door's email would be a confident wrong name — the status falls back to "Authenticated".
- */
-const configDirIsDefault = (): boolean => path.resolve(claudeConfigDir()) === path.join(os.homedir(), '.claude');
 
 /**
  * The cloud backends Claude Code signs in to through the cloud's own credentials rather than a
@@ -152,7 +144,7 @@ export class ClaudeProviderAuth implements IProviderAuth {
         // so a re-login could never show the account it had just signed in as.
         const email = readOptionalString(creds.email)
           ?? readOptionalString(creds.user)
-          ?? (configDirIsDefault() ? liveAccountEmail() : null);
+          ?? (claudeConfigDirIsDefault() ? liveAccountEmail() : null);
         if (!expiresAt || Date.now() < expiresAt) {
           return {
             authenticated: true,

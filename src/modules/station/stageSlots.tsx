@@ -40,8 +40,8 @@ export function StageHeadActions({ children }: { children: ReactNode }) {
 }
 
 /**
- * A kind's foot: the presses that stand under the body, outside its scroller, so a long body never scrolls them away. In the
- * phone's one scrolling stack it sticks to the screen's foot while the stage is in view, where the thumb is.
+ * A kind's foot: the presses that stand under the body, outside its scroller, so a long body never scrolls them away, at the
+ * foot of the stage where the thumb is.
  *
  * Used by this module's `WalkStageView` (Back and Next).
  */

@@ -41,7 +41,7 @@ export type HouseText = DispatcherCardText;
  *   - `cerberus()` — the Cerberus tab's overview, built from the module's own inputs on each call;
  *   - `heal` — the heal lane's service, narrowed to the two reads she makes (`summary`, `kind`); it runs the worker
  *     `HEAL_REFLEX_BIN` names, so the worker's binary keeps its one rule;
- *   - `relay(order)` — the dispatcher lane's door for one act of hers on his spoken word: the answers to an open prompt go through
+ *   - `relay(order)` — the dispatcher lane's door for one act of hers on his word, spoken or typed: the answers to an open prompt go through
  *     the ask book (which answers its own record of the pinned ask) and every other verb is the dispatcher's own, each carrying
  *     kaylee--press's record of his word (`relayed-press-types.ts`). Never throws: a refusal is a `RelayAnswer`;
  *   - `resumeRun(order)` — the dispatch-souls lane's door for a chain resumed with his rulings (`plan-runner chain --resume`),

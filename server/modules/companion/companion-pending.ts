@@ -17,8 +17,9 @@ import { isStoreStamp } from '@/shared/utils.js';
  *
  * A PENDING ACTION IS ONE OF THE ELEVEN that take the ceremony (`CompanionCeremonyAction`): an open and a close are done at once and
  * never wait on his panel. `armedFrom` is when its ceremony began: its own `preparedAt`, or, for a prepare that re-armed an action
- * which lapsed, the first prepare's stamp. The check of his word reads her read-backs and his lines from `armedFrom` and the lapse
- * from `expiresAt`, so a read-back from before the lapse and his yes since still count. Server-only, like the pin.
+ * which lapsed, was refused by the door or was replaced, the first prepare's stamp. The check of `take_action` reads her read-backs
+ * from `armedFrom` (and picks the record of his word from the lines since) and the lapse from `expiresAt`, so a read-back from before
+ * the lapse still counts. Server-only, like the pin.
  *
  * Consumer: `companion-store.ts`, which reads `pending_json` through `isStoredPending`, writes it, and puts only `withoutPin`'s
  * result on the picture and on `companion_pending`.
@@ -100,7 +101,7 @@ const isPin = (value: unknown): value is CompanionPin =>
  * Whether a parsed `pending_json` has every part the take and the card read. Passed to the store's JSON-column reader, so a value
  * that is not this (a hand edit, a later build's shape) reads as no pending action. The three stamps must be real stored stamps
  * (`isStoreStamp`): `heardSince(armedFrom)` and every lapse test hang on them, and an empty or unparseable one would read the whole log as
- * "after the card went up" and make the action never lapse.
+ * "since the ceremony began" and make the action never lapse.
  */
 export function isStoredPending(value: unknown): value is CompanionStoredPending {
   return isRecord(value)

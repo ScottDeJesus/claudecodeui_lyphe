@@ -3,16 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { CompanionLog, useCompanion } from '@/modules/companion';
 import { useStation } from '@/modules/station/context/StationContext';
 import type { CompanionNote, CompanionPicture } from '@/shared/companion-types';
-import type { CompanionSentenceRef, StationRegionProps, StationTier } from '@/shared/types';
+import type { CompanionSentenceRef, StationDensity, StationRegionProps } from '@/shared/types';
 import { Banner, Button, Spinner } from '@/shared/ui';
-import { cn } from '@/shared/utils';
 
 /** What the conversation draws: her picture still being read, a read that failed, or her log. */
 type ConversationState = 'loading' | 'failed' | 'log';
 
 type StationConversationViewProps = {
-  /** The arrangement: in her column it takes the room her column leaves; in the narrow stack it is a window of its own height. */
-  tier: StationTier;
+  /** Taken and passed by every region; the conversation draws the same at every tier and density, on the room it is given. */
+  density: StationDensity;
   /** Her picture as the page holds it (her log, her cards, the turn she is answering); null until the first read lands. */
   picture: CompanionPicture | null;
   /** Why the read of her picture failed, while there is none: the failed state, with Try again. */
@@ -43,21 +42,20 @@ type StationConversationViewProps = {
  *   as chips (`cards`): each its kind's glyph and word, its title on one line and a pin when pinned, named "Open <title> on the
  *   stage"; a press is `onOpenCard`. A card taken down leaves the log with it.
  *
- * In her column (wide, laptop) it takes the room her head, the dock and the talk control leave, down to the shell's 3.5rem
- * floor, and scrolls inside. In the narrow stack, which scrolls as one, it is a window of its own height (60% of the screen,
- * at most 32rem), the same in every state, so the stack does not jump when her picture lands; her log scrolls inside it.
+ * It takes the room it is given and scrolls inside: in her column (wide, laptop) what her head, the dock and the talk control
+ * leave, down to the shell's 3.5rem floor; in compact's Conversation section what the dock and the box to type to her leave.
  *
  * `data-station-conversation` reads the state. A pure view: `StationConversation` below binds it, and
  * `.verify/kaylee-station-shots.mjs` draws it on `fake/conversation.ts`'s pictures.
  */
-export function StationConversationView({ tier, picture, readFailure, onReread, name, speaking, onOpenCard, scrollRef }: StationConversationViewProps) {
+export function StationConversationView({ picture, readFailure, onReread, name, speaking, onOpenCard, scrollRef }: StationConversationViewProps) {
   const { t } = useTranslation();
   const state: ConversationState = picture !== null ? 'log' : readFailure !== null ? 'failed' : 'loading';
 
   return (
     <div
       data-station-conversation={state}
-      className={cn('flex min-h-0 min-w-0 flex-col bg-background', tier === 'narrow' ? 'h-[min(32rem,60dvh)]' : 'flex-1')}
+      className="flex min-h-0 min-w-0 flex-1 flex-col bg-background"
     >
       {picture !== null ? (
         <CompanionLog
@@ -96,7 +94,7 @@ export function StationConversationView({ tier, picture, readFailure, onReread, 
  * picture, the read's failure and its Try again, the sentence her voice is sounding, a card's press, and the log's scroller to
  * the station's scroll memory. It adds no state of its own.
  */
-export function StationConversation({ tier }: StationRegionProps) {
+export function StationConversation({ density }: StationRegionProps) {
   const { t } = useTranslation();
   const { picture, readFailure, reread, voice } = useCompanion();
   // The stage a card's press puts it on, and the log's place: `scrollMemory('conversation')` keeps its identity across renders, so the scroller is bound once.
@@ -105,7 +103,7 @@ export function StationConversation({ tier }: StationRegionProps) {
 
   return (
     <StationConversationView
-      tier={tier}
+      density={density}
       picture={picture}
       readFailure={readFailure}
       onReread={reread}

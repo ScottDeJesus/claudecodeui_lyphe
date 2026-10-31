@@ -99,7 +99,7 @@ export function StageShelfView({ notes, focus, onOpen }: StageShelfViewProps) {
   const order = [...pinned, ...newest].map((note) => note.id).join(',');
 
   // The lit chip scrolled into the row's view by the row's own `scrollLeft`, never `scrollIntoView`, which would move the
-  // page's stack on a phone as well. Before paint, so the row never shows a frame without it.
+  // section's and the page's scrollers as well. Before paint, so the row never shows a frame without it.
   useLayoutEffect(() => {
     const row = rowRef.current;
     const lit = row?.querySelector<HTMLElement>('[aria-current="true"]');

@@ -1,12 +1,13 @@
 import type { TFunction } from 'i18next';
-import { Mic, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useId, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { QuestionText } from '@/modules/chat';
 import { useActionLapse } from '@/modules/companion/hooks/useActionLapse';
 import { useWithdraw } from '@/modules/companion/hooks/useWithdraw';
-import type { CompanionActionKind, CompanionActionTarget, CompanionPendingAction } from '@/shared/companion-types';
+import { ACTION_SENTENCE, CARRIED_OTHER, CARRIED_TITLE, hourMinute } from '@/modules/companion/utils/actionWords';
+import type { CompanionActionTarget, CompanionPendingAction } from '@/shared/companion-types';
 import { Button, Card, CardFoldBody, Collapsible, CollapsibleTrigger, FoldChevron, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -22,37 +23,6 @@ type CompanionActionCardProps = {
   onWithdraw?: () => Promise<void>;
 };
 
-/** A locale key and its English, for the words that change with the action. */
-type Words = { key: string; english: string };
-
-/**
- * Each action in his words, the verb before the target it acts on — the server's `SAY_VERB` (hands/action-prompts.ts) says
- * the same, so the sentence that names the action and the words he says to fire it are one phrase.
- */
-const ACTION_SENTENCE: Readonly<Record<CompanionActionKind, Words>> = {
-  queue: { key: 'companion.action.verb.queue', english: 'Queue <target/>' },
-  hide: { key: 'companion.action.verb.hide', english: 'Hide <target/>' },
-  show: { key: 'companion.action.verb.show', english: 'Show <target/>' },
-  rework: { key: 'companion.action.verb.rework', english: 'Rework <target/>' },
-  answer: { key: 'companion.action.verb.answer', english: 'Send the answers to <target/>' },
-  recut: { key: 'companion.action.verb.recut', english: 'Re-cut <target/>' },
-  stop: { key: 'companion.action.verb.stop', english: 'Stop <target/>' },
-  resume: { key: 'companion.action.verb.resume', english: 'Resume <target/>' },
-  kick: { key: 'companion.action.verb.kick', english: 'Kick <target/>' },
-  resume_run: { key: 'companion.action.verb.resumeRun', english: 'Resume the run <target/>' },
-  open: { key: 'companion.action.verb.open', english: 'Open <target/>' },
-  close_followup: { key: 'companion.action.verb.closeFollowup', english: 'Close the follow-up on <target/>' },
-  clear_memory: { key: 'companion.action.verb.clearMemory', english: 'Clear <target/>' },
-};
-
-/** What his carried lines are to the action, said over them; the actions that carry none fall to the last. */
-const CARRIED_TITLE: Readonly<Partial<Record<CompanionActionKind, Words>>> = {
-  rework: { key: 'companion.action.carried.rework', english: 'Your notes · sent word for word' },
-  answer: { key: 'companion.action.carried.answer', english: 'Your answers · sent word for word' },
-  resume_run: { key: 'companion.action.carried.resumeRun', english: 'Your rulings · sent word for word' },
-};
-const CARRIED_OTHER: Words = { key: 'companion.action.carried.other', english: 'Your words · sent word for word' };
-
 /** The house's caption type (MAN-742), here naming his carried lines; the ink is the muted one, which holds AA where the faint does not. */
 const CAPTION = 'text-xs uppercase tracking-[0.14em] text-muted-foreground';
 
@@ -62,15 +32,8 @@ const WELL = 'rounded-md border border-border bg-background px-2.5 py-2';
 /** A well that scrolls inside its own cap: the prompt's alone. His lines never do. */
 const SCROLLS = 'scrollbar-thin min-h-0 overflow-y-auto overscroll-contain';
 
-/** A stamp on his clock, 24-hour `14:07`: the clock she says the lapse in ("It lapses at 14:07"). Empty for a stamp that is not a time. */
-function hourMinute(iso: string): string {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return '';
-  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
-}
-
 /**
- * The target's kind and the house's own names for it, beside the name he says: what tells it apart from a card of a like
+ * The target's kind and the house's own names for it, beside the name she says: what tells it apart from a card of a like
  * name. A feature names its plan and its epic, an epic its name (the wire marks one `<name>.arc`), a run its plan and its
  * id (two runs of one task differ only at the id's end, so the line wraps rather than cut it), a page its id and the block
  * an open lands on, a follow-up its number, her memory how many things it keeps, a check its node and its key. (A check is what
@@ -106,11 +69,14 @@ function targetFacts(target: CompanionActionTarget, t: TFunction): string {
 }
 
 /**
- * THE ACTION WAITING FOR HIS WORD: the one thing on screen that says what will happen. Nothing fires on her judgment, so all
- * of it is here to be read at a glance, on a phone too, before he says the words. Drawn by this module's CompanionPanel in
+ * THE ACTION WAITING FOR HIS WORD: the one thing on screen that says what will happen. She reads it back to him in her own
+ * words and judges from the conversation whether he agreed, so all of it is here to be read at a glance, on a phone too, while
+ * she does. The card gives him no phrase to say: there is none. Drawn by this module's CompanionPanel in
  * her dock, above the draft: the draft's sibling, with the same Card, the same eyebrow's type and a target line under it.
  * Its second home is the head of the station module's right rail, "What needs you" (`WhatNeedsYouView`, through the
  * barrel), drawn there exactly as here: the rail's scroller is the edge its foot sticks to.
+ * On the station's phone it stands in one line too, over the bar (`CompanionActionLine`: its sentence and lapse from
+ * `utils/actionWords.ts`, its deadline this one's), and that line's press leads to this card.
  *
  * TOP, standing: the waiting mark and "Waiting for your word" in the warn tone (an amber pulse, the Roadmap's own mark for a
  * prompt waiting on him, and words beside it, never the colour alone), and the × that withdraws it. Then the action as a
@@ -124,10 +90,9 @@ function targetFacts(target: CompanionActionTarget, t: TFunction): string {
  * stop, and they stand whole in the card at whatever length he spoke them. The prompt gives way instead: beside his lines it
  * keeps a 12% peek of the panel's height (it is a size container), and in a round, where every question already heads his
  * answers to it, the questions with their options fold away behind one press. A prompt alone takes 30%. FOOT, set apart in
- * the tone's wash: the words that fire it — "Say: “Queue Lane drag”", with the talk button's mic beside them — then "Aloud,
- * not typed" (a typed line never fires it) and "Lapses at 14:07", in the 24-hour clock she says it in. It is sticky to the
- * dock's bottom edge: whenever the dock is too short for the whole card (a phone's keyboard up, a phone on its side), the
- * words that fire it and when it lapses stay in sight while any of the card is.
+ * the tone's wash: "Lapses at 14:07", in the 24-hour clock she says it in, and a refused Withdraw's sentence under it. It is
+ * sticky to the dock's bottom edge: whenever the dock is too short for the whole card (a phone's keyboard up, a phone on its
+ * side), when it lapses stays in sight while any of the card is.
  *
  * It never shrinks. While it stands the dock has no cap of its own, so the room it needs comes first from the log, down to the
  * log's floor, then from the notes and the draft's field, down to theirs; past that the dock scrolls as one region, this card
@@ -196,8 +161,9 @@ export function CompanionActionCard({ pending, name, onWithdraw }: CompanionActi
                 busy={withdrawing}
                 aria-label={t('companion.action.withdraw', 'Withdraw')}
                 onClick={withdraw}
-                // 28px to look at, a 40px catch under a mouse and 44px under a finger (Verve's touch floor), as a note's ✕.
-                className="relative h-7 w-7 text-muted-foreground before:absolute before:-inset-1.5 before:content-[''] hover:text-foreground [@media(pointer:coarse)]:before:-inset-2"
+                // 28px to look at, a 40px catch under a mouse and 44px under a finger (Verve's touch floor), as a note's ✕: below
+                // 768 px as well as under a coarse pointer (`max-md:` beside it, the station's touch law being keyed on width).
+                className="relative h-7 w-7 text-muted-foreground before:absolute before:-inset-1.5 before:content-[''] hover:text-foreground max-md:before:-inset-2 [@media(pointer:coarse)]:before:-inset-2"
               >
                 <X aria-hidden="true" />
               </Button>
@@ -221,7 +187,7 @@ export function CompanionActionCard({ pending, name, onWithdraw }: CompanionActi
 
       {round ? (
         <Collapsible open={questionsShown} onOpenChange={setQuestionsShown} data-companion-action-questions="" className="flex min-w-0 flex-col">
-          <CollapsibleTrigger className="flex items-center gap-1.5 self-start rounded-sm text-xs font-medium text-muted-foreground hover:text-foreground [@media(pointer:coarse)]:min-h-11">
+          <CollapsibleTrigger className="flex items-center gap-1.5 self-start rounded-sm text-xs font-medium text-muted-foreground hover:text-foreground max-md:min-h-11 [@media(pointer:coarse)]:min-h-11">
             <FoldChevron collapsed={!questionsShown} />
             {t('companion.action.questions', 'The questions, with their options')}
           </CollapsibleTrigger>
@@ -267,30 +233,21 @@ export function CompanionActionCard({ pending, name, onWithdraw }: CompanionActi
       )}
 
       {/* Sticky to the dock's bottom edge (its wash is opaque): in a dock too short for the card, it rides over the wells,
-          and a refused Withdraw is said inside it, so the refusal is in sight with the words it stands beside. It sits on the
+          and a refused Withdraw is said inside it, so the refusal is in sight with the lapse it stands beside. It sits on the
           edge itself (`-bottom-1` takes back the dock's 4px foot padding), and a ring of the card's own ground masks the words
           passing under its rounded corners; resting in the card, the ring is the card's colour and draws nothing. */}
-      <div data-companion-action-say="" className="sticky -bottom-1 z-[1] flex min-w-0 items-start gap-2 rounded-md bg-tone-soft px-2.5 py-2 shadow-[0_0_0_0.375rem_var(--surface)]">
-        <Mic aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-tone-ink" />
-        <div className="min-w-0 flex-1">
-          <p className="break-words text-sm leading-snug text-foreground">
-            <span className="font-medium text-tone-ink">{t('companion.action.say', 'Say:')}</span>{' '}
-            <span className="font-semibold">{t('companion.action.quoted', { text: pending.say, defaultValue: '“{{text}}”' })}</span>
+      <div data-companion-action-foot="" className="sticky -bottom-1 z-[1] flex min-w-0 flex-col gap-1 rounded-md bg-tone-soft px-2.5 py-2 shadow-[0_0_0_0.375rem_var(--surface)]">
+        <p className="text-xs leading-snug text-tone-ink">
+          <time data-companion-action-lapse="" dateTime={pending.expiresAt}>
+            {t('companion.action.lapses', { time: hourMinute(pending.expiresAt), defaultValue: 'Lapses at {{time}}' })}
+          </time>
+        </p>
+        {refusal !== null && (
+          <p role="alert" className="flex items-start gap-1.5 text-xs leading-relaxed text-tone-ink">
+            <span aria-hidden="true">▲</span>
+            {refusal}
           </p>
-          <p className="mt-0.5 text-xs leading-snug text-tone-ink">
-            {t('companion.action.aloud', 'Aloud, not typed')}
-            <span aria-hidden="true"> · </span>
-            <time data-companion-action-lapse="" dateTime={pending.expiresAt}>
-              {t('companion.action.lapses', { time: hourMinute(pending.expiresAt), defaultValue: 'Lapses at {{time}}' })}
-            </time>
-          </p>
-          {refusal !== null && (
-            <p role="alert" className="mt-1 flex items-start gap-1.5 text-xs leading-relaxed text-tone-ink">
-              <span aria-hidden="true">▲</span>
-              {refusal}
-            </p>
-          )}
-        </div>
+        )}
       </div>
     </Card>
   );

@@ -144,12 +144,12 @@ export const HER_PICTURES = {
 };
 
 /** The conversation's drawing: her picture (null: no picture yet), and whatever a state changes. */
-function drawing(her: CompanionPicture | null, over: Partial<Omit<ComponentProps<typeof StationConversationView>, 'tier'>> = {}) {
+function drawing(her: CompanionPicture | null, over: Partial<Omit<ComponentProps<typeof StationConversationView>, 'tier' | 'density'>> = {}) {
   return {
     view: StationConversationView,
     props: {
       picture: her, readFailure: null, onReread: NO_PRESS, name: her?.settings.name ?? 'Kaylee', speaking: null, onOpenCard: NO_PRESS, ...over,
-    } satisfies Omit<ComponentProps<typeof StationConversationView>, 'tier'>,
+    } satisfies Omit<ComponentProps<typeof StationConversationView>, 'tier' | 'density'>,
   };
 }
 

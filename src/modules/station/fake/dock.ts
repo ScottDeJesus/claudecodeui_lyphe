@@ -99,7 +99,7 @@ const dock = (draft: CompanionDraft | null, targetWorking = false, refusal: stri
     },
     onClear: () => { DOCK_PRESSES.push(['clear']); return Promise.resolve(); },
     onTargetPress: () => { DOCK_PRESSES.push(['show']); },
-  } satisfies Omit<ComponentProps<typeof StationDockView>, 'tier'>,
+  } satisfies Omit<ComponentProps<typeof StationDockView>, 'tier' | 'density'>,
 });
 
 /** The `dock` slot's drawing in each of the four pictures: its quiet line wherever she holds no draft, never nothing. */

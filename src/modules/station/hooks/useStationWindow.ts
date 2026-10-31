@@ -4,7 +4,7 @@ import type { StationTier } from '@/shared/types';
 
 /** The width from which the station draws four columns (wide), in CSS pixels. */
 const WIDE_MIN_WIDTH = 1360;
-/** The width from which it draws three (laptop); below it, one scrolling column (narrow). */
+/** The width from which it draws three (laptop); below it, compact's one column (narrow). */
 const LAPTOP_MIN_WIDTH = 1024;
 /** The house's mobile breakpoint (`useDeviceSettings`): a window narrower than this is a phone's. */
 const PHONE_MAX_WIDTH = 768;

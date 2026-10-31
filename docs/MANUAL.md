@@ -86,15 +86,33 @@ touched, so the answers may not change underneath it. What each answer looks lik
    (`readCredentials`, the only token read server-side), never logged, never persisted, never on an
    error path (every failure collapses to a fixed reason vocabulary and a status int), and never
    following a redirect (`redirect: 'manual'`, so a 3xx is read and never chased — a
-   redirect-following fetch copies its headers onto the next hop). An expired token, a 401 or a dead
-   network keeps the last good number on screen with `degraded: true` and `staleSince`, and
-   SURRENDERS it the moment the credential stamp moves.
+   redirect-following fetch copies its headers onto the next hop). An expired token is RENEWED, not
+   sent: the providers module's `renewSavedLogin` runs `claude auth status` on the saved login (the
+   only thing here that starts the CLI on that file, since chats ride saved long-lived tokens), which
+   renews the pass from its refresh token and rewrites the file itself; the fetch then goes on in the
+   same call. The verb strips every credential from the CLI's environment, shares one attempt at a
+   time, and waits ten minutes after an attempt that left no newer live pass. A pass that could not be
+   renewed is `degraded` with `reason: 'expired'`, and so is a login the CLI itself cleared
+   (`accessToken: ""`, `expiresAt: 0` — what it writes when the vendor refuses the refresh token, read
+   by `readCredentials` as `cleared`, and never renewed again); a login file that cannot be read is
+   `credentials`; a 401 or 403 on a pass the clock still trusts earns one renewal and one retry, only
+   when the file then holds a different token; the wait after an attempt that left a live pass
+   unmoved lasts only until that pass expires. Each attempt logs one `[usage] …` line. An expired pass
+   that could not be renewed, a cleared login, a 401 or a dead network keeps the last good number on
+   screen with `degraded: true` and `staleSince`, and SURRENDERS it the moment the credential stamp
+   moves — except the CLI's own rewrite of the file it was asked to renew, which is the same login:
+   `reboundTo` re-files the last good reading under the stamp the CLI left, so a fetch that fails right
+   after a renewal still shows the numbers.
 8. **The identity read opens no credential file.** `account-identity.service.ts` returns
    `oauthAccount.emailAddress` from `~/.claude.json` and nothing else — cached against the file's stat
    key, an absent or malformed file is `null` — and copies, swaps and writes nothing: the account in
    use is the token switch's (`~/.claude/scripts/claude-account`). The meter's credentials path
-   (`usage.service.ts`) is deliberately NOT environment-redirectable, since a variable that moved it
-   could meter an account nobody named.
+   (`usage.service.ts`) is the CLI's own config directory (`claudeConfigDir()`: `CLAUDE_CONFIG_DIR`
+   when the server's environment sets it, else `~/.claude`) — the same place the Claude provider reads
+   the file and the renewal runs the CLI against, so the readers and the writer of one file cannot
+   disagree about where it is. The identity file is not redirected with it: `account-digest.ts` still
+   reads `~/.claude.json`, so the meter names a reading by that digest only while the config directory
+   is the default (`claudeConfigDirIsDefault()`) and answers `''` otherwise.
 9. **Nothing in this lane is callable by an agent.** The five routes (`GET /api/accounts`,
    `GET /api/usage`, `POST /api/accounts/use|auto|remove`) sit behind `authenticateToken` on the
    app's own mount, and no MCP verb, no dispatch path and no board tool reaches them: a choice is a
@@ -169,7 +187,7 @@ the provider's own label, which is the only place a `weekly_scoped:*` plan is ev
 | `windows: []` + `degraded` | *No figures are available under this account.* |
 | `reachable: false` | *Usage is unknown — \<the reason, in English\>* |
 
-`GET /api/usage` carries `account`: the digest of the live login the figures were read from (`liveAccountDigest()`, read beside the token; `''` when it cannot be told), on cached, pending and degraded answers alike, so the panel can tell whether the numbers belong to the account in use (the client's test and its fallback: MAN-8862). An `expiresAt` (epoch ms) already passed means the token is never sent: degraded `credentials`, status 0, no fetch. A `401`/`403` is `auth` — the endpoint refusing a token the clock still counted live.
+`GET /api/usage` carries `account`: the digest of the live login the figures were read from (`liveAccountDigest()`, read beside the token; `''` when it cannot be told), on cached, pending and degraded answers alike, so the panel can tell whether the numbers belong to the account in use (the client's test and its fallback: MAN-8862). An `expiresAt` (epoch ms) already passed means the token is never sent: the pass is renewed first (`renewSavedLogin` runs `claude auth status` on the saved login, MAN-461), and the fetch goes on in the same call with the new one; a pass that could not be renewed — and a login the CLI itself cleared (`accessToken: ""`, what it writes when the refresh token is refused) — is degraded `expired`, status 0, no fetch, with *the saved login has expired and could not be renewed; sign in again with claude /login*. A login file that cannot be read is `credentials`. A `401`/`403` — the endpoint refusing a token the clock still counted live — earns one renewal and one retry, only when the file then holds a different token; otherwise it is `auth`. With `CLAUDE_CONFIG_DIR` set the token is read from that directory and `account` is `''`, because `~/.claude.json` would name another login.
 
 A window with a `resetsAt` also says when it turns over, counted in hours inside a day and in
 weekdays past one. The instant is read by `resetInstant` (`utils/usageWindows.ts`), which takes a
@@ -2723,7 +2741,7 @@ section: design-login/002 Where each part lives
 | `src/modules/settings/hooks/useSettingsController.ts` | `loginFlow`, `openDesignLogin`, `openLoginForProvider` (sets `'account'`), `closeLoginModal` (resets the flow, and for an `'account'` flow re-reads that provider's auth status with `checkProviderAuthStatus(provider, { keepLastAnswerOnFailure: true })` — the account line's refresh) |
 | `src/modules/settings/Settings.tsx` | The modal's `customCommand` and `title`, read off `loginFlow`; `key={`${loginProvider \|\| 'claude'}:${loginFlow}`}`; `openLoginForProvider` and `openDesignLogin` are wired straight to the controller; `closeProviderLogin` closes the modal and, for a Claude account login only (`loginFlow === 'account' && loginProvider === 'claude'`), calls `announceAccountsChanged()` so the account panel re-reads — another provider's login and the design flow announce nothing |
 | `src/modules/provider-auth/ProviderLoginModal.tsx` | Optional `title`: `titleOverride ?? getProviderTitle(provider)`; the window itself, portalled to `document.body` for every caller. It reports `onClose` and nothing about the command's exit |
-| `server/modules/providers/list/claude/claude-auth.provider.ts` | The Claude half of the auth status: the email comes from `liveAccountEmail()` (the accounts module's barrel) when `.credentials.json` carries none and `configDirIsDefault()` holds (`CLAUDE_CONFIG_DIR` unset or resolving to `~/.claude`); otherwise `email` stays null |
+| `server/modules/providers/list/claude/claude-auth.provider.ts` | The Claude half of the auth status: the email comes from `liveAccountEmail()` (the accounts module's barrel) when `.credentials.json` carries none and `claudeConfigDirIsDefault()` (`server/shared/utils.ts`) holds (`CLAUDE_CONFIG_DIR` unset or resolving to `~/.claude`); otherwise `email` stays null |
 | `src/modules/provider-auth/hooks/useProviderAuthStatus.ts` | `checkProviderAuthStatus(provider, { keepLastAnswerOnFailure? })`: default shows "Checking…", then the answer, a failed read included; with the option it skips "Checking…" and keeps the last answer when the read did not answer. Only `closeLoginModal` passes it; `refreshProviderAuthStatuses` (Settings open, Onboarding close) does not |
 | `src/modules/i18n/locales/en/settings.json` | `agents.designLogin.{title,description,button}` — `en` only, the other locales fall back |
 
@@ -10437,7 +10455,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/, /hom
 ## MAN-8494 — The dispatcher lane — the prompts a plan owes the operator, raised for the — The answer (`dispatcher-answer.service.ts`)
 section: The dispatcher lane — the prompts a plan owes the operator, raised for the plan's card and the phone: the raise, the book, the answer/002 The answer (`dispatcher-answer.service.ts`)
 
-Three doors: the plan's card (names the ask by the ask it drew), the phone (by its prompt key) and Kaylee (`DispatcherAsks.answerOnHisWord`: his spoken word for that specific card, carried with kaylee--press's record of it — who spoke, when, what he said). `AnswerDoor` is `'card' | 'phone' | 'kaylee'`.
+Three doors: the plan's card (names the ask by the ask it drew), the phone (by its prompt key) and Kaylee (`DispatcherAsks.answerOnHisWord`: his word, spoken or typed, for that specific card, carried with kaylee--press's record of it — who said it, when, what he said). `AnswerDoor` is `'card' | 'phone' | 'kaylee'`.
 - KAYLEE'S DOOR finds the book's own record of the ask by the ask's name (`keyOf`, with `catchUp` for a name the book does not hold) and carries THAT; a prompt re-cut, answered or being carried since he heard it read back, or a reply that does not fit the prompt (an answers round on an Accept ask, a non-answers reply on a questions ask), answers `refused` — "that prompt changed since you read it back; read it again" — and nothing is carried. A store that cannot be read answers `refused` "the dispatcher could not be read, so nothing was carried; read it again"; a Kaylee answer with no record is `refused` before any verb runs. Every non-`took` outcome is one journal line, `[Dispatcher] <plan>: Kaylee's answer on his word carried nothing — <why>`. It retracts the prompt, takes its phone buttons down and holds the answered prompt down for its grace, as a card press does. Its Accept adds `--relay <record>` (target: the epic when the lock names several plans, else the plan; `token`: the `--lock`); a refusal of the dispatcher's door (`REFUSED …`, exit 2) comes back as the answer's `said` (MAN-9152 §Doors that exist today); each `tell` adds `--relay` naming its own target and no token, and the notes or answers stay his words on stdin. The journal names the record `<record>` and never copies it. The other acts on his word (hide, show, recut, stop, resume, kick, a plain tell) are not the book's: MAN-9152.
 - THE CARD'S DOOR: `POST /api/dispatcher/answer` (`dispatcher-answer.routes.ts`, `DispatcherAsks.answer`), the ask back exactly as the card drew it — `took` 200 · `already-answered`, `refused`, `not-open` 409 · `no-answer` 400 · `unread` 503. The status is the outcome, and the sentence in the body is the lane's own (MAN-7534).
 - Queue runs `dispatcher accept --lock <token> --by app:<door> <plans…>` (the plans join the queue); Hide is the same with `--hidden` (approved and held out of the queue until Show). The verb re-checks the token; a stale one approves NOTHING, after which the current prompt is up again.
@@ -14321,7 +14339,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs, /home/
 
 ## MAN-9152 — Kaylee's relay doors — relay(order), resumeRun(order), relayRecord and the relayed-press types (dispatcher-relay.service.ts, run-resume.service.ts, server/shared)
 
-Kaylee carries an act on the operator's spoken word through two lane doors, each with kaylee--press's record of that word attached as `--relay <record>`. The lanes decide nothing of his: the dispatcher and the plan-runner own the verbs, the words and the refusals; a door's first line comes back untouched as `said`.
+Kaylee carries an act on the operator's word (a spoken or typed line of his, chosen by the check: MAN-9171 §The record) through two lane doors, each with kaylee--press's record of that word attached as `--relay <record>`. The lanes decide nothing of his: the dispatcher and the plan-runner own the verbs, the words and the refusals; a door's first line comes back untouched as `said`.
 
 | door | built by | takes | answers |
 |---|---|---|---|

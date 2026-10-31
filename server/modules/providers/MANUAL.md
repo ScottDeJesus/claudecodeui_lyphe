@@ -1066,9 +1066,58 @@ The house's model names and the account's default model. Code: `list/claude/clau
 | `model` names no table family (`default`, another name) | `null` | `[Claude] the account default model names a family the house has no name for…` |
 - `null` → the caller sends no model and `opus[1m]` runs.
 - Consumer: `companion-send.ts` `sendToNewChat`, for a new chat whose `model` she left out (MAN-9072).
-- `claudeConfigDir()` (`server/shared/utils.ts`): `CLAUDE_CONFIG_DIR` trimmed when set, else `~/.claude`. Callers: this reader and `claude-auth.provider.ts`.
+- `claudeConfigDir()` (`server/shared/utils.ts`): `CLAUDE_CONFIG_DIR` trimmed when set, else `~/.claude`. Callers: this reader, `claude-auth.provider.ts`, `claude-login-renewal.ts` and the accounts module's `usage.service.ts`.
 
 ## Proof
 `.verify/kaylee-model-choice.mjs` section 2: the real settings give `fable`; alias, pinned id and `[1m]` forms read down; `default`, empty, absent and non-JSON give `null`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-account-default-model.ts
+
+## MAN-9350 — renewSavedLogin — the saved login's pass renewed by claude auth status: answer, cooldown, child, detail
+
+`renewSavedLogin(): Promise<LoginRenewal>` (`list/claude/claude-login-renewal.ts`, exported through `providers/index.ts`) renews the saved login's pass by running `claude auth status` on it. Why it exists: chats, souls and the companion ride saved long-lived tokens, so nothing else starts the CLI on `<claudeConfigDir()>/.credentials.json`, and its access token dies every few hours. The meter's side of the contract is MAN-461 rule 7; this row is the verb's.
+
+## Answer — `LoginRenewal`
+| field | meaning |
+|---|---|
+| `renewed` | the file's `expiresAt` is ahead of the clock now. True also when the pass never needed renewing; on a cooldown answer it is the file's own clock too |
+| `expiresAt` | that stamp, epoch ms; `null` when the file cannot be read |
+| `attempted` | `false` only on a cooldown answer (no CLI started); a caller logs one line per attempt, never one per poll |
+| `detail` | built by the verb from facts, never copied from CLI stdout (its JSON names the account) |
+
+## What it does
+1. Returns the in-flight promise when one exists (one attempt at a time, shared by every caller).
+2. Returns a cooldown answer (`attempted: false`, `detail: the last renewal left no new pass; the next try is in N min`) while `holdUntil` is ahead.
+3. Reads `expiresAt` → runs `claude auth status` → reads `expiresAt` again.
+4. Sets the hold: no live pass afterwards ⇒ 10 min; a live pass equal to the one before (the endpoint refused a pass the clock trusts) ⇒ `min(10 min, that pass's expiry)`; a newer live pass ⇒ none.
+
+## The child
+| item | value |
+|---|---|
+| executable | `resolveClaudeCodeExecutablePath(CLAUDE_CLI_PATH) ?? 'claude'`, argv `auth status` |
+| environment | a copy of the server's with `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` deleted — with a token in the environment the CLI reports THAT token and renews nothing |
+| `CLAUDE_CONFIG_DIR` | passed only when the server's own environment sets it (trimmed); never set to the default dir — naming it moves where the CLI keeps `.claude.json` |
+| cwd | `os.homedir()`, so a project's `.claude/settings.json` adds no environment |
+| ceiling | 30 s, then `SIGKILL`; stdout and stderr each stop collecting at 16 KiB |
+
+## What it reads and never does
+- Reads two facts from the file: `claudeAiOauth.expiresAt` and the boolean `accessToken === ''`. No token is read, kept or logged.
+- Never writes the credentials file (the CLI does), never calls the OAuth endpoint, never rejects (a failure is `detail: the renewal failed unexpectedly`).
+- A login the CLI cleared (`accessToken: ""`, `expiresAt: 0` — its mark for a refused refresh token) is read by the meter and never sent here (MAN-461 rule 7).
+
+## `detail` — in the order the verb tests
+| when | text |
+|---|---|
+| CLI did not start | `claude could not be started (<errno code>)` — the code, never the message |
+| over 30 s | `claude auth status gave no answer within 30 s` |
+| live pass, same as before | `the pass was still valid; nothing was rewritten` |
+| live pass, different | `the pass was renewed` |
+| file holds the cleared mark | `the refresh token was refused and claude cleared the saved login` |
+| stdout says `loggedIn: false` | `claude auth status exited <code>; claude reports no login` |
+| otherwise | `claude auth status exited <code|by signal>[: <first stderr line>]; <the pass is still expired|the saved login file has no readable expiry>` |
+- The stderr line has `sk-ant-…` and any 40+ character token-shaped run replaced with `<redacted>`, and is capped at 160 characters.
+
+## Consumer
+- `usage.service.ts` only (`renewLogin`): once when the pass has expired, once more on a 401/403 to a pass the clock trusts. It fetches again only when the file then holds a different token.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-login-renewal.ts

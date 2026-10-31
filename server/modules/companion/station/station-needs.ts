@@ -10,9 +10,7 @@ import { chatAskNeeds, checkNeeds, followupNeeds, planNeeds } from './need-reade
 
 /**
  * EVERYTHING THAT NEEDS HIM, read whole on the server, and the answer of one chat's ask. The station's rail draws what
- * `stationNeeds` answers and fires nothing on its own: the words on each item (`say`) are hers, built by the same `sayOf` her check
- * of his word is built from and offered only when her resolver for the item's own kind takes it (`need-readers.ts`). A name two
- * kinds share is refused by her `open` and tested by no reader; the rail only shows the words.
+ * `stationNeeds` answers and fires nothing on its own, and offers him no phrase to say.
  *
  * IN HIS ORDER: the dispatcher's Accepts and questions rounds (the lane's order), the chats' waiting asks, the follow-ups the
  * chats filed, then Cerberus' red checks. One reader per family (`need-readers.ts`); a reader that throws is logged and costs its

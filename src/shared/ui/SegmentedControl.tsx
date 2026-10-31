@@ -1,8 +1,12 @@
 import type { KeyboardEvent } from 'react';
 
 type SegmentedControlProps<T extends string> = {
-  /** The choices, in the order drawn. `count` is an optional number beside the word (a queue's length). */
-  options: { value: T; label: string; count?: number }[];
+  /**
+   * The choices, in the order drawn. `count` is an optional number beside the word (a queue's length). `detail` is more words
+   * after the label, in the muted ink, that give way first when the tray is squeezed (Kaylee Station's compact switch: "Stage"
+   * and the label of what stands on the stage); the tray must still hold every label whole.
+   */
+  options: { value: T; label: string; count?: number; detail?: string }[];
   /** The chosen option's `value`. A value no option carries leaves nothing chosen, and the first option holds the Tab stop. */
   value: T;
   onChange: (value: T) => void;
@@ -12,7 +16,8 @@ type SegmentedControlProps<T extends string> = {
 
 /**
  * Used by the affected-areas module: the Tours · Mark · Tables sub-switch, the pano's layer switch and the
- * Mark screen's queue mode — Verve's §11 Plumbing "IconButton · SegmentedControl".
+ * Mark screen's queue mode — Verve's §11 Plumbing "IconButton · SegmentedControl"; and by the station module's
+ * compact arrangement: its one switch between Conversation, Needs you, Where things stand and Stage.
  *
  * A switch between a few views of the same thing, drawn as one tray with the chosen option lifted on its own
  * surface. It is a RADIO GROUP, not a tablist: it chooses a value and owns no panel (`Tabs` is the strip that
@@ -63,8 +68,10 @@ export function SegmentedControl<T extends string>({ options, value, onChange, l
             onKeyDown={(event) => chooseByKey(event, index)}
             className="vv-segmented__option"
           >
-            {/* The word gives way first when the tray is squeezed (an ellipsis); the count never does. */}
+            {/* The word gives way first when the tray is squeezed (an ellipsis); the count never does. An option with a
+                detail gives way before any other, its detail first and its word never (data.css). */}
             <span className="vv-segmented__label">{option.label}</span>
+            {option.detail !== undefined && <span className="vv-segmented__detail">{option.detail}</span>}
             {/* Read with the word ("Mark 12"): the number is part of what the option is called. */}
             {option.count !== undefined && (
               <span className="vv-segmented__count" data-tone="neutral">

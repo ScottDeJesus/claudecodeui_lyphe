@@ -15,7 +15,7 @@ import type { CompanionModel, CompanionPicture } from '@/shared/companion-types'
 import { openStation } from '@/shared/cloudcliDoors';
 import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
-import type { CompanionPresence, CompanionVoice, TalkPress } from '@/shared/types';
+import type { CompanionEars, CompanionPresence, CompanionVoice, TalkPress } from '@/shared/types';
 import { Banner, Button, Card, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -36,6 +36,8 @@ type CompanionPanelViewProps = {
   talk?: TalkPress;
   /** This page's voice: the header draws its switch and the log marks the sentence being spoken. Absent, neither is drawn. */
   voice?: CompanionVoice;
+  /** This page's ears: the header draws their switch, "Listen for her name on this device", and what they are doing. Absent, no row. */
+  ears?: CompanionEars;
   onClose: () => void;
   onSendText: (text: string) => Promise<void>;
   onModelChange: (model: CompanionModel) => Promise<void>;
@@ -78,8 +80,8 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  * meant for send. The sheet carries its own close, and whatever the FAB opens in the shell — an application at 40, the
  * floating chat at 45 — would open under the sheet anyway; dialogs, menus and toasts are portalled and stay above it.
  *
- * TOP TO BOTTOM: the header (who, what she is doing, the focus, the controls, and this device's voice switch given
- * `voice`; its status line draws `presence` alone, in which the page's own state wins over her process and her activity: Cut
+ * TOP TO BOTTOM: the header (who, what she is doing, the focus, the controls, this device's voice switch given `voice`, and
+ * this device's ears given `ears`; its status line draws `presence` alone, in which the page's own state wins over her process and her activity: Cut
  * for a breath after a press that stopped her voice, then his press, Listening or Transcribing, then Speaking while this
  * page sounds her, then Loading, Stopped, Asleep or Waking while her process is not awake); a warn
  * Banner while her process has failed — the server's sentence, pinned where the eye lands, while the log keeps the
@@ -115,7 +117,7 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  * rail's door, or her disc, wherever it stands on screen.
  */
 export function CompanionPanelView({
-  picture, readFailure, onReread, open, targetWorking, presence, talk, voice, onClose, onSendText, onModelChange, onLiveChange, onInterrupt,
+  picture, readFailure, onReread, open, targetWorking, presence, talk, voice, ears, onClose, onSendText, onModelChange, onLiveChange, onInterrupt,
   onClear, onEditDraft, onSendDraft, onClearDraft, onDismissNote, onWithdraw, onOpenStation,
 }: CompanionPanelViewProps) {
   const { t } = useTranslation();
@@ -168,6 +170,7 @@ export function CompanionPanelView({
         picture={picture}
         presence={presence}
         voice={voice}
+        ears={ears}
         onModelChange={onModelChange}
         onLiveChange={onLiveChange}
         onInterrupt={onInterrupt}
@@ -256,7 +259,7 @@ export function CompanionPanel() {
   // `voice` is the switch and the sentence sounding, for the header's switch and the log's mark; the status line reads `presence` instead.
   const {
     picture, readFailure, reread, open, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, interrupt, clear,
-    talk, voice,
+    talk, voice, ears,
   } = useCompanion();
   const presence = useCompanionPresence();
   // The head's station button: the same door as the command palette's row, bound here to the router and to where the page stands.
@@ -293,6 +296,7 @@ export function CompanionPanel() {
       onOpenStation={() => openStation(navigate, { phone: isMobile, pwa: isPWA })}
       talk={talk}
       voice={voice}
+      ears={ears}
     />
   );
 }

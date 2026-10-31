@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 import { useCompanionFab } from '@/modules/companion/hooks/useCompanionFab';
 import { useCompanionVoice } from '@/modules/companion/hooks/useCompanionVoice';
+import { useEars } from '@/modules/companion/hooks/useEars';
 import { useTalkBinding } from '@/modules/companion/hooks/useTalkBinding';
 import { useTalkPress } from '@/modules/companion/hooks/useTalkPress';
 import { isCompanionPicture, isOpenTarget, reduceCompanion } from '@/modules/companion/utils/companionReducer';
@@ -10,7 +11,7 @@ import type { PcmPlayer } from '@/modules/companion/utils/pcmPlayer';
 import { api, refusalSentence } from '@/shared/api';
 import type { CompanionFrame, CompanionOpenTarget, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-import type { CompanionVoice, TalkPress } from '@/shared/types';
+import type { CompanionEars, CompanionVoice, TalkPress } from '@/shared/types';
 import type { DockableFabPosition } from '@/shared/ui';
 import { companionClientId } from '@/shared/utils';
 
@@ -80,6 +81,13 @@ type CompanionContextValue = {
    * floor plays, and only while the switch is on; `useCompanionPresence` reads `speaking` and `cut` with the press into her status line's state.
    */
   voice: CompanionVoice;
+  /**
+   * This page's ears: `on` / `setOn` the per-device switch (`companion-ears` in localStorage, off by default), `state` what they are doing
+   * (the switch row draws it), and `reason` the sentence when they cannot listen. Her name opens the same ONE press as `talk` (the page that
+   * holds the floor listens, and only when the switch is on, the page has been touched and it has a microphone); read by `CompanionControls`
+   * through the panel and the station's head.
+   */
+  ears: CompanionEars;
   /**
    * The id of the chat she opened in the last four seconds — the chat a send went to, or one she was told to open (counted from
    * the `companion_open` frame for a chat target that this page heard) — else null. `useAvatarTarget` points the button at that chat's
@@ -164,6 +172,10 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  * `talkBinding` (from the picture's settings, so a re-bind on any page reaches every page by its settings frame) to that press.
  * A press never opens her panel; the press route takes the floor itself.
  *
+ * THE PAGE'S EARS live beside the press (`useEars`): a second way into that ONE press, by her name. They listen only on the page that
+ * holds the floor, with the per-device switch on, after the page's first touch, on a secure page with a microphone; the press gives them its
+ * name door (`byName`) and they give the press `finish`, for his button ending a name press.
+ *
  * THE PAGE'S ONE VOICE lives here too (`useCompanionVoice`): the player, the switch, and the pull that plays her sentences while
  * the picture's `floor` is this page's client id. The press is handed the voice, so it can cut her off. The player is unlocked in
  * the first gesture: opening her panel, typing to her, or a talk press. A Stop and a Clear silence the page's voice as well as her turn.
@@ -189,7 +201,20 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
   // Stable for the page's life (unlike `speech`, which moves with every sentence), so the callbacks below keep their identity.
   const { unlock: unlockVoice, silence: silenceVoice } = speech;
   // The page's one press, and the key or mouse button he bound to it. The press is not state of the picture: it is this page's mic.
-  const talk = useTalkPress(speech);
+  // The ears take the press's name door and hand back `finish`, which the press calls when his button ends a name press: the press is
+  // called first, so it reaches `finish` through this ref, set once the ears have been called.
+  const finishNamePressRef = useRef<() => void>(() => undefined);
+  const finishNamePress = useCallback(() => finishNamePressRef.current(), []);
+  const press = useTalkPress(speech, finishNamePress);
+  const { ears, finish: finishEars } = useEars({
+    picture, clientId, herVoiceSounding: speech.voice.speaking !== null, buttonRecording: press.buttonRecording, door: press.byName,
+  });
+  useEffect(() => {
+    finishNamePressRef.current = finishEars;
+  }, [finishEars]);
+  // What consumers read of the press: its state, its toggle and its error. The door and the recorder's state are the ears' business.
+  const { state: talkState, toggle: talkToggle, error: talkError } = press;
+  const talk = useMemo<TalkPress>(() => ({ state: talkState, toggle: talkToggle, error: talkError }), [talkState, talkToggle, talkError]);
   useTalkBinding(picture?.settings.talkBinding ?? null, talk.toggle);
 
   // Whether a read of the picture is out, so a second request waits for it rather than racing it.
@@ -421,12 +446,12 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
     () => ({
       picture, readFailure: picture === null ? readFailure : null, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft,
       clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear, talk,
-      voice: speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
+      voice: speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
       progress: speech.progress,
     }),
     [
       picture, readFailure, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear,
-      talk, speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress,
+      talk, speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress,
     ],
   );
 

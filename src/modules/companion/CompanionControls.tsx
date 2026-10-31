@@ -3,11 +3,12 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+import { CompanionEarsSwitch } from '@/modules/companion/CompanionEarsSwitch';
 import { CompanionVoiceSwitch } from '@/modules/companion/CompanionVoiceSwitch';
 import { errorMessage } from '@/shared/api';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
 import { useToast } from '@/shared/context/ToastContext';
-import type { CompanionPresence, CompanionVoice } from '@/shared/types';
+import type { CompanionEars, CompanionPresence, CompanionVoice } from '@/shared/types';
 import { Button, ConfirmDialog, Select, Switch, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -26,13 +27,18 @@ type CompanionControlsProps = {
    * row.
    */
   voice?: Pick<CompanionVoice, 'on' | 'setOn'>;
+  /**
+   * This page's ears: "Listen for her name on this device" and, while on, what they are doing. A row of its own under the voice
+   * row in `rows`, beside the voice switch in `line`. Absent, nothing is drawn.
+   */
+  ears?: CompanionEars;
   onModelChange: (model: CompanionModel) => Promise<void>;
   onLiveChange: (live: boolean) => Promise<void>;
   onInterrupt: () => Promise<void>;
   onClear: () => Promise<void>;
 } & (
   | {
-      /** `rows` is the panel's: the controls row, and the voice row under it. */
+      /** `rows` is the panel's: the controls row, the voice row under it, and the ears row under that. */
       layout: 'rows';
       /**
        * Where `rows` draws Stop: the node the panel's title row keeps beside her way out. Stop is drawn into it and nowhere
@@ -50,29 +56,32 @@ type CompanionControlsProps = {
 );
 
 /**
- * Her controls: Stop, the model picker, the Live switch, Clear (asked first) and, given `voice`, this device's voice.
- * Consumed by this module's `CompanionHeader` (the panel's `rows`) and by the station module, so a rule of a control is
- * kept in this one place (MAN-9090).
+ * Her controls: Stop, the model picker, the Live switch, Clear (asked first), given `voice` this device's voice, and given
+ * `ears` her ears on this device. Consumed by this module's `CompanionHeader` (the panel's `rows`) and by the station module,
+ * so a rule of a control is kept in this one place (MAN-9090).
  *
  * ROWS, the panel's. ROW ONE of the header, far end: Stop — only while her turn runs, the one urgent press, so the title row keeps its place
  * beside the way out and this draws it there (`stopSlot`). THE CONTROLS ROW: the model picker, the Live switch, and Clear
  * behind its question. THE VOICE ROW, given `voice`: "Voice on this device" (CompanionVoiceSwitch), its switch under
  * Clear. A row of its own because the controls row has no width to give a labelled switch (measured: 50px spare on the
- * 400px column, none at 320px), and because it is this device's where the controls row's are hers, on every device.
+ * 400px column, none at 320px), and because it is this device's where the controls row's are hers, on every device. THE EARS
+ * ROW, given `ears`, under it: "Listen for her name on this device" (CompanionEarsSwitch), its switch under the voice row's, and
+ * while it is on what her ears are doing under the words; a row of its own for the voice row's two reasons.
  *
  * LINE, the station's (its head draws it under her state): one line, in the order the eye wants it — Stop while her turn
- * runs, the model picker, the Live switch, "Voice on this device" given `voice`, then Clear. Each keeps its words and its
- * catch under a finger, the panel's own; the line wraps rather than cut a word where its box runs out of width (her
- * column at 1440 px, a phone), and the voice switch and Clear wrap as one, so Clear never stands alone on a line of its own:
- * "Stop · model · Live" over "Voice on this device · Clear". `align` centres it under a centred head.
+ * runs, the model picker, the Live switch, "Voice on this device" given `voice`, "Listen for her name on this device" given
+ * `ears`, then Clear. Each keeps its words and its catch under a finger, the panel's own; the line wraps rather than cut a word
+ * where its box runs out of width (her column at 1440 px, a phone), and the last switch and Clear wrap as one, so Clear never
+ * stands alone on a line of its own: "Stop · model · Live" over "Voice on this device · Clear", or, given `ears`, over "Voice on
+ * this device" over "Listen for her name on this device · Clear". `align` centres it under a centred head.
  *
  * A model or Live choice shows at once and holds while its save is out: the picture keeps the old value until the
  * server's settings come back, and a control that snapped back meanwhile would read as refused. A refused save puts
- * the old value back and says so in a toast; so does a Stop or a Clear that fails. Clear asks first. The voice switch is
- * the page's own and answers at once.
+ * the old value back and says so in a toast; so does a Stop or a Clear that fails. Clear asks first. The voice and ears
+ * switches are the page's own and answer at once.
  */
 export function CompanionControls(props: CompanionControlsProps) {
-  const { name, picture, voice, onModelChange, onLiveChange, onInterrupt, onClear } = props;
+  const { name, picture, voice, ears, onModelChange, onLiveChange, onInterrupt, onClear } = props;
   const { t } = useTranslation();
   const pushToast = useToast();
   // The model he just chose, shown until its save settles; null when none is out. Needed because the picture only
@@ -169,6 +178,9 @@ export function CompanionControls(props: CompanionControlsProps) {
   );
 
   const voiceSwitch = voice && <CompanionVoiceSwitch on={voice.on} onChange={voice.setOn} />;
+  const earsSwitch = ears && <CompanionEarsSwitch ears={ears} name={name} />;
+  // The line's last switch, which Clear wraps with: the ears' where they are drawn, else the voice's.
+  const lastSwitch = earsSwitch ?? voiceSwitch;
 
   const confirmClear = (
     <ConfirmDialog
@@ -191,10 +203,12 @@ export function CompanionControls(props: CompanionControlsProps) {
           {/* A fixed width, so the line does not move as he picks a model with a longer name. */}
           <div className="w-36 min-w-0">{select}</div>
           {liveSwitch}
-          {/* The voice switch and Clear as one: a lone Clear on a line of its own reads as a stray word. The switch's own box is
+          {/* Given the ears, the voice switch stands on its own, and the ears' switch is the one Clear wraps with. */}
+          {earsSwitch && voiceSwitch && <div className="flex min-w-0">{voiceSwitch}</div>}
+          {/* The last switch and Clear as one: a lone Clear on a line of its own reads as a stray word. The switch's own box is
               as wide as its words: its row is a full-width label, made for the panel's row of its own. */}
           <div className="flex min-w-0 items-center gap-3">
-            {voiceSwitch && <div className="flex min-w-0">{voiceSwitch}</div>}
+            {lastSwitch && <div className="flex min-w-0">{lastSwitch}</div>}
             {clearButton}
           </div>
         </div>
@@ -220,6 +234,15 @@ export function CompanionControls(props: CompanionControlsProps) {
         // 44px label is the row's height, so the row adds no padding of its own there.
         <div data-companion-voice-row="" className="flex items-center border-t border-border px-3 py-1.5 max-md:py-0 [@media(pointer:coarse)]:py-0">
           {voiceSwitch}
+        </div>
+      )}
+
+      {earsSwitch && (
+        // Under the voice row, its switch closing the row under the voice row's. Below 768 px and on a touch screen its 44px label
+        // is the row's height, as the voice row's is; while the state's words stand under the label the row keeps its padding there
+        // too, so two lines of words never touch its rules.
+        <div data-companion-ears-row="" className="flex items-center border-t border-border px-3 py-1.5 max-md:py-0 has-[[data-companion-ears-state]]:max-md:py-1.5 [@media(pointer:coarse)]:py-0 [@media(pointer:coarse)]:has-[[data-companion-ears-state]]:py-1.5">
+          {earsSwitch}
         </div>
       )}
 

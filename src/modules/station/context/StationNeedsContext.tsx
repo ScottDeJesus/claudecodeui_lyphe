@@ -58,7 +58,7 @@ export function useStationNeeds(): StationNeedsContextValue {
 
 /**
  * THE PAGE'S KEEP OF WHAT NEEDS HIM, mounted by `StationRoute` inside `StationProvider`: one `GET /api/companion/station/needs`
- * (the dispatcher's Accepts and rounds, the chats' asks, the follow-ups, the red checks, each with the words that fire it), held for
+ * (the dispatcher's Accepts and rounds, the chats' asks, the follow-ups, the red checks), held for
  * every region of the page.
  *
  * IT IS KEPT ON EVENTS, and nothing polls. It reads on six, every one an announcement the house already makes:

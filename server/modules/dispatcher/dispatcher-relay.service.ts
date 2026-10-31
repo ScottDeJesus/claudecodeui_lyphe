@@ -8,7 +8,7 @@ import { firstLine, runDispatcherCommand } from './dispatcher-ask.transport.js';
 import type { CommandDependencies } from './dispatcher-ask.transport.js';
 
 /**
- * Kaylee's acts on his spoken word, carried to the dispatcher (`createDispatcherModule().relay`).
+ * Kaylee's acts on his word, spoken or typed, carried to the dispatcher (`createDispatcherModule().relay`).
  *
  * TWO KINDS OF ORDER, TWO ROADS. The four that ANSWER AN OPEN PROMPT (`LockRelayOrder`: Queue, Hide, Rework, a questions round) go
  * through the book of the open asks (`dispatcher-asks.service.ts`, `answerOnHisWord`), which finds its own record of the prompt and

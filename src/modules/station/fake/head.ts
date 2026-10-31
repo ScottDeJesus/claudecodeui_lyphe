@@ -56,7 +56,7 @@ function drawing(her: CompanionPicture | null, presence: CompanionPresence) {
         onModelChange: NO_SAVE, onLiveChange: NO_SAVE, onInterrupt: NO_SAVE, onClear: NO_SAVE,
       }),
       failure: her?.process.state === 'failed' ? { sentence: her.process.error } : null,
-    } satisfies Omit<ComponentProps<typeof StationHeadView>, 'tier'>,
+    } satisfies Omit<ComponentProps<typeof StationHeadView>, 'tier' | 'density'>,
   };
 }
 

@@ -10,7 +10,8 @@ import { useEffect, useState } from 'react';
  * no timer and never lapses here: the action is still his to fire or withdraw until the server says otherwise, and hiding
  * a live action is the worse mistake.
  *
- * Used by this module's CompanionActionCard, which draws nothing once it returns true.
+ * Used by this module's CompanionActionCard and CompanionActionLine (the card in one line, on the station's phone), each of
+ * which draws nothing once it returns true: the two lapse together.
  */
 export function useActionLapse(expiresAt: string): boolean {
   // The `expiresAt` that has passed. The stamp, not a flag, so the answer stays true to the action on screen: a card

@@ -8,7 +8,7 @@ import type { RelayAnswer, ResumeRunOrder } from '@/shared/relayed-press-types.j
 import { expandHome } from '@/shared/utils.js';
 
 /**
- * A run resumed with his rulings, on his spoken word — the one door a chain's resume goes through from this server, and the owner
+ * A run resumed with his rulings, on his word, spoken or typed — the one door a chain's resume goes through from this server, and the owner
  * of runs here is dispatch-souls.
  *
  * `plan-runner chain --resume <chain id> --rulings <file> --relay <record>` is the runner's own door (kaylee--press): the file

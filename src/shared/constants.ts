@@ -26,7 +26,7 @@ import {
   StickyNote,
   type LucideIcon,
 } from 'lucide-react';
-import type { ComponentType } from 'react';
+import type { ComponentType, HTMLAttributes } from 'react';
 
 import type { CompanionNoteKind } from '@/shared/companion-types';
 import type { RoadmapEpicWord, RoadmapFeatureWord, RoadmapMilestoneWord } from '@/shared/roadmap-types';
@@ -726,3 +726,27 @@ export const STATION_NEED_KINDS: Readonly<Record<StationNeedKind, { icon: Lucide
     act: { key: 'station.needs.act.open', english: 'Open' },
   },
 };
+
+// ---------------------------
+
+//----------------- THE STATION'S BOXES OUT OF REACH ------------
+
+/**
+ * The props that take a box of Kaylee Station out of the tab order, the reading order and the press while it stands drawn under
+ * something or behind it: `inert` (spelled as the string React 18 carries) and `aria-hidden`. Spread on the box: by compact's and
+ * the phone's arrangements on the strip's line (and compact's switch) while the strip's week stands over them, and by the sections
+ * on every section not shown.
+ */
+export const STATION_OUT_OF_REACH = { inert: '', 'aria-hidden': true } as unknown as HTMLAttributes<HTMLDivElement>;
+
+// ---------------------------
+
+//----------------- THE STATION PHONE'S SIDEWAYS CATCH ------------
+
+/**
+ * A press of Kaylee Station's phone top row on its side, where the row is 40 px: drawn 40 px tall, its catch grown 2 px over and
+ * under it by a transparent `::before`, so a finger still has 44 px (the touch law's own way to grow a press without moving its
+ * neighbours, INV-10275). Worn by the two presses the row draws on its side: her menu's trigger (the station's `HeadRow`) and the
+ * count of what needs him (`StationPhoneView`).
+ */
+export const STATION_SIDEWAYS_CATCH = "relative h-10 before:absolute before:inset-x-0 before:-inset-y-0.5 before:content-['']";

@@ -11,14 +11,13 @@ import { LandedEntry } from '@/modules/station/LandedEntry';
 import { LandedTimeline } from '@/modules/station/LandedTimeline';
 import { StripFailedLine, StripLine, StripQuietLine, StripReadingLine } from '@/modules/station/StripLines';
 import type { StationFocus, StationLanded, StationLandedKind, StationSession } from '@/shared/station-types';
-import type { Tone } from '@/shared/types';
+import type { StationDensity, StationRegionProps, Tone } from '@/shared/types';
 import { Badge, Button, Chip, Tooltip } from '@/shared/ui';
 import { formatShortDate } from '@/shared/utils';
 
 /**
- * EVERY KIND OF LANDING AS THE STRIP DRAWS IT, the one map of them: its badge's glyph, word and tone. A kind is never
- * colour alone (MAN-578): the glyph and the word carry it. A shipped feature, a finished epic and a recovered check came
- * good, so they are `positive`; a landing (background work finished in a chat) is news with no verdict, so `info`.
+ * EVERY KIND OF LANDING AS THE STRIP DRAWS IT, the one map of them: its badge's glyph, word and tone, never colour alone (MAN-578).
+ * A shipped feature, a finished epic and a recovered check came good (`positive`); a chat's landing is news with no verdict (`info`).
  */
 const LANDED_KINDS: Record<StationLandedKind, { icon: LucideIcon; wordKey: string; word: string; tone: Tone }> = {
   shipped: { icon: PackageCheck, wordKey: 'station.strip.kind.shipped', word: 'Shipped', tone: 'positive' },
@@ -40,9 +39,8 @@ function KindBadge({ kind }: { kind: StationLandedKind }) {
 }
 
 /**
- * When a landing (or his last look) was, on his clock: the locale's clock alone today ("14:02"), "yesterday 19:34", and
- * the page's one spelling of a day before that ("Oct 26", `formatShortDate`). The strip reads one week, so past
- * yesterday the day is enough. Nothing for a stamp that is not a time.
+ * When a landing (or his last look) was, on his clock: the locale's clock alone today ("14:02"), "yesterday 19:34", and the
+ * page's one spelling of a day before that ("Oct 26", `formatShortDate`; the strip reads one week). Nothing for a non-time.
  */
 function whenOf(at: string, t: TFunction): string {
   const moment = new Date(at);
@@ -58,9 +56,8 @@ function whenOf(at: string, t: TFunction): string {
 }
 
 /**
- * Whether a landing opens in place rather than on the stage: a recovered check, whose history names no check's path, and
- * any landing that names neither a plan nor a chat. Its press then has nowhere to lead, and a press must always do
- * something.
+ * Whether a landing opens in place rather than on the stage: a recovered check, whose history names no check's path, and any
+ * landing that names neither a plan nor a chat. Its press has nowhere else to lead, and a press must always do something.
  */
 function opensInPlace(entry: StationLanded): boolean {
   return entry.kind === 'recovered' || (entry.plan === null && entry.sessionId === null);
@@ -72,11 +69,13 @@ function oldestFirst(landed: StationLanded[]): StationLanded[] {
 }
 
 type SinceYouLastLookedViewProps = {
+  /** `compact`: always the folded line, the fold's press opening and closing the week over the body (the arrangement's). */
+  density: StationDensity;
   /** The week's landings as the read answers them (newest first, at most 60); `null` while the first read is out. */
   landed: StationLanded[] | null;
   /** His last look (ISO): the line between what he has seen and what is new. `null` when none is on record: then all is new. */
   seenAt: string | null;
-  /** The strip folded to one line: the count, the newest landing, and the press that opens it again. */
+  /** The strip folded to one line: the count, the newest landing, and the press that opens it again. At compact, the week shut. */
   collapsed: boolean;
   /** The fold pressed: `true` folds the strip to its newest landing, `false` opens the whole week. */
   onCollapse: (collapsed: boolean) => void;
@@ -105,25 +104,18 @@ type SinceYouLastLookedViewProps = {
  *   (below 768 px, "Nothing new"), and the newest landing beside them says what last landed and when.
  * - "Nothing has landed this week" for an empty week; a quiet row of placeholders while the first read is out; a failed
  *   read in the warn tone, its glyph and its words, with Try again (`StripLines`).
+ * - AT COMPACT DENSITY, always the folded line: the arrangement draws the opened week over the body, and the fold's press
+ *   (its words and glyph following `collapsed`) opens and closes it there.
  *
- * One landing at a time stands open in place: a recovered check's whole line, a row under the strip's line at its whole
- * width (one line on a desk), the view's own state and never stored. No figure of cost reaches the strip: it draws each
- * landing's title as the history kept it, and reads nothing else of it.
- * Every press is a 44 px catch below 768 px (the touch law), and every tooltip repeats a name the press already carries.
+ * One landing at a time stands open in place: a recovered check's whole line, a row under the strip's line at its whole width
+ * (one line on a desk), the view's own state and never stored. No figure of cost reaches the strip: it draws each landing's
+ * title as the history kept it. Every press is a 44 px catch below 768 px; every tooltip repeats a name the press carries.
  *
  * A pure view: `SinceYouLastLooked` below binds it, and `.verify/kaylee-station-shots.mjs` draws it on the fixtures'
  * pictures (`fake/strip.ts`) in the bar's `strip` slot.
  */
 export function SinceYouLastLookedView({
-  landed,
-  seenAt,
-  collapsed,
-  onCollapse,
-  onSeen,
-  onPress,
-  failure,
-  onReread,
-  scrollRef,
+  density, landed, seenAt, collapsed, onCollapse, onSeen, onPress, failure, onReread, scrollRef,
 }: SinceYouLastLookedViewProps) {
   const { t } = useTranslation();
   // The one landing standing open in place, by id, `null` for none: the view's own, never stored, so opening one folds
@@ -150,8 +142,10 @@ export function SinceYouLastLookedView({
     nothingNew.current?.focus();
   }, [hasFresh]);
 
+  // What is drawn: the folded line while folded, and always at compact.
+  const folded = collapsed || density === 'compact';
   if (failure !== null) return <StripFailedLine failure={failure} onReread={onReread} />;
-  if (landed === null) return <StripReadingLine folded={collapsed} />;
+  if (landed === null) return <StripReadingLine folded={folded} />;
   if (newest === null) return <StripQuietLine />;
 
   const entryOf = (entry: StationLanded, at: number, { oneLine = false, tabbable = true }: { oneLine?: boolean; tabbable?: boolean } = {}) => (
@@ -213,14 +207,14 @@ export function SinceYouLastLookedView({
   );
 
   // The landing standing open, if the line draws it: folded, only the newest is drawn.
-  const open = entries.find((entry) => entry.id === openId && opensInPlace(entry) && (!collapsed || entry === newest));
+  const open = entries.find((entry) => entry.id === openId && opensInPlace(entry) && (!folded || entry === newest));
   const below = open === undefined ? null : (
     <p id={lineId} data-landed-line="" className="break-words rounded-md bg-muted px-2.5 py-1.5 text-sm leading-5 text-foreground">
       {open.title}
     </p>
   );
 
-  if (collapsed) {
+  if (folded) {
     return (
       <StripLine state="folded" fresh={freshCount} below={below}>
         {lead}
@@ -248,10 +242,9 @@ export function SinceYouLastLookedView({
 /**
  * What a landing puts on the stage. A shipped feature or an epic is its card (`plan`, labelled by its title); a landing is the chat
  * it came from, labelled by the name his sessions hold for it NOW: an entry's own `chat` is the name the chat had when the history
- * kept the row, and a chat not yet named then ("Untitled Session") would head the stage with it for good (the focus is stored). The
- * entry's name and then its title stand in while his sessions are unread or hold no such chat. The kind decides first, so a shipped
- * feature whose lane also named its chat still shows its card; a kind that names the other thing falls back to it, so a press the
- * strip offers always has a stage to go to. A landing that names neither is `null`: the view opens it in place and never asks.
+ * kept the row ("Untitled Session" would head the stage for good: the focus is stored); the entry's name and then its title stand
+ * in while his sessions are unread or hold no such chat. The kind decides first (a shipped feature whose lane also named its chat
+ * shows its card), then the other thing it names, so a press always has a stage. A landing naming neither is `null` (in place).
  */
 function stageOf(entry: StationLanded, sessions: StationSession[] | null): StationFocus | null {
   const card = entry.plan === null ? null : ({ kind: 'card', plan: entry.plan, label: entry.title } as const);
@@ -260,35 +253,41 @@ function stageOf(entry: StationLanded, sessions: StationSession[] | null): Stati
   return entry.kind === 'landed' ? (chat ?? card) : (card ?? chat);
 }
 
+/** The week the compact arrangement holds open over its body, and his press on a fold of it (`open`: what he asks for). */
+type StripWeek = { open: boolean; onOpen: (open: boolean) => void };
+
 /**
- * The strip on the page: the region the station's registry draws in the bar's `strip` slot (`stationRegions.ts`). It reads what
- * landed and his last look (`useStationLanded`), the fold he left it in (`useStationPref('stripCollapsed', false)`), the stage and
- * scroll memory (`useStation`) and his chats' names (`useStationSessions`), and hands them to `SinceYouLastLookedView`, which
- * draws every state.
+ * The strip on the page, the bar's `strip` slot (`stationRegions.ts`): what landed and his last look (`useStationLanded`), the
+ * fold he left it in, the stage and scroll memory (`useStation`) and his chats' names (`useStationSessions`), for the view.
  *
  * - THE LANDINGS AND HIS LAST LOOK are the provider's: a landing joins on the history's own write (`station_landed`), and the
  *   last look is written on his look-aways and on "<n> new" (`markSeen`). This binder starts no read and sets no timer.
- * - THE FOLD is the station pref `stripCollapsed`, per device; it is written by his press alone.
- * - A PRESS puts a shipped feature's or an epic's card, or a landing's chat, on the stage (`stageOf`). It marks nothing seen: the
- *   look-aways and "<n> new" do. A recovered check, which no stage holds, never reaches here (the view opens its line in place).
+ * - THE FOLD is the columns' pref `stripCollapsed`, per device, written by his press alone. Handed the compact arrangement's `week`,
+ *   it is the week's: the line's fold opens it, the strip drawn open over the body (at full) shuts it; compact never writes the pref.
+ * - A PRESS puts a shipped feature's or an epic's card, or a landing's chat, on the stage (`stageOf`), and shuts the `week`. It
+ *   marks nothing seen: the look-aways and "<n> new" do. A recovered check never reaches here (the view opens its line in place).
  */
-export function SinceYouLastLooked() {
+export function SinceYouLastLooked({ density, week }: StationRegionProps & { week?: StripWeek }) {
   const { landed, seenAt, markSeen, failure, reread } = useStationLanded();
   const [collapsed, setCollapsed] = useStationPref('stripCollapsed', false);
   const { setFocus, scrollMemory } = useStation();
   const { sessions } = useStationSessions();
+  // The fold: the arrangement's week when it hands one, else the columns' pref, which compact never writes.
+  const fold = week !== undefined ? { collapsed: !week.open, onCollapse: (shut: boolean) => week.onOpen(!shut) }
+    : density === 'compact' ? { collapsed: true, onCollapse: () => {} } : { collapsed, onCollapse: setCollapsed };
 
   return (
     <SinceYouLastLookedView
+      density={density}
       landed={landed}
       seenAt={seenAt}
-      collapsed={collapsed}
-      onCollapse={setCollapsed}
+      collapsed={fold.collapsed}
+      onCollapse={fold.onCollapse}
       onSeen={markSeen}
       // The stage brings itself into view on a focus change (`StationStage`, once for every region's press), so a press needs only the focus.
       onPress={(entry) => {
         const next = stageOf(entry, sessions);
-        if (next !== null) setFocus(next);
+        if (next !== null) { setFocus(next); week?.onOpen(false); }
       }}
       failure={failure}
       onReread={reread}

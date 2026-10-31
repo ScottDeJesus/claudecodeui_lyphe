@@ -3,9 +3,9 @@ import type { DispatcherAsk } from '@/shared/types.js';
 /**
  * THE WORDS OF KAYLEE'S DOORS INTO THE DISPATCHER AND THE RUNS (kaylee--eyes, seam K).
  *
- * Kaylee carries an act on the operator's spoken word, and the dispatcher's and the plan-runner's
- * doors admit her for it only with the record of that word attached (kaylee--press: who spoke, when,
- * what he said, which press of his it was). Three modules read these types — the companion builds an
+ * Kaylee carries an act on the operator's word, spoken or typed, and the dispatcher's and the plan-runner's
+ * doors admit her for it only with the record of that word attached (kaylee--press: who said it, when,
+ * what he said, which line of his it was). Three modules read these types — the companion builds an
  * order out of a prepared action, the dispatcher carries the verbs, dispatch-souls resumes a run —
  * which is why they live here and hold TYPES ONLY. The record's writer is `relay-record.ts`.
  *
@@ -21,7 +21,7 @@ import type { DispatcherAsk } from '@/shared/types.js';
  * His press, as kaylee--press's record carries it; the door adds `by` (`app:kaylee`) and `target` (the card, or the
  * chain, the verb acts on) when the record is written (`relayRecord`).
  *
- * `account` is the login that spoke; `saidAt` is the time of his line (ISO); `words` is that line verbatim; `press`
+ * `account` is the login that said it; `saidAt` is the time of his line (ISO); `words` is that line verbatim; `press`
  * is its id in her log, the press the record points at; `token` is the lock token he heard read back — an Accept's, `null` for every
  * other act. The companion's `take_action` fills it from her log, never from anything she said. The doors do not copy it into the
  * record: the dispatcher lane writes the record's own `token` (an Accept's `--lock`, none on any other act), because the door takes

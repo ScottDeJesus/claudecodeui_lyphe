@@ -50,9 +50,10 @@ export type CompanionSessionDeps = MessageReaders &
   };
 
 /**
- * The surface of her conversation. The four pushes each assemble and push ONE message, start a turn
- * when she is idle and wake a closed process (`pushOperatorEmpty` is a press of the talk button that carried
- * no words she could hear: `<operator via="spoken" heard="nothing">`, still a turn she answers); `warm` starts the process of a closed one ahead of its first
+ * The surface of her conversation. The five pushes each assemble and push ONE message, start a turn
+ * when she is idle and wake a closed process (`pushOperatorEmpty` is a press that carried no words she could hear:
+ * `<operator via="spoken" heard="nothing">`, and `pushOperatorCalled` a press that was only her name:
+ * `<operator via="spoken" heard="name">`, each still a turn she answers); `warm` starts the process of a closed one ahead of its first
  * message and pushes nothing (the CLI takes about a second to come up, which a caller that knows a push is
  * coming in seconds spends in parallel); `resendUnanswered` pushes again, each as a fresh message, the words of his that her last
  * process was given and never answered (the entrypoint calls it once the server is the sole one on the port); `oweCut` stores the cut the next message opens with (the last sentence he heard to its end, and the one playing at the press);
@@ -66,6 +67,8 @@ export type CompanionSessionDeps = MessageReaders &
 export type CompanionSession = {
   pushOperator(text: string, via: 'typed' | 'spoken'): void;
   pushOperatorEmpty(): void;
+  /** A name press with nothing after her name: `<operator via="spoken" heard="name">`, a turn she answers as someone called by name does. Kept with his unanswered words as `heard: 'name'`, so a replay sends it again as a call. Consumed by `companion-press.ts`. */
+  pushOperatorCalled(): void;
   pushAlerts(blocks: string[]): void;
   pushFocusNews(envelope: string): void;
   warm(): void;

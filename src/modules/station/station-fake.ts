@@ -27,14 +27,16 @@ import type { StationSlot } from '@/shared/types';
  * (`bus`), which the probe publishes before it draws.
  *
  * A DRAWING IS `{ view, props }`: a region's VIEW component and the props it draws one picture with. The shots probe
- * draws a slot as `createElement(view, { ...props, tier })`, and the stage as `StationStageView` holding
+ * draws a slot as `createElement(view, { ...props, tier, density })`, and the stage as `StationStageView` holding
  * `FAKE_STAGE`'s drawing, so it draws any region without knowing it. The stage's drawing carries her cards' shelf
  * (`shelf`, from `fake/cards.ts`: a pinned list card and a diff in `home`, one plan card in `waiting`, none elsewhere),
  * which the probe draws above the stage's head.
  *
  * EACH REGION ADDS ITS OWN SLICES, in a file of its own, `fake/<slot>.ts`, exporting `<SLOT>_FAKE`: one drawing per
  * picture (null where the region draws nothing in it), each drawing's props `satisfies Omit<ComponentProps<typeof
- * TheView>, 'tier'>`. The region's one line goes in `REGION_FAKES` below. The stage's own data is `fake/stage.ts`.
+ * TheView>, 'tier' | 'density'>`. The region's one line goes in `REGION_FAKES` below. The stage's own data is `fake/stage.ts`.
+ * A picture at compact density is the same drawing handed `density: 'compact'` (`.verify/kaylee-station-density.mjs`); a
+ * region drawn there in a form its pictures do not carry exports it beside them (the talk control's halves, `TALK_COMPACT`).
  *
  * A REGION'S STATES THAT NO PICTURE SHOWS (a fold opened, a read still out, a read that failed) are `<SLOT>_STATES` in the
  * same file, drawings by name, and its one line in `REGION_STATES`: the probe draws each over the `home` picture with that

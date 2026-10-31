@@ -72,12 +72,11 @@ const isActivity = (value: unknown): value is CompanionPicture['activity'] =>
   && orNull(Array.isArray)(value.files)
   && orNull((walk) => isRecord(walk) && isNumber(walk.at) && isNumber(walk.total))(value.walk);
 const isDraft = (value: unknown): boolean => isRecord(value) && isText(value.text) && isRecord(value.target);
-/** The action card draws `say`, `expiresAt` and the target's words, and walks `carried[].lines`, so a payload without them is refused rather than drawn. */
+/** The action card draws `expiresAt` and the target's words, and walks `carried[].lines`, so a payload without them is refused rather than drawn. */
 const isPending = (value: unknown): boolean =>
   isRecord(value)
   && isText(value.id)
   && isText(value.action)
-  && isText(value.say)
   && isText(value.preparedAt)
   && isText(value.expiresAt)
   && isRecord(value.target)

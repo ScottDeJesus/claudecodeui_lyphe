@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from 'clsx';
+import type { ReactNode } from 'react';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
@@ -53,6 +54,19 @@ const twMerge = extendTailwindMerge({
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+// ---------------------------
+
+//----------------- A NODE THAT DRAWS SOMETHING ------------
+
+/**
+ * Whether a React node draws something: anything but `undefined`, `null` and `false`, the three a slot left empty or a
+ * condition that failed hands a layout. Kaylee Station's layouts ask it of every slot they place (the shell's columns, compact's
+ * and the phone's arrangements, the sections, the strip's week), so a place with nothing in it draws no box of its own.
+ */
+export function isDrawn(node: ReactNode): boolean {
+  return node !== undefined && node !== null && node !== false;
 }
 
 // ---------------------------

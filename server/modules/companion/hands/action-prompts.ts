@@ -1,16 +1,15 @@
-import type { CompanionActionKind, CompanionActionTarget, CompanionCeremonyAction } from '@/shared/companion-types.js';
+import type { CompanionActionKind, CompanionActionTarget } from '@/shared/companion-types.js';
 import type { DispatcherAsk } from '@/shared/types.js';
 
-import { ACTION_WORDS, shortNameOf } from './action-word.js';
+import type { RearmedAfter } from './action-rearm.js';
 
 /**
- * THE WORDS OF AN ACTION: what he says to fire it, what it is called in the past tense on his panel, and the texts the card and
- * her read-back are made of (the prompt as the card draws it, and the head of an Accept she reads aloud). Strings in, strings
- * out; no I/O.
+ * THE WORDS OF AN ACTION: what it is called as a command and in the past tense on his panel, and the texts the card and her read-back
+ * are made of (the prompt as the card draws it, and the head of an Accept she reads aloud), and what the prepare's answer tells her to
+ * do next. Strings in, strings out; no I/O.
  *
- * `SAY_VERB` is the verb of `say` ("Queue Kaylee's eyes"), and each of the eleven is chosen to hold one of the action's own words
- * (`ACTION_WORDS` in `action-word.ts`) so his saying `say` aloud always passes the check of his word; the two harmless actions (open,
- * close_followup) have a verb for the panel's lines alone, since no word of his is checked for them. `DONE_VERB` is what the
+ * `SAY_VERB` is the verb of an action's one-line order ("Queue Kaylee's eyes", `sayOf`): the name the panel's record and her
+ * read-back give the action. It is never a phrase for him to say: she reads the action back in her own words. `DONE_VERB` is what the
  * panel's system line says after the act ("On your word: queued Kaylee's eyes."); `doneOf` joins it to the target, and `systemLine`
  * is that line.
  *
@@ -19,7 +18,7 @@ import { ACTION_WORDS, shortNameOf } from './action-word.js';
  * `nextStepFor` and `rearmStepFor` are the texts that tell her what to do after a prepare of one of the eleven.
  */
 
-/** What he says first: the action as a command, followed by the target's `spoken` name. Consumed by `sayOf`, and by the prepare's answer ("waiting for his word: queue …"). */
+/** The action as a command, followed by the target's `spoken` name: the sentence the card's head draws. Consumed by `sayOf`, and by the prepare's answer ("on his panel: queue …"). */
 export const SAY_VERB: Readonly<Record<CompanionActionKind, string>> = {
   queue: 'Queue',
   hide: 'Hide',
@@ -56,7 +55,7 @@ export const DONE_VERB: Readonly<Record<CompanionActionKind, string>> = {
 /** The refusal of an open while no page holds the floor: the open is sent to that page alone. Consumed by `direct-tools.ts` (before the open's row is written) and `action-doors.ts` (`openOnFloor`). */
 export const NO_FLOOR = 'No page of his holds the floor; he must open your panel first.';
 
-/** What he says to fire the action on `spoken`: `<Verb> <spoken>`. Consumed by `action-recipe.ts`. */
+/** The action's one-line order on `spoken`: `<Verb> <spoken>`, the stored `say` of a pending action and the head of her read-back. Consumed by `action-recipe.ts` and `direct-tools.ts`. */
 export const sayOf = (action: CompanionActionKind, spoken: string): string => `${SAY_VERB[action]} ${spoken}`;
 
 /**
@@ -65,33 +64,48 @@ export const sayOf = (action: CompanionActionKind, spoken: string): string => `$
  */
 export const doneOf = (action: CompanionActionKind, spoken: string): string => (action === 'clear_memory' ? DONE_VERB[action] : `${DONE_VERB[action]} ${spoken}`);
 
-/** The words of his that fire the action besides a yes: his own naming the target by the shortest name the check takes and saying the action's first word, or the full order. */
-const orderingOf = (action: CompanionCeremonyAction, target: CompanionActionTarget, say: string): string => `words of his own naming ${shortNameOf(target)} and saying ${ACTION_WORDS[action][0]}, or "${say}"`;
-
-/** What she does with his line, and the one binding on a bare yes: both prepare answers end on it. */
-const TAKE_WITH_HIS_LINE = 'Then call take_action with his newest spoken line, exactly as logged; a line that came before your read-back is not his answer to it, '
-  + 'and a bare yes counts only as the first thing he says after your newest read-back: if he said anything else first, read it back again.';
+/** How she reads an action back: plainly, in her own words, saying what she will do and to which card, run or page, by its full name (the server's check looks for the name). */
+const READ_BACK_IN_HER_WORDS = 'Read it back to him plainly in your own words: what you will do, and to what, by its full name';
 
 /**
- * What the prepare's answer tells her to do next: read it back to him in plain words, then stop. `readBack` is the recipe's sentence,
- * `say` the full order. The name she is told to listen for is the shortest the check takes (`shortNameOf`), never a long title it takes
- * shorter. Consumed by `hands-tools.ts` (the prepare's answer).
+ * What she does once it is read back, and the one check the server makes: the decision is hers. Both prepare answers end on it. No set
+ * words fire the action and a typed line counts as much as a spoken one; the server confirms that she read it back and records the logged line that equals the one she passes.
  */
-export function nextStepFor(action: CompanionCeremonyAction, target: CompanionActionTarget, say: string, readBack: string): string {
-  return `Read it back to him in plain words, then stop: ${readBack} His next spoken yes fires it, and so do ${orderingOf(action, target, say)}. ${TAKE_WITH_HIS_LINE}`;
+const SHE_DECIDES = 'Whether he agreed, and when, is your call from the conversation: there are no set words, and a line he typed counts as much as one he spoke. '
+  + 'When you judge he agreed, call take_action with his line exactly as logged, which is the record of what he said. When he declines, or you judge he does not want it, call cancel_action. '
+  + 'The server only confirms that you read it back and records the logged line that equals the one you pass (his newest line when none does, and the answer names it); never call take_action on your own words.';
+
+/**
+ * What the prepare's answer tells her to do next: read it back to him in her own words, then stop and decide from the conversation whether he agreed. `readBack` is the
+ * recipe's sentence, what she has to cover. Consumed by `hands-tools.ts` (the prepare's answer).
+ */
+export function nextStepFor(readBack: string): string {
+  return `${READ_BACK_IN_HER_WORDS}, then stop. What to cover: ${readBack} ${SHE_DECIDES}`;
+}
+
+/** Why the earlier ceremony of the same thing ended, as the re-arm's sentence says it. Consumed by `rearmStepFor`. */
+const ENDED_AS: Readonly<Record<RearmedAfter, string>> = {
+  expired: 'it lapsed',
+  refused: 'the house refused it when you took it',
+  replaced: 'it was already on his panel',
+};
+
+/**
+ * What the prepare's answer tells her after a RE-ARM: the same thing had been on his panel and `endedAs` says how that ended. Her
+ * read-back from before still stands. When she had already judged that he agreed and nothing since changes it,
+ * she takes it at once and asks him nothing; otherwise she reads it back again. Consumed by `hands-tools.ts` (the prepare's answer).
+ */
+export function rearmStepFor(readBack: string, endedAs: RearmedAfter): string {
+  return `Re-armed: ${ENDED_AS[endedAs]}, and this takes its place. Your read-back from before still stands. `
+    + `If you have already judged that he agreed to what you read back, and nothing he said since changes that, call take_action now with his line exactly as logged and ask him nothing. `
+    + `If he has not answered yet, or you are unsure, ${READ_BACK_IN_HER_WORDS} again, then stop. What to cover: ${readBack} ${SHE_DECIDES}`;
 }
 
 /**
- * What the prepare's answer tells her after a RE-ARM: the same action on the same target had lapsed at `lapsedAt` and this takes its place.
- * Her read-back from before the lapse still stands for a bare yes he has spoken since, and for nothing else: when his newest spoken line is
- * such a yes she passes it at once and asks him nothing; an order that names it, other talk, or nothing since, and she reads it back again.
- * Consumed by `hands-tools.ts` (the prepare's answer).
+ * The sentence that tells her which line of his the take recorded as his word, so she sees when it is not the one she passed (the server
+ * records the logged line `said` equals, else his newest). Consumed by `hands-tools.ts` (a take's answer).
  */
-export function rearmStepFor(action: CompanionCeremonyAction, target: CompanionActionTarget, say: string, readBack: string, lapsedAt: string): string {
-  return `Re-armed: it lapsed at ${clockOf(lapsedAt)} and this takes its place. Your read-back from before the lapse still stands for a yes he has said since, and for nothing else. `
-    + `If his newest spoken line is a bare yes, call take_action now with his newest spoken line, exactly as logged, and ask him nothing. `
-    + `If it is anything else (an order that names it, other talk) or he has said nothing since, read it back to him again and stop: ${readBack} His next spoken yes fires it, and so do ${orderingOf(action, target, say)}. ${TAKE_WITH_HIS_LINE}`;
-}
+export const recordedAs = (lineText: string): string => `Recorded as his word: “${clipped(lineText.replace(/\s+/g, ' ').trim(), 160)}”.`;
 
 /** A stamp's local HH:MM, as the prepare's answer says when an action lapses; a stamp that does not parse is "an unknown time". Consumed by `hands-tools.ts`. */
 export function clockOf(stamp: string): string {

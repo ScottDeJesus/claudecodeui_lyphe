@@ -10,10 +10,11 @@ import type { AppError } from '@/shared/utils.js';
  *   - the AUDIO is freed when the next turn starts (`startTurn`) and when `SPEECH_CACHE_TTL_MS` (ten minutes) have passed
  *     since a sentence was last added: one timer, set when a sentence is added and cancelled when the audio is freed, so it
  *     is an expiry and not a poll. The expiry frees audio and nothing else: the turn stays hers, so a sentence asked for
- *     after a long gap inside one running turn is synthesized again;
+ *     after a long gap inside one running turn is synthesized again, and so is one of an earlier turn still asked for;
  *   - freed by `end` when the account is cleared or the server stops, which also retires the turn.
- * The CURRENT turn is the one `startTurn` named last (until `end`); a sentence of any other turn is not speakable, which is
- * how a turn "already cleared" reads as unknown and how a page cannot spend on a turn that is over.
+ * The CURRENT turn is the one `startTurn` named last (until `end`). The door answers any sentence its log still holds, so a
+ * reply a new turn cut short can be heard to its end; a sentence of another turn is spoken only while fresh
+ * (`companion-speech.ts`), and a cleared log reads as unknown, so a page cannot spend on a turn that is long over.
  *
  * A sentence still being synthesized when its audio is freed is not stopped: it finishes for the page that holds it. It
  * is kept as an ORPHAN (outside `turns`, so no new request finds it) for as long as it runs, so that a cut naming its turn
@@ -53,9 +54,9 @@ export type SpeechEntry = {
 
 /** What `createSpeechCache` answers; the account holds one. Consumed by `companion-speech.ts`, `companion-account.ts` and `companion.service.ts`. */
 export type SpeechCache = {
-  /** A new turn began: the audio of the old one is forgotten, and `turnId` is now the only speakable turn. A sentence still being sent to a page finishes for that page, and a cut naming the old turn or `end` still stops it. */
+  /** A new turn began: the audio of the old one is freed and `turnId` is now the current turn. The old turn's sentences may still be asked for while fresh (`companion-speech.ts`), each then synthesized anew and cached under its turn. A sentence still being sent to a page finishes for that page, and a cut naming the old turn or `end` still stops it. */
   startTurn(turnId: string): void;
-  /** Whether `turnId` is the turn whose sentences may be spoken. */
+  /** Whether `turnId` is the turn `startTurn` named last: the running turn, which the door exempts from the freshness window of its sentences. */
   isCurrent(turnId: string): boolean;
   find(turnId: string, index: number): SpeechEntry | undefined;
   /** Adds an entry for a sentence about to be synthesized and starts the cache's ten-minute expiry. */

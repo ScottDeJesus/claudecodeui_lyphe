@@ -10,12 +10,15 @@ import { SessionRows } from '@/modules/station/SessionRows';
 import type { CompanionActivity, CompanionPhase } from '@/shared/companion-types';
 import type { Roadmap } from '@/shared/roadmap-types';
 import type { StationFocus, StationSession } from '@/shared/station-types';
-import type { StationHerMark, StationRegionProps, StationTier } from '@/shared/types';
+import type { StationDensity, StationHerMark, StationRegionProps, StationTier } from '@/shared/types';
 import { ScrollArea } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 type WhereThingsStandViewProps = {
-  /** The arrangement: a column of its own on `wide` and `laptop`, a part of the one stack on `narrow`. */
+  /** The window's tier: a column of its own on `wide` and `laptop`, a section of the one column at `narrow`. */
   tier: StationTier;
+  /** `compact`: a session on one line and a feature on one line, the folds as in full; the rail fills its section and scrolls inside itself. */
+  density: StationDensity;
   /** His chats in her order, each with the line she reads of it; null until the first read has landed. */
   sessions: StationSession[] | null;
   /** Why the first read of his chats failed, in the server's sentence; null while none has (a later failure keeps the rows). */
@@ -42,12 +45,15 @@ type WhereThingsStandViewProps = {
 
 /**
  * WHERE THINGS STAND, the station's left rail (the `sessions` slot): his sessions over the roadmap he selected, in one scroller
- * of the rail's own on the columns, read top to bottom in the narrow stack (whose one scroller it stands in). Every row is a press
+ * of the rail's own, in a column and in compact's section alike. Every row is a press
  * that puts its thing on the stage, the thing on the stage is lit, and nothing is said only under a pointer: a line cut to one line
  * stands whole on the stage its row's press opens.
  *
  * Its sections draw every state of their own: `SessionRows` (reading, failed, no sessions, nothing running, the rows and the asleep
  * fold, her mark) and `RoadmapRows` (reading, no roadmap, nothing open, the open epics and their features, the complete fold).
+ *
+ * AT COMPACT DENSITY (the one-column arrangement's "Where things stand") each chat and each feature is one line, the epics and the
+ * two folds as in full, the two sections closer together; the rail's one scroller fills the section it is given.
  *
  * ONE SCROLLER, NOT TWO. The design gave the sessions and the roadmap a scroller each (`scrollMemory('sessions')` and
  * `scrollMemory('roadmap')`); the rail is drawn as one, remembered under `sessions` alone. Beside the corner the rail's column is
@@ -58,7 +64,7 @@ type WhereThingsStandViewProps = {
  * pictures (`fake/sessions.ts`).
  */
 export function WhereThingsStandView({
-  tier, sessions, failure, onReread, roadmap, focus, her, asleepOpen, onAsleepOpen, completeOpen, onCompleteOpen, onPress, scrollRef,
+  tier, density, sessions, failure, onReread, roadmap, focus, her, asleepOpen, onAsleepOpen, completeOpen, onCompleteOpen, onPress, scrollRef,
 }: WhereThingsStandViewProps) {
   const { t } = useTranslation();
   return (
@@ -69,9 +75,10 @@ export function WhereThingsStandView({
       data-station-rail=""
       className="min-h-0 flex-1"
     >
-      <div className="flex min-w-0 flex-col gap-6 px-2 py-3">
+      <div className={cn('flex min-w-0 flex-col px-2 py-3', density === 'compact' ? 'gap-4' : 'gap-6')}>
         <SessionRows
           tier={tier}
+          density={density}
           sessions={sessions}
           failure={failure}
           onReread={onReread}
@@ -81,7 +88,15 @@ export function WhereThingsStandView({
           onAsleepOpen={onAsleepOpen}
           onPress={onPress}
         />
-        <RoadmapRows tier={tier} roadmap={roadmap} focus={focus} completeOpen={completeOpen} onCompleteOpen={onCompleteOpen} onPress={onPress} />
+        <RoadmapRows
+          tier={tier}
+          density={density}
+          roadmap={roadmap}
+          focus={focus}
+          completeOpen={completeOpen}
+          onCompleteOpen={onCompleteOpen}
+          onPress={onPress}
+        />
       </div>
     </ScrollArea>
   );
@@ -113,7 +128,7 @@ function herMarkOf(t: TFunction, activity: CompanionActivity | null, name: strin
  * The left rail on the page, registered for the `sessions` slot in `stationRegions.ts`: it reads his sessions, the roadmap he
  * selected, her activity, the station's focus and the rail's two folds, and hands them to `WhereThingsStandView`.
  */
-export function WhereThingsStand({ tier }: StationRegionProps) {
+export function WhereThingsStand({ tier, density }: StationRegionProps) {
   const { t } = useTranslation();
   // His chats, the rows the chat's stage and her draft read too (null until the first read lands).
   const { sessions, failure, reread } = useStationSessions();
@@ -133,6 +148,7 @@ export function WhereThingsStand({ tier }: StationRegionProps) {
   return (
     <WhereThingsStandView
       tier={tier}
+      density={density}
       sessions={sessions}
       failure={failure}
       onReread={reread}
@@ -143,8 +159,8 @@ export function WhereThingsStand({ tier }: StationRegionProps) {
       onAsleepOpen={setAsleepOpen}
       completeOpen={completeOpen}
       onCompleteOpen={setCompleteOpen}
-      // A press only stages its thing. Below laptop the stage stands above every rail in the one stack, so bringing it into view
-      // on a focus change is the stage's own work (`StationStage`, once, for every region's press), never this rail's.
+      // A press only stages its thing. Bringing the stage into view on a focus change is the one-column arrangement's work
+      // (`useStationSection`, once, for every region's press), never this rail's.
       onPress={setFocus}
       // The rail's one scroller (see the view's ONE SCROLLER): `sessions` holds its place; no `roadmap` region is registered. The memory
       // follows the scroller only once BOTH sections are drawn: it puts the remembered place back as soon as the content is tall enough,
