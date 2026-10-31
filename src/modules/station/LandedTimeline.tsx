@@ -13,7 +13,7 @@ function LastLookRule({ when }: { when: string }) {
   return (
     <div
       data-strip-rule=""
-      className="flex flex-col-reverse justify-center border-l-2 border-dashed border-garnish py-0.5 pl-2 pr-1 max-md:min-h-11"
+      className="flex flex-col-reverse justify-center border-l-2 border-dashed border-garnish py-0.5 pl-2 pr-1 finger:min-h-11"
     >
       <span className="whitespace-nowrap text-sm leading-5 text-garnish">
         {t('station.strip.rule', { defaultValue: 'You last looked' })}

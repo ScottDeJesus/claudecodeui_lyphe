@@ -514,8 +514,8 @@
 .vv-select__action:hover { background: var(--accent-soft); }
 
 /* Dense form, for narrow chrome. The stock trigger is ~46px tall and towers over the `sm`
-   Button it shares a strip with in the sidebar; this sits at that button's own 36px. Below
-   the sidebar's compact breakpoint the 44px touch floor outranks the density. */
+   Button it shares a strip with in the sidebar; this sits at that button's own 36px. Below 768px
+   and on any touch screen (a phone on its side is 844px across) the 44px touch floor outranks it. */
 .vv-select--sm .vv-select__trigger {
   min-height: 36px;
   padding: 0 10px;
@@ -524,6 +524,6 @@
 .vv-select--sm .vv-select__chevron { font-size: 9px; }
 .vv-select--sm .vv-select__option { padding: 6px 10px; font-size: 13px; }
 .vv-select--sm .vv-select__action { padding: 8px 10px; font-size: 13px; }
-@media (max-width: 767px) {
+@media (pointer: coarse), (max-width: 767.98px) {
   .vv-select--sm .vv-select__trigger { min-height: 44px; }
 }

@@ -15555,7 +15555,7 @@ The page's side: MAN-9113 (pull, switch, cut), MAN-9134 (state), MAN-9112 (playe
 | Events go out through `drain()` only, in enqueue order | the pull frees the next sentence on `start`; out of order it would ask twice or never |
 | The pull never asks more than one ahead: a request stays `pending` until its sentence STARTS | a cut costs at most the sentence in flight and the one ahead |
 | A turn that begins while another is heard is queued behind it, never followed at once; only `silence()` (a press, Stop, Clear), `arm()`, `disarm()` and `release()` empty the queue | an alert's turn must not cut her off; only he does |
-| The press that opens the mic holds the pull until the press that ends it | her voice never enters his clip |
+| The press that opens the mic holds the pull until the press that ends it; a name press is a press: her ears open it through `byName.open()` and close it through `byName.close()`, and the pull is held between | her voice never enters his clip |
 | The cut request settles before the press's clip is uploaded | the cut is owed before the press is pushed, so its message carries `<cut>` |
 | `speaking` is never `null` between two sentences; the status line's order is `cut` > `listening` > `transcribing` > `speaking` | the band and the words must not blink at every join |
 
@@ -18868,22 +18868,22 @@ probe-key: fd938c64d9723cea4f5709306779ff0e3161ee3c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/station-whole-her-lines.txt
 
-## INV-10275 — Kaylee Station's touch law: below 768 px every press is 44 px, nothing is said only on hover, and a kind always has its word
+## INV-10275 — Kaylee Station's touch law: under a finger (a touch screen, or a window under 768 px) every press is 44 px, nothing is said only on hover, and a kind always has its word
 
 Every component of Kaylee Station keeps one law for a finger and one for a pointer's absence. The operator's rework, 2026-10-29: "Mobile capable as well please. Not just small laptop screen". Where each rule is held: the components' rows (MAN-9230, the compact arrangement MAN-9337, MAN-9228, her head MAN-9314, her conversation MAN-9325, her talk control MAN-9324 and the rows of the stage's views); the frame: MAN-9258.
 
 | when | do |
 |---|---|
-| a station component draws a press (a button, a link, a tab, a field) | 44 px tall below 768 px: `max-md:h-11`, and `max-md:w-11` on an icon-only press. On a desk it keeps its own size (the stage's Back and ✕ are 32 px) |
+| a station component draws a press (a button, a link, a tab, a field) | 44 px tall under a finger: `finger:h-11`, and `finger:w-11` on an icon-only press. `finger:` (`tailwind.config.js`) is the kit's own query (`verve/data.css`): a touch screen (`pointer: coarse`) or a window under 768 px. On a desk with a mouse it keeps its own size (the stage's Back and ✕ are 32 px). `max-md:` stays for what a NARROW window lays out differently (a line that wraps, a cell that hides), and never for a press's size in a station or companion file (the shared and owner-drawn presses named in the known edge below still do) |
 | a press has a tooltip | the tooltip only repeats the name the press already carries (`aria-label` or its visible words). The press is the thing itself, so a finger loses nothing. A tap's compatibility mouse events do open the kit `Tooltip`'s bubble (measured 2026-10-30: it stayed over the stage head after a strip landing's tap), so a press that stages a thing hides its bubble where there is no hover: `[@media(hover:none)]:hidden` on the `Tooltip` (`LandedEntry`, MAN-9287; the left rail's session, epic and feature rows, MAN-9288) |
-| a row of the left rail (a chat, an epic, a feature) cuts its line to one line | the line stands whole on the stage the row's press opens, which is how a finger reads it; the row's `Tooltip` only repeats it for a pointer and, with `showOnFocus`, a keyboard. Every row and fold head is a real `<button>`, `max-md:min-h-11` (MAN-9288) |
-| a region draws at `density: 'compact'` (a row on one line, her controls behind one press) | every press in the compact drawing is the same 44 px catch below 768 px: a row (MAN-9289, MAN-9290), a need's act and its words (MAN-9281), the talk button 44 px with its words kept (MAN-9324), "Her controls" `max-md:h-11` and, open, every press of her controls' line (MAN-9314). A row's words are cut to one line and stand whole on the stage |
+| a row of the left rail (a chat, an epic, a feature) cuts its line to one line | the line stands whole on the stage the row's press opens, which is how a finger reads it; the row's `Tooltip` only repeats it for a pointer and, with `showOnFocus`, a keyboard. Every row and fold head is a real `<button>`, `finger:min-h-11` (MAN-9288) |
+| a region draws at `density: 'compact'` (a row on one line, her controls behind one press) | every press in the compact drawing is the same 44 px catch under a finger: a row (MAN-9289, MAN-9290), a need's act and its words (MAN-9281), the talk button 44 px with its words kept (MAN-9324), "Her controls" `finger:h-11` and, open, every press of her controls' line (MAN-9314). A row's words are cut to one line and stand whole on the stage |
 | something would be said only on hover | say it in the press's visible words or its `aria-label`. No tooltip, `title` or hover-only mark holds what a press does not reach |
 | a kind, a state or a tone is shown | glyph AND word, never colour or shape alone (MAN-578). A fallback names its kind in words |
 | a press can be made 44 px without moving its neighbours | grow its catch with a transparent `::before`; the probe counts it as the press's size |
 | a door leaves the page (`openStation`, `openInCloudcli`, `backToCloudcli`) | on a phone or in the home-screen app it navigates in THIS window (MAN-9247); a new window would leave the app for the browser |
 | another module's drawing stands on the stage (`PlanCard`, `FeatureFacts`, `EpicPanel`) | it is that module's to bring up. The station does not resize it; the shots probe REPORTS its presses under 44 px and never fails on them (2026-10-29, 390 px: 18 of 21 presses of the dispatcher's `PlanCard` under 44 px) |
-| the rail's ask, follow-ups or check stage draws another module's presses (the followups ticks and Done fold, Cerberus's card presses and Diagnose, the kit's option row and empty-state button) | those are 44 px below 768 px in the owner's own file (`max-md:min-h-11`, `max-md:h-11`), because the law names every answer there. The probe FAILS any press inside the three stages under 44 px (MAN-9229, MAN-9283) |
+| the rail's ask, follow-ups or check stage draws another module's presses (the followups ticks and Done fold, Cerberus's card presses and Diagnose, the kit's option row and empty-state button) | those are 44 px below 768 px in the owner's own file (`max-md:min-h-11`, `max-md:h-11`), because the law names every answer there; on a touch screen over 768 px they are not yet (the known edge below). The probe FAILS any press inside the three stages under 44 px (MAN-9229, MAN-9283) |
 
 ## `phone` — what is a phone's window
 `useStation().phone` = `innerWidth < 768`, or a touch window (`(pointer: coarse)`) under 500 px tall (a phone on its side). Read by `useStationWindow` on `resize` and on the pointer query's `change`; no timer (MAN-9249).
@@ -18892,12 +18892,14 @@ Every component of Kaylee Station keeps one law for a finger and one for a point
 | `StationShell` | `backToCloudcli(navigate, { phone, pwa })` |
 | `FocusFallback` | `openInCloudcli(path, navigate, { phone, pwa })` |
 | `ChatStage` | `openInCloudcli('/session/<id>', navigate, { phone, pwa })`: "Open the chat" is the window named `cloudcli` on a desktop and this window on a phone (`.verify/kaylee-station-rail-live.mjs`) |
-- The 44 px is CSS, keyed on width (`max-md:`, Tailwind's 768 px), not on `phone`. `phone` decides only which window a door opens in.
+- The 44 px is CSS, keyed on a finger (`finger:`: a touch screen or a window under 768 px), not on `phone`. `phone` decides only which window a door opens in and which arrangement the shell draws. A phone on its side (844 px across, a touch screen) is a finger's window, so its presses are 44 px there as upright.
 - The workspace's two doors into the station (the palette's row, her panel's head) read `useDeviceSettings().isMobile` (under 768 px), so a phone on its side in a plain browser tab gets the station in a window of its own from them and then navigates in place from the bar. In the home-screen app all three agree through `pwa` (MAN-9247).
-- The phone's own arrangement, with the talk control under his thumb, is the phone plan's. Until it lands a phone draws the compact arrangement (MAN-9337): its window is under 1024 px, which is compact's. The phone's arrangement draws `StationSectionsView` and reads `useStationSection` (MAN-9335, MAN-9344), not a copy.
+- The phone's own arrangement, with the talk control under his thumb (`StationPhoneView`, MAN-9370), is what the shell draws whenever `phone` is true, before compact (MAN-9337), which stays the second monitor's and the tablet's. It draws `StationSectionsView` and reads `useStationSection` (MAN-9335, MAN-9344), not a copy.
+- Its own presses are 44 px catches on its side too, whatever the width: where a press is drawn shorter than the row (40 px sideways) its catch grows by a transparent `::before` (`STATION_SIDEWAYS_CATCH`, `STATION_COUNT_FORM_CATCH`).
+- Known edge: the presses ANOTHER module owns and draws on the stage still key on width (`max-md:`): the kit's `QuestionOptionRow`, `EmptyState`, `ConfirmDialog`, `ViewBoundary` and `SphereView`, the followups module's rows and Cerberus's card presses (`NeedFix`, `NeedsYouCard`, `DiagnoseButton`, `DiagnosisPanel`…). A phone on its side (844 px across, a touch screen) draws them desk-sized. They are shared across the app, so moving them to `finger:` changes every screen that draws them and wants its own review. The shots probe cannot see them: no fixture picture at 844×390 draws one, and presses inside another module's drawing are REPORTED, never failed.
 
 ## Proof
-`.verify/kaylee-station-shots.mjs` `touch` check at 390×844: the shell's own presses, every region's, every press on the rail's three stages and every press of her cards (`NoteStage`, `WalkStage`, `StageShelf`) must be ≥ 44 px (MAN-9229, MAN-9295, MAN-9296, MAN-9297). In the compact arrangement (`lib/station-compact.mjs`, MAN-9336) the same check runs at 600×900 (a mouse) and 390×844 (touch), with compact's own presses among the shell's: the switch's segments, its buttons below 480 px (two to a row), the count of what needs him and the bar's Compact label; and on the phone with the keyboard up, her draft's card, its target and its sends a 44 px catch where they stand above the keys (`lib/station-compact.mjs`'s keyboard run); in a mouse window, however short (600×900, 700×900, 600×620, and 1280×600 with the switch on), a field or a dock button focused folds nothing and moves nothing: the folds wait on a touch screen as well as a short column. `.verify/kaylee-station-density.mjs` (MAN-9328) draws every region at compact density at the same two sizes and measures every press, "Her controls" open included; its box's Send is measured after one typed letter. A disabled press (her box's Send while the field is empty) is measured with its `pointer-events` lifted for the measure: the kit's `disabled:pointer-events-none` hides it from `elementFromPoint` under a mouse (not under touch), which read its 32 px box at 600 px and never its 44 px catch. `.verify/station-doors.mjs` check 7: every button, link, tab and field in the shell is a 44 px catch on the phone (MAN-9253). `.verify/kaylee-station-rail-live.mjs`, live at 390×844 with touch: every row and fold head of the left rail is ≥ 44 px (the folds exactly 44) and a pressed session's stage stands up with its line whole (leg E: its known edge is in MAN-9306).
+`.verify/kaylee-station-shots.mjs` `touch` check at 390×844: the shell's own presses, every region's, every press on the rail's three stages and every press of her cards (`NoteStage`, `WalkStage`, `StageShelf`) must be ≥ 44 px (MAN-9229, MAN-9295, MAN-9296, MAN-9297). In the compact arrangement (`lib/station-compact.mjs`, MAN-9336) the same check runs at 600×900 (a mouse) and 390×844 (touch), with compact's own presses among the shell's: the switch's segments, its buttons below 480 px (two to a row), the count of what needs him and the bar's Compact label; and on the phone with the keyboard up, her draft's card, its target and its sends a 44 px catch where they stand above the keys (`lib/station-compact.mjs`'s keyboard run); the phone's arrangement (`lib/station-phone.mjs`, MAN-9373) at 390×844, 360×780, 390×664 and 844×390 (on its side, where every region's and the stage's presses are 44 px under `finger:` and the kit's `.vv-select--sm` as well), its own presses among the shell's: the bar's four sections, the round talk control, the count, her menu's trigger and the action's line; in a mouse window, however short (600×900, 700×900, 600×620, and 1280×600 with the switch on), a field or a dock button focused folds nothing and moves nothing: the folds wait on a touch screen as well as a short column. `.verify/kaylee-station-density.mjs` (MAN-9328) draws every region at compact density at the same two sizes and measures every press, "Her controls" open included; its box's Send is measured after one typed letter. A disabled press (her box's Send while the field is empty) is measured with its `pointer-events` lifted for the measure: the kit's `disabled:pointer-events-none` hides it from `elementFromPoint` under a mouse (not under touch), which read its 32 px box at 600 px and never its 44 px catch. `.verify/station-doors.mjs` check 7: every button, link, tab and field in the shell is a 44 px catch on the phone (MAN-9253). `.verify/kaylee-station-rail-live.mjs`, live at 390×844 with touch: every row and fold head of the left rail is ≥ 44 px (the folds exactly 44) and a pressed session's stage stands up with its line whole (leg E: its known edge is in MAN-9306).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionCardChip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/AskAnswers.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/AskStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/cardBodies.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/ChatStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/CheckStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/FocusFallback.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/FollowupsStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NeedItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NoteStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/PageStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RailRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RoadmapRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/SessionRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StageShelf.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationConversation.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationSections.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationTalk.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WalkStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhatNeedsYou.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhereThingsStand.tsx
 
@@ -21641,3 +21643,713 @@ measured 2026-10-30 by chain chain-kaylee--wake-word--engine-20261030-161212-350
 probe-key: 0aa9bfa3b67a41e2cfb196cfa524b0bd5a3b4f11
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/vite-ears-build.config.mjs
+
+## INV-10455 — probe — a name press closed `gone` because the floor moved retakes the floor for the page that lost it
+
+a name press closed `gone` because the floor moved retakes the floor for the page that lost it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+export D
+cat > "$D/p.mjs" <<'EOF'
+import { join } from 'node:path';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { reloadApp } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs';
+import { composeWake } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/wake-compose.mjs';
+const APP = process.env.PROBE_APP; if (!APP || APP.endsWith(':5183')) process.exit(2);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (f, ms) => { const end = Date.now() + ms; for (;;) { const v = await f(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await sleep(100); } };
+const S = (silenceMs) => ({ silenceMs }); const C = (c) => ({ clip: `kaylee-wake-${c}.wav` });
+const DOOR = ':is(button[data-companion-door], [data-companion-fab] > .vv-fab):visible';
+async function open(parts, { on = true } = {}) {
+  const wav = join(process.env.D, `s${Math.random().toString(36).slice(2, 7)}.wav`); composeWake(parts, wav);
+  const s = await openConsole({ appUrl: APP, navigationTimeout: 120000, hotUpdates: false, launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${wav}%noloop`] }, contextOptions: { permissions: ['microphone'] } });
+  await s.page.context().addInitScript((on) => {
+    try { localStorage.setItem('companion-voice', 'off'); if (on) localStorage.setItem('companion-ears', 'on'); } catch { /* none */ }
+    window.__t = []; window.__c = []; window.__n = []; window.__gd = 0;
+    const g = navigator.mediaDevices?.getUserMedia.bind(navigator.mediaDevices);
+    if (g) navigator.mediaDevices.getUserMedia = async (c) => { if (window.__gd) await new Promise((r) => setTimeout(r, window.__gd)); const st = await g(c); st.getAudioTracks().forEach((t) => window.__t.push(t)); return st; };
+    const AC = window.AudioContext; window.AudioContext = class extends AC { constructor(...a) { super(...a); window.__c.push(this); } };
+    const st = OscillatorNode.prototype.start; OscillatorNode.prototype.start = function (w) { window.__n.push(Math.round(this.frequency.value)); return st.call(this, w); };
+  }, on);
+  await reloadApp(s.page);
+  const api = (p, m = 'GET', j) => s.page.evaluate(async ([p, m, j]) => { const r = await fetch('/api/companion' + p, { method: m, headers: { Authorization: 'Bearer ' + localStorage.getItem('auth-token'), 'x-companion-client': sessionStorage.getItem('companion-client-id'), ...(j ? { 'content-type': 'application/json' } : {}) }, body: j ? JSON.stringify(j) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } }, [p, m, j]);
+  const row = () => s.page.evaluate(() => document.querySelector('[data-companion-ears]')?.getAttribute('data-companion-ears') ?? null);
+  const panel = async () => { await s.page.locator(DOOR).first().click(); await s.page.locator('[data-companion-panel]').waitFor({ timeout: 15000 }); };
+  const id = () => s.page.evaluate(() => sessionStorage.getItem('companion-client-id'));
+  const live = () => s.page.evaluate(() => window.__t.filter((t) => t.readyState === 'live').length);
+  return { ...s, api, row, panel, id, live };
+}
+const haiku = (s) => s.api('/clear', 'POST').then(() => s.api('/settings', 'PUT', { name: 'Kaylee', model: 'haiku' }));
+
+const a = await open([S(2000), C('hold'), S(6000), C('close'), S(6000)]);
+const b = await open([S(2000), C('passing'), S(60000)], { on: false });
+await haiku(a);
+// a's name press goes to the REAL scratch door with its duration forced to 0: the empty press (no Gemini call), whose first act is the floor take.
+await a.page.route('**/api/companion/press', async (route) => {
+  const req = route.request(); const text = req.postDataBuffer().toString('latin1').replace(/(name="durationMs"\r\n\r\n)\d+/, '$10');
+  const headers = { ...req.headers() }; delete headers['content-length'];
+  await route.fulfill({ response: await route.fetch({ postData: Buffer.from(text, 'latin1'), headers }) });
+});
+const aid = await a.id(); const bid = await b.id();
+await a.panel(); await until(async () => (await a.row()) === 'hearing', 120000); await sleep(1000);
+await b.panel();
+const seen = []; const t0 = Date.now();
+for (let i = 0; i < 24; i++) { const f = (await a.api('/')).floor; const tag = f === aid ? 'a' : f === bid ? 'b' : String(f); if (seen.at(-1)?.[1] !== tag) seen.push([Date.now() - t0, tag]); await sleep(250); }
+console.log(`floor over 6 s after b took it while a's name press was open: ${JSON.stringify(seen)}`);
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+COMPANION_EARS_DIR="${EARS_WARM:-$D/ears}" SUNSET_SLOT="${PROBE_SLOT:-6}" KAYLEE_EYES_PLANS="" bash .verify/kaylee-eyes-scratch.sh node "$D/p.mjs"
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-10-30 by chain chain-kaylee--wake-word--page-20261030-174647-fee0, finding M1, MEDIUM
+probe-key: d97bdb4d322e0e3ad5cf3186a92f92bf7e234f05
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useEars.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earcons.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ears-page-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ears-page-switch.mjs
+
+## INV-10456 — probe — an in-document hop between providers (workspace ⇄ `/station`) forgets the first touch and leaves the old AudioContext running
+
+an in-document hop between providers (workspace ⇄ `/station`) forgets the first touch and leaves the old AudioContext running
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+export D
+cat > "$D/p.mjs" <<'EOF'
+import { join } from 'node:path';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { reloadApp } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs';
+import { composeWake } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/wake-compose.mjs';
+const APP = process.env.PROBE_APP; if (!APP || APP.endsWith(':5183')) process.exit(2);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (f, ms) => { const end = Date.now() + ms; for (;;) { const v = await f(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await sleep(100); } };
+const S = (silenceMs) => ({ silenceMs }); const C = (c) => ({ clip: `kaylee-wake-${c}.wav` });
+const DOOR = ':is(button[data-companion-door], [data-companion-fab] > .vv-fab):visible';
+async function open(parts, { on = true } = {}) {
+  const wav = join(process.env.D, `s${Math.random().toString(36).slice(2, 7)}.wav`); composeWake(parts, wav);
+  const s = await openConsole({ appUrl: APP, navigationTimeout: 120000, hotUpdates: false, launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${wav}%noloop`] }, contextOptions: { permissions: ['microphone'] } });
+  await s.page.context().addInitScript((on) => {
+    try { localStorage.setItem('companion-voice', 'off'); if (on) localStorage.setItem('companion-ears', 'on'); } catch { /* none */ }
+    window.__t = []; window.__c = []; window.__n = []; window.__gd = 0;
+    const g = navigator.mediaDevices?.getUserMedia.bind(navigator.mediaDevices);
+    if (g) navigator.mediaDevices.getUserMedia = async (c) => { if (window.__gd) await new Promise((r) => setTimeout(r, window.__gd)); const st = await g(c); st.getAudioTracks().forEach((t) => window.__t.push(t)); return st; };
+    const AC = window.AudioContext; window.AudioContext = class extends AC { constructor(...a) { super(...a); window.__c.push(this); } };
+    const st = OscillatorNode.prototype.start; OscillatorNode.prototype.start = function (w) { window.__n.push(Math.round(this.frequency.value)); return st.call(this, w); };
+  }, on);
+  await reloadApp(s.page);
+  const api = (p, m = 'GET', j) => s.page.evaluate(async ([p, m, j]) => { const r = await fetch('/api/companion' + p, { method: m, headers: { Authorization: 'Bearer ' + localStorage.getItem('auth-token'), 'x-companion-client': sessionStorage.getItem('companion-client-id'), ...(j ? { 'content-type': 'application/json' } : {}) }, body: j ? JSON.stringify(j) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } }, [p, m, j]);
+  const row = () => s.page.evaluate(() => document.querySelector('[data-companion-ears]')?.getAttribute('data-companion-ears') ?? null);
+  const panel = async () => { await s.page.locator(DOOR).first().click(); await s.page.locator('[data-companion-panel]').waitFor({ timeout: 15000 }); };
+  const id = () => s.page.evaluate(() => sessionStorage.getItem('companion-client-id'));
+  const live = () => s.page.evaluate(() => window.__t.filter((t) => t.readyState === 'live').length);
+  return { ...s, api, row, panel, id, live };
+}
+const haiku = (s) => s.api('/clear', 'POST').then(() => s.api('/settings', 'PUT', { name: 'Kaylee', model: 'haiku' }));
+
+const s = await open([S(1000), C('passing'), S(70000)]);
+await s.panel(); await until(async () => (await s.row()) === 'waiting', 120000);
+await s.page.evaluate(() => { history.pushState({}, '', '/station'); dispatchEvent(new PopStateEvent('popstate')); });
+await s.page.locator('[data-station-head]').first().waitFor({ state: 'visible', timeout: 60000 }); await sleep(9000);
+const before = await s.row();
+await s.page.mouse.click(300, 300); await until(async () => (await s.row()) === 'waiting', 120000); await sleep(1500);
+const ctx = await s.page.evaluate(() => window.__c.filter((c) => c.state !== 'closed').length);
+console.log(`after the in-app hop to /station: row ${before}; after one tap there: ${ctx} audio contexts not closed, ${await s.live()} live microphone track(s)`);
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+COMPANION_EARS_DIR="${EARS_WARM:-$D/ears}" SUNSET_SLOT="${PROBE_SLOT:-6}" KAYLEE_EYES_PLANS="" bash .verify/kaylee-eyes-scratch.sh node "$D/p.mjs"
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-10-30 by chain chain-kaylee--wake-word--page-20261030-174647-fee0, finding L1, LOW
+probe-key: c786b71a419df976773f59c3b0bec0fec8d02914
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useEars.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earcons.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ears-page-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ears-page-switch.mjs
+
+## INV-10457 — probe — turning the device's switch off in another tab leaves this tab's microphone open
+
+turning the device's switch off in another tab leaves this tab's microphone open
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+export D
+cat > "$D/p.mjs" <<'EOF'
+import { join } from 'node:path';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { reloadApp } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs';
+import { composeWake } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/wake-compose.mjs';
+const APP = process.env.PROBE_APP; if (!APP || APP.endsWith(':5183')) process.exit(2);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (f, ms) => { const end = Date.now() + ms; for (;;) { const v = await f(); if (v) return v; if (Date.now() > end) throw new Error('timed out'); await sleep(100); } };
+const S = (silenceMs) => ({ silenceMs }); const C = (c) => ({ clip: `kaylee-wake-${c}.wav` });
+const DOOR = ':is(button[data-companion-door], [data-companion-fab] > .vv-fab):visible';
+async function open(parts, { on = true } = {}) {
+  const wav = join(process.env.D, `s${Math.random().toString(36).slice(2, 7)}.wav`); composeWake(parts, wav);
+  const s = await openConsole({ appUrl: APP, navigationTimeout: 120000, hotUpdates: false, launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${wav}%noloop`] }, contextOptions: { permissions: ['microphone'] } });
+  await s.page.context().addInitScript((on) => {
+    try { localStorage.setItem('companion-voice', 'off'); if (on) localStorage.setItem('companion-ears', 'on'); } catch { /* none */ }
+    window.__t = []; window.__c = []; window.__n = []; window.__gd = 0;
+    const g = navigator.mediaDevices?.getUserMedia.bind(navigator.mediaDevices);
+    if (g) navigator.mediaDevices.getUserMedia = async (c) => { if (window.__gd) await new Promise((r) => setTimeout(r, window.__gd)); const st = await g(c); st.getAudioTracks().forEach((t) => window.__t.push(t)); return st; };
+    const AC = window.AudioContext; window.AudioContext = class extends AC { constructor(...a) { super(...a); window.__c.push(this); } };
+    const st = OscillatorNode.prototype.start; OscillatorNode.prototype.start = function (w) { window.__n.push(Math.round(this.frequency.value)); return st.call(this, w); };
+  }, on);
+  await reloadApp(s.page);
+  const api = (p, m = 'GET', j) => s.page.evaluate(async ([p, m, j]) => { const r = await fetch('/api/companion' + p, { method: m, headers: { Authorization: 'Bearer ' + localStorage.getItem('auth-token'), 'x-companion-client': sessionStorage.getItem('companion-client-id'), ...(j ? { 'content-type': 'application/json' } : {}) }, body: j ? JSON.stringify(j) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } }, [p, m, j]);
+  const row = () => s.page.evaluate(() => document.querySelector('[data-companion-ears]')?.getAttribute('data-companion-ears') ?? null);
+  const panel = async () => { await s.page.locator(DOOR).first().click(); await s.page.locator('[data-companion-panel]').waitFor({ timeout: 15000 }); };
+  const id = () => s.page.evaluate(() => sessionStorage.getItem('companion-client-id'));
+  const live = () => s.page.evaluate(() => window.__t.filter((t) => t.readyState === 'live').length);
+  return { ...s, api, row, panel, id, live };
+}
+const haiku = (s) => s.api('/clear', 'POST').then(() => s.api('/settings', 'PUT', { name: 'Kaylee', model: 'haiku' }));
+
+const a = await open([S(1000), C('passing'), S(70000)]);
+await a.panel(); await until(async () => (await a.row()) === 'waiting', 120000);
+const b = await a.page.context().newPage();
+await b.route('**/api/companion/floor', (r) => r.fulfill({ status: 204, body: '' }));
+await b.goto(APP); await b.locator(DOOR).first().waitFor({ timeout: 90000 }); await b.locator(DOOR).first().click();
+await b.locator('[data-companion-panel]').waitFor({ timeout: 30000 });
+await b.getByRole('switch', { name: 'Listen for her name on this device' }).click(); await sleep(5000);
+console.log(`storage says ${await b.evaluate(() => localStorage.getItem('companion-ears'))}; tab a has ${await a.live()} live microphone track(s) and its row reads ${await a.row()}`);
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+COMPANION_EARS_DIR="${EARS_WARM:-$D/ears}" SUNSET_SLOT="${PROBE_SLOT:-6}" KAYLEE_EYES_PLANS="" bash .verify/kaylee-eyes-scratch.sh node "$D/p.mjs"
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-10-30 by chain chain-kaylee--wake-word--page-20261030-174647-fee0, finding L2, LOW
+probe-key: b8b6159fec24883906500bc4fe5972236607a5cc
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useEars.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earcons.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ears-page-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ears-page-switch.mjs
+
+## INV-10458 — probe — a WAV name press leaves as `recording.webm`
+
+a WAV name press leaves as `recording.webm`
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "wav known to recordingFileName: $(sed -n '/export function recordingFileName/,/^}/p' src/shared/utils.ts | grep -c -i wav)"
+echo "the press route reads the part's own type: $(grep -c 'file.mimetype' server/modules/companion/companion.routes.ts)"
+```
+
+measured 2026-10-30 by chain chain-kaylee--wake-word--page-20261030-174647-fee0, finding L3, LOW
+probe-key: 392a3e89e165c90588608473b0ef1d732c3be8ec
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useEars.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earcons.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ears-page-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ears-page-switch.mjs
+
+## INV-10459 — src/modules/companion — her ears: the rules later edits keep
+
+The page (MAN-9367), the machine (MAN-9352), the worker (MAN-9353), the files (MAN-9366), the press door (MAN-9272). The worker's and the engine's own rules: INV-10431, INV-10432, INV-10433.
+
+| rule | why |
+|---|---|
+| Only the page that holds the floor listens: `useEars` arms only while `picture.floor === clientId`; any other page opens no microphone and loads no model | two pages hearing one "Kaylee" would push two presses |
+| The mic opens only after the models are ready: `engine.arm()` resolves, THEN `getUserMedia`; every disarm closes the mic at once | the mic is never open while nothing can listen |
+| Nothing leaves the page before her name: the worker keeps the last 5 s of sound in memory (`EARS.ringSeconds`), overwritten as it goes, never stored or sent; the first sound that goes to the server is a clip uploaded by `door.close` after a press opened | operator, 2026-10-30: "ideally nothing leaves the browser until the wake word is heard" |
+| A segment that starts while she sounds, within `herTailMs` (600 ms) after her voice stops, or while his button records, never opens a press (the page is told by `her-voice` and `button`) | her own voice would call her |
+| Her name must OPEN what he says, after greetings only; in the middle of a sentence it never opens | no recognizer separates "Kaylee" from "Kelly" by spelling; position does (MAN-9364) |
+| The tones never pass through her player: `earcons.ts` plays on the ears' own `AudioContext`, straight to its destination | the player's analyser moves her mouth, and her voice switch must not silence a cue |
+| Every byte the ears load comes from CloudCLI's own server: `allowRemoteModels = false`, `localModelPath` = the files route, `wasmPaths` = the app's own build, `env.fetch` adds the sign-in header to the files route only; the route serves manifest entries only, each checked against its SHA-256 | the page asks no third party; a path outside the manifest names nothing |
+| Arming follows events (the switch, the `storage` event, the floor's frame, the first touch, `devicechange`, a track's `ended`); the machine's time is the audio's own frames; nothing polls | operator: events, never a watchdog |
+| A name press takes the floor only while no page holds it (`companion-press.ts`) | a clip a page held when the floor moved away (its ears closed `gone`) must not undo the move |
+| `useMicRecorder` and a button press's recording, upload and hearing stay as they were; the only new behaviour of the button is ending a name press that is open (`toggle()` → `finishNamePress`) | ruling 3: everything that exists today stays |
+| The server cuts her name and the close from a name press's transcript before it is logged or pushed (`stripCall`), and asks Gemini for no second check of the name | ruling 2: what he says after the wake word is the press; Gemini wrote one real "Kaylee" as "Gilly" |
+| The switch is the device's: off until he turns it on (`localStorage['companion-ears']`), and a storage that refuses the read is off | a microphone opens only by his word |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-press.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/ears/ears-files.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/ears/ears.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useEars.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earcons.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts
+
+## INV-10461 — .verify/lib/console.mjs — openConsole in project mode PATCHes the LIVE :3011 dev account's simpleChatList whatever appUrl says
+
+Measured 2026-10-30 (`kaylee-wake-whole.mjs`, first runs, twice per run): a probe on the SCRATCH stack (`appUrl` = the stager's client) moved the dev account `verve` on the live :3011 from `simpleChatList` unset to `false`.
+
+- Cause: `parkOnProjectTree` (run when `openConsole` has `project: true`, the default) sends `PATCH ${API_URL}/api/user/preferences` with `{simpleChatList: false}`; `API_URL` is the constant `http://127.0.0.1:3011`, never `PROBE_API`.
+- Every project-mode driver has done the same; the value on the live account is the harness's, not the operator's.
+
+| when | do |
+|---|---|
+| the page needs no project (her door is in the app shell) | `openConsole({ appUrl, project: false, … })` — as `lib/ears-page-kit.mjs` `openBrowser` and `kaylee-memory-corner-whole.mjs` do |
+| the page needs a project row | project mode writes to :3011; say so in the driver's header |
+| a new scratch-stack driver | grep it for `project:` before the first run |
+
+Open: `parkOnProjectTree` should send its PATCH to `PROBE_API` when the stager sets it (shared by many drivers; needs its own review).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs
+
+## INV-10462 — probe — . MEDIUM — an open microphone has no Stop in reach once the keys are up
+
+. MEDIUM — an open microphone has no Stop in reach once the keys are up
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$(dirname "$0")" || exit 1
+cat > p.mjs <<'JS'
+import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
+import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
+const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES }, launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] } });
+const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 390, height: 844 }, storageState: await S.page.context().storageState() });
+await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
+await ctx.grantPermissions(["microphone"], { origin: APP_URL });
+await ctx.route("**/api/companion/press", (r) => r.fulfill({ status: 202, contentType: "application/json", body: '{"text":""}' }));
+const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
+await p.locator('[data-station-phone-bar] [data-companion-talk-size="round"] button').tap(); await sleep(600);
+await p.locator('[data-station-section=conversation] textarea').first().tap();
+await p.evaluate(() => { Object.defineProperty(visualViewport, "height", { configurable: true, get: () => innerHeight - 336 }); visualViewport.dispatchEvent(new Event("resize")); }); await sleep(500);
+console.log(JSON.stringify(await p.evaluate(() => ({ talk: document.querySelector("[data-companion-talk]")?.dataset.companionTalk ?? "none", keyboard: document.documentElement.dataset.keyboard,
+  talkVisible: !!document.querySelector("[data-companion-talk]")?.getClientRects().length,
+  visibleStops: [...document.querySelectorAll("button,[role=button]")].filter((b) => b.getClientRects().length && /stop|cancel|talk|listen|record|microphone/i.test(b.getAttribute("aria-label") ?? "")).map((b) => b.getAttribute("aria-label")) }))));
+await S.browser.close();
+JS
+timeout 100 node p.mjs 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: {"talk":"listening","keyboard":"up","talkVisible":false,"visibleStops":[]} (cured: `talkVisible` true or a stop in `visibleStops`)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding M1, MEDIUM
+probe-key: d34227fd085daf2a315c1ab42f01066b828a8294
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
+
+## INV-10463 — probe — . LOW — a long unbroken stage label spills out of its press over the neighbours and the screen edge
+
+. LOW — a long unbroken stage label spills out of its press over the neighbours and the screen edge
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$(dirname "$0")" || exit 1
+cat > p.mjs <<'JS'
+import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
+import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
+const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
+const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 360, height: 780 }, storageState: await S.page.context().storageState() });
+await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
+await ctx.addInitScript(() => localStorage.setItem("kaylee-station", JSON.stringify({ focus: { kind: "chat", sessionId: "aaaaaaaa-0000-4000-8000-000000000001", label: "a_very_long_unbroken_feature_label_with_no_spaces_at_all_0123456789" }, stack: [], scroll: {}, prefs: {} })));
+const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
+console.log(JSON.stringify(await p.evaluate(() => { const press = document.querySelector("[data-station-phone-section=stage]"); const a = press.getBoundingClientRect(), w = press.querySelector("[data-station-phone-word]").getBoundingClientRect();
+  return { pressLeft: Math.round(a.left), pressRight: Math.round(a.right), wordLeft: Math.round(w.left), wordRight: Math.round(w.right), wordOutsidePress: w.left < a.left - 1 || w.right > a.right + 1, pressClips: getComputedStyle(press).overflow }; })));
+await S.browser.close();
+JS
+timeout 100 node p.mjs 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: {"pressLeft":285,"pressRight":354,"wordLeft":149,"wordRight":491,"wordOutsidePress":true,...} (cured: `wordOutsidePress` false)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L1, LOW
+probe-key: c387b96308fc47b80d5e845b2abb0664f26e8412
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
+
+## INV-10464 — probe — . LOW — `data-keyboard` marks `up` for any gap over 0, so a sub-pixel gap hides the bar
+
+. LOW — `data-keyboard` marks `up` for any gap over 0, so a sub-pixel gap hides the bar
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$(dirname "$0")" || exit 1
+cat > p.mjs <<'JS'
+import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
+import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
+const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
+const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 390, height: 844 }, storageState: await S.page.context().storageState() });
+await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
+
+const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
+await p.evaluate(() => { Object.defineProperty(visualViewport, "height", { configurable: true, get: () => innerHeight - 0.4 }); visualViewport.dispatchEvent(new Event("resize")); });
+console.log(JSON.stringify(await p.evaluate(() => ({ keyboard: document.documentElement.dataset.keyboard, keyboardHeight: document.documentElement.style.getPropertyValue("--keyboard-height"), footDisplay: getComputedStyle(document.querySelector("[data-station-phone-foot]")).display }))));
+await S.browser.close();
+JS
+timeout 100 node p.mjs 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: {"keyboard":"up","keyboardHeight":"0.39999999999997726px","footDisplay":"none"} (cured: `down`, `block`)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L2, LOW
+probe-key: 709472925b5383307b4d2d0ab4becec5aeef2452
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
+
+## INV-10465 — probe — . LOW — "healed means deleted": statements this phase made false still stand
+
+. LOW — "healed means deleted": statements this phase made false still stand
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "MANUAL rows still saying a phone draws compact: $(grep -ci 'A phone draws `compact`' MANUAL.md)"
+echo "MAN-9375 slots line limiting density compact to the compact arrangement: $(grep -c 'density` = `compact` while the arrangement is `compact`, else `full`' MANUAL.md)"
+echo "stale comments (StationCompact.tsx, cloudcliDoors.ts): $(grep -c "a phone until the phone's own\|and, later, the phone's menu" src/modules/station/StationCompact.tsx src/shared/cloudcliDoors.ts | tr '\n' ' ')"
+EOF
+bash "$D/p.sh"
+# expect: a count of 3, a count of 1, and one hit in each comment file (cured: all 0)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L3, LOW
+probe-key: e61a30c733ac74315003aa0fb5197601d772dc3b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
+
+## INV-10466 — probe — . LOW — after a pending action lapses, the needs count still counts it and an empty wrapper stays
+
+. LOW — after a pending action lapses, the needs count still counts it and an empty wrapper stays
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$(dirname "$0")" || exit 1
+cat > p.mjs <<'JS'
+import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
+import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
+const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
+const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 390, height: 844 }, storageState: await S.page.context().storageState() });
+await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
+await ctx.route("**/api/companion", async (route) => { if (route.request().method() !== "GET") return route.continue(); const r = await route.fetch(); const j = await r.json();
+  j.pending = { id: "athena-1", action: "queue", target: { kind: "card", name: "lane-drag", spoken: "Lane drag", arc: null }, prompt: null, carried: [], say: "Queue Lane drag", preparedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 7000).toISOString() };
+  await route.fulfill({ response: r, body: JSON.stringify(j), headers: { ...r.headers(), "content-type": "application/json" } }); });
+const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
+const snap = () => p.evaluate(() => ({ count: document.querySelector("[data-station-phone-needs]")?.dataset.stationPhoneNeeds, itemsDrawn: document.querySelectorAll("[data-station-section=needs] li[data-station-need]").length, card: !!document.querySelector("[data-station-section=needs] [data-companion-action]"), line: !!document.querySelector("[data-companion-action-line-row]"), emptyWrapper: !!document.querySelector("[data-station-phone-pending]") && !document.querySelector("[data-companion-action-line-row]") }));
+await p.locator("[data-station-phone-section=needs]").tap(); await sleep(300); console.log("standing", JSON.stringify(await snap()));
+await sleep(9000); console.log("lapsed  ", JSON.stringify(await snap()));
+await S.browser.close();
+JS
+timeout 100 node p.mjs 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: "lapsed" prints count 12 against itemsDrawn 11, card false, line false, emptyWrapper true (cured: count 11, emptyWrapper false)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L4, LOW
+probe-key: 5218145f2845af9adf118dc214293ed8c6bee593
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
+
+## INV-10467 — probe — . LOW — the pending line's tap selects Needs you but can leave the card scrolled out of sight
+
+. LOW — the pending line's tap selects Needs you but can leave the card scrolled out of sight
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$(dirname "$0")" || exit 1
+cat > p.mjs <<'JS'
+import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
+import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
+const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
+const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 390, height: 844 }, storageState: await S.page.context().storageState() });
+await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
+await ctx.route("**/api/companion", async (route) => { if (route.request().method() !== "GET") return route.continue(); const r = await route.fetch(); const j = await r.json();
+  j.pending = { id: "athena-1", action: "queue", target: { kind: "card", name: "lane-drag", spoken: "Lane drag", arc: null }, prompt: null, carried: [], say: "Queue Lane drag", preparedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 600000).toISOString() };
+  await route.fulfill({ response: r, body: JSON.stringify(j), headers: { ...r.headers(), "content-type": "application/json" } }); });
+const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
+await p.locator("[data-station-phone-section=needs]").tap(); await sleep(300);
+await p.evaluate(() => { const r = document.querySelector("[data-station-section=needs]"); const s = [r, ...r.querySelectorAll("*")].find((e) => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1); if (s) s.scrollTop = s.scrollHeight; });
+await p.locator("[data-station-phone-section=where]").tap(); await sleep(300);
+await p.locator("[data-station-phone-pending] [data-companion-action-line-row]").tap(); await sleep(700);
+console.log(JSON.stringify(await p.evaluate(() => { const sec = document.querySelector("[data-station-section=needs]"), card = sec.querySelector("[data-companion-action]"), c = card?.getBoundingClientRect(), s = sec.getBoundingClientRect();
+  return { section: document.querySelector("[data-station-phone]").dataset.stationPhone, cardTop: c ? Math.round(c.top) : null, sectionTop: Math.round(s.top), cardInView: !!c && c.top >= s.top - 1 && c.bottom <= s.bottom + 1 }; })));
+await S.browser.close();
+JS
+timeout 100 node p.mjs 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: {"section":"needs","cardTop":-138,"sectionTop":110,"cardInView":false} (cured: cardInView true)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L5, LOW
+probe-key: 65fd4f53b67b85c88531d96758c2e6b6561e4c86
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
+
+## INV-10468 — probe — . LOW — the new proof's "the pending line is gone" half cannot fail
+
+. LOW — the new proof's "the pending line is gone" half cannot fail
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$(dirname "$0")" || exit 1
+cat > p.mjs <<'JS'
+import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
+import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
+const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
+const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 390, height: 844 }, storageState: await S.page.context().storageState() });
+await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
+
+const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
+console.log(JSON.stringify(await p.evaluate(() => ({ pendingWrapperDrawn: document.querySelector("[data-station-phone-pending]") !== null }))));
+await S.browser.close();
+JS
+timeout 100 node p.mjs 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: {"pendingWrapperDrawn":false}: the account holds no pending action, so the script's `pendingShown` is false whatever the CSS does (cured: the script stubs a pending action and the line reads true before the keys rise)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L6, LOW
+probe-key: 5d4db1511c56ad4674589427ae48566f29379465
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
+
+## INV-10469 — probe — . LOW — with the keys up on its side, her conversation is a sliver
+
+. LOW — with the keys up on its side, her conversation is a sliver
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$(dirname "$0")" || exit 1
+cat > p.mjs <<'JS'
+import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
+import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
+const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
+const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 844, height: 390 }, storageState: await S.page.context().storageState() });
+await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
+
+const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
+await p.locator("[data-station-section=conversation] textarea").first().tap(); await sleep(300);
+await p.evaluate(() => { Object.defineProperty(visualViewport, "height", { configurable: true, get: () => innerHeight - 190 }); visualViewport.dispatchEvent(new Event("resize")); }); await sleep(500);
+console.log(JSON.stringify(await p.evaluate(() => { const h = (s) => Math.round(document.querySelector(s).getBoundingClientRect().height); return { keyboard: document.documentElement.dataset.keyboard, window: [innerWidth, innerHeight], conversationPx: h("[data-station-slot=conversation]"), dockPx: h("[data-station-section=conversation] [data-station-slot=dock]"), talkPx: h("[data-station-section=conversation] [data-station-slot=talk]") }; })));
+await S.browser.close();
+JS
+timeout 100 node p.mjs 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: {"keyboard":"up","window":[844,390],"conversationPx":21,"dockPx":67,"talkPx":71} (cured: conversationPx of at least 56)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L7, LOW
+probe-key: df1639b75f6863aa4b5a0e3129b959d4614cfbe1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
+
+## INV-10470 — probe — . LOW — a short upright phone reads as "on its side", and the mark is blind to a resizing keyboard; neither is in the rows
+
+. LOW — a short upright phone reads as "on its side", and the mark is blind to a resizing keyboard; neither is in the rows
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$(dirname "$0")" || exit 1
+cat > p.mjs <<'JS'
+import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
+import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
+const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
+const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 360, height: 740 }, storageState: await S.page.context().storageState() });
+await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
+
+const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
+const form = () => p.evaluate(() => ({ window: [innerWidth, innerHeight], form: document.querySelector("[data-station-phone]")?.dataset.stationPhoneForm, keyboard: document.documentElement.dataset.keyboard }));
+console.log("upright 360x740       ", JSON.stringify(await form()));
+await p.setViewportSize({ width: 360, height: 420 }); await sleep(700);
+console.log("layout shrunk to 420  ", JSON.stringify(await form()));
+await S.browser.close();
+JS
+timeout 100 node p.mjs 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: the second line prints "form":"sideways" and "keyboard":"down" for a 360×420 window (cured: "upright")
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L8, LOW
+probe-key: afef46383661ad609bdff632cff1baba6bdea2fd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
+
+## INV-10471 — probe — MEDIUM — the sitting does not stop a clip reaching the transcriber, and nothing in it bounds the clip after the gate
+
+MEDIUM — the sitting does not stop a clip reaching the transcriber, and nothing in it bounds the clip after the gate
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+S=.verify/kaylee-station-phone-whole.mjs; L=.verify/lib/station-phone-sitting.mjs
+echo "guards on the press door (route/abort/AbortError): $(grep -cE '\.route\(|route\.abort|AbortError' $S $L | paste -sd' ')"
+grep -n "EMPTY_PRESS_UNDER_MS = \|durationMs < EMPTY_PRESS_UNDER_MS" server/modules/companion/companion-press.ts
+EOF
+bash "$D/p.sh"
+# expect: both guard counts 0 while the server's bound is 400 (a cure shows a non-zero count in a file)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--whole-20261030-212746-57bc, finding M1, MEDIUM
+probe-key: ce829b4797b31f4db829d4e9d1b727689d9047e9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone-sitting.mjs
+
+## INV-10472 — probe — MEDIUM — INV-10275, healed by this walk, says the kit's option row and empty-state button are `finger:` sized; they are `max-md:`, and the known edge it deleted is now recorded nowhere
+
+MEDIUM — INV-10275, healed by this walk, says the kit's option row and empty-state button are `finger:` sized; they are `max-md:`, and the known edge it deleted is now recorded nowhere
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -no "max-md:min-h-11\|max-md:h-11" src/shared/ui/QuestionOptionRow.tsx src/shared/ui/EmptyState.tsx || echo "no max-md press size left in the two"
+echo "INV-10275 still claims the pair is finger-sized: $(docstore get INV-10275 | python3 -c "import json,sys; b=json.load(sys.stdin)['row']['body']; print(b.count(\"the kit's option row and empty-state button) | those are 44 px under a finger\"))")"
+EOF
+bash "$D/p.sh"
+# expect: two max-md lines (QuestionOptionRow.tsx:73, EmptyState.tsx:50) and the claim count 1; cured when the lines are gone or the count is 0
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--whole-20261030-212746-57bc, finding M2, MEDIUM
+probe-key: 8a9a7f3a170912f8be8925641333aea865156644
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone-sitting.mjs
+
+## INV-10473 — probe — LOW — "the spend ledger unmoved" is a witness that cannot move for the one spend it guards, and MAN-9379 repeats it
+
+LOW — "the spend ledger unmoved" is a witness that cannot move for the one spend it guards, and MAN-9379 repeats it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+echo "ledger words in the transcribe door: $(grep -cE 'gemini_plan_spend|ledger|admit\(|record\(' server/modules/voice/gemini-transcribe.ts)"
+echo "journal read in the sitting: $(grep -c journalLines .verify/kaylee-station-phone-whole.mjs)"
+ls /opt/shadow-connector/state/gemini_plan_spend | wc -l
+EOF
+bash "$D/p.sh"
+# expect: 0 ledger words in the door, 0 journal reads in the sitting (cured when the second is non-zero)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--whole-20261030-212746-57bc, finding L1, LOW
+probe-key: 8d3a8476a512880da1d355842befd0708b700c2b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone-sitting.mjs
+
+## INV-10474 — probe — LOW — when the page is gone, the cards cleanup throws at its first tap and the API delete that follows never runs
+
+LOW — when the page is gone, the cards cleanup throws at its first tap and the API delete that follows never runs
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+sed -n '/restore(.the sitting.*cards/,/the sitting.*cards are taken down/p' .verify/kaylee-station-phone-whole.mjs | grep -nE "await tap\(|try \{|for \(const id"
+EOF
+bash "$D/p.sh"
+# expect: two `await tap(` lines, then the `for (const id` line, and no `try {` line between (cured when a `try {` stands before the for)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--whole-20261030-212746-57bc, finding L2, LOW
+probe-key: 194f00639a9a3cc2d2087cbe394da1a926113839
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone-sitting.mjs
+
+## INV-10475 — probe — LOW — a SIGINT or SIGTERM skips the `finally`, so her model stays on `haiku` (inherited from `center-whole`)
+
+LOW — a SIGINT or SIGTERM skips the `finally`, so her model stays on `haiku` (inherited from `center-whole`)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+echo "signal handlers: $(grep -cE 'process\.(on|once)\(' .verify/kaylee-station-phone-whole.mjs)"
+EOF
+bash "$D/p.sh"
+# expect: 0 (cured when SIGINT/SIGTERM run the restore)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--whole-20261030-212746-57bc, finding L3, LOW
+probe-key: c1652297350d21279b5408313c70bb67b1bd6e5a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone-sitting.mjs
+
+## INV-10476 — probe — LOW — `hotUpdates: false` does not reach the phone page the sitting stands on
+
+LOW — `hotUpdates: false` does not reach the phone page the sitting stands on
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+echo "routeWebSocket in the sitting: $(grep -c routeWebSocket .verify/kaylee-station-phone-whole.mjs)"
+echo "hotUpdates option: $(grep -c 'hotUpdates: false' .verify/kaylee-station-phone-whole.mjs)"
+EOF
+bash "$D/p.sh"
+# expect: 0 and 1 (the option is passed to the session context only; cured when the phone's context carries its own routeWebSocket)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--whole-20261030-212746-57bc, finding L4, LOW
+probe-key: 35e58883413e12a70bf9a05dc2efcebe85ead88a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone-sitting.mjs
+
+## INV-10477 — probe — LOW — the record's `answer` is the last sentence of her reply, and a pass leaves an old run's error picture beside its shots
+
+LOW — the record's `answer` is the last sentence of her reply, and a pass leaves an old run's error picture beside its shots
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -n "const answer = " .verify/kaylee-station-phone-whole.mjs
+python3 -c "import json; print(json.load(open('.verify/shots/station-phone-whole-record.json'))['answer'])" || echo "no record"
+ls -l --time-style=+%m-%d_%H:%M .verify/shots/station-phone-whole-error.png .verify/shots/station-phone-whole-record.json 2>&1 | awk '{print $6, $7}'
+EOF
+bash "$D/p.sh"
+# expect: `picture.log.at(-1)`, a single sentence for the answer, and an error.png older than the record (cured when the answer is the reply's rows since the empty line and a pass clears the old error picture)
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--whole-20261030-212746-57bc, finding L5, LOW
+probe-key: e8726dfbcb340ad6c6270dc307faf853c23309e7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone-sitting.mjs
+
+## INV-10478 — probe — LOW — four things the sitting says it shows are not read
+
+LOW — four things the sitting says it shows are not read
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+echo "ears / talk-error / aside read: $(grep -cE 'companion-ears|talk-error|compactSectionAside' .verify/kaylee-station-phone-whole.mjs .verify/lib/station-phone-sitting.mjs | paste -sd' ')"
+grep -c "getBoundingClientRect" .verify/lib/station-phone-sitting.mjs
+EOF
+bash "$D/p.sh"
+# expect: `…whole.mjs:0 …sitting.mjs:0` on the first line, then `1` (the looks read `getBoundingClientRect` once, for the scale, never the position); cured when the first line is non-zero
+```
+
+measured 2026-10-30 by chain chain-kaylee-station--phone--whole-20261030-212746-57bc, finding L6, LOW
+probe-key: 6f0f0fa8021e901af32b9160f535fe88c78554e1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone-sitting.mjs

@@ -60,7 +60,7 @@ export function StageReadFailed({ kind, title, onRetry }: { kind: StationFocusKi
       <Banner
         tone="warn"
         action={(
-          <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onRetry}>
+          <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs finger:h-11" onClick={onRetry}>
             {t('station.cards.retry', { defaultValue: 'Try again' })}
           </Button>
         )}
@@ -151,7 +151,7 @@ export function FocusFallbackView({ focus, gone, onOpen }: FocusFallbackViewProp
       <Button
         variant="outline"
         data-station-fallback-open=""
-        className="self-start max-md:h-11"
+        className="self-start finger:h-11"
         onClick={() => onOpen(cloudcliPathOf(focus))}
       >
         {t(`station.fallback.open.${focus.kind}`, { defaultValue: OPEN_LINES[focus.kind] })}

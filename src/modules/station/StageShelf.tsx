@@ -57,7 +57,7 @@ function ShelfChip({ note, current, onOpen }: { note: CompanionNote; current: bo
       data-station-shelf-chip={note.id}
       data-station-shelf-pinned={note.pinned}
       aria-current={current ? 'true' : undefined}
-      className="max-w-[min(18rem,60cqw)] shrink-0 max-md:h-11"
+      className="max-w-[min(18rem,60cqw)] shrink-0 finger:h-11"
       onClick={() => onOpen(note)}
     >
       <KindIcon aria-hidden="true" />

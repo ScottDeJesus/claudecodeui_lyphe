@@ -41,7 +41,7 @@ function KindMark({ kind }: { kind: string }) {
 }
 
 /** A press of the corner below 768 px: a 44 px catch under a finger (the shell's touch law). */
-const TOUCH_PRESS = 'max-md:min-h-11';
+const TOUCH_PRESS = 'finger:min-h-11';
 
 /**
  * The corner's own line, in the left rail's fold look (`RailFold`): the whole line is the press, a quiet ground under the
@@ -155,7 +155,7 @@ export function MemoryCornerView({
           variant="tonal"
           size="sm"
           data-station-corner-retry=""
-          className="mt-2 h-8 px-2.5 text-xs max-md:h-11"
+          className="mt-2 h-8 px-2.5 text-xs finger:h-11"
           onClick={onReread}
         >
           {t('station.memory.retry', { defaultValue: 'Try again' })}

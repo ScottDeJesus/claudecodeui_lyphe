@@ -285,7 +285,7 @@ export function CompanionLog({ entries, name, turnId, visible, speaking = null, 
       </ScrollArea>
       {!following && (
         <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center">
-          <Button variant="secondary" size="sm" onClick={jumpToNewest} className="pointer-events-auto h-8 rounded-full px-3 shadow-hover max-md:h-11">
+          <Button variant="secondary" size="sm" onClick={jumpToNewest} className="pointer-events-auto h-8 rounded-full px-3 shadow-hover finger:h-11">
             <ArrowDown aria-hidden="true" />
             {t('companion.log.newest')}
           </Button>

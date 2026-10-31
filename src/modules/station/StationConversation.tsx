@@ -72,7 +72,7 @@ export function StationConversationView({ picture, readFailure, onReread, name, 
           <Banner
             tone="warn"
             action={
-              <Button variant="outline" size="sm" data-station-conversation-retry="" className="max-md:h-11" onClick={onReread}>
+              <Button variant="outline" size="sm" data-station-conversation-retry="" className="finger:h-11" onClick={onReread}>
                 {t('companion.panel.retry')}
               </Button>
             }

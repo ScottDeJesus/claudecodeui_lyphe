@@ -212,7 +212,7 @@ export function SessionRows({ tier, density, sessions, failure, onReread, focus,
             <Banner
               tone="warn"
               action={(
-                <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onReread}>
+                <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs finger:h-11" onClick={onReread}>
                   {t('station.sessions.retry', { defaultValue: 'Try again' })}
                 </Button>
               )}

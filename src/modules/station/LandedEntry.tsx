@@ -71,7 +71,7 @@ export function LandedEntry({ entry, badge, when, fresh, fold, oneLine = false, 
           aria-controls={fold?.open ? fold.line : undefined}
           tabIndex={tabbable ? 0 : -1}
           className={cn(
-            'flex w-full min-w-0 rounded-md border bg-card px-2.5 py-1 text-left transition-colors hover:bg-muted focus-visible:-outline-offset-2 aria-expanded:bg-muted max-md:min-h-11',
+            'flex w-full min-w-0 rounded-md border bg-card px-2.5 py-1 text-left transition-colors hover:bg-muted focus-visible:-outline-offset-2 aria-expanded:bg-muted finger:min-h-11',
             oneLine ? 'items-center gap-2' : 'flex-col items-start justify-center gap-0.5',
             fresh ? 'border-garnish' : 'border-border',
           )}

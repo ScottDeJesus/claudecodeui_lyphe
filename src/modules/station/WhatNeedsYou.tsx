@@ -126,7 +126,7 @@ export function WhatNeedsYouView({
         <Banner
           tone="warn"
           action={(
-            <Button variant="outline" size="sm" className="shrink-0 max-md:h-11" onClick={onReread}>
+            <Button variant="outline" size="sm" className="shrink-0 finger:h-11" onClick={onReread}>
               {t('station.needs.retry', 'Try again')}
             </Button>
           )}

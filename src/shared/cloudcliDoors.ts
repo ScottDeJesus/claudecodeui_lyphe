@@ -231,7 +231,7 @@ function isOurOpener(opener: Window | null): opener is Window {
  * comes forward and this window stays; with no such opener (a reload in a new tab, a bookmark) it opens CloudCLI's home
  * in a new tab.
  *
- * Consumed by `src/modules/station`: the bar's "CloudCLI" (`StationShell` binds it) and, later, the phone's menu.
+ * Consumed by `src/modules/station`: the bar's "CloudCLI" and the phone's menu's "CloudCLI" (`StationShell` binds it for both).
  */
 export function backToCloudcli(navigate: (to: string) => void, where: CloudcliDoorWhere): void {
   if (where.phone || where.pwa) {

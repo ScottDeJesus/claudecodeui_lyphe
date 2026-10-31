@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { playEarcon } from '@/modules/companion/utils/earcons';
 import { encodeWav } from '@/modules/companion/utils/earsAudio';
+import { ensurePageAudioContext, heldAudioContext } from '@/modules/companion/utils/earsContext';
 import { createEarsEngine } from '@/modules/companion/utils/earsEngine';
 import type { EarsEngine } from '@/modules/companion/utils/earsEngine';
 import type { EarsFromWorker } from '@/modules/companion/utils/earsProtocol';
-import { canUseMicrophone, earsStateOf, microphoneSentence, NO_MICROPHONE, readEarsSwitch, writeEarsSwitch } from '@/modules/companion/utils/earsState';
+import { canUseMicrophone, earsStateOf, isEarsSwitchChange, microphoneSentence, NO_MICROPHONE, readEarsSwitch, writeEarsSwitch } from '@/modules/companion/utils/earsState';
 import { api } from '@/shared/api';
 import { getStoredAuthToken } from '@/shared/authToken';
 import type { CompanionPicture } from '@/shared/companion-types';
@@ -29,13 +30,14 @@ export type NamePressDoor = { open(): void; close(clip: { blob: Blob; mimeType: 
  * (two pages hearing one "Kaylee" would push two presses); the page has been touched (its first `pointerdown` or `keydown`, or the
  * switch's own press), because an AudioContext stays suspended until then; and the page is a secure context with a microphone.
  * Arming and disarming happen on events and nothing polls: the switch, the `companion_*` frame that moves the floor (it reaches
- * `picture`), the first touch, `devicechange` and a track's `ended`.
+ * `picture`), the first touch, `devicechange`, a track's `ended`, and the switch changed from another tab (the `storage` event).
  *
  * THE ORDER. The models load first; the mic opens only once they are ready (`engine.arm()` resolved), so it is never open while
  * nothing can listen. A disarm closes the mic at once. The engine, with its models, is kept while the switch is on, so a floor that
  * moves back re-arms in a moment; it ends when the switch goes off, or when she is renamed (the worker listens for one name; the new
  * engine loads from the browser's cache of the immutable files). A name press still open when an engine goes is closed by the
- * worker (`gone`) and its clip is sent: the engine ends after that close.
+ * worker (`gone`) and its clip is sent: the engine ends after that close. The press door does not hand the floor back for that clip
+ * (a name press takes it only while no page holds it), so a floor that moved away stays where it moved.
  *
  * THE TONES play on the ears' own AudioContext (`earcons.ts`), never through her player.
  */
@@ -44,8 +46,9 @@ export function useEars(input: { picture: CompanionPicture | null; clientId: str
   // This device's switch, read from storage at load: the operator's own control, per device, off until he turns it on.
   const [on, setOnState] = useState(readEarsSwitch);
   // The audio context the capture and the tones use. Made at the switch's press or the page's first touch, so a context that exists
-  // IS the page having been touched (before one it would stay suspended). Kept for the page's life.
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  // IS the page having been touched (before one it would stay suspended). The page keeps it (`earsContext.ts`), so a provider that
+  // mounts later in the same document (the workspace and the station each have one) starts with the touch the page already had.
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(heldAudioContext);
   // The engine whose models are loaded and whose capture holds the mic, null while none does (loading, and from any disarm). Held as
   // the engine, not a flag: a new engine (a rename) is not listening in the very render that makes it, so the row says "Getting her
   // ears ready" there and never "Listening for <new name>" while the old ears still hear.
@@ -57,8 +60,7 @@ export function useEars(input: { picture: CompanionPicture | null; clientId: str
   const [hearing, setHearing] = useState(false);
   // The same fact for the worker's messages, which are not React events and must read it as it stands.
   const pressOpenRef = useRef(false);
-  // The audio context as a ref, so the switch's press and the first touch (two ways to the same context) never make two.
-  const audioContextRef = useRef<AudioContext | null>(null);
+
   // The press door as the provider gave it last, read by the worker's messages without making the engine depend on it.
   const doorRef = useRef(door);
   // Engines that were let go with a name press open: each ends at the `closed` (or `failed`) that settles the press.
@@ -72,14 +74,13 @@ export function useEars(input: { picture: CompanionPicture | null; clientId: str
   const capable = canUseMicrophone();
   const holdsFloor = picture !== null && picture.floor === clientId;
 
-  /** Makes the page's audio context inside a gesture (the switch's press or the first touch), once. */
+  /** Takes the page's audio context inside a gesture (the switch's press or the first touch): the one the page already made, else a new one. */
   const ensureAudioContext = useCallback(() => {
-    if (audioContextRef.current !== null || !canUseMicrophone()) return;
+    if (!canUseMicrophone()) return;
     try {
-      const made = new AudioContext();
-      audioContextRef.current = made;
-      setAudioContext(made);
-      made.resume().catch((error: unknown) => console.warn('[Companion] Her ears could not wake the page\'s audio:', error));
+      const context = ensurePageAudioContext();
+      setAudioContext(context);
+      if (context.state === 'suspended') context.resume().catch((error: unknown) => console.warn('[Companion] Her ears could not wake the page\'s audio:', error));
     } catch (error) {
       console.warn('[Companion] Her ears could not make an audio context:', error);
       setFailure(microphoneSentence(error));
@@ -92,6 +93,16 @@ export function useEars(input: { picture: CompanionPicture | null; clientId: str
     // The switch's own press is the touch the page's audio waits for.
     if (next) ensureAudioContext();
   }, [ensureAudioContext]);
+
+  // The switch is the device's, kept in storage, so another tab of this browser can turn it off (or on). That tab's write reaches
+  // this one as a `storage` event, and the ears follow it: a switch that says off never leaves a microphone open here.
+  useEffect(() => {
+    const follow = (event: StorageEvent) => {
+      if (isEarsSwitchChange(event)) setOnState(readEarsSwitch());
+    };
+    window.addEventListener('storage', follow);
+    return () => window.removeEventListener('storage', follow);
+  }, []);
 
   // The first touch, for a page that loaded with the switch on: one listener on each of the two events, gone at the first.
   useEffect(() => {

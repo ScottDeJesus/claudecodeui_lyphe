@@ -10,10 +10,11 @@ import { useStationSessions } from '@/modules/station/context/StationSessionsCon
 import { LandedEntry } from '@/modules/station/LandedEntry';
 import { LandedTimeline } from '@/modules/station/LandedTimeline';
 import { StripFailedLine, StripLine, StripQuietLine, StripReadingLine } from '@/modules/station/StripLines';
+import { STATION_COUNT_FORM_CATCH } from '@/shared/constants';
 import type { StationFocus, StationLanded, StationLandedKind, StationSession } from '@/shared/station-types';
 import type { StationDensity, StationRegionProps, Tone } from '@/shared/types';
 import { Badge, Button, Chip, Tooltip } from '@/shared/ui';
-import { formatShortDate } from '@/shared/utils';
+import { cn, formatShortDate } from '@/shared/utils';
 
 /**
  * EVERY KIND OF LANDING AS THE STRIP DRAWS IT, the one map of them: its badge's glyph, word and tone, never colour alone (MAN-578).
@@ -89,6 +90,8 @@ type SinceYouLastLookedViewProps = {
   onReread: () => void;
   /** The timeline's scroller, for the station's scroll memory on the page. Absent on a fixture, which remembers nothing. */
   scrollRef?: (node: HTMLElement | null) => void;
+  /** The line as its count alone, the phone on its side (its top row's end): "<n> new" or "Nothing new", and the fold. */
+  countOnly?: boolean;
 };
 
 /**
@@ -106,6 +109,9 @@ type SinceYouLastLookedViewProps = {
  *   read in the warn tone, its glyph and its words, with Try again (`StripLines`).
  * - AT COMPACT DENSITY, always the folded line: the arrangement draws the opened week over the body, and the fold's press
  *   (its words and glyph following `collapsed`) opens and closes it there.
+ * - THE COUNT FORM (`countOnly`, the phone's top row on its side): the folded line's count and fold alone, never its newest
+ *   landing (the week the fold opens holds it) nor the long "Nothing new since you last looked": "<n> new" in its pill, or "Nothing
+ *   new" after a hairline, so it never reads as her state beside it; each a 44 px catch wherever the window's width puts it.
  *
  * One landing at a time stands open in place: a recovered check's whole line, a row under the strip's line at its whole width
  * (one line on a desk), the view's own state and never stored. No figure of cost reaches the strip: it draws each landing's
@@ -115,7 +121,7 @@ type SinceYouLastLookedViewProps = {
  * pictures (`fake/strip.ts`) in the bar's `strip` slot.
  */
 export function SinceYouLastLookedView({
-  density, landed, seenAt, collapsed, onCollapse, onSeen, onPress, failure, onReread, scrollRef,
+  density, landed, seenAt, collapsed, onCollapse, onSeen, onPress, failure, onReread, scrollRef, countOnly = false,
 }: SinceYouLastLookedViewProps) {
   const { t } = useTranslation();
   // The one landing standing open in place, by id, `null` for none: the view's own, never stored, so opening one folds
@@ -144,8 +150,8 @@ export function SinceYouLastLookedView({
 
   // What is drawn: the folded line while folded, and always at compact.
   const folded = collapsed || density === 'compact';
-  if (failure !== null) return <StripFailedLine failure={failure} onReread={onReread} />;
-  if (landed === null) return <StripReadingLine folded={folded} />;
+  if (failure !== null) return <StripFailedLine failure={failure} onReread={onReread} countOnly={countOnly} />;
+  if (landed === null) return <StripReadingLine folded={folded} countOnly={countOnly} />;
   if (newest === null) return <StripQuietLine />;
 
   const entryOf = (entry: StationLanded, at: number, { oneLine = false, tabbable = true }: { oneLine?: boolean; tabbable?: boolean } = {}) => (
@@ -173,16 +179,17 @@ export function SinceYouLastLookedView({
       onBlur={() => { seenHeldFocus.current = false; }}
     >
       <Tooltip content={seenLabel} position="bottom" showOnFocus>
-        <Chip size="sm" action ariaLabel={seenLabel} className="max-md:min-h-11" onClick={onSeen}>
+        {/* In the count form its catch grows past the pill to 44 px (the phone's top row on its side is 40 px). */}
+        <Chip size="sm" action ariaLabel={seenLabel} className={cn('finger:min-h-11', countOnly && STATION_COUNT_FORM_CATCH)} onClick={onSeen}>
           <span aria-hidden="true" className="size-1.5 rounded-full bg-garnish" />
           {t('station.strip.newCount', { count: freshCount, defaultValue: '{{count}} new' })}
         </Chip>
       </Tooltip>
     </div>
   ) : (
-    <p ref={nothingNew} tabIndex={-1} data-strip-nothing-new="" className="shrink-0 text-sm text-muted-foreground">
-      <span className="max-md:hidden">{t('station.strip.nothingNew', { defaultValue: 'Nothing new since you last looked' })}</span>
-      <span className="md:hidden">{t('station.strip.nothingNewShort', { defaultValue: 'Nothing new' })}</span>
+    <p ref={nothingNew} tabIndex={-1} data-strip-nothing-new="" className={cn('shrink-0 text-sm text-muted-foreground', countOnly && 'border-l border-border pl-2.5')}>
+      <span className={cn('max-md:hidden', countOnly && 'hidden')}>{t('station.strip.nothingNew', { defaultValue: 'Nothing new since you last looked' })}</span>
+      <span className={cn('md:hidden', countOnly && 'md:inline')}>{t('station.strip.nothingNewShort', { defaultValue: 'Nothing new' })}</span>
     </p>
   );
 
@@ -197,7 +204,7 @@ export function SinceYouLastLookedView({
           size="icon"
           data-strip-fold={collapsed ? 'collapsed' : 'open'}
           aria-label={foldLabel}
-          className="size-8 text-muted-foreground hover:text-foreground max-md:size-11"
+          className={cn('size-8 text-muted-foreground hover:text-foreground finger:size-11', countOnly && 'size-11')}
           onClick={() => onCollapse(!collapsed)}
         >
           {collapsed ? <UnfoldHorizontal aria-hidden="true" /> : <FoldHorizontal aria-hidden="true" />}
@@ -216,9 +223,9 @@ export function SinceYouLastLookedView({
 
   if (folded) {
     return (
-      <StripLine state="folded" fresh={freshCount} below={below}>
+      <StripLine state="folded" fresh={freshCount} below={countOnly ? null : below}>
         {lead}
-        <div className="min-w-0 max-w-md">{entryOf(newest, entries.length - 1, { oneLine: true })}</div>
+        {!countOnly && <div className="min-w-0 max-w-md">{entryOf(newest, entries.length - 1, { oneLine: true })}</div>}
         {fold}
       </StripLine>
     );
@@ -267,7 +274,7 @@ type StripWeek = { open: boolean; onOpen: (open: boolean) => void };
  * - A PRESS puts a shipped feature's or an epic's card, or a landing's chat, on the stage (`stageOf`), and shuts the `week`. It
  *   marks nothing seen: the look-aways and "<n> new" do. A recovered check never reaches here (the view opens its line in place).
  */
-export function SinceYouLastLooked({ density, week }: StationRegionProps & { week?: StripWeek }) {
+export function SinceYouLastLooked({ density, week, countOnly }: StationRegionProps & { week?: StripWeek; countOnly?: boolean }) {
   const { landed, seenAt, markSeen, failure, reread } = useStationLanded();
   const [collapsed, setCollapsed] = useStationPref('stripCollapsed', false);
   const { setFocus, scrollMemory } = useStation();
@@ -279,6 +286,7 @@ export function SinceYouLastLooked({ density, week }: StationRegionProps & { wee
   return (
     <SinceYouLastLookedView
       density={density}
+      countOnly={countOnly}
       landed={landed}
       seenAt={seenAt}
       collapsed={fold.collapsed}

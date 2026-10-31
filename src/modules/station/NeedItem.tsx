@@ -136,7 +136,7 @@ export function NeedItem({ need, density, current, onPress, tooltipSide }: NeedI
   const kindWord = <span className={cn('font-medium uppercase tracking-[0.14em]', kindInk)}>{t(look.word.key, look.word.english)}</span>;
   const kindGlyph = <KindIcon aria-hidden="true" className={cn('size-3.5 shrink-0', kindInk)} />;
   const actButton = (catchClass: string) => (
-    <Button variant="outline" size="sm" data-station-need-act="" aria-describedby={titleId} className={cn('shrink-0 max-md:h-11', catchClass)} onClick={onPress}>
+    <Button variant="outline" size="sm" data-station-need-act="" aria-describedby={titleId} className={cn('shrink-0 finger:h-11', catchClass)} onClick={onPress}>
       {t(act.key, act.english)}
     </Button>
   );
@@ -152,7 +152,7 @@ export function NeedItem({ need, density, current, onPress, tooltipSide }: NeedI
             tabIndex={-1}
             data-station-need-press=""
             onClick={onPress}
-            className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs leading-5 max-md:min-h-11"
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs leading-5 finger:min-h-11"
           >
             {kindGlyph}
             <span className="shrink-0">{kindWord}</span>
@@ -179,7 +179,7 @@ export function NeedItem({ need, density, current, onPress, tooltipSide }: NeedI
           tabIndex={-1}
           data-station-need-press=""
           onClick={onPress}
-          className="flex w-full min-w-0 flex-col gap-1 pb-2 pl-4 pr-3 pt-2.5 text-left max-md:min-h-11"
+          className="flex w-full min-w-0 flex-col gap-1 pb-2 pl-4 pr-3 pt-2.5 text-left finger:min-h-11"
         >
           <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-snug">
             {kindGlyph}

@@ -20,7 +20,7 @@ type Piece = { place: SectionPlace; box: string; held?: boolean };
  * WHICH REGIONS MAKE EACH SECTION, the one drawing of it (compact's arrangement draws it, and the phone's draws it again):
  * - Conversation: her conversation, taking the room; her draft dock under it, its own height up to 45% of the section (her
  *   column's own cap for it) and scrolling itself, so a long brief never squeezes her log away; the box to type to her at the
- *   foot (the talk control's composer half: its button stands in her head). WHILE HER DRAFT'S FIELD HOLDS THE FOCUS AND THE KEYS
+ *   foot (the talk control's composer half: its button stands in compact's head, and the phone's round one in its bar). WHILE HER DRAFT'S FIELD HOLDS THE FOCUS AND THE KEYS
  *   TAKE HIS ROOM (on a touch screen, the one column under 36rem tall: a phone's keyboard up) the cap lifts and the box to type to
  *   her gives way, so the card, its target and its sends stand whole above the keys (the dock's own hold, 60% of the frame over
  *   them), her conversation taking what is left. A press of one of the dock's buttons, or any mouse window however short, folds

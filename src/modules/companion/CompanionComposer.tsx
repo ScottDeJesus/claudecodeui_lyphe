@@ -26,13 +26,20 @@ type CompanionComposerProps = {
    * the 40 px its panel draws.
    */
   touchField?: boolean;
+  /**
+   * Whether the box stands at the screen's own foot, as her panel's does on a phone: then below 1024 px it pads its foot by the
+   * home indicator's inset (`env(safe-area-inset-bottom)`). False for the station's talk control, whose frame clears the
+   * indicator itself (compact's body, the phone's bottom bar): padded twice, the box stood 34 px over the bar on an iPhone, and
+   * 34 px over the keyboard while he types, where the indicator's inset still reads 34. Absent, true.
+   */
+  atScreenFoot?: boolean;
 };
 
 /**
  * The box to type to her: the kit's PromptInput as one row that grows with the text — the field, then the talk button's
  * place, then send. Enter sends and Shift+Enter breaks the line (a phone's Enter key says "Send"); an IME still composing
  * keeps its Enter. Drawn by this module's CompanionPanel, at the panel's foot, clear of a phone's home indicator, and by the
- * station module's talk control.
+ * station module's talk control, inside a frame that clears it (`atScreenFoot` false).
  *
  * THE TALK BUTTON (CompanionTalkButton) stands in the tools cluster before send, the same press as the key or mouse
  * button he binds, here for the phone: drawn from `talk`, the page's one press. What failed with a press on the page
@@ -43,7 +50,7 @@ type CompanionComposerProps = {
  * A send clears the field at once, so the next thought can start; a send that is refused puts the words back (ahead of
  * anything typed since) and says so under the box. The field stays live while a send is out.
  */
-export function CompanionComposer({ name, ready, visible, onSend, talk, touchField = false }: CompanionComposerProps) {
+export function CompanionComposer({ name, ready, visible, onSend, talk, touchField = false, atScreenFoot = true }: CompanionComposerProps) {
   const { t } = useTranslation();
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   // What he is typing to her. The composer's own: it is not hers until he sends it.
@@ -84,7 +91,7 @@ export function CompanionComposer({ name, ready, visible, onSend, talk, touchFie
   };
 
   return (
-    <div data-companion-composer="" className="shrink-0 bg-background px-3 pb-3 pt-2 max-lg:pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
+    <div data-companion-composer="" className={cn('shrink-0 bg-background px-3 pb-3 pt-2', atScreenFoot && 'max-lg:pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]')}>
       {talk?.error != null && (
         // What failed on the page with his last press (the mic refused, the clip not sent), right above the box at the
         // talk button's end: in the flow, so it takes room instead of standing over her newest line or the draft's sends.
@@ -112,7 +119,7 @@ export function CompanionComposer({ name, ready, visible, onSend, talk, touchFie
             data-companion-composer-field=""
             // Capped at a quarter of the PANEL's height (her panel is a size container), not the window's 40vh/300px:
             // with the keyboard up the panel is the strip above it, and a long message must never push send out of it.
-            className={cn('max-h-[25cqh] min-w-0 flex-1 px-3 sm:max-h-[25cqh]', touchField && 'max-md:py-2.5')}
+            className={cn('max-h-[25cqh] min-w-0 flex-1 px-3 sm:max-h-[25cqh]', touchField && 'finger:py-2.5')}
           />
           {/* The talk button, before send. */}
           <PromptInputTools data-companion-talk-slot="" className="mb-1">

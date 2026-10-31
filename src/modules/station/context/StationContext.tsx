@@ -42,6 +42,8 @@ type StationContextValue = {
   tier: StationTier;
   /** True in a window under 768 px wide, or a touch window under 500 px tall (a phone on its side). */
   phone: boolean;
+  /** True in a touch window under 500 px tall: the phone on its side, whose rows are the slimmer ones. Always inside `phone`. */
+  sideways: boolean;
   /**
    * A region's scroll memory, as a ref callback for its scroller: the stored `scrollTop` is put back as the node mounts and
    * each newer one is remembered from its `scroll` events, except a place at the end of a scroller that follows its own end (the
@@ -61,7 +63,7 @@ const StationContext = createContext<StationContextValue | null>(null);
 const StationPrefsContext = createContext<StationPrefs | null>(null);
 
 /**
- * The station's context: the focus and its back-stack, the tier and whether the window is a phone's, the scroll memory.
+ * The station's context: the focus and its back-stack, the tier and whether the window is a phone's (and on its side), the scroll memory.
  * Used by the station's shell, bar, stage and regions, and by the doors they press. Throws outside `StationProvider`, so
  * a consumer placed wrong fails at once.
  */
@@ -97,7 +99,7 @@ export function useStationPref<T>(key: StationPrefKey, initial: T): [T, (next: T
  * `visibilitychange` → hidden), which is where the scroll is carried. No timer writes it.
  */
 export function StationProvider({ children }: { children: ReactNode }) {
-  const { tier, phone } = useStationWindow();
+  const { tier, phone, sideways } = useStationWindow();
   // The record this device held as the station mounted: the starting point of the three pieces of state below, read once.
   const [initial] = useState<StationRecord>(readStationRecord);
   // The stage as React draws it. State, so a focus change re-draws the stage and every region that reads it; mirrored by
@@ -187,8 +189,8 @@ export function StationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<StationContextValue>(
-    () => ({ focus: stage.focus, setFocus, restaged, back, canGoBack: stage.stack.length > 0, tier, phone, scrollMemory }),
-    [stage, setFocus, restaged, back, tier, phone, scrollMemory],
+    () => ({ focus: stage.focus, setFocus, restaged, back, canGoBack: stage.stack.length > 0, tier, phone, sideways, scrollMemory }),
+    [stage, setFocus, restaged, back, tier, phone, sideways, scrollMemory],
   );
   const prefsValue = useMemo<StationPrefs>(() => ({ prefs, setPref }), [prefs, setPref]);
 

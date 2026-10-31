@@ -2,9 +2,8 @@ import { Inbox } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useCompanion } from '@/modules/companion';
 import { useStation } from '@/modules/station/context/StationContext';
-import { useStationNeeds } from '@/modules/station/context/StationNeedsContext';
+import { useNeedsCount } from '@/modules/station/context/StationNeedsContext';
 import { useStationSection } from '@/modules/station/hooks/useStationSection';
 import { useStripWeek } from '@/modules/station/hooks/useStripWeek';
 import { StationSectionsView } from '@/modules/station/StationSections';
@@ -75,8 +74,8 @@ type StationCompactViewProps = {
 };
 
 /**
- * THE COMPACT ARRANGEMENT, the station in one column (a second monitor, a small window, and a phone until the phone's own
- * arrangement lands), under the shell's bar. Top to bottom:
+ * THE COMPACT ARRANGEMENT, the station in one column (a second monitor, a tablet, a small window; a phone has its own
+ * arrangement, which the shell picks first), under the shell's bar. Top to bottom:
  *
  * - HER HEAD, which never scrolls away: her face, her name and her state in words, her controls behind one press (the head
  *   region's compact form); the talk button, the page's one press, its words kept; and the count of what needs him, a press to
@@ -139,7 +138,7 @@ export function StationCompactView({ head, talk, strip, openStrip, sections, sec
             size="sm"
             data-station-compact-needs={needsCount ?? 'unread'}
             aria-label={needsName}
-            className="max-md:h-11 max-md:min-w-11"
+            className="finger:h-11 finger:min-w-11"
             onClick={() => onSection('needs')}
           >
             <Inbox aria-hidden="true" />
@@ -182,7 +181,7 @@ export function StationCompactView({ head, talk, strip, openStrip, sections, sec
                   variant={shown ? 'tonal' : 'outline'}
                   size="sm"
                   aria-current={shown ? 'true' : undefined}
-                  className="min-w-0 justify-start max-md:h-11"
+                  className="min-w-0 justify-start finger:h-11"
                   onClick={() => onSection(name)}
                 >
                   {/* The word holds; a count keeps its width; the Stage's label gives way. */}
@@ -222,12 +221,9 @@ type StationCompactProps = {
  */
 export function StationCompact({ slots, stage, tier }: StationCompactProps) {
   const [section, setSection] = useStationSection();
-  const { needs } = useStationNeeds();
-  const { picture } = useCompanion();
   const { focus, scrollMemory } = useStation();
-  // What needs him: the rail's items and her one pending action, the two things "What needs you" draws. Null until the first read of the
-  // items has landed (`needs` null, in flight or failed): the rail says so in its own words, and a 0 here would claim "nothing waits".
-  const needsCount = needs === null ? null : needs.length + (picture?.pending ? 1 : 0);
+  // What needs him, one number for compact and the phone (`useNeedsCount`); null until the first read of the items has landed.
+  const needsCount = useNeedsCount();
   const focusLabel = focus === null ? null : focus.label;
   // The strip's line and, while he holds it open, its whole week over the body: the line inert under it (`useStripWeek`).
   const { line, week } = useStripWeek(slots.strip);

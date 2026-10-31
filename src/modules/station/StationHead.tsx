@@ -173,7 +173,7 @@ export function StationHeadView({ tier, density, name, presence, face, controls,
               label={controlsLabel}
               panel={controls('start')}
               trigger={(
-                <span data-station-head-controls="" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'max-md:h-11')}>
+                <span data-station-head-controls="" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'finger:h-11')}>
                   <SlidersHorizontal aria-hidden="true" />
                   {controlsLabel}
                   <ChevronDown aria-hidden="true" />

@@ -41,7 +41,7 @@ export function CompanionCardChip({ note, onOpen }: CompanionCardChipProps) {
       data-companion-card-pinned={note.pinned ? '' : undefined}
       aria-label={name}
       onClick={() => onOpen(note)}
-      className="max-w-full max-md:h-11"
+      className="max-w-full finger:h-11"
     >
       <KindIcon aria-hidden="true" />
       <span className="shrink-0 text-xs font-medium uppercase tracking-[0.12em]">{kind}</span>

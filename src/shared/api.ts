@@ -881,7 +881,7 @@ export const api = {
     // Wipes her conversation, log, unpinned cards, draft, walk and focus. The wind-down of her process is awaited, so it can take a while.
     clear: () => post('/api/companion/clear', undefined, { ...companionOptions(), timeoutMs: 90_000 }),
     // His talk press: the clip as multipart `audio` (named by its type, as the chat's mic names its upload) and the recorder's own
-    // `durationMs` for it. Takes the floor for this page and answers 202 `{ text }` once the press has been heard and pushed to her;
+    // `durationMs` for it. Takes the floor for this page (a name press does not take it from the page that holds it) and answers 202 `{ text }` once the press has been heard and pushed to her;
     // a hearing that came to nothing is a 409 `COMPANION_SPEECH_REFUSED` or a 502 `COMPANION_SPEECH_FAILED` carrying the sentence,
     // and the system line in her log. An upload has no deadline of its own (see `timeoutSignal`). `opened` says what began the press: his
     // button (the default, sent as nothing) or her name, heard by this page's ears, which is the multipart field `opened=name`; the

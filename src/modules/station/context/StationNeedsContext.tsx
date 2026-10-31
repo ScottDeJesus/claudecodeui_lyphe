@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { useActionLapse, useCompanion } from '@/modules/companion';
 import { useDispatcherPlans } from '@/modules/dispatcher';
 import { api, refusalSentence } from '@/shared/api';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
@@ -46,14 +47,29 @@ function sentenceFor(sentence: string, cause: unknown): Error {
 
 /**
  * Used by the station's rail (`WhatNeedsYou`), which draws the items, and by its three stages (`AskStage`, `FollowupsStage`,
- * `CheckStage`), which say that the thing they were opened on is gone when the list no longer holds it, and by the compact and phone
- * plans, which draw the count. All read the same list, so the count and the rail never disagree.
+ * `CheckStage`), which say that the thing they were opened on is gone when the list no longer holds it. The compact and phone plans draw
+ * the count through `useNeedsCount` below, off the same list, so the count and the rail never disagree.
  * Throws outside `StationNeedsProvider`, so a consumer placed wrong fails at once.
  */
 export function useStationNeeds(): StationNeedsContextValue {
   const context = useContext(StationNeedsContext);
   if (!context) throw new Error('useStationNeeds must be used within a StationNeedsProvider');
   return context;
+}
+
+/**
+ * How many things need him: the rail's items and her one pending action, the two things "What needs you" draws. The action counts
+ * only while its card is drawn: the server closes a lapsed row at its next prepare, take or cancel and leaves it in her picture
+ * until then, while the card and the phone's line go at its deadline (`useActionLapse`), so a lapsed action is counted out with
+ * them. `null` until the first read of the items has landed (`needs` null, in flight or failed): the rail says so in its own words,
+ * and a 0 here would claim "nothing waits". Used by the compact arrangement's wrapper and the phone's, so the two count the same
+ * number. Throws outside `StationNeedsProvider` and outside her provider.
+ */
+export function useNeedsCount(): number | null {
+  const { needs } = useStationNeeds();
+  const { picture } = useCompanion();
+  const lapsed = useActionLapse(picture?.pending?.expiresAt ?? null);
+  return needs === null ? null : needs.length + (picture?.pending && !lapsed ? 1 : 0);
 }
 
 /**

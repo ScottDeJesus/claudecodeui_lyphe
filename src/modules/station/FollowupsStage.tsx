@@ -64,7 +64,7 @@ export function FollowupsStageView({ focus, reading, onOpenChat }: FollowupsStag
         size="sm"
         data-station-followups-open=""
         data-station-fire={gone ? '' : undefined}
-        className="self-start max-md:h-11"
+        className="self-start finger:h-11"
         onClick={onOpenChat}
       >
         {t('station.needs.openChat', 'Open the chat')}

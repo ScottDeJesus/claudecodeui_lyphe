@@ -169,7 +169,7 @@ function Column({ name, pieces, className }: { name: string; pieces: Piece[]; cl
  *
  * A pure view: `StationShell` below binds it to the station, and `.verify/kaylee-station-shots.mjs` draws it on the
  * fixtures' pictures (`station-fake.ts`) at 1440×900 and 1280×800, in compact at 600×900, 1080×1920 and 390×844, and in the
- * phone's arrangement at 390×844 and 844×390 as the home-screen app.
+ * phone's arrangement as the home-screen app at 390×844, 360×780, 390×664 and, on its side, 844×390.
  */
 export function StationShellView({ arrangement, slots, stage, compact, phone, compactSwitch, onBackToCloudcli }: StationShellViewProps) {
   // An empty stage gives way to her own regions in her column on a laptop. While her cards'
@@ -249,10 +249,11 @@ export function StationShellView({ arrangement, slots, stage, compact, phone, co
  * The station on the page: what `StationRoute` renders inside the station's provider. It reads the tier, his Compact switch,
  * the registered regions and the way back, and hands them, with the live stage, to `StationShellView`.
  *
- * THE ARRANGEMENT is compact below 1024 px (the tier `narrow`: a phone's window, upright or on its side, until the phone's own
- * arrangement picks first) and wherever his switch is on; else the tier's. It follows `resize` (the context reads the tier on
- * it) and his switch, never a timer. His switch is the station pref `compact`, per device, and is drawn from 1024 px up: below,
- * compact is the only arrangement and a switch would change nothing.
+ * THE ARRANGEMENT is `phone` first, on a phone (`useStation().phone`: a window under 768 px wide, or a touch window under 500 px
+ * tall); else compact below 1024 px (the tier `narrow`: a tablet, the second monitor, a small window) and wherever his switch is
+ * on; else the tier's. It follows `resize` and the pointer query's `change` (the context reads both) and his switch, never a
+ * timer. His switch is the station pref `compact`, per device, and is drawn from 1024 px up: below, compact is the only
+ * arrangement a non-phone has and a switch would change nothing.
  *
  * EVERY REGION'S DENSITY is `compact` in the one-column arrangements (compact's and the phone's) and `full` in the columns,
  * handed to each region with the tier.
@@ -262,8 +263,8 @@ export function StationShell() {
   const navigate = useNavigate();
   const { isPWA } = useDeviceSettings({ trackMobile: false });
   const [compactOn, setCompactOn] = useStationPref('compact', false);
-  // FILL: arrangement — `'phone'` first while `useStation().phone` (a window under 768 px, or a touch window under 500 px tall), then compact.
-  const arrangement = (tier === 'narrow' || compactOn ? 'compact' : tier) as StationArrangement;
+  // The phone's own arrangement is picked BEFORE compact: a phone is never asked to use the second monitor's.
+  const arrangement: StationArrangement = phone ? 'phone' : tier === 'narrow' || compactOn ? 'compact' : tier;
   const compactSwitch: StationCompactSwitch | null = tier === 'narrow' ? null : { on: compactOn, onChange: setCompactOn };
   const density: StationDensity = arrangement === 'compact' || arrangement === 'phone' ? 'compact' : 'full';
   // The way back, bound here for the bar (a pure view drawn by this pure layout) and for the phone's top row, her menu.

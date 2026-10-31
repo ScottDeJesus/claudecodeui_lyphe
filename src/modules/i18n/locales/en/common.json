@@ -3470,7 +3470,7 @@
       "clear": "Clear the stage",
       "empty": {
         "title": "Nothing on the stage",
-        "message": "Press anything on either side, or ask her to show you something."
+        "message": "Press anything, or ask her to show you something."
       }
     },
     "card": {
@@ -3695,7 +3695,9 @@
       "quiet": "Nothing has landed this week",
       "loading": "Reading what landed…",
       "failed": "Couldn’t read what landed",
+      "failedShort": "Couldn’t read",
       "retry": "Try again",
+      "retryLabel": "Try again: {{failure}}",
       "expand": "Show the whole week",
       "collapse": "Show only the newest"
     },

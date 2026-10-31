@@ -4,8 +4,11 @@ import type { ReactNode } from 'react';
 import type { StationDensity } from '@/shared/types';
 import { isDrawn } from '@/shared/utils';
 
-/** What the arrangement asks of the strip's region: its density, and the week it opens and shuts (`SinceYouLastLooked`'s `week`). */
-type StripLook = { density?: StationDensity; week: { open: boolean; onOpen: (open: boolean) => void } };
+/**
+ * What the arrangement asks of the strip's region: its density, the week it opens and shuts (`SinceYouLastLooked`'s `week`), and
+ * for the line, its count form (`countOnly`: the phone on its side, where the line stands at the top row's end).
+ */
+type StripLook = { density?: StationDensity; week: { open: boolean; onOpen: (open: boolean) => void }; countOnly?: boolean };
 
 /** The strip's region as the arrangement draws it: its own element, handed what the arrangement asks of it (as the sections do their regions). */
 function stripAs(node: ReactNode, look: StripLook): ReactNode {
@@ -28,9 +31,10 @@ type StripWeek = { line: ReactNode; week: ReactNode };
  *   and the browser drops the focus to the page. So the focus goes to the other fold (`data-strip-fold`), but only when it was
  *   lost: a focus he has already put elsewhere is his.
  *
- * A strip slot with nothing in it draws neither.
+ * `countOnly` draws the line in the strip's count form ("<n> new" or "Nothing new" and its fold: the phone on its side); the week
+ * is always the whole timeline. A strip slot with nothing in it draws neither.
  */
-export function useStripWeek(strip: ReactNode): StripWeek {
+export function useStripWeek(strip: ReactNode, { countOnly = false }: { countOnly?: boolean } = {}): StripWeek {
   // Whether he holds the strip's whole week open over the body. State: the arrangement draws the week from it.
   const [weekOpen, setWeekOpen] = useState(false);
   // The boxes the line and the week stand in, which the focus is handed between. Refs: only the effect below looks inside them.
@@ -49,7 +53,7 @@ export function useStripWeek(strip: ReactNode): StripWeek {
 
   if (!isDrawn(strip)) return { line: null, week: null };
   return {
-    line: <div ref={lineBox} className="contents">{stripAs(strip, { week: { open: weekOpen, onOpen: setWeekOpen } })}</div>,
+    line: <div ref={lineBox} className="contents">{stripAs(strip, { week: { open: weekOpen, onOpen: setWeekOpen }, countOnly })}</div>,
     // The week is the strip's region drawn at full density, its timeline, and open: the fold in it shuts it.
     week: weekOpen ? <div ref={weekBox} className="contents">{stripAs(strip, { density: 'full', week: { open: true, onOpen: setWeekOpen } })}</div> : null,
   };

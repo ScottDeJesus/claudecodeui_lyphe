@@ -180,7 +180,7 @@ export function PageBody({ text, href }: { text: string; href: string | null }) 
           target="_blank"
           rel="noreferrer"
           data-station-note-page-open=""
-          className={cn(buttonVariants({ variant: 'outline' }), 'mt-1 self-start max-md:h-11')}
+          className={cn(buttonVariants({ variant: 'outline' }), 'mt-1 self-start finger:h-11')}
         >
           {t('station.cards.openInDocSpace', { defaultValue: 'Open in DocSpace' })}
           <ArrowUpRight aria-hidden="true" />

@@ -70,7 +70,7 @@ export function CheckStageView({ focus, found, onOpenSheet, onRetry }: CheckStag
   const { t } = useTranslation();
 
   const openCheck = (target: CerberusSheetTarget) => (
-    <Button variant="outline" size="sm" data-station-check-open="" className="self-start max-md:h-11" onClick={() => onOpenSheet(target)}>
+    <Button variant="outline" size="sm" data-station-check-open="" className="self-start finger:h-11" onClick={() => onOpenSheet(target)}>
       <PanelRight aria-hidden="true" />
       {t('station.needs.check.open', 'Open the check')}
     </Button>
@@ -92,7 +92,7 @@ export function CheckStageView({ focus, found, onOpenSheet, onRetry }: CheckStag
             <span className="min-w-0 break-words">{t('station.needs.fault.check', 'Couldn’t read the checks just now')}</span>
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" data-station-check-retry="" className="max-md:h-11" onClick={onRetry}>
+            <Button variant="outline" size="sm" data-station-check-retry="" className="finger:h-11" onClick={onRetry}>
               {t('station.needs.retry', 'Try again')}
             </Button>
             {target !== null && openCheck(target)}

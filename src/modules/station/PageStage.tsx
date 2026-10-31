@@ -40,7 +40,7 @@ export function PageStage({ focus }: { focus: PageFocus }) {
         target="_blank"
         rel="noreferrer"
         data-station-page-open=""
-        className={cn(buttonVariants({ variant: 'outline' }), 'self-start max-md:h-11')}
+        className={cn(buttonVariants({ variant: 'outline' }), 'self-start finger:h-11')}
       >
         {t('station.page.open', { defaultValue: 'Open in DocSpace' })}
         <ArrowUpRight aria-hidden="true" />

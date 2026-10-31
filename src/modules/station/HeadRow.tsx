@@ -32,7 +32,11 @@ type HeadRowProps = {
  *
  * - her face, 44 px (32 px on its side, where the row is 40 px);
  * - her name and her state on one line: her name keeps its width up to 40% of the line, her state takes the rest and gives way by
- *   its own rule (a chat's name cut, "· item 4 of 15" kept; words with no subject wrap rather than lose their end);
+ *   its own rule (a chat's name cut, "· item 4 of 15" kept; words with no subject wrap rather than lose their end). Her state is
+ *   the companion's small line (`panel`, as her panel's narrow head draws it): at the station's 16 px it had 110 px beside her
+ *   name at 390, and "Asleep · your next message wakes her" lost "wakes her" and "· item 4 of 15" lost its 5; at 12 px its two
+ *   lines (20 px each) stand whole beside her name, inside the 40 px row on its side too. Her words take their own width first
+ *   (`flex: 1 1 auto`): what stands in the `trail` gives way before them.
  * - the arrangement's `trail`: the count of what needs him and, on its side, the strip's line;
  * - her ONE menu at the row's end, the glyph alone (a row this narrow has no room for its words; they are its name, "Her controls
  *   and CloudCLI"): its panel is her controls' line over "CloudCLI", the shell's way back, the bar's own press. The panel hangs
@@ -47,16 +51,24 @@ export function HeadRow({ row, face, name, nameId, presence, controls, panelWidt
 
   return (
     <section data-station-head="row" data-station-head-sideways={row.sideways ? '' : undefined} aria-labelledby={nameId} className="flex min-w-0 flex-col px-3">
-      <div className={cn('flex min-w-0 items-center gap-2.5', row.sideways ? 'h-10' : 'min-h-14 py-1.5')}>
+      {/* 56 px upright, so the row never moves as her state changes: her state stands on two lines at most (its own rule clamps
+          it there), and every state's two fit beside her name down to 360 px (measured at 12 px, "Asleep · your next message
+          wakes her" needs 112 px for two; the row gives it 118 at 360) but one: "Stopped · your next message starts her again"
+          needs 142, so at 360 it loses its end ("…starts he…"), and the banner under the row carries the server's sentence. On
+          its side 40 px: one line, or two at 20 px. Her words stand 8 px from her face and none from the presses after them:
+          each of those is a 44 px catch round a 20 px glyph, 12 px of air already. */}
+      <div className={cn('flex min-w-0 items-center', row.sideways ? 'h-10' : 'h-14 py-1')}>
         {face}
-        <div className="flex min-w-0 flex-1 items-baseline gap-x-2">
-          <h2 id={nameId} data-station-head-name="" className="max-w-[40%] shrink-0 truncate text-base font-semibold leading-6 text-foreground">
+        <div className="ml-2 flex min-w-0 flex-[1_1_auto] items-baseline gap-x-2">
+          {/* Her name on her state's 20 px line, so two lines of her state are the row's 40 px on its side and never more. */}
+          <h2 id={nameId} data-station-head-name="" className="max-w-[40%] shrink-0 truncate text-base font-semibold leading-5 text-foreground">
             {name}
           </h2>
-          <CompanionStatus presence={presence} emphasis="station" />
+          <CompanionStatus presence={presence} emphasis="panel" />
         </div>
-        {row.trail}
-        <div className="shrink-0">
+        {/* The trail and her menu side by side with no gap: each press is already a 44 px catch round a 20 px glyph. */}
+        <div className="flex shrink-0 items-center">
+          {row.trail}
           <Menu
             width={panelWidth}
             label={menuLabel}
@@ -81,7 +93,8 @@ export function HeadRow({ row, face, name, nameId, presence, controls, panelWidt
             trigger={(
               <span
                 data-station-head-controls=""
-                className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'relative', row.sideways ? cn(STATION_SIDEWAYS_CATCH, 'w-11') : 'size-11')}
+                // The count's ink beside it: the ghost's accent green would say "healthy" on a press that says nothing of the sort.
+                className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'relative text-foreground', row.sideways ? cn(STATION_SIDEWAYS_CATCH, 'w-11') : 'size-11')}
               >
                 <Ellipsis aria-hidden="true" />
                 <span className="sr-only">{menuLabel}</span>

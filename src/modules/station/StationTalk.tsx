@@ -69,7 +69,8 @@ export function StationTalkView({ tier, density, part = 'both', talk, name, bind
       bindingLabel={ready ? bindingLabel : undefined}
     />
   );
-  const composer = <CompanionComposer name={name} ready={ready} visible onSend={onSend} touchField />;
+  // Inside the station's frame, which clears the home indicator itself: the box pads nothing more for it.
+  const composer = <CompanionComposer name={name} ready={ready} visible onSend={onSend} touchField atScreenFoot={false} />;
 
   if (part !== 'both') {
     return (

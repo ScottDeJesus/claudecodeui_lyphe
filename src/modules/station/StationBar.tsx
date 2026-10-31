@@ -70,7 +70,7 @@ export function StationBar({ strip, compactSwitch, onBackToCloudcli }: StationBa
         size="sm"
         data-station-back-to-cloudcli=""
         aria-label={t('station.bar.backLabel', { defaultValue: 'Back to CloudCLI' })}
-        className={cn('shrink-0 max-md:h-11', compactSwitch === null && 'ml-auto')}
+        className={cn('shrink-0 finger:h-11', compactSwitch === null && 'ml-auto')}
         onClick={onBackToCloudcli}
       >
         <AppLogo size={64} className="size-4 rounded-[25%]" />

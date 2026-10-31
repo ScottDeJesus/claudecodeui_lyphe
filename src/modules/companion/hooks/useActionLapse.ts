@@ -10,20 +10,24 @@ import { useEffect, useState } from 'react';
  * no timer and never lapses here: the action is still his to fire or withdraw until the server says otherwise, and hiding
  * a live action is the worse mistake.
  *
- * Used by this module's CompanionActionCard and CompanionActionLine (the card in one line, on the station's phone), each of
- * which draws nothing once it returns true: the two lapse together.
+ * `null` is no action at all: it sets no timer and never lapses. Used by this module's CompanionActionCard and
+ * CompanionActionLine (the card in one line, on the station's phone), each of which draws nothing once it returns true: the two
+ * lapse together; and, through the barrel, by the station's count of what needs him (`useNeedsCount`), which stays mounted across
+ * actions and so counts a lapsed one out when its card goes (a past one reads live for the render that brings it, the timer
+ * lapses it a tick later: only a keyed consumer is spared that).
  */
-export function useActionLapse(expiresAt: string): boolean {
+export function useActionLapse(expiresAt: string | null): boolean {
   // The `expiresAt` that has passed. The stamp, not a flag, so the answer stays true to the action on screen: a card
   // handed another deadline reads as live again until that one passes.
-  const [lapsedAt, setLapsedAt] = useState<string | null>(() => (Date.parse(expiresAt) <= Date.now() ? expiresAt : null));
+  const [lapsedAt, setLapsedAt] = useState<string | null>(() => (expiresAt !== null && Date.parse(expiresAt) <= Date.now() ? expiresAt : null));
 
   useEffect(() => {
+    if (expiresAt === null) return undefined;
     const deadline = Date.parse(expiresAt);
     if (Number.isNaN(deadline)) return undefined;
     const timer = window.setTimeout(() => setLapsedAt(expiresAt), Math.max(0, deadline - Date.now()));
     return () => window.clearTimeout(timer);
   }, [expiresAt]);
 
-  return lapsedAt === expiresAt;
+  return expiresAt !== null && lapsedAt === expiresAt;
 }

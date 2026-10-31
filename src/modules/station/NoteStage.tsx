@@ -91,7 +91,7 @@ function NoteRef({ noteRef, pageHref, onOpenRef }: { noteRef: CompanionNoteRef; 
     case 'chat': {
       const KindIcon = STATION_FOCUS_GLYPHS[noteRef.kind].icon;
       return (
-        <Button variant="outline" size="sm" data-station-note-open={noteRef.kind} className="max-md:h-11" onClick={() => onOpenRef(noteRef)}>
+        <Button variant="outline" size="sm" data-station-note-open={noteRef.kind} className="finger:h-11" onClick={() => onOpenRef(noteRef)}>
           <KindIcon aria-hidden="true" />
           {noteRef.kind === 'card'
             ? t('station.cards.openCard', { defaultValue: 'Open its plan card' })
@@ -101,7 +101,7 @@ function NoteRef({ noteRef, pageHref, onOpenRef }: { noteRef: CompanionNoteRef; 
     }
     case 'page':
       return pageHref === null ? null : (
-        <a href={pageHref} target="_blank" rel="noreferrer" data-station-note-open="page" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'max-md:h-11')}>
+        <a href={pageHref} target="_blank" rel="noreferrer" data-station-note-open="page" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'finger:h-11')}>
           {t('station.cards.openInDocSpace', { defaultValue: 'Open in DocSpace' })}
           <ArrowUpRight aria-hidden="true" />
         </a>
@@ -171,11 +171,11 @@ export function NoteStageView({ focus, note, readFailed = null, pageHref, onPin,
   return (
     <article data-station-note={note.id} data-station-note-kind={note.kind} data-station-note-pinned={note.pinned} className="min-w-0">
       <StageHeadActions>
-        <Button variant="outline" size="sm" data-station-note-pin={note.pinned ? 'unpin' : 'pin'} className="max-md:h-11" onClick={() => onPin(!note.pinned)}>
+        <Button variant="outline" size="sm" data-station-note-pin={note.pinned ? 'unpin' : 'pin'} className="finger:h-11" onClick={() => onPin(!note.pinned)}>
           {note.pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
           {note.pinned ? t('station.cards.unpin', { defaultValue: 'Unpin' }) : t('station.cards.pin', { defaultValue: 'Pin' })}
         </Button>
-        <Button variant="outline" size="sm" data-station-note-dismiss="" className="max-md:h-11" onClick={onDismiss}>
+        <Button variant="outline" size="sm" data-station-note-dismiss="" className="finger:h-11" onClick={onDismiss}>
           <X aria-hidden="true" />
           {t('station.cards.dismiss', { defaultValue: 'Dismiss' })}
         </Button>

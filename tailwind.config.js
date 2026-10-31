@@ -1,3 +1,5 @@
+const plugin = require('tailwindcss/plugin')
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["class"],
@@ -267,5 +269,11 @@ export default {
       },
     },
   },
-  plugins: [require('@tailwindcss/typography')],
+  plugins: [
+    require('@tailwindcss/typography'),
+    // `finger:`: the touch law's one trigger (Kaylee Station's INV-10275), the kit's own query (`verve/data.css`): a touch screen, or any
+    // window under 768 px, the house's mobile breakpoint. A width alone missed a phone on its side (844 px across), whose presses stayed
+    // desk-sized. Beside `max-md:`, which stays for what a NARROW window lays out differently (a line that wraps, a cell that hides).
+    plugin(({ addVariant }) => addVariant('finger', '@media (pointer: coarse), (max-width: 767.98px)')),
+  ],
 }

@@ -33,7 +33,7 @@ type StationStageViewProps = {
 };
 
 /** The two presses of the head: 32 px to look at on a desk, a 44 px catch under a finger below 768 px (the touch law). */
-const HEAD_PRESS = 'h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground max-md:h-11 max-md:w-11';
+const HEAD_PRESS = 'h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground finger:h-11 finger:w-11';
 
 /**
  * The head's box for the kind's own acts (`StageHeadActions`): a row of its own under the label on a stage under 40rem (a
@@ -97,7 +97,7 @@ export function StationStageView({ focus, view, canGoBack, onBack, onClear, shel
           <EmptyState
             icon={Focus}
             title={t('station.stage.empty.title', { defaultValue: 'Nothing on the stage' })}
-            message={t('station.stage.empty.message', { defaultValue: 'Press anything on either side, or ask her to show you something.' })}
+            message={t('station.stage.empty.message', { defaultValue: 'Press anything, or ask her to show you something.' })}
           />
         </div>
       </section>

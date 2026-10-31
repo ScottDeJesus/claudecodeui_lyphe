@@ -22,6 +22,11 @@ export function readEarsSwitch(): boolean {
   }
 }
 
+/** Whether a `storage` event (which a page hears only for another tab's writes) is a change of this device's ears switch: its own key, or a whole storage cleared. */
+export function isEarsSwitchChange(event: StorageEvent): boolean {
+  return event.key === null || event.key === EARS_SWITCH_KEY;
+}
+
 /** Keeps the switch for this device. */
 export function writeEarsSwitch(on: boolean): void {
   try {

@@ -84,7 +84,7 @@ export function AskStageView({ focus, found, answering, refusal, onAnswer, onRer
 
   const openChat = (quiet: boolean) => (
     // A 44 px catch under a finger below 768 px, as every answer above it.
-    <Button variant={quiet ? 'ghost' : 'outline'} size="sm" data-station-ask-open="" className="self-start max-md:h-11" onClick={onOpenChat}>
+    <Button variant={quiet ? 'ghost' : 'outline'} size="sm" data-station-ask-open="" className="self-start finger:h-11" onClick={onOpenChat}>
       {t('station.needs.openChat', 'Open the chat')}
       <ArrowUpRight aria-hidden="true" />
     </Button>
@@ -127,7 +127,7 @@ export function AskStageView({ focus, found, answering, refusal, onAnswer, onRer
             <span className="min-w-0 break-words">{t('station.needs.fault.ask', 'Couldn’t read the permissions just now')}</span>
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" data-station-ask-retry="" className="max-md:h-11" onClick={onReread}>
+            <Button variant="outline" size="sm" data-station-ask-retry="" className="finger:h-11" onClick={onReread}>
               {t('station.needs.retry', 'Try again')}
             </Button>
             {openChat(true)}

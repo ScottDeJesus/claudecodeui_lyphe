@@ -7,7 +7,7 @@ import { Button, QuestionOptionRow, TextArea } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /** Every answer: 36 px to look at on a desk, a 44 px catch under a finger below 768 px (the touch law). */
-const ANSWER = 'max-md:h-11';
+const ANSWER = 'finger:h-11';
 
 type AnswerProps = {
   /** The ask as the needs hold it: its kind, the rule an always keeps, a question's options. */

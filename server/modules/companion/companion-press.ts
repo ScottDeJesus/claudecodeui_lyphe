@@ -15,7 +15,10 @@ import { readCompanionSettings } from './companion-settings.js';
  * and nothing leaves the page before her name, so the server keeps no silence timer and no gate.
  *
  * A press does three things, in this order:
- *   1. it takes the floor for the page that pressed, at once, so she acts on that page whatever the clip says;
+ *   1. a button press takes the floor for the page that pressed, at once, so she acts on that page whatever the clip says. A
+ *      name press does not take it from the page that holds it: the ears listen only on the page that holds the floor, so a
+ *      name press from any other page is the clip a page still held when the floor moved away from it (its ears closed `gone`),
+ *      and taking the floor back would undo the move that closed it. With no page holding the floor, a name press takes it;
  *   2. it is HEARD: a clip shorter than `EMPTY_PRESS_UNDER_MS` by the page's own clock (or one with no bytes) is the empty
  *      press with no Gemini call; any other goes through the voice barrel's `transcribeSpeech`, whose empty answer is the
  *      empty press too and whose text is what he said. A name press is heard exactly as a button press is: the same call,
@@ -133,7 +136,7 @@ export function createPress({ accountOf, refuseWhileStopping }: PressDeps) {
   return async function press(userId: number, client: string, input: PressInput): Promise<PressAnswer> {
     refuseWhileStopping();
     const account = accountOf(userId);
-    account.store.setFloor(client);
+    if (input.opened === 'button' || account.store.readState().floor === null) account.store.setFloor(client);
 
     // Started now, before the press ahead of this one is done: the uploads overlap, the pushes do not.
     const heard = hear(userId, input);

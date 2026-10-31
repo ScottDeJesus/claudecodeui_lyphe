@@ -6,11 +6,11 @@ import { cn } from '@/shared/utils';
 
 /**
  * The box every press of the left rail shares, a row and a fold's head alike: the whole row is the press, its text left-set,
- * a 44 px catch under a finger below 768 px (the touch law: `max-md:min-h-11`). Its keyboard ring is drawn INSIDE the row
+ * a 44 px catch under a finger below 768 px (the touch law: `finger:min-h-11`). Its keyboard ring is drawn INSIDE the row
  * (`-outline-offset-2`), because a row stands flush in a scroller and a fold's body clips what passes its edges: the house's
  * outer ring would be cut in half there.
  */
-const PRESS = 'relative flex w-full min-w-0 gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-quick focus-visible:-outline-offset-2 max-md:min-h-11';
+const PRESS = 'relative flex w-full min-w-0 gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-quick focus-visible:-outline-offset-2 finger:min-h-11';
 
 /** A row at rest: full ink, and the quiet ground the roadmap's own panel rows take under the pointer. */
 const UNLIT = 'text-foreground hover:bg-muted/60';

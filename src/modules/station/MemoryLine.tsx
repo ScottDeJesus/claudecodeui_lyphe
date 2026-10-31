@@ -59,7 +59,7 @@ export function MemoryLine({ line, kind, open, onOpenChange }: MemoryLineProps) 
     <li data-station-memory-line={line.token} onTransitionEnd={reveal} className="min-w-0">
       <Collapsible open={open} onOpenChange={onOpenChange}>
         <CollapsibleTrigger
-          className="relative flex w-full min-w-0 items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-quick hover:bg-muted/60 focus-visible:-outline-offset-2 max-md:min-h-11"
+          className="relative flex w-full min-w-0 items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors duration-quick hover:bg-muted/60 focus-visible:-outline-offset-2 finger:min-h-11"
         >
           <FoldChevron collapsed={!open} className="mt-[3px] text-sm text-muted-foreground" />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">

@@ -132,7 +132,7 @@ export function WalkStageView({ walk, readFailed = null, sessionName, onBack, on
       className="flex min-w-0 flex-col gap-5"
     >
       <StageHeadActions>
-        <Button variant="outline" size="sm" data-station-walk-end="" className="max-md:h-11" onClick={onEnd}>
+        <Button variant="outline" size="sm" data-station-walk-end="" className="finger:h-11" onClick={onEnd}>
           <X aria-hidden="true" />
           {t('station.cards.walk.end', { defaultValue: 'End the walkthrough' })}
         </Button>
@@ -197,11 +197,11 @@ export function WalkStageView({ walk, readFailed = null, sessionName, onBack, on
 
       <StageFoot>
         <div data-station-walk-moves="" className="grid grid-cols-2 gap-2 [@container(min-width:40rem)]:flex [@container(min-width:40rem)]:justify-between">
-          <Button variant="outline" data-station-walk-back="" aria-disabled={backRefused} aria-keyshortcuts="ArrowLeft" className="max-md:h-11" onClick={onBack}>
+          <Button variant="outline" data-station-walk-back="" aria-disabled={backRefused} aria-keyshortcuts="ArrowLeft" className="finger:h-11" onClick={onBack}>
             <ArrowLeft aria-hidden="true" />
             {t('station.cards.walk.back', { defaultValue: 'Back' })}
           </Button>
-          <Button data-station-walk-next="" aria-disabled={nextRefused} aria-keyshortcuts="ArrowRight" className="max-md:h-11" onClick={onNext}>
+          <Button data-station-walk-next="" aria-disabled={nextRefused} aria-keyshortcuts="ArrowRight" className="finger:h-11" onClick={onNext}>
             {t('station.cards.walk.next', { defaultValue: 'Next' })}
             <ArrowRight aria-hidden="true" />
           </Button>

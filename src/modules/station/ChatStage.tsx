@@ -51,7 +51,7 @@ export function ChatStageView({ focus, session, onOpenChat, failure = null, onRe
         <Banner
           tone="warn"
           action={onReread && (
-            <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={onReread}>
+            <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs finger:h-11" onClick={onReread}>
               {t('station.sessions.retry', { defaultValue: 'Try again' })}
             </Button>
           )}
@@ -97,7 +97,7 @@ export function ChatStageView({ focus, session, onOpenChat, failure = null, onRe
           {session.activity}
         </p>
       )}
-      <Button variant="outline" data-station-chat-open="" className="self-start max-md:h-11" onClick={onOpenChat}>
+      <Button variant="outline" data-station-chat-open="" className="self-start finger:h-11" onClick={onOpenChat}>
         {t('station.chat.open', { defaultValue: 'Open the chat' })}
         <ArrowUpRight aria-hidden="true" />
       </Button>

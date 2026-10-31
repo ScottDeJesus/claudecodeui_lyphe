@@ -744,9 +744,16 @@ export const STATION_OUT_OF_REACH = { inert: '', 'aria-hidden': true } as unknow
 //----------------- THE STATION PHONE'S SIDEWAYS CATCH ------------
 
 /**
- * A press of Kaylee Station's phone top row on its side, where the row is 40 px: drawn 40 px tall, its catch grown 2 px over and
- * under it by a transparent `::before`, so a finger still has 44 px (the touch law's own way to grow a press without moving its
- * neighbours, INV-10275). Worn by the two presses the row draws on its side: her menu's trigger (the station's `HeadRow`) and the
- * count of what needs him (`StationPhoneView`).
+ * A press of Kaylee Station's phone top row on its side, where the row is 40 px: drawn 40 px tall, its catch grown over and under
+ * it by a transparent `::before`, so a finger still has 44 px (the touch law's own way to grow a press without moving its
+ * neighbours, INV-10275). The `::before` stands on the press's padding box and reaches 4 px past it: worn by two borderless ghost
+ * presses, her menu's trigger (the station's `HeadRow`) and the count of what needs him (`StationPhoneView`), whose catch is 48 px.
  */
-export const STATION_SIDEWAYS_CATCH = "relative h-10 before:absolute before:inset-x-0 before:-inset-y-0.5 before:content-['']";
+export const STATION_SIDEWAYS_CATCH = "relative h-10 before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']";
+
+/**
+ * A press of the strip's count form (the phone's 40 px top row on its side) that keeps its own drawn size: its catch grown 8 px past
+ * its padding box by a transparent `::before`, so its 32 px pill or 36 px outlined box (a 1.5 px border inside it) catches 44 px
+ * and more. Worn by the strip's "<n> new" chip (`SinceYouLastLooked`) and its Try again (`StripLines`).
+ */
+export const STATION_COUNT_FORM_CATCH = "relative before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']";

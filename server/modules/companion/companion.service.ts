@@ -28,7 +28,8 @@ import { stationLanded } from './station/station-landed.js';
  *   - `sendText` takes the floor for the page that typed, logs his line and pushes it to her;
  *   - `saveSettings` stores the patch, tells every page, and applies a model change to her running process
  *     with her conversation kept (`setModel`);
- *   - `press` is a press of the talk button (`companion-press.ts`): the page takes the floor, the clip is heard, and
+ *   - `press` is a press of the talk button or of her name (`companion-press.ts`): a button press takes the floor for its page (a
+ *     name press takes it only while no page holds it), the clip is heard, and
  *     his words (or the empty press) are logged and pushed in arrival order; a hearing that fails pushes nothing;
  *   - `sendDraft` is the panel's Send: the draft goes to its target (a turn, or folded into the running one) and the
  *     pressing page takes the floor, so the chat opens where he pressed;
@@ -154,7 +155,7 @@ function createCompanionService() {
       session.pushOperator(text, 'typed');
     },
 
-    /** A press of the talk button: the page `client` takes the floor, the clip is heard, and what he said (`''` for the empty press) is answered once it has been pushed. */
+    /** A press of the talk button or of her name: a button press takes the floor for the page `client` (a name press only while no page holds it), the clip is heard, and what he said (`''` for the empty press) is answered once it has been pushed. */
     press,
 
     /** One sentence of hers, her current turn's or a fresh earlier one's, as streamed PCM for the floor page; an `AppError` refusal comes before the first byte (`companion-speech.ts`). */
