@@ -3166,7 +3166,7 @@
       "nameHelper": "What you call it in this drawer.",
       "namePlaceholder": "Jobs console",
       "urlLabel": "Web address",
-      "urlHelper": "http:// is added if you leave it off. {host} stands for the address this page is open on.",
+      "urlHelper": "If you leave the scheme off, this page's own (http:// or https://) is added. {host} stands for the address this page is open on.",
       "urlPlaceholder": "{host}:8080",
       "descriptionLabel": "Description",
       "descriptionHelper": "Optional. Shown under the name instead of the address.",

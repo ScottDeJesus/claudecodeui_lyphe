@@ -423,7 +423,7 @@
       "nameHelper": "So heißt sie in dieser Leiste.",
       "namePlaceholder": "Auftragskonsole",
       "urlLabel": "Webadresse",
-      "urlHelper": "Fehlt http://, wird es ergänzt. {host} steht für die Adresse, unter der diese Seite offen ist.",
+      "urlHelper": "Fehlt das Schema, wird das der Seite selbst (http:// oder https://) ergänzt. {host} steht für die Adresse, unter der diese Seite offen ist.",
       "urlPlaceholder": "{host}:8080",
       "descriptionLabel": "Beschreibung",
       "descriptionHelper": "Optional. Wird statt der Adresse unter dem Namen angezeigt.",

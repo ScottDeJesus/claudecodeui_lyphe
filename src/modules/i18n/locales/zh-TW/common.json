@@ -450,7 +450,7 @@
       "nameHelper": "它在此面板中顯示的名稱。",
       "namePlaceholder": "作業主控台",
       "urlLabel": "網址",
-      "urlHelper": "省略 http:// 時會自動補上。{host} 代表目前頁面開啟時使用的位址。",
+      "urlHelper": "省略通訊協定時會自動補上本頁所用的通訊協定（http:// 或 https://）。{host} 代表目前頁面開啟時使用的位址。",
       "urlPlaceholder": "{host}:8080",
       "descriptionLabel": "描述",
       "descriptionHelper": "選填。顯示在名稱下方，取代位址。",

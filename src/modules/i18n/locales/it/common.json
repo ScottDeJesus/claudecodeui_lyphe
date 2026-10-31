@@ -454,7 +454,7 @@
       "nameHelper": "Come la chiami in questo pannello.",
       "namePlaceholder": "Console lavori",
       "urlLabel": "Indirizzo web",
-      "urlHelper": "Se manca http://, viene aggiunto. {host} indica l'indirizzo su cui è aperta questa pagina.",
+      "urlHelper": "Se manca lo schema, viene aggiunto quello di questa pagina (http:// o https://). {host} indica l'indirizzo su cui è aperta questa pagina.",
       "urlPlaceholder": "{host}:8080",
       "descriptionLabel": "Descrizione",
       "descriptionHelper": "Facoltativa. Mostrata sotto il nome al posto dell'indirizzo.",

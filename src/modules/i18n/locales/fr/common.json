@@ -454,7 +454,7 @@
       "nameHelper": "Le nom affiché dans ce panneau.",
       "namePlaceholder": "Console des tâches",
       "urlLabel": "Adresse web",
-      "urlHelper": "http:// est ajouté s'il manque. {host} désigne l'adresse sur laquelle cette page est ouverte.",
+      "urlHelper": "Si le schéma manque, celui de cette page (http:// ou https://) est ajouté. {host} désigne l'adresse sur laquelle cette page est ouverte.",
       "urlPlaceholder": "{host}:8080",
       "descriptionLabel": "Description",
       "descriptionHelper": "Facultatif. Affichée sous le nom à la place de l'adresse.",

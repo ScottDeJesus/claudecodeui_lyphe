@@ -21,15 +21,26 @@ type FieldErrors = { name?: string; url?: string };
 const HAS_SCHEME = /^[a-z][a-z\d+.-]*:\/\//i;
 
 /**
- * The address as it will be stored: trimmed, and given `http://` when the reader left the scheme off.
- * HTTP and not HTTPS, because what this registry holds is the operator's own apps on loopback, the LAN
- * and Tailscale — every seeded row is `http://{host}:<port>` — and a guessed `https://` there is an
- * address that never answers.
+ * The address as it will be stored: trimmed, and given the PAGE'S OWN scheme when the reader left the
+ * scheme off — `https://` on a page served over https, `http://` on a page served over plain http.
+ *
+ * `pageProtocol` is `window.location.protocol` (`'https:'` or `'http:'`), passed in by the caller so
+ * this function stays pure. Anything but `'https:'` completes to `http://`: the registry holds only
+ * http and https, and plain http is the shape a page on an unknown protocol was always given.
+ *
+ * WHY THE PAGE'S SCHEME AND NOT A FIXED ONE. The drawer's rows take the scheme the page is served on:
+ * a box served over Tailscale https has `https://{host}:<port>` rows, and one served over plain http has
+ * `http://{host}:<port>` rows. A fixed `http://` on an https page stores a link that the browser
+ * blocks as mixed content the moment it is framed or followed from that page; a fixed `https://` on
+ * an http page stores an address nothing answers. That is already the rule `resolveDocSpaceOrigin`
+ * (`src/modules/widgets/docspaceOrigin.ts`) follows for DocSpace's origin.
  */
-function completeAddress(raw: string): string {
+function completeAddress(raw: string, pageProtocol: string): string {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return '';
-  return HAS_SCHEME.test(trimmed) ? trimmed : `http://${trimmed}`;
+  if (HAS_SCHEME.test(trimmed)) return trimmed;
+  const scheme = pageProtocol === 'https:' ? 'https' : 'http';
+  return `${scheme}://${trimmed}`;
 }
 
 /**
@@ -83,7 +94,7 @@ export function NewApplicationForm({ onSubmit, onCancel }: NewApplicationFormPro
     event.preventDefault();
     if (sending) return;
 
-    const draft: NewApplicationDraft = { name: name.trim(), url: completeAddress(url) };
+    const draft: NewApplicationDraft = { name: name.trim(), url: completeAddress(url, window.location.protocol) };
     if (description.trim()) draft.description = description.trim();
     const next: FieldErrors = {};
     if (draft.name.length === 0) next.name = t('applications.form.nameRequired');

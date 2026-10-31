@@ -29,7 +29,8 @@ import { Input, Select } from '@/shared/ui';
  * and handing it to `classifyWidgetBody`, the same call the transcript makes. So the field inherits
  * the scheme check, the length ceiling and the title/height repair without restating any of them,
  * and the widget can never accept an address the inline card would have refused. A value with no
- * scheme is retried once as `http://` — the reader typing `myhost:8005` means a host, not a protocol.
+ * scheme is retried once with the page's own scheme — the reader typing `myhost:8005` means a host, not
+ * a protocol.
  *
  * THE FRAME ITSELF IS `EmbedUrlFrame`, the very component the transcript card draws, with `fill` set
  * because the gutter card owns the height here. Nothing about the sandbox, the origin gate or the
@@ -106,8 +107,10 @@ export function EmbedWidgetBody({ sessionId }: { sessionId: string | null }) {
     if (!raw) return;
     // The bare value first, then the same value given a scheme: `10.0.0.5:8005` parses as a
     // URL whose protocol is `10.0.0.5:`, which the classifier correctly refuses, and which is
-    // never what a reader typing a host and a port meant.
-    const parsed = readAddress(raw) ?? readAddress(`http://${raw}`);
+    // never what a reader typing a host and a port meant. The scheme is the PAGE'S OWN
+    // (`window.location.protocol`), the rule `resolveDocSpaceOrigin` follows: a fixed `http://` inside
+    // an https page is a frame the browser blocks as mixed content.
+    const parsed = readAddress(raw) ?? readAddress(`${window.location.protocol}//${raw}`);
     if (!parsed) {
       setRejected(true);
       return;

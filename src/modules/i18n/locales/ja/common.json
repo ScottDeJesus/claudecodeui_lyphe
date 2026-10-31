@@ -450,7 +450,7 @@
       "nameHelper": "このパネルでの表示名です。",
       "namePlaceholder": "ジョブコンソール",
       "urlLabel": "ウェブアドレス",
-      "urlHelper": "http:// を省略すると自動で付きます。{host} はこのページを開いているアドレスを表します。",
+      "urlHelper": "スキームを省略すると、このページと同じスキーム（http:// または https://）が自動で付きます。{host} はこのページを開いているアドレスを表します。",
       "urlPlaceholder": "{host}:8080",
       "descriptionLabel": "説明",
       "descriptionHelper": "任意。アドレスの代わりに名前の下に表示されます。",

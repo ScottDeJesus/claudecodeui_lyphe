@@ -454,7 +454,7 @@
       "nameHelper": "Cómo la llamas en este panel.",
       "namePlaceholder": "Consola de trabajos",
       "urlLabel": "Dirección web",
-      "urlHelper": "Si no pones http://, se añade. {host} equivale a la dirección en la que está abierta esta página.",
+      "urlHelper": "Si no pones el esquema, se añade el de esta página (http:// o https://). {host} equivale a la dirección en la que está abierta esta página.",
       "urlPlaceholder": "{host}:8080",
       "descriptionLabel": "Descripción",
       "descriptionHelper": "Opcional. Se muestra bajo el nombre en lugar de la dirección.",

@@ -453,7 +453,7 @@
       "nameHelper": "Bu panelde görünecek adı.",
       "namePlaceholder": "İş konsolu",
       "urlLabel": "Web adresi",
-      "urlHelper": "http:// yazmazsan eklenir. {host}, bu sayfanın açık olduğu adres anlamına gelir.",
+      "urlHelper": "Şemayı yazmazsan bu sayfanın kendi şeması (http:// veya https://) eklenir. {host}, bu sayfanın açık olduğu adres anlamına gelir.",
       "urlPlaceholder": "{host}:8080",
       "descriptionLabel": "Açıklama",
       "descriptionHelper": "İsteğe bağlı. Adın altında adres yerine gösterilir.",

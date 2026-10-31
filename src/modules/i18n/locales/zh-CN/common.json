@@ -450,7 +450,7 @@
       "nameHelper": "它在此面板中显示的名称。",
       "namePlaceholder": "作业控制台",
       "urlLabel": "网址",
-      "urlHelper": "省略 http:// 时会自动补上。{host} 表示当前页面打开时使用的地址。",
+      "urlHelper": "省略协议时会自动补上本页所用的协议（http:// 或 https://）。{host} 表示当前页面打开时使用的地址。",
       "urlPlaceholder": "{host}:8080",
       "descriptionLabel": "描述",
       "descriptionHelper": "可选。显示在名称下方，代替地址。",

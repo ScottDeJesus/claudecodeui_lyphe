@@ -10,7 +10,8 @@ import { resolveAppsFile } from './apps.store.js';
  *
  * Fetched here, by the server, and handed to the drawer as data URLs inside `GET /api/apps`: the
  * browser cannot read another origin's page to find its `<link rel="icon">`, and the server can.
- * `{host}` is resolved to loopback — the registry's rows are apps on this box.
+ * `{host}` is resolved to loopback — the registry's rows are apps on this box (see `probeTarget` for
+ * the scheme and port a `{host}` row is asked at).
  *
  * THE CACHE IS A FILE beside the registry (`apps.icons.local.json`), keyed by app id and holding the
  * url it was found for, so an icon survives a restart and a changed url fetches afresh. A found icon
@@ -103,8 +104,44 @@ async function imageAt(url: string): Promise<string | null> {
   }
 }
 
+/** A row whose HOST is the placeholder — `https://{host}:8005/x` — as against a row that names a real host. */
+const HOST_PLACEHOLDER_ROW = /^[a-z][a-z\d+.-]*:\/\/(?:[^/?#@]*@)?\{host\}(?=[:/?#]|$)/i;
+
+/**
+ * The address the probe actually fetches for a row.
+ *
+ * A `{host}` ROW IS ASKED ON LOOPBACK, OVER PLAIN HTTP, AT ITS OWN PORT, whatever scheme the row is
+ * written with: `https://{host}:8005/#page=p` is fetched at `http://127.0.0.1:8005/#page=p`. The row's
+ * `https://` is the address a READER opens — Tailscale's https door in front of the app — and the app
+ * behind that door only speaks plain http, on the port the door shares. And the probe is a call made
+ * ON THIS BOX, which resolves its own tailnet name publicly, to the Funnel's ingress where every port
+ * but 443 is closed: the name is no way in from here, loopback is. Keeping the row's scheme would be
+ * TLS against a plain listener, and a null icon for every row that was switched to https.
+ *
+ * A row with a real host (`https://prism.scottdejesus.dev`) is asked exactly as written.
+ *
+ * A `{host}` row with no port has no listener to name: `https://{host}` is port 443, which no app
+ * here owns, and rewriting it to `http://127.0.0.1/` would fetch port 80, a different app's page.
+ * It keeps its scheme and takes only the loopback host, so it fails honestly as it always did.
+ *
+ * Never throws: an address that will not parse is handed to `fetch` as it stands, and the probe's
+ * own catch turns that into "no icon now".
+ */
+function probeTarget(url: string): string {
+  if (!HOST_PLACEHOLDER_ROW.test(url)) return url;
+  const onLoopback = url.replace(/\{host\}/gi, '127.0.0.1');
+  try {
+    const target = new URL(onLoopback);
+    // `URL.port` is '' for the scheme's own default port, which is the case with no port to keep.
+    if (target.port !== '') target.protocol = 'http:';
+    return target.href;
+  } catch {
+    return onLoopback;
+  }
+}
+
 async function probe(url: string): Promise<CachedIcon> {
-  const target = url.replace(/\{host\}/gi, '127.0.0.1');
+  const target = probeTarget(url);
   let pageUrl = target;
   let html = '';
   try {
