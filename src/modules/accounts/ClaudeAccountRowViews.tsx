@@ -1,6 +1,7 @@
 import { MoreHorizontal } from 'lucide-react';
 
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
+import { hasFiveHour } from '@/modules/accounts/utils/accountInUseUsage';
 import { resetsLine } from '@/modules/accounts/UsageMeters';
 import { ActionMenu, Avatar } from '@/shared/ui';
 import type { ClaudeAccountRow } from '@/shared/types';
@@ -19,10 +20,14 @@ function figureInPoints(fraction: number | null): string {
   return `${Math.round(fraction * 100)}%`;
 }
 
-/** The two windows each row states, through the one reading rule above. */
-function figuresInPoints(reading: ClaudeAccountRow['reading']): string {
-  if (reading === null) return '5h — · wk —';
-  return `5h ${figureInPoints(reading.five)} · wk ${figureInPoints(reading.week)}`;
+/**
+ * The two windows each row states, through the one reading rule above. An account with no 5-hour window states
+ * the weekly alone: its "5h" figure would be an em-dash for a window that does not exist.
+ */
+function figuresInPoints(reading: ClaudeAccountRow['reading'], withFiveHour: boolean): string {
+  const week = `wk ${figureInPoints(reading?.week ?? null)}`;
+  if (!withFiveHour) return week;
+  return `5h ${figureInPoints(reading?.five ?? null)} · ${week}`;
 }
 
 /** How old a row's figures are, in words — only once they are old enough that "current" would be a lie. */
@@ -110,7 +115,7 @@ export function AccountRowView({ account, hue, nowMs, busy, autoWhy, held, onUse
         {canUse && <span className="flex-none text-xs text-accent-ink">{useCue}</span>}
       </span>
       <span className="block text-xs text-muted-foreground">
-        {figuresInPoints(account.reading)}
+        {figuresInPoints(account.reading, hasFiveHour(account))}
         {age !== null && <span className="text-ink-faint"> · {age}</span>}
       </span>
       {weekResets !== undefined && <span className="block text-xs text-ink-faint">{weekResets}</span>}

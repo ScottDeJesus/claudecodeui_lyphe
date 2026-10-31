@@ -4,9 +4,12 @@ import type { CompanionDraft, CompanionPicture, CompanionSessionRef, CompanionSe
 import type { StationAskAnswer, StationLanded, StationNeed } from '@/shared/station-types.js';
 import { AppError } from '@/shared/utils.js';
 
+import { prepareTypedAttachments } from './attachments/typed-attachments.js';
 import { createCompanionAccount, type CompanionAccount } from './companion-account.js';
+import { inputInvalid } from './companion-input.js';
 import { createPress } from './companion-press.js';
 import { createSpeech } from './companion-speech.js';
+import { stopMouth } from './mouth/mouth-follow.js';
 import type { DraftSendOutcome } from './companion-send.js';
 import { buildPicture } from './companion-picture.js';
 import { readCompanionSettings, saveCompanionSettings, type CompanionSettingsPatch } from './companion-settings.js';
@@ -25,7 +28,7 @@ import { stationLanded } from './station/station-landed.js';
  *
  * Every verb here backs one route (`companion.routes.ts`, `cards.routes.ts`) or one feed, and takes the account's id first, so a call
  * cannot reach another account's rows, pages or conversation. The routes only parse and answer; the verbs decide:
- *   - `sendText` takes the floor for the page that typed, logs his line and pushes it to her;
+ *   - `sendText` takes the floor for the page that typed, logs his line (with the files he attached, read off the upload store) and pushes it to her;
  *   - `saveSettings` stores the patch, tells every page, and applies a model change to her running process
  *     with her conversation kept (`setModel`);
  *   - `press` is a press of the talk button or of her name (`companion-press.ts`): a button press takes the floor for its page (a
@@ -96,6 +99,24 @@ function createCompanionService() {
     }
   }
 
+  // Each account's typed lines in arrival order: a promise that settles (never rejects) when the latest line so far has been logged and pushed, or refused.
+  const typedChains = new Map<number, Promise<void>>();
+
+  /** One typed line, delivered inside its account's chain (`sendText`): the files read, then the floor, the log and the push, with nothing awaited after the first write. */
+  async function deliverTyped(userId: number, client: string, input: { text: string; attachments: Array<{ path: string; name: string }> }): Promise<void> {
+    if (stopped) throw stopping();
+    const prepared = await prepareTypedAttachments(input.attachments);
+    if (!prepared.ok) throw inputInvalid(prepared.sentence, 'attachments');
+    if (stopped) throw stopping();
+    const { text } = input;
+    const { attachments, images } = prepared;
+    const carried = attachments.length > 0;
+    const { store, session } = accountOf(userId);
+    store.setFloor(client);
+    store.appendLog({ role: 'operator', via: 'typed', text, ...(carried ? { attachments } : {}) });
+    session.pushOperator(text, 'typed', carried ? { attachments, images } : undefined);
+  }
+
   /**
    * The gateway and the house `attachRuntime` handed in. Falsy, not `=== null`: a plain-JS caller (a probe) that forgets the second
    * argument of `attachRuntime` hands `undefined`, which must be refused here and not carried into the tools.
@@ -144,15 +165,26 @@ function createCompanionService() {
     },
 
     /**
-     * A line he typed: the typing page takes the floor, the line joins the log, and she is pushed it as
-     * `<operator via="typed">`. Refused with a 503 once `stopAll` has run.
+     * A line he typed: the typing page takes the floor, the line joins the log with the files he attached, and she is pushed it as
+     * `<operator via="typed">` with its `<attachments>` and one image block per picture. The files are prepared first
+     * (`attachments/typed-attachments.ts`): one outside the upload store or unreadable is the 400 naming `attachments`, with nothing logged,
+     * pushed or taken. Refused with a 503 once `stopAll` has run, before the files are read and again after (it may have run meanwhile).
+     * An account's lines are delivered in the order they arrived, one at a time: a line with no files must not overtake the line before it
+     * whose files are still being read.
      */
-    sendText(userId: number, client: string, text: string): void {
-      if (stopped) throw stopping();
-      const { store, session } = accountOf(userId);
-      store.setFloor(client);
-      store.appendLog({ role: 'operator', via: 'typed', text });
-      session.pushOperator(text, 'typed');
+    sendText(userId: number, client: string, input: { text: string; attachments: Array<{ path: string; name: string }> }): Promise<void> {
+      const ahead = typedChains.get(userId) ?? Promise.resolve();
+      const delivered = ahead.then(() => deliverTyped(userId, client, input));
+      const tail = delivered.then(
+        () => undefined,
+        () => undefined,
+      );
+      typedChains.set(userId, tail);
+      // An account with no line in flight keeps no chain.
+      void tail.then(() => {
+        if (typedChains.get(userId) === tail) typedChains.delete(userId);
+      });
+      return delivered;
     },
 
     /** A press of the talk button or of her name: a button press takes the floor for the page `client` (a name press only while no page holds it), the clip is heard, and what he said (`''` for the empty press) is answered once it has been pushed. */
@@ -244,14 +276,16 @@ function createCompanionService() {
      * Says to her again, for each user whose last process left words of his unanswered, those words (making the account if it is
      * not made yet): she answers them without anyone speaking to her or a page opening. A duty of the SOLE server on the port,
      * which the entrypoint runs once the predecessor of a handover is gone (`soleServerDuties`) — a predecessor still serving may
-     * be answering the same words. One account's failure is logged and is that account's alone.
+     * be answering the same words. One account's failure, a throw or a rejection (a line with a picture reads it first, so its replay is
+     * a promise), is logged naming the account and is that account's alone. The entrypoint does not wait on the replays.
      */
     resendUnanswered(): void {
       for (const userId of companionDb.userIdsWithUnanswered()) {
+        const failed = (error: unknown): void => console.error(`[Companion] account ${userId}: her unanswered messages could not be sent again`, error);
         try {
-          accountOf(userId).session.resendUnanswered();
+          accountOf(userId).session.resendUnanswered().catch(failed);
         } catch (error) {
-          console.error(`[Companion] account ${userId}: her unanswered messages could not be sent again`, error);
+          failed(error);
         }
       }
     },
@@ -375,6 +409,8 @@ function createCompanionService() {
      */
     async stopAll(): Promise<void> {
       stopped = true;
+      // Every Rhubarb run of every sentence, waiting or running: the sentences' own aborts (below) end their streams, not these.
+      stopMouth();
       await Promise.all(
         [...accounts.values()].map(async ({ userId, session, speechCache }) => {
           // A sentence streaming to a page would hold the HTTP drain open for as long as Gemini kept speaking.

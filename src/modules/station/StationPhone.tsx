@@ -12,7 +12,7 @@ import { useStationHeadFoot } from '@/modules/station/hooks/useStationHeadFoot';
 import { useStationSection } from '@/modules/station/hooks/useStationSection';
 import { useStripWeek } from '@/modules/station/hooks/useStripWeek';
 import { StationSectionsView } from '@/modules/station/StationSections';
-import { STATION_OUT_OF_REACH as UNDER_THE_WEEK, STATION_SIDEWAYS_CATCH } from '@/shared/constants';
+import { OUT_OF_REACH as UNDER_THE_WEEK, STATION_SIDEWAYS_CATCH } from '@/shared/constants';
 import type { StationCompactSection, StationHeadRow, StationSlot, TalkPress } from '@/shared/types';
 import { Badge, Button } from '@/shared/ui';
 import { cn, isDrawn } from '@/shared/utils';
@@ -63,7 +63,8 @@ type StationPhoneViewProps = {
  * bar clears the home indicator itself). Compact's one column arranged for the glass: its sections and the regions' compact
  * density, with the presses at the bottom and her face and state at the top. Top to bottom:
  *
- * 1. THE TOP ROW, the bar and her head in one (her head's `row`, `HeadRow`): her face at 44 px, her name and state on one line,
+ * 1. THE TOP ROW, the bar and her head in one (her head's `row`, `HeadRow`): her face at 44 px (none in the portrait view: her portrait
+ *    stands large in the Conversation section, and her menu holds the toggle between her views), her name and state on one line,
  *    the count of what needs him (a press to Needs you), and her ONE menu, her controls over "CloudCLI". No station title: her
  *    name stands there. Her face is never covered: everything this arrangement lays over anything opens under the row.
  * 2. THE STRIP'S LINE, "<n> new" and the newest landing. Its fold opens the whole week OVER the middle, laid from the line's own

@@ -1,14 +1,16 @@
 import { ChevronDown, SlidersHorizontal } from 'lucide-react';
-import { useId, useLayoutEffect, useState } from 'react';
+import { useId } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionControls, CompanionFace, CompanionStatus, useCompanion, useCompanionPresence } from '@/modules/companion';
 import { HeadRow } from '@/modules/station/HeadRow';
-import { useHostWindow } from '@/shared/context/HostWindowContext';
-import type { CompanionPresence, StationDensity, StationHeadRow, StationRegionProps, StationTier } from '@/shared/types';
+import { HerViewToggle } from '@/modules/station/HerViewToggle';
+import { useDrawnSquare } from '@/modules/station/hooks/useDrawnSquare';
+import { useHerView } from '@/modules/station/hooks/useHerView';
+import type { CompanionPresence, StationDensity, StationHeadRow, StationHerView, StationRegionProps, StationTier } from '@/shared/types';
 import { Banner, buttonVariants, Menu } from '@/shared/ui';
-import { cn, resizeObserverIn } from '@/shared/utils';
+import { cn } from '@/shared/utils';
 
 /** The tiers a full-density head draws on: under 1024 px (`narrow`, a phone included) the station is always compact. */
 type FullTier = Exclude<StationTier, 'narrow'>;
@@ -68,6 +70,14 @@ type StationHeadViewProps = {
   /** While her process has failed, the server's sentence for it (null when it gave none); null while it runs. */
   failure: { sentence: string | null } | null;
   /**
+   * How her column draws her (`useHerView` on the page). `chat` draws her face in its disc, as every form below stands it;
+   * `portrait` draws none: her portrait stands large in her conversation's place, and the head is her name, her state, her
+   * controls behind "Her controls" and the toggle, in the compact form's look at every tier and density.
+   */
+  herView: StationHerView;
+  /** The toggle's press: her column in the other view. */
+  onHerView: (next: StationHerView) => void;
+  /**
    * Her head as the phone's top row (`StationHeadRow`, handed by the phone's arrangement over `density: 'compact'`): her face at 44
    * px (32 on its side), her name and her state on one line, the arrangement's `trail`, and her one menu at the row's end, holding
    * her controls and "CloudCLI". Absent everywhere else.
@@ -76,8 +86,9 @@ type StationHeadViewProps = {
 };
 
 /**
- * HER HEAD, the top of her column on Kaylee Station: her face, her name, her one state in words, the failed process's banner,
- * and her controls. Everything in it is the companion module's own, drawn through its barrel: the status line is
+ * HER HEAD, the top of her column on Kaylee Station: her face (in the `chat` view; in `portrait` her portrait stands in her
+ * conversation's place), her name, her one state in words, the failed process's banner, her controls, and the toggle between her
+ * two views. Everything in it is the companion module's own, drawn through its barrel: the status line is
  * `CompanionStatus` at the station's emphasis (the same table of words, in the same order, from the same presence as her
  * panel's line and her button's label, MAN-9089), the controls are `CompanionControls` in one line (every rule of MAN-9090
  * comes with them), and the face is the caller's `face`, the face she wears on her button.
@@ -101,8 +112,16 @@ type StationHeadViewProps = {
  *   holding it. On a laptop the banner stands in her words' column, under the press.
  *
  * - THE PHONE'S TOP ROW (`row`, handed by the phone's arrangement; `HeadRow`): her face at 44 px (32 on its side), her name and
- *   her state on one line, the arrangement's `trail`, and her ONE menu at the row's end, her controls' line over "CloudCLI", the
- *   shell's way back in the same window. The station's title is not drawn: her name stands there.
+ *   her state on one line, the arrangement's `trail`, and her ONE menu at the row's end, her controls' line over the toggle and
+ *   "CloudCLI", the shell's way back in the same window. The station's title is not drawn: her name stands there.
+ *
+ * - THE TOGGLE, "Show chat" or "Show portrait" (`HerViewToggle`, one kit `Button`, 44 px under a finger): beside "Her controls"
+ *   wherever that press stands, under her controls' line in the wide form, under her face in the laptop form (where her words are the
+ *   taller column, so the stage beside her loses no height to it: a row under her controls took the iPad's stage its last 34 px), and
+ *   in her menu on the phone's row.
+ * - THE PORTRAIT VIEW (`herView: 'portrait'`, the default): no face and no disc here. At every tier and density the head is the
+ *   compact form's look without its face: her name and her state on one line, "Her controls" and the toggle under them, the
+ *   banner under those, so her portrait takes the room her conversation list took. On the phone's row, the row without her face.
  *
  * A FAILED PROCESS is a warn `Banner` with the server's sentence right under the status line ("Stopped · your next message
  * starts her again"), as her panel says it, the sentence on the banner and the next step in the line. While her picture
@@ -110,31 +129,25 @@ type StationHeadViewProps = {
  *
  * A pure view: `StationHead` below binds it, and `.verify/kaylee-station-shots.mjs` draws it on `fake/head.ts`'s pictures.
  */
-export function StationHeadView({ tier, density, name, presence, face, controls, failure, row }: StationHeadViewProps) {
+export function StationHeadView({ tier, density, name, presence, face, controls, failure, herView, onHerView, row }: StationHeadViewProps) {
   const { t } = useTranslation();
   const nameId = useId();
-  // Under 1024 px the station is one column, so a narrow tier draws the compact head whatever its density says.
-  const fullTier: FullTier | null = density === 'compact' || tier === 'narrow' ? null : tier;
+  const portrait = herView === 'portrait';
+  // Under 1024 px the station is one column, so a narrow tier draws the compact head whatever its density says; the portrait view draws it at every tier.
+  const fullTier: FullTier | null = density === 'compact' || tier === 'narrow' || portrait ? null : tier;
   const { px, box } = row !== undefined ? ROW_FACE[row.sideways ? 'sideways' : 'upright'] : fullTier === null ? COMPACT_FACE : FACE[fullTier];
-  const hostWindow = useHostWindow();
-  // Her face's box as drawn: state, so a head laid out again (a tier change keeps her column) is observed afresh.
-  const [faceNode, setFaceNode] = useState<HTMLDivElement | null>(null);
-  // The px her face's box is drawn at, read off the box (a ResizeObserver: an event), since on a wide screen her column's height,
-  // which only the layout knows, makes it 132 or 200 px: her initial is drawn at it, so it fills the disc it stands in.
-  const [drawnPx, setDrawnPx] = useState(px);
-  useLayoutEffect(() => {
-    if (faceNode === null) return undefined;
-    const observer = resizeObserverIn(hostWindow, ([entry]) => { if (entry) setDrawnPx(Math.round(entry.contentRect.width)); });
-    observer?.observe(faceNode);
-    return () => observer?.disconnect();
-  }, [faceNode, hostWindow]);
+  // The px her face's box is drawn at, read off the box, since on a wide screen her column's height, which only the layout knows,
+  // makes it 132 or 200 px: her initial is drawn at it, so it fills the disc it stands in.
+  const [setFaceNode, drawnPx] = useDrawnSquare(px);
 
-  const faceBox = (
+  // No disc in the portrait view: her face stands in her conversation's place, and the head draws none.
+  const faceBox = portrait ? null : (
     // The disc's own ground under her portrait, which shows only while its sheets decode.
     <div ref={setFaceNode} data-station-head-face="" className={cn('relative shrink-0 rounded-full bg-accent-soft', box)}>
       {face(drawnPx)}
     </div>
   );
+  const viewToggle = () => <HerViewToggle herView={herView} onChange={onHerView} />;
   const controlsLabel = t('station.head.controls', { defaultValue: 'Her controls' });
   // Her controls behind one press: the compact form's, and the full forms' while her column is under 47rem.
   const controlsPress = (
@@ -170,11 +183,17 @@ export function StationHeadView({ tier, density, name, presence, face, controls,
         </h2>
         <CompanionStatus presence={presence} emphasis="station" />
       </div>
-      <div className="hidden [@container_her_not_(min-height:47rem)]:block">{controlsPress}</div>
+      <div className="hidden flex-wrap items-center gap-2 [@container_her_not_(min-height:47rem)]:flex">{controlsPress}{viewToggle()}</div>
     </div>
   );
-  // Her controls in their line, while her column is 47rem tall or more; under it they stand behind "Her controls".
-  const controlsLine = (align: 'start' | 'center') => <div className="[@container_her_not_(min-height:47rem)]:hidden">{controls(align)}</div>;
+  // Her controls in their line, while her column is 47rem tall or more; under it they stand behind "Her controls", the toggle beside.
+  // `center` (the wide form, its column over the stage's own) draws the toggle under the line; the laptop form's stands under her face.
+  const controlsLine = (align: 'start' | 'center') => (
+    <div className="[@container_her_not_(min-height:47rem)]:hidden">
+      {controls(align)}
+      {align === 'center' && <div className="mt-2 flex justify-center">{viewToggle()}</div>}
+    </div>
+  );
   const banner = failure !== null && (
     <div data-station-head-failed="" className="w-full text-left">
       <Banner tone="warn">{failure.sentence ?? t('companion.panel.failedUnknown', { name })}</Banner>
@@ -192,13 +211,15 @@ export function StationHeadView({ tier, density, name, presence, face, controls,
         controls={controls('start')}
         panelWidth={CONTROLS_PANEL_PX}
         banner={banner}
+        herView={herView}
+        onHerView={onHerView}
       />
     );
   }
 
   if (fullTier === null) {
     return (
-      <section data-station-head="compact" aria-labelledby={nameId} className="flex min-w-0 flex-col gap-2 px-3 py-2">
+      <section data-station-head={portrait ? 'portrait' : 'compact'} aria-labelledby={nameId} className="flex min-w-0 flex-col gap-2 px-3 py-2">
         <div className="flex min-w-0 items-center gap-3">
           {faceBox}
           <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
@@ -209,7 +230,7 @@ export function StationHeadView({ tier, density, name, presence, face, controls,
               </h2>
               <CompanionStatus presence={presence} emphasis="station" />
             </div>
-            {controlsPress}
+            <div className="flex flex-wrap items-center gap-2">{controlsPress}{viewToggle()}</div>
           </div>
         </div>
         {banner}
@@ -244,7 +265,11 @@ export function StationHeadView({ tier, density, name, presence, face, controls,
       aria-labelledby={nameId}
       className="flex min-w-0 items-center gap-5 p-4 [@container_her_not_(min-height:47rem)]:gap-3 [@container_her_not_(min-height:47rem)]:px-3 [@container_her_not_(min-height:47rem)]:py-2"
     >
-      {faceBox}
+      {/* The toggle stands under her face: her words beside it are the taller column, so it costs the stage beside her no height. */}
+      <div className="flex shrink-0 flex-col items-center gap-2">
+        {faceBox}
+        <div className="[@container_her_not_(min-height:47rem)]:hidden">{viewToggle()}</div>
+      </div>
       <div className="flex min-w-0 flex-1 flex-col gap-3 [@container_her_not_(min-height:47rem)]:items-start [@container_her_not_(min-height:47rem)]:gap-1">
         {words}
         {banner}
@@ -266,6 +291,7 @@ export function StationHead({ tier, density, row }: StationRegionProps & { row?:
   } = useCompanion();
   // The one state her face and the status line read, so the two cannot disagree (MAN-9089).
   const presence = useCompanionPresence();
+  const [herView, setHerView] = useHerView();
   const name = picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
 
   return (
@@ -291,6 +317,8 @@ export function StationHead({ tier, density, row }: StationRegionProps & { row?:
         />
       )}
       failure={picture?.process.state === 'failed' ? { sentence: picture.process.error } : null}
+      herView={herView}
+      onHerView={setHerView}
       row={row}
     />
   );

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
-import type { AffectedAreasTrouble, DispatcherModelWord, Project, ProjectSession, SlashCommand } from '@/shared/types';
+import type { AffectedAreasTrouble, ChatAttachment, DispatcherModelWord, Project, ProjectSession, SlashCommand } from '@/shared/types';
 
 //----------------- DEPLOYMENT MODE ------------
 
@@ -644,6 +644,22 @@ export function isEngineHandledCommand(command: SlashCommand): boolean {
 
 // ---------------------------
 
+//----------------- A CHAT ATTACHMENT THAT IS A PICTURE ------------
+
+/**
+ * Whether a stored chat attachment is a picture: its MIME type says `image/…`, or its path (its name when it has no
+ * path) ends in a picture's extension (gif, jpg, jpeg, png, svg, webp), whatever MIME type it carries otherwise. Used by
+ * the chat module's `useChatComposerState`, which sends the pictures and the other files of one message apart, and by the
+ * companion module's `CompanionAttachments`, which draws the files he attached to a typed line as the chat's pictures, then its
+ * other files.
+ */
+export function isImageAttachment(attachment: ChatAttachment): boolean {
+  if (attachment.mimeType?.startsWith('image/')) return true;
+  return /\.(gif|jpe?g|png|svg|webp)$/i.test(attachment.path || attachment.name || '');
+}
+
+// ---------------------------
+
 //----------------- A LANE READ THAT BROUGHT NO ANSWER ------------
 // Pure: the hooks hand these what `fetch` gave or threw, and draw the trouble each returns.
 
@@ -712,23 +728,6 @@ export function companionClientId(): string {
     }
   }
   return companionClientIdInMemory;
-}
-
-/**
- * Takes this page's name to her out of a window this page has just opened, before that window's document has loaded, so it
- * mints a name of its own. A window opened with `window.open` starts with a COPY of its opener's sessionStorage, and the name
- * lives there: left alone, the new window would be the same page to her as this one, answer the same `companion_open`, and
- * (the later of two same-named pages) speak her `<view>` over this one's. Reached through the window's own storage, which is
- * readable while it still holds its initial document; a window that cannot be read is left as it is.
- *
- * Consumed by `src/shared/cloudcliDoors.ts`, which opens every window the station opens for CloudCLI.
- */
-export function forgetCompanionClientIdIn(opened: Window): void {
-  try {
-    opened.sessionStorage.removeItem(COMPANION_CLIENT_STORAGE_KEY);
-  } catch (error) {
-    console.warn('[Companion] Could not clear the page name a new window inherited:', error);
-  }
 }
 
 // ---------------------------

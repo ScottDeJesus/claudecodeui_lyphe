@@ -10,7 +10,7 @@ import { firstQuote, quotesOf } from './memory-words.js';
  * read for the corner.
  *
  * NOTHING OF HERS STANDS AS A QUOTE OF HIS (INV-10122). The moment (`saidAt`), the account and his words (`quote`) come from the body's
- * first `He said (<account>, <at>): “…”` line, parsed by `quotesOf`, and from nowhere else: her context line and her reason line are
+ * first `He said (<account>, <at>): “…”` line (`He typed (…)` when he typed it), parsed by `quotesOf`, and from nowhere else: her context line and her reason line are
  * not quotes and never reach a line. A memory whose body quotes no one has `null` for all three, and the view says so.
  *
  * ONE UNREADABLE MEMORY MAKES THE READING FAIL, WITH ITS SENTENCE. A list with a hole would show seven as six; so a `list` or a `get`

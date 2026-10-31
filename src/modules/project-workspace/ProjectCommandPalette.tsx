@@ -11,8 +11,7 @@ import { useProjectCommandState } from '@/modules/project-workspace/context/Proj
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
 import { openStation } from '@/shared/cloudcliDoors';
 import { GIT_REPO_PATHS } from '@/shared/constants';
-import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
-import { usePhoneWindow } from '@/shared/hooks/usePhoneWindow';
+import { useStationShowing } from '@/shared/context/StationLayerContext';
 import type { ChatDoor, PaletteGroup, PaletteNavRow } from '@/shared/types';
 
 /**
@@ -30,6 +29,7 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
     setActiveTab,
   } = useProjectCommandState();
   const { views } = useWorkspaceViews();
+  const stationShowing = useStationShowing();
 
   // The switcher's five acts, the list the radial draws too. They are the switcher's to define (which
   // pane is in front, what a Reload is), so this only forwards them to the palette's Applications group.
@@ -69,12 +69,10 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
 
   // Kaylee's group: a row that opens her panel and a row that opens her station. Her name is the one he gave her, so it is
   // read off her picture, and the memo keeps the group's identity through the frames she sends (each sentence changes the
-  // picture, not her name). The station's door is `openStation`: its own window on a desktop (named, so a second press brings
-  // the same one forward), this window on a phone (`usePhoneWindow`) or in the home-screen app; the same door her panel's head carries.
+  // picture, not her name). The station's door is `openStation`: the station comes forward over this page, in this tab, and the
+  // workspace stays as it is under it; the same door her panel's head carries.
   const { picture, setOpen: setCompanionOpen } = useCompanion();
   const navigate = useNavigate();
-  const { isPWA } = useDeviceSettings();
-  const phone = usePhoneWindow();
   const companionName = picture?.settings.name ?? t('companion.defaultName');
   const companionGroup = useMemo<PaletteGroup>(
     () => ({
@@ -90,14 +88,18 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
         {
           key: 'station',
           label: t('companion.palette.station', { defaultValue: 'Open Kaylee Station' }),
-          keywords: t('companion.palette.stationKeywords', { defaultValue: 'kaylee station watch floor dashboard monitor window' }),
+          keywords: t('companion.palette.stationKeywords', { defaultValue: 'kaylee station watch floor dashboard monitor' }),
           icon: LayoutDashboard,
-          run: () => openStation(navigate, { phone, pwa: isPWA }),
+          run: () => openStation(navigate),
         },
       ],
     }),
-    [t, companionName, setCompanionOpen, navigate, phone, isPWA],
+    [t, companionName, setCompanionOpen, navigate],
   );
+
+  // The station on screen covers this page, and Ctrl+K is heard on the whole document: with the palette drawn it would open on a page nobody sees and be
+  // open when he comes back. Not drawn, it hears nothing.
+  if (stationShowing) return null;
 
   return (
     <CommandPalette

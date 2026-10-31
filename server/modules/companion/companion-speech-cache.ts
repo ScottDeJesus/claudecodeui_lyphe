@@ -1,3 +1,4 @@
+import type { CompanionMouthPiece } from '@/shared/companion-types.js';
 import type { AppError } from '@/shared/utils.js';
 
 /**
@@ -27,6 +28,9 @@ import type { AppError } from '@/shared/utils.js';
  * so a closed page costs nothing more; an entry that stopped before its end leaves the cache, because replaying half a
  * sentence would be worse than asking again.
  *
+ * An entry also keeps `mouth`, the timed shapes announced for its audio so far, so a sentence served from the cache can
+ * announce them again; they are the speech door's to fill and are freed with the audio.
+ *
  * Consumers: `companion-speech.ts` (fills and follows entries), `companion-account.ts` (one cache per account; tells it
  * when a turn starts) and `companion.service.ts` (ends it on Clear and on shutdown).
  */
@@ -50,6 +54,8 @@ export type SpeechEntry = {
   opened: Promise<AppError | null>;
   /** Wakes of the requests waiting for more audio; each is called once and removed. */
   wakes: Set<() => void>;
+  /** The pieces of her exact mouth announced so far (`mouth/mouth-follow.ts`, in the order they landed): sent again, once, to each request that finds this entry in the cache, so a page that reloaded or took the floor mid-turn is not left without shapes it missed. Freed with the entry. */
+  mouth: CompanionMouthPiece[];
 };
 
 /** What `createSpeechCache` answers; the account holds one. Consumed by `companion-speech.ts`, `companion-account.ts` and `companion.service.ts`. */
@@ -75,7 +81,7 @@ export type SpeechCache = {
 
 /** A new entry, empty and not yet opened. `opened` is given by the caller once the synthesis is started. */
 export function createSpeechEntry(opened: (entry: SpeechEntry) => Promise<AppError | null>): SpeechEntry {
-  const entry: SpeechEntry = { pcm: [], done: false, abort: new AbortController(), bytes: 0, followers: 0, opened: Promise.resolve(null), wakes: new Set() };
+  const entry: SpeechEntry = { pcm: [], done: false, abort: new AbortController(), bytes: 0, followers: 0, opened: Promise.resolve(null), wakes: new Set(), mouth: [] };
   entry.opened = opened(entry);
   return entry;
 }

@@ -1,5 +1,5 @@
 import type { StationFocus } from '@/shared/station-types';
-import type { StationCompactSection, StationPrefKey, StationRegion } from '@/shared/types';
+import type { StationCompactSection, StationHerView, StationPrefKey, StationRegion } from '@/shared/types';
 
 /** The localStorage key the station keeps its one record under: per device, as a window's size and its pointer are. */
 export const STATION_STORAGE_KEY = 'kaylee-station';
@@ -18,11 +18,14 @@ export type StationRecord = {
   prefs: Partial<Record<StationPrefKey, unknown>>;
 };
 
-/** The preferences a record may hold as flags: a stored key outside this list, `compactSection` and `compactSectionAside` is from another build and is dropped on read. */
+/** The preferences a record may hold as flags: a stored key outside this list, `compactSection`, `compactSectionAside` and `herView` (each read by its own rule below) is from another build and is dropped on read. */
 const FLAG_PREF_KEYS: readonly StationPrefKey[] = ['stripCollapsed', 'cornerOpen', 'compact', 'asleepOpen', 'completeOpen'];
 
 /** The sections the one-column station shows, which a stored `compactSection` must be one of. */
 const COMPACT_SECTIONS: readonly StationCompactSection[] = ['conversation', 'needs', 'where', 'stage'];
+
+/** The views of her column, which a stored `herView` must be one of. */
+const HER_VIEWS: readonly StationHerView[] = ['portrait', 'chat'];
 
 /** A record with nothing remembered: a first visit, or a stored record that could not be read. */
 export function emptyStationRecord(): StationRecord {
@@ -129,6 +132,10 @@ export function readStationRecord(): StationRecord {
     // The section it was pulled from: a word of the three it can come from (never `stage`, the one it was pulled to), else none.
     const aside = raw.prefs.compactSectionAside;
     if (COMPACT_SECTIONS.some((each) => each !== 'stage' && each === aside)) prefs.compactSectionAside = aside;
+    // How her column draws her: one of the two words, else no preference and the station opens on her portrait (a record from before
+    // the portrait existed holds none).
+    const herView = raw.prefs.herView;
+    if (HER_VIEWS.some((each) => each === herView)) prefs.herView = herView;
   }
   const focus = isStationFocus(raw.focus) ? raw.focus : null;
   const stack = backableFrom(Array.isArray(raw.stack) ? raw.stack.filter(isStationFocus).slice(-BACK_STACK_DEPTH) : [], focus);

@@ -3289,6 +3289,9 @@
       "emptyTitle": "Nothing said yet",
       "emptyMessage": "Type to {{name}} below. She keeps track of every chat you're running, drafts what to tell one, and sends only on your word."
     },
+    "attachments": {
+      "strip": "You attached"
+    },
     "walk": {
       "title": "Walkthrough",
       "of": "Item\u00a0{{at}}\u00a0of\u00a0{{total}}",
@@ -3381,6 +3384,8 @@
       "placeholder": "Message {{name}}…",
       "label": "Message {{name}}",
       "send": "Send",
+      "attach": "Attach a file",
+      "leftOut": "Not put back, {{max}} files are already waiting:",
       "refused": "Couldn't reach {{name}}. Your message is back in the box; send it again."
     },
     "talk": {
@@ -3408,7 +3413,7 @@
       "talk": "Talk to {{name}}",
       "keywords": "kaylee companion voice assistant talk draft brief",
       "station": "Open Kaylee Station",
-      "stationKeywords": "kaylee station watch floor dashboard monitor window"
+      "stationKeywords": "kaylee station watch floor dashboard monitor"
     },
     "noteKind": {
       "note": "Note",
@@ -3425,7 +3430,9 @@
     },
     "head": {
       "controls": "Her controls",
-      "menu": "Her controls and CloudCLI"
+      "menu": "Her controls and CloudCLI",
+      "showChat": "Show chat",
+      "showPortrait": "Show portrait"
     },
     "talk": {
       "orPress": "or press",

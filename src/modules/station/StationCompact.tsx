@@ -9,7 +9,7 @@ import { useStationSection } from '@/modules/station/hooks/useStationSection';
 import { useStripWeek } from '@/modules/station/hooks/useStripWeek';
 import { StationSectionsView } from '@/modules/station/StationSections';
 import { StationTalk } from '@/modules/station/StationTalk';
-import { STATION_OUT_OF_REACH as UNDER_THE_WEEK } from '@/shared/constants';
+import { OUT_OF_REACH as UNDER_THE_WEEK } from '@/shared/constants';
 import type { StationCompactSection, StationSlot, StationTier } from '@/shared/types';
 import { Badge, Button, SegmentedControl } from '@/shared/ui';
 import { cn, isDrawn } from '@/shared/utils';
@@ -48,7 +48,7 @@ const FOLDS_FOR_THE_KEYS = '[html[data-keyboard=up]_&]:[@container_station-colum
 
 
 type StationCompactViewProps = {
-  /** Her head at compact density: the `head` slot's region (`StationHead`), her face at 64 px and her controls behind one press. */
+  /** Her head at compact density: the `head` slot's region (`StationHead`), her face at 64 px (none in the portrait view) and her controls behind one press. */
   head: ReactNode;
   /** The talk button at compact density, its words kept: `StationTalk` at `part: 'button'`. Its box is in the Conversation section. */
   talk: ReactNode;
@@ -74,7 +74,8 @@ type StationCompactViewProps = {
  * THE COMPACT ARRANGEMENT, the station in one column (a second monitor, a tablet, a small window; a phone has its own
  * arrangement, which the shell picks first), under the shell's bar. Top to bottom:
  *
- * - HER HEAD, which never scrolls away: her face, her name and her state in words, her controls behind one press (the head
+ * - HER HEAD, which never scrolls away: her face (in the `chat` view; in `portrait`, the default, her portrait stands large in the
+ *   Conversation section instead and the head holds her name, her state and the toggle), her name and her state in words, her controls behind one press (the head
  *   region's compact form); the talk button, the page's one press, its words kept; and the count of what needs him, a press to
  *   Needs you. Her face is never covered: the stage is a section of the body under her head, never an overlay on her.
  * - THE STRIP as one line, "<n> new" and the newest landing. Its press opens the whole week OVER the body: laid from the

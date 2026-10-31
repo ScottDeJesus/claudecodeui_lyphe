@@ -126,6 +126,13 @@
     "placeholderDefault": "Type your message...",
     "disabled": "Input disabled",
     "attachFiles": "Attach a file",
+    "refused": {
+      "tooBig_one": "Not attached: {{names}} is over {{megabytes}} MB.",
+      "tooBig_other": "Not attached: {{names}} are over {{megabytes}} MB.",
+      "tooMany": "Not attached: {{count}} files at once; at most {{max}} go with one message.",
+      "waiting": "Not attached: {{names}}; {{max}} files are already waiting.",
+      "pair": "{{first}} and {{second}}"
+    },
     "attachImages": "Attach images",
     "send": "Send",
     "stop": "Stop",

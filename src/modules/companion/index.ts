@@ -2,7 +2,7 @@
 // button, its rail her dock, its command palette opens her), the settings module (its voice tab draws her section) and the
 // station module (its route mounts the page's other `CompanionProvider`, with an `onOpen` that puts what she opens on the
 // stage; its fallback and its floor hook read `useCompanion`; its right rail draws her action card; its dock draws her draft
-// card; its head, conversation and talk control compose her face, state words, controls, log, talk button and composer rather
+// card; its head, conversation, portrait and talk control compose her face, state words, controls, log, reply, attachment strip, talk button and composer rather
 // than rebuild them; its phone arrangement draws her round talk button in its bottom bar and her action line over it).
 // Everything else in this module is private.
 export { CompanionProvider, useCompanion } from '@/modules/companion/context/CompanionContext';
@@ -34,6 +34,14 @@ export { CompanionStatus } from '@/modules/companion/CompanionStatus';
 export { CompanionControls } from '@/modules/companion/CompanionControls';
 // her exchange with him: this module's panel (CompanionPanel), and the station's conversation.
 export { CompanionLog } from '@/modules/companion/CompanionLog';
+// keeps a scroller on its newest content while the reader is there: this module's log, and the station's portrait, whose words follow her answer as it streams.
+export { useFollowNewest } from '@/modules/companion/hooks/useFollowNewest';
+// her turn as one paragraph, the sentence she is speaking marked: this module's log, and the station's portrait, which draws her latest turn alone under her face.
+export { CompanionReply } from '@/modules/companion/CompanionReply';
+// what his newest line attached, one centred row of small chips: the station's portrait, at the top of her words, the one place it
+// draws anything of his lines while she thinks about that line and answers it; it says when her words are the thinking dots
+// (`pinned`), so the strip pins over them.
+export { CompanionAttachmentStrip } from '@/modules/companion/CompanionAttachmentStrip';
 // the talk press: this module's composer (CompanionComposer), the station's talk control (`size: 'large'`), and the round button
 // in the center of the station's phone bar (`size: 'round'`).
 export { CompanionTalkButton } from '@/modules/companion/CompanionTalkButton';

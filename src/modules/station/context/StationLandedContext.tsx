@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 
 import { api, refusalSentence } from '@/shared/api';
+import { useStationDoors, useStationShowing } from '@/shared/context/StationLayerContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { StationLanded, StationLandedKind } from '@/shared/station-types';
 import {
@@ -93,7 +94,8 @@ export function useStationLanded(): StationLandedContextValue {
 }
 
 /**
- * THE PAGE'S KEEP OF WHAT LANDED AND OF HIS LAST LOOK, mounted by `StationRoute` inside `StationProvider`.
+ * THE PAGE'S KEEP OF WHAT LANDED AND OF HIS LAST LOOK, mounted by `StationRoute` inside `StationProvider`. The station stays mounted under the
+ * workspace once visited, so the landings go on being kept while he is away and are new to him when he comes back.
  *
  * THE LANDINGS are one `GET /api/companion/station/landed` at mount and another on `websocket_reconnected` (a frame sent while the
  * socket was down is lost, and the read has it). Between them each `station_landed` frame folds its entry in by id. Nothing polls.
@@ -106,7 +108,8 @@ export function useStationLanded(): StationLandedContextValue {
  * HIS LAST LOOK is `stationSeenAt`, a preference of the account, so it follows him from device to device and is read through the
  * preference store's own subscription. `markSeen` writes it as now, and the provider calls it on every look-away: the
  * document going hidden, the page going away, the window blurring after it was focused (he was in it and left it for another
- * window), and the route unmounting (he left the station by the app's own router, which raises none of the others). A look-away
+ * window), and the station leaving the screen (he left it by the app's own router, which raises none of the others). They are
+ * heard only while the station is the page on screen: the workspace's hidden and focused states are not looks at the station. A look-away
  * with nothing new writes too, so the next look counts from it; with nothing drawn (no landings held) it writes nothing. Nothing
  * writes it on a clock. A page that comes back (its document visible again, its window focused) asks the server for the stamp
  * once, because another device may have written it while this one sat open, and keeps it when it is the newer.
@@ -118,6 +121,8 @@ export function useStationLanded(): StationLandedContextValue {
  */
 export function StationLandedProvider({ children }: { children: ReactNode }) {
   const { subscribe } = useWebSocket();
+  const showing = useStationShowing();
+  const stationDoors = useStationDoors();
   // The week's landings as the last good read answered, with the frames folded in since. State, because the strip draws from it and a new landing must re-draw it; null is "no read has landed".
   const [landed, setLanded] = useState<StationLanded[] | null>(null);
   // Why the last read failed, cleared when a read lands or Try again starts one. State, because the strip's failed state draws it; the value below withholds it once landings are held.
@@ -214,10 +219,11 @@ export function StationLandedProvider({ children }: { children: ReactNode }) {
     flushUserPreferences();
   }, []);
 
-  // HIS LOOK-AWAYS, each a browser event and none a clock. `focused` is a plain variable of this effect: it is only the memory
+  // HIS LOOK-AWAYS, each a browser event and none a clock, heard while the station is on screen. `focused` is a plain variable of this effect: it is only the memory
   // that a `blur` follows a `focus`, so a window that was never focused (a page opened in the background) is not "looked away from".
-  // It starts as the window's focus at mount, because a page loaded with focus never fires a `focus` of its own.
+  // It starts as the window's focus when the station comes on screen, because a page loaded with focus never fires a `focus` of its own.
   useEffect(() => {
+    if (!showing) return undefined;
     let focused = document.hasFocus();
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') markSeen();
@@ -239,15 +245,15 @@ export function StationLandedProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('pagehide', markSeen);
       window.removeEventListener('focus', onFocus);
       window.removeEventListener('blur', onBlur);
-      // THE ROUTE LEAVING is a look-away that raises none of the events above (a phone's "Back to CloudCLI" is the app's own
-      // navigation, in the same window). It is stamped one microtask later and only if no remount revived the provider by then:
-      // strict mode unmounts and remounts in one commit, and a stamp written then would put "now" over a landing never seen. Not
-      // stamped after a sign-out either (the store is no longer settled), so one account's stamp is never queued under the next.
+      // THE STATION LEAVING THE SCREEN is a look-away that raises none of the events above ("Back to CloudCLI" is the app's own navigation, in the
+      // same window), and so is the provider going. It is stamped one microtask later, and only if the station is really gone: strict mode unmounts
+      // and remounts in one commit, and a stamp written then would put "now" over a landing never seen. Not stamped after a sign-out either (the
+      // store is no longer settled), so one account's stamp is never queued under the next.
       queueMicrotask(() => {
-        if (!aliveRef.current && hasHydratedUserPreferences()) markSeen();
+        if ((!aliveRef.current || !stationDoors.showing()) && hasHydratedUserPreferences()) markSeen();
       });
     };
-  }, [markSeen]);
+  }, [markSeen, showing, stationDoors]);
 
   // HIS COMING BACK, a browser event and no clock: the document visible again, or the window focused. Another device may have
   // written the stamp while this page sat open, and the store reads the server only at sign-in, so the page asks once and keeps the

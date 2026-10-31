@@ -33,7 +33,8 @@ const AT_END_SLACK = 48;
  * scroll memory, through CompanionLog's `scrollRef`, after a reload or a tier change): it is left where it stands and starts
  * not following, so "Newest" brings him down. Her panel puts no place back, so its scroller pins as it always has.
  *
- * Used by this module's CompanionLog, the one scroller in her panel that grows at its end.
+ * Used by this module's CompanionLog, the one scroller in her panel that grows at its end, and by the station's portrait view, whose
+ * words area follows her answer as it streams.
  */
 export function useFollowNewest(contentKey: string, visible: boolean) {
   const hostWindow = useHostWindow();

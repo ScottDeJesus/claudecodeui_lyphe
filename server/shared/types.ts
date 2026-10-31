@@ -2278,7 +2278,10 @@ export type SandboxCommandService = {
  * by 100, never dollars (INV-4299) — or null for a window the pacer could not measure, which draws
  * as unknown and never as zero; `reading.at` is when that reading was filed. `token` is the
  * stored sign-in token's state; `wall.kind: "refused"` is a token Claude would not accept. `why` is
- * the door's own sentence and is rendered as it arrives.
+ * the door's own sentence and is rendered as it arrives. `no_five` is the door's ONE boolean for an
+ * account that has no 5-hour window at all (the plan dropped the limit) — derived by the pacer from the
+ * account's stored readings, not from a window missing in one reply, which also happens between 5-hour
+ * blocks. A picture without the key reads as "has a 5-hour window".
  */
 export type ClaudeAccountRow = {
   slug: string;
@@ -2294,6 +2297,7 @@ export type ClaudeAccountRow = {
   pace: { five: { projected: number; ceiling: number } | null; week: { projected: number; ceiling: number } | null } | null;
   room: boolean;
   why: string;
+  no_five?: boolean;
 };
 
 /**

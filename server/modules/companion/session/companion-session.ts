@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto';
 
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
-import type { CompanionProcess } from '@/shared/companion-types.js';
+import type { CompanionAttachment, CompanionProcess } from '@/shared/companion-types.js';
+import { claudeImageBlocks, type ClaudeImageBlock } from '@/shared/image-attachments.js';
 
 import type { UnansweredMessage } from '../companion-unanswered.js';
 
-import { calledEnvelope, emptyPressEnvelope, operatorEnvelope } from './companion-envelopes.js';
+import { createReplayHold, messageContent } from './companion-content.js';
+import { attachmentsEnvelope, calledEnvelope, emptyPressEnvelope, operatorEnvelope } from './companion-envelopes.js';
 import { failureSentence, readLoopEvent, type CompanionLoopEvent } from './companion-events.js';
 import { resumableSessionId, unexpectedTools } from './companion-launch.js';
 import { createHandoverGate } from './companion-handover-gate.js';
@@ -46,6 +48,11 @@ import { guarded } from './guarded-callback.js';
  * only once the server is the sole one on the port (the entrypoint's takeover duties): a predecessor that is still serving
  * may be answering the same words, and two processes must not both say them to her.
  *
+ * HIS PICTURES SURVIVE IT TOO, AS RECORDS. The stored entry keeps the attachment records and never a byte; the image blocks ride in memory
+ * beside the message (`Sent.images`) and a message said again within a process keeps them. A replay after a restart reads them again from the
+ * upload store before it pushes anything, and while it reads, a push that arrives is parked and goes after it (`companion-content.ts`), so his
+ * words keep their order; with no picture to read the replay is as synchronous as ever.
+ *
  * A STOP IS ANSWERED BEFORE ANYTHING ELSE IS SAID. From the moment `interrupt` starts until the stopped turn's
  * `result` is in, a push is held, not given to the CLI: a message that reaches the CLI while it unwinds an interrupt can be
  * folded into the request being aborted, and then nothing ever answers it. The held words are given, in order, once the result
@@ -65,10 +72,15 @@ type Launch = { cli: CompanionCli; shape: string; initSeen: boolean; resumeRefus
 /** A stop whose turn has not yet reported its result: the launch concerned, a promise that settles when the wait is over and the way to settle it. */
 type Stop = { launch: Launch; over: Promise<void>; end(): void };
 
-/** His words as an envelope: the empty press is its own tag, and so is a call by name (`heard: 'name'`), which a replay must not read as the empty one. */
-const wordsEnvelope = (words: Pick<UnansweredMessage, 'body' | 'via' | 'heard'>): string => {
-  if (words.body !== '' || words.via !== 'spoken') return operatorEnvelope(words.body, words.via);
-  return words.heard === 'name' ? calledEnvelope() : emptyPressEnvelope();
+/**
+ * His words as an envelope: the empty press is its own tag, and so is a call by name (`heard: 'name'`), which a replay must not read as the empty
+ * one. A typed line is always an `<operator via="typed">`, empty or not (its `via` decides, never the empty press's tag), and the files it carries
+ * follow it as `<attachments>`.
+ */
+const wordsEnvelope = (words: Pick<UnansweredMessage, 'body' | 'via' | 'heard' | 'attachments'>): string => {
+  if (words.body === '' && words.via === 'spoken') return words.heard === 'name' ? calledEnvelope() : emptyPressEnvelope();
+  const line = operatorEnvelope(words.body, words.via);
+  return words.attachments === undefined || words.attachments.length === 0 ? line : `${line}\n${attachmentsEnvelope(words.attachments)}`;
 };
 
 /** Consumed by `companion-account.ts`: one call per account, made lazily on the account's first use. */
@@ -96,6 +108,8 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   let condition: CompanionProcess = { state: 'asleep', error: null };
   // Set from the moment a stop starts until its turn's result is in: a push is held while it stands.
   let stopping: Stop | null = null;
+  // Set while the boot replay reads the pictures of the messages it says again: a new push is parked behind it (`push`), so his words keep their order.
+  let replay: ReturnType<typeof createReplayHold> | null = null;
 
   /** What a previous process left unanswered; a row that cannot be read is none, so the conversation still starts. */
   function readInherited(): UnansweredMessage[] {
@@ -168,13 +182,13 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     dropHandover();
   }
 
-  /** The same message under a new uuid, for the CLI that is to be told it again. His words are assembled afresh (the roster and the view in the old message are a snapshot); a message that cannot be goes as it was. */
+  /** The same message under a new uuid, for the CLI that is to be told it again. His words are assembled afresh (the roster and the view in the old message are a snapshot) and his pictures ride again (`sent.images`); a message that cannot be goes as it was. */
   function restate(sent: Sent): Sent {
     const uuid = randomUUID();
     let content = sent.message.message.content;
     if (sent.words !== null) {
       try {
-        content = assembler.assemble(wordsEnvelope(sent.words), false);
+        content = messageContent(assembler.assemble(wordsEnvelope(sent.words), false), sent.images);
       } catch (error) {
         console.error(`[Companion] account ${userId}: a message of his could not be assembled again; it is sent as it was`, error);
       }
@@ -313,6 +327,8 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
 
   /** Ends the input and the process, waits for it to wind down, and leaves her asleep. */
   async function closeProcess(reason: string): Promise<void> {
+    // A replay still reading his pictures is stopped with the process, as a handover being written is (below).
+    abandonReplay();
     // A handover still being written is stopped with the process: his parked words are in the ledger for the next one.
     if (gate.abandon() && live === null) setCondition({ state: 'asleep', error: null });
     await detach(reason)?.cli.close();
@@ -369,31 +385,100 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     },
   });
 
-  /** Says to her again what her last process was given and never answered, each as a fresh message that replaces its entry: a restart storm leaves one entry and gets one answer. */
-  function resendUnanswered(): void {
-    const entries = [...ledger.inherited()];
-    if (entries.length === 0) return;
-    console.log(`[Companion] account ${userId}: re-sending ${entries.length} message(s) her last process never answered`);
-    for (const entry of entries) {
-      try {
-        push(wordsEnvelope(entry), { body: entry.body, via: entry.via, at: entry.at, heard: entry.heard, cut: entry.cut }, entry);
-      } catch (error) {
-        // Left in the list, it is tried again at the next boot.
-        console.error(`[Companion] account ${userId}: a message her last process never answered could not be sent again`, error);
-      }
+  /**
+   * One inherited entry said again, as a fresh message that replaces it. `attachments` are its files as they will be told to her (`readPictures` sets an
+   * unreadable picture `unopened`, so the envelope never announces a picture the message does not carry). A failure is logged and leaves the entry in the list, to be tried at the next boot.
+   */
+  function resend(entry: UnansweredMessage, images: ClaudeImageBlock[], attachments: UnansweredMessage['attachments'] = entry.attachments): void {
+    try {
+      const words = { body: entry.body, via: entry.via, at: entry.at, heard: entry.heard, cut: entry.cut, attachments };
+      deliver(wordsEnvelope(words), words, images, entry);
+    } catch (error) {
+      console.error(`[Companion] account ${userId}: a message her last process never answered could not be sent again`, error);
     }
   }
 
   /**
-   * Assembles one message around `body` and pushes it: the turn starts if she is idle, the process wakes if it is closed, and
-   * while a stop is being answered it is held. `words` is his raw text when the message is his (kept until it is answered);
-   * `replacing` is the stored entry a re-sent message stands for.
+   * The pictures of one entry's files, each read on its own by the chat's own reader from the upload store, so the one it cannot read (skipped, with the reader's
+   * warning) is known: the message goes without it, and its record is set `unopened` in the files told to her. Her `restate`s and the next boot read those records, so they never announce it either.
    */
-  function push(body: string, words: Sent['words'], replacing?: UnansweredMessage): void {
+  async function readPictures(entry: UnansweredMessage): Promise<{ images: ClaudeImageBlock[]; attachments: UnansweredMessage['attachments'] }> {
+    const files = entry.attachments ?? [];
+    let read: ClaudeImageBlock[][];
+    try {
+      read = await Promise.all(files.map((file) => (file.opens === 'shown' ? claudeImageBlocks([file]) : [])));
+    } catch (error) {
+      console.error(`[Companion] account ${userId}: the pictures of a message her last process never answered could not be read; it is sent without them`, error);
+      read = files.map(() => []);
+    }
+    const attachments = files.map((file, index): CompanionAttachment => (file.opens === 'shown' && read[index].length === 0 ? { ...file, opens: 'unopened' } : file));
+    return { images: read.flat(), attachments: entry.attachments === undefined ? undefined : attachments };
+  }
+
+  /**
+   * Close and Clear end a replay that is still reading: it says nothing afterwards, and what was parked behind it does not run, as `gate.abandon` leaves a handover's parked
+   * words. His words stay in the ledger for the next process (a close) or are gone (Clear), and the hold is never released: nothing waits on it any more.
+   */
+  function abandonReplay(): void {
+    replay = null;
+  }
+
+  /**
+   * Says to her again what her last process was given and never answered, each as a fresh message that replaces its entry: a restart storm leaves one entry and gets one answer.
+   * Synchronous when no entry carries a picture. Otherwise the pictures are read first, and a new push is parked behind the replay meanwhile (`replay`): the hold ends when the reads settle,
+   * after the replay's own messages are pushed, in order, past it. One replay at a time: a call made while another reads has nothing to add (the entries are the one's).
+   */
+  async function resendUnanswered(): Promise<void> {
+    const entries = [...ledger.inherited()];
+    if (entries.length === 0 || replay !== null) return;
+    console.log(`[Companion] account ${userId}: re-sending ${entries.length} message(s) her last process never answered`);
+    if (!entries.some((entry) => entry.attachments?.some((attachment) => attachment.opens === 'shown'))) {
+      for (const entry of entries) resend(entry, []);
+      return;
+    }
+    const hold = createReplayHold();
+    replay = hold;
+    try {
+      const pictures = await Promise.all(entries.map(readPictures));
+      // Abandoned meanwhile (a close, Clear): whoever abandoned it owns what follows.
+      if (replay !== hold) return;
+      // A push that replaced an entry may have taken one out while the reads ran: what is no longer owed is not said.
+      const owed = new Set(ledger.inherited());
+      entries.forEach((entry, index) => {
+        if (owed.has(entry)) resend(entry, pictures[index].images, pictures[index].attachments);
+      });
+    } finally {
+      if (replay === hold) {
+        replay = null;
+        hold.release();
+      }
+    }
+  }
+
+  /** His new words that must wait for something (a handover, the replay's reads) are on disk meanwhile, kept as an inherited entry the push that says them later replaces. */
+  const keptWhileWaiting = (words: Sent['words'], replacing?: UnansweredMessage): UnansweredMessage | undefined =>
+    words !== null && replacing === undefined ? ledger.keep(words) : replacing;
+
+  /** A push from outside the replay: parked behind it while it reads his pictures (the replay's own messages go past it, through `deliver`), else delivered at once. */
+  function push(body: string, words: Sent['words'], images: ClaudeImageBlock[], replacing?: UnansweredMessage): void {
+    if (replay?.holding()) {
+      const kept = keptWhileWaiting(words, replacing);
+      replay.park(guarded('push held behind the replay', userId, () => deliver(body, words, images, kept)));
+      return;
+    }
+    deliver(body, words, images, replacing);
+  }
+
+  /**
+   * Assembles one message around `body` and delivers it: the turn starts if she is idle, the process wakes if it is closed, and
+   * while a stop is being answered it is held. `words` is his raw text when the message is his (kept until it is answered);
+   * `images` are the pictures that ride after the text (read before, kept in memory with the message); `replacing` is the stored entry a re-sent message stands for.
+   */
+  function deliver(body: string, words: Sent['words'], images: ClaudeImageBlock[], replacing?: UnansweredMessage): void {
     // A wake onto a conversation she is about to drop waits for its handover. His words are on disk meanwhile (kept as an inherited entry the replayed push replaces).
     if (live === null && gate.holding()) {
-      const kept = words !== null && replacing === undefined ? ledger.keep(words) : replacing;
-      gate.park(() => push(body, words, kept));
+      const kept = keptWhileWaiting(words, replacing);
+      gate.park(() => deliver(body, words, images, kept));
       return;
     }
     // A process started ahead of its first message (`warm`) is woken for that message's sake: it carries the roster and the view like any wake.
@@ -403,13 +488,14 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     // A message said again opens with the cut it first opened with, unless a newer cut is owed; the cut that rides is kept with his words.
     if (words?.cut !== undefined && assembler.owedCut() === null) assembler.oweCut(words.cut.heard, words.cut.interrupted);
     const cut = words === null ? null : assembler.owedCut();
-    const content = assembler.assemble(body, woke);
+    const content = messageContent(assembler.assemble(body, woke), images);
     // The uuid is how the CLI's `result` tells us which of our messages it answered (`companion-turns.ts`).
     const uuid = randomUUID();
     const sent: Sent = {
       uuid,
       message: { type: 'user', message: { role: 'user', content }, parent_tool_use_id: null, uuid },
       words: words !== null && cut !== null ? { ...words, cut } : words,
+      images,
       stoppedBy: null,
     };
     if (stopping !== null) {
@@ -428,9 +514,14 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     }
   }
 
-  /** His words, kept until answered (`at` is when he said them). `''` spoken is a press that carried no words; with `heard: 'name'` it is a press that was only her name. */
-  function pushHis(body: string, via: 'typed' | 'spoken', heard?: 'name'): void {
-    push(wordsEnvelope({ body, via, heard }), { body, via, at: new Date().toISOString(), ...(heard === undefined ? {} : { heard }) });
+  /**
+   * His words, kept until answered (`at` is when he said them). `''` spoken is a press that carried no words; with `heard: 'name'` it is a press that was only her name.
+   * A typed line's `attached` files ride in his words as records (the ledger writes those to disk) and their pictures as image blocks beside them (memory only).
+   */
+  function pushHis(body: string, via: 'typed' | 'spoken', heard?: 'name', attached?: Parameters<CompanionSession['pushOperator']>[2]): void {
+    const attachments = attached?.attachments ?? [];
+    const words = { body, via, at: new Date().toISOString(), ...(heard === undefined ? {} : { heard }), ...(attachments.length === 0 ? {} : { attachments }) };
+    push(wordsEnvelope(words), words, attached?.images ?? []);
   }
 
   /** Starts her process if it is closed, with nothing in it: the idle closer is armed with the launch, so a message that never comes costs a process until the window ends. */
@@ -486,8 +577,8 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   }
 
   return {
-    pushOperator(text, via) {
-      pushHis(text, via);
+    pushOperator(text, via, attached) {
+      pushHis(text, via, undefined, attached);
     },
     pushOperatorEmpty() {
       pushHis('', 'spoken');
@@ -496,10 +587,10 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       pushHis('', 'spoken', 'name');
     },
     pushAlerts(blocks) {
-      if (blocks.length > 0) push(blocks.join('\n'), null);
+      if (blocks.length > 0) push(blocks.join('\n'), null, []);
     },
     pushFocusNews(envelope) {
-      push(envelope, null);
+      push(envelope, null, []);
     },
     warm,
     resendUnanswered,
@@ -516,6 +607,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       // while it winds down is a wake into a fresh conversation, never a resume of the one being cleared.
       writeProviderSession(null);
       dropHandover();
+      abandonReplay();
       gate.abandon();
       assembler.forget();
       const ending = detach('cleared');

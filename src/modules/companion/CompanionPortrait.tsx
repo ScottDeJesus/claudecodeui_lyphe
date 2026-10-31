@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { useCanvasBackingSide } from '@/modules/companion/hooks/useCanvasBackingSide';
 import { useReducedMotion } from '@/modules/companion/hooks/useReducedMotion';
 import type { FaceAtlas } from '@/modules/companion/hooks/useFaceAtlas';
 import { createFaceEngine, frameNames } from '@/modules/companion/utils/faceEngine';
@@ -20,12 +21,18 @@ type CompanionPortraitProps = {
   look: CompanionFaceLook | null;
 };
 
-/** The sentence the player is sounding now: its log entry's words with the audio's place in them, or null when the entry is not the one the player names. */
+/**
+ * The sentence the player is sounding now: its log entry's words with the audio's place in them and the timed mouth shapes the page has heard for it,
+ * or null when the entry is not the one the player names. The shapes are looked up here on every step, so a piece that landed since the last one is in hand.
+ */
 function playingNow(entry: CompanionFaceSentences['playing'], voice: CompanionFaceVoice | null): FacePlaying | null {
-  if (entry === null) return null;
-  const progress = voice?.progress() ?? null;
+  if (entry === null || voice === null) return null;
+  const progress = voice.progress();
   if (progress === null || entry.turnId !== progress.turnId || entry.index !== progress.index) return null;
-  return { mood: entry.mood, text: entry.text, sounds: entry.sounds, elapsed: progress.elapsed, duration: progress.duration };
+  return {
+    mood: entry.mood, text: entry.text, sounds: entry.sounds, elapsed: progress.elapsed, duration: progress.duration,
+    mouth: voice.mouth(entry.turnId, entry.index),
+  };
 }
 
 /**
@@ -36,13 +43,17 @@ function hairLagMs(hairCanvas: HTMLCanvasElement): number {
   return Number.parseFloat(getComputedStyle(hairCanvas).getPropertyValue('--kaylee-lag')) || 0;
 }
 
-/** Cuts frame `frame` out of its sheet onto `context`, whole. A frame the manifest does not hold draws nothing, so a bad index leaves the last frame up. */
+/**
+ * Cuts frame `frame` out of its sheet onto `context`, whole, scaled to the canvas's own backing store (the cell's side is the atlas's tier,
+ * the backing store's is the pixels the canvas is drawn at). A frame the manifest does not hold draws nothing, so a bad index leaves the last frame up.
+ */
 function drawFrame(context: CanvasRenderingContext2D, atlas: FaceAtlas, frame: number): void {
   const cell = atlas.manifest.frames[frame];
   const sheet = cell ? atlas.sheets[cell.sheet] : undefined;
   if (!cell || !sheet) return;
-  const size = atlas.manifest.frameSize;
-  context.drawImage(sheet, cell.column * size, cell.row * size, size, size, 0, 0, size, size);
+  const { frameSize } = atlas;
+  const side = context.canvas.width;
+  context.drawImage(sheet, cell.column * frameSize, cell.row * frameSize, frameSize, frameSize, 0, 0, side, side);
 }
 
 /**
@@ -51,8 +62,11 @@ function drawFrame(context: CanvasRenderingContext2D, atlas: FaceAtlas, frame: n
  * is asked for: the page copies a square out of an image it has already decoded.
  *
  * TWO CANVASES, one frame. The HAIR canvas holds the whole frame; the FACE canvas holds the same frame under a feathered circular
- * mask over its inner part (CompanionAvatar.css). Both keep the frame's own size as their backing store and are drawn a little
- * larger than the disc and clipped to its circle, so her movement never shows the disc's ground at the rim. Every continuous movement
+ * mask over its inner part (CompanionAvatar.css). Both are drawn a little larger than the disc and clipped to its circle, so her
+ * movement never shows the disc's ground at the rim. Their backing store is the pixels they are drawn at, CSS size times the screen's
+ * pixel ratio (`useCanvasBackingSide`), never the atlas's cell size stretched by CSS, and each frame is scaled onto it with the
+ * browser's high-quality smoothing: a screen that has more pixels than the atlas has detail shows the atlas's own detail, scaled
+ * well, not a smaller picture stretched twice. A resize or a change of pixel ratio clears a canvas, so the loop restarts and draws again. Every continuous movement
  * is CSS on the compositor (breath, sway, her lean, the clips' motions), and the hair takes each of them 90 ms after the face on a
  * softer ease: where the two canvases differ the mask blends them, so her face leads and her hair follows.
  *
@@ -62,9 +76,14 @@ function drawFrame(context: CanvasRenderingContext2D, atlas: FaceAtlas, frame: n
  * hold running out. A hidden page schedules nothing and draws again the moment it is shown. Under reduced motion she speaks on one
  * held mouth, so no frame is asked for.
  *
+ * HER MOUTH reads the page's timed shapes (`voice.mouth`) on each of those steps: wherever an announced piece holds the audio's place the
+ * engine draws that shape's mouth, and elsewhere the level's. The store is not React state, so a piece landing mid-sentence takes over at
+ * the next animation frame and nothing is redrawn for it.
+ *
  * WHAT THE PROBES READ. The root's `data-frame` is the base frame's name and, during a crossfade, `data-frame-over` the frame
- * fading in (`frameNames`); `data-motion` and `--kaylee-tilt` are what the stylesheet plays. All are written straight onto the node, and
- * only when they change: nothing in React redraws at the loop's pace.
+ * fading in (`frameNames`); `data-mouth` is what drove her mouth while she speaks, `exact` (a timed shape) or `voice` (her level and the
+ * sentence's vowel), and is absent when she is not speaking and under reduced motion; `data-motion` and `--kaylee-tilt` are what the
+ * stylesheet plays. All are written straight onto the node, and only when they change: nothing in React redraws at the loop's pace.
  */
 export function CompanionPortrait({ atlas, presence, voice, sentences, look }: CompanionPortraitProps) {
   const reducedMotion = useReducedMotion();
@@ -81,9 +100,11 @@ export function CompanionPortrait({ atlas, presence, voice, sentences, look }: C
 
   // What the canvases and the root's stamps show now, kept across the loop's restarts so a restart that changes nothing draws and writes nothing.
   // `motionHold` is the deadline that takes `data-motion` off the root once the hair has finished the motion the engine dropped; it outlives a restart.
+  // `mouthBy` is the `data-mouth` the root carries now (null: none).
   const shown = useRef<{
-    atlas: FaceAtlas | null; base: number; over: number | null; alpha: number; motion: string | null; tilt: number | null; motionHold: number | null;
-  }>({ atlas: null, base: -1, over: null, alpha: 0, motion: null, tilt: null, motionHold: null });
+    atlas: FaceAtlas | null; side: number; base: number; over: number | null; alpha: number; motion: string | null; tilt: number | null; motionHold: number | null;
+    mouthBy: FaceDraw['mouthBy'];
+  }>({ atlas: null, side: 0, base: -1, over: null, alpha: 0, motion: null, tilt: null, motionHold: null, mouthBy: null });
 
   // A portrait that goes away takes its pending hold with it.
   useEffect(() => {
@@ -93,13 +114,15 @@ export function CompanionPortrait({ atlas, presence, voice, sentences, look }: C
     };
   }, []);
 
+  // The pixels per side both canvases are drawn at on the screen; the atlas's own cell side stands until the canvas is measured.
+  const side = useCanvasBackingSide(hairRef, atlas.frameSize);
   const { playing, newest, turnRunning } = sentences;
   const lookDx = look?.dx;
   const lookDy = look?.dy;
 
   // THE LOOP, restarted whenever an input changes: it steps the engine at once with the new inputs and schedules the next step itself. A layout
   // effect, so the first frame is on the canvases before the first paint (an opaque canvas starts black, and the sheets are already decoded).
-  // `voice` is read by identity: its two functions are the provider's, kept for the page's life, and the caller keeps the object as long.
+  // `voice` is read by identity: its three functions are the provider's, kept for the page's life, and the caller keeps the object as long.
   useLayoutEffect(() => {
     const root = rootRef.current;
     const hairCanvas = hairRef.current;
@@ -107,6 +130,11 @@ export function CompanionPortrait({ atlas, presence, voice, sentences, look }: C
     const faceContext = faceRef.current?.getContext('2d', { alpha: false });
     if (!root || !hairCanvas || !hairContext || !faceContext) return undefined;
     const contexts = [hairContext, faceContext];
+    // A canvas's size attribute resets its context, so the smoothing is set again each time the loop starts (it restarts when `side` changes).
+    for (const context of contexts) {
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
+    }
     const lookNow = lookDx === undefined || lookDy === undefined ? null : { dx: lookDx, dy: lookDy };
     const newestMood = newest === null ? null : newest.mood ?? '';
     let frameHandle: number | null = null;
@@ -116,7 +144,8 @@ export function CompanionPortrait({ atlas, presence, voice, sentences, look }: C
     const paint = (draw: FaceDraw): void => {
       const last = shown.current;
       const sameAtlas = last.atlas === atlas;
-      if (sameAtlas && last.base === draw.base && last.over === draw.over && last.alpha === draw.alpha) return;
+      const sameSide = last.side === side;
+      if (sameAtlas && sameSide && last.base === draw.base && last.over === draw.over && last.alpha === draw.alpha) return;
       for (const context of contexts) {
         context.globalAlpha = 1;
         drawFrame(context, atlas, draw.base);
@@ -132,15 +161,22 @@ export function CompanionPortrait({ atlas, presence, voice, sentences, look }: C
         else root.dataset.frameOver = names[draw.over];
       }
       last.atlas = atlas;
+      last.side = side;
       last.base = draw.base;
       last.over = draw.over;
       last.alpha = draw.alpha;
     };
 
-    // What the stylesheet plays: the clip's motion and her lean, written only when they change. The motion is taken off the root only once the
+    // What the stylesheet plays: the clip's motion and her lean, written only when they change, and with them the probes' `data-mouth` (no frame
+    // change carries it: the exact mouth and the voice's draw the same frame names). The motion is taken off the root only once the
     // hair has finished it (its lag after the face): taking it off at the engine's end would cut the hair's animation short and snap it to rest.
     const stamp = (draw: FaceDraw): void => {
       const last = shown.current;
+      if (last.mouthBy !== draw.mouthBy) {
+        if (draw.mouthBy === null) delete root.dataset.mouth;
+        else root.dataset.mouth = draw.mouthBy;
+        last.mouthBy = draw.mouthBy;
+      }
       if (last.motion !== draw.motion) {
         if (last.motionHold !== null) window.clearTimeout(last.motionHold);
         last.motionHold = null;
@@ -201,16 +237,15 @@ export function CompanionPortrait({ atlas, presence, voice, sentences, look }: C
       document.removeEventListener('visibilitychange', handleVisibility);
       cancel();
     };
-  }, [atlas, engine, names, presence, voice, playing, newest, turnRunning, lookDx, lookDy, reducedMotion]);
+  }, [atlas, side, engine, names, presence, voice, playing, newest, turnRunning, lookDx, lookDy, reducedMotion]);
 
-  const size = manifest.frameSize;
   return (
     <div ref={rootRef} className="kaylee-portrait" aria-hidden="true" data-state={presence}>
       <div className="kaylee-portrait__layer kaylee-portrait__layer--hair">
-        <canvas ref={hairRef} width={size} height={size} />
+        <canvas ref={hairRef} width={side} height={side} />
       </div>
       <div className="kaylee-portrait__layer kaylee-portrait__layer--face">
-        <canvas ref={faceRef} width={size} height={size} />
+        <canvas ref={faceRef} width={side} height={side} />
       </div>
     </div>
   );

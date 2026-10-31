@@ -5,7 +5,7 @@ import type { CompanionOpenTarget, CompanionPendingAction } from '@/shared/compa
 import type { RelayAnswer, RelayedPress } from '@/shared/relayed-press-types.js';
 
 import type { CompanionStoredPending } from '../companion-pending.js';
-import { accountName, clearMemory } from '../memory/memory-verbs.js';
+import { accountName, clearMemory, WHOLE_LOG } from '../memory/memory-verbs.js';
 import type { CompanionToolDeps } from '../tools/companion-tools.js';
 import { companionScratchDir, nextScratchFile, pruneScratch } from '../tools/transcript-render.js';
 
@@ -137,7 +137,11 @@ const thingsOf = (count: number): string => `${count} ${count === 1 ? 'thing' : 
  * way is `refused` with the sentence that says how far it got.
  */
 async function clearHerMemory(deps: CompanionToolDeps, press: RelayedPress): Promise<RelayAnswer> {
-  const cleared = await clearMemory({ kind: 'word', account: accountName(deps.userId), line: { id: press.press, at: press.saidAt, text: press.words } });
+  // The record of his press carries no channel, so the firing line's own is read off her log: a word he typed is quoted "He typed". A line
+  // that has left the log keeps the quote every clear on his word has had, "He said".
+  const fired = deps.store.readLog(WHOLE_LOG).find((row) => row.id === press.press);
+  const via = fired?.via === 'typed' ? 'typed' : 'spoken';
+  const cleared = await clearMemory({ kind: 'word', account: accountName(deps.userId), line: { id: press.press, at: press.saidAt, via, text: press.words } });
   if (!cleared.ok) return refused(cleared.sentence);
   if (cleared.forgotten === 0) return { outcome: 'already', said: 'Her memory was already empty.' };
   return { outcome: 'took', said: `She forgot ${thingsOf(cleared.forgotten)}. The docstore's history keeps them.` };

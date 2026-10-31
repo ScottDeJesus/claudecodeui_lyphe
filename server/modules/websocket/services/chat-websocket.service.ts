@@ -1,5 +1,3 @@
-import path from 'node:path';
-
 import type { WebSocket } from 'ws';
 
 import { projectsDb, sessionUserStateDb, sessionsDb } from '@/modules/database/index.js';
@@ -16,10 +14,9 @@ import {
   WS_OPEN_STATE,
 } from '@/modules/websocket/services/websocket-state.service.js';
 import {
-  getGlobalImageAssetsDir,
+  filterAttachmentsToUploadStore,
   isImageAttachmentDescriptor,
   normalizeAttachmentDescriptors,
-  type ChatAttachmentDescriptor,
 } from '@/shared/image-attachments.js';
 import type {
   AnyRecord,
@@ -30,48 +27,6 @@ import type {
   ProviderRuntimeWriter,
 } from '@/shared/types.js';
 import { parseIncomingJsonObject } from '@/shared/utils.js';
-
-/**
- * Trust boundary for client-supplied image attachments: chat.send options come
- * straight from the browser, and the provider runtimes read the referenced
- * files off disk (Claude base64-encodes them into the prompt). Only images
- * that live directly inside the global upload store (`~/.cloudcli/assets`,
- * where POST /api/assets/images puts them) are allowed through — anything
- * else (absolute paths elsewhere, traversal, subdirectories) is dropped.
- *
- * Exported for tests; `assetsRootOverride` exists only for them.
- */
-export function filterAttachmentsToUploadStore(
-  attachments: unknown,
-  assetsRootOverride?: string,
-): ChatAttachmentDescriptor[] {
-  const assetsRoot = path.resolve(assetsRootOverride ?? getGlobalImageAssetsDir());
-
-  return normalizeAttachmentDescriptors(attachments).filter((descriptor) => {
-    // Relative paths are anchored in the store; absolute ones must already be in it.
-    const resolved = path.resolve(assetsRoot, descriptor.path);
-    const relative = path.relative(assetsRoot, resolved);
-    const isDirectChild =
-      relative.length > 0 &&
-      !relative.startsWith('..') &&
-      !path.isAbsolute(relative) &&
-      !relative.includes(path.sep) &&
-      !relative.includes('/');
-
-    if (!isDirectChild) {
-      console.warn(`[Chat] Dropping attachment outside the upload store: ${descriptor.path}`);
-    }
-    return isDirectChild;
-  });
-}
-
-/** Backward-compatible image filter consumed by existing websocket tests. */
-export function filterImagesToUploadStore(
-  images: unknown,
-  assetsRootOverride?: string,
-): ChatAttachmentDescriptor[] {
-  return filterAttachmentsToUploadStore(images, assetsRootOverride);
-}
 
 /** Application boundary for dispatching provider runs and approvals. */
 export type ProviderRuntimeGateway = {

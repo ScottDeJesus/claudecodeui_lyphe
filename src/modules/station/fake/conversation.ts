@@ -4,7 +4,7 @@ import { ALL_CARDS, SHELF_NOTES } from '@/modules/station/fake/cards';
 import { PENDING } from '@/modules/station/fake/needs';
 import { SESSIONS_FAKE } from '@/modules/station/fake/sessions';
 import { StationConversationView } from '@/modules/station/StationConversation';
-import type { CompanionActivity, CompanionLogEntry, CompanionPicture, CompanionSessionRef, CompanionSettings } from '@/shared/companion-types';
+import type { CompanionActivity, CompanionAttachment, CompanionLogEntry, CompanionPicture, CompanionSessionRef, CompanionSettings } from '@/shared/companion-types';
 import type { CompanionSentenceRef } from '@/shared/types';
 
 /*
@@ -28,6 +28,10 @@ import type { CompanionSentenceRef } from '@/shared/types';
  * `CONVERSATION_STATES` are the states no picture shows, drawn over `home` in the slot's place: no picture yet (`loading`), a
  * read that failed (`failed`), her answer begun with no sentence yet (`answering`), and three hours with every kind of line and
  * all seven of her cards standing where she put them (`dense`).
+ *
+ * `ATTACHED` is his typed line carrying a picture and a note, at three moments of her answer to it. It is in none of the sets above,
+ * each of which the station's probes judge by its rows: `.verify/kaylee-attachments-transcript.mjs` draws it, in her chat view and in
+ * her portrait with the strip at the top of her words.
  */
 
 const NOW = Date.now();
@@ -51,14 +55,17 @@ export const KANBAN = railChat('walkthrough', 'Kanban lane review');
 
 let nextId = 900_501;
 type Sounds = CompanionLogEntry['sounds'];
-/** His line, `minutes` ago, typed or spoken. */
-const he = (minutes: number, text: string, via: 'typed' | 'spoken' = 'typed'): CompanionLogEntry => (
-  { id: nextId++, at: ago(minutes), role: 'operator', via, turnId: null, index: null, text, mood: null, sounds: [] });
-/** One sentence of hers, the `index`th of turn `turnId`, its sounds at their offsets. */
-const she = (minutes: number, turnId: string, index: number, text: string, sounds: Sounds = []): CompanionLogEntry => (
+/**
+ * His line, `minutes` ago, typed or spoken; `attachments`, the files a typed line carried, absent as the wire leaves it on a line with
+ * none. Also `fake/portrait.ts`'s.
+ */
+export const he = (minutes: number, text: string, via: 'typed' | 'spoken' = 'typed', attachments: CompanionAttachment[] = []): CompanionLogEntry => (
+  { id: nextId++, at: ago(minutes), role: 'operator', via, turnId: null, index: null, text, mood: null, sounds: [], ...(attachments.length > 0 && { attachments }) });
+/** One sentence of hers, the `index`th of turn `turnId`, its sounds at their offsets. Also `fake/portrait.ts`'s. */
+export const she = (minutes: number, turnId: string, index: number, text: string, sounds: Sounds = []): CompanionLogEntry => (
   { id: nextId++, at: ago(minutes), role: 'kaylee', via: null, turnId, index, text, mood: null, sounds });
-/** The house's alert, or her harness's system line. */
-const house = (minutes: number, role: 'alert' | 'system', text: string): CompanionLogEntry => (
+/** The house's alert, or her harness's system line. Also `fake/portrait.ts`'s. */
+export const house = (minutes: number, role: 'alert' | 'system', text: string): CompanionLogEntry => (
   { id: nextId++, at: ago(minutes), role, via: null, turnId: null, index: null, text, mood: null, sounds: [] });
 
 const HOME_LOG = [
@@ -172,4 +179,32 @@ export const CONVERSATION_STATES = {
   failed: drawing(null, { readFailure: 'Failed to fetch' }),
   answering: drawing(picture({ log: [...HOME_LOG, he(0.2, 'Is the uploads chat still waiting?')], notes: SHELF_NOTES.home, turnId: 'h4' })),
   dense: drawing(picture({ log: DENSE_LOG, notes: ALL_CARDS, settings: { ...SETTINGS, live: true } })),
+};
+
+/**
+ * What he attached to his typed line, as the upload store holds it and `GET /api/companion` lists it: the stored name
+ * `<Date.now()>-<random>-<his name>` (server/modules/assets/assets.routes.ts), his name for it, its size and type read from the
+ * stored file, and what she can do with it: a picture shown to her, a note her reader opens.
+ */
+const ATTACHED_FILES: CompanionAttachment[] = [
+  { path: '/home/lyphe/.cloudcli/assets/1793030400000-482913377-blue.png', name: 'blue.png', size: 1754, mimeType: 'image/png', opens: 'shown' },
+  { path: '/home/lyphe/.cloudcli/assets/1793030400001-905114862-notes.md', name: 'notes.md', size: 42, mimeType: 'text/markdown', opens: 'text' },
+];
+
+/** The start of `home`'s morning, then his typed line carrying a picture and a note, and her two sentences answering it. */
+const ATTACHED_LOG = [
+  ...HOME_LOG.slice(0, 4),
+  he(2, 'What colour is this, and what is the code word in the note?', 'typed', ATTACHED_FILES),
+  she(1.5, 'a1', 0, 'The picture is one solid blue, edge to edge.'),
+  she(1.5, 'a1', 1, 'And the note says the code word for the launch is marigold.'),
+];
+
+/**
+ * His attached line at three moments of her answer: `thinking` (his line sent, her turn running with none of its sentences yet),
+ * `answering` (her first sentence landed, the turn still running) and `answered` (her answer whole, at rest).
+ */
+export const ATTACHED = {
+  thinking: picture({ log: ATTACHED_LOG.slice(0, -2), turnId: 'a1' }),
+  answering: picture({ log: ATTACHED_LOG.slice(0, -1), turnId: 'a1' }),
+  answered: picture({ log: ATTACHED_LOG }),
 };

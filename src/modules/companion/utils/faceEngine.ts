@@ -9,8 +9,9 @@
 //
 // WHAT EACH STATE DRAWS. idle, asleep, loading and walking: neutral (or the mood still held), blinking and glancing.
 // listening: her listening face, leaning toward the sound, with a nod as the press begins. transcribing: eyes down.
-// thinking and waking: eyes up and away, leaning; drafting: eyes down and right, leaning. speaking: the sentence's mood, her
-// mouth on her voice. reading_session and reading_code: her eyes sweeping between down-left and down-right, one cycle each 4.4 s
+// thinking and waking: eyes up and away, leaning; drafting: eyes down and right, leaning. speaking: the sentence's mood, her mouth
+// the exact shape where an announced piece holds the audio's place (40 ms crossfades, `faceMouth.ts`) and else her voice's level and
+// vowel; `mouthBy` says which. reading_session and reading_code: her eyes sweeping between down-left and down-right, one cycle each 4.4 s
 // and 2.6 s. cut: the surprised face with one quick blink. failed: her stopped face, still. While a look holds, every state but
 // those with a face of their own (listening, transcribing, speaking, cut, failed) turns her head toward the anchor instead.
 //
@@ -24,14 +25,13 @@ import { createFader } from '@/modules/companion/utils/faceFader';
 import { moodTilt } from '@/modules/companion/utils/faceMoodMap';
 import { createMoodHold } from '@/modules/companion/utils/faceMoodHold';
 import type { FacePlaying } from '@/modules/companion/utils/faceMoodHold';
-import { MOUTH_CLOSED, mouthOpenness, soundAt, vowelAt } from '@/modules/companion/utils/faceMouth';
-import type { MouthVowel } from '@/modules/companion/utils/faceMouth';
+import { MOUTH_CLOSED, MOUTH_FADE_MS, QUIET_VOICE, chooseMouth, soundAt } from '@/modules/companion/utils/faceMouth';
 import {
   blinkAt, blinkGap, blinkIsDoubled, blinkLength, blinkSteps, createRandom, glanceGap, glanceOf,
 } from '@/modules/companion/utils/faceSchedule';
 import { NO_TURN, poseOf, sameTurn, stepTurn, turnToward } from '@/modules/companion/utils/faceTurn';
 import type { Turn } from '@/modules/companion/utils/faceTurn';
-import type { CompanionFaceGaze, CompanionFaceManifest, CompanionFaceMouth } from '@/shared/companion-types';
+import type { CompanionFaceGaze, CompanionFaceManifest } from '@/shared/companion-types';
 import type { CompanionPresenceState } from '@/shared/types';
 
 /** Everything the engine reads, each step. Times are ms on one steady clock, spans are seconds. */
@@ -55,10 +55,9 @@ export type FaceInput = {
   reducedMotion: boolean;
 };
 
-/** What the page draws: `base` whole with `over` (frame indices into the manifest) on top at `alpha` (null and 0 when nothing fades), the one-shot `motion` its stylesheet plays, the lean in degrees, and the next ms the engine wants a call at (null for none). */
-export type FaceDraw = { base: number; over: number | null; alpha: number; motion: FaceMotion | null; tilt: number; nextAt: number | null };
+/** What the page draws: `base` whole with `over` (frame indices into the manifest) on top at `alpha` (null and 0 when nothing fades), the one-shot `motion` its stylesheet plays, the lean in degrees, the next ms the engine wants a call at (null for none), and `mouthBy`, what drove her mouth while she speaks: `exact` (a timed shape) or `voice` (level and vowel), the frame names being the same; null when she is not speaking and under reduced motion. */
+export type FaceDraw = { base: number; over: number | null; alpha: number; motion: FaceMotion | null; tilt: number; nextAt: number | null; mouthBy: 'exact' | 'voice' | null };
 
-const MOUTH_FADE_MS = 60;
 const MOOD_FADE_MS = 180;
 const STEP_FADE_MS = 140;
 const EASE_TO_NEUTRAL_MS = 300;
@@ -122,9 +121,8 @@ export function createFaceEngine(manifest: CompanionFaceManifest, seed: number):
   // The presence last drawn and when it began, so a change is seen, and the sweep and the cut's blink count from it.
   let state: CompanionPresenceState | null = null;
   let stateSince = 0;
-  // The mouth shown (its dwell needs when it changed) and the vowel it shapes, kept for a step with no sentence.
-  let mouth = MOUTH_CLOSED;
-  let vowel: MouthVowel = 'a';
+  // The level mouth: the openness shown (its dwell needs when it changed) and the vowel it shapes, kept for a step with no sentence.
+  let voice = QUIET_VOICE;
   // The blink in play, when the next one is due, and whether the cut's one blink has been made.
   let blink: { startedAt: number; steps: ReturnType<typeof blinkSteps> } | null = null;
   let nextBlinkAt: number | null = null;
@@ -148,7 +146,7 @@ export function createFaceEngine(manifest: CompanionFaceManifest, seed: number):
     glance = null;
     clips.clear();
     cutBlinked = false;
-    mouth = MOUTH_CLOSED;
+    voice = { ...voice, openness: MOUTH_CLOSED };
     if (!TURNABLE.has(next)) turn = NO_TURN;
     if (next === 'listening' && !reduced) clips.play(nodClip(manifest), now);
   }
@@ -184,15 +182,11 @@ export function createFaceEngine(manifest: CompanionFaceManifest, seed: number):
       glance = null;
     }
 
-    // THE MOUTH, while she speaks: its openness from the voice's level, its vowel from the text at the audio's place.
+    // THE MOUTH, while she speaks: the exact shape at the audio's place, else the voice's level and the text's vowel.
     const speaking = presence === 'speaking';
     const playing = input.playing;
-    let mouthKey: CompanionFaceMouth = 'a1';
-    if (speaking && !reduced) {
-      mouth = mouthOpenness(input.level, mouth, now);
-      if (playing !== null) vowel = vowelAt(playing.text, playing.sounds, playing.elapsed, playing.duration);
-      mouthKey = mouth.openness === 'closed' ? 'closed' : (`${vowel}${mouth.openness === 'half' ? 1 : 2}` as CompanionFaceMouth);
-    }
+    const drawn = speaking && !reduced ? chooseMouth(input.level, playing, voice, now) : null;
+    if (drawn !== null) voice = drawn.voice;
 
     // THE SOUNDS: a sound's clip plays when the audio reaches its place.
     clips.advance(now);
@@ -223,7 +217,7 @@ export function createFaceEngine(manifest: CompanionFaceManifest, seed: number):
     }
     const hasBlinkFrames = !reduced && (RESTING.has(presence) || speaking);
     const free = settled && blink === null && glance === null && !clips.playing() && !turned && !lookHeld && !fader.fading(now);
-    if (hasBlinkFrames && nextBlinkAt <= now && free && (!speaking || mouth.openness === 'closed')) {
+    if (hasBlinkFrames && nextBlinkAt <= now && free && (drawn === null || drawn.closed)) {
       const steps = blinkSteps(blinkIsDoubled(random));
       blink = { startedAt: now, steps };
       nextBlinkAt = now + blinkLength(steps) + blinkGap(random);
@@ -263,8 +257,8 @@ export function createFaceEngine(manifest: CompanionFaceManifest, seed: number):
       frame = clipShown ?? states.listening;
       fadeMs = MOUTH_FADE_MS;
     } else if (speaking) {
-      frame = clipShown ?? blinkFrame ?? moods[mood].mouths[mouthKey];
-      fadeMs = MOUTH_FADE_MS;
+      frame = clipShown ?? blinkFrame ?? moods[mood].mouths[drawn?.key ?? 'a1'];
+      fadeMs = clipShown === null ? drawn?.fadeMs ?? MOUTH_FADE_MS : MOUTH_FADE_MS;
     } else if (turned) {
       frame = manifest.poses[poseOf(turn)];
     } else if (EYES_OF_STATE[presence] !== undefined) {
@@ -301,7 +295,7 @@ export function createFaceEngine(manifest: CompanionFaceManifest, seed: number):
     wantAt(fader.endsAt());
 
     const tilt = STATE_TILT[presence] ?? (RESTING.has(presence) || speaking ? moodTilt(mood) : 0);
-    return { ...shown, motion: clips.motion(), tilt, nextAt: deadlines.length === 0 ? null : Math.min(...deadlines) };
+    return { ...shown, motion: clips.motion(), tilt, nextAt: deadlines.length === 0 ? null : Math.min(...deadlines), mouthBy: drawn?.by ?? null };
   }
 
   return { step };

@@ -56,9 +56,19 @@ function tidyHandover(summary: string): string {
 }
 
 /**
+ * What a log row says, for the handover's quote: its words, and when it is a typed line that carried files, the names of them after the words
+ * (`<his words> (he attached blue.png, notes.md)`). A line of files alone reads `(he attached blue.png, notes.md)`, so a handover never quotes an empty line.
+ */
+function quotedWords(entry: CompanionLogEntry): string {
+  const words = entry.text.trim();
+  if (entry.attachments === undefined || entry.attachments.length === 0) return words;
+  return `${words} (he attached ${entry.attachments.map((attachment) => attachment.name).join(', ')})`.trim();
+}
+
+/**
  * Her newest exchange as her log holds it: the rows of her last turn (her sentences, joined) and the operator's or the house's row that
  * she answered (system lines between are skipped). `null` when she has said nothing. His unanswered messages, which are newer, are
- * not it: they come to her as the messages themselves. Consumed by `companion-account.ts`, which reads the log.
+ * not it: they come to her as the messages themselves. A line of his that carried files names them (`quotedWords`). Consumed by `companion-account.ts`, which reads the log.
  */
 export function lastWordsOf(log: readonly CompanionLogEntry[]): LastWords | null {
   let end = log.length - 1;
@@ -71,7 +81,7 @@ export function lastWordsOf(log: readonly CompanionLogEntry[]): LastWords | null
   let before = start - 1;
   while (before >= 0 && log[before].role === 'system') before -= 1;
   const prompt = before >= 0 ? log[before] : null;
-  const asked = prompt !== null && (prompt.role === 'operator' || prompt.role === 'alert') ? { by: prompt.role, text: prompt.text.trim() } : null;
+  const asked = prompt !== null && (prompt.role === 'operator' || prompt.role === 'alert') ? { by: prompt.role, text: quotedWords(prompt) } : null;
   return { before: asked, reply };
 }
 

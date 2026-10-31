@@ -124,7 +124,7 @@ export function CheckStageView({ focus, found, onOpenSheet, onRetry }: CheckStag
         aria-label={t('station.needs.check.card', { label: focus.label, defaultValue: '{{label}} in Cerberus' })}
         tabIndex={-1}
         data-station-fire=""
-        className="flex min-w-0 rounded-[10px]"
+        className="flex min-w-0 rounded-lg"
       >
         <NeedCard need={found.need} leaving={false} onOpen={onOpenSheet} wholeValue />
       </ul>

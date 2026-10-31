@@ -16,7 +16,7 @@ function LastLookRule({ when }: { when: string }) {
       data-strip-rule=""
       className="flex flex-col-reverse justify-center border-l-2 border-dashed border-garnish py-0.5 pl-2 pr-1 finger:min-h-11"
     >
-      <span className="whitespace-nowrap text-sm leading-5 text-garnish">
+      <span className="whitespace-nowrap text-sm leading-5 text-warn-ink">
         {t('station.strip.rule', { defaultValue: 'You last looked' })}
       </span>
       <span className="text-xs tabular-nums leading-4 text-muted-foreground">{when}</span>
@@ -63,7 +63,7 @@ type LandedTimelineProps = {
  * THE STRIP'S TIMELINE, the week sideways: its landings oldest to newest in a horizontal `ScrollArea`, a finger panning it
  * and a mouse's wheel turning it, between the strip's head and its fold. The rule "You last looked" stands before the
  * first new landing, so "since you last looked" is a place on the line and not only a colour: its dashed edge in the
- * garnish, his last look's time over its words. With nothing new it stands at the line's end, after the newest landing: he has
+ * garnish and its words in the warm ink, his last look's time over its words. With nothing new it stands at the line's end, after the newest landing: he has
  * looked at everything, and the next landing will join the line after it, so the place he looked from never leaves the line
  * (it is the "<n> new" press, and every look-away, that moves it there).
  *

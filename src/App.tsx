@@ -1,4 +1,3 @@
-import { Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { I18nextProvider } from 'react-i18next';
 
@@ -21,11 +20,12 @@ import { SessionHostLivenessProvider } from '@/shared/context/SessionHostLivenes
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
 import { PluginsProvider } from '@/modules/plugins';
 import { ProjectWorkspaceRoute } from '@/modules/project-workspace';
-import { StationRoute } from '@/modules/station';
+import { StationLayer } from '@/modules/station';
 import { i18n } from '@/modules/i18n';
 import { routerBasename } from '@/shared/cloudcliDoors';
+import { STATION_PATH } from '@/shared/constants';
 
-/** Rendered by main.tsx; mounts the shared providers, the auth gate and the project workspace routes. */
+/** Rendered by main.tsx; mounts the shared providers, the auth gate and the app's one layout: the project workspace with Kaylee Station drawn over it. */
 export default function App() {
   const basename = routerBasename();
 
@@ -83,12 +83,14 @@ export default function App() {
                       <CerberusProvider>
                       <Router basename={basename}>
                         <Routes>
-                          <Route path="/" element={<ProjectWorkspaceRoute />} />
-                          <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
-                          {/* Kaylee Station stands beside the workspace, inside every provider above and outside its shell.
-                              The route loads on its first visit (`lazyStationRoute`); until then a quiet page that is
-                              already dark, so a station opened at midday does not flash light. */}
-                          <Route path="/station" element={<Suspense fallback={<div className="dark fixed inset-0 bg-background" />}><StationRoute /></Suspense>} />
+                          {/* ONE layout element for the app's three paths, so a move between them unmounts nothing: the workspace stays mounted while
+                              `/station` is on screen, and the station, drawn inside the workspace's own chat host and Kaylee's provider, stays mounted
+                              after its first visit. The paths below only say which addresses exist; the layout reads the router and draws the right page. */}
+                          <Route element={<ProjectWorkspaceRoute stationLayer={<StationLayer />} />}>
+                            <Route path="/" />
+                            <Route path="/session/:sessionId" />
+                            <Route path={STATION_PATH} />
+                          </Route>
                         </Routes>
                       </Router>
                       </CerberusProvider>

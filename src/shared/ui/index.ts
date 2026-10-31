@@ -132,6 +132,8 @@ export { Field } from '@/shared/ui/Field';
 // Verve's §10 Media gallery: square photo tiles, each with its tag, the final tile collapsing the overflow into
 // "+N", the grey tile where a photo is missing. The affected-areas module draws a tour's panos with it.
 export { Gallery } from '@/shared/ui/Gallery';
+// Holds a whole page of the app (the workspace, Kaylee Station) mounted and out of reach while the other page is on screen.
+export { HeldPage } from '@/shared/ui/HeldPage';
 export { Input } from '@/shared/ui/Input';
 export { KanbanCard } from '@/shared/ui/KanbanCard';
 export type { CardPriority, KanbanCardModel, KanbanCardSignals } from '@/shared/ui/KanbanCard';

@@ -2,6 +2,9 @@ import { realpathSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import type { CompanionAttachment } from '@/shared/companion-types.js';
+import { getGlobalImageAssetsDir } from '@/shared/image-attachments.js';
+
 import { listVisibleProjects } from './house-reads.js';
 import { companionScratchDir } from './transcript-render.js';
 
@@ -31,11 +34,26 @@ import { companionScratchDir } from './transcript-render.js';
  * ordinary folder, so the name rules stay a net, not a promise. A denied path is refused BY NAME, in a sentence that
  * says why, and no dactyl starts for the call.
  *
+ * THE ATTACHED-FILE DOOR. A file he attached to a typed line is his giving it to her. The upload store it sits in
+ * (`~/.cloudcli/assets`, a home dot-folder, so the place rule above refuses the whole of it) opens for exactly those files
+ * and for nothing else: a path whose realpath is the realpath of a file a line her log still holds attached (`attached`, the
+ * store's `attachedFiles()`, read at every call) is admitted past the roots and past the place rules, provided that real
+ * file is a direct child of the upload store (`getGlobalImageAssetsDir()`, read at the call): a record is only a claim, so a
+ * record naming a path elsewhere, or a link in the store that leads out of it, opens nothing. The rest of the store stays
+ * refused as above — the pictures tools returned, every file he sent to any chat — and so does a file whose line has left
+ * the log (the 400-row keep window, Clear). The file's directory is the store's, so only its NAMES are judged, three of
+ * them: the stored name, which carries the upload's `<Date.now()>-<random>-` prefix (so `credentials*` does not match
+ * `1761900000000-123456789-credentials.json`); his name for it (which does); and the name it was uploaded under (the stored
+ * name less that prefix), which holds when his name for it is another. A file he attached under a secret's name is refused by
+ * name, and a file attached on several lines is refused when any of his names for it is. The dactyl itself fences no folder
+ * (it refuses a file that is absent, empty, binary or past its prompt), so a stored file these rules admit is read.
+ *
  * A name that is not a full path (`server/shared/prompt-stream.ts`, as a person says it) is looked for under the
  * visible projects: one project holding it is the file, none or several is a sentence that says what to give.
  *
- * Consumers: `read-tools.ts` (`ask_dactyl`), on every file and on the context file, and `eyes/house-reads.ts` (`read_git`),
- * which holds a changed file to the same rule through `isDeniedPath` before it reads that file's diff.
+ * Consumers: `read-tools.ts` (`ask_dactyl`), on every file and on the context file, handing it `store.attachedFiles()` at every
+ * call, and `eyes/git-reads.ts` (`read_git`), which holds a changed file to the same rule through `isDeniedPath` before it
+ * reads that file's diff.
  */
 
 /** The file or folder names that are secrets whole, whatever sits beside them. Compared in lower case. */
@@ -78,12 +96,23 @@ function realOrSelf(candidate: string): string {
   }
 }
 
-/** The rule `candidate` (an absolute path) breaks, in words, or `null` when none. Judged on the path as written AND as resolved by the caller. */
-function deniedBy(candidate: string): string | null {
+/** The first segment of `candidate` (an absolute path, or one bare name; split on the path separator) that is or looks like a secret, with the rule it breaks. */
+function secretSegmentIn(candidate: string): { segment: string; rule: string } | null {
   for (const segment of candidate.split(path.sep)) {
     const hit = DENIED_SEGMENTS.find((denied) => denied.matches(segment.toLowerCase()));
-    if (hit) return `its name "${segment}" matches ${hit.rule}`;
+    if (hit) return { segment, rule: hit.rule };
   }
+  return null;
+}
+
+/** The name rule `candidate` (an absolute path) breaks, in words, or `null` when none: every segment against `DENIED_SEGMENTS`. */
+function deniedByName(candidate: string): string | null {
+  const hit = secretSegmentIn(candidate);
+  return hit ? `its name "${hit.segment}" matches ${hit.rule}` : null;
+}
+
+/** The place rule `candidate` (an absolute path) breaks, in words, or `null` when none: a home dot-folder, or a place of `DENIED_HOME_PATHS`. */
+function deniedByPlace(candidate: string): string | null {
   for (const home of new Set([os.homedir(), realOrSelf(os.homedir())])) {
     const first = candidate.startsWith(home + path.sep) ? candidate.slice(home.length + 1).split(path.sep)[0] : '';
     if (first.startsWith('.') && first !== '.claude') return `it sits in ~/${first}, a home dot-folder where applications keep their tokens and keys`;
@@ -97,12 +126,16 @@ function deniedBy(candidate: string): string | null {
   return null;
 }
 
+/** The rule `candidate` (an absolute path) breaks, in words, or `null` when none: the name rules, then the place rules. Judged on the path as written AND as resolved by the caller. */
+const deniedBy = (candidate: string): string | null => deniedByName(candidate) ?? deniedByPlace(candidate);
+
 /**
  * Whether `candidate` is a file no reader of hers may open: the rule above as a predicate, judged the way `judgeFile` judges
  * it — on the path as written AND on the real file it resolves to when it exists (a link called `notes.txt` that points at a
  * `.env` is a `.env`), and whether or not the file exists. `candidate` is an absolute path, or `~/…`; a relative one is taken
  * against the server's own working directory, so a caller holding a project-relative name joins it to the project first.
- * Consumed by `eyes/house-reads.ts` (`read_git`), which names a changed file this refuses and never reads its diff.
+ * Consumed by `eyes/git-reads.ts` (`read_git`), which names a changed file this refuses and never reads its diff. It knows
+ * nothing of the attached-file door: a file of the upload store is a denied place to it, as it is to every path no line attached.
  */
 export function isDeniedPath(candidate: string): boolean {
   const written = path.resolve(withHome(candidate.trim()));
@@ -135,13 +168,82 @@ function findUnderProjects(given: string): { ok: true; file: string } | { ok: fa
   return { ok: false, sentence: `"${given}" is in ${found.length} projects (${found.map(({ project }) => `"${project.name}"`).join(', ')}). Give the full path of the one meant.` };
 }
 
+/** One path judged: the real file it comes to, or the sentence that refuses it. */
+type Judged = { ok: true; file: string } | { ok: false; sentence: string };
+
+const missingSentence = (shown: string): string => `${shown} does not exist, or cannot be reached. Check the path; ask_dactyl reads files that exist.`;
+const notRegularSentence = (shown: string): string => `${shown} is not a regular file, and a dactyl reads one file each. Name the files inside it.`;
+
+/**
+ * The records of attached files that come to the real file `real`, or `undefined` when none does. One upload can ride several
+ * lines, each with his own name for it, so every record that names it is answered. A record is matched on its basename first and
+ * by realpath only then (a stored file is a regular file, its real basename its own): thousands of records cost string compares.
+ */
+type AttachedLookup = (real: string) => readonly CompanionAttachment[] | undefined;
+
+function attachedLookup(attached: readonly CompanionAttachment[]): AttachedLookup {
+  return (real) => {
+    const basename = path.basename(real);
+    const holders = attached.filter((attachment) => path.basename(attachment.path) === basename && realOrSelf(attachment.path) === real);
+    return holders.length > 0 ? holders : undefined;
+  };
+}
+
+/** The `<Date.now()>-<random>-` the upload store puts before every name it keeps (`assets.routes.ts`), which hides a name from `credentials*` and `.env*`. */
+const UPLOAD_NAME_PREFIX = /^\d+-\d+-/;
+
+/**
+ * The name rule a file he attached breaks, in words, or `null` when none. Only NAMES are judged: the place it sits in is the upload
+ * store, which the door opens on purpose. Three kinds of name, a hit on any one refuses the file, and the sentence names the first
+ * hit in this order: the stored name (the real file's); his names for it, which are what he called the file (one holding `/` is
+ * judged piece by piece); and the stored name once the upload's prefix is off, so the name the file was uploaded under is held to
+ * the rules even when the name he gave it is another.
+ */
+function attachedDeniedBy(real: string, holders: readonly CompanionAttachment[]): string | null {
+  const storedName = path.basename(real);
+  const stored = secretSegmentIn(storedName);
+  if (stored) return `its stored name "${stored.segment}" matches ${stored.rule}`;
+  for (const { name } of holders) {
+    const hit = secretSegmentIn(name);
+    if (hit) return `his name for it, "${name}", matches ${hit.rule}`;
+  }
+  const uploaded = secretSegmentIn(storedName.replace(UPLOAD_NAME_PREFIX, ''));
+  return uploaded ? `the name it was uploaded under, "${uploaded.segment}", matches ${uploaded.rule}` : null;
+}
+
+/**
+ * A file a line of her log attached: a direct child of the upload store, past the roots and the place rules, judged by the name
+ * rules alone (`attachedDeniedBy`), and a regular file that exists. A record is only a claim, so the store is checked here on the
+ * real file. `shown` is the path as she gave it; `candidate` is where it leads, resolved here.
+ */
+function judgeAttachedFile(shown: string, candidate: string, holders: readonly CompanionAttachment[]): Judged {
+  let real: string;
+  try {
+    real = realpathSync(candidate);
+  } catch {
+    return { ok: false, sentence: missingSentence(shown) };
+  }
+  const named = real === path.resolve(candidate) ? shown : `${shown} (which is ${real})`;
+  if (path.dirname(real) !== realOrSelf(getGlobalImageAssetsDir())) {
+    return { ok: false, sentence: refusedByName(named, 'it is not a file of the upload store, and only a store file a line attached is opened past the places a dactyl may read') };
+  }
+  const byName = attachedDeniedBy(real, holders);
+  if (byName) return { ok: false, sentence: refusedByName(named, byName) };
+  if (!statSync(real).isFile()) return { ok: false, sentence: notRegularSentence(shown) };
+  return { ok: true, file: real };
+}
+
 /** One path judged: the real file it comes to, or the sentence that refuses it. Consumed by `resolveDactylFiles`. */
-function judgeFile(given: string, roots: string[]): { ok: true; file: string } | { ok: false; sentence: string } {
-  const written = withHome(given.trim());
+function judgeFile(given: string, roots: string[], attached: AttachedLookup): Judged {
+  const shown = given.trim();
+  const written = withHome(shown);
+  // A file he attached is judged by its own rules from the first step: the place rule below would refuse the whole upload store.
+  const attachedAtWritten = path.isAbsolute(written) ? attached(realOrSelf(path.resolve(written))) : undefined;
+  if (attachedAtWritten) return judgeAttachedFile(shown, path.resolve(written), attachedAtWritten);
   // The name alone is judged first: a `.env` that does not exist is still refused as a `.env`.
   if (path.isAbsolute(written)) {
     const byName = deniedBy(path.resolve(written));
-    if (byName) return { ok: false, sentence: refusedByName(given.trim(), byName) };
+    if (byName) return { ok: false, sentence: refusedByName(shown, byName) };
   }
   const located = path.isAbsolute(written) ? { ok: true as const, file: written } : findUnderProjects(written);
   if (!located.ok) return located;
@@ -150,14 +252,17 @@ function judgeFile(given: string, roots: string[]): { ok: true; file: string } |
   try {
     real = realpathSync(located.file);
   } catch {
-    return { ok: false, sentence: `${given.trim()} does not exist, or cannot be reached. Check the path; ask_dactyl reads files that exist.` };
+    return { ok: false, sentence: missingSentence(shown) };
   }
+  // A path that is not the upload store's own but comes to a file he attached (a link, a project name) is that file.
+  const attachedAtReal = attached(real);
+  if (attachedAtReal) return judgeAttachedFile(shown, located.file, attachedAtReal);
   const byRealName = deniedBy(real);
   if (byRealName) {
-    const shown = real === path.resolve(located.file) ? given.trim() : `${given.trim()} (which is ${real})`;
-    return { ok: false, sentence: refusedByName(shown, byRealName) };
+    const named = real === path.resolve(located.file) ? shown : `${shown} (which is ${real})`;
+    return { ok: false, sentence: refusedByName(named, byRealName) };
   }
-  if (!statSync(real).isFile()) return { ok: false, sentence: `${given.trim()} is not a regular file, and a dactyl reads one file each. Name the files inside it.` };
+  if (!statSync(real).isFile()) return { ok: false, sentence: notRegularSentence(shown) };
   if (!roots.some((root) => isUnder(real, root))) {
     return { ok: false, sentence: `${given.trim()} is outside what a dactyl may read: a visible project, ~/.claude, or her own scratch folder. Pick a file inside one of them.` };
   }
@@ -171,14 +276,18 @@ export type DactylFiles = { ok: true; files: string[] } | { ok: false; sentence:
  * Holds every path in `given` (the files, then the context file if any) to the rules above. Every path is judged, so
  * the sentence names ALL the refused ones; nothing is returned for the ones that pass when any fails — the caller
  * starts no dactyl. The files answered are REAL paths, so the dactyl reads exactly what was judged, and a path given
- * twice is answered once. Consumer: `read-tools.ts` (`ask_dactyl`), which hands the answer to `runDactylRead`.
+ * twice is answered once. `attached` is every file a line of her log still holds attached (`store.attachedFiles()`, read
+ * by the caller at every call), the one door into the upload store: those files, and only those, are admitted past the roots
+ * and the place rules, and are still judged by name on their stored name and on his. Consumer: `read-tools.ts`
+ * (`ask_dactyl`), which hands the answer to `runDactylRead`.
  */
-export function resolveDactylFiles(userId: number, given: string[]): DactylFiles {
+export function resolveDactylFiles(userId: number, given: string[], attached: readonly CompanionAttachment[]): DactylFiles {
   const roots = allowedRoots(userId);
+  const lookupAttached = attachedLookup(attached);
   const files: string[] = [];
   const sentences: string[] = [];
   for (const file of given) {
-    const judged = judgeFile(file, roots);
+    const judged = judgeFile(file, roots, lookupAttached);
     if (!judged.ok) sentences.push(judged.sentence);
     else if (!files.includes(judged.file)) files.push(judged.file);
   }

@@ -6,7 +6,8 @@ import path from 'node:path';
  * Shared chat-attachment plumbing for every provider runtime.
  *
  * Uploaded chat files are persisted once in the global `~/.cloudcli/assets`
- * folder and referenced by absolute path everywhere else:
+ * folder (`CLOUDCLI_ASSETS_DIR` moves it) and referenced by absolute path
+ * everywhere else:
  * - Claude: paths are read back into base64 `image` content blocks.
  * - Codex: paths become `local_image` input items.
  * - General files: verified paths are appended inside a `<files_input>` tag,
@@ -15,11 +16,22 @@ import path from 'node:path';
  *
  * The chat UI loads them through dedicated `/api/assets/images/:filename` and
  * `/api/assets/files/:filename` routes, which serve only from this folder.
+ *
+ * Two doors read the store, and both run `filterAttachmentsToUploadStore` on
+ * what the browser names and read pictures with `claudeImageBlocks`: the chat's
+ * websocket gateway (`chat.send`) and Kaylee's typed door
+ * (`POST /api/companion/messages`, which her session also replays from).
  */
 
-/** Global storage folder for uploaded chat image attachments. */
+/**
+ * `CLOUDCLI_ASSETS_DIR`, else `~/.cloudcli/assets`; always absolute, read at
+ * every call, so a scratch server keeps its uploads under its own folder.
+ * Every reader and writer of the store goes through it: the upload route, the
+ * serving routes, the filter and the picture readers below, and the
+ * tool-result pictures of a Claude history.
+ */
 export function getGlobalImageAssetsDir(): string {
-  return path.join(os.homedir(), '.cloudcli', 'assets');
+  return path.resolve(process.env.CLOUDCLI_ASSETS_DIR || path.join(os.homedir(), '.cloudcli', 'assets'));
 }
 
 export type ImageAttachmentDescriptor = {
@@ -141,11 +153,12 @@ function getDirectoryPathVariants(directory: string): string[] {
 }
 
 /**
- * Second layer of the image trust boundary (the first is the chat.send filter
- * in the websocket gateway): provider builders only reference files that live
- * in the global upload store or inside the run's working directory — places
- * the agent could already access on its own. Anything else (e.g. `~/.ssh`) is
- * refused, so a caller-supplied descriptor can never leak arbitrary files.
+ * Second layer of the image trust boundary (the first is
+ * `filterAttachmentsToUploadStore`, below): provider builders only reference
+ * files that live in the global upload store or inside the run's working
+ * directory — places the agent could already access on its own. Anything else
+ * (e.g. `~/.ssh`) is refused, so a caller-supplied descriptor can never leak
+ * arbitrary files.
  */
 export function isAllowedImageSourcePath(resolvedPath: string, cwd?: string): boolean {
   return [getGlobalImageAssetsDir(), cwd || process.cwd()].some((directory) =>
@@ -153,6 +166,38 @@ export function isAllowedImageSourcePath(resolvedPath: string, cwd?: string): bo
       isPathInsideDirectory(resolvedPath, directoryVariant)
     )
   );
+}
+
+/**
+ * Trust boundary for client-supplied image attachments: chat.send options come
+ * straight from the browser, and the provider runtimes read the referenced
+ * files off disk (Claude base64-encodes them into the prompt). Only images
+ * that live directly inside the global upload store (`~/.cloudcli/assets`,
+ * where POST /api/assets/images puts them) are allowed through — anything
+ * else (absolute paths elsewhere, traversal, subdirectories) is dropped.
+ *
+ * Consumed by the websocket gateway's `chat.send`
+ * (`websocket/services/chat-websocket.service.ts`).
+ */
+export function filterAttachmentsToUploadStore(attachments: unknown): ChatAttachmentDescriptor[] {
+  const assetsRoot = getGlobalImageAssetsDir();
+
+  return normalizeAttachmentDescriptors(attachments).filter((descriptor) => {
+    // Relative paths are anchored in the store; absolute ones must already be in it.
+    const resolved = path.resolve(assetsRoot, descriptor.path);
+    const relative = path.relative(assetsRoot, resolved);
+    const isDirectChild =
+      relative.length > 0 &&
+      !relative.startsWith('..') &&
+      !path.isAbsolute(relative) &&
+      !relative.includes(path.sep) &&
+      !relative.includes('/');
+
+    if (!isDirectChild) {
+      console.warn(`[Chat] Dropping attachment outside the upload store: ${descriptor.path}`);
+    }
+    return isDirectChild;
+  });
 }
 
 /**
@@ -352,22 +397,24 @@ export function toImageAttachments(imagePaths: string[]): Array<{ path: string }
   return imagePaths.map((imagePath) => ({ path: toPosixPath(imagePath) }));
 }
 
-type ClaudeContentBlock =
-  | { type: 'text'; text: string }
-  | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
+/**
+ * One base64 image of a Claude user message, the shape `claudeImageBlocks`
+ * returns and `buildClaudeUserContent` puts after its text block. Exported for
+ * the callers of `claudeImageBlocks`, so a picture is carried in the shape the
+ * chat's own reader makes it in.
+ */
+export type ClaudeImageBlock = { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
+
+type ClaudeContentBlock = { type: 'text'; text: string } | ClaudeImageBlock;
 
 /**
- * Builds the Claude user-message content list: the prompt text followed by one
- * base64 `image` block per attachment. Images the Claude API cannot accept
- * (e.g. SVG) or that fail to read are skipped with a warning so the prompt
- * itself still goes through.
+ * The base64 image blocks of `images`, in order: Claude's four media types, the
+ * allowed roots, realpath, and a read that fails skipped with its warning, so
+ * one bad picture never stops the message. The chat reads its pictures through
+ * this (`buildClaudeUserContent`), and so does Kaylee's door.
  */
-export async function buildClaudeUserContent(
-  prompt: string,
-  images: unknown,
-  cwd?: string,
-): Promise<ClaudeContentBlock[]> {
-  const blocks: ClaudeContentBlock[] = [{ type: 'text', text: prompt }];
+export async function claudeImageBlocks(images: unknown, cwd?: string): Promise<ClaudeImageBlock[]> {
+  const blocks: ClaudeImageBlock[] = [];
 
   for (const descriptor of normalizeImageDescriptors(images)) {
     const mediaType = resolveImageMediaType(descriptor);
@@ -405,6 +452,20 @@ export async function buildClaudeUserContent(
   }
 
   return blocks;
+}
+
+/**
+ * Builds the Claude user-message content list: the prompt text followed by one
+ * base64 `image` block per attachment. Images the Claude API cannot accept
+ * (e.g. SVG) or that fail to read are skipped with a warning (in
+ * `claudeImageBlocks`) so the prompt itself still goes through.
+ */
+export async function buildClaudeUserContent(
+  prompt: string,
+  images: unknown,
+  cwd?: string,
+): Promise<ClaudeContentBlock[]> {
+  return [{ type: 'text', text: prompt }, ...(await claudeImageBlocks(images, cwd))];
 }
 
 type CodexInputItem =

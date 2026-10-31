@@ -14,7 +14,7 @@ import { fillRegister } from './companion-prompt.js';
  *   3. `<cut>`, owed once after he cut her off (`oweCut`, set by the companion's speech cut);
  *   4. `<sessions>`, on a wake, then only when its text differs from the last one sent;
  *   5. `<view>`, on the same rule (it names what is on his screen, so a press on the station changes the text and rides the next message he sends: it never pushes or wakes);
- *   6. the body — an `<operator>`, one or more `<alert>`s, or a `<session>`;
+ *   6. the body — an `<operator>` (a typed line with files is followed by its `<attachments>`; the session writes both into the body), one or more `<alert>`s, or a `<session>`;
  *   7. `<register>`, read from his settings EVERY time: he edits it, so it is never stale. The sounds it lists are
  *      the account's sound-tag list, read at the same moment.
  * The roster and the view are compared by their TEXT, not by the envelope: `<sessions at="HH:MM">`

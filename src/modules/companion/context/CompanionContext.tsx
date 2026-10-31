@@ -7,11 +7,12 @@ import { useEars } from '@/modules/companion/hooks/useEars';
 import { useTalkBinding } from '@/modules/companion/hooks/useTalkBinding';
 import { useTalkPress } from '@/modules/companion/hooks/useTalkPress';
 import { isCompanionPicture, isOpenTarget, reduceCompanion } from '@/modules/companion/utils/companionReducer';
+import { isMouthFrame } from '@/modules/companion/utils/mouthPieces';
 import type { PcmPlayer } from '@/modules/companion/utils/pcmPlayer';
-import { api, refusalSentence } from '@/shared/api';
+import { api, refusalSentence, ServerSentenceError, uploadAttachmentFiles } from '@/shared/api';
 import type { CompanionFrame, CompanionOpenTarget, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-import type { CompanionEars, CompanionVoice, TalkPress } from '@/shared/types';
+import type { CompanionEars, CompanionFaceVoice, CompanionVoice, TalkPress } from '@/shared/types';
 import type { DockableFabPosition } from '@/shared/ui';
 import { companionClientId } from '@/shared/utils';
 
@@ -31,7 +32,18 @@ type CompanionContextValue = {
   clientId: string;
   /** Opens or closes her panel here; opening tells her this page is the one she acts on. */
   setOpen: (open: boolean) => void;
-  sendText: (text: string) => Promise<void>;
+  /**
+   * Tells her this page is the one she acts on, and unlocks the page's audio, WITHOUT opening her panel: what the station does when it comes on
+   * screen, so the workspace's panel is as he left it when he returns. `setOpen(true)` is this plus the panel opening.
+   */
+  takeFloor: () => void;
+  /**
+   * His typed line: `text` and the `files` he attached to it (either may be empty, never both). The files go up by the chat's own road
+   * first and the line carries the stored records, never the bytes; the page's audio is unlocked before either. Rejects with a
+   * `ServerSentenceError` (the server's own sentence) when it answered one (an upload refused, the door's 400), and with a plain Error
+   * otherwise (a status, a transport failure, a timeout).
+   */
+  sendText: (text: string, files?: File[]) => Promise<void>;
   /** Saves a partial of her settings; `register: null` restores the original register. Rejects with the server's sentence. */
   saveSettings: (patch: Partial<CompanionSettings> | { register: null }) => Promise<void>;
   editDraft: (text: string) => Promise<void>;
@@ -114,6 +126,8 @@ type CompanionContextValue = {
   level: () => number;
   /** The page player's `progress()`: the sounding sentence's seconds elapsed and, once its body has ended, its length — what picks the vowel of her mouth. Stable for the page's life. */
   progress: PcmPlayer['progress'];
+  /** The timed mouth shapes the page has heard for a sentence (`[]` for none yet): what her face's exact mouth looks up at the audio's place. Stable for the page's life. */
+  mouth: CompanionFaceVoice['mouth'];
 };
 
 const CompanionContext = createContext<CompanionContextValue | null>(null);
@@ -128,10 +142,14 @@ export function useCompanion(): CompanionContextValue {
   return context;
 }
 
-/** A response that is a refusal becomes a thrown Error carrying the server's own sentence, so the panel can show why. */
+/**
+ * A response that is a refusal becomes a thrown Error, so the panel can show why: a `ServerSentenceError` carrying the server's own sentence
+ * when the refusal had one, else a plain Error naming the status.
+ */
 async function ensureOk(response: Response): Promise<Response> {
   if (response.ok) return response;
-  throw new Error((await refusalSentence(response)) ?? `Request failed (${response.status})`);
+  const sentence = await refusalSentence(response);
+  throw sentence === null ? new Error(`Request failed (${response.status})`) : new ServerSentenceError(sentence);
 }
 
 /** How long after a send the page counts it as recent: the time her button keeps looking at the composer the send went to. */
@@ -199,7 +217,7 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
   // Her disc and her rail cell meet here: where she rests, the cell's rect, and whether a look holds her off the seat.
   const { fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway } = useCompanionFab();
   // Stable for the page's life (unlike `speech`, which moves with every sentence), so the callbacks below keep their identity.
-  const { unlock: unlockVoice, silence: silenceVoice } = speech;
+  const { unlock: unlockVoice, silence: silenceVoice, hearMouth, forgetMouth } = speech;
   // The page's one press, and the key or mouse button he bound to it. The press is not state of the picture: it is this page's mic.
   // The ears take the press's name door and hand back `finish`, which the press calls when his button ends a name press: the press is
   // called first, so it reaches `finish` through this ref, set once the ears have been called.
@@ -293,12 +311,13 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
       applyFrame(frame);
       // Her conversation is gone: what she was saying goes with it.
       silenceVoice();
+      forgetMouth();
       void seed();
       return;
     }
     if (seedingRef.current) queuedRef.current.push(frame);
     applyFrame(frame);
-  }, [seed, applyFrame, silenceVoice]);
+  }, [seed, applyFrame, silenceVoice, forgetMouth]);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -318,6 +337,11 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
     }
     if (!isCompanionFrame(event)) return;
     const frame = event as unknown as CompanionFrame;
+    // The timed mouth shapes of one piece of a sentence's audio are for her face alone, never part of her picture: kept, or dropped when malformed, and no further.
+    if (frame.kind === 'companion_mouth') {
+      if (isMouthFrame(frame)) hearMouth(frame);
+      return;
+    }
     if (frame.kind === 'companion_open') {
       const { target } = frame;
       // A target of a kind this build does not know, or cut short of its name or id, is not acted on.
@@ -336,7 +360,7 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
     }
     heardRef.current[frame.kind] = (heardRef.current[frame.kind] ?? 0) + 1;
     fold(frame);
-  }), [subscribe, seed, fold, clientId]);
+  }), [subscribe, seed, fold, clientId, hearMouth]);
 
   // A page whose first read failed reads again the moment she is opened: the one place a person is waiting on her.
   useEffect(() => {
@@ -348,21 +372,30 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
     void seed();
   }, [seed]);
 
-  const setOpen = useCallback((next: boolean) => {
-    setOpenState(next);
-    if (!next) return;
-    // Opening her is a gesture: the page's audio is unlocked now, so her first sentence can sound.
+  const takeFloor = useCallback(() => {
+    // A gesture, when it comes from one: the page's audio is unlocked now, so her first sentence can sound.
     unlockVoice();
-    // Opening her is the page saying "act on me": the floor moves here.
+    // The page saying "act on me": the floor moves here.
     api.companion.floor().then(ensureOk).catch((error: unknown) => {
       console.warn('[Companion] Could not take the floor:', error);
     });
   }, [unlockVoice]);
 
-  const sendText = useCallback(async (text: string) => {
+  const setOpen = useCallback((next: boolean) => {
+    setOpenState(next);
+    // Opening her is a gesture and the page saying "act on me" at once.
+    if (next) takeFloor();
+  }, [takeFloor]);
+
+  const sendText = useCallback(async (text: string, files: File[] = []) => {
     // Typing to her is a gesture too, and unlocking comes before the first await.
     unlockVoice();
-    await ensureOk(await api.companion.sendText(text));
+    // His files go up by the chat's own road before the line is posted; a refused upload throws the store's sentence and posts nothing.
+    const stored = files.length > 0 ? await uploadAttachmentFiles(files) : [];
+    // The upload route reads a multipart filename as latin1, so every non-ASCII name (an accent, CJK, a macOS screenshot's U+202F) comes back
+    // mangled. His name for a file is the page's own: the records come back in the files' order (`uploadAttachmentFiles` checks the count).
+    const attachments = stored.map((record, index) => ({ ...(record as object), name: files[index].name }));
+    await ensureOk(await api.companion.sendText(text, attachments));
   }, [unlockVoice]);
 
   // Every write is announced to this page by the frame its route sends, in the same tick as the write. The two writes that
@@ -444,14 +477,14 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
 
   const value = useMemo<CompanionContextValue>(
     () => ({
-      picture, readFailure: picture === null ? readFailure : null, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft,
+      picture, readFailure: picture === null ? readFailure : null, reread, open, clientId, setOpen, takeFloor, sendText, saveSettings, editDraft, sendDraft,
       clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear, talk,
       voice: speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
-      progress: speech.progress,
+      progress: speech.progress, mouth: speech.mouth,
     }),
     [
-      picture, readFailure, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear,
-      talk, speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress,
+      picture, readFailure, reread, open, clientId, setOpen, takeFloor, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear,
+      talk, speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress, speech.mouth,
     ],
   );
 

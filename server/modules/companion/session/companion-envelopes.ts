@@ -1,11 +1,11 @@
-import type { CompanionDraft, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
+import type { CompanionAttachment, CompanionDraft, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
 import type { StationFocus } from '@/shared/station-types.js';
 import { oneLine } from '@/shared/tool-call-hint.js';
 
 /**
  * Every envelope pushed to her: one builder per kind, each answering the string that is handed to her
  * conversation as it stands. The system prompt teaches her to read exactly these tags (`<operator>`,
- * `<cut>`, `<view>`, `<sessions>`, `<state>`, `<handover>`, `<alert>`, `<session>`, `<register>`), so a tag spelled
+ * `<cut>`, `<view>`, `<sessions>`, `<state>`, `<handover>`, `<alert>`, `<session>`, `<register>`, `<attachments>`), so a tag spelled
  * differently here is a message she cannot read.
  *
  * Two rules hold for all of them. An ATTRIBUTE value is escaped (`&`, `<`, `>`, `"`), so a chat named
@@ -22,7 +22,7 @@ import { oneLine } from '@/shared/tool-call-hint.js';
  *
  * PURE: no I/O and no import beyond the contract's types and the one-line fold.
  *
- * Consumers: `session/companion-session.ts` (the operator, state, cut, sessions, view and register
+ * Consumers: `session/companion-session.ts` (the operator, attachments, state, cut, sessions, view and register
  * envelopes of every message it pushes) and the alert and focus feeds (`feeds/alert-block.ts`,
  * `feeds/focus-feed.ts`), which build `<alert>` and `<session>` from the house's events.
  */
@@ -196,6 +196,43 @@ export function emptyPressEnvelope(): string {
  */
 export function calledEnvelope(): string {
   return `${openTag('operator', [['via', 'spoken'], ['heard', 'name']])}</operator>`;
+}
+
+/** A file's size as the chat's file chip writes it (`ChatMessageFiles`): `<n> B`, `<n> KB` rounded, `<n.n> MB`. */
+function fileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * One file's line after its number and name: what it is, and what she can do with it. The wording follows from `opens` alone, which the
+ * server decided once, at send (`attachments/typed-attachments.ts`), so a replay or a later reader never re-judges the file. The `text`
+ * path is written as stored: the upload store names a file `<digits>-<digits>-<his name>` with every character of the name outside
+ * letters, digits, `.` and `-` made `_`, so the path holds nothing this grammar needs escaped, and `ask_dactyl` must be handed it byte for byte.
+ */
+function attachmentFate(attachment: CompanionAttachment): string {
+  // `||`, not `??`: a record whose type is the empty string reads `unknown type`, never `(, 5 B)`.
+  const details = `${attachment.mimeType || 'unknown type'}, ${fileSize(attachment.size)}`;
+  switch (attachment.opens) {
+    case 'shown':
+      return `a picture (${details}): shown to you after this message's words.`;
+    case 'text':
+      return `text (${details}): ask_dactyl reads it at ${attachment.path}.`;
+    case 'unopened':
+      return `a file you cannot open yet (${details}).`;
+  }
+}
+
+/**
+ * `<attachments count="n">`: one numbered line per file he attached to the line before it, his name for it quoted and escaped, its type and
+ * size, and what she can do with it. Consumed by the session, which assembles it after his `<operator>` line. The name sits between quotes,
+ * so it is folded to one line (a line break in it could begin a second numbered line) and escaped as an attribute value (`"` too), which
+ * leaves it no way to end its own quote or the tag.
+ */
+export function attachmentsEnvelope(attachments: readonly CompanionAttachment[]): string {
+  const lines = attachments.map((attachment, index) => `${index + 1}. "${escapeAttribute(oneLine(attachment.name))}", ${attachmentFate(attachment)}`);
+  return lineEnvelope('attachments', [['count', String(attachments.length)]], lines);
 }
 
 /**

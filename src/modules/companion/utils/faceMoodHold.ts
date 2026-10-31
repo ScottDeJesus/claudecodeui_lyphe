@@ -4,10 +4,16 @@
 // eases back to neutral.
 
 import { moodOf } from '@/modules/companion/utils/faceMoodMap';
-import type { CompanionFaceMood, CompanionSound } from '@/shared/companion-types';
+import type { CompanionFaceMood, CompanionMouthPiece, CompanionSound } from '@/shared/companion-types';
 
-/** The sentence the player is sounding: her mood word, the text and sounds it displays, seconds elapsed in it, and its length in seconds once its body has ended (else null). */
-export type FacePlaying = { mood: string | null; text: string; sounds: readonly CompanionSound[]; elapsed: number; duration: number | null };
+/**
+ * The sentence the player is sounding: her mood word, the text and sounds it displays, seconds elapsed in it, its length in seconds
+ * once its body has ended (else null), and the timed mouth shapes announced for it so far (`mouth`, pieces of its audio; `[]` for none yet).
+ */
+export type FacePlaying = {
+  mood: string | null; text: string; sounds: readonly CompanionSound[]; elapsed: number; duration: number | null;
+  mouth: readonly CompanionMouthPiece[];
+};
 
 /** What `read` needs of the engine's input. `newestMood` is null for "nothing to read" (a page that plays her voice, or no sentence arrived yet) and never for "a sentence without a mood": that one is `''`, which reads as neutral. */
 type MoodInput = { now: number; playing: FacePlaying | null; newestMood: string | null; turnRunning: boolean };
@@ -18,7 +24,7 @@ type MoodMove = { move: 'same' | 'changed' | 'eased'; freshSentence: boolean };
 /** How long the mood holds after her turn has ended and her voice has stopped, ms. */
 const MOOD_HOLD_MS = 2500;
 
-/** Whether two playings are the same sentence, by value: a page may build a new object each step for the same one. */
+/** Whether two playings are the same sentence, by value: a page may build a new object each step for the same one. Its words, mood and sounds make it; its `mouth` does not, so a piece landing mid-sentence is the same sentence. */
 const sameSentence = (a: FacePlaying, b: FacePlaying): boolean =>
   a.text === b.text && a.mood === b.mood && a.sounds.length === b.sounds.length
   && a.sounds.every((sound, k) => sound.tag === b.sounds[k].tag && sound.at === b.sounds[k].at);

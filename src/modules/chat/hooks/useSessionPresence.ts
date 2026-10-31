@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { useStationDoors } from '@/shared/context/StationLayerContext';
 import { companionClientId } from '@/shared/utils';
 
 /**
@@ -71,12 +72,17 @@ export function useIsLookingAtSession(isActive: boolean): boolean {
  * Presence is keyed by the websocket on the server, so a phone and a laptop on the same account
  * are two records and one switching sessions never speaks for the other — which is also why
  * leaving is announced rather than merely stopped.
+ *
+ * THE STATION SPEAKS FOR THE PAGE WHILE IT COVERS THIS ONE. Both pages are one tab on one socket, so they are one record: while the station is
+ * on screen it states what it shows (`useStationPresence`) and this report is silent, whatever event wakes it. The press back to the workspace
+ * restates the chat at once (`onShowingChange`); the station says nothing on its way out, so nothing lands after the restatement to take it back.
  */
 export function useSessionPresence({ sessionId, sendMessage, isConnected }: UseSessionPresenceInput): void {
   // Only the frame stream is read from the context here; sending stays with the caller's
   // `sendMessage`, so the signature ChatInterface relies on is the whole contract.
   const { subscribe } = useWebSocket();
   const hostWindow = useHostWindow();
+  const stationDoors = useStationDoors();
 
   // Held in a ref so a new `sendMessage` identity cannot restart the heartbeat or re-announce.
   // Seeded at construction and restated in its own effect — declared FIRST, so the mount
@@ -93,6 +99,8 @@ export function useSessionPresence({ sessionId, sendMessage, isConnected }: UseS
     // `clientId` names this page to the server (it is the id Kaylee's floor is held under) and `focused` says whether its window
     // has the keyboard: together they let the server find the page he last talked to her from.
     const announce = () => {
+      // The station on screen speaks for the page: one socket holds one record, and this one would take the station's view back.
+      if (stationDoors.showing()) return;
       sendRef.current({
         type: 'chat.presence',
         sessionId,
@@ -103,6 +111,8 @@ export function useSessionPresence({ sessionId, sendMessage, isConnected }: UseS
     };
 
     announce();
+    // The station leaving the screen hands the page back to this chat; its coming says nothing here, its own report replaces this one.
+    const unsubscribeShowing = stationDoors.onShowingChange(announce);
     hostDocument.addEventListener('visibilitychange', announce);
     // Moving the keyboard between windows changes which page speaks for his screen, and no heartbeat is owed to say so.
     hostWindow.addEventListener('focus', announce);
@@ -127,6 +137,7 @@ export function useSessionPresence({ sessionId, sendMessage, isConnected }: UseS
       hostWindow.removeEventListener('focus', announce);
       hostWindow.removeEventListener('blur', announce);
       unsubscribe();
+      unsubscribeShowing();
       window.clearInterval(heartbeat);
       // A closed socket is forgotten server-side on its own, but a session switch or an
       // unmount inside a live socket has to say so or this tab keeps muting the old session.
@@ -134,5 +145,5 @@ export function useSessionPresence({ sessionId, sendMessage, isConnected }: UseS
     };
   // `hostWindow`: a move to another window re-runs this, which announces the new document's
   // visibility (the cleanup first says the old one has left).
-  }, [hostWindow, isConnected, sessionId, subscribe]);
+  }, [hostWindow, isConnected, sessionId, subscribe, stationDoors]);
 }

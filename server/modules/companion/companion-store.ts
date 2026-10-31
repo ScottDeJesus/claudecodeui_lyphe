@@ -2,6 +2,7 @@ import { companionDb } from '@/modules/database/index.js';
 import type { CompanionLogRow, CompanionNoteRow, CompanionStateRow } from '@/modules/database/index.js';
 import { sendToUser } from '@/modules/websocket/index.js';
 import type {
+  CompanionAttachment,
   CompanionDraft,
   CompanionDraftTarget,
   CompanionFrame,
@@ -16,6 +17,7 @@ import type {
 } from '@/shared/companion-types.js';
 import { isList, isRecord, isText, isWholeFrom } from '@/shared/document-fields.js';
 
+import { isAttachmentList, toAttachmentRecords } from './attachments/attachment-shape.js';
 import { isStoredPending, withoutPin } from './companion-pending.js';
 import type { CompanionStoredPending } from './companion-pending.js';
 import { isUnansweredList, type UnansweredMessage } from './companion-unanswered.js';
@@ -32,7 +34,7 @@ import { isUnansweredList, type UnansweredMessage } from './companion-unanswered
  * account's rows or pages. The write comes first and the frame second, in the same tick: a failed
  * write sends nothing, and two writes reach a page in the order they were made. The frames of
  * things that are not rows (a turn, her activity, her process, the settings, the open order,
- * the clear) go through `emit`.
+ * the mouth's timed shapes, the clear) go through `emit`.
  *
  * THE PENDING ACTION is held here WITH its pin (`CompanionStoredPending`, `companion-pending.ts`): what the prepare pinned is
  * the server's alone, so `setPending` writes the whole of it to `pending_json` and sends the action WITHOUT the pin, and the
@@ -82,11 +84,15 @@ export type CompanionLogLineInput = {
   index?: number | null;
   mood?: string | null;
   sounds?: CompanionSound[];
+  /** The files he attached to a typed line (`companion.service.ts`' `sendText`); kept as records on the row, never as bytes. */
+  attachments?: CompanionAttachment[];
 };
 
 /**
  * The frames that carry no row of the store's: she tells these, the store only delivers them.
- * Consumed by `companion.service.ts`, which builds them from the conversation's turn, activity and process callbacks.
+ * Consumed by `companion.service.ts`, which builds them from the conversation's turn, activity and process callbacks;
+ * `companion_mouth` is the speech door's: it tells each piece of a sentence's audio as the timed shapes land
+ * (`companion-speech.ts`), and no page keeps it in her picture.
  */
 export type CompanionEmittedFrame = Extract<
   CompanionFrame,
@@ -97,6 +103,7 @@ export type CompanionEmittedFrame = Extract<
       | 'companion_process'
       | 'companion_settings'
       | 'companion_open'
+      | 'companion_mouth'
       | 'companion_cleared';
   }
 >;
@@ -133,6 +140,12 @@ export type CompanionStore = {
   readSentence(turnId: string, index: number): CompanionLogEntry | null;
   /** The newest `limit` lines, oldest first. */
   readLog(limit: number): CompanionLogEntry[];
+  /**
+   * Every file attached to a line the account's log still holds, oldest line first and in the order he attached them: what her reader's
+   * door opens (`tools/read-tools.ts` reads it at every call). A line that leaves the log (the keep window, Clear) takes its files out of
+   * the list; the files themselves stay in the upload store. A column that does not read as records is dropped with `readJsonColumn`'s one warning.
+   */
+  attachedFiles(): CompanionAttachment[];
   /** `companion_note`. A card is a `note` about nothing unless it is given its `kind` and the `ref` it is about. */
   addNote(note: { title: string; text: string; kind?: CompanionNoteKind; ref?: CompanionNoteRef | null }): CompanionNote;
   listNotes(): CompanionNote[];
@@ -199,6 +212,7 @@ function toStoredState(userId: number, row: CompanionStateRow | null): Companion
 
 function toLogEntry(userId: number, row: CompanionLogRow): CompanionLogEntry {
   const sounds = readJsonColumn(userId, `companion_log.sounds_json (row ${row.id})`, row.sounds_json, (value): value is CompanionSound[] => isList(value) && value.every(isSound));
+  const attachments = readJsonColumn(userId, `companion_log.attachments_json (row ${row.id})`, row.attachments_json, isAttachmentList);
   return {
     id: row.id,
     at: row.at,
@@ -209,6 +223,8 @@ function toLogEntry(userId: number, row: CompanionLogRow): CompanionLogEntry {
     text: row.text,
     mood: row.mood,
     sounds: sounds ?? [],
+    // Only a line that carries some has the key, so every other line keeps exactly the shape it always had.
+    ...(attachments?.length ? { attachments } : {}),
   };
 }
 
@@ -269,7 +285,9 @@ export function createCompanionStore(userId: number): CompanionStore {
     readUnanswered: () => readJsonColumn(userId, 'unanswered_json', companionDb.readState(userId)?.unanswered_json ?? null, isUnansweredList) ?? [],
 
     setUnanswered(unanswered) {
-      companionDb.writeState(userId, { unanswered_json: unanswered.length === 0 ? null : JSON.stringify(unanswered) });
+      // His attachments ride the ledger as records too: cut to their five fields, as the log's are.
+      const records = unanswered.map((message) => (message.attachments === undefined ? message : { ...message, attachments: toAttachmentRecords(message.attachments) }));
+      companionDb.writeState(userId, { unanswered_json: records.length === 0 ? null : JSON.stringify(records) });
     },
 
     setFloor(floor) {
@@ -314,6 +332,8 @@ export function createCompanionStore(userId: number): CompanionStore {
         mood: input.mood ?? null,
         // No sounds is NULL, not "[]": most lines have none.
         sounds_json: input.sounds?.length ? JSON.stringify(input.sounds) : null,
+        // Likewise no files is NULL: almost every line has none. Records only: each is cut to its five fields on the way in.
+        attachments_json: input.attachments?.length ? JSON.stringify(toAttachmentRecords(input.attachments)) : null,
       });
       const entry = toLogEntry(userId, row);
       send({ kind: entry.role === 'kaylee' ? 'companion_sentence' : 'companion_log', entry });
@@ -321,6 +341,9 @@ export function createCompanionStore(userId: number): CompanionStore {
     },
 
     readLog: (limit) => companionDb.readLog(userId, limit).map((row) => toLogEntry(userId, row)),
+
+    attachedFiles: () =>
+      companionDb.readAttachedFiles(userId).flatMap((raw) => readJsonColumn(userId, 'companion_log.attachments_json', raw, isAttachmentList) ?? []),
 
     readSentence(turnId, index) {
       const row = companionDb.readSentence(userId, turnId, index);

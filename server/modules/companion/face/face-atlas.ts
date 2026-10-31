@@ -9,14 +9,15 @@ import { FACE_FRAMING, type FaceFraming } from './face-recipe.js';
 
 /**
  * The picture work of the bake, all of it sharp: the photo made ready, the cut of each generator crop to the disc's
- * square, the packing of the cut frames onto WebP sheets, and the contact sheet he reads to tune the recipe.
+ * square at each of the recipe's tiers, the packing of the cut frames onto WebP sheets, and the contact sheet he reads
+ * to tune the recipe.
  */
 
 /** The longest side `photo.png` keeps: the generator sees a face of a few hundred pixels either way, and a phone photo is far more. */
 const PHOTO_MAX_SIDE = 2048;
 /** The side of the crop the node's preview is: LivePortrait's own working size (nodes.py `prepare_source`). */
 const PREVIEW_SIDE = 512;
-/** Cells per row of a sheet, and per column: 8 × 8 cells of 256 px is a 2048 px sheet. */
+/** Cells per row of a sheet, and per column: 8 × 8 cells of 256 px is a 2048 px sheet, of 448 px a 3584 px one, both under the 4096 px a phone's GPU takes as one texture. */
 const SHEET_CELLS = 8;
 const WEBP_QUALITY = 82;
 
@@ -96,11 +97,13 @@ export function discSquare(framing: FaceFraming): { left: number; top: number; s
 }
 
 /**
- * One frame: the disc's square cut from the node's preview and resized to `frameSize`, as a lossless PNG for packing.
- * A square that does not lie inside the preview is a recipe value to correct, so it throws and names the numbers.
- * Consumed by `face-bake.ts`, once per frame.
+ * One frame at one tier: the disc's square cut from the node's preview and, below the square's own side, resized to
+ * `frameSize` (the square's own side is cut as it is, with no resampling: the preview holds no more detail than that), as a
+ * lossless PNG for packing. A square that does not lie inside the preview, or a `frameSize` above the square's side (a tier
+ * that would only stretch pixels), is a recipe value to correct, so it throws and names the numbers.
+ * Consumed by `face-bake.ts`, once per frame and tier.
  */
-export async function cutFrame(preview: Buffer, framing: FaceFraming = FACE_FRAMING): Promise<Buffer> {
+export async function cutFrame(preview: Buffer, frameSize: number, framing: FaceFraming = FACE_FRAMING): Promise<Buffer> {
   const { width, height } = await sharp(preview).metadata();
   if (width !== PREVIEW_SIDE || height !== PREVIEW_SIDE) {
     throw new Error(`the node's preview is ${width}x${height}, not ${PREVIEW_SIDE}x${PREVIEW_SIDE}`);
@@ -109,24 +112,26 @@ export async function cutFrame(preview: Buffer, framing: FaceFraming = FACE_FRAM
   if (square.left < 0 || square.top < 0 || square.left + square.size > PREVIEW_SIDE || square.top + square.size > PREVIEW_SIDE) {
     throw new Error(`the disc's square ${JSON.stringify(square)} runs outside the ${PREVIEW_SIDE} px preview: lower discSide or discRaise, or raise cropFactor`);
   }
-  return sharp(preview)
-    .extract({ left: square.left, top: square.top, width: square.size, height: square.size })
-    .resize(framing.frameSize, framing.frameSize, { kernel: 'lanczos3' })
-    .png({ compressionLevel: 3 })
-    .toBuffer();
+  if (frameSize > square.size) {
+    throw new Error(`a ${frameSize} px tier is larger than the disc's ${square.size} px square (${PREVIEW_SIDE} px preview, ${framing.discSide} face sides of ${PREVIEW_SIDE / framing.cropFactor} px): it would only stretch pixels; set the tier to ${square.size} or less`);
+  }
+  const cut = sharp(preview).extract({ left: square.left, top: square.top, width: square.size, height: square.size });
+  return (frameSize === square.size ? cut : cut.resize(frameSize, frameSize, { kernel: 'lanczos3' })).png({ compressionLevel: 3 }).toBuffer();
 }
 
 /**
- * Where each of `frameCount` frames sits: filled sheet by sheet, row by row, 8 columns by 8 rows at most, and the last
- * sheet only as tall as its frames need. These are the manifest's `sheets` and `frames`. Consumed by `face-bake.ts`.
+ * Where each of `frameCount` frames sits, and the sheet files of the tier cut `frameSize` px: filled sheet by sheet, row by
+ * row, 8 columns by 8 rows at most, and the last sheet only as tall as its frames need. The placement is the same at every
+ * tier (only the cell's size differs), so the manifest's `frames` is one table. These are the manifest's `sheets` (named
+ * `sheet-<frameSize>-<n>.webp`) and `frames`. Consumed by `face-bake.ts`.
  */
-export function layoutSheets(frameCount: number): Pick<CompanionFaceManifest, 'sheets' | 'frames'> {
+export function layoutSheets(frameCount: number, frameSize: number): Pick<CompanionFaceManifest, 'sheets' | 'frames'> {
   const perSheet = SHEET_CELLS * SHEET_CELLS;
   const sheets: CompanionFaceManifest['sheets'] = [];
   const frames: CompanionFaceManifest['frames'] = [];
   for (let first = 0; first < frameCount; first += perSheet) {
     const held = Math.min(perSheet, frameCount - first);
-    sheets.push({ file: `sheet-${sheets.length}.webp`, columns: Math.min(SHEET_CELLS, held), rows: Math.ceil(held / SHEET_CELLS) });
+    sheets.push({ file: `sheet-${frameSize}-${sheets.length}.webp`, columns: Math.min(SHEET_CELLS, held), rows: Math.ceil(held / SHEET_CELLS) });
   }
   for (let index = 0; index < frameCount; index += 1) {
     const within = index % perSheet;
@@ -135,18 +140,17 @@ export function layoutSheets(frameCount: number): Pick<CompanionFaceManifest, 's
   return { sheets, frames };
 }
 
-/** The cut frames packed 8 by 8 onto WebP sheets (quality 82), in `layoutSheets`' order. Consumed by `face-bake.ts`. */
-export async function packSheets(frames: Buffer[]): Promise<Buffer[]> {
+/** The frames cut `frameSize` px, packed 8 by 8 onto WebP sheets (quality 82), in `layoutSheets`' order. Consumed by `face-bake.ts`. */
+export async function packSheets(frames: Buffer[], frameSize: number): Promise<Buffer[]> {
   if (frames.length === 0) return [];
-  const cell = (await sharp(frames[0]).metadata()).width ?? FACE_FRAMING.frameSize;
-  const layout = layoutSheets(frames.length);
+  const layout = layoutSheets(frames.length, frameSize);
 
   return Promise.all(layout.sheets.map((sheet, sheetIndex) => {
     const cells = layout.frames
       .map((place, index) => ({ place, index }))
       .filter(({ place }) => place.sheet === sheetIndex)
-      .map(({ place, index }) => ({ input: frames[index], left: place.column * cell, top: place.row * cell }));
-    return sharp({ create: { width: sheet.columns * cell, height: sheet.rows * cell, channels: 3, background: '#ffffff' } })
+      .map(({ place, index }) => ({ input: frames[index], left: place.column * frameSize, top: place.row * frameSize }));
+    return sharp({ create: { width: sheet.columns * frameSize, height: sheet.rows * frameSize, channels: 3, background: '#ffffff' } })
       .composite(cells)
       .webp({ quality: WEBP_QUALITY, smartSubsample: true })
       .toBuffer();

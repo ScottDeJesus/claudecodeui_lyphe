@@ -16,8 +16,9 @@ type StationBarProps = {
 
 /**
  * THE STATION'S BAR, across the top of every arrangement but the phone's (its top row is her head, `HeadRow`, and holds the bar's
- * place): "Kaylee Station" in the page's serif title weight, its second word in Verve's warm garnish (the station's one warm
- * touch, never a wall); the `strip` slot across its middle; and at its right his "Compact" switch, then "CloudCLI" with the
+ * place): "Kaylee Station" in the app's display serif at the title weight the Settings page uses (Verve's `--font-display`: italic for emphasis, never
+ * bold), its second word in the emphasis ink Verve spells for warm text (`warn-ink`, which reads at AA on either canvas where `garnish` is
+ * a shape's colour and reads 3:1 on the light one); the `strip` slot across its middle; and at its right his "Compact" switch, then "CloudCLI" with the
  * app's own mark, the way back to the workspace.
  *
  * The title is the page's one `h1`. In compact (below 1024 px, and wherever his switch is on) the strip is a row of the
@@ -48,7 +49,7 @@ export function StationBar({ strip, compactSwitch, onBackToCloudcli }: StationBa
           t={t}
           i18nKey="station.bar.title"
           defaults="Kaylee <accent>Station</accent>"
-          components={{ accent: <em className="text-garnish" /> }}
+          components={{ accent: <em className="text-warn-ink" /> }}
         />
       </h1>
       {hasStrip && (

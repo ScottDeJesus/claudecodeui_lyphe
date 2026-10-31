@@ -20,16 +20,16 @@ type CompanionFaceProps = {
  * module (her head, looking at no anchor).
  *
  * It reads what the face needs from the provider and from `useCompanionPresence`, the same presence the status line and the button's
- * label read (MAN-9089): her state, her `picture.face.id`, the page player's `level` and `progress` (stable functions, so a level sixty
- * times a second redraws nothing in React), the sentences she says (`useFaceSentences`), and her name as he set it, the default while
+ * label read (MAN-9089): her state, her `picture.face.id`, the page player's `level` and `progress` and the page's `mouth` (the timed shapes
+ * heard for a sentence; stable functions, so a level sixty times a second redraws nothing in React), the sentences she says (`useFaceSentences`), and her name as he set it, the default while
  * the page has not read it. The drawing is `CompanionAvatar`'s.
  */
 export function CompanionFace({ size, look = null }: CompanionFaceProps) {
   const { t } = useTranslation();
-  const { picture, voice, clientId, level, progress } = useCompanion();
+  const { picture, voice, clientId, level, progress, mouth } = useCompanion();
   const presence = useCompanionPresence();
   const sentences = useFaceSentences({ picture, voice, clientId });
-  const faceVoice = useMemo(() => ({ level, progress }), [level, progress]);
+  const faceVoice = useMemo(() => ({ level, progress, mouth }), [level, progress, mouth]);
   const name = picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
 
   return (

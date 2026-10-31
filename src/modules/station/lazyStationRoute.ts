@@ -1,8 +1,15 @@
 import { lazy } from 'react';
 
+/** The one import of the station's chunk: the lazy component and the early fetch share it, so the browser loads the chunk once. */
+const loadStationRoute = () => import('@/modules/station/StationRoute').then((m) => ({ default: m.StationRoute }));
+
 /**
- * The station's route, loaded on its first visit and never before: the station is a page of its own (the stage, the
- * dispatcher's cards, the roadmap's facts), so the workspace's first load must not pull it. The ONE definition of that
- * door: the barrel re-exports it for `src/App.tsx`, which stands it in a `Suspense`.
+ * The station's page, loaded on its first visit and never before: the station is a page of its own (the stage, the dispatcher's cards, the
+ * roadmap's facts), so the workspace's first load must not pull it. The ONE definition of that door: `StationLayer` stands it in a `Suspense`.
  */
-export const StationRoute = lazy(() => import('@/modules/station/StationRoute').then((m) => ({ default: m.StationRoute })));
+export const StationRoute = lazy(loadStationRoute);
+
+/** Starts the chunk's fetch without mounting anything, so the first visit finds it already here. Called once by `StationLayer`, when the browser is idle. */
+export function preloadStationRoute(): void {
+  void loadStationRoute();
+}

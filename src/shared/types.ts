@@ -6,7 +6,7 @@ import type { NavigateFunction } from 'react-router-dom';
 import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
-import type { CompanionLogEntry, CompanionSessionRef } from '@/shared/companion-types';
+import type { CompanionLogEntry, CompanionMouthPiece, CompanionSessionRef } from '@/shared/companion-types';
 import type { StationAskKind, StationNeed } from '@/shared/station-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
@@ -1075,18 +1075,26 @@ export type CompanionEars = { on: boolean; setOn: (on: boolean) => void; state: 
 //----------------- HER FACE'S INPUTS ON THE PAGE ------------
 
 /**
- * The sentence this page's player is sounding, as `progress()` says it: its place (`turnId`, `index`), `elapsed` seconds since its
- * first sample on the audio clock, and its `duration` in seconds once its body has ended and every sample is scheduled (else null,
- * still arriving). The companion module's player gives it, and her face reads it to pick the vowel of her mouth.
+ * The sentence this page's player is sounding, as `progress()` says it: its place (`turnId`, `index`), `elapsed` seconds of its audio
+ * that have sounded (gaps excluded: it holds at the last sample sounded while a stream that fell behind is awaited, and is the seconds
+ * since the first sample whenever the audio never stalls), and its `duration` in seconds once its body has ended and every sample is
+ * scheduled (else null, still arriving). The companion module's player gives it, and her face reads it to pick the vowel of her mouth.
  */
 export type CompanionSoundProgress = { turnId: string; index: number; elapsed: number; duration: number | null };
 
 /**
- * What her face reads of the page's voice: `level()` is the loudness of what sounds, 0..1, and `progress()` the sentence sounding.
- * Both are functions, never props that change, so a level sixty times a second never redraws React. Null where a face hears no voice
- * (Settings' preview). Handed by the companion module's CompanionFace to CompanionAvatar and on to CompanionPortrait.
+ * What her face reads of the page's voice: `level()` is the loudness of what sounds, 0..1, `progress()` the sentence sounding, and
+ * `mouth(turnId, index)` the timed mouth shapes the page has heard for that sentence so far (pieces of its audio, each with its cues
+ * in seconds of the sentence; `[]` for none yet). The face looks a shape up at `progress().elapsed` on each animation frame, so a piece
+ * that lands mid-sentence takes over at the next one. All three are functions, never props that change, so a level sixty times a second
+ * never redraws React. Null where a face hears no voice (Settings' preview). Handed by the companion module's CompanionFace to
+ * CompanionAvatar and on to CompanionPortrait.
  */
-export type CompanionFaceVoice = { level: () => number; progress: () => CompanionSoundProgress | null };
+export type CompanionFaceVoice = {
+  level: () => number;
+  progress: () => CompanionSoundProgress | null;
+  mouth: (turnId: string, index: number) => readonly CompanionMouthPiece[];
+};
 
 /**
  * The sentences her face reads from her log: `playing` the one this page's player is sounding (its mood, text and sounds), `newest` the
@@ -2586,7 +2594,11 @@ type TaskPriority = 'high' | 'medium' | 'low' | string;
  * by 100, never dollars (INV-4299) — or null for a window the pacer could not measure, which draws
  * as unknown and never as zero; `reading.at` is when that reading was filed. `token` is the
  * stored sign-in token's state; `wall.kind: "refused"` is a token Claude would not accept. `why` is
- * the door's own sentence and is rendered as it arrives.
+ * the door's own sentence and is rendered as it arrives. `no_five` is the door's ONE boolean for an
+ * account that has no 5-hour window at all (the plan dropped the limit) — derived by the pacer from the
+ * account's stored readings, not from a window missing in one reply, which also happens between 5-hour
+ * blocks. A picture without the key reads as "has a 5-hour window"; every 5-hour indicator is
+ * dropped for an account with `no_five: true` and the weekly ones stay as they were.
  */
 export type ClaudeAccountRow = {
   slug: string;
@@ -2602,6 +2614,7 @@ export type ClaudeAccountRow = {
   pace: { five: { projected: number; ceiling: number } | null; week: { projected: number; ceiling: number } | null } | null;
   room: boolean;
   why: string;
+  no_five?: boolean;
 };
 
 /**
@@ -3978,11 +3991,20 @@ export type StationRegion = StationSlot | 'stage';
  * The station's own preferences, remembered per window by `useStationPref`: `stripCollapsed` (the strip is folded),
  * `cornerOpen` (the corner is open), `compact` (his switch for the one-column arrangement), `asleepOpen` (the left rail's fold
  * of his asleep chats is open), `completeOpen` (its fold of the roadmap's complete epics is open), `compactSection` (the
- * section the one-column arrangement shows, a `StationCompactSection`) and `compactSectionAside` (the section he was in when the
- * stage pulled him to it, which clearing the stage returns him to: a `StationCompactSection` other than `stage`, or none).
+ * section the one-column arrangement shows, a `StationCompactSection`), `compactSectionAside` (the section he was in when the
+ * stage pulled him to it, which clearing the stage returns him to: a `StationCompactSection` other than `stage`, or none) and
+ * `herView` (how her column draws her, a `StationHerView`).
  */
 export type StationPrefKey =
-  | 'stripCollapsed' | 'cornerOpen' | 'compact' | 'asleepOpen' | 'completeOpen' | 'compactSection' | 'compactSectionAside';
+  | 'stripCollapsed' | 'cornerOpen' | 'compact' | 'asleepOpen' | 'completeOpen' | 'compactSection' | 'compactSectionAside' | 'herView';
+
+/**
+ * How her column draws her, held per device by the station pref `herView` and chosen by the toggle in her head: `portrait` (the
+ * default: her face, large and undisced, over the words of her latest answer alone) or `chat` (her face in its disc over her
+ * whole conversation with him). Read by her head (`StationHeadView`, which draws the face only in `chat`) and her conversation
+ * (`StationConversation`, which draws the portrait in `portrait`), and by the station's memory when it reads a stored record.
+ */
+export type StationHerView = 'portrait' | 'chat';
 
 /**
  * The section the one-column station shows under her head: `conversation` (her conversation, her draft and the box to type to

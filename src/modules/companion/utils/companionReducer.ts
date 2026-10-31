@@ -26,7 +26,8 @@ import type { CompanionFace, CompanionFrame, CompanionLogEntry, CompanionNote, C
  * pinned (his keep). `companion_note_pinned` replaces one card's `pinned` by its id. `companion_face`
  * replaces the face the page draws (an upload, a restore, each frame a bake renders and the bake's end), and one that is not
  * a face is left alone like any other frame. `companion_open` changes nothing here: it is an order to the page whose
- * client id it names, which the provider carries out.
+ * client id it names, which the provider carries out. `companion_mouth` changes nothing here either: it is the timed shapes of one
+ * piece of a sentence's audio, for her face, and is never part of her picture.
  */
 
 /** How many log entries a page keeps: the newest, as `GET /api/companion` carries. The server stores more; the panel draws no more than this. */
@@ -227,7 +228,7 @@ export function reduceCompanion(picture: CompanionPicture, frame: CompanionFrame
         activity: { phase: 'idle', session: null, files: null, walk: null },
       };
     default:
-      // `companion_open`, and any kind a newer server sends.
+      // `companion_open` and `companion_mouth` (both are for the page's doors, not its picture), and any kind a newer server sends.
       return picture;
   }
 }

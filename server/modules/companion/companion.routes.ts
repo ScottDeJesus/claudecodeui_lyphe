@@ -9,6 +9,7 @@ import {
   DRAFT_TEXT_MAX,
   MESSAGE_TEXT_MAX,
   inputInvalid,
+  readBodyAttachments,
   readBodyObject,
   readBodySentenceIndex,
   readBodyText,
@@ -45,6 +46,11 @@ import { createStationSessionsRoutes } from './station/sessions.routes.js';
  * AN ANSWER IS THE THING ITSELF, not wrapped: `GET /` answers the picture, `PUT /settings` the settings and
  * `PUT /draft` the draft, so a page folds them straight into what it holds. A write that has nothing to
  * say answers 204 — `DELETE /draft` and `DELETE /action` (his × on the card of the action waiting for his word) among them.
+ *
+ * THE TYPED DOOR, `POST /messages`, takes `text` (1-8000 characters, or 0-8000 when the line carries files) and `attachments`: up to ten `{ path, name }`
+ * records of files the page already uploaded to the chat's own route (`POST /api/assets/files`); nothing else of a record is read. The service reads each file off
+ * the upload store (`attachments/typed-attachments.ts`), so a file outside the store or one that cannot be read refuses the whole line with the 400 naming
+ * `attachments`, and nothing is logged. It answers 202 `{ accepted: true }`. A voice press carries no file.
  *
  * THE PRESS DOOR, `POST /press`, is the one multipart route: the clip as `audio`, the page's own clock for it as
  * `durationMs`, and `opened`, what opened the press — absent for his talk button, `name` for a clip the page's ears
@@ -151,8 +157,11 @@ export function createCompanionRoutes(service: CompanionService): Router {
     asyncHandler(async (request: Request, response: Response) => {
       const userId = readAuthenticatedUserId(request);
       const client = requireClientId(request);
-      const text = readBodyText(readBodyObject(request), 'text', MESSAGE_TEXT_MAX);
-      service.sendText(userId, client, text);
+      const body = readBodyObject(request);
+      // The files first: his words may be empty only when the line carries some (a message of files alone, as in a chat).
+      const attachments = readBodyAttachments(body);
+      const text = readBodyText(body, 'text', MESSAGE_TEXT_MAX, { allowEmpty: attachments.length > 0 });
+      await service.sendText(userId, client, { text, attachments });
       // Accepted, not answered: her sentences come back as frames on the page's socket.
       response.status(202).json({ accepted: true });
     }),

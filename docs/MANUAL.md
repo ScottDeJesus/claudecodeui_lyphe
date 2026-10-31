@@ -197,6 +197,8 @@ closes with the sentence that makes a blank bar readable: *Figures come from the
 a few minutes. A blank reading means unknown, never zero.* There is no flexible-spend bar — the
 provider reports no such window, and a third bar reading "—" would invent a limit nobody set.
 
+**An account with no 5-hour window has no 5-hour meter.** The door's `no_five` for the account in use (MAN-8843) makes `accountInUseUsage` drop the `five_hour` window from the reading it hands the meters, so the *Current 5-hour window* bar and the pacer's caption under it are simply not drawn and *This week* is unchanged; `UsageMeters` asks nothing about it and draws the windows it is given. The flag, never a window missing from one reply, decides (MAN-9033).
+
 **The pacer's picture sits on the bars** (`usage.pace`, MAN-8680): the 5-hour and weekly meters carry a ceiling tick and a projected-end mark, and the 5-hour meter a caption of the pacer's own sentence. The figures are PERCENTS the usage route attaches itself — `pacer status --json --account <digest>` for the login this reading came from, converted once in `pacer-door.ts`, cached with the reading, and ABSENT from `GET /api/usage` on any failure (a pacer fault exits 0 with a diagnostic and no `reading.at`, and is refused like any other) — so the meter does no arithmetic, and a failure draws exactly the block it drew before the key existed. The weekly-scoped windows (`weekly · Fable`, …) get neither mark: the pacer's picture is the account's two windows, not a plan-scoped one. Neither the tick nor the mark changes a meter's fill or tone — a projection past the ceiling is a forecast, never amber. `node .verify/pacer-fill-live.mjs` shows the live pair at 320 px, light and dark.
 
 **Every good reading is filed with the pacer.** A poll that comes back whole — a 200 whose windows
@@ -337,7 +339,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs
 ## MAN-9033 — The usage rings on the views rail — UsageRings, Meter's ring face, ringTone, .verify/probe-usage-rings.mjs
 section: accounts/010 The usage rings on the views rail
 
-Two rings at the foot of the views rail, directly above Inbox — the 5-hour over the week, each labelled with the time left until its window resets ("2h", "4d"). `UsageRings` (accounts module, exported through its barrel, mounted by `WorkspaceRail`'s foot: MAN-9005) draws them with the library's `Meter` in `variant="ring"`. They stand wherever the rail does: docked on a desktop, inside the drawer on a phone (one tree across 768px).
+Two rings at the foot of the views rail, directly above the companion dock, which stands above Inbox (`CompanionDock`, committed since 2026-10-27) — the 5-hour over the week, each labelled with the time left until its window resets ("2h", "4d"). `UsageRings` (accounts module, exported through its barrel, mounted by `WorkspaceRail`'s foot: MAN-9005) draws them with the library's `Meter` in `variant="ring"`. They stand wherever the rail does: docked on a desktop, inside the drawer on a phone (one tree across 768px).
 
 ## What they read
 - `accountInUseUsage(usage, accounts, now)` (MAN-8862) — the SAME reading the panel's top meters draw, so a ring and its meter always show one figure. Never the raw `useAccountsContext().usage`: `GET /api/usage` measures the box's live login, which is not always the account in use, and a ring on it would read under the wrong owner. `now` is `useMinuteTick()`. No fetch, no poll.
@@ -347,6 +349,7 @@ Two rings at the foot of the views rail, directly above Inbox — the 5-hour ove
 - No reading — `usage` null, unreachable with no filed reading under it, a body with no `windows` array, the window absent from `windows`, or a window whose `percent` is absent or not finite (`windowPercent` answers `null`, never `NaN`) — draws the track only: no arc element, no `data-tone`, no `aria-valuenow`, and the words say *No reading yet*. The two cells never go away, so the foot never jumps.
 - A degraded reading and a rolled window dim to `opacity-60`, as the panel's bars do: a red ring on a window that has already reset would be a false alarm.
 - Not a button, no tab stop. The `Tooltip` is the rail's (`position="right"`), on hover and a phone's long press.
+- AN ACCOUNT WITH NO 5-HOUR WINDOW DRAWS THE WEEKLY RING ALONE. The account in use's row carries the door's `no_five` (`claude-account status --json`, MAN-8843): `hasFiveHour(accountInUse(accounts))` is false and the `five_hour` cell is not drawn — no track, no "No reading yet" — and `accountInUseUsage` drops the 5-hour window from the reading the panel's meters draw, so the figures above stay one reading. The flag is the pacer's derivation from the account's stored readings; a window missing from one usage reply (the gap between 5-hour blocks, or a lagging reading that still carries one) does NOT move it: an account without the flag keeps its bare track and an account with the flag draws no 5-hour ring whatever the reply carries. A picture without the key reads as "has a 5-hour window". `.verify/probe-usage-rings.mjs` (c) proves all three with the picture and the reply replaced in the browser only (`noFiveRoutes(state, app)` in `.verify/lib/no-five-routes.mjs`, shared with the Accounts widget probe: MAN-9021).
 
 ## The bands — `ringTone(key, percent)` in `utils/usageWindows.ts`, the only place a threshold is written
 It returns the Verve tone the ring's cell carries as `data-tone` (README rule 4); `null` for no figure.
@@ -366,7 +369,7 @@ A figure on a boundary takes the higher colour. The 5-hour yellow comes later be
 
 ## Proof
 `node .verify/probe-usage-rings.mjs before|after`, against the production client (:5184; `scripts/prod-client-build.sh` between the two runs). Logs in as the dev account, drops every preference write and refuses every account write.
-- (a) desktop and phone, light and dark: two rings directly above Inbox, the 5-hour over the week, each labelled with a countdown (the 5-hour's in hours or minutes), centred, 28px, 4.5px arc; each figure equals its meter's printed figure (the open Accounts widget, else the account popover); each tone is the band rule's and the arc is painted in that tone's colour; no tab stop; the hover words are in the accessible name; the panel's stacked meters keep their markup; a 560px phone keeps the foot whole while the runs scroll; reduced motion stills the arc; console errors 0.
+- (a) desktop and phone, light and dark: two rings directly above the rail item under them (the companion dock, else Inbox), the 5-hour over the week, each labelled with a countdown (the 5-hour's in hours or minutes), centred, 28px, 4.5px arc; each figure equals its meter's printed figure (the open Accounts widget, else the account popover); each tone is the band rule's and the arc is painted in that tone's colour; no tab stop; the hover words are in the accessible name; the panel's stacked meters keep their markup; a 560px phone keeps the foot whole while the runs scroll; reduced motion stills the arc; console errors 0.
 - (b) the usage reply replaced in the browser only (`page.route`): the week at 74/75/89/90 → green/yellow/yellow/red, the 5-hour at 79/80/89/90 likewise, resets 2½ hours and 2½ days ahead labelled "3h" and "3d", a reply without the weekly window (its ring keeps its name "wk"), and an unreachable reply.
 - 2026-10-26, with the countdown labels: 73 PASS, 0 FAIL, exit 0.
 
@@ -13890,7 +13893,7 @@ Reference: door face MAN-8843 (`claude-account status --json`); the routes MAN-8
 2. **A refused token draws the wall and no date.** `wall.kind === "refused"` → `sign-in token refused — set it up again` (`data-tone="warn"`), no `valid until`. The door still relays `expires_at` for it; the suppression is in the view. `checking` keeps its date.
 3. **A full account with a checked token stays pressable.** A hand pick that is held is legal; the cue reads `Use anyway` and the caveat `no room now — …`. The in-use row never draws the caveat while `held`: it says `stays chosen until it has room again`.
 4. **`Use` needs `token === 'saved'`, not refused, not in use.** `none` or refused → `Set up`; `checking` → the word `checking`, no press.
-5. **Points, never dollars; unknown is `—`, never 0% and never `NaN%`.** `5h N% · wk N%` is the fraction ×100 rounded (`figureInPoints`); `reading === null` → `5h — · wk —`; a `five` / `week` that is null, absent or non-finite → `—` for that window; `as of <relative>` only past `READING_STALE_MS` (3 min), and only when `reading.at` names an instant (`readingAgeInWords` returns `null` otherwise).
+5. **Points, never dollars; unknown is `—`, never 0% and never `NaN%`.** `5h N% · wk N%` is the fraction ×100 rounded (`figureInPoints`); `reading === null` → `5h — · wk —`; an account the door marks `no_five` (no 5-hour window at all, `hasFiveHour`) states `wk N%` alone — no `5h` figure, not even an em-dash; a `five` / `week` that is null, absent or non-finite → `—` for that window; `as of <relative>` only past `READING_STALE_MS` (3 min), and only when `reading.at` names an instant (`readingAgeInWords` returns `null` otherwise).
 6. **The in-use row carries the record's why.** `chosen.by === "auto"` and `chosen.slug` the row's slug → `chosen.why` verbatim under the row.
 7. **The last-switch line is the why's headline.** `whyHeadline` cuts at the first `;` or ` (`; the whole sentence stays in the `title`; two-line clamp.
 8. **The auto switch's label and `aria` label are both `Switch automatically when the account in use fills`.** Off-state line follows it. The closing `SWITCHING_IN_WORDS` sentence draws only with at least one account.
@@ -14302,17 +14305,32 @@ Headless Playwright against the running client; no model call, no chat turn, no 
 - `ACCOUNTS_APP` defaults to `http://127.0.0.1:5184` (the production client, MAN-558). `before` serves `git archive HEAD` built with `vite build` on a scratch port, run just ahead of `after` so clock-driven lines agree.
 - `after` reads the `before` JSON files; run `before` first.
 - Exit 0 on all checks passed; exit 1 with the failed checks listed; exit 2 on a mode other than `before|after`.
+- Run it ALONE: beside a second probe (the rings probe) check d's request count fails (measured 2026-10-31); alone it passes.
 
 ## What `after` checks
 
 | Id | Check |
 |---|---|
-| a | the widget's place in the operator's stored arrangement (right side, directly behind Next steps) and the order inside it: meters, DeepSeek and Jev balances, rows |
+| a | the widget's place in the operator's stored arrangement (right side, directly behind Next steps) and the order inside it: meters, DeepSeek and Jev balances, rows; every account row in view without scrolling the widget, light and dark (2026-10-31: FAILs with three accounts — widget frame ends at 794, rows at 878) |
 | b | the widget's text equals the popover's text, read in one evaluate, both themes |
 | c | a tap on another account's row sends `POST /api/accounts/use {"slug":…}` from the widget and from the popover; fulfilled by `page.route`, never sent |
 | d | requests to `/api/accounts`, usage and both balance routes land at the same times with the widget open as folded; mounting the widget adds none |
 | e | phone: no gutter, no widget, popover unchanged; desktop popover unchanged |
 | f | the account in use, the account picture and the operator's stored gutter arrangement equal their start values |
+| g | an account in use with NO 5-hour window (the door's `no_five`, MAN-8843): the widget and the popover draw no "Current 5-hour window" meter, "This week" is unchanged, the in-use row says `wk N%` with no `5h`, every other row keeps `5h · wk`; console errors 0, failed responses 0, account writes 0 |
+
+## The no-5-hour replies — `.verify/lib/no-five-routes.mjs`
+
+`noFiveRoutes(state, app)` returns the `context.route` handlers that rewrite ONE row of the real replies in the browser only (`route.fetch`, then fulfil); nothing is written on the server, the readings store or the operator's preferences, and no switch is sent. Shared with `.verify/probe-usage-rings.mjs` (MAN-9033).
+
+| `state` key | Sets |
+|---|---|
+| `noFive` | the flag on the account in use's row: `true` sets `no_five`; `false` leaves the key off (an account with a window, or an older door) |
+| `week` | the weekly figure in percent, in the usage reply AND the row's reading |
+| `replyFive` | the 5-hour figure the usage reply carries; `null` leaves that window out |
+| `pictureFive` | the 5-hour figure the row's reading carries; `null` also drops the row's 5-hour pace |
+
+`app` is the client's base URL: the in-use digest is read through it with the page's own token, so the reply names the account the panel draws.
 
 ## Guards
 
@@ -14322,7 +14340,7 @@ Headless Playwright against the running client; no model call, no chat turn, no 
 - Every desktop page logs one aborted `GET …/file-tree/…/files` (`net::ERR_ABORTED`) on the pre-change build too; the probe counts it aborted, not failed.
 - The meters' "As of …, the provider gave no figures" line appears whenever the in-use account's filed reading is over 3 minutes old; the probe masks it in the before/after comparison.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/no-five-routes.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs
 
 ## MAN-9136 — The verify kit's navigations — gotoApp and reloadApp resolve at domcontentloaded and the caller's element wait is the gate; networkidle is advisory, never the gate
 

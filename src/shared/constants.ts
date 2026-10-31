@@ -572,7 +572,7 @@ export const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([d
 
 /**
  * The media query that asks whether the window's main pointer is a finger. Read, with `matchMedia`, by the one phone predicate
- * (`usePhoneWindow`'s `isPhoneWindow`), by the station's window (`useStationWindow`: a phone on its side) and by the keyboard's
+ * (`useStationWindow`'s `isPhoneWindow`, and a phone on its side) and by the keyboard's
  * mark (`useVisualViewportKeyboardOffset`: a coarse pointer is what makes a shrunken layout viewport a keyboard).
  */
 export const COARSE_POINTER_QUERY = '(pointer: coarse)';
@@ -739,15 +739,23 @@ export const STATION_NEED_KINDS: Readonly<Record<StationNeedKind, { icon: Lucide
 
 // ---------------------------
 
-//----------------- THE STATION'S BOXES OUT OF REACH ------------
+//----------------- BOXES OUT OF REACH ------------
 
 /**
- * The props that take a box of Kaylee Station out of the tab order, the reading order and the press while it stands drawn under
- * something or behind it: `inert` (spelled as the string React 18 carries) and `aria-hidden`. Spread on the box: by compact's and
- * the phone's arrangements on the strip's line (and compact's switch) while the strip's week stands over them, and by the sections
- * on every section not shown.
+ * The props that take a box out of the tab order, the reading order and the press while it stands drawn under something or behind
+ * it: `inert` (spelled as the string React 18 carries) and `aria-hidden`. Spread on the box. Worn by Kaylee Station's compact and
+ * phone arrangements on the strip's line (and compact's switch) while the strip's week stands over them, by its sections on every
+ * section not shown, and by the two whole pages of the app (the workspace frame and the station's layer) on whichever of them is not
+ * the one on screen.
  */
-export const STATION_OUT_OF_REACH = { inert: '', 'aria-hidden': true } as unknown as HTMLAttributes<HTMLDivElement>;
+export const OUT_OF_REACH = { inert: '', 'aria-hidden': true } as unknown as HTMLAttributes<HTMLDivElement>;
+
+// ---------------------------
+
+//----------------- WHERE KAYLEE STATION STANDS ------------
+
+/** The router path Kaylee Station is shown at, under the basename. A page at it draws the station over the held workspace; deep-linking to it opens the station. */
+export const STATION_PATH = '/station';
 
 // ---------------------------
 
@@ -767,3 +775,13 @@ export const STATION_SIDEWAYS_CATCH = "relative h-10 before:absolute before:inse
  * and more. Worn by the strip's "<n> new" chip (`SinceYouLastLooked`) and its Try again (`StripLines`).
  */
 export const STATION_COUNT_FORM_CATCH = "relative before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']";
+
+// ---------------------------
+
+//----------------- ATTACHMENTS A MESSAGE CARRIES ------------
+
+/**
+ * The most files one message carries, in a chat and in a typed line to Kaylee: the intake (`useAttachmentIntake`) refuses the eleventh, the
+ * upload route holds the same ten, and the companion's composer caps a refused send's put-back at it.
+ */
+export const MAX_ATTACHMENT_COUNT = 10;

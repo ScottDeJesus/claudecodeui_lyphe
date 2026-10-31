@@ -1,7 +1,7 @@
 import { cloneElement, isValidElement } from 'react';
 import type { ReactNode } from 'react';
 
-import { STATION_OUT_OF_REACH as SECTION_AWAY } from '@/shared/constants';
+import { OUT_OF_REACH as SECTION_AWAY } from '@/shared/constants';
 import type { StationCompactSection, StationDensity } from '@/shared/types';
 import { ScrollArea } from '@/shared/ui';
 import { cn, isDrawn } from '@/shared/utils';
@@ -60,7 +60,7 @@ const BOX_ON_THE_KEYS = cn(
 
 /**
  * WHICH REGIONS MAKE EACH SECTION, the one drawing of it (compact's arrangement draws it, and the phone's draws it again):
- * - Conversation: her conversation, taking the room; her draft dock under it, its own height up to 45% of the section (her
+ * - Conversation: her conversation (in the portrait view, her portrait over her latest answer), taking the room; her draft dock under it, its own height up to 45% of the section (her
  *   column's own cap for it) and scrolling itself, so a long brief never squeezes her log away; the box to type to her at the
  *   foot (the talk control's composer half: its button stands in compact's head, and the phone's round one in its bar). WHILE HER DRAFT'S FIELD HOLDS THE FOCUS AND THE KEYBOARD'S
  *   MARK IS UP (`html[data-keyboard=up]`, which `useVisualViewportKeyboardOffset` sets on iOS by the visual viewport's gap and on

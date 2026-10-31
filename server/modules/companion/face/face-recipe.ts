@@ -7,6 +7,7 @@ import type {
   CompanionFaceMood,
   CompanionFaceMouth,
   CompanionFacePose,
+  CompanionFaceTier,
 } from '@/shared/companion-types.js';
 
 /**
@@ -47,14 +48,19 @@ export type FaceFraming = {
   discSide: number;
   /** How far the disc's centre is raised above the face's centre, in face sides: the hair above the face wants room. */
   discRaise: number;
-  /** Pixels per side of one cut frame. */
-  frameSize: number;
+  /**
+   * Pixels per side of the cut frames of each TIER of the atlas, smallest first (`cutFrame`, `packSheets`): a page draws the smallest
+   * that covers the pixels it is drawn at. The largest is the disc's native square, `discSide × 512 / cropFactor` preview pixels (448
+   * for the current framing), cut with no resampling; `cutFrame` refuses a tier above it. Hashed into the recipe's id, so a tier added
+   * or dropped is a new face: a face's files are immutable under their id.
+   */
+  frameSizes: number[];
   /** The mirrored band added on every side of the photo before the node sees it, in photo sizes: it keeps the crop from running off the image, and lies outside the disc. */
   pad: number;
 };
 
 /** The framing every face is made with. Consumed by `face-atlas.ts` (the cut and the pad) and `comfyui.ts` (crop_factor). */
-export const FACE_FRAMING: FaceFraming = { cropFactor: 2.0, discSide: 1.75, discRaise: 0.05, frameSize: 256, pad: 0.5 };
+export const FACE_FRAMING: FaceFraming = { cropFactor: 2.0, discSide: 1.75, discRaise: 0.05, frameSizes: [256, 448], pad: 0.5 };
 
 /** The node's own range for each slider; each frame's sum is clamped to it. */
 const SLIDER_RANGES: Record<keyof FaceSliders, readonly [number, number]> = {
@@ -219,10 +225,13 @@ function clipPlaylist(clip: CompanionFaceClip): string[] {
 }
 
 /**
- * The manifest of a face whose frames are placed on the sheets by `layout`: every number an index into `frames`, found
- * by the frame's name so the manifest and the recipe cannot drift. Consumed by `face-bake.ts`, which writes it last.
+ * The manifest of a face whose frames are placed by `frames` on the sheets of each of `tiers` (smallest first, as
+ * `FACE_FRAMING.frameSizes`): every number an index into `frames`, found by the frame's name so the manifest and the recipe
+ * cannot drift. The smallest tier is the manifest's own `frameSize` and `sheets`; the rest are its `largerTiers`. Consumed by
+ * `face-bake.ts`, which writes it last.
  */
-export function buildManifest(faceId: string, layout: Pick<CompanionFaceManifest, 'sheets' | 'frames'>): CompanionFaceManifest {
+export function buildManifest(faceId: string, tiers: CompanionFaceTier[], frames: CompanionFaceManifest['frames']): CompanionFaceManifest {
+  const [smallest, ...larger] = tiers;
   const indexByName = new Map(recipeFrames().map((frame, index) => [frame.name, index]));
   const at = (name: string): number => {
     const index = indexByName.get(name);
@@ -235,9 +244,10 @@ export function buildManifest(faceId: string, layout: Pick<CompanionFaceManifest
   return {
     version: 1,
     faceId,
-    frameSize: FACE_FRAMING.frameSize,
-    sheets: layout.sheets,
-    frames: layout.frames,
+    frameSize: smallest.frameSize,
+    sheets: smallest.sheets,
+    ...(larger.length > 0 ? { largerTiers: larger } : {}),
+    frames,
     moods: Object.fromEntries(
       moodNames.map((mood) => [mood, {
         mouths: record(mouthNames, (mouth) => `mood.${mood}.${mouth}`),

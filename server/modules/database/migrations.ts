@@ -721,6 +721,19 @@ const addCompanionHandoverColumn = (db: Database): void => {
 };
 
 /**
+ * Adds `companion_log.attachments_json`: the files he attached to a typed line, as the wire's `CompanionAttachment[]` JSON — each one's
+ * upload-store path, his name for it, the size and type read from the stored file and what she can do with it (`opens`), decided once at
+ * the door. The records only, never the bytes: the files stay in the upload store, and her reader opens exactly the files named on the
+ * lines the log still holds (`companion/tools/read-tools.ts`). NULL for none, which is every row before this column and every line that
+ * carries no file.
+ */
+const addCompanionLogAttachmentsColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_log').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'companion_log', columnNames, 'attachments_json', 'TEXT');
+};
+
+/**
  * Adds the `permission_mode` column that records the permission mode a session last ran under.
  *
  * Recorded beside `model` and `effort` on every send, so a send the companion relays can run in
@@ -892,6 +905,7 @@ export const runMigrations = (db: Database) => {
     addCompanionHandoverColumn(db);
     addCompanionActionArmedFromColumn(db);
     addCompanionNoteShapeColumns(db);
+    addCompanionLogAttachmentsColumn(db);
     // What the house told each account, kept: one row per notification the orchestrator was handed, written at
     // the listener seam. It references `users` alone, so it sits beside the companion's script, which reads it.
     db.exec(NOTIFICATION_HISTORY_SCHEMA_SQL);

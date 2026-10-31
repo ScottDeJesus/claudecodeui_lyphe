@@ -2,15 +2,12 @@ import type { TFunction } from 'i18next';
 import { ArrowUpRight } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
-import { useStation } from '@/modules/station/context/StationContext';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
+import { useOpenChatInCloudcli } from '@/modules/station/hooks/useOpenChatInCloudcli';
 import { StageGone } from '@/modules/station/stageStates';
 import { stationStamp } from '@/modules/station/stationClock';
 import { SessionStateChip } from '@/modules/station/SessionRows';
-import { openInCloudcli } from '@/shared/cloudcliDoors';
-import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import type { StationFocus, StationSession } from '@/shared/station-types';
 import { Banner, Button, Card, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -128,9 +125,7 @@ export function ChatStageView({ focus, session, onOpenChat, failure = null, onRe
  * in his sessions, the very rows the rail draws, and binds the open, and hands them to `ChatStageView`, which draws every state.
  */
 export function ChatStage({ focus }: { focus: ChatFocus }) {
-  const navigate = useNavigate();
-  const { phone } = useStation();
-  const { isPWA } = useDeviceSettings({ trackMobile: false });
+  const openChat = useOpenChatInCloudcli();
   const { sessions, failure, reread } = useStationSessions();
   // The answer his sessions held when this chat was staged (the stage's body is keyed by its focus, so this is taken once per chat).
   // State, because it must outlive the renders: an answer that was already out when the chat was staged cannot know a chat staged
@@ -148,8 +143,8 @@ export function ChatStage({ focus }: { focus: ChatFocus }) {
       session={session}
       failure={failure}
       onReread={reread}
-      // The chat in CloudCLI: the window named `cloudcli` on a desktop, this window on a phone or in the home-screen app (the door's own rule).
-      onOpenChat={() => openInCloudcli(`/session/${encodeURIComponent(focus.sessionId)}`, navigate, { phone, pwa: isPWA })}
+      // The chat in CloudCLI: the station gives way to the workspace, in this tab.
+      onOpenChat={() => openChat(focus.sessionId)}
     />
   );
 }

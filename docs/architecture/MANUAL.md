@@ -79,7 +79,7 @@ section: 01-websocket-transport/003 The pieces
 | `server/modules/auth/auth.middleware.ts` | `authenticateWebSocket` — first DB user in platform mode, JWT verification in OSS mode |
 | `server/modules/websocket/services/websocket-state.service.ts` | `connectedClients`, the set of open `/ws` sockets, and `WS_OPEN_STATE`; the socket-to-account map (`registerSocketUser`) behind `sendToUser` and `isUserConnected` |
 | `server/modules/websocket/services/chat-run-verbs.service.ts` | `abortChatRun`, `answerChatPermission` — the `chat.abort` and `chat.permission-response` actions as verbs the handlers and the companion module share |
-| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the seven inbound handlers, `protocol_error`, the attachment trust boundary, `runDetachedChatTurn`, and the one `session_host_liveness` snapshot a connecting socket is sent (MAN-8122) |
+| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the seven inbound handlers, `protocol_error`, the call to the attachment trust boundary (`filterAttachmentsToUploadStore`, MAN-9407), `runDetachedChatTurn`, and the one `session_host_liveness` snapshot a connecting socket is sent (MAN-8122) |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | `chatRunRegistry` — one run per session, `seq` stamping, the replay buffer, the exactly-one-`complete` contract |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter` — the object runtimes write into; swallows `session_created`, fans out to every attached socket |
 | `server/modules/websocket/services/session-upsert-broadcast.service.ts` | The only builder of `session_upserted`, the batched broadcast helper, and `onSessionUpserted(listener)`: a listener set called with the app session id of each event that goes out (consumed by the station hint, MAN-9257) |
@@ -92,7 +92,7 @@ section: 01-websocket-transport/003 The pieces
 | `src/shared/context/WebSocketContext.tsx` | The single browser-side socket: URL building, reconnect, the `subscribe` fan-out |
 | `src/modules/chat/hooks/useChatRealtimeHandlers.ts` | The one `kind` switch on the client, and `lastSeqRef` bookkeeping |
 | `src/modules/chat/ChatInterface.tsx`, `src/modules/chat/hooks/useChatSessionState.ts` | The two places that send `chat.subscribe` |
-| `src/modules/chat/hooks/useChatComposerState.ts` | Builds `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response` |
+| `src/modules/chat/hooks/useChatComposerState.ts` | Builds `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response`; takes its files through `useAttachmentIntake` and uploads them with `uploadAttachmentFiles` (`src/shared`, MAN-9406) |
 | `src/modules/chat/hooks/useSessionPresence.ts` | Builds `chat.presence` — the one place, called once from `ChatInterface.tsx`. Also exports `useIsLookingAtSession(isActive)`, the same pair (chat on screen, document visible) as a boolean (MAN-7575) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/websocket/desktop-notifications-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/projects-with-sessions-fetch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/taskmaster/taskmaster.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/plugin-websocket-proxy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/session-upsert-broadcast.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/shell-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-auth.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-server.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx
@@ -246,24 +246,31 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessio
 ## MAN-301 — The client is not trusted past the session id
 section: 01-websocket-transport/007 The chat protocol going up/008 The client is not trusted past the session id
 
-`resolveSendTarget` (`:170-200`) is the shared front half of `chat.send` and
+`resolveSendTarget` is the shared front half of `chat.send` and
 `chat.edit-send`. It reads the row from `sessionsDb` and takes provider, project path and
 provider-native id from there:
 
 > the session row and provider come from the database, never from the client.
-> — `chat-websocket.service.ts:167-168`
+> — `chat-websocket.service.ts`, above `resolveSendTarget`
 
 A send for a session with no row is refused with `SESSION_NOT_FOUND` and told to create it
-over REST first (`:184-189`) — that is the entry point in
+over REST first — that is the entry point in
 [conversation handoff](MANUAL.md).
 
-Attachments get the same treatment. `filterAttachmentsToUploadStore` (`:34-56`) resolves
-every path against the global upload store (`~/.cloudcli/assets`, where
-`POST /api/assets/images` writes) and keeps it only if it is a **direct child** of that
-directory: relative paths are anchored there, absolute paths must already be inside it, and
-traversal or subdirectories are dropped with a warning. Survivors are deduped by path and
-re-split into `attachments` / `images` / `files` before the runtime sees them (`:253-276`).
-The rejected shapes are covered by `tests/chat-attachment-filter.test.ts`.
+Attachments get the same treatment. `filterAttachmentsToUploadStore`
+(`server/shared/image-attachments.ts`, beside the trust boundary's second layer
+`isAllowedImageSourcePath`) resolves
+every path against the global upload store (`getGlobalImageAssetsDir()`: `CLOUDCLI_ASSETS_DIR`,
+else `~/.cloudcli/assets`, where `POST /api/assets/images` and `POST /api/assets/files` write) and keeps it only if it is a
+**direct child** of that directory: relative paths are anchored there, absolute paths must
+already be inside it, and traversal or subdirectories are dropped with a warning. Survivors are
+deduped by path and re-split into `attachments` / `images` / `files` before the runtime sees
+them (`chat-websocket.service.ts`, `chat.send`'s options). Her typed door
+(`POST /api/companion/messages`, `prepareTypedAttachments`: MAN-9411) runs the same
+filter on every record it is posted; it takes only `path` and `name` from the page and reads
+size and type off the stored file.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/image-attachments.ts
 
 ## MAN-305 — Protocol errors have their own kind
 section: 01-websocket-transport/007 The chat protocol going up/009 Protocol errors have their own kind
@@ -810,19 +817,21 @@ section: 01-websocket-transport/025 If you change this, check that
 | --- | --- |
 | The pathname routing block | Every path still gets the heartbeat first, and the unknown-path branch still closes rather than leaking a live socket |
 | `verifyWebSocketClient` | Both user shapes still work — `readRequestUserId` in the chat handler and `readRequestUserId` in the notifications handler read different fields |
-| `decorateAndRecordEvent` | The exactly-one-`complete` contract, `seq` monotonicity, and the buffer trim — `tests/chat-run-registry.test.ts` covers all three |
+| `decorateAndRecordEvent` | The exactly-one-`complete` contract, `seq` monotonicity, and the buffer trim |
 | `ChatSessionWriter.send` or `forward` | That no frame can escape without `sessionId` remapped and a `seq`, and that a closed socket is still dropped rather than throwing |
-| `attachConnection` | It must keep *adding*; the second-tab test is the regression guard |
+| `attachConnection` | It must keep *adding*: a second tab joins, never replaces |
 | `handleChatSubscribe` | Ack-before-replay ordering, the completed-run rule, and the client's `lastSeqRef` semantics in `useChatRealtimeHandlers.ts:104-109` |
 | The `protocol_error` codes | The client's `protocol_error` branch clears the spinner on the assumption that no `complete` follows — that must stay true of every new code |
-| `filterAttachmentsToUploadStore` | `tests/chat-attachment-filter.test.ts`, and that the re-split into `images` / `files` still happens *after* filtering |
+| `filterAttachmentsToUploadStore` | That the re-split into `images` / `files` still happens *after* filtering, that only direct children of the store pass, and that her typed door (`prepareTypedAttachments`, MAN-9411), its second caller, still gets the same rule |
 | Anything broadcasting to clients | Use `connectedClients`, never `wss.clients`, or the frames reach `/shell`, `/plugin-ws` and `/desktop-notifications` too |
 | The reconnect timing or the `ws` memo | Both `chat.subscribe` senders — `useChatSessionState.ts:664` and `ChatInterface.tsx:263` — and whether either now fires with a stale `lastSeq` |
-| `attachWebSocketHeartbeat` | `tests/websocket-heartbeat.service.test.ts`, and that the interval is still shorter than the shortest proxy idle timeout in front of the app |
+| `attachWebSocketHeartbeat` | That the interval is still shorter than the shortest proxy idle timeout in front of the app |
 
 Related: [the realtime stream](MANUAL.md) for what the frames become,
 [conversation handoff](MANUAL.md) for the ids they carry,
 [the index](MANUAL.md) for the rest of the set.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/image-attachments.ts
 
 ## MAN-322 — The realtime stream
 section: 02-realtime-stream/000
@@ -4837,7 +4846,7 @@ through the app's own switch, no reload, diff against a fresh dark load). Any ot
 computed tokens gets the same guarantee only from an ordinary effect; one in its own layout effect,
 or at render time, would still read the old theme.
 
-`isDarkMode` is the colour ON SCREEN: a theme held with `holdTheme(theme)` while any hold stands (the station holds dark: MAN-9251), else his own choice. The layout effect above and `useWidgetHost`'s repost both key on it, so a hold or its release changes a widget's theme exactly as his switch does, and the hold stores nothing.
+`isDarkMode` is the colour ON SCREEN: the reader's own choice (the stored theme, the sun's answer or the system scheme), on every page of the app, Kaylee Station included. The layout effect above and `useWidgetHost`'s repost both key on it, so a hold or its release changes a widget's theme exactly as his switch does, and the hold stores nothing.
 
 The repost reads the opener's `<html>`, never the picture-in-picture window's copy of it. chat-host's mirror keeps that copy live through a `MutationObserver`, which runs AFTER the widget host's effect on a click-driven flip; a read there posted the new `dark` flag with the previous theme's tokens, one flip behind on every flip (measured 2026-09-29). The window's sheets are clones of the opener's, so once the mirror catches up it computes the same values.
 

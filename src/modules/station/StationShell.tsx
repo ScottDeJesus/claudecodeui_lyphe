@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 import { useStation, useStationPref } from '@/modules/station/context/StationContext';
 import { StationBar } from '@/modules/station/StationBar';
@@ -9,7 +8,7 @@ import { StationPhone } from '@/modules/station/StationPhone';
 import { StationStage } from '@/modules/station/StationStage';
 import { STATION_REGIONS } from '@/modules/station/stationRegions';
 import { backToCloudcli } from '@/shared/cloudcliDoors';
-import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
+import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { StationArrangement, StationCompactSwitch, StationDensity, StationSlot } from '@/shared/types';
 import { cn, isDrawn } from '@/shared/utils';
 
@@ -42,6 +41,9 @@ type StationShellViewProps = {
   onBackToCloudcli: () => void;
 };
 
+/** The floor of the conversation slot while it draws her portrait (11rem, `StationPortraitView`'s `data-station-portrait`): beats the 3.5rem floor of her log, and is read off what is drawn. */
+const PORTRAIT_FLOOR = '[&:has([data-station-portrait])]:min-h-44';
+
 /**
  * How each slot stands in its column. The lists take the room (sessions, the conversation, needs) and scroll inside
  * themselves; the rest are their own height.
@@ -57,7 +59,9 @@ type StationShellViewProps = {
  *      own cap, `DOCK_CAP` in `StationDock`: 45% of the column wide, 40% on a laptop) only into the room the others' bases leave,
  *      her conversation's share among them; past that the brief scrolls inside its field;
  *   2. HER CONVERSATION (10000), from its share of 30% of the column down to its 3.5rem floor (her panel's own rule): the record,
- *      which scrolls and keeps her newest line in sight;
+ *      which scrolls and keeps her newest line in sight. In the portrait view the slot holds her portrait over her latest answer and its
+ *      floor is 11rem, read off what the slot draws (`PORTRAIT_FLOOR`, `:has`), never a mode: a face about 100 px over two lines of her
+ *      words, where 3.5rem left a laptop's column (the stage beside her at its 55%) a 50 px face and half a line;
  *   3. ON A LAPTOP, THE STAGE beside her (1), down to what the others leave it (`LAPTOP_STAGE_BESIDE_HER`).
  * While the dock's own field holds the focus its basis takes the field's 88 px back (to its words at most), so the brief he types
  * in stands open: her conversation gives way for it, then the stage.
@@ -69,7 +73,7 @@ const SLOT_BOX: Record<BodySlot, string> = {
   sessions: 'min-h-0 flex-1',
   corner: 'mt-auto shrink-0 border-t border-border',
   head: 'shrink-0',
-  conversation: 'min-h-14 flex-1 [[data-station-column=her]_&]:flex-[1_10000_30%]',
+  conversation: cn('min-h-14 flex-1 [[data-station-column=her]_&]:flex-[1_10000_30%]', PORTRAIT_FLOOR),
   dock: cn(
     'min-h-0 flex-[0_1_auto]',
     '[[data-station-column=her]_&]:max-h-max [[data-station-column=her]_&]:flex-[10000_0_var(--station-dock-floor,8rem)]',
@@ -261,14 +265,13 @@ export function StationShellView({ arrangement, slots, stage, compact, phone, co
  */
 export function StationShell() {
   const { tier, phone } = useStation();
-  const navigate = useNavigate();
-  const { isPWA } = useDeviceSettings({ trackMobile: false });
+  const doors = useStationDoors();
   const [compactOn, setCompactOn] = useStationPref('compact', false);
   const arrangement = stationArrangementOf(tier, phone, compactOn);
   const compactSwitch: StationCompactSwitch | null = tier === 'narrow' ? null : { on: compactOn, onChange: setCompactOn };
   const density: StationDensity = arrangement === 'compact' || arrangement === 'phone' ? 'compact' : 'full';
-  // The way back, bound here for the bar (a pure view drawn by this pure layout) and for the phone's top row, her menu.
-  const onBackToCloudcli = () => backToCloudcli(navigate, { phone, pwa: isPWA });
+  // The way back, bound here for the bar (a pure view drawn by this pure layout) and for the phone's top row, her menu: to the workspace as it stood when the station came forward.
+  const onBackToCloudcli = () => backToCloudcli(doors.navigate, doors.workspacePath());
 
   // Each slot with a registered region, drawn for this tier at the arrangement's density; a slot with none is left out, so it
   // draws nothing.

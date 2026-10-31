@@ -19,7 +19,6 @@ import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import {
   Chip,
   PromptInput,
-  PromptInputHeader,
   PromptInputBody,
   PromptInputTextarea,
   PromptInputFooter,
@@ -32,7 +31,8 @@ import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
 import type { QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
 import CommandMenu from '@/modules/chat/composer/CommandMenu';
 import ActivityIndicator from '@/modules/chat/composer/ActivityIndicator';
-import ComposerAttachment from '@/modules/chat/composer/ComposerAttachment';
+import { ComposerAttachmentTray } from '@/modules/chat/composer/ComposerAttachmentTray';
+import { ComposerDropOverlay } from '@/modules/chat/composer/ComposerDropOverlay';
 import VoiceInputButton from '@/modules/chat/composer/VoiceInputButton';
 import PermissionRequestsBanner from '@/modules/chat/composer/PermissionRequestsBanner';
 import TokenUsageSummary from '@/modules/chat/composer/TokenUsageSummary';
@@ -110,7 +110,8 @@ type ChatComposerProps = {
   onDeleteQueuedDraft: () => void;
   attachedFiles: File[];
   onRemoveAttachment: (index: number) => void;
-  fileErrors: Map<string, string>;
+  /** The sentence for the files the last intake did not take; null when it took them all. */
+  refused: string | null;
   showFileDropdown: boolean;
   filteredFiles: MentionableFile[];
   selectedFileIndex: number;
@@ -195,7 +196,7 @@ export default function ChatComposer({
   onDeleteQueuedDraft,
   attachedFiles,
   onRemoveAttachment,
-  fileErrors,
+  refused,
   showFileDropdown,
   filteredFiles,
   selectedFileIndex,
@@ -468,38 +469,9 @@ export default function ChatComposer({
           ].filter(Boolean).join(' ')}
           {...getRootProps()}
         >
-          {isDragActive && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/50 bg-primary/15">
-              <div className="rounded-xl border border-border/30 bg-card p-4 shadow-lg">
-                <svg className="mx-auto mb-2 h-8 w-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  />
-                </svg>
-                <p className="text-sm font-medium">Drop files here</p>
-              </div>
-            </div>
-          )}
+          {isDragActive && <ComposerDropOverlay />}
 
-          {attachedFiles.length > 0 && (
-            <PromptInputHeader>
-              <div className="rounded-xl bg-muted/40 p-2">
-                <div className="flex flex-wrap gap-2">
-                  {attachedFiles.map((file, index) => (
-                    <ComposerAttachment
-                      key={`${file.name}-${file.lastModified}-${index}`}
-                      file={file}
-                      onRemove={() => onRemoveAttachment(index)}
-                      error={fileErrors.get(file.name)}
-                    />
-                  ))}
-                </div>
-              </div>
-            </PromptInputHeader>
-          )}
+          <ComposerAttachmentTray files={attachedFiles} onRemove={onRemoveAttachment} refused={refused} />
 
           <input {...getInputProps()} />
 

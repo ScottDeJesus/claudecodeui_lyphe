@@ -218,7 +218,7 @@ export function NeedItem({ need, density, current, onPress, tooltipSide }: NeedI
       data-tone={look.warn ? 'warn' : undefined}
       aria-current={current ? 'true' : undefined}
       className={cn(
-        'relative flex min-w-0 flex-col overflow-hidden rounded-[10px] border bg-card transition-colors duration-quick',
+        'relative flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card transition-colors duration-quick',
         current ? 'border-primary/60' : 'border-border hover:border-input',
       )}
     >

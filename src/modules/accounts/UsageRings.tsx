@@ -1,7 +1,7 @@
 import { useAccountsContext } from '@/modules/accounts/context/AccountsContext';
 import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
 import { resetsLine } from '@/modules/accounts/UsageMeters';
-import { accountInUseUsage } from '@/modules/accounts/utils/accountInUseUsage';
+import { accountInUse, accountInUseUsage, hasFiveHour } from '@/modules/accounts/utils/accountInUseUsage';
 import { WINDOW_NAMES, resetCountdown, ringTone, windowPercent, windowValue } from '@/modules/accounts/utils/usageWindows';
 import type { ClaudeUsageWindow } from '@/shared/types';
 import { Meter, Tooltip } from '@/shared/ui';
@@ -10,6 +10,7 @@ import { cn } from '@/shared/utils';
 /**
  * The two rings, top to bottom: the 5-hour window over the week. Each is labelled with the time left until its window
  * resets (`resetCountdown`); `short` — the words the account rows print, `5h … · wk …` — names a ring with no figure.
+ * An account with no 5-hour window (`hasFiveHour`) draws the weekly ring alone.
  */
 const RINGS = [
   { key: 'five_hour', short: '5h' },
@@ -81,12 +82,15 @@ function UsageRing({ ring, usageWindow, degraded, now }: UsageRingProps) {
  * read — it dates a filed reading's age (when the ring dims) and moves each ring's countdown label and the hover's countdown on.
  *
  * The rings keep their places whatever the reading says — an unreachable reading, a missing window, nothing asked yet
- * all draw the bare track — so the rail's foot never jumps. They are a status, not a control: no button, no tab stop.
+ * all draw the bare track — so the rail's foot never jumps. The one exception is an account the door says has no
+ * 5-hour window at all (`no_five`, never a window missing from a reply): it has no 5-hour ring to keep, so only the
+ * weekly ring stands. They are a status, not a control: no button, no tab stop.
  */
 export function UsageRings() {
   const { accounts, usage } = useAccountsContext();
   const now = useMinuteTick();
   const reading = accountInUseUsage(usage, accounts, now);
+  const rings = hasFiveHour(accountInUse(accounts)) ? RINGS : RINGS.filter((ring) => ring.key !== 'five_hour');
   // `Array.isArray`: the provider's body is stored as it came (`useClaudeUsage` checks no shape), and this component is
   // mounted on every page — a reply with no `windows` must leave two bare tracks, never take the whole app down.
   const windows = reading !== null && reading.reachable && Array.isArray(reading.windows) ? reading.windows : [];
@@ -94,7 +98,7 @@ export function UsageRings() {
 
   return (
     <div className="flex flex-none flex-col items-center pb-2">
-      {RINGS.map((ring) => (
+      {rings.map((ring) => (
         <UsageRing
           key={ring.key}
           ring={ring}
