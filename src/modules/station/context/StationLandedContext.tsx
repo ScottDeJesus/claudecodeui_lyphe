@@ -32,14 +32,17 @@ type StationLandedContextValue = {
 
 const StationLandedContext = createContext<StationLandedContextValue | null>(null);
 
-/** The most landings the page holds: what the read answers (`stationLanded`'s cap), so folded frames never grow the list past it. */
-const LANDED_HELD = 60;
+/** The most landings the page holds: what the read answers (`stationLanded`'s cap, 300, the most a strip draws), so folded frames never grow the list past it and a busy week stays whole. */
+const LANDED_HELD = 300;
 
 /** The four kinds the strip has a badge for: an entry of any other would be drawn with no glyph and no word, so it is left out. */
 const LANDED_KINDS: ReadonlySet<StationLandedKind> = new Set(['shipped', 'epic', 'landed', 'recovered']);
 
-/** What the failed state says when the read got no answer at all (a dropped connection, a deadline), in place of the browser's own "Failed to fetch". */
-const UNREACHABLE = 'the server could not be reached';
+/**
+ * What the failed state says when the read got no answer at all (a dropped connection, a deadline), in place of the browser's own
+ * "Failed to fetch". Used by this provider, and by `fake/strip.ts`, whose failed picture says it as the live strip does.
+ */
+export const LANDED_UNREACHABLE = 'the server could not be reached';
 
 /** What the failed state says when the answer is not the list: a proxy's page, a server of another shape. In place of the JSON parser's own words. */
 const NOT_A_LIST = 'the answer is not a list of landings this page can draw';
@@ -153,7 +156,7 @@ export function StationLandedProvider({ children }: { children: ReactNode }) {
     outRef.current += 1;
     try {
       const response = await api.companion.station.landed().catch(() => {
-        throw new Error(UNREACHABLE);
+        throw new Error(LANDED_UNREACHABLE);
       });
       if (!response.ok) throw new Error((await refusalSentence(response)) ?? `Request failed (${response.status})`);
       const answer: unknown = await response.json().catch(() => {

@@ -1,3 +1,5 @@
+import { performance } from 'node:perf_hooks';
+
 import { onSessionArchiveChanged, onSessionsDeleted } from '@/modules/database/index.js';
 import { onNotification } from '@/modules/notifications/index.js';
 import { onHostLivenessChanged } from '@/modules/providers/index.js';
@@ -25,14 +27,16 @@ import type { StationFrame } from '@/shared/station-types.js';
  * Chats belong to no account (as the sidebar's do), so the frame names none and goes to EVERY open gateway socket,
  * carrying nothing but `states`, like `followups_changed`.
  *
- * The coalescing window is a one-shot: the first touch arms a 1,000 ms timeout, a touch inside it only adds to it
- * (`states` is the OR of the window's touches), and when it closes ONE frame goes out and nothing is armed until the next
- * touch. A deadline an event sets, never a clock that checks, and two frames are always at least a second apart.
+ * A frame goes out at once when none went in the last second: the first touch of a quiet stretch rides its own frame, so
+ * the page hears a chat's first change in the same moment. A touch inside the second after a frame sets one deadline, the
+ * close of that second, and the touches after it only add to it (`states` is the OR of the folded touches); at the close
+ * ONE frame goes out. Nothing is armed between touches: the close is a deadline a touch sets, never a clock that checks,
+ * and two frames are never less than a second apart, the station's cap on them.
  *
  * Consumer: `companion.module.ts`, which starts it beside the three feeds and stops it with them.
  */
 
-/** How long touches gather into one frame. */
+/** The least time between two frames: touches inside it fold into the one frame at its close. */
 const HINT_WINDOW_MS = 1_000;
 
 /** The notification codes that mean an ask was raised on a chat: the two the alert feed names `asking` and `permission`. */
@@ -55,24 +59,50 @@ function sendToEveryOpenSocket(frame: StationFrame): void {
 
 /** Starts the one hint that a chat changed; answers the stop. Consumed by `companion.module.ts`. */
 export function startStationHint(): () => void {
-  // The window's timer while one is open, `null` between windows. The first touch arms it; its close is the only thing that clears it.
-  let windowTimer: NodeJS.Timeout | null = null;
-  // Whether any touch of the open window moved a chat's state, so the one frame carries the strongest thing that happened in it.
-  let windowMovedStates = false;
+  // When the last frame went out, on the monotonic clock (a wall-clock step must not stretch or cut the second); minus infinity
+  // until the first, so the first touch of the process is sent at once.
+  let lastFrameAt = Number.NEGATIVE_INFINITY;
+  // The timer of the one deadline a touch inside the second sets (the second's close), `null` while none is set. Its firing is the only thing that clears it.
+  let closeTimer: NodeJS.Timeout | null = null;
+  // Whether any touch folded into the open deadline moved a chat's state, so the one frame carries the strongest thing that happened.
+  let foldedMovedStates = false;
 
-  function closeWindow(): void {
-    const states = windowMovedStates;
-    windowTimer = null;
-    windowMovedStates = false;
+  function sendFrame(states: boolean): void {
+    lastFrameAt = performance.now();
     sendToEveryOpenSocket({ kind: 'station_sessions_changed', states });
   }
 
-  function touch(states: boolean): void {
-    windowMovedStates = windowMovedStates || states;
-    if (windowTimer) return;
-    windowTimer = setTimeout(closeWindow, HINT_WINDOW_MS);
+  function armClose(): void {
+    // `ceil` and the 1 ms floor: a timer must never fire before the second is out.
+    const remainingMs = Math.max(1, Math.ceil(HINT_WINDOW_MS - (performance.now() - lastFrameAt)));
+    closeTimer = setTimeout(closeWindow, remainingMs);
     // Never keep the process alive just to say a chat changed.
-    windowTimer.unref?.();
+    closeTimer.unref?.();
+  }
+
+  function closeWindow(): void {
+    closeTimer = null;
+    // Node may fire a timer a fraction of a millisecond early; the second is whole or the frame waits for the rest of it.
+    if (performance.now() - lastFrameAt < HINT_WINDOW_MS) {
+      armClose();
+      return;
+    }
+    const states = foldedMovedStates;
+    foldedMovedStates = false;
+    sendFrame(states);
+  }
+
+  function touch(states: boolean): void {
+    if (closeTimer) {
+      foldedMovedStates = foldedMovedStates || states;
+      return;
+    }
+    if (performance.now() - lastFrameAt >= HINT_WINDOW_MS) {
+      sendFrame(states);
+      return;
+    }
+    foldedMovedStates = states;
+    armClose();
   }
 
   const unsubscribers = [
@@ -88,8 +118,8 @@ export function startStationHint(): () => void {
 
   return () => {
     for (const unsubscribe of unsubscribers) unsubscribe();
-    if (windowTimer) clearTimeout(windowTimer);
-    windowTimer = null;
-    windowMovedStates = false;
+    if (closeTimer) clearTimeout(closeTimer);
+    closeTimer = null;
+    foldedMovedStates = false;
   };
 }

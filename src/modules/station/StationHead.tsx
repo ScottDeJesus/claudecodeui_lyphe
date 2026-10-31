@@ -10,16 +10,19 @@ import type { CompanionPresence, StationDensity, StationHeadRow, StationRegionPr
 import { Banner, buttonVariants, Menu } from '@/shared/ui';
 import { cn, resizeObserverIn } from '@/shared/utils';
 
+/** The tiers a full-density head draws on: under 1024 px (`narrow`, a phone included) the station is always compact. */
+type FullTier = Exclude<StationTier, 'narrow'>;
+
 /**
- * Her face's square per tier: the px her face is drawn at, and the class that sizes its box. Fixed per tier, never grown: growth
- * is her button's, not her head's. On a wide screen the box is 200 px while her column is at least 62rem tall (the container
- * query `her`, StationShell's column) and 132 px below that; the face fills its box by CSS, and her initial (a box whose face
- * is not made yet) is drawn at the px the view reads off the box as it lays out, starting from the px given here.
+ * Her face's square per full-density tier: the px her face is drawn at, and the class that sizes its box. Fixed per tier, never
+ * grown: growth is her button's, not her head's. On a wide screen the box is 200 px while her column is at least 62rem tall (the
+ * container query `her`, StationShell's column) and 132 px below that; on both tiers it is the compact form's 64 px while the
+ * column is under 47rem. The face fills its box by CSS, and her initial (a box whose face is not made yet) is drawn at the px
+ * the view reads off the box as it lays out, starting from the px given here.
  */
-const FACE: Record<StationTier, { px: number; box: string }> = {
-  wide: { px: 132, box: 'size-[132px] [@container_her_(min-height:62rem)]:size-[200px]' },
-  laptop: { px: 132, box: 'size-[132px]' },
-  narrow: { px: 72, box: 'size-[72px]' },
+const FACE: Record<FullTier, { px: number; box: string }> = {
+  wide: { px: 132, box: 'size-[132px] [@container_her_(min-height:62rem)]:size-[200px] [@container_her_not_(min-height:47rem)]:size-16' },
+  laptop: { px: 132, box: 'size-[132px] [@container_her_not_(min-height:47rem)]:size-16' },
 };
 
 /** Her face at compact density, at every tier: one column has no height to give a larger one. */
@@ -37,17 +40,19 @@ const ROW_FACE = { upright: { px: 44, box: 'size-11' }, sideways: { px: 32, box:
  */
 const CONTROLS_PANEL_PX = 380;
 
-/** Her name's type per tier: the largest words of her column with her face over them, beside her face below it. */
-const NAME: Record<StationTier, string> = {
-  wide: 'text-lg [@container_her_(min-height:62rem)]:text-xl',
-  laptop: 'text-lg',
-  narrow: 'text-base',
+/**
+ * Her name's type per full-density tier: the largest words of her column with her face over them, beside her face below it, and
+ * the compact form's 16 px on its 24 px line while her column is under 47rem.
+ */
+const NAME: Record<FullTier, string> = {
+  wide: 'text-lg [@container_her_(min-height:62rem)]:text-xl [@container_her_not_(min-height:47rem)]:text-base [@container_her_not_(min-height:47rem)]:leading-6',
+  laptop: 'text-lg [@container_her_not_(min-height:47rem)]:text-base [@container_her_not_(min-height:47rem)]:leading-6',
 };
 
 type StationHeadViewProps = {
-  /** The arrangement: her face over her words on a wide screen, beside them on a laptop and below (a phone included). */
+  /** The arrangement: her face over her words on a wide screen, beside them on a laptop. A `narrow` tier always draws the compact head. */
   tier: StationTier;
-  /** `compact` draws the one-column head, the same at every tier: her face at 64 px, her controls behind "Her controls". */
+  /** `compact` draws the one-column head, the same at every tier: her face at 64 px, her controls behind "Her controls". `full` draws on wide and laptop. */
   density: StationDensity;
   /** Her name as he set it, the default while her picture loads. */
   name: string;
@@ -78,18 +83,22 @@ type StationHeadViewProps = {
  * comes with them), and the face is the caller's `face`, the face she wears on her button.
  *
  * - WIDE, her column at least 62rem tall (a 1920×1080 screen): her face at 200 px, centred, over her name and the status
- *   line, the controls under them (two lines in a 420 px column, three given her ears, each centred under her). Shorter (a
+ *   line, the controls under them (two lines in her 360 px column, three given her ears, each centred under her). Shorter (a
  *   1440×900 screen): her face at 132 px beside her name and the status line, the two centred as one, the controls centred under
  *   them. Read off her column's height (a container query), never a mode: measured at 1440×900, the 200 px form stood 402 px,
  *   48% of her column, and held her conversation at its floor while a draft was docked; this form is 260 px, and given her ears
  *   294 px, 322 px while their `unavailable` sentence runs to three lines (the ears scaffold's fixtures, 2026-10-30).
  * - LAPTOP: her face at 132 px beside her name, the status line and the controls.
- * - NARROW, a phone included: her face at 72 px beside her name and the status line; the controls under them, across.
- * - COMPACT DENSITY (the one-column arrangement, at any tier): her face at 64 px beside her name and the status line, the two on
+ * - COMPACT DENSITY (the one-column arrangement, at any tier, and always under 1024 px): her face at 64 px beside her name and the status line, the two on
  *   one line where they fit (the status drops under the name, whole, where they do not), and under them her controls behind
  *   ONE press, "Her controls": the kit `Menu`'s panel holding `CompanionControls`' line, every rule of theirs kept (Stop leads
  *   it while her turn runs). The press stands under her words, so the panel hangs from their left edge and never over her
  *   face, at every width. A failed process's banner takes the head's whole width under them.
+ * - HER COLUMN UNDER 47rem TALL (wide and laptop: 1280×800 and 1366×768 stand under the line, 1440×900 above it): the compact
+ *   form's look, so his sends, the thing on the stage and her newest line keep the room her head gave up (178 px at 1280×800 in
+ *   the laptop form, 80 here). Read off her column (the container `her`), riding the browser's own layout: her face takes the
+ *   compact 64 px, her name and state share a line, her controls' line steps aside and "Her controls" stands under her words
+ *   holding it. On a laptop the banner stands in her words' column, under the press.
  *
  * - THE PHONE'S TOP ROW (`row`, handed by the phone's arrangement; `HeadRow`): her face at 44 px (32 on its side), her name and
  *   her state on one line, the arrangement's `trail`, and her ONE menu at the row's end, her controls' line over "CloudCLI", the
@@ -104,8 +113,9 @@ type StationHeadViewProps = {
 export function StationHeadView({ tier, density, name, presence, face, controls, failure, row }: StationHeadViewProps) {
   const { t } = useTranslation();
   const nameId = useId();
-  const compact = density === 'compact';
-  const { px, box } = row !== undefined ? ROW_FACE[row.sideways ? 'sideways' : 'upright'] : compact ? COMPACT_FACE : FACE[tier];
+  // Under 1024 px the station is one column, so a narrow tier draws the compact head whatever its density says.
+  const fullTier: FullTier | null = density === 'compact' || tier === 'narrow' ? null : tier;
+  const { px, box } = row !== undefined ? ROW_FACE[row.sideways ? 'sideways' : 'upright'] : fullTier === null ? COMPACT_FACE : FACE[fullTier];
   const hostWindow = useHostWindow();
   // Her face's box as drawn: state, so a head laid out again (a tier change keeps her column) is observed afresh.
   const [faceNode, setFaceNode] = useState<HTMLDivElement | null>(null);
@@ -125,14 +135,46 @@ export function StationHeadView({ tier, density, name, presence, face, controls,
       {face(drawnPx)}
     </div>
   );
-  const words = (
-    <div className={cn('flex min-w-0 max-w-full flex-col gap-0.5', tier === 'wide' && '[@container_her_(min-height:62rem)]:items-center')}>
-      <h2 id={nameId} data-station-head-name="" className={cn('max-w-full truncate font-semibold leading-tight text-foreground', NAME[tier])}>
-        {name}
-      </h2>
-      <CompanionStatus presence={presence} emphasis="station" />
+  const controlsLabel = t('station.head.controls', { defaultValue: 'Her controls' });
+  // Her controls behind one press: the compact form's, and the full forms' while her column is under 47rem.
+  const controlsPress = (
+    <Menu
+      width={CONTROLS_PANEL_PX}
+      label={controlsLabel}
+      panel={controls('start')}
+      trigger={(
+        <span data-station-head-controls="" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'finger:h-11')}>
+          <SlidersHorizontal aria-hidden="true" />
+          {controlsLabel}
+          <ChevronDown aria-hidden="true" />
+        </span>
+      )}
+    />
+  );
+  // Her name over her state, centred under a 200 px face; under 47rem the two share a line and "Her controls" stands under them.
+  const words = fullTier !== null && (
+    <div
+      className={cn(
+        'flex min-w-0 max-w-full flex-col gap-0.5 [@container_her_not_(min-height:47rem)]:items-start [@container_her_not_(min-height:47rem)]:gap-1',
+        fullTier === 'wide' && '[@container_her_(min-height:62rem)]:items-center',
+      )}
+    >
+      <div
+        className={cn(
+          'flex min-w-0 max-w-full flex-col gap-0.5 [@container_her_not_(min-height:47rem)]:flex-row [@container_her_not_(min-height:47rem)]:flex-wrap [@container_her_not_(min-height:47rem)]:items-baseline [@container_her_not_(min-height:47rem)]:gap-x-2.5',
+          fullTier === 'wide' && '[@container_her_(min-height:62rem)]:items-center',
+        )}
+      >
+        <h2 id={nameId} data-station-head-name="" className={cn('max-w-full truncate font-semibold leading-tight text-foreground', NAME[fullTier])}>
+          {name}
+        </h2>
+        <CompanionStatus presence={presence} emphasis="station" />
+      </div>
+      <div className="hidden [@container_her_not_(min-height:47rem)]:block">{controlsPress}</div>
     </div>
   );
+  // Her controls in their line, while her column is 47rem tall or more; under it they stand behind "Her controls".
+  const controlsLine = (align: 'start' | 'center') => <div className="[@container_her_not_(min-height:47rem)]:hidden">{controls(align)}</div>;
   const banner = failure !== null && (
     <div data-station-head-failed="" className="w-full text-left">
       <Banner tone="warn">{failure.sentence ?? t('companion.panel.failedUnknown', { name })}</Banner>
@@ -154,8 +196,7 @@ export function StationHeadView({ tier, density, name, presence, face, controls,
     );
   }
 
-  if (compact) {
-    const controlsLabel = t('station.head.controls', { defaultValue: 'Her controls' });
+  if (fullTier === null) {
     return (
       <section data-station-head="compact" aria-labelledby={nameId} className="flex min-w-0 flex-col gap-2 px-3 py-2">
         <div className="flex min-w-0 items-center gap-3">
@@ -168,18 +209,7 @@ export function StationHeadView({ tier, density, name, presence, face, controls,
               </h2>
               <CompanionStatus presence={presence} emphasis="station" />
             </div>
-            <Menu
-              width={CONTROLS_PANEL_PX}
-              label={controlsLabel}
-              panel={controls('start')}
-              trigger={(
-                <span data-station-head-controls="" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'finger:h-11')}>
-                  <SlidersHorizontal aria-hidden="true" />
-                  {controlsLabel}
-                  <ChevronDown aria-hidden="true" />
-                </span>
-              )}
-            />
+            {controlsPress}
           </div>
         </div>
         {banner}
@@ -187,42 +217,39 @@ export function StationHeadView({ tier, density, name, presence, face, controls,
     );
   }
 
-  if (tier === 'wide') {
+  if (fullTier === 'wide') {
     return (
-      <section data-station-head={tier} aria-labelledby={nameId} className="flex min-w-0 flex-col gap-3 p-4 [@container_her_(min-height:62rem)]:text-center">
-        {/* Her face and her words: beside each other, centred as one, or (her column tall enough) her face over her words. */}
-        <div className="flex min-w-0 items-center justify-center gap-4 [@container_her_(min-height:62rem)]:flex-col [@container_her_(min-height:62rem)]:gap-3">
+      <section
+        data-station-head={fullTier}
+        aria-labelledby={nameId}
+        className="flex min-w-0 flex-col gap-3 px-3 py-4 [@container_her_(min-height:62rem)]:text-center [@container_her_not_(min-height:47rem)]:gap-2 [@container_her_not_(min-height:47rem)]:py-2"
+      >
+        {/* Her face and her words: beside each other, centred as one, or (her column tall enough) her face over her words; under
+            47rem beside each other from the left, as the compact form stands them. */}
+        <div className="flex min-w-0 items-center justify-center gap-4 [@container_her_(min-height:62rem)]:flex-col [@container_her_(min-height:62rem)]:gap-3 [@container_her_not_(min-height:47rem)]:justify-start [@container_her_not_(min-height:47rem)]:gap-3">
           {faceBox}
           {words}
         </div>
         {banner}
-        {/* The line wraps in her 420 px column: each of its lines centred under her, as her face and words are. */}
-        {controls('center')}
-      </section>
-    );
-  }
-
-  if (tier === 'laptop') {
-    return (
-      <section data-station-head={tier} aria-labelledby={nameId} className="flex min-w-0 items-center gap-5 p-4">
-        {faceBox}
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          {words}
-          {banner}
-          {controls('start')}
-        </div>
+        {/* The line wraps in her 360 px column, each of its lines centred under her as her face and words are: 12 px across, as
+            her conversation stands, so Stop, the model and Live (332 px) share its first line and the voice and Clear its second. */}
+        {controlsLine('center')}
       </section>
     );
   }
 
   return (
-    <section data-station-head={tier} aria-labelledby={nameId} className="flex min-w-0 flex-col gap-3 p-4">
-      <div className="flex min-w-0 items-center gap-3">
-        {faceBox}
+    <section
+      data-station-head={fullTier}
+      aria-labelledby={nameId}
+      className="flex min-w-0 items-center gap-5 p-4 [@container_her_not_(min-height:47rem)]:gap-3 [@container_her_not_(min-height:47rem)]:px-3 [@container_her_not_(min-height:47rem)]:py-2"
+    >
+      {faceBox}
+      <div className="flex min-w-0 flex-1 flex-col gap-3 [@container_her_not_(min-height:47rem)]:items-start [@container_her_not_(min-height:47rem)]:gap-1">
         {words}
+        {banner}
+        {controlsLine('start')}
       </div>
-      {banner}
-      {controls('start')}
     </section>
   );
 }
@@ -253,7 +280,6 @@ export function StationHead({ tier, density, row }: StationRegionProps & { row?:
         <CompanionControls
           name={name}
           picture={picture}
-          presence={presence}
           layout="line"
           align={align}
           voice={voice}

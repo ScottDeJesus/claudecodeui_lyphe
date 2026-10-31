@@ -111,7 +111,6 @@ export function CompanionHeader({ name, picture, presence, voice, ears, onModelC
       <CompanionControls
         name={name}
         picture={picture}
-        presence={presence}
         voice={voice}
         ears={ears}
         layout="rows"

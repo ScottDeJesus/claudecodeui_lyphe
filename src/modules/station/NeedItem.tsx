@@ -2,6 +2,7 @@ import type { TFunction } from 'i18next';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { stationStamp } from '@/modules/station/stationClock';
 import { STATION_NEED_KINDS } from '@/shared/constants';
 import type { StationNeed } from '@/shared/station-types';
 import type { LocaleWords, StationDensity, StationNeedKind } from '@/shared/types';
@@ -14,12 +15,16 @@ const STATUS_WORDS: Readonly<Record<Extract<StationNeed, { kind: 'check' }>['sta
   denied: { key: 'station.needs.status.denied', english: 'Refused' },
 };
 
-/** `HH:MM` on his clock, 24-hour, the clock she speaks in; a day before today adds its date ("Oct 28 14:02"). */
-function sinceWords(at: number): string {
-  const when = new Date(at);
-  const time = `${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`;
-  if (when.toDateString() === new Date().toDateString()) return time;
-  return `${when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${time}`;
+/**
+ * When a red check went red, on his clock and the locale's (`stationStamp`), the clock alone today ("2:04 PM"), "yesterday 7:34 PM",
+ * else its day and clock ("Oct 28 2:04 PM"): the strip's own clock. Empty for a stamp that is not a time.
+ */
+function wentRedAt(at: number, t: TFunction): string {
+  const stamp = stationStamp(at);
+  if (stamp === null) return '';
+  if (stamp.day === 'today') return t('station.needs.when.today', { clock: stamp.clock, defaultValue: '{{clock}}' });
+  if (stamp.day === 'yesterday') return t('station.needs.when.yesterday', { clock: stamp.clock, defaultValue: 'yesterday {{clock}}' });
+  return t('station.needs.when.day', { date: stamp.date, clock: stamp.clock, defaultValue: '{{date}} {{clock}}' });
 }
 
 /** What the item is about, in its weight: the feature's or epic's title, the chat's name, the check's label. */
@@ -76,15 +81,17 @@ function lineOf(need: StationNeed, t: TFunction): string {
     case 'followups':
       return need.newest;
     case 'check': {
-      const where = need.since === null
+      // No "since" for a moment that is no time: `wentRedAt` answers '' for it, and "since" with nothing after it says nothing.
+      const since = need.since === null ? '' : wentRedAt(need.since, t);
+      const where = since === ''
         ? need.node
-        : t('station.needs.where', { node: need.node, time: sinceWords(need.since), defaultValue: '{{node}} · since {{time}}' });
+        : t('station.needs.where', { node: need.node, time: since, defaultValue: '{{node}} · since {{time}}' });
       return need.value === null ? where : `${need.value} · ${where}`;
     }
   }
 }
 
-/** A tooltip's box: as wide as its words up to 28rem, wrapping; never drawn where nothing hovers (a tap would leave it standing). */
+/** A tooltip's box: as wide as its words up to 28rem, wrapping; never drawn where nothing hovers, the kit's long press included. */
 const TIP = 'max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere] [@media(hover:none)]:hidden';
 
 type NeedItemProps = {
@@ -108,7 +115,7 @@ type NeedItemProps = {
  * - what it is about, in its weight, cut at two lines;
  * - its one line, cut at one (a permission's in mono: it is a command; a question's and a plan's are prose, in the body face);
  *   the whole of it in a `Tooltip` for a pointer, which only repeats what the stage shows whole (and is not drawn where nothing
- *   hovers, `hover:none`: a tap's compatibility mouse events would leave its bubble over the rail's head);
+ *   hovers, `hover:none`, the kit's long press included: a finger reads it whole on the stage its press opens);
  * - its act as a kit `Button`. No phrase to say stands beside it: she reads an action back in her own words and judges from the
  *   conversation whether he agreed.
  * An Accept and a red check wear `data-tone="warn"`: the tone's bar down the left edge and their kind word in its ink. A

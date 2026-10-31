@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LOCK_DRAFT } from '@/modules/dispatcher/askDrafts';
@@ -10,6 +11,9 @@ import { Button } from '@/shared/ui';
 
 /** The lock this form answers: `DispatcherAsk` narrowed to its Accept kind — the shape `lockOptions` takes, and the only one a lock's card is drawn from. */
 type LockAsk = Extract<DispatcherAsk, { kind: 'accept' }>;
+
+/** Every press of the form: 32 px at a desk, a 44 px catch under a finger (`finger:` — a touch screen, or a window under 768 px; the touch law). */
+const PRESS = 'h-8 finger:h-11';
 
 /** A lock with nothing typed: the three answers showing, no notes. */
 const BLANK_LOCK: LockCompose = { rework: false, notes: '' };
@@ -35,6 +39,19 @@ const BLANK_LOCK: LockCompose = { rework: false, notes: '' };
  * designer and launches nothing. They are one row of one weight in three variants — primary,
  * secondary, outline — so the press that starts work reads strongest and the one that sends words
  * back reads quietest.
+ *
+ * WHERE NOTHING HOVERS, THE DESCRIPTIONS STAND IN WORDS (`[@media(hover:none)]`, the touch law: nothing is said
+ * only on hover). Under the three, inside the same group, one muted line per answer is led by its label and says what
+ * the press does; a pointer sees none of them and keeps the `title`. The lines are `aria-hidden`: the `title` is
+ * already each button's description for a screen reader, which would otherwise hear every answer twice.
+ *
+ * THE THREE ARE A GROUP THE KEYBOARD CAN LAND ON (`data-ask-answers`, `tabIndex={-1}`, `role="group"`, named by the
+ * census region above it). The station's Accept lands the keyboard there and never on Queue itself, so a second
+ * Enter after the one that opened the card presses nothing and approves nothing: Queue is one Tab away, and the
+ * press that approves is one he chose after the census was in front of him (the lock law).
+ *
+ * UNDER A FINGER every press is 44 px (`finger:h-11`: a touch screen, or a window under 768 px), the notes'
+ * Send and Cancel with them; at a desk with a mouse they keep their 32 px.
  *
  * REWORK IS A FIELD, NOT A PRESS. It swaps the three for a notes textarea — the one answer that
  * carries words — and `Send notes` stays disabled until those words exist, so no Rework is ever sent
@@ -72,6 +89,9 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
   const { state: compose, edit, clear: clearDraft, scopeRef } = useAskDraft(askIdentity(ask), BLANK_LOCK, LOCK_DRAFT);
   const { rework, notes } = compose;
 
+  // The census region's id. Essential: it is what names the answers' group (`aria-labelledby`), so the keyboard landing on the group is told which prompt's answers they are, in the region's own words (`ask.header`).
+  const censusId = useId();
+
   // What every press does with the lane's word: a TAKEN answer ends the ask, so its draft goes and the card is marked answered; a refusal changes nothing and the prompt stands beside the toast that says why.
   const settle = (took: boolean) => {
     if (!took) return;
@@ -100,6 +120,7 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
   return (
     <div ref={scopeRef} className="flex min-w-0 flex-col gap-2">
       <div
+        id={censusId}
         data-ask-region
         role="region"
         aria-label={ask.header}
@@ -128,54 +149,69 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
               data-ask-send
               type="button"
               size="sm"
-              className="h-8"
+              className={PRESS}
               disabled={busy || notes.trim().length === 0}
               onClick={pressSendNotes}
             >
               {t('dispatcher.ask.sendNotes')}
             </Button>
-            <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => edit((current) => ({ ...current, rework: false }))}>
+            <Button type="button" variant="ghost" size="sm" className={PRESS} onClick={() => edit((current) => ({ ...current, rework: false }))}>
               {t('dispatcher.ask.cancel')}
             </Button>
           </div>
         </div>
       ) : (
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Button
-            data-ask-queue
-            type="button"
-            size="sm"
-            className="h-8"
-            title={options.queue.description}
-            disabled={busy}
-            onClick={pressQueue}
-          >
-            {options.queue.label}
-          </Button>
-          <Button
-            data-ask-hide
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="h-8"
-            title={options.hide.description}
-            disabled={busy}
-            onClick={pressHide}
-          >
-            {options.hide.label}
-          </Button>
-          <Button
-            data-ask-rework
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8"
-            title={options.rework.description}
-            disabled={busy}
-            onClick={() => edit((current) => ({ ...current, rework: true }))}
-          >
-            {options.rework.label}
-          </Button>
+        <div
+          data-ask-answers
+          role="group"
+          aria-labelledby={censusId}
+          tabIndex={-1}
+          className="flex min-w-0 flex-col gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Button
+              data-ask-queue
+              type="button"
+              size="sm"
+              className={PRESS}
+              title={options.queue.description}
+              disabled={busy}
+              onClick={pressQueue}
+            >
+              {options.queue.label}
+            </Button>
+            <Button
+              data-ask-hide
+              type="button"
+              variant="secondary"
+              size="sm"
+              className={PRESS}
+              title={options.hide.description}
+              disabled={busy}
+              onClick={pressHide}
+            >
+              {options.hide.label}
+            </Button>
+            <Button
+              data-ask-rework
+              type="button"
+              variant="outline"
+              size="sm"
+              className={PRESS}
+              title={options.rework.description}
+              disabled={busy}
+              onClick={() => edit((current) => ({ ...current, rework: true }))}
+            >
+              {options.rework.label}
+            </Button>
+          </div>
+          <div aria-hidden="true" data-ask-answer-words className="hidden min-w-0 flex-col gap-1 [@media(hover:none)]:flex">
+            {[options.queue, options.hide, options.rework].map((option) => (
+              <p key={option.label} className="text-xs leading-snug text-muted-foreground">
+                <span className="font-medium text-foreground">{option.label}</span>{' · '}{option.description}
+              </p>
+            ))}
+          </div>
         </div>
       )}
     </div>

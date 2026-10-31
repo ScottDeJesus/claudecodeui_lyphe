@@ -12,6 +12,7 @@ import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspac
 import { openStation } from '@/shared/cloudcliDoors';
 import { GIT_REPO_PATHS } from '@/shared/constants';
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
+import { usePhoneWindow } from '@/shared/hooks/usePhoneWindow';
 import type { ChatDoor, PaletteGroup, PaletteNavRow } from '@/shared/types';
 
 /**
@@ -69,10 +70,11 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
   // Kaylee's group: a row that opens her panel and a row that opens her station. Her name is the one he gave her, so it is
   // read off her picture, and the memo keeps the group's identity through the frames she sends (each sentence changes the
   // picture, not her name). The station's door is `openStation`: its own window on a desktop (named, so a second press brings
-  // the same one forward), this window on a phone or in the home-screen app; the same door her panel's head carries.
+  // the same one forward), this window on a phone (`usePhoneWindow`) or in the home-screen app; the same door her panel's head carries.
   const { picture, setOpen: setCompanionOpen } = useCompanion();
   const navigate = useNavigate();
-  const { isMobile, isPWA } = useDeviceSettings();
+  const { isPWA } = useDeviceSettings();
+  const phone = usePhoneWindow();
   const companionName = picture?.settings.name ?? t('companion.defaultName');
   const companionGroup = useMemo<PaletteGroup>(
     () => ({
@@ -90,11 +92,11 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
           label: t('companion.palette.station', { defaultValue: 'Open Kaylee Station' }),
           keywords: t('companion.palette.stationKeywords', { defaultValue: 'kaylee station watch floor dashboard monitor window' }),
           icon: LayoutDashboard,
-          run: () => openStation(navigate, { phone: isMobile, pwa: isPWA }),
+          run: () => openStation(navigate, { phone, pwa: isPWA }),
         },
       ],
     }),
-    [t, companionName, setCompanionOpen, navigate, isMobile, isPWA],
+    [t, companionName, setCompanionOpen, navigate, phone, isPWA],
   );
 
   return (

@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
 
 import { ALL_CARDS, SHELF_NOTES } from '@/modules/station/fake/cards';
+import { PENDING } from '@/modules/station/fake/needs';
 import { SESSIONS_FAKE } from '@/modules/station/fake/sessions';
 import { StationConversationView } from '@/modules/station/StationConversation';
 import type { CompanionActivity, CompanionLogEntry, CompanionPicture, CompanionSessionRef, CompanionSettings } from '@/shared/companion-types';
@@ -18,8 +19,9 @@ import type { CompanionSentenceRef } from '@/shared/types';
  *
  * - `home`: a morning exchange. She put the uncommitted diff up while she answered, so it stands under that answer; the list
  *   of runs he pinned three hours ago is older than this conversation and stands on the shelf alone.
- * - `waiting`: her line naming the two Accepts and the red check the right rail holds, then his "Queue Kaylee's desk" and her
- *   read-back, its last sentence being spoken (marked).
+ * - `waiting`: her lines naming the two Accepts and the red check the right rail holds (the feature on the stage, the epic of
+ *   three features, the check on eis1), then his "Queue Kaylee's desk" and her read-back, which ends on her Queue waiting for his
+ *   word, that last sentence being spoken (marked). Her picture holds the action the rail draws at its head (`fake/needs.ts`).
  * - `walkthrough`: her paragraph on item 4 of 15 of the Kanban lane review, still being said; her activity Walking.
  * - `empty`: her picture read, her process asleep, nothing said yet: the empty log.
  *
@@ -42,7 +44,7 @@ function railChat(picture: keyof typeof SESSIONS_FAKE, name: string): CompanionS
   return { sessionId: found.sessionId, name: found.name, project: found.project };
 }
 
-/** The chat he pressed in `home`, the chat whose permission `waiting`'s rail heads, and the chat she walks in `walkthrough`. */
+/** The chat he pressed in `home`, the chat her drafting presence names, and the chat she walks in `walkthrough`. */
 export const TREE_POLISH = railChat('home', 'Roadmap tree polish');
 export const UPLOADS = railChat('home', 'Restorly uploads handoff');
 export const KANBAN = railChat('walkthrough', 'Kanban lane review');
@@ -77,7 +79,7 @@ const WAITING_LOG = [
   she(8, 'w1', 1, 'And Cerberus has one red check: Session is valid, on eis1, because the shadow connector\'s session token expired.'),
   he(2, 'Queue Kaylee\'s desk.', 'spoken'),
   she(1, 'w2', 0, 'Kaylee\'s desk: seven tasks over three features.'),
-  she(1, 'w2', 1, 'Say yes and I\'ll queue it.'),
+  she(1, 'w2', 1, 'My Queue is ready, and it waits for your word.'),
 ];
 /** The sentence `waiting`'s page is sounding: the last of her read-back. */
 export const WAITING_SPEAKING: CompanionSentenceRef = { turnId: 'w2', index: 1 };
@@ -135,7 +137,10 @@ export const picture = (change: Partial<CompanionPicture>): CompanionPicture => 
 /** Her picture in each of the station's four: what her head, her conversation and her talk control are drawn from. */
 export const HER_PICTURES = {
   home: picture({ log: HOME_LOG, notes: SHELF_NOTES.home }),
-  waiting: picture({ log: WAITING_LOG, notes: SHELF_NOTES.waiting, settings: { ...SETTINGS, live: true, talkBinding: { kind: 'mouse', button: 3, label: 'Mouse back' } } }),
+  waiting: picture({
+    log: WAITING_LOG, notes: SHELF_NOTES.waiting, pending: PENDING,
+    settings: { ...SETTINGS, live: true, talkBinding: { kind: 'mouse', button: 3, label: 'Mouse back' } },
+  }),
   walkthrough: picture({
     log: WALK_LOG, notes: SHELF_NOTES.walkthrough, turnId: 't-walk', focus: KANBAN,
     activity: { ...IDLE, phase: 'walking', session: KANBAN, walk: { at: 4, total: 15 } },

@@ -145,9 +145,14 @@ export { notesDb } from '@/modules/database/repositories/notes.db.js';
 export type { NoteRow } from '@/modules/database/repositories/notes.db.js';
 export { notificationChannelEndpointsDb } from '@/modules/database/repositories/notification-channel-endpoints.js';
 export { notificationPreferencesDb } from '@/modules/database/repositories/notification-preferences.js';
-// notificationHistoryDb: what the house told each account, the newest 300 rows of it — written and read by the
-// notifications module's history service (`startNotificationHistory`, `listNotificationHistory`).
-export { notificationHistoryDb } from '@/modules/database/repositories/notification-history.db.js';
+// notificationHistoryDb: what the house told each account — every row of the last seven days and, past that, the newest 300 — written
+// and read by the notifications module's history service (`startNotificationHistory`, `listNotificationHistory`,
+// `listNotificationHistorySince`). NOTIFICATION_HISTORY_WINDOW_MS: those seven days; handed on by the notifications module's barrel
+// to the companion's strip read, the one reader of the week.
+export {
+  NOTIFICATION_HISTORY_WINDOW_MS,
+  notificationHistoryDb,
+} from '@/modules/database/repositories/notification-history.db.js';
 export type { NotificationHistoryInput, NotificationHistoryRow } from '@/modules/database/repositories/notification-history.db.js';
 // providerModelsDb: used by Providers to persist user-managed custom model rows.
 export { providerModelsDb } from '@/modules/database/repositories/provider-models.js';

@@ -218,7 +218,7 @@ export function DiagnosisPanel({ diagnosisId, held, onPromote }: DiagnosisPanelP
           // Open while it runs; once over, the one line opens it. `CardFoldBody` takes a folded trail out of the tab order and the accessibility tree.
           <Collapsible open={running || stepsOpen} onOpenChange={setStepsOpen}>
             {!running && (
-              <CollapsibleTrigger className="flex items-center gap-1.5 text-left text-[12.5px] text-muted-foreground hover:text-foreground max-md:min-h-11">
+              <CollapsibleTrigger className="flex items-center gap-1.5 text-left text-[12.5px] text-muted-foreground hover:text-foreground finger:min-h-11">
                 <FoldChevron collapsed={!stepsOpen} />
                 {t('cerberus.diagnosis.steps', {
                   count: steps.length,
@@ -282,14 +282,14 @@ export function DiagnosisPanel({ diagnosisId, held, onPromote }: DiagnosisPanelP
                     size="sm"
                     disabled={held && !starting}
                     busy={starting}
-                    className="min-w-28 max-md:h-11"
+                    className="min-w-28 finger:h-11"
                     onClick={() => void runOnce()}
                   >
                     {starting ? t('cerberus.catalog.running') : t('cerberus.diagnosis.proposal.runOnce')}
                   </Button>
                 )}
                 {offerPromote && (
-                  <Button variant="tonal" size="sm" className="max-md:h-11" onClick={promote}>
+                  <Button variant="tonal" size="sm" className="finger:h-11" onClick={promote}>
                     {t('cerberus.diagnosis.proposal.addToCatalog')}
                   </Button>
                 )}

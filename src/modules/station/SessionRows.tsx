@@ -58,7 +58,7 @@ function HerMark({ her, wrap = false }: { her: StationHerMark; wrap?: boolean })
   );
 }
 
-/** A row's tooltip box: as wide as its words up to 28rem, wrapping; never drawn where nothing hovers (a tap would leave it standing). */
+/** A row's tooltip box: as wide as its words up to 28rem, wrapping; never drawn where nothing hovers, the kit's long press included. */
 const TIP = 'max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere] [@media(hover:none)]:hidden';
 
 type SessionRowProps = {
@@ -75,8 +75,8 @@ type SessionRowProps = {
  * One chat's row: its name over its project, its state chip at the right of the name's first line, the line she reads of it cut
  * to one line, and her mark when she looks at it. A chat waiting on him says what it waits on in the warn ink. The cut line is
  * read whole on the stage this row's press opens, which is how a finger reads it; the `Tooltip` over the row only repeats it for
- * a pointer, and for a keyboard as the row takes the focus. It is not drawn where nothing hovers (`hover:none`): a tap's
- * compatibility mouse events would open it and leave it standing over the stage the press has just opened. On the columns the
+ * a pointer, and for a keyboard as the row takes the focus. It is not drawn where nothing hovers (`hover:none`), the kit's long
+ * press included: a finger reads the line whole on the stage its press opens, and a bubble would only stand over it. On the columns the
  * tip opens to the row's right, over her column; at the narrow tier and at compact density, above the row.
  *
  * AT COMPACT DENSITY the row is ONE line: its name, cut at 60% of the line so a long one never pushes out what follows it, the

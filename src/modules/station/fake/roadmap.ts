@@ -19,10 +19,28 @@ import type {
  * this file.
  *
  * Its three open epics are the real ones: `usage-limits`, `kaylee` and `kaylee-station`. A picture may stand some features at
- * other steps (`lyphecliRoadmap({ name: step })`): the `waiting` picture's two Accepts.
+ * other steps (`lyphecliRoadmap({ name: step })`) and add the epic `DESK_EPIC` (`lyphecliRoadmap({}, { desk: true })`): the
+ * `waiting` picture's two Accepts, the feature's and the epic's, which the roadmap words as the dispatcher does. Its derivation
+ * has an epic's Accept over its features, each cut and not yet approved, so each stands at the step `accept` and none of the
+ * epic's own rows says it: the epic is "waiting on you" through its three features.
  */
 
 const REPO = '/home/lyphe/.claude/claudecodeui_lyphe';
+
+/**
+ * The epic whose Accept the `waiting` picture holds beside the feature's, as `fake/needs.ts` names it (its `card`, its title and
+ * how many features it holds): three features, each cut and owing the epic's one lock. The roadmap draws it in that picture
+ * only, under the companion milestone; every other picture's roadmap is the real one.
+ */
+export const DESK_EPIC = {
+  name: 'kaylee-desk',
+  title: 'Kaylee’s desk',
+  features: [
+    { name: 'kaylee-desk--notes', title: 'The notes she keeps for him' },
+    { name: 'kaylee-desk--pins', title: 'The cards he pins' },
+    { name: 'kaylee-desk--clock', title: 'The clock she tells the time by' },
+  ],
+} as const;
 const NO_CASES: RoadmapCases = { total: 0, holding: 0, broken: 0, regressed: 0, not_run: 0, cant_run: 0 };
 
 /** The word each step stands under, as the dispatcher derives it (`RoadmapFeatureStep`'s own grouping). */
@@ -74,8 +92,11 @@ function milestone(
   };
 }
 
-/** The roadmap `lyphecli`, each feature at its own step but the ones `steps` names, which stand at the step it gives. */
-export function lyphecliRoadmap(steps: Readonly<Record<string, RoadmapFeatureStep>> = {}): Roadmap {
+/**
+ * The roadmap `lyphecli`, each feature at its own step but the ones `steps` names, which stand at the step it gives; with the
+ * epic `DESK_EPIC` after `kaylee-station` when `desk` is set.
+ */
+export function lyphecliRoadmap(steps: Readonly<Record<string, RoadmapFeatureStep>> = {}, { desk = false }: { desk?: boolean } = {}): Roadmap {
   const feature = (
     position: number, name: string, title: string, project: string, step: RoadmapFeatureStep, createdAt: string,
     shippedAt: string | null, runtimeS: number, waitsOn: string[] = [],
@@ -202,6 +223,8 @@ export function lyphecliRoadmap(steps: Readonly<Record<string, RoadmapFeatureSte
         feature(10, 'kaylee-station--memory-page', 'Her memory\'s full page: the read-only live page of her bank in DocSpace', 'house', 'shipped', '2026-10-30T02:34:06Z', '2026-10-30T06:17:29Z', 6411),
         feature(11, 'kaylee-station--phone', 'The station on a phone', 'lyphecli', 'waiting', '2026-10-30T03:50:51Z', null, 0, ['kaylee-station--compact']),
       ]),
+      ...(desk ? [epic(3, DESK_EPIC.name, DESK_EPIC.title, 'in progress', '2026-10-30T09:20:00Z', null, 0,
+        DESK_EPIC.features.map(({ name, title }, at) => feature(at + 1, name, title, 'lyphecli', 'accept', '2026-10-30T09:20:00Z', null, 0)))] : []),
     ]),
   ];
 

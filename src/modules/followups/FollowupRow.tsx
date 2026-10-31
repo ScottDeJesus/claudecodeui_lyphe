@@ -36,8 +36,9 @@ function splitClosedFor(closedFor: string | null): ClosedForNames | null {
  * ticks the row and a screen reader hears the line with its state. The line is plain text (never markdown or HTML) and
  * wraps, long unbroken text included (`.vv-checkbox__label` breaks anywhere). A done row shows when it was settled;
  * an open row shows how long it has been open. A row the house closed when the feature, task or epic it named finished
- * says so: `closedFor` is `<feature>`, `<feature>/<task key>` or `epic:<epic>` (`splitClosedFor`). Below 768 px the tick's
- * row is a 44 px catch under a finger, the house's touch floor: the station's follow-ups stage draws these rows on a phone.
+ * says so: `closedFor` is `<feature>`, `<feature>/<task key>` or `epic:<epic>` (`splitClosedFor`). Under a finger (a touch
+ * screen, or a window under 768 px) the tick's row is a 44 px catch, the house's touch floor: the station's follow-ups stage
+ * draws these rows on a phone, upright and on its side.
  */
 export function FollowupRow({ item, onToggle }: { item: Followup; onToggle: (id: number, done: boolean) => void }) {
   const { t } = useTranslation();
@@ -56,7 +57,7 @@ export function FollowupRow({ item, onToggle }: { item: Followup; onToggle: (id:
   return (
     <li data-followup data-followup-id={item.id} data-followup-kind={item.kind} data-followup-state={item.state} className="min-w-0">
       <Checkbox
-        className="items-start py-1 max-md:min-h-11 max-md:py-2.5"
+        className="items-start py-1 finger:min-h-11 finger:py-2.5"
         checked={done}
         label={item.text}
         onChange={(next) => onToggle(item.id, next)}

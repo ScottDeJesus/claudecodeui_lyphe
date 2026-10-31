@@ -20,8 +20,16 @@ import { spendFreeWording } from './notification-spend-free.service.js';
  * AN ASK TOLD AGAIN IS ONE ROW. Every server boot re-raises the asks still open (each boot is a new push, and the dev server
  * restarts on every save), so the same Accept or permission reaches the seam dozens of times. An event of kind `action_required`
  * that repeats one the account already holds — same code, chat, plan, title and body — replaces it: the row moves to the front
- * with the time it was told last, and the 300 rows are not spent on repeats. Every other kind is kept as it happens: a chat that
+ * with the time it was told last, and the week's rows are not spent on repeats. Every other kind is kept as it happens: a chat that
  * finishes twice finished twice.
+ *
+ * WHAT IS KEPT, AND FOR HOW LONG. Every row of the last seven days, whole, and past that age the newest 300 (`notificationHistoryDb.record`
+ * prunes a row only when it is both older than the week and past the newest 300). 300 rows were once the whole bound and held about three
+ * days and a half of one account, mostly `run.stopped` and `permission.required`, while the station's strip promises a week of landings.
+ *
+ * A KIND KEPT AND NEVER PUSHED. An event of kind `record` (the dispatcher's `dispatcher.feature_finished`, a feature of an epic finishing)
+ * reaches this seam like any other and is kept like any other; the orchestrator returns before every push gate, so it is told to no
+ * channel. The history is where it lives, and the station's strip is what reads it.
  *
  * A write that fails is one journal line and never costs the push, which is why the write is deferred one turn of the event
  * loop (`setImmediate`): the seam runs listeners to completion BEFORE the orchestrator builds and sends the push, and a write
@@ -35,7 +43,7 @@ import { spendFreeWording } from './notification-spend-free.service.js';
  * its own guard, so a listener's fault costs only itself.
  *
  * Consumers: `server/index.ts` (starts it after `listen`, calls its unsubscribe on shutdown) and the companion module's
- * alert reads and station landed read and feed (`listNotificationHistory`, `onHistoryKept`).
+ * alert reads and station landed read and feed (`listNotificationHistory`, `listNotificationHistorySince`, `onHistoryKept`).
  */
 
 /** What hears a kept row: the account it belongs to and the row exactly as stored. */
@@ -118,9 +126,19 @@ export function startNotificationHistory(): () => void {
 }
 
 /**
- * The account's newest `limit` kept events, newest first, as stored (the table keeps 300 per account, so a `limit` past that
- * is 300). Consumed by the companion module's `list_alerts`, which filters out the usage family and words the rest.
+ * The account's newest `limit` kept events, newest first, as stored (a `limit` past 300 is 300: the newest 300 are the most any read of
+ * "the latest" wants, and the repository holds the read to them). Consumed by the companion module's `list_alerts`, which filters out
+ * the usage family and words the rest.
  */
 export function listNotificationHistory(userId: number, limit: number): NotificationHistoryRow[] {
   return notificationHistoryDb.list(userId, limit);
+}
+
+/**
+ * EVERY kept event of the account at or after `sinceIso` (an ISO-8601 UTC stamp), newest first, as stored. The history keeps every row
+ * of the last `NOTIFICATION_HISTORY_WINDOW_MS`, so a `sinceIso` inside that window is answered whole, however busy the house was.
+ * Consumed by the companion module's station landed read (`stationLanded`), which draws the week's landings from it.
+ */
+export function listNotificationHistorySince(userId: number, sinceIso: string): NotificationHistoryRow[] {
+  return notificationHistoryDb.listSince(userId, sinceIso);
 }

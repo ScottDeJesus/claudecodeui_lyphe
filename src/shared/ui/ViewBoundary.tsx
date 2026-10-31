@@ -34,7 +34,7 @@ export function ViewBoundary({ view, children }: ViewBoundaryProps) {
           <Banner
             tone="warn"
             action={(
-              <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs max-md:h-11" onClick={() => window.location.reload()}>
+              <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs finger:h-11" onClick={() => window.location.reload()}>
                 {t('viewBoundary.reload')}
               </Button>
             )}

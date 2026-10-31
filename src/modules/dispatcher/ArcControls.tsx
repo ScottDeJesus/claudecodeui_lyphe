@@ -73,13 +73,13 @@ export function DispatchArcControls({ arc }: { arc: DispatcherArc }) {
           <AcceptWhenCut scope="dispatch-arc" busy={held} pressable={arc.armable > 0} armed={arc.armed > 0}
             onArm={() => void armAccept()} onCancel={() => void disarmAccept()} />
           {arc.walking && (
-            <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void stop()}
+            <Button variant="secondary" size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => void stop()}
               data-dispatch-arc-stop>{t('dispatcher.arcPause')}</Button>
           )}
           {/* THE ARC'S RESUME, for the plans that have walked and stopped, and for a stalled one: the
               plans' own Resume repeated over the arc, with the daemon's waits keeping their order. */}
           {resumable && (
-            <Button size="sm" className="h-8" disabled={held} onClick={() => void resume()}
+            <Button size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => void resume()}
               data-dispatch-arc-resume>{t('runner.resume')}</Button>
           )}
         </>

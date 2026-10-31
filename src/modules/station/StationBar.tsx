@@ -15,9 +15,10 @@ type StationBarProps = {
 };
 
 /**
- * THE STATION'S BAR, across the top of every arrangement: "Kaylee Station" in the page's serif title weight, its
- * second word in Verve's warm garnish (the station's one warm touch, never a wall); the `strip` slot across its
- * middle; and at its right his "Compact" switch, then "CloudCLI" with the app's own mark, the way back to the workspace.
+ * THE STATION'S BAR, across the top of every arrangement but the phone's (its top row is her head, `HeadRow`, and holds the bar's
+ * place): "Kaylee Station" in the page's serif title weight, its second word in Verve's warm garnish (the station's one warm
+ * touch, never a wall); the `strip` slot across its middle; and at its right his "Compact" switch, then "CloudCLI" with the
+ * app's own mark, the way back to the workspace.
  *
  * The title is the page's one `h1`. In compact (below 1024 px, and wherever his switch is on) the strip is a row of the
  * arrangement's own, under her head, and the bar holds none.
@@ -26,8 +27,8 @@ type StationBarProps = {
  * the station is one column at any width (a portrait monitor, a window kept beside his work). It stands only where it changes
  * something, from 1024 px up; below, compact is the only arrangement and the switch is not drawn.
  *
- * THE TOUCH LAW: "CloudCLI" and the Compact label are 44 px catches under a finger below 768 px (and the label on any touch
- * screen); each says what it does in its own words ("Back to CloudCLI", "Compact"), so neither needs a tooltip.
+ * THE TOUCH LAW: "CloudCLI" and the Compact label are 44 px catches under a finger (a touch screen, or a window under 768 px);
+ * each says what it does in its own words ("Back to CloudCLI", "Compact"), so neither needs a tooltip.
  *
  * A pure view: the presses are the caller's. Drawn by `StationShellView` (this module), above the body of every arrangement.
  */
@@ -59,7 +60,7 @@ export function StationBar({ strip, compactSwitch, onBackToCloudcli }: StationBa
         // The switch carries the name; the word beside it is for the eye. The kit's 30 px switch gets the label's 44 px catch.
         <label
           data-station-compact-toggle={compactSwitch.on ? 'on' : 'off'}
-          className="ml-auto flex shrink-0 cursor-pointer items-center gap-2 max-md:min-h-11 [@media(pointer:coarse)]:min-h-11"
+          className="ml-auto flex shrink-0 cursor-pointer items-center gap-2 finger:min-h-11"
         >
           <span aria-hidden="true" className="text-sm font-medium text-foreground">{compactLabel}</span>
           <Switch checked={compactSwitch.on} label={compactLabel} onChange={compactSwitch.onChange} />

@@ -1,13 +1,14 @@
 import { Focus, Inbox, LayoutList, MessageCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cloneElement, isValidElement } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionActionLine, CompanionTalkButton, useCompanion } from '@/modules/companion';
 import { useStation } from '@/modules/station/context/StationContext';
 import { useNeedsCount } from '@/modules/station/context/StationNeedsContext';
 import { useOpenPendingCard } from '@/modules/station/hooks/useOpenPendingCard';
+import { useStationHeadFoot } from '@/modules/station/hooks/useStationHeadFoot';
 import { useStationSection } from '@/modules/station/hooks/useStationSection';
 import { useStripWeek } from '@/modules/station/hooks/useStripWeek';
 import { StationSectionsView } from '@/modules/station/StationSections';
@@ -53,6 +54,8 @@ type StationPhoneViewProps = {
   sideways: boolean;
   /** "CloudCLI" in her menu, the shell's way back in the same window. */
   onBackToCloudcli: () => void;
+  /** Put on the top row's box, so `useStationHeadFoot` can write where her head ends. Absent on a fixture's picture, which opens no sheet. */
+  headRef?: Ref<HTMLDivElement>;
 };
 
 /**
@@ -77,12 +80,13 @@ type StationPhoneViewProps = {
  *    The talk control is the page's one press (`CompanionTalkButton`, round, 64 px): Conversation's box to type to her has no
  *    talk button of its own. What failed with the last press stands in words just above the bar, in the flow, covering nothing.
  *
- * WHILE THE KEYBOARD IS UP (`data-keyboard="up"` on html): the frame ends at the keys and the strip's line, the pending line, the
- * talk error and the bar step aside, so the box to type to her sits on the keyboard as a phone's own messaging does, her face and
+ * WHILE THE KEYBOARD IS UP (the mark, `data-keyboard="up"` on html, which both platforms set: `useVisualViewportKeyboardOffset`): the
+ * frame ends at the keys (the iOS lift; on Android the browser has already resized the layout viewport to end there) and the strip's
+ * line, the pending line, the talk error and the bar step aside, so the box to type to her sits on the keyboard as a phone's own messaging does, her face and
  * state standing over it. EXCEPT WHILE THE MICROPHONE IS OPEN (the press is `listening`): the foot stays, so the round control that
  * ends the recording is never hidden under the keys (the box to type to her has no talk button of its own), and under the keys it
- * drops the home indicator's padding, which the keyboard covers. The arrangement's root is the size container `station-column`,
- * compact's name for its own column, so the sections fold for the keys here as they do there.
+ * drops the home indicator's padding, which the keyboard covers. The arrangement's root is a size container (`container-type: size`),
+ * so a width rule inside it that names no container reads the phone's own column.
  *
  * ON ITS SIDE (`sideways`): the top row 40 px with her face at 32 px and the strip's line folded into its end as its count, before
  * the count of what needs him: the strip's own count form (`countOnly`, "<n> new" or "Nothing new" and its fold), the newest
@@ -101,7 +105,7 @@ type StationPhoneViewProps = {
  * and `.verify/kaylee-station-shots.mjs` draws it on the fixtures' pictures, a section per picture, as the home-screen app.
  */
 export function StationPhoneView({
-  head, strip, openStrip, middle, pendingLine, section, onSection, needsCount, focusLabel, talk, sideways, onBackToCloudcli,
+  head, strip, openStrip, middle, pendingLine, section, onSection, needsCount, focusLabel, talk, sideways, onBackToCloudcli, headRef,
 }: StationPhoneViewProps) {
   const { t } = useTranslation();
   const weekOpen = isDrawn(openStrip);
@@ -200,9 +204,9 @@ export function StationPhoneView({
     <div
       data-station-phone={section}
       data-station-phone-form={sideways ? 'sideways' : 'upright'}
-      className="flex min-h-0 w-full flex-1 flex-col [container-name:station-column] [container-type:size]"
+      className="flex min-h-0 w-full flex-1 flex-col [container-type:size]"
     >
-      <div data-station-phone-top="" className="relative z-20 shrink-0 border-b border-border bg-background">
+      <div ref={headRef} data-station-phone-top="" className="relative z-20 shrink-0 border-b border-border bg-background">
         <div data-station-slot="head" className="min-w-0">
           {headAs(head, { sideways, onBackToCloudcli, trail: <>{sideStrip}{count}</> })}
         </div>
@@ -240,7 +244,7 @@ export function StationPhoneView({
             </p>
           </div>
         )}
-        {/* A group, as compact's section buttons are: it holds the page's talk control, which is no navigation. */}
+        {/* A group, not a navigation: it holds the page's talk control beside the section presses. */}
         <div
           role="group"
           data-station-phone-bar=""
@@ -306,9 +310,12 @@ export function StationPhone({ slots, stage, onBackToCloudcli }: StationPhonePro
   // The strip's line (on its side the strip's count form) and, while he holds it open, its whole week over the middle (compact's
   // own, `useStripWeek`).
   const { line, week } = useStripWeek(slots.strip, { countOnly: sideways });
+  // Where her head ends, written for the sheets that must stand below her face (`CheckStage`'s check sheet).
+  const headRef = useStationHeadFoot();
 
   return (
     <StationPhoneView
+      headRef={headRef}
       head={slots.head}
       strip={line}
       openStrip={week}

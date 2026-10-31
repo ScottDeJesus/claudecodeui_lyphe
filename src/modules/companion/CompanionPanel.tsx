@@ -15,6 +15,7 @@ import type { CompanionModel, CompanionPicture } from '@/shared/companion-types'
 import { openStation } from '@/shared/cloudcliDoors';
 import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
+import { usePhoneWindow } from '@/shared/hooks/usePhoneWindow';
 import type { CompanionEars, CompanionPresence, CompanionVoice, TalkPress } from '@/shared/types';
 import { Banner, Button, Card, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -264,7 +265,8 @@ export function CompanionPanel() {
   const presence = useCompanionPresence();
   // The head's station button: the same door as the command palette's row, bound here to the router and to where the page stands.
   const navigate = useNavigate();
-  const { isMobile, isPWA } = useDeviceSettings();
+  const { isPWA } = useDeviceSettings();
+  const phone = usePhoneWindow();
   // The page's own set of chats with a turn running: Send steer shows while the draft's target is in it, because only then is there a turn to fold into.
   const busySessionIds = useBusySessionIdSet();
   // The action on the card he sees: the × withdraws that one, whatever has been prepared since the press.
@@ -293,7 +295,7 @@ export function CompanionPanel() {
       onDismissNote={dismissNote}
       // His × on the action card: the provider calls the server and clears this action from the picture, so the card goes at once.
       onWithdraw={pendingId === null ? undefined : () => cancelAction(pendingId)}
-      onOpenStation={() => openStation(navigate, { phone: isMobile, pwa: isPWA })}
+      onOpenStation={() => openStation(navigate, { phone, pwa: isPWA })}
       talk={talk}
       voice={voice}
       ears={ears}

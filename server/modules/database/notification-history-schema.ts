@@ -7,7 +7,7 @@
  * and the plan it names (`plan`), at the moment it was heard (`at`). It is the house's record of what it said, in the
  * words it said it in, and not a log of the push channels: a kind that is OFF for pushes by default is in it, and so is
  * an event the push dedupe dropped. An ask told AGAIN (every boot re-raises the asks still open) is one row: it replaces the
- * row it repeats. The newest 300 rows of each account are kept; the repository prunes on every insert (`notification-history.db.ts`).
+ * row it repeats. Every row of the last seven days is kept whole and, past that age, the newest 300 of each account; the repository prunes on every insert (`notification-history.db.ts`).
  *
  * WHY IT HANGS ON `users`. A notification belongs to the account the orchestrator was called for, and nothing else of
  * it outlives that account: `ON DELETE CASCADE` takes an account's history away with the account, without any path that

@@ -1,9 +1,10 @@
 import { Inbox } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useStation } from '@/modules/station/context/StationContext';
 import { useNeedsCount } from '@/modules/station/context/StationNeedsContext';
+import { useStationHeadFoot } from '@/modules/station/hooks/useStationHeadFoot';
 import { useStationSection } from '@/modules/station/hooks/useStationSection';
 import { useStripWeek } from '@/modules/station/hooks/useStripWeek';
 import { StationSectionsView } from '@/modules/station/StationSections';
@@ -13,18 +14,14 @@ import type { StationCompactSection, StationSlot, StationTier } from '@/shared/t
 import { Badge, Button, SegmentedControl } from '@/shared/ui';
 import { cn, isDrawn } from '@/shared/utils';
 
-/**
- * Her head's row: her head, the talk button and the count of what needs him on one line from 640 px; below, her head and the
- * count on the first line and the talk button across the second, so the button keeps its words whole on a phone.
- */
+/** Her head's row: her head, the talk button and the count of what needs him on one line. */
 const HEAD_ROW = cn(
   'grid shrink-0 items-center border-b border-border',
   "grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_auto] [grid-template-areas:'head_talk_needs']",
-  "max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:[grid-template-areas:'head_needs'_'talk_talk']",
 );
 
 /**
- * The column's measure: the whole window up to 48rem (a phone, a narrow window), and from there that measure centred under the
+ * The column's measure: the whole window up to 48rem (a tablet's width, the narrowest window compact draws in), and from there that measure centred under the
  * bar with its edges drawn, so a portrait monitor or a wide window with the switch on reads her lines at a reading length.
  *
  * Its edges are an arbitrary `@media` variant, never a rem `min-[…]`: the project's screens are px, and one `min-[…]` in another
@@ -34,22 +31,20 @@ const HEAD_ROW = cn(
  * he types reads the room the keys leave it.
  */
 const COLUMN = cn(
-  'group/compact mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col [container-name:station-column] [container-type:size]',
+  'mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col [container-name:station-column] [container-type:size]',
   '[@media(min-width:50rem)]:border-x [@media(min-width:50rem)]:border-border',
 );
 
 /**
- * WHILE THE KEYS TAKE HIS ROOM: on a touch screen, while a field in the body holds the focus (her box, her draft, an answer on
- * the stage) and the column stands under 36rem tall (a phone with its keyboard up: the frame's foot rides the keys, so the
- * column is 447 px at 390×844 with an iPhone's keys and 783 without), the strip's line and the switch fold away, and below
- * 640 px, where it has a row of its own, the talk row too: his field takes their room above the keys, her face and state stay.
+ * WHILE THE KEYS TAKE HIS ROOM: while the keyboard's mark is up (`html[data-keyboard=up]`, which both platforms set: the visual
+ * viewport's gap on iOS, a focused field's shrink of the layout viewport on Android; `useVisualViewportKeyboardOffset`) and the
+ * column stands under 36rem tall (a tablet with its keyboard up: the frame's foot rides the keys), the strip's line and the
+ * switch fold away: his field takes their room above the keys, her head stays. The mark says there are keys and the column says
+ * whether they leave too little room, so the two are asked together.
  * With a mouse nothing folds, however short the window (a tiled second monitor, a laptop's 600 px): there are no keys to make
- * room for. Nor on a phone before its keys rise. Nothing moves under his eye.
+ * room for. Nor on a tablet before its keys rise. Nothing moves under his eye.
  */
-const FOLDS_FOR_THE_KEYS = '[@media(pointer:coarse)]:[@container_station-column_(max-height:36rem)]:group-has-[[data-station-sections]_textarea:focus]/compact:hidden';
-
-/** The talk row's fold: the same, below 640 px only, where it has a row of its own (on one row with her head it would leave a hole). */
-const TALK_FOLDS_FOR_THE_KEYS = 'max-sm:[@media(pointer:coarse)]:[@container_station-column_(max-height:36rem)]:group-has-[[data-station-sections]_textarea:focus]/compact:hidden';
+const FOLDS_FOR_THE_KEYS = '[html[data-keyboard=up]_&]:[@container_station-column_(max-height:36rem)]:hidden';
 
 
 type StationCompactViewProps = {
@@ -71,6 +66,8 @@ type StationCompactViewProps = {
   needsCount: number | null;
   /** The label of what stands on the stage, or null while the stage is empty: the Stage section is offered only while one stands. */
   focusLabel: string | null;
+  /** Put on the head row's box, so `useStationHeadFoot` can write where her head ends. Absent on a fixture's picture, which opens no sheet. */
+  headRef?: Ref<HTMLDivElement>;
 };
 
 /**
@@ -84,28 +81,26 @@ type StationCompactViewProps = {
  *   line's own top over the line and the switch, both whole and inert under it (no press is ever half covered), and on over the
  *   body as far as it runs, so nothing under it moves; the week's fold, or a landing he puts on the stage, shuts it.
  * - ONE SWITCH between the sections: Conversation, Needs you with its count, Where things stand, and Stage with the label of
- *   what stands there, offered only while something does. A kit `SegmentedControl` from 480 px (the four need about 440), the
- *   Stage's label the one thing that gives way (the kit's `detail`). Below, on a phone, the same sections as kit `Button`s two
- *   to a row, the one shown filled and `aria-current`, so every section stays in sight with its words whole.
+ *   what stands there, offered only while something does. A kit `SegmentedControl`, the Stage's label the one thing that gives
+ *   way (the kit's `detail`).
  * - THE BODY: the section, full height, each scrolling inside itself (`StationSectionsView`).
  *
- * WHILE THE KEYS TAKE HIS ROOM (on a touch screen, a field in the body focused and the column under 36rem tall: a phone's
- * keyboard up): the strip's line, the switch and, below 640 px, the talk row fold away, so the field and her last lines stand
- * above the keys (`FOLDS_FOR_THE_KEYS`; the sections lift her draft's cap the same way). With a mouse, nothing folds.
+ * WHILE THE KEYS TAKE HIS ROOM (the keyboard's mark up and the column under 36rem tall: a tablet's keyboard up): the strip's
+ * line and the switch fold away, so the field and her last lines stand above the keys (`FOLDS_FOR_THE_KEYS`; the sections lift
+ * her draft's cap on the same mark). With a mouse, nothing folds.
  *
  * THE COLUMN is the window's width up to 48rem, and from there that measure centred under the bar with its edges drawn: on a
  * portrait monitor, or a wide window with the switch on, her lines keep a reading length.
  *
- * THE TOUCH LAW. Below 768 px every press here is a 44 px catch: the switch's segments (the kit's own rule there), the
- * sections' buttons below 480 px, the count, and the regions' own presses. Nothing is said only on hover: the count's words
- * are its name.
+ * THE TOUCH LAW. Under a finger (a tablet) every press here is a 44 px catch: the switch's segments (the kit's own rule
+ * there), the count, and the regions' own presses. Nothing is said only on hover: the count's words are its name.
  * Everything stands inside the shell's frame (status bar, home indicator, keyboard cleared): the week over the body is the
  * one box laid over anything, and it stands inside the arrangement.
  *
  * `data-station-compact` reads the section shown. A pure view: `StationCompact` below binds it, and
  * `.verify/kaylee-station-shots.mjs` draws it on the fixtures' pictures, a section per picture.
  */
-export function StationCompactView({ head, talk, strip, openStrip, sections, section, onSection, needsCount, focusLabel }: StationCompactViewProps) {
+export function StationCompactView({ head, talk, strip, openStrip, sections, section, onSection, needsCount, focusLabel, headRef }: StationCompactViewProps) {
   const { t } = useTranslation();
   const weekOpen = isDrawn(openStrip);
 
@@ -127,10 +122,10 @@ export function StationCompactView({ head, talk, strip, openStrip, sections, sec
 
   return (
     <div data-station-compact={section} className={COLUMN}>
-      <div data-station-compact-head="" className={HEAD_ROW}>
+      <div ref={headRef} data-station-compact-head="" className={HEAD_ROW}>
         <div data-station-slot="head" className="min-w-0 [grid-area:head]">{head}</div>
         {isDrawn(talk) && (
-          <div data-station-slot="talk" className={cn('min-w-0 px-3 py-2 [grid-area:talk] max-sm:pt-0', TALK_FOLDS_FOR_THE_KEYS)}>{talk}</div>
+          <div data-station-slot="talk" className="min-w-0 px-3 py-2 [grid-area:talk]">{talk}</div>
         )}
         <div className="pr-3 [grid-area:needs]">
           <Button
@@ -161,36 +156,13 @@ export function StationCompactView({ head, talk, strip, openStrip, sections, sec
           </div>
         )}
         <div data-station-compact-switch="" {...(weekOpen ? UNDER_THE_WEEK : null)} className="flex items-center border-b border-border px-3 py-2">
-          {/* One breakpoint for the two: the segments from 480 px, the buttons below it, so exactly one switch stands at every width. */}
-          <div data-station-compact-sections="" className="hidden min-w-0 [@media(min-width:480px)]:flex">
+          <div data-station-compact-sections="" className="flex min-w-0">
             <SegmentedControl
               options={offered.map((name) => ({ value: name, label: words[name], count: countOf(name), detail: detailOf(name) }))}
               value={section}
               onChange={onSection}
               label={switchLabel}
             />
-          </div>
-          <div data-station-compact-grid="" role="group" aria-label={switchLabel} className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 [@media(min-width:480px)]:hidden">
-            {offered.map((name) => {
-              const shown = name === section;
-              const count = countOf(name);
-              const detail = detailOf(name);
-              return (
-                <Button
-                  key={name}
-                  variant={shown ? 'tonal' : 'outline'}
-                  size="sm"
-                  aria-current={shown ? 'true' : undefined}
-                  className="min-w-0 justify-start finger:h-11"
-                  onClick={() => onSection(name)}
-                >
-                  {/* The word holds; a count keeps its width; the Stage's label gives way. */}
-                  <span className="shrink-0">{words[name]}</span>
-                  {count !== undefined && <Badge as="span" tone="neutral" className="shrink-0 tabular-nums">{count}</Badge>}
-                  {detail !== undefined && <span className={cn('min-w-0 truncate font-normal', !shown && 'text-muted-foreground')}>{detail}</span>}
-                </Button>
-              );
-            })}
           </div>
         </div>
         {weekOpen && (
@@ -227,9 +199,12 @@ export function StationCompact({ slots, stage, tier }: StationCompactProps) {
   const focusLabel = focus === null ? null : focus.label;
   // The strip's line and, while he holds it open, its whole week over the body: the line inert under it (`useStripWeek`).
   const { line, week } = useStripWeek(slots.strip);
+  // Where her head ends, written for the sheets that must stand below her face (`CheckStage`'s check sheet).
+  const headRef = useStationHeadFoot();
 
   return (
     <StationCompactView
+      headRef={headRef}
       head={slots.head}
       talk={<StationTalk tier={tier} density="compact" part="button" />}
       strip={line}

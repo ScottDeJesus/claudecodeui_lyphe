@@ -26,6 +26,12 @@ function isMemoryLines(value: unknown): value is CompanionMemoryLines {
     && Array.isArray(lines) && lines.every(isMemoryLine);
 }
 
+/**
+ * The sentence for a read that got no answer at all (a dropped connection, a server down): the page's own, never the browser's
+ * "Failed to fetch". Used by `useMemoryLines` below, and by `fake/corner.ts`, whose failed picture says it as the live corner does.
+ */
+export const MEMORY_NO_ANSWER = 'the server did not answer';
+
 /** What the page holds of her memory: the last good reading, and why the read after it failed. Held whole so one update changes both. */
 type Held = { lines: CompanionMemoryLines | null; failure: string | null };
 
@@ -67,7 +73,7 @@ export function useMemoryLines(): { lines: CompanionMemoryLines | null; failure:
         console.warn('[Station] The memory route did not answer:', error);
         return null;
       });
-      if (response === null) throw new Error('the server did not answer');
+      if (response === null) throw new Error(MEMORY_NO_ANSWER);
       if (!response.ok) throw new Error((await refusalSentence(response)) ?? `Request failed (${response.status})`);
       const body: unknown = await response.json().catch(() => null);
       if (!isMemoryLines(body)) throw new Error('the answer was not a list of her memories this page can draw');

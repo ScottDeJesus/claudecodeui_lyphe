@@ -3969,10 +3969,10 @@ export type StationCompactSwitch = { on: boolean; onChange: (on: boolean) => voi
 export type StationSlot = 'strip' | 'sessions' | 'corner' | 'head' | 'conversation' | 'dock' | 'talk' | 'needs';
 
 /**
- * Every place the station remembers a scroll position for: the slots, the `roadmap` and the `stage`. The key of the station's
- * scroll memory, written when a region scrolls and put back when the page reloads or the layout moves a region.
+ * Every place the station remembers a scroll position for: the slots and the `stage`. The key of the station's scroll
+ * memory, written when a region scrolls and put back when the page reloads or the layout moves a region.
  */
-export type StationRegion = StationSlot | 'roadmap' | 'stage';
+export type StationRegion = StationSlot | 'stage';
 
 /**
  * The station's own preferences, remembered per window by `useStationPref`: `stripCollapsed` (the strip is folded),

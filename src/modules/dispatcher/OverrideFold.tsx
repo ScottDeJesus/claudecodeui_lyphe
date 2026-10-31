@@ -31,7 +31,7 @@ export function OverrideFold({ scope, overrides, children }: { scope: 'plan' | '
   return (
     <Collapsible className="flex w-full min-w-0 flex-col" data-override-fold={scope}>
       <CollapsibleTrigger
-        className="group flex min-h-8 w-full min-w-0 items-center gap-1.5 rounded-md px-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="group flex min-h-8 finger:min-h-11 w-full min-w-0 items-center gap-1.5 rounded-md px-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <FoldChevron collapsed={false} className="group-data-[state=closed]:-rotate-90" />
         <span className="flex-none font-semibold">{t('dispatcher.fold.label')}</span>

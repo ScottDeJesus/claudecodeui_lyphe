@@ -84,10 +84,10 @@
 .kaylee-portrait__layer--hair { --kaylee-lag: 90ms; }
 
 /* The face layer shows only the inner part of her frame, feathered into the hair canvas beneath it: a circle round her face (the bake frames
-   her face to the middle of the frame, a little below its centre, cheek to cheek within 32% of its width), opaque over her features and
+   her face to the middle of the frame, just below its centre, cheek to cheek within 23% of its width), opaque over her features and
    fading out over the hair beside them, so where the two layers differ in motion the blend falls on hair and not on her cheek. */
 .kaylee-portrait__layer--face {
-  mask-image: radial-gradient(ellipse 46% 46% at 50% 61%, #000 70%, transparent 100%);
+  mask-image: radial-gradient(ellipse 33% 33% at 50% 50%, #000 70%, transparent 100%);
 }
 
 /* Every part turns about its own middle unless a rule below says otherwise. */

@@ -1,13 +1,10 @@
 import { useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { CSSProperties, KeyboardEvent } from 'react';
 
 import { useFlowTrack } from '@/modules/dispatcher/hooks/useFlowTrack';
 import { badgeVariants } from '@/shared/ui';
 import type { LaneFlowNode } from '@/shared/types';
 import { cn } from '@/shared/utils';
-
-/** A node's width and height, in rem — Tailwind's `w-6` on the node, and what the row's minimum width counts. */
-const NODE_REM = 1.5;
 
 /**
  * The track's edge fade: opaque between two ends whose widths `useFlowTrack` writes as
@@ -20,8 +17,10 @@ const FADE_MASK = 'linear-gradient(to right, transparent, black var(--fade-befor
  * Verve's StatusFlow, horizontal (`_ds_bundle.js`, `components/domain/StatusFlow.jsx`), in this
  * module's terms: every node on ONE track, the track filled as far as the work has got.
  *
- * ONE ROW AT EVERY WIDTH, NEVER SQUEEZED. A node is its natural size, `NODE_REM`, at every width, and
- * the row is at least as wide as all of them side by side. Where that fits, the nodes share the row in
+ * ONE ROW AT EVERY WIDTH, NEVER SQUEEZED. A node is its natural size, 24 px (`w-6`), at every width, and
+ * the row is at least as wide as all of them side by side: 24 px each at a desk, a 44 px column each under a finger
+ * (`finger:`, the touch law), where the node keeps its 24 px look and the column is its catch (a transparent 44 px `::before`
+ * centred on it, which the track's own 10 px of padding above and below holds whole). Where that fits, the nodes share the row in
  * equal columns, as the bundle draws it; where it does not, the row scrolls sideways instead of
  * shrinking the nodes — a two-digit label at 11px bold is about 13px wide, so a node squeezed under
  * that (twenty-three phases in a 332px row are 14px columns) crowds its own ring and collides with its
@@ -114,8 +113,9 @@ export function StatusFlow({
       data-status-flow
     >
       <div
-        className="relative grid flex-1 items-center"
-        style={{ gridTemplateColumns: `repeat(${nodes.length}, minmax(0, 1fr))`, minWidth: `${nodes.length * NODE_REM}rem` }}
+        className="relative grid min-w-[calc(var(--flow-nodes)*1.5rem)] flex-1 items-center finger:min-w-[calc(var(--flow-nodes)*2.75rem)]"
+        // `--flow-nodes` is how many columns the row counts its minimum width in: a class cannot hold a node count, so the count rides in as a property.
+        style={{ gridTemplateColumns: `repeat(${nodes.length}, minmax(0, 1fr))`, '--flow-nodes': nodes.length } as CSSProperties}
       >
         {/* The track: a base line across the row, and the accent filled over it to the share done —
             a meter under the nodes, moving on the entry curve when a phase lands. */}
@@ -152,6 +152,8 @@ export function StatusFlow({
               className={cn(
                 badgeVariants(),
                 'relative aspect-square w-6 cursor-pointer justify-center justify-self-center rounded-full p-0',
+                // The catch under a finger: a 44 px square CENTRED on the node (`inset` would measure from its padding box, which the border and the selected ring change), transparent.
+                "finger:before:absolute finger:before:left-1/2 finger:before:top-1/2 finger:before:h-11 finger:before:w-11 finger:before:-translate-x-1/2 finger:before:-translate-y-1/2 finger:before:content-['']",
                 'text-[11px] font-bold leading-none tabular-nums motion-safe:transition-transform motion-safe:duration-quick motion-safe:ease-spring hover:scale-110',
                 node.live && 'motion-safe:animate-live-ring',
                 isSelected && 'border-2 border-current',

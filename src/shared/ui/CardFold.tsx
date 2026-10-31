@@ -24,9 +24,9 @@ import { cn } from '@/shared/utils';
  * which is where its open state comes from: `aria-expanded` is the primitive's own, and the chevron
  * reads the same context, so the sign and the attribute can never disagree.
  *
- * IT IS NOT 28px ON A PHONE. A thumb needs a real target, so the box is 40px until `sm` and the
- * card's own tight 28px from there up — the desktop header is a row of 20px text and does not want a
- * 40px button in it. The glyph stays small either way; only the pressable box changes.
+ * IT IS NOT 28px UNDER A FINGER. A thumb needs a real target, so the box is 44px where a finger presses (`finger:`:
+ * a touch screen, or a window under 768 px) and the card's own tight 28px at a desk — the desktop header is a row of
+ * 20px text and does not want a 44px button in it. The glyph stays small either way; only the pressable box changes.
  *
  * The toggle is drawn by the dispatcher's `LaneCardHead` — the one head of the plan card and the arc deck — and
  * the glyph alone by the chat's `ShapeFrame`.
@@ -55,9 +55,9 @@ export function CardFoldToggle({ className }: { className?: string }) {
       aria-label={label}
       title={label}
       className={cn(
-        'grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors',
+        'grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors finger:h-11 finger:w-11',
         'hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        'forced-colors:text-[CanvasText] sm:h-7 sm:w-7',
+        'forced-colors:text-[CanvasText]',
         className
       )}
     >

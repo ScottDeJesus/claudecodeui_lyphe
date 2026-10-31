@@ -47,7 +47,7 @@ export function AcceptWhenCut({ scope, pressable, armed, armedTitle, busy, onArm
 
   if (pressable) {
     return (
-      <Button type="button" size="sm" className="h-8" disabled={busy} title={t('dispatcher.acceptWhenCutTitle')}
+      <Button type="button" size="sm" className="h-8 finger:h-11" disabled={busy} title={t('dispatcher.acceptWhenCutTitle')}
         onClick={onArm} {...{ [handles.press]: '' }}>
         {t('dispatcher.acceptWhenCut')}
       </Button>
@@ -60,7 +60,7 @@ export function AcceptWhenCut({ scope, pressable, armed, armedTitle, busy, onArm
         {...{ [handles.armed]: '' }}>
         {t('dispatcher.acceptWhenCutArmed')}
       </span>
-      <Button type="button" variant="ghost" size="sm" className="h-8" disabled={busy} onClick={onCancel}
+      <Button type="button" variant="ghost" size="sm" className="h-8 finger:h-11" disabled={busy} onClick={onCancel}
         {...{ [handles.cancel]: '' }}>
         {t('dispatcher.acceptWhenCutCancel')}
       </Button>

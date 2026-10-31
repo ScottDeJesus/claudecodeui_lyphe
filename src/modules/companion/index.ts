@@ -17,7 +17,7 @@ export { CompanionActionCard } from '@/modules/companion/CompanionActionCard';
 // bar while the action waits, and its press opens the whole card in Needs you (it never carries his lines, MAN-9186).
 export { CompanionActionLine } from '@/modules/companion/CompanionActionLine';
 // Whether the action waiting for his word has lapsed (its deadline, one timer): the card and the line read it, and the station's
-// count of what needs him (`useNeedsCount`) so an action whose card is gone is not counted.
+// count of what needs him (through the station's `useLivePending`) so an action whose card is gone is not counted.
 export { useActionLapse } from '@/modules/companion/hooks/useActionLapse';
 // Her draft, its one editor, as her panel draws it last in her dock; its second home is the station's dock (`StationDock`), at
 // the foot of her column over the talk control, which hands it `onTargetPress` so the target's name puts its session on the

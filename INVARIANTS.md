@@ -18874,34 +18874,35 @@ Every component of Kaylee Station keeps one law for a finger and one for a point
 
 | when | do |
 |---|---|
-| a station component draws a press (a button, a link, a tab, a field) | 44 px tall under a finger: `finger:h-11`, and `finger:w-11` on an icon-only press. `finger:` (`tailwind.config.js`) is the kit's own query (`verve/data.css`): a touch screen (`pointer: coarse`) or a window under 768 px. On a desk with a mouse it keeps its own size (the stage's Back and ✕ are 32 px). `max-md:` stays for what a NARROW window lays out differently (a line that wraps, a cell that hides), and never for a press's size in a station or companion file (the shared and owner-drawn presses named in the known edge below still do) |
+| a station component draws a press (a button, a link, a tab, a field) | 44 px tall under a finger: `finger:h-11`, and `finger:w-11` on an icon-only press. `finger:` (`tailwind.config.js`) is the kit's own query (`verve/data.css`): a touch screen (`pointer: coarse`) or a window under 768 px. On a desk with a mouse it keeps its own size (the stage's Back and ✕ are 32 px). `max-md:` stays for what a NARROW window lays out differently (a line that wraps, a cell that hides), and never for a press's size |
 | a press has a tooltip | the tooltip only repeats the name the press already carries (`aria-label` or its visible words). The press is the thing itself, so a finger loses nothing. A tap's compatibility mouse events do open the kit `Tooltip`'s bubble (measured 2026-10-30: it stayed over the stage head after a strip landing's tap), so a press that stages a thing hides its bubble where there is no hover: `[@media(hover:none)]:hidden` on the `Tooltip` (`LandedEntry`, MAN-9287; the left rail's session, epic and feature rows, MAN-9288) |
 | a row of the left rail (a chat, an epic, a feature) cuts its line to one line | the line stands whole on the stage the row's press opens, which is how a finger reads it; the row's `Tooltip` only repeats it for a pointer and, with `showOnFocus`, a keyboard. Every row and fold head is a real `<button>`, `finger:min-h-11` (MAN-9288) |
 | a region draws at `density: 'compact'` (a row on one line, her controls behind one press) | every press in the compact drawing is the same 44 px catch under a finger: a row (MAN-9289, MAN-9290), a need's act and its words (MAN-9281), the talk button 44 px with its words kept (MAN-9324), "Her controls" `finger:h-11` and, open, every press of her controls' line (MAN-9314). A row's words are cut to one line and stand whole on the stage |
 | something would be said only on hover | say it in the press's visible words or its `aria-label`. No tooltip, `title` or hover-only mark holds what a press does not reach |
-| a kind, a state or a tone is shown | glyph AND word, never colour or shape alone (MAN-578). A fallback names its kind in words |
+| a press's description is its `title` or tooltip (the dispatcher's lock answers, her controls' Live, the draft's Send steer) | the description also stands in visible words where there is no hover: `[@media(hover:none)]` shows one muted line, outside the press (a tap on the words presses nothing). A pointer keeps the title or tooltip and is drawn no words: `LockAnswer` (MAN-7537), `CompanionControls` Live and `CompanionDraftCard` Send steer (MAN-9062, MAN-9393) |
+| a kind, a state or a tone is shown | glyph AND word, never colour or shape alone (MAN-578). `StageGone` stands under the stage's head, which draws the kind's glyph and word |
 | a press can be made 44 px without moving its neighbours | grow its catch with a transparent `::before`; the probe counts it as the press's size |
 | a door leaves the page (`openStation`, `openInCloudcli`, `backToCloudcli`) | on a phone or in the home-screen app it navigates in THIS window (MAN-9247); a new window would leave the app for the browser |
-| another module's drawing stands on the stage (`PlanCard`, `FeatureFacts`, `EpicPanel`) | it is that module's to bring up. The station does not resize it; the shots probe REPORTS its presses under 44 px and never fails on them (2026-10-29, 390 px: 18 of 21 presses of the dispatcher's `PlanCard` under 44 px) |
-| the rail's ask, follow-ups or check stage draws another module's presses (the followups ticks and Done fold, Cerberus's card presses and Diagnose, the kit's option row and empty-state button) | those are 44 px below 768 px in the owner's own file (`max-md:min-h-11`, `max-md:h-11`), because the law names every answer there; on a touch screen over 768 px they are not yet (the known edge below). The probe FAILS any press inside the three stages under 44 px (MAN-9229, MAN-9283) |
+| the dispatcher's `PlanCard` stands on the stage (an Accept, a round) | every press of it is `finger:` sized in the dispatcher's own files: its head, the census fold, the answers, the round's pager and nodes. The shots probe FAILS any press inside `[data-dispatcher-card]` under 44 px (`lib/station-touch.mjs`, MAN-9261) |
+| another module's drawing stands on the stage (`FeatureFacts`, `EpicPanel`) | it is that module's to bring up. The station does not resize it; the shots probe REPORTS its presses under 44 px and never fails on them |
+| the rail's ask, follow-ups or check stage draws another module's presses (the followups ticks and Done fold, Cerberus's card presses, Diagnose and the diagnosis panel's, the kit's empty-state button, option row, confirm dialog and view boundary) | those are `finger:` sized in the owner's own file (`finger:min-h-11`, `finger:h-11`): 44 px on a touch screen of any width and in a window under 768 px, a desk's own size otherwise. The probe FAILS any press inside the three stages under 44 px, at 390×844 and at 844×390 with touch (MAN-9229, MAN-9283) |
 
 ## `phone` — what is a phone's window
-`useStation().phone` = `innerWidth < 768`, or a touch window (`(pointer: coarse)`) under 500 px tall (a phone on its side). Read by `useStationWindow` on `resize` and on the pointer query's `change`; no timer (MAN-9249).
+`useStation().phone` = `isPhoneWindow()` (MAN-9392): `innerWidth < 768`, or a touch window (`(pointer: coarse)`) under 500 px tall (a phone on its side). Read by `useStationWindow` on `resize` and on the pointer query's `change`; no timer (MAN-9249).
 | reader | uses `phone` for |
 |---|---|
 | `StationShell` | `backToCloudcli(navigate, { phone, pwa })` |
-| `FocusFallback` | `openInCloudcli(path, navigate, { phone, pwa })` |
 | `ChatStage` | `openInCloudcli('/session/<id>', navigate, { phone, pwa })`: "Open the chat" is the window named `cloudcli` on a desktop and this window on a phone (`.verify/kaylee-station-rail-live.mjs`) |
 - The 44 px is CSS, keyed on a finger (`finger:`: a touch screen or a window under 768 px), not on `phone`. `phone` decides only which window a door opens in and which arrangement the shell draws. A phone on its side (844 px across, a touch screen) is a finger's window, so its presses are 44 px there as upright.
-- The workspace's two doors into the station (the palette's row, her panel's head) read `useDeviceSettings().isMobile` (under 768 px), so a phone on its side in a plain browser tab gets the station in a window of its own from them and then navigates in place from the bar. In the home-screen app all three agree through `pwa` (MAN-9247).
+- The workspace's two doors into the station (the palette's row, her panel's head) pass `usePhoneWindow()`, the same predicate, so a phone on its side in a plain browser tab opens the station in THIS tab from them as the bar navigates in place. In the home-screen app `pwa` says the same (MAN-9247).
 - The phone's own arrangement, with the talk control under his thumb (`StationPhoneView`, MAN-9370), is what the shell draws whenever `phone` is true, before compact (MAN-9337), which stays the second monitor's and the tablet's. It draws `StationSectionsView` and reads `useStationSection` (MAN-9335, MAN-9344), not a copy.
 - Its own presses are 44 px catches on its side too, whatever the width: where a press is drawn shorter than the row (40 px sideways) its catch grows by a transparent `::before` (`STATION_SIDEWAYS_CATCH`, `STATION_COUNT_FORM_CATCH`).
-- Known edge: the presses ANOTHER module owns and draws on the stage still key on width (`max-md:`): the kit's `QuestionOptionRow`, `EmptyState`, `ConfirmDialog`, `ViewBoundary` and `SphereView`, the followups module's rows and Cerberus's card presses (`NeedFix`, `NeedsYouCard`, `DiagnoseButton`, `DiagnosisPanel`…). A phone on its side (844 px across, a touch screen) draws them desk-sized. They are shared across the app, so moving them to `finger:` changes every screen that draws them and wants its own review. The shots probe cannot see them: no fixture picture at 844×390 draws one, and presses inside another module's drawing are REPORTED, never failed.
+
 
 ## Proof
-`.verify/kaylee-station-shots.mjs` `touch` check at 390×844: the shell's own presses, every region's, every press on the rail's three stages and every press of her cards (`NoteStage`, `WalkStage`, `StageShelf`) must be ≥ 44 px (MAN-9229, MAN-9295, MAN-9296, MAN-9297). In the compact arrangement (`lib/station-compact.mjs`, MAN-9336) the same check runs at 600×900 (a mouse) and 390×844 (touch), with compact's own presses among the shell's: the switch's segments, its buttons below 480 px (two to a row), the count of what needs him and the bar's Compact label; and on the phone with the keyboard up, her draft's card, its target and its sends a 44 px catch where they stand above the keys (`lib/station-compact.mjs`'s keyboard run); the phone's arrangement (`lib/station-phone.mjs`, MAN-9373) at 390×844, 360×780, 390×664 and 844×390 (on its side, where every region's and the stage's presses are 44 px under `finger:` and the kit's `.vv-select--sm` as well), its own presses among the shell's: the bar's four sections, the round talk control, the count, her menu's trigger and the action's line; in a mouse window, however short (600×900, 700×900, 600×620, and 1280×600 with the switch on), a field or a dock button focused folds nothing and moves nothing: the folds wait on a touch screen as well as a short column. `.verify/kaylee-station-density.mjs` (MAN-9328) draws every region at compact density at the same two sizes and measures every press, "Her controls" open included; its box's Send is measured after one typed letter. A disabled press (her box's Send while the field is empty) is measured with its `pointer-events` lifted for the measure: the kit's `disabled:pointer-events-none` hides it from `elementFromPoint` under a mouse (not under touch), which read its 32 px box at 600 px and never its 44 px catch. `.verify/station-doors.mjs` check 7: every button, link, tab and field in the shell is a 44 px catch on the phone (MAN-9253). `.verify/kaylee-station-rail-live.mjs`, live at 390×844 with touch: every row and fold head of the left rail is ≥ 44 px (the folds exactly 44) and a pressed session's stage stands up with its line whole (leg E: its known edge is in MAN-9306).
+`.verify/kaylee-station-shots.mjs` `touch` check at 390×844: the shell's own presses, every region's, every press on the rail's three stages and every press of her cards (`NoteStage`, `WalkStage`, `StageShelf`) must be ≥ 44 px (MAN-9229, MAN-9295, MAN-9296, MAN-9297). Compact's own presses are among the shell's: the switch's segments, the count of what needs him and the bar's Compact label (`lib/station-compact.mjs`, MAN-9336, draws from 768 px up); the phone's arrangement (`lib/station-phone.mjs`, MAN-9373) at 390×844, 360×780, 390×664 and 844×390 (on its side, where every region's and the stage's presses are 44 px under `finger:` and the kit's `.vv-select--sm` as well), its own presses among the shell's: the bar's four sections, the round talk control, the count, her menu's trigger and the action's line; in a mouse window, however short (1280×600 with the switch on), a field or a dock button focused folds nothing and moves nothing: the folds wait on a touch screen as well as a short column. `.verify/kaylee-station-density.mjs` (MAN-9328) draws every region at compact density at 600×900 and 390×844 and measures every press, "Her controls" open included; its box's Send is measured after one typed letter. A disabled press (her box's Send while the field is empty) is measured with its `pointer-events` lifted for the measure: the kit's `disabled:pointer-events-none` hides it from `elementFromPoint` under a mouse (not under touch), which read its 32 px box at 600 px and never its 44 px catch. `.verify/station-doors.mjs` check 7: every button, link, tab and field in the shell is a 44 px catch on the phone (MAN-9253). `.verify/kaylee-station-rail-live.mjs`, live at 390×844 with touch: every row and fold head of the left rail is ≥ 44 px (the folds exactly 44) and a pressed session's stage stands up with its line whole (leg E: its known edge is in MAN-9306). `.verify/station-round-touch.mjs` (MAN-9304), at 390×844 and 844×390 with touch: every press of a design round on the stage, its `Other…` field open, is 44 px.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionCardChip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/AskAnswers.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/AskStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/cardBodies.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/ChatStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/CheckStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/FocusFallback.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/FollowupsStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NeedItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NoteStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/PageStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RailRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RoadmapRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/SessionRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StageShelf.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationConversation.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationSections.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationTalk.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WalkStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhatNeedsYou.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhereThingsStand.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionCardChip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/AskAnswers.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/AskStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/cardBodies.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/ChatStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/CheckStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/FollowupsStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NeedItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/NoteStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/PageStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RailRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/RoadmapRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/SessionRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StageShelf.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stageStates.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationConversation.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationSections.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationTalk.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WalkStage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhatNeedsYou.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/WhereThingsStand.tsx
 
 ## INV-10276 — probe — The saved speech audio can be found only by the session that made it, and a failed live run loses it
 
@@ -19297,68 +19298,6 @@ probe-key: c344e412b02b65aeb9119765693b6b2131f13b5b
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationLandedContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-landed-provider.mjs
 
-## INV-10300 — probe — a first read that fails by a dropped connection or a non-JSON body shows the browser's / JSON parser's words in the rail's failed state
-
-a first read that fails by a dropped connection or a non-JSON body shows the browser's / JSON parser's words in the rail's failed state
-
-```probe
-D=$(mktemp -d /tmp/athena-pin-XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { loginToken } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ntfy.mjs';
-import { openNeedsContext, openStation, providerValue, settled } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-needs-reads-kit.mjs';
-const { browser, context } = await openNeedsContext(await loginToken());
-for (const [label, fulfil] of [['dropped connection', (r) => r.abort('connectionreset')], ['HTML 200', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<html>proxy</html>' })]]) {
-  const station = await openStation(context, { beforeGoto: (page) => page.route('**/api/companion/station/needs', fulfil) });
-  await settled(station.page, 2000);
-  console.log(`${label} -> failure ${JSON.stringify((await providerValue(station.page))?.failure ?? null)}`);
-  await station.page.close();
-}
-await browser.close();
-process.exit(0);
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /tmp && timeout 400 node "$(dirname "$0")/p.mjs" 2>&1 | tail -4
-EOF
-bash "$D/p.sh"
-# expect: defect stands while it prints `failure "Failed to fetch"` and `failure "Unexpected token '<'…"`; cured when each prints a plain sentence (the sibling's "the server could not be reached" / "the answer is not a list of needs this page can draw").
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--what-needs-you--provider-20261030-035536-c262, finding M1, MEDIUM
-probe-key: 5fc91d23462c2443df23d7ac09a3f278592d3f65
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationNeedsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-needs-reads-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-needs-provider.mjs
-
-## INV-10301 — probe — a socket drop and return costs two reads: the lane's REST re-seed republishes an unchanged lane and the provider takes it for a new picture
-
-a socket drop and return costs two reads: the lane's REST re-seed republishes an unchanged lane and the provider takes it for a new picture
-
-```probe
-D=$(mktemp -d /tmp/athena-pin-XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { loginToken } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ntfy.mjs';
-import { openNeedsContext, openStation, settled, sleep } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-needs-reads-kit.mjs';
-const { browser, context } = await openNeedsContext(await loginToken());
-const station = await openStation(context, { routeSocket: true });
-const before = (await settled(station.page, 4000)).reads.length;
-station.sockets.at(-1).close();
-await sleep(9000);
-const after = await settled(station.page, 3000);
-console.log(`one reconnect -> ${after.reads.length - before} read(s) of GET /needs`);
-await browser.close();
-process.exit(0);
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /tmp && timeout 300 node "$(dirname "$0")/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh"
-# expect: `one reconnect -> 2 read(s)` while the defect stands; `1 read(s)` once the lane trigger ignores an unchanged picture.
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--what-needs-you--provider-20261030-035536-c262, finding L1, LOW
-probe-key: 9ee769cf728986d005825d5b14bc3a42aa8a9426
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/context/StationNeedsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-needs-reads-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-needs-provider.mjs
-
 ## INV-10305 — probe — LOW: two of the rewritten rows still say the header imports `FILES_NAMED` and `baseName`, and two still name `useFaceInputs` as the hook that takes `size`
 
 LOW: two of the rewritten rows still say the header imports `FILES_NAMED` and `baseName`, and two still name `useFaceInputs` as the hook that takes `size`
@@ -19735,52 +19674,52 @@ probe-key: fb684cffbb18d3d44d2ca44ccf2c92f022346858
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/LandedTimeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-strip-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-strip-whole.mjs
 
-## INV-10323 — probe — The hold on the pressing Enter ends at ANY key's release, so Enter's auto-repeat reaches Queue after another key comes up (H1's cure, one gap)
+## INV-10323 — The hold on the pressing key ends only at THAT key's release (or a window blur), so a held Enter's auto-repeat never reaches a round's first option while another key comes up
 
-The hold on the pressing Enter ends at ANY key's release, so Enter's auto-repeat reaches Queue after another key comes up (H1's cure, one gap)
+The hold on the pressing key ends only at THAT key's release (or a window blur), so a held Enter's auto-repeat never reaches a round's first option while another key comes up
 
 ```probe
 D=$(mktemp -d /tmp/athena-p7.XXXXXX) || exit 1
 cat > "$D/p.sh" <<'EOF'
 cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
 W=$1
-cat > "$W/shiftheld.mjs" <<'EOF2'
-import { execFileSync } from 'node:child_process';
-import { homedir } from 'node:os';
-import path from 'node:path';
+cat > "$W/heldkey.mjs" <<'EOF2'
 import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
-const { PROBE_APP: APP, PROBE_TOKEN: TOKEN, PROBE_DISPATCHER_HOME: HOME, PROBE_PLAN_ACCEPT: ACCEPT } = process.env;
+import { STUBBED_REQUESTS } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES, pinPreferences } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const { PROBE_APP: APP, PROBE_TOKEN: TOKEN, PROBE_DISPATCHER_HOME: HOME, PROBE_PLAN_QUESTIONS: QUESTIONS } = process.env;
 if (!HOME?.startsWith('/tmp/heph-eyes.')) process.exit(2);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const approved = () => /approved by/.test(execFileSync(path.join(homedir(), '.claude/scripts/dispatcher'), ['show', ACCEPT], { encoding: 'utf8', env: { ...process.env, DISPATCHER_HOME: HOME } }));
 const browser = await pw.chromium.launch();
-const c = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block' });
-await c.addInitScript((t) => { localStorage.setItem('auth-token', t); localStorage.setItem('companion-voice', 'off'); }, TOKEN);
-const page = await c.newPage();
-await page.routeWebSocket(/^wss?:\/\/[^/]+\/\?token=/, (ws) => { ws.connectToServer().onMessage(() => {}); });
-await page.goto(`${APP}/station`, { waitUntil: 'domcontentloaded' });
-const act = page.locator('li[data-station-need="accept"] [data-station-need-act]').first();
-await act.waitFor({ timeout: 120000 });
-await sleep(1500);
-await act.focus();
-await page.keyboard.down('Shift');
-await page.keyboard.down('Enter');
-await sleep(300);
-const first = approved();
-await page.keyboard.up('Shift');
-await sleep(150);
-await page.keyboard.down('Enter');
-await sleep(500);
-const second = approved();
-await page.keyboard.up('Enter');
-console.log(`SHIFTHELD approved after Shift+Enter=${first}; after Shift came up and Enter's auto-repeat keydown=${second}`);
-await browser.close();
+try {
+  const context = await browser.newContext({ serviceWorkers: 'block', colorScheme: 'dark', viewport: { width: 1440, height: 900 } });
+  context.setDefaultTimeout(240_000);
+  await context.addInitScript((t) => { try { localStorage.setItem('auth-token', t); localStorage.setItem('companion-voice', 'off'); } catch {} }, TOKEN);
+  await pinPreferences(context, HARNESS_PREFERENCES);
+  for (const { pattern, body } of STUBBED_REQUESTS) await context.route(pattern, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }));
+  const page = await context.newPage();
+  await page.routeWebSocket(/^wss?:\/\/[^/]+\/\?token=/, (ws) => { ws.connectToServer().onMessage(() => {}); });
+  await page.goto(`${APP}/station`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-station-shell]', { timeout: 300_000 });
+  const checked = () => page.evaluate(() => document.querySelectorAll('[data-question-option][aria-checked="true"]').length);
+  const act = page.locator('li[data-station-need="questions"]', { hasText: new RegExp(QUESTIONS.replace(/-/g, '[ -]'), 'i') }).first().locator('[data-station-need-act]');
+  await act.waitFor();
+  await act.focus();
+  await page.keyboard.down('Shift'); await page.keyboard.down('Enter'); await sleep(1500);
+  const landedOn = await page.evaluate(() => document.activeElement?.hasAttribute('data-question-option') ?? false);
+  await page.keyboard.down('Enter'); await page.keyboard.down('Enter'); await page.keyboard.up('Shift'); await page.keyboard.down('Enter'); await sleep(300);
+  await page.keyboard.up('Enter'); await sleep(400);
+  const afterHeld = await checked();
+  await page.keyboard.press('Enter'); await sleep(400);
+  console.log(`HELDKEYONROUND landedOnOption=${landedOn} checkedAfterHeldRepeats=${afterHeld} checkedAfterFreshEnter=${await checked()}`);
+  await context.close();
+} finally { await browser.close(); }
 EOF2
-KAYLEE_EYES_PLANS="accept" bash .verify/kaylee-eyes-scratch.sh node "$W/shiftheld.mjs" 2>&1 | grep -E '^SHIFTHELD' || echo "SHIFTHELD none"
+SUNSET_SLOT="${SUNSET_SLOT:-8}" KAYLEE_EYES_PLANS="accept questions" bash .verify/kaylee-eyes-scratch.sh node "$W/heldkey.mjs" 2>&1 | grep -E '^HELDKEYONROUND' || echo "HELDKEYONROUND none"
 EOF
 bash "$D/p.sh" "$D"
 case "$D" in /tmp/athena-p7.*) rm -rf "$D" ;; esac
-# expect: `SHIFTHELD approved after Shift+Enter=false; after Shift came up and Enter's auto-repeat keydown=false` once the hold ends only on Enter's own keyup; `…=true` while the defect stands (the scratch plan is then `approved by: app:card`)
+# expect: `HELDKEYONROUND landedOnOption=true checkedAfterHeldRepeats=0 checkedAfterFreshEnter=1`: the hold ends only on Enter's own keyup. `checkedAfterHeldRepeats` of 1 or more means a held key pressed the round's first option
 ```
 
 measured 2026-10-30 by chain chain-kaylee-station--what-needs-you--live-20261030-053122-b863, finding L1, LOW
@@ -20039,25 +19978,6 @@ measured 2026-10-30 by chain chain-kaylee-station--memory-corner--docs-20261030-
 probe-key: 55c6ac418089427da906da460709a9cad651e7e7
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-chain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-announce.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-bank-door.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-bank-standin.mjs
-
-## INV-10336 — probe — (LOW). MAN-9312's `failed` fixture is "Failed to fetch", the browser's own words, beside MAN-9293's rule that this is never what the corner says
-
-(LOW). MAN-9312's `failed` fixture is "Failed to fetch", the browser's own words, beside MAN-9293's rule that this is never what the corner says
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-echo "MAN-9312 'Failed to fetch' line says it is a stand-in: $(docstore get MAN-9312 --text | grep 'Failed to fetch' | grep -c -i -E 'stand-in|fixture only|never the hook')"
-EOF
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: `0` while the row presents the string without saying it is a fixture's; cured at ≥ 1.
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--memory-corner--docs-20261030-080930-ab65, finding L4, LOW
-probe-key: 54a23b73356f621899520f95d7c2baeee2ce9315
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/fake/corner.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useMemoryLines.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/MemoryCorner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/MemoryLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-corner.mjs
 
 ## INV-10337 — probe — (LOW). MAN-9308's "Prove it" does not say `kaylee-memory-lines.mjs` spends a Gemini transcription
 
@@ -20749,38 +20669,6 @@ bash "$D/p.sh"
 
 measured 2026-10-30 by chain chain-kaylee-station--center--whole-20261030-111002-224a, finding L4, LOW
 probe-key: 52dd4e424b69434d2e6e6e1f223106442e29aae6
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-center-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-voice-kit.mjs
-
-## INV-10367 — probe — (LOW) — `audioProbe` counts a touch `pointerdown` as a gesture, and Chromium does not
-
-(LOW) — `audioProbe` counts a touch `pointerdown` as a gesture, and Chromium does not
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
-const browser = await pw.chromium.launch({});
-const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
-await context.addInitScript(() => {
-  window.__log = [];
-  for (const type of ['pointerdown', 'touchstart', 'pointerup', 'touchend']) {
-    window.addEventListener(type, (event) => window.__log.push(`${type} active=${navigator.userActivation.isActive}`), true);
-  }
-});
-const page = await context.newPage();
-await page.goto('data:text/html,<body style="margin:0"><div style="width:390px;height:844px">tap</div></body>');
-await page.touchscreen.tap(200, 400);
-await new Promise((r) => setTimeout(r, 200));
-console.log((await page.evaluate(() => window.__log)).join(' | '));
-await browser.close();
-EOF
-cd /tmp && node "$D/p.mjs"
-grep -n "addEventListener('pointerdown'" /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-voice-kit.mjs
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--center--whole-20261030-111002-224a, finding L5, LOW
-probe-key: 986626e7f6ab9f72b486e1da2f8e3692f17a5fa9
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-center-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-voice-kit.mjs
 
@@ -21884,315 +21772,6 @@ Open: `parkOnProjectTree` should send its PATCH to `PROBE_API` when the stager s
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs
 
-## INV-10462 — probe — . MEDIUM — an open microphone has no Stop in reach once the keys are up
-
-. MEDIUM — an open microphone has no Stop in reach once the keys are up
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd "$(dirname "$0")" || exit 1
-cat > p.mjs <<'JS'
-import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
-import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
-import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
-const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES }, launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] } });
-const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 390, height: 844 }, storageState: await S.page.context().storageState() });
-await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
-await ctx.grantPermissions(["microphone"], { origin: APP_URL });
-await ctx.route("**/api/companion/press", (r) => r.fulfill({ status: 202, contentType: "application/json", body: '{"text":""}' }));
-const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
-await p.locator('[data-station-phone-bar] [data-companion-talk-size="round"] button').tap(); await sleep(600);
-await p.locator('[data-station-section=conversation] textarea').first().tap();
-await p.evaluate(() => { Object.defineProperty(visualViewport, "height", { configurable: true, get: () => innerHeight - 336 }); visualViewport.dispatchEvent(new Event("resize")); }); await sleep(500);
-console.log(JSON.stringify(await p.evaluate(() => ({ talk: document.querySelector("[data-companion-talk]")?.dataset.companionTalk ?? "none", keyboard: document.documentElement.dataset.keyboard,
-  talkVisible: !!document.querySelector("[data-companion-talk]")?.getClientRects().length,
-  visibleStops: [...document.querySelectorAll("button,[role=button]")].filter((b) => b.getClientRects().length && /stop|cancel|talk|listen|record|microphone/i.test(b.getAttribute("aria-label") ?? "")).map((b) => b.getAttribute("aria-label")) }))));
-await S.browser.close();
-JS
-timeout 100 node p.mjs 2>&1 | tail -3
-EOF
-bash "$D/p.sh"
-# expect: {"talk":"listening","keyboard":"up","talkVisible":false,"visibleStops":[]} (cured: `talkVisible` true or a stop in `visibleStops`)
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding M1, MEDIUM
-probe-key: d34227fd085daf2a315c1ab42f01066b828a8294
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
-
-## INV-10463 — probe — . LOW — a long unbroken stage label spills out of its press over the neighbours and the screen edge
-
-. LOW — a long unbroken stage label spills out of its press over the neighbours and the screen edge
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd "$(dirname "$0")" || exit 1
-cat > p.mjs <<'JS'
-import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
-import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
-import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
-const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
-const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 360, height: 780 }, storageState: await S.page.context().storageState() });
-await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
-await ctx.addInitScript(() => localStorage.setItem("kaylee-station", JSON.stringify({ focus: { kind: "chat", sessionId: "aaaaaaaa-0000-4000-8000-000000000001", label: "a_very_long_unbroken_feature_label_with_no_spaces_at_all_0123456789" }, stack: [], scroll: {}, prefs: {} })));
-const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
-console.log(JSON.stringify(await p.evaluate(() => { const press = document.querySelector("[data-station-phone-section=stage]"); const a = press.getBoundingClientRect(), w = press.querySelector("[data-station-phone-word]").getBoundingClientRect();
-  return { pressLeft: Math.round(a.left), pressRight: Math.round(a.right), wordLeft: Math.round(w.left), wordRight: Math.round(w.right), wordOutsidePress: w.left < a.left - 1 || w.right > a.right + 1, pressClips: getComputedStyle(press).overflow }; })));
-await S.browser.close();
-JS
-timeout 100 node p.mjs 2>&1 | tail -3
-EOF
-bash "$D/p.sh"
-# expect: {"pressLeft":285,"pressRight":354,"wordLeft":149,"wordRight":491,"wordOutsidePress":true,...} (cured: `wordOutsidePress` false)
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L1, LOW
-probe-key: c387b96308fc47b80d5e845b2abb0664f26e8412
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
-
-## INV-10464 — probe — . LOW — `data-keyboard` marks `up` for any gap over 0, so a sub-pixel gap hides the bar
-
-. LOW — `data-keyboard` marks `up` for any gap over 0, so a sub-pixel gap hides the bar
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd "$(dirname "$0")" || exit 1
-cat > p.mjs <<'JS'
-import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
-import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
-import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
-const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
-const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 390, height: 844 }, storageState: await S.page.context().storageState() });
-await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
-
-const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
-await p.evaluate(() => { Object.defineProperty(visualViewport, "height", { configurable: true, get: () => innerHeight - 0.4 }); visualViewport.dispatchEvent(new Event("resize")); });
-console.log(JSON.stringify(await p.evaluate(() => ({ keyboard: document.documentElement.dataset.keyboard, keyboardHeight: document.documentElement.style.getPropertyValue("--keyboard-height"), footDisplay: getComputedStyle(document.querySelector("[data-station-phone-foot]")).display }))));
-await S.browser.close();
-JS
-timeout 100 node p.mjs 2>&1 | tail -3
-EOF
-bash "$D/p.sh"
-# expect: {"keyboard":"up","keyboardHeight":"0.39999999999997726px","footDisplay":"none"} (cured: `down`, `block`)
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L2, LOW
-probe-key: 709472925b5383307b4d2d0ab4becec5aeef2452
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
-
-## INV-10465 — probe — . LOW — "healed means deleted": statements this phase made false still stand
-
-. LOW — "healed means deleted": statements this phase made false still stand
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-echo "MANUAL rows still saying a phone draws compact: $(grep -ci 'A phone draws `compact`' MANUAL.md)"
-echo "MAN-9375 slots line limiting density compact to the compact arrangement: $(grep -c 'density` = `compact` while the arrangement is `compact`, else `full`' MANUAL.md)"
-echo "stale comments (StationCompact.tsx, cloudcliDoors.ts): $(grep -c "a phone until the phone's own\|and, later, the phone's menu" src/modules/station/StationCompact.tsx src/shared/cloudcliDoors.ts | tr '\n' ' ')"
-EOF
-bash "$D/p.sh"
-# expect: a count of 3, a count of 1, and one hit in each comment file (cured: all 0)
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L3, LOW
-probe-key: e61a30c733ac74315003aa0fb5197601d772dc3b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
-
-## INV-10466 — probe — . LOW — after a pending action lapses, the needs count still counts it and an empty wrapper stays
-
-. LOW — after a pending action lapses, the needs count still counts it and an empty wrapper stays
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd "$(dirname "$0")" || exit 1
-cat > p.mjs <<'JS'
-import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
-import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
-import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
-const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
-const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 390, height: 844 }, storageState: await S.page.context().storageState() });
-await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
-await ctx.route("**/api/companion", async (route) => { if (route.request().method() !== "GET") return route.continue(); const r = await route.fetch(); const j = await r.json();
-  j.pending = { id: "athena-1", action: "queue", target: { kind: "card", name: "lane-drag", spoken: "Lane drag", arc: null }, prompt: null, carried: [], say: "Queue Lane drag", preparedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 7000).toISOString() };
-  await route.fulfill({ response: r, body: JSON.stringify(j), headers: { ...r.headers(), "content-type": "application/json" } }); });
-const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
-const snap = () => p.evaluate(() => ({ count: document.querySelector("[data-station-phone-needs]")?.dataset.stationPhoneNeeds, itemsDrawn: document.querySelectorAll("[data-station-section=needs] li[data-station-need]").length, card: !!document.querySelector("[data-station-section=needs] [data-companion-action]"), line: !!document.querySelector("[data-companion-action-line-row]"), emptyWrapper: !!document.querySelector("[data-station-phone-pending]") && !document.querySelector("[data-companion-action-line-row]") }));
-await p.locator("[data-station-phone-section=needs]").tap(); await sleep(300); console.log("standing", JSON.stringify(await snap()));
-await sleep(9000); console.log("lapsed  ", JSON.stringify(await snap()));
-await S.browser.close();
-JS
-timeout 100 node p.mjs 2>&1 | tail -3
-EOF
-bash "$D/p.sh"
-# expect: "lapsed" prints count 12 against itemsDrawn 11, card false, line false, emptyWrapper true (cured: count 11, emptyWrapper false)
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L4, LOW
-probe-key: 5218145f2845af9adf118dc214293ed8c6bee593
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
-
-## INV-10467 — probe — . LOW — the pending line's tap selects Needs you but can leave the card scrolled out of sight
-
-. LOW — the pending line's tap selects Needs you but can leave the card scrolled out of sight
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd "$(dirname "$0")" || exit 1
-cat > p.mjs <<'JS'
-import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
-import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
-import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
-const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
-const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 390, height: 844 }, storageState: await S.page.context().storageState() });
-await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
-await ctx.route("**/api/companion", async (route) => { if (route.request().method() !== "GET") return route.continue(); const r = await route.fetch(); const j = await r.json();
-  j.pending = { id: "athena-1", action: "queue", target: { kind: "card", name: "lane-drag", spoken: "Lane drag", arc: null }, prompt: null, carried: [], say: "Queue Lane drag", preparedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 600000).toISOString() };
-  await route.fulfill({ response: r, body: JSON.stringify(j), headers: { ...r.headers(), "content-type": "application/json" } }); });
-const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
-await p.locator("[data-station-phone-section=needs]").tap(); await sleep(300);
-await p.evaluate(() => { const r = document.querySelector("[data-station-section=needs]"); const s = [r, ...r.querySelectorAll("*")].find((e) => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1); if (s) s.scrollTop = s.scrollHeight; });
-await p.locator("[data-station-phone-section=where]").tap(); await sleep(300);
-await p.locator("[data-station-phone-pending] [data-companion-action-line-row]").tap(); await sleep(700);
-console.log(JSON.stringify(await p.evaluate(() => { const sec = document.querySelector("[data-station-section=needs]"), card = sec.querySelector("[data-companion-action]"), c = card?.getBoundingClientRect(), s = sec.getBoundingClientRect();
-  return { section: document.querySelector("[data-station-phone]").dataset.stationPhone, cardTop: c ? Math.round(c.top) : null, sectionTop: Math.round(s.top), cardInView: !!c && c.top >= s.top - 1 && c.bottom <= s.bottom + 1 }; })));
-await S.browser.close();
-JS
-timeout 100 node p.mjs 2>&1 | tail -3
-EOF
-bash "$D/p.sh"
-# expect: {"section":"needs","cardTop":-138,"sectionTop":110,"cardInView":false} (cured: cardInView true)
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L5, LOW
-probe-key: 65fd4f53b67b85c88531d96758c2e6b6561e4c86
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
-
-## INV-10468 — probe — . LOW — the new proof's "the pending line is gone" half cannot fail
-
-. LOW — the new proof's "the pending line is gone" half cannot fail
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd "$(dirname "$0")" || exit 1
-cat > p.mjs <<'JS'
-import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
-import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
-import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
-const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
-const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 390, height: 844 }, storageState: await S.page.context().storageState() });
-await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
-
-const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
-console.log(JSON.stringify(await p.evaluate(() => ({ pendingWrapperDrawn: document.querySelector("[data-station-phone-pending]") !== null }))));
-await S.browser.close();
-JS
-timeout 100 node p.mjs 2>&1 | tail -3
-EOF
-bash "$D/p.sh"
-# expect: {"pendingWrapperDrawn":false}: the account holds no pending action, so the script's `pendingShown` is false whatever the CSS does (cured: the script stubs a pending action and the line reads true before the keys rise)
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L6, LOW
-probe-key: 5d4db1511c56ad4674589427ae48566f29379465
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
-
-## INV-10469 — probe — . LOW — with the keys up on its side, her conversation is a sliver
-
-. LOW — with the keys up on its side, her conversation is a sliver
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd "$(dirname "$0")" || exit 1
-cat > p.mjs <<'JS'
-import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
-import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
-import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
-const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
-const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 844, height: 390 }, storageState: await S.page.context().storageState() });
-await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
-
-const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
-await p.locator("[data-station-section=conversation] textarea").first().tap(); await sleep(300);
-await p.evaluate(() => { Object.defineProperty(visualViewport, "height", { configurable: true, get: () => innerHeight - 190 }); visualViewport.dispatchEvent(new Event("resize")); }); await sleep(500);
-console.log(JSON.stringify(await p.evaluate(() => { const h = (s) => Math.round(document.querySelector(s).getBoundingClientRect().height); return { keyboard: document.documentElement.dataset.keyboard, window: [innerWidth, innerHeight], conversationPx: h("[data-station-slot=conversation]"), dockPx: h("[data-station-section=conversation] [data-station-slot=dock]"), talkPx: h("[data-station-section=conversation] [data-station-slot=talk]") }; })));
-await S.browser.close();
-JS
-timeout 100 node p.mjs 2>&1 | tail -3
-EOF
-bash "$D/p.sh"
-# expect: {"keyboard":"up","window":[844,390],"conversationPx":21,"dockPx":67,"talkPx":71} (cured: conversationPx of at least 56)
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L7, LOW
-probe-key: df1639b75f6863aa4b5a0e3129b959d4614cfbe1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
-
-## INV-10470 — probe — . LOW — a short upright phone reads as "on its side", and the mark is blind to a resizing keyboard; neither is in the rows
-
-. LOW — a short upright phone reads as "on its side", and the mark is blind to a resizing keyboard; neither is in the rows
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd "$(dirname "$0")" || exit 1
-cat > p.mjs <<'JS'
-import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
-import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
-import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
-const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
-const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: 360, height: 740 }, storageState: await S.page.context().storageState() });
-await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
-
-const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "networkidle" }); await sleep(2500);
-const form = () => p.evaluate(() => ({ window: [innerWidth, innerHeight], form: document.querySelector("[data-station-phone]")?.dataset.stationPhoneForm, keyboard: document.documentElement.dataset.keyboard }));
-console.log("upright 360x740       ", JSON.stringify(await form()));
-await p.setViewportSize({ width: 360, height: 420 }); await sleep(700);
-console.log("layout shrunk to 420  ", JSON.stringify(await form()));
-await S.browser.close();
-JS
-timeout 100 node p.mjs 2>&1 | tail -3
-EOF
-bash "$D/p.sh"
-# expect: the second line prints "form":"sideways" and "keyboard":"down" for a 360×420 window (cured: "upright")
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--phone--live-20261030-203512-52c8, finding L8, LOW
-probe-key: afef46383661ad609bdff632cff1baba6bdea2fd
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs
-
 ## INV-10471 — probe — MEDIUM — the sitting does not stop a clip reaching the transcriber, and nothing in it bounds the clip after the gate
 
 MEDIUM — the sitting does not stop a clip reaching the transcriber, and nothing in it bounds the clip after the gate
@@ -22211,26 +21790,6 @@ bash "$D/p.sh"
 
 measured 2026-10-30 by chain chain-kaylee-station--phone--whole-20261030-212746-57bc, finding M1, MEDIUM
 probe-key: ce829b4797b31f4db829d4e9d1b727689d9047e9
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone-sitting.mjs
-
-## INV-10472 — probe — MEDIUM — INV-10275, healed by this walk, says the kit's option row and empty-state button are `finger:` sized; they are `max-md:`, and the known edge it deleted is now recorded nowhere
-
-MEDIUM — INV-10275, healed by this walk, says the kit's option row and empty-state button are `finger:` sized; they are `max-md:`, and the known edge it deleted is now recorded nowhere
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX)
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe
-grep -no "max-md:min-h-11\|max-md:h-11" src/shared/ui/QuestionOptionRow.tsx src/shared/ui/EmptyState.tsx || echo "no max-md press size left in the two"
-echo "INV-10275 still claims the pair is finger-sized: $(docstore get INV-10275 | python3 -c "import json,sys; b=json.load(sys.stdin)['row']['body']; print(b.count(\"the kit's option row and empty-state button) | those are 44 px under a finger\"))")"
-EOF
-bash "$D/p.sh"
-# expect: two max-md lines (QuestionOptionRow.tsx:73, EmptyState.tsx:50) and the claim count 1; cured when the lines are gone or the count is 0
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--phone--whole-20261030-212746-57bc, finding M2, MEDIUM
-probe-key: 8a9a7f3a170912f8be8925641333aea865156644
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone-sitting.mjs
 
@@ -22353,3 +21912,187 @@ measured 2026-10-30 by chain chain-kaylee-station--phone--whole-20261030-212746-
 probe-key: 6f0f0fa8021e901af32b9160f535fe88c78554e1
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone-sitting.mjs
+
+## INV-10511 — probe — LOW — leg 4's activation checks read an emulation of the flag the hook reads, because the probe's own `routeWebSocket` makes the real flag useless (`.verify/kaylee-station-check-sheet-live.mjs:73`, with `lib/station-voice-kit.mjs`'s shim)
+
+LOW — leg 4's activation checks read an emulation of the flag the hook reads, because the probe's own `routeWebSocket` makes the real flag useless (`.verify/kaylee-station-check-sheet-live.mjs:73`, with `lib/station-voice-kit.mjs`'s shim)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX); cat > "$D/p.sh" <<'PROBE_EOF'
+set -u
+HERE=$(mktemp -d /tmp/athena-probe-run.XXXXXX) || exit 1
+cat > "$HERE/run.mjs" <<'JS'
+import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
+import { APP_URL } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { loginToken } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs';
+const token = loginToken();
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const browser = await pw.chromium.launch();
+for (const hold of [true, false]) {
+  const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 } });
+  // the probe's own `openStation` does exactly this one call
+  if (hold) await ctx.routeWebSocket((url) => url.pathname === '/', () => {});
+  await ctx.addInitScript(({ bearer }) => { try { localStorage.setItem('auth-token', bearer); } catch {} }, { bearer: token });
+  await ctx.addInitScript(() => { setTimeout(() => console.log('ACT ' + navigator.userActivation.isActive + '/' + navigator.userActivation.hasBeenActive), 4000); });
+  const page = await ctx.newPage();
+  let seen = 'none';
+  page.on('console', (m) => { if (m.text().startsWith('ACT ')) seen = m.text().slice(4); });
+  await page.goto(APP_URL + '/station', { waitUntil: 'domcontentloaded' });
+  await sleep(6000);
+  console.log(`routeWebSocket held: ${hold}, no gesture yet, navigator.userActivation isActive/hasBeenActive at +4 s: ${seen}`);
+  await ctx.close();
+}
+await browser.close();
+JS
+( cd "$HERE" && node run.mjs ) 2>&1 | tail -3
+PROBE_EOF
+bash "$D/p.sh"
+# expect: routeWebSocket held: true … true/true, then routeWebSocket held: false … false/false (the hold alone flips the real flag)
+```
+
+measured 2026-10-31 by chain chain-kaylee-station--judgment--under-her-face-20261030-233739-09c2, finding L1, LOW
+probe-key: 3243d70d24d77050a283125e5fba0a3e801b3af3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-check-sheet-live.mjs
+
+## INV-10513 — probe — the hook now erases a hand-set `--keyboard-height` on every focus move, and `kaylee-station-dock-live.mjs`'s phone leg fails on it (a pinned proof this build broke)
+
+the hook now erases a hand-set `--keyboard-height` on every focus move, and `kaylee-station-dock-live.mjs`'s phone leg fails on it (a pinned proof this build broke)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$(dirname "$0")" || exit 1
+cat > p.mjs <<'JS'
+import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
+import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
+const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
+const open = async (w, h) => { const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: w, height: h }, storageState: await S.page.context().storageState() });
+  await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
+  const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "load", timeout: 120000 }); await p.waitForSelector("[data-station-shell]", { timeout: 90000 }); await sleep(2500); return p; };
+const mark = (p) => p.evaluate(() => document.documentElement.dataset.keyboard);
+// F1: a lift set by hand (as .verify/kaylee-station-dock-live.mjs:419 and lib/station-dock.mjs do) is erased by the next focus move.
+const p = await open(390, 844);
+await p.evaluate(() => document.documentElement.style.setProperty("--keyboard-height", "336px"));
+const before = await p.evaluate(() => document.documentElement.style.getPropertyValue("--keyboard-height"));
+await p.locator("[data-station-section=conversation] textarea").first().tap(); await sleep(500);
+console.log(JSON.stringify({ lift_before_tap: before, lift_after_tap: await p.evaluate(() => document.documentElement.style.getPropertyValue("--keyboard-height")), shellBottom: await p.evaluate(() => Math.round(document.querySelector("[data-station-shell]").getBoundingClientRect().bottom)), innerHeight: await p.evaluate(() => innerHeight) }));
+await S.browser.close();
+JS
+timeout 150 node p.mjs 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+echo "[probe exit $?]"
+# expect: {"lift_before_tap":"336px","lift_after_tap":"336px",...} when a hand-set lift survives a focus move; today it prints "lift_after_tap":"0px" with shellBottom 844 (the lift erased)
+```
+
+measured 2026-10-31 by chain chain-kaylee-station--judgment--one-device-20261030-233737-0ffb, finding M1, MEDIUM
+probe-key: 3a62851b9da05ab1e79c194118ecd23bbaad32b3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationPhone.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationSections.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/usePhoneWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-doors.mjs
+
+## INV-10514 — probe — a touch window 768 px or wider swaps its whole arrangement under the keyboard's own shrink, and her box loses the focus (INHERITED from HEAD, now carried to the doors by B3; not introduced by this diff)
+
+a touch window 768 px or wider swaps its whole arrangement under the keyboard's own shrink, and her box loses the focus (INHERITED from HEAD, now carried to the doors by B3; not introduced by this diff)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$(dirname "$0")" || exit 1
+cat > p.mjs <<'JS'
+import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
+import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
+const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
+const open = async (w, h) => { const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: w, height: h }, storageState: await S.page.context().storageState() });
+  await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
+  const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "load", timeout: 120000 }); await p.waitForSelector("[data-station-shell]", { timeout: 90000 }); await sleep(2500); return p; };
+const mark = (p) => p.evaluate(() => document.documentElement.dataset.keyboard);
+// F2: a touch window 768+ wide, her box focused, the keyboard's shrink under 500 tall: does the arrangement hold and the box keep the focus?
+const p = await open(1100, 900);
+await p.evaluate(() => { window.__arr = []; const el = document.querySelector("[data-station-shell]"); new MutationObserver(() => window.__arr.push(el.dataset.stationArrangement)).observe(el, { attributes: true, attributeFilter: ["data-station-arrangement"] }); });
+const start = await p.evaluate(() => document.querySelector("[data-station-shell]").dataset.stationArrangement);
+await p.locator("textarea:visible").first().focus(); await p.keyboard.type("abc"); await sleep(300);
+await p.setViewportSize({ width: 1100, height: 480 }); await sleep(1200);
+console.log(JSON.stringify({ start, during: await p.evaluate(() => ({ arrangement: document.querySelector("[data-station-shell]").dataset.stationArrangement, active: document.activeElement.tagName })), flips: await p.evaluate(() => window.__arr) }));
+await S.browser.close();
+JS
+timeout 150 node p.mjs 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+echo "[probe exit $?]"
+# expect: {"start":"laptop","during":{"arrangement":"laptop","active":"TEXTAREA"},"flips":[]} when the arrangement holds under a keyboard's shrink; today it prints "arrangement":"phone","active":"BODY","flips":["phone"]
+```
+
+measured 2026-10-31 by chain chain-kaylee-station--judgment--one-device-20261030-233737-0ffb, finding M2, MEDIUM
+probe-key: a1f3d0b71e8e3f52cc2d49fe2bbe76bc60831e96
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationPhone.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationSections.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/usePhoneWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-doors.mjs
+
+## INV-10516 — probe — compact's fold no longer needs a focused field, so a visual-viewport gap with no keys (an iOS pinch-zoom, as the hook's own doc says) folds the strip's line and the switch in a short compact column
+
+compact's fold no longer needs a focused field, so a visual-viewport gap with no keys (an iOS pinch-zoom, as the hook's own doc says) folds the strip's line and the switch in a short compact column
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$(dirname "$0")" || exit 1
+cat > p.mjs <<'JS'
+import { openConsole, APP_URL } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs";
+import { HARNESS_PREFERENCES } from "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs";
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { viewport, screen, defaultBrowserType, ...IPHONE } = pw.devices["iPhone 13"];
+const S = await openConsole({ dark: true, project: false, hotUpdates: false, preferences: { ...HARNESS_PREFERENCES } });
+const open = async (w, h) => { const ctx = await S.browser.newContext({ ...IPHONE, viewport: { width: w, height: h }, storageState: await S.page.context().storageState() });
+  await ctx.addInitScript(() => { localStorage.setItem("companion-voice", "off"); localStorage.removeItem("kaylee-station"); });
+  const p = await ctx.newPage(); await p.goto(`${APP_URL}/station`, { waitUntil: "load", timeout: 120000 }); await p.waitForSelector("[data-station-shell]", { timeout: 90000 }); await sleep(2500); return p; };
+const mark = (p) => p.evaluate(() => document.documentElement.dataset.keyboard);
+// F4: a short compact window, nothing focused, the visual viewport 200 px short (a pinch-zoom's shape): does compact's switch fold?
+const p = await open(800, 520);
+await p.evaluate(() => { Object.defineProperty(visualViewport, "height", { configurable: true, get: () => innerHeight - 200 }); visualViewport.dispatchEvent(new Event("resize")); }); await sleep(500);
+console.log(JSON.stringify(await p.evaluate(() => ({ mark: document.documentElement.dataset.keyboard, focused: document.activeElement.tagName, switchDrawn: document.querySelector("[data-station-compact-switch]")?.getClientRects().length ?? "no compact" }))));
+await S.browser.close();
+JS
+timeout 150 node p.mjs 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+echo "[probe exit $?]"
+# expect: {"mark":"up","focused":"BODY","switchDrawn":1} when a gap with no field leaves the switch drawn; today it prints "switchDrawn":0
+```
+
+measured 2026-10-31 by chain chain-kaylee-station--judgment--one-device-20261030-233737-0ffb, finding L2, LOW
+probe-key: c55eaabfab9c89b9a3d12470417e84edb0d5616c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/hooks/useStationWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationCompact.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationPhone.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationSections.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/usePhoneWindow.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-phone-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-doors.mjs
+
+## INV-10517 — probe — `kaylee-station-rail-live.mjs`'s phone leg throws in its helper before any claim runs
+
+`kaylee-station-rail-live.mjs`'s phone leg throws in its helper before any claim runs
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+f=/home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-rail-live.mjs
+awk '
+  /^const openStationWith/ { inside = 1 }
+  inside && /row="session"\]`\)\.first\(\)\.waitFor/ { helper = NR }
+  inside && /^};/ { inside = 0 }
+  /openStationWith\(phone/ { call = NR }
+  /phone-section="where"\]\x27\)\.tap/ { tap = NR }
+  END { printf "helper waits for a visible session row at line %s; the phone leg calls it at line %s; its Where tap is at line %s\n", helper, call, tap }
+' "$f"
+EOF
+bash "$D/p.sh"; cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: the helper's visible-row wait (line 99) is called at line 246, before the Where tap at line 249. Cured when the tap line is below no such wait: the leg presses Where before it waits for a row, or the helper no longer waits for a visible row on the phone.
+```
+
+measured 2026-10-31 by chain chain-kaylee-station--judgment--deletions-20261030-233741-543b, finding M1, MEDIUM
+probe-key: eb5c0ed39da5a883b91d376f48692620d4e0f1b4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/stageStates.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationPhone.tsx

@@ -9,11 +9,7 @@ import { forgetCompanionClientIdIn } from '@/shared/utils';
  * Where the pressing page stands, as the doors need it: `phone` and `pwa` (CloudCLI running as the home-screen app,
  * `useDeviceSettings().isPWA`). On either the doors stay in this window: a new window would leave the app for the browser.
  *
- * `phone` is each caller's own reading, and the three do not all draw the line in the same place. The station's bar passes
- * `useStation().phone` (a window under 768 px wide, or a touch window under 500 px tall: a phone on its side); the
- * workspace's two doors into the station, the palette's row and the head of her panel, pass `useDeviceSettings().isMobile`
- * (under 768 px). So a phone held on its side in a plain browser tab gets the station in a window of its own from them, and
- * that window's bar then navigates in place; in the home-screen app all three agree through `pwa`.
+ * `phone` is `usePhoneWindow()` for every caller (the station's bar through `useStation().phone`, the palette's row and the head of her panel).
  */
 export type CloudcliDoorWhere = { phone: boolean; pwa: boolean };
 
@@ -193,7 +189,7 @@ function openInWindowNamed(
  * Opens `path` (a path under CloudCLI's router) in CloudCLI: `navigate(path)` in this window on a phone or in the
  * home-screen app, else the window named `cloudcli`.
  *
- * Consumed by `src/modules/station`: `FocusFallback`'s press, the chat's stage, and "Open the chat" on the ask's and the follow-ups'
+ * Consumed by `src/modules/station`: the chat's stage, and "Open the chat" on the ask's and the follow-ups'
  * stages (through the station's `useOpenChatInCloudcli`).
  */
 export function openInCloudcli(path: string, navigate: (to: string) => void, where: CloudcliDoorWhere): void {
@@ -201,7 +197,7 @@ export function openInCloudcli(path: string, navigate: (to: string) => void, whe
 }
 
 /**
- * Opens Kaylee Station: `navigate('/station')` in this window on a phone (the 768 px breakpoint) or in the home-screen app,
+ * Opens Kaylee Station: `navigate('/station')` in this window on a phone (`usePhoneWindow`) or in the home-screen app,
  * else the window named `kaylee-station` — the second monitor's window, which a second press brings forward as it stands
  * (its document is not navigated again, so nothing it holds is lost) rather than opening another.
  *

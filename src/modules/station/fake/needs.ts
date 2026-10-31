@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react';
 
 import { AskStageView } from '@/modules/station/AskStage';
 import { CheckStageView } from '@/modules/station/CheckStage';
+import { DESK_EPIC } from '@/modules/station/fake/roadmap';
 import { WAITING_FEATURE } from '@/modules/station/fake/stage';
 import { FollowupsStageView } from '@/modules/station/FollowupsStage';
 import { WhatNeedsYouView } from '@/modules/station/WhatNeedsYou';
@@ -20,8 +21,12 @@ import type { Followup } from '@/shared/types';
  * `CompanionPendingAction` as her picture holds one. Ids and request ids no store holds (above 900000, as `fake/stage.ts`
  * keeps them), and made-up chat ids: nothing here names a real chat, ask or check. Times are relative to when it loads.
  *
- * - `waiting`: the "waiting on you" state — the waiting feature's Accept (its card is on the stage), an epic's Accept over
- *   three features, a red check, and her action waiting for his word: "Queue Kaylee’s desk", the epic's census its prompt;
+ * - `waiting`: the "waiting on you" state — her action waiting for his word at the head ("Queue Kaylee’s desk", the epic's
+ *   census its prompt), over two Accepts and one red check: the waiting feature's Accept (its card is on the stage) and the
+ *   epic's, over three features. Her Queue answers the epic's Accept, so the count is 3 (`needsCountOf`). Nothing else in that
+ *   picture waits on him: the left rail's roadmap (`fake/roadmap.ts`) stands the feature and the epic at "waiting on you:
+ *   Accept" and no chat waits on a permission (`fake/sessions.ts`), her lines speak of the same three (`fake/conversation.ts`)
+ *   and her picture holds the action (`PENDING`);
  * - `home`: one chat's follow-ups;
  * - `walkthrough`: one chat's permission, a deploy whose command wraps on a phone;
  * - `empty`: nothing, and no action: "Nothing needs you."
@@ -74,19 +79,23 @@ const EPIC_CENSUS = [
   'Run it? · lock:station-fake-0000000002',
 ].join('\n');
 
-/** An epic's Accept: one lock over its three features, one item naming the epic (the Inbox's rule). */
+/** An epic's Accept: one lock over its three features, one item naming the epic (the Inbox's rule). The roadmap's epic is the same one. */
 const EPIC_ACCEPT: StationNeed = {
   kind: 'accept',
   id: `accept:900102-${ago(31)}`,
-  card: 'kaylee-desk',
+  card: DESK_EPIC.name,
   epic: true,
-  title: 'Kaylee’s desk',
-  headline: 'kaylee-desk--notes + kaylee-desk--pins + kaylee-desk--clock — 7 tasks',
-  features: 3,
+  title: DESK_EPIC.title,
+  headline: `${DESK_EPIC.features.map((feature) => feature.name).join(' + ')} — 7 tasks`,
+  features: DESK_EPIC.features.length,
 };
 
-/** The red check, failing 23 minutes. */
+/**
+ * The red check, failing 23 minutes. Its value names no clock time of its own: the one line that says when it went red is `since`,
+ * and a time written into the words would disagree with it on any day but the one it was written.
+ */
 const CHECK_SINCE = NOW - 23 * 60_000;
+const CHECK_VALUE = '401 from the shadow connector: the session token expired';
 const RED_CHECK: StationNeed = {
   kind: 'check',
   id: 'check:eis1/shadow-connector/session.valid',
@@ -94,15 +103,18 @@ const RED_CHECK: StationNeed = {
   key: 'shadow-connector/session.valid',
   label: 'Session is valid',
   status: 'failing',
-  value: '401 from the shadow connector: the session token expired at 13:52',
+  value: CHECK_VALUE,
   since: CHECK_SINCE,
 };
 
-/** Her action waiting for his word: he asked her to queue the epic, she read it back, and the card waits for his yes. */
-const PENDING: CompanionPendingAction = {
+/**
+ * Her action waiting for his word: he asked her to queue the epic, she read it back, and the card waits for his word. Exported for
+ * her picture (`fake/conversation.ts`'s `waiting`), which holds the same action the right rail draws at its head.
+ */
+export const PENDING: CompanionPendingAction = {
   id: '900201',
   action: 'queue',
-  target: { kind: 'card', name: 'kaylee-desk.arc', spoken: 'Kaylee’s desk', arc: null },
+  target: { kind: 'card', name: `${DESK_EPIC.name}.arc`, spoken: DESK_EPIC.title, arc: null },
   prompt: EPIC_CENSUS,
   carried: [],
   say: 'Queue Kaylee’s desk',
@@ -166,7 +178,8 @@ function drawing(needs: StationNeed[] | null, pending: CompanionPendingAction | 
 
 /**
  * The `needs` slot's drawing in each of the four pictures. `waiting`'s stage holds the feature's card, so its Accept reads as
- * on the stage; the other pictures' stages hold nothing of the rail's.
+ * on the stage; the other pictures' stages hold nothing of the rail's. `waiting`'s head is her action, and under it the feature's
+ * Accept, the epic's and the red check: her Queue is the epic's Accept answered, so they count 3.
  */
 export const NEEDS_FAKE = {
   home: drawing([FOLLOWUPS], null, null),
@@ -205,7 +218,7 @@ const CHECK_NEED: CerberusNeed = {
   check: {
     node: 'eis1', key: 'shadow-connector/session.valid', service: 'shadow-connector', id: 'session.valid',
     label: 'Session is valid', serviceLabel: 'Shadow connector', status: 'failing', stored: 'failing',
-    value: '401 from the shadow connector: the session token expired at 13:52', at: NOW - 20_000, since: CHECK_SINCE,
+    value: CHECK_VALUE, at: NOW - 20_000, since: CHECK_SINCE,
     every: 30, staleAfter: 90, origin: 'component', kind: 'health_doc', mute: null,
   },
   fix: {

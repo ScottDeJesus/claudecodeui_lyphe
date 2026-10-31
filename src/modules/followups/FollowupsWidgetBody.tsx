@@ -21,7 +21,8 @@ const GROUPS = [
  * body, and by `src/modules/station` (`FollowupsStage`), the same way, as a chat's follow-ups on the station's stage. It
  * reads the list its host already made (`FollowupsContext`) — in the gutter the same reading that gives the badge its
  * number — and draws nothing of its own state but the fold. The chrome, the header, the count and the scrolling belong
- * to the frame around it. Below 768 px the Done fold's head is a 44 px catch under a finger, as each row's tick is.
+ * to the frame around it. Under a finger (a touch screen, or a window under 768 px) the Done fold's head is a 44 px catch,
+ * as each row's tick is.
  *
  * A GROUP WITH NOTHING OPEN IS NOT DRAWN, and when both are empty the body says so in one sentence; the Done fold is
  * drawn whenever something is done, even then, because an untick is how a settled item comes back.
@@ -68,7 +69,7 @@ export function FollowupsWidgetBody() {
 
       {done.length > 0 && (
         <Collapsible open={foldOpen} onOpenChange={setFoldOpen} data-followups-done className="min-w-0 border-t border-border pt-2">
-          <CollapsibleTrigger className="flex w-full items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground max-md:min-h-11">
+          <CollapsibleTrigger className="flex w-full items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground finger:min-h-11">
             <FoldChevron collapsed={!foldOpen} />
             {t('followups.doneFold', { n: done.length })}
           </CollapsibleTrigger>

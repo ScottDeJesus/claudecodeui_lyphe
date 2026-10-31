@@ -10,18 +10,23 @@ import type { DispatcherArc, DispatcherEvent, DispatcherPlan } from '@/shared/ty
  * happened, and two events can share a second while a hand-edited or replayed row can carry an older
  * stamp than the one before it. An id is a total order the store itself guarantees.
  *
+ * The kept RECORDS (a feature of an epic finishing, `dispatcher.feature_finished`) have a watermark of their own and never move the
+ * push one: an epic's finish is keyed on its newest feature `complete`, the very id a record is kept under, so a record that advanced
+ * the push mark would put that finish behind it, lost whenever the epic turns `complete` a picture after its last feature.
+ *
  * "Already announced" is held by the caller in durable storage rather than in this process, for a
  * measured reason: the dev server restarts on every edit through a handover that runs the old and the
  * new server side by side, so a set kept in memory would re-announce the last day's endings on each
  * boot, and one seeded silently at boot would lose the ending that landed during the restart. Read
  * again just before anything is sent, the mark also keeps the two servers of a handover from pushing
- * one ending twice. Every rule below that decides an ending is SILENT (the wall, a wave, an epic's
- * feature finishing) is therefore computed from the event history the picture carries and never
- * from what this process has already said.
+ * one ending twice. Every rule below that decides an ending is SILENT (the wall, a wave) or KEPT AND NEVER
+ * PUSHED (an epic's feature finishing) is therefore computed from the event history the picture carries
+ * and never from what this process has already said.
  */
 
 export type DispatcherEndingCode =
   | 'dispatcher.finished'
+  | 'dispatcher.feature_finished'
   | 'dispatcher.epic_finished'
   | 'dispatcher.paused'
   | 'dispatcher.limit_paused'
@@ -71,12 +76,26 @@ export type DispatcherEnding = {
   eventId: number;
   code: DispatcherEndingCode;
   meta: DispatcherEndingMeta;
+  /**
+   * The chat that asked for the work, as its app session id: a plan's own `session_app_id`, an epic's its lead plan's (the first of the
+   * epic's plans that names a chat — the rule `planChatOf` keeps for the station's strip). Set on a landing (`LANDING_CODES`) so a tap on
+   * its push opens that chat (`announceDispatcherEnding` hands it on only while the house still holds the chat), and `null` on a pause
+   * and a relaunch, which land on the root, and wherever the lane holds no chat for the card.
+   */
+  sessionId: string | null;
 };
 
 export type DispatcherEndingsDependencies = {
-  /** The highest event id already announced, or `null` when none was ever stored. */
+  /** The highest event id already announced as a PUSH, or `null` when none was ever stored. */
   readMark: () => number | null;
   writeMark: (eventId: number) => void;
+  /**
+   * The highest event id already kept as a RECORD (`dispatcher.feature_finished`), or `null` when none was ever stored. A mark of its own, so
+   * a record never moves the push mark (the file's head). A record mark never stored beside a push mark is taken from it: every event at or
+   * before the push mark was already handled.
+   */
+  readRecordMark: () => number | null;
+  writeRecordMark: (eventId: number) => void;
   /** Tells the users about one ending. Synchronous; a throw leaves that ending and the ones after it due. */
   announce: (ending: DispatcherEnding) => void;
 };
@@ -103,8 +122,10 @@ export type DispatcherEndingsNotifier = {
  *
  * A plan in no epic pushes each of them as it happens. A FEATURE OF AN EPIC (`plan.arc` set) is read
  * as one piece of work with its siblings, and tells the operator less, and tells him once:
- * - its `complete` pushes nothing; the EPIC's finish does, once (`epicFinishes`,
- *   `dispatcher.epic_finished`);
+ * - its `complete` is KEPT AND NEVER PUSHED: it is handed on as `dispatcher.feature_finished`, a `record` the history keeps for
+ *   the station's strip "since you last looked", and no channel hears it; the EPIC's finish is what he is told, once
+ *   (`epicFinishes`, `dispatcher.epic_finished`). The epic's judgment plan is a review and no feature: its `complete` is the epic's
+ *   finish and nothing else;
  * - its `relaunched` and its `paused` push once per wave of trouble of that kind on that epic
  *   (`waveStarters`) — the rest stay on the card;
  * - a usage-limit pause keeps the wall rule, which is already one push per wall.
@@ -116,6 +137,16 @@ const ENDING_CODES = new Map<string, DispatcherEndingCode>([
   ['complete', 'dispatcher.finished'],
   ['paused', 'dispatcher.paused'],
   ['relaunched', 'dispatcher.relaunched'],
+]);
+
+/**
+ * The endings that are landings, and so carry the chat that asked for the work (`DispatcherEnding.sessionId`): a feature that
+ * finished, a feature of an epic that finished, and an epic that finished.
+ */
+const LANDING_CODES: ReadonlySet<DispatcherEndingCode> = new Set([
+  'dispatcher.finished',
+  'dispatcher.feature_finished',
+  'dispatcher.epic_finished',
 ]);
 
 /**
@@ -186,6 +217,7 @@ function endingOf(
       resetsAt: limit?.resetsAt ?? null,
       limitGuess: limit?.guess ?? false,
     },
+    sessionId: LANDING_CODES.has(code) ? plan.session_app_id : null,
   };
 }
 
@@ -271,6 +303,14 @@ function waveStarters(plans: DispatcherPlan[]): Set<number> {
 /** `hooks/dispatcher/store_arcs.py` `JUDGMENT_SUFFIX`: the judgment plan of an arc designed whole is `<arc>--judgment`. */
 const JUDGMENT_SUFFIX = '--judgment';
 
+/** Is this plan the judgment of its epic (`<epic>--judgment`)? A review, not a feature: no `dispatcher.feature_finished` is kept for it. */
+function isJudgmentPlan(plan: DispatcherPlan): boolean {
+  return plan.arc !== null && plan.name === `${plan.arc}${JUDGMENT_SUFFIX}`;
+}
+
+/** The two watermarks (the file's head): the push mark, and the record mark `dispatcher.feature_finished` rides. */
+type Marks = { push: number; record: number };
+
 /**
  * The epics that are finished, one ending each, keyed on the completion that finished them.
  *
@@ -285,10 +325,10 @@ const JUDGMENT_SUFFIX = '--judgment';
  * turn came with a new completion.
  *
  * THE LIMIT: a status that turns `complete` with NO new completion — the roadmap's `remove` deleting
- * the last idea an epic held writes no event — leaves nothing to key on. The watermark has usually
- * passed the epic's newest completion by then (pushes advance it, and a feature's own `complete` is
- * silent), so that finish is never announced. Curing it needs the dispatcher to log an event when an
- * arc becomes complete; until it does, the epic is complete on its card and silent on the phone.
+ * the last idea an epic held writes no event — leaves nothing to key on. The push watermark has usually
+ * passed the epic's newest completion by then (pushes advance it; a feature's own `complete` is a record
+ * under a mark of its own and does not), so that finish is never announced. Curing it needs the dispatcher
+ * to log an event when an arc becomes complete; until it does, the epic is complete on its card and silent on the phone.
  *
  * `features` and `tasks` are counted over the epic's features (its judgment is a review, not a
  * feature); the spend is the arc's own sum, which includes features the lane has already put away.
@@ -308,6 +348,12 @@ function epicFinishes(plans: DispatcherPlan[], arcs: DispatcherArc[]): Dispatche
     }
     if (completedAt === 0) continue;
     const featureNames = arc.plans.filter((name) => name !== `${arc.name}${JUDGMENT_SUFFIX}`);
+    // The lead plan's chat: the first of the epic's plans the lane still holds that names one (an epic's plans are cut in one chat).
+    let leadChat: string | null = null;
+    for (const name of arc.plans) {
+      leadChat = onLane.get(name)?.session_app_id ?? null;
+      if (leadChat !== null) break;
+    }
     const countable = featureNames.every((name) => onLane.has(name));
     finishes.push({
       key: `epic:${arc.name}:${completedAt}`,
@@ -331,6 +377,7 @@ function epicFinishes(plans: DispatcherPlan[], arcs: DispatcherArc[]): Dispatche
         resetsAt: null,
         limitGuess: false,
       },
+      sessionId: leadChat,
     });
   }
   return finishes;
@@ -339,37 +386,62 @@ function epicFinishes(plans: DispatcherPlan[], arcs: DispatcherArc[]): Dispatche
 export function createDispatcherEndingsNotifier(
   dependencies: DispatcherEndingsDependencies,
 ): DispatcherEndingsNotifier {
-  /** The mark as this process last read or wrote it; `undefined` until the first picture loads it. */
-  let knownMark: number | null | undefined;
+  /** The marks as this process last read or wrote them; `undefined` until the first picture loads them, `null` while the store was never seen. */
+  let knownMarks: Marks | null | undefined;
 
   /**
-   * Every ending past the mark, oldest id first.
+   * The marks as the caller holds them, or `null` when no push mark was ever stored (first sight of the store). A record mark never
+   * stored beside a push mark is written from it, once: the events at or before the push mark were all handled.
+   */
+  const readMarks = (): Marks | null => {
+    const push = dependencies.readMark();
+    if (push === null) return null;
+    let record = dependencies.readRecordMark();
+    if (record === null) {
+      record = push;
+      dependencies.writeRecordMark(record);
+    }
+    return { push, record };
+  };
+
+  /**
+   * Every ending past its mark (a record past the record mark, every other ending past the push mark), oldest id first.
    *
    * Ordered because the pushes are read in order by whoever receives them: a plan that paused and
    * then completed while the server was down must not arrive as "finished" and then "paused". The
    * store's ids give that order across plans as well as within one, which is the second thing a
    * single global sequence buys.
    */
-  const dueEndings = (plans: DispatcherPlan[], arcs: DispatcherArc[], mark: number): DispatcherEnding[] => {
+  const dueEndings = (plans: DispatcherPlan[], arcs: DispatcherArc[], marks: Marks): DispatcherEnding[] => {
     const speaking = speakingLimitPauses(plans);
     const waveStart = waveStarters(plans);
     const due: DispatcherEnding[] = [];
     for (const plan of plans) {
+      // A feature of an epic, its judgment aside: its `complete` is a record (below).
+      const keepsComplete = plan.arc !== null && !isJudgmentPlan(plan);
       for (const event of plan.events) {
         const code = ENDING_CODES.get(event.kind);
-        if (code === undefined || event.id <= mark || isHidePause(event)) continue;
+        if (code === undefined || isHidePause(event)) continue;
+        const isRecord = keepsComplete && event.kind === 'complete';
+        if (event.id <= (isRecord ? marks.record : marks.push)) continue;
+        // KEPT AND NEVER PUSHED: the epic's own finish (below) is what the operator is told, once, and the history keeps this
+        // one as a `record` for the station's strip, under the record mark so the epic's finish is never put behind it.
+        if (isRecord) {
+          due.push(endingOf(plan, event, 'dispatcher.feature_finished', null));
+          continue;
+        }
         const limit = limitPause(event);
         // ONE push per wall, whichever plan it paused and however many minutes apart: see
         // `speakingLimitPauses`.
         if (limit !== null && !speaking.has(event.id)) continue;
-        // A feature of an epic speaks only for the event that opens a wave; its `complete` is never
-        // one, because the epic's own finish (below) is what the operator is told: see `waveStarters`.
+        // A feature of an epic speaks only for the event that opens a wave. Its `complete` is none: a feature's is a record
+        // (above), and its judgment's is the epic's finish, below: see `waveStarters`.
         if (limit === null && plan.arc !== null && !waveStart.has(event.id)) continue;
         due.push(endingOf(plan, event, limit === null ? code : 'dispatcher.limit_paused', limit));
       }
     }
     for (const finish of epicFinishes(plans, arcs)) {
-      if (finish.eventId > mark) due.push(finish);
+      if (finish.eventId > marks.push) due.push(finish);
     }
     return due.sort((left, right) => left.eventId - right.eventId);
   };
@@ -387,28 +459,35 @@ export function createDispatcherEndingsNotifier(
 
   return {
     observe(plans, arcs) {
-      if (knownMark === undefined) knownMark = dependencies.readMark();
-      if (knownMark === null) {
+      if (knownMarks === undefined) knownMarks = readMarks();
+      if (knownMarks === null) {
         // First sight of the dispatcher's store on this database: the events already in it are
         // HISTORY. This lane writes the highest id the store already holds — announce nothing that
         // was already there, and leave everything written after this moment due.
         const highest = highestEventId(plans);
         dependencies.writeMark(highest);
-        knownMark = highest;
+        dependencies.writeRecordMark(highest);
+        knownMarks = { push: highest, record: highest };
         return;
       }
 
-      const cached = knownMark;
+      const cached = knownMarks;
       if (dueEndings(plans, arcs, cached).length === 0) return;
 
-      const mark = dependencies.readMark() ?? cached;
-      knownMark = mark;
-      for (const ending of dueEndings(plans, arcs, mark)) {
+      let marks = readMarks() ?? cached;
+      knownMarks = marks;
+      for (const ending of dueEndings(plans, arcs, marks)) {
         dependencies.announce(ending);
         // Advanced after each announcement, never before: a throw leaves the rest due on the next
-        // change and never marks a push that did not go out.
-        dependencies.writeMark(ending.eventId);
-        knownMark = ending.eventId;
+        // change and never marks a push that did not go out. A record moves the record mark only.
+        if (ending.code === 'dispatcher.feature_finished') {
+          dependencies.writeRecordMark(ending.eventId);
+          marks = { ...marks, record: ending.eventId };
+        } else {
+          dependencies.writeMark(ending.eventId);
+          marks = { ...marks, push: ending.eventId };
+        }
+        knownMarks = marks;
       }
     },
   };

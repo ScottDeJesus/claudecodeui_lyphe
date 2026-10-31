@@ -33,8 +33,6 @@
     color 0.2s,
     box-shadow var(--dur-move);
 }
-.vv-button:hover:not(:disabled, [aria-disabled='true']) { transform: translateY(-1px); }
-.vv-button:active:not(:disabled, [aria-disabled='true']) { transform: scale(0.96); }
 .vv-button:disabled {
   background: var(--surface2);
   color: var(--ink-faint);
@@ -47,28 +45,32 @@
  * button, but on its own fill and ink, and it neither lifts nor presses. */
 .vv-button[aria-disabled='true'] { opacity: 0.7; cursor: not-allowed; }
 .vv-button--default { background: var(--accent); color: var(--on-accent); }
-.vv-button--default:hover:not(:disabled, [aria-disabled='true']) { background: var(--accent-deep); box-shadow: var(--shadow-hover); }
-
 .vv-button--destructive { background: var(--danger); color: var(--on-danger); }
-.vv-button--destructive:hover:not(:disabled, [aria-disabled='true']) { background: var(--danger-deep); box-shadow: var(--shadow-hover); }
-
 /* Every size in Button.tsx is an explicit height, so this ring comes out of its own box. */
 .vv-button--outline { border: 1.5px solid var(--border-strong); color: var(--ink); }
-.vv-button--outline:hover:not(:disabled, [aria-disabled='true']) { border-color: var(--accent); box-shadow: var(--shadow-hover); }
-
 /* One appearance under two names: the app spells it `secondary`, Verve spells it `tonal`, and
  * a second colour for the second name would be a fork of the same idea. */
 .vv-button--secondary,
 .vv-button--tonal { background: var(--accent-soft); color: var(--accent-ink); }
-.vv-button--secondary:hover:not(:disabled, [aria-disabled='true']),
-.vv-button--tonal:hover:not(:disabled, [aria-disabled='true']) { background: var(--accent-soft-hover); box-shadow: var(--shadow-hover); }
-
 .vv-button--ghost { color: var(--accent); }
-.vv-button--ghost:hover:not(:disabled, [aria-disabled='true']) { background: var(--accent-soft); }
-
 /* Link is text, so it neither lifts nor presses — a moving line of text reads as a glitch. */
 .vv-button--link { color: var(--accent); text-underline-offset: 4px; }
-.vv-button--link:hover:not(:disabled, [aria-disabled='true']) { text-decoration: underline; transform: none; }
+
+/* THE HOVER LOOKS, for a pointer that really hovers: the button lifts a pixel, and its variant deepens its fill or rings it in
+ * the accent; the link underlines and never lifts. A touch screen leaves the press it tapped `:hover` until the next tap
+ * elsewhere, so there a press that is done would stay lit, its shadow and its lift standing after the tap (the phone's round
+ * talk control, measured); a finger's feedback is the `:active` press below. Before it, so a hovered button still presses. */
+@media (hover: hover) {
+  .vv-button:hover:not(:disabled, [aria-disabled='true']) { transform: translateY(-1px); }
+  .vv-button--default:hover:not(:disabled, [aria-disabled='true']) { background: var(--accent-deep); box-shadow: var(--shadow-hover); }
+  .vv-button--destructive:hover:not(:disabled, [aria-disabled='true']) { background: var(--danger-deep); box-shadow: var(--shadow-hover); }
+  .vv-button--outline:hover:not(:disabled, [aria-disabled='true']) { border-color: var(--accent); box-shadow: var(--shadow-hover); }
+  .vv-button--secondary:hover:not(:disabled, [aria-disabled='true']),
+  .vv-button--tonal:hover:not(:disabled, [aria-disabled='true']) { background: var(--accent-soft-hover); box-shadow: var(--shadow-hover); }
+  .vv-button--ghost:hover:not(:disabled, [aria-disabled='true']) { background: var(--accent-soft); }
+  .vv-button--link:hover:not(:disabled, [aria-disabled='true']) { text-decoration: underline; transform: none; }
+}
+.vv-button:active:not(:disabled, [aria-disabled='true']) { transform: scale(0.96); }
 .vv-button--link:active:not(:disabled, [aria-disabled='true']) { transform: none; }
 
 /* ---------------------------------------------------------------- Badge */
@@ -154,7 +156,9 @@
  * (ProviderSelectionEmptyState.tsx:175, role="button") but already spells its own hover;
  * converting it to `interactive` is a screen edit, so Phase 4's. */
 .vv-card--interactive { cursor: pointer; }
-.vv-card--interactive:hover { transform: translateY(-5px); box-shadow: var(--shadow-lift); }
+@media (hover: hover) {
+  .vv-card--interactive:hover { transform: translateY(-5px); box-shadow: var(--shadow-lift); }
+}
 
 /* ---------------------------------------------------------------- Chat bubble
  * A tail on the side the speaker sits: `data-side="start"` points left (Claude's turn card),
@@ -187,7 +191,9 @@
   font-weight: 500;
   transition: border-color 0.2s, background-color 0.2s, color 0.2s;
 }
-.vv-chip:hover:not([aria-disabled='true']) { border-color: var(--accent); }
+@media (hover: hover) {
+  .vv-chip:hover:not([aria-disabled='true']) { border-color: var(--accent); }
+}
 /* Its flip cannot be taken yet — the answer it acts on is still crossing the wire. Quieter, not
  * gone: the position it shows is the last one the server confirmed, and a reader who cannot read
  * that is being lied to more cheaply than before.
@@ -226,9 +232,13 @@
  *
  * `data-selected` is the second channel §6 asks for: the soft fill arrives for the modes that
  * write without asking, so the boundary that matters survives a greyscale screen — the same
- * outline-goes-fill-arrives move the accent-selected chip above already makes. */
+ * outline-goes-fill-arrives move the accent-selected chip above already makes.
+ *
+ * Its hover keeps the tone's ring: as specific as the chip's own accent hover, and after it, so it wins on order. */
 .vv-chip--toned { border-color: var(--tone-ink); }
-.vv-chip--toned:hover { border-color: var(--tone-ink); }
+@media (hover: hover) {
+  .vv-chip--toned:hover:not([aria-disabled='true']) { border-color: var(--tone-ink); }
+}
 .vv-chip--toned[data-selected='true'] {
   border-color: var(--tone-ink);
   background: var(--tone-soft);
@@ -269,7 +279,9 @@
   cursor: pointer;
   transition: background-color 0.2s, color 0.2s;
 }
-.vv-stepper__button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-ink); }
+@media (hover: hover) {
+  .vv-stepper__button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-ink); }
+}
 .vv-stepper__button:disabled { color: var(--ink-faint); cursor: not-allowed; }
 .vv-stepper__value {
   min-width: 46px;
@@ -430,7 +442,9 @@
   cursor: pointer;
   transition: border-color 0.2s;
 }
-.vv-select__trigger:hover,
+@media (hover: hover) {
+  .vv-select__trigger:hover { border-color: var(--accent); }
+}
 .vv-select__trigger[aria-expanded='true'] { border-color: var(--accent); }
 /* A value the reader cannot change now: dimmed, and no hover to suggest a press. */
 .vv-select__trigger:disabled { opacity: 0.6; cursor: not-allowed; border-color: var(--border-strong); }
@@ -485,7 +499,9 @@
   cursor: pointer;
   transition: background-color 0.15s;
 }
-.vv-select__option:hover { background: var(--surface2); }
+@media (hover: hover) {
+  .vv-select__option:hover { background: var(--surface2); }
+}
 /* What sets a choice apart from another of the same name, after the name and quieter than it: lighter,
    smaller and in the muted ink, so it reads as a note and not as part of the name. */
 .vv-select__hint { margin-left: 4px; font-size: 0.86em; font-weight: 400; color: var(--ink-muted); }
@@ -511,7 +527,9 @@
   cursor: pointer;
   transition: background-color 0.15s;
 }
-.vv-select__action:hover { background: var(--accent-soft); }
+@media (hover: hover) {
+  .vv-select__action:hover { background: var(--accent-soft); }
+}
 
 /* Dense form, for narrow chrome. The stock trigger is ~46px tall and towers over the `sm`
    Button it shares a strip with in the sidebar; this sits at that button's own 36px. Below 768px

@@ -36,7 +36,8 @@ type FeatureRowProps = {
  * picture, so each row is a component of its own), " · Blocked" after it while its dot is blocked so that red is never the whole
  * signal (the tree's tip says it so). A feature that waits on him has its phrase in the warn ink, and the phrase says "waiting on
  * you" itself. The phrase is cut to one line: it stands whole on the card the press opens, and the `Tooltip` repeats it for a
- * pointer and a keyboard (it is not drawn where nothing hovers, so a tap leaves none standing over the stage).
+ * pointer and a keyboard. It is not drawn where nothing hovers, the kit's long press included: a finger reads the phrase whole on
+ * the card its press opens.
  *
  * AT COMPACT DENSITY the row is ONE line: the dot, its title cut to what is left, and its phrase at the line's end, its own
  * width up to 45% of the line (so "waiting on you", in the warn ink, is never the part a long title pushes out); the tip

@@ -3,11 +3,12 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CheckSheet, NeedCard, useCerberusNeedOf } from '@/modules/cerberus';
-import { useStation } from '@/modules/station/context/StationContext';
-import { StageGone } from '@/modules/station/FocusFallback';
+import { useStation, useStationPref } from '@/modules/station/context/StationContext';
+import { stationArrangementOf } from '@/modules/station/stationArrangement';
+import { StageGone } from '@/modules/station/stageStates';
 import type { CerberusNeed } from '@/shared/cerberus-types';
 import type { StationFocus } from '@/shared/station-types';
-import type { CerberusSheetTarget, StationTier } from '@/shared/types';
+import type { CerberusSheetTarget, StationArrangement } from '@/shared/types';
 import { Button, Spinner } from '@/shared/ui';
 
 /** A service check on the stage, by its node and its key (`<service>/<id>`). */
@@ -22,15 +23,18 @@ type CheckFocus = Extract<StationFocus, { kind: 'check' }>;
 type CheckFound = { kind: 'loading' } | { kind: 'unread' } | { kind: 'needs'; need: CerberusNeed } | { kind: 'gone' };
 
 /**
- * THE CHECK SHEET'S WIDTH in each arrangement: over the station's right side, never over her face. Wide, the kit's own
- * `min(600px, 100%)` from the right edge covers the rail and the stage and stops short of her column (it begins at 708 px at
- * most, and the sheet at 760 px at the narrowest wide window, 1360 px). On a laptop the stage stands in her column under her
- * face, so the sheet takes the right rail's own 296 px. Below 1024 px (compact) a sheet takes the screen, as every sheet does there.
+ * WHERE THE CHECK SHEET STANDS in each arrangement, never over her face. Wide, the kit's own `min(600px, 100%)` from the right
+ * edge covers the rail and the stage and stops short of her column (it begins at 708 px at most, and the sheet at 760 px at the
+ * narrowest wide window, 1360 px). On a laptop the stage stands in her column under her face, so the sheet takes the right
+ * rail's own 296 px. In compact and on a phone her head is the page's top and the sheet takes the screen, so it stands below her
+ * head: `top` is the foot of her head's box, which the arrangement writes (`useStationHeadFoot`). The `0px` after it is the
+ * sheet's own top, which a read of the property before its first write would otherwise turn into `auto`.
  */
-const CHECK_SHEET_WIDTH: Readonly<Record<StationTier, string | undefined>> = {
-  wide: undefined,
-  laptop: '296px',
-  narrow: undefined,
+const CHECK_SHEET_PLACE: Readonly<Record<StationArrangement, { width?: string; top?: string }>> = {
+  wide: {},
+  laptop: { width: '296px' },
+  compact: { top: 'var(--station-head-foot, 0px)' },
+  phone: { top: 'var(--station-head-foot, 0px)' },
 };
 
 /** Where "Open the check" opens the sheet when only the focus is left: its node, and its key split at its first `/`. */
@@ -54,7 +58,7 @@ type CheckStageViewProps = {
  * rail cut must stand on the stage its press opens, with no hover to read it by — and what can be done as the Cerberus
  * tab offers it — its fix to run (`Run “<fix>”`, its run's strip once one goes) and Diagnose — with no Mute: muting stays the
  * Cerberus tab's, whose dialog the station does not host. Then "Open the check", the Cerberus check sheet on it, which stands
- * over the station's right side (`CHECK_SHEET_WIDTH`).
+ * where her face is not (`CHECK_SHEET_PLACE`).
  *
  * A check that needs no one any more draws its kind's line, "<label> is no longer red", with "Open the check" still under it,
  * where its history says what happened. While the overview has not been read, a quiet "Looking for the check…".
@@ -134,7 +138,10 @@ export function CheckStageView({ focus, found, onOpenSheet, onRetry }: CheckStag
  * check in Cerberus's overview, hands it to `CheckStageView`, and holds the check sheet its presses open.
  */
 export function CheckStage({ focus }: { focus: CheckFocus }) {
-  const { tier } = useStation();
+  const { tier, phone } = useStation();
+  // His Compact switch, which decides the arrangement above 1024 px; the shell reads the same pref.
+  const [compactOn] = useStationPref('compact', false);
+  const place = CHECK_SHEET_PLACE[stationArrangementOf(tier, phone, compactOn)];
   const { need, unreachable, retry } = useCerberusNeedOf(focus.node, focus.key);
   // The check the sheet is open on, null while it is shut. State, because the sheet is drawn from it and it opens on a press of the card or of "Open the check".
   const [sheet, setSheet] = useState<CerberusSheetTarget | null>(null);
@@ -152,7 +159,8 @@ export function CheckStage({ focus }: { focus: CheckFocus }) {
           check={sheet.check}
           lookupAt={sheet.lookupAt}
           run={sheet.run}
-          width={CHECK_SHEET_WIDTH[tier]}
+          width={place.width}
+          top={place.top}
         />
       )}
     </>

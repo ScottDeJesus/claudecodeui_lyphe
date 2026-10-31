@@ -2,7 +2,7 @@ import { ArrowUpRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { FollowupsContext, FollowupsWidgetBody, useFollowups } from '@/modules/followups';
-import { StageGone } from '@/modules/station/FocusFallback';
+import { StageGone } from '@/modules/station/stageStates';
 import { useOpenChatInCloudcli } from '@/modules/station/hooks/useOpenChatInCloudcli';
 import type { StationFocus } from '@/shared/station-types';
 import { Button, Card } from '@/shared/ui';

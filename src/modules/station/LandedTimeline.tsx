@@ -1,7 +1,8 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { FocusEvent, KeyboardEvent, ReactNode, WheelEvent } from 'react';
+import type { FocusEvent, KeyboardEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useSidewaysWheel } from '@/modules/station/hooks/useSidewaysWheel';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { StationLanded } from '@/shared/station-types';
 import { ScrollArea } from '@/shared/ui';
@@ -136,13 +137,8 @@ export function LandedTimeline({ entries, firstFresh, lastLook, entryOf, scrollR
     };
   }, [hostWindow]);
 
-  // A mouse's wheel turns the timeline: a bar does not scroll down, so its downward turn is read as sideways. A wheel
-  // that counts in lines (Firefox's) is turned into pixels; a trackpad's sideways sweep is left to the browser.
-  const turnSideways = (event: WheelEvent<HTMLDivElement>) => {
-    const node = scroller.current;
-    if (node === null || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-    node.scrollLeft += event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
-  };
+  // A mouse's wheel turns the timeline: a bar does not scroll down, so its downward turn is read as sideways (the shelf's row turns alike).
+  const turnSideways = useSidewaysWheel(scroller);
 
   // A landing focused (by Tab, an arrow or a press) becomes the line's tab stop, so Tab returns to it.
   const followFocus = (event: FocusEvent<HTMLOListElement>) => {

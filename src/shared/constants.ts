@@ -524,8 +524,7 @@ export const ROADMAP_DOT_PAINT: Record<RoadmapDotState, { fill: string; stroke: 
 /**
  * The query parameter a landing names a plan in (`?runner=<plan>`): the key one side writes and the other
  * reads. Used by the project-workspace module's `useRunnerLanding`, which reads it, and the shared
- * `useRevealCard`, which writes it from a surface that has no Roadmap tab above it, as does the station module's
- * `FocusFallback` (its way to a card in CloudCLI).
+ * `useRevealCard`, which writes it from a surface that has no Roadmap tab above it.
  */
 export const RUNNER_LANDING_PARAM = 'runner';
 
@@ -566,6 +565,17 @@ export const ZOOM_DOUBLE_TAP_RADIUS_PX = 32;
  * when they open.
  */
 export const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// ---------------------------
+
+//----------------- THE WINDOW'S POINTER ------------
+
+/**
+ * The media query that asks whether the window's main pointer is a finger. Read, with `matchMedia`, by the one phone predicate
+ * (`usePhoneWindow`'s `isPhoneWindow`), by the station's window (`useStationWindow`: a phone on its side) and by the keyboard's
+ * mark (`useVisualViewportKeyboardOffset`: a coarse pointer is what makes a shrunken layout viewport a keyboard).
+ */
+export const COARSE_POINTER_QUERY = '(pointer: coarse)';
 
 // ---------------------------
 
@@ -656,7 +666,7 @@ export const COMPANION_NOTE_KIND_GLYPHS: Record<CompanionNoteKind, { icon: Lucid
  * The glyph and the word of each kind of thing the station's stage can hold (`StationFocus.kind`): `icon` is the lucide mark and
  * `wordKey` the i18n key of its word (`station.focusKind.<kind>`: Session, Feature or epic, Waiting ask, Follow-ups, Check, Card,
  * Walkthrough, Page). A kind is always drawn with its word beside the mark, never the mark alone. Read by the station's stage
- * head, by its fallback for a view that has not landed, and by every region's press, which names its kind by them.
+ * head and by every region's press, which names its kind by them.
  */
 export const STATION_FOCUS_GLYPHS: Record<StationFocusKind, { icon: LucideIcon; wordKey: string }> = {
   chat: { icon: MessageSquare, wordKey: 'station.focusKind.chat' },

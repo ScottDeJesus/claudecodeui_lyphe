@@ -4,7 +4,6 @@ import type { ComponentType, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useStation } from '@/modules/station/context/StationContext';
-import { FocusFallback } from '@/modules/station/FocusFallback';
 import { StageShelf } from '@/modules/station/StageShelf';
 import { StageSlotsProvider } from '@/modules/station/stageSlots';
 import { focusKey } from '@/modules/station/stationMemory';
@@ -16,7 +15,7 @@ import { Button, EmptyState, ScrollArea, Tooltip } from '@/shared/ui';
 type StationStageViewProps = {
   /** The one thing on the stage, or null for an empty stage. */
   focus: StationFocus | null;
-  /** The focus's kind drawn: its registered view, else its fallback. Ignored while the stage is empty. */
+  /** The focus's kind drawn: its registered view. Ignored while the stage is empty. */
   view: ReactNode;
   /** Whether the back-stack holds a focus to return to: Back is drawn only then. */
   canGoBack: boolean;
@@ -163,9 +162,9 @@ export function StationStageView({ focus, view, canGoBack, onBack, onClear, shel
 export function StationStage() {
   const { focus, canGoBack, setFocus, back, scrollMemory } = useStation();
   // The registry keys each component to the kind it takes, so the one looked up by `focus.kind` takes this `focus`.
-  const View = focus === null ? undefined : (STAGE_VIEWS[focus.kind] as ComponentType<{ focus: StationFocus }> | undefined);
+  const View = focus === null ? null : (STAGE_VIEWS[focus.kind] as ComponentType<{ focus: StationFocus }>);
   // Keyed by the thing, so a different thing in the same kind starts its view afresh, state and all.
-  const view = focus === null ? null : View === undefined ? <FocusFallback key={focusKey(focus)} focus={focus} /> : <View key={focusKey(focus)} focus={focus} />;
+  const view = focus === null || View === null ? null : <View key={focusKey(focus)} focus={focus} />;
 
   return (
     <StationStageView

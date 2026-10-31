@@ -6,7 +6,9 @@ import { CompanionActionCard, useCompanion } from '@/modules/companion';
 import { useStation } from '@/modules/station/context/StationContext';
 import { useStationNeeds } from '@/modules/station/context/StationNeedsContext';
 import { useLandOnStageControl } from '@/modules/station/hooks/useLandOnStageControl';
+import { useLivePending } from '@/modules/station/hooks/useLivePending';
 import { NeedItem } from '@/modules/station/NeedItem';
+import { needsCountOf } from '@/modules/station/needsCount';
 import { focusKey } from '@/modules/station/stationMemory';
 import type { CompanionPendingAction } from '@/shared/companion-types';
 import type { StationFocus, StationNeed } from '@/shared/station-types';
@@ -76,8 +78,11 @@ type WhatNeedsYouViewProps = {
 /**
  * "WHAT NEEDS YOU", the station's right rail: everything waiting on his word, read at a glance and acted on from the stage.
  *
- * THE HEAD: "What needs you" with its count (none at zero: the quiet line says it). It tells him no words to say: she reads an
- * action back in her own words and judges from the conversation whether he agreed.
+ * THE HEAD: "What needs you" with its count (none at zero, nor before the first read: the quiet line and the spinner say those). The
+ * count is the one rule (`needsCountOf`): the items, with her action as one more unless it answers an Accept or a round among
+ * them, and not once its card has lapsed (`useLivePending`, the deadline her card draws by), so it is the number compact's button
+ * and the phone's bar say. It tells him no words to say: she reads an action back in her own words and judges from the
+ * conversation whether he agreed.
  *
  * THE BODY, top to bottom:
  * - a failed read, as a warn `Banner` with Try again (amber, never red, MAN-577), over the last good list when there is one;
@@ -111,6 +116,8 @@ export function WhatNeedsYouView({
   const headId = useId();
   const compact = density === 'compact';
   const current = focus === null ? null : focusKey(focus);
+  const livePending = useLivePending(pending);
+  const count = needsCountOf(needs, livePending);
 
   const body = (
     <div
@@ -181,12 +188,13 @@ export function WhatNeedsYouView({
       className="flex min-h-0 min-w-0 flex-1 flex-col"
     >
       <header className={cn('shrink-0 border-b border-border px-3 py-3', !compact && 'min-[1360px]:px-4')}>
-        <h2 id={headId} className="flex min-w-0 items-center gap-2 font-serif text-lg font-normal leading-tight text-foreground">
+        {/* 26 px at least, the height its count badge makes the line: the head stands as tall before the count lands as after, and as the left rail's. */}
+        <h2 id={headId} className="flex min-h-[1.625rem] min-w-0 items-center gap-2 font-serif text-lg font-normal leading-tight text-foreground">
           {t('station.needs.title', 'What needs you')}
           {/* A space, so the heading reads "What needs you 3" aloud; the flex row draws no gap for it. */}
           {' '}
-          {needs !== null && needs.length > 0 && (
-            <Badge as="span" tone="warn" data-station-needs-count="" className="font-sans tabular-nums">{needs.length}</Badge>
+          {count !== null && count > 0 && (
+            <Badge as="span" tone="warn" data-station-needs-count="" className="font-sans tabular-nums">{count}</Badge>
           )}
         </h2>
       </header>

@@ -6,7 +6,7 @@ import { byArc, DispatchArcDecks, PlanCard, usePutAway, useDispatcherPlans, wait
 import { EpicPanel, FeatureFacts, RoadmapDialogHost, useRoadmap, useRoadmapCard } from '@/modules/roadmap';
 import { useStation } from '@/modules/station/context/StationContext';
 import { labelOf } from '@/modules/station/cardLabel';
-import { StageGone } from '@/modules/station/FocusFallback';
+import { StageGone } from '@/modules/station/stageStates';
 import type { RoadmapEpic, RoadmapFeature, RoadmapPicture } from '@/shared/roadmap-types';
 import type { StationFocus } from '@/shared/station-types';
 import type { DispatcherArcGroup, DispatcherPlan, RoadmapDotState } from '@/shared/types';

@@ -35,13 +35,17 @@ import { cappedLines, toPanel, whenWords } from './eyes-answer.js';
  * never usage or spend). The wording it reads is already
  * taken clear of every figure (`spendFreeWording`, applied when the row was written).
  *
+ * A RECORD IS NEVER LISTED EITHER. An event of kind `record` (a feature of an epic finishing, `dispatcher.feature_finished`) is kept for
+ * the station's strip and told to no one, so it is no part of "what the house told him": a burst of them would fill `recent`'s
+ * twenty lines and push the asks and failures out of it.
+ *
  * `panel: true` puts the whole answer on his panel as a card. No eyes tool moves her focus or her activity: a read here
  * runs as `thinking`, and it names a chat only to say its name.
  *
  * Consumer: `tools/companion-tools.ts` (`buildCompanionTools`), once per account.
  */
 
-/** How many kept events `recent` and a phrase read: the history keeps 300 per account, and the read takes all of them so a phrase can reach the oldest. */
+/** How many kept events `recent` and a phrase read: the newest 300 per account, the most `list` answers (the history keeps every row of the week and, past that, these 300), so a phrase can reach the oldest of them. */
 const HISTORY_READ_MAX = 300;
 
 /**
@@ -66,9 +70,9 @@ function alertLine(row: NotificationHistoryRow): string {
   return [whenWords(row.at), kind, oneLine(about), oneLine(row.title)].join(' · ');
 }
 
-/** The kept events that are the house's to list: the history less the usage family, newest first. */
+/** The kept events that are the house's to list: the history less the usage family and less the records (kept, never told), newest first. */
 function listableAlerts(deps: CompanionToolDeps): NotificationHistoryRow[] {
-  return listNotificationHistory(deps.userId, HISTORY_READ_MAX).filter((row) => !NEVER_LISTED.test(row.code));
+  return listNotificationHistory(deps.userId, HISTORY_READ_MAX).filter((row) => row.kind !== 'record' && !NEVER_LISTED.test(row.code));
 }
 
 /** `recent`: the newest 20, then how many more the history holds. */

@@ -8,7 +8,7 @@ import { ListBody, NoteBody, PageBody, PlanBody } from '@/modules/station/cardBo
 import { labelOf } from '@/modules/station/cardLabel';
 import { useStation } from '@/modules/station/context/StationContext';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
-import { StageGone, StageReadFailed } from '@/modules/station/FocusFallback';
+import { StageGone, StageReadFailed } from '@/modules/station/stageStates';
 import { useKeepFocusWhenGone } from '@/modules/station/hooks/useKeepFocusWhenGone';
 import { refusalMessage } from '@/modules/station/stageRefusal';
 import { StageHeadActions } from '@/modules/station/stageSlots';

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
 import { useStationWindow } from '@/modules/station/hooks/useStationWindow';
 import { FOLLOWS_END, followScroll } from '@/modules/station/stationScroll';
@@ -59,8 +59,12 @@ type StationPrefs = {
   setPref: (key: StationPrefKey, value: unknown) => void;
 };
 
+/** What he has typed to her at the talk control, and its setter. Its own context, as the prefs are: a keystroke re-draws the box and never what only reads the focus. */
+type StationTalkText = { text: string; setText: Dispatch<SetStateAction<string>> };
+
 const StationContext = createContext<StationContextValue | null>(null);
 const StationPrefsContext = createContext<StationPrefs | null>(null);
+const StationTalkTextContext = createContext<StationTalkText | null>(null);
 
 /**
  * The station's context: the focus and its back-stack, the tier and whether the window is a phone's (and on its side), the scroll memory.
@@ -74,8 +78,10 @@ export function useStation(): StationContextValue {
 }
 
 /**
- * One region's remembered preference (`stripCollapsed`, `cornerOpen`, `compact`): the stored value, else `initial`, and the
- * setter that stores a new one on this device. Each key belongs to one region, which is the only reader of it.
+ * One region's remembered preference: the stored value, else `initial`, and the setter that stores a new one on this device. The
+ * seven keys (`StationPrefKey`) and their readers: `stripCollapsed` (`SinceYouLastLooked`), `cornerOpen` (`MemoryCorner`), `compact` (the
+ * shell's switch, and `CheckStage`, which places its sheet by the arrangement), `asleepOpen` and `completeOpen` (`WhereThingsStand`),
+ * `compactSection` and `compactSectionAside` (`useStationSection`).
  */
 export function useStationPref<T>(key: StationPrefKey, initial: T): [T, (next: T) => void] {
   const context = useContext(StationPrefsContext);
@@ -88,6 +94,17 @@ export function useStationPref<T>(key: StationPrefKey, initial: T): [T, (next: T
 }
 
 /**
+ * The words he has typed to her in the talk control's box, and the setter that changes them: held by the station, not by the box,
+ * so they are still there after the Compact switch has mounted another arrangement's tree. Used by this module's `StationTalk`,
+ * which hands them to the composer. Throws outside `StationProvider`.
+ */
+export function useStationTalkText(): [string, Dispatch<SetStateAction<string>>] {
+  const context = useContext(StationTalkTextContext);
+  if (!context) throw new Error('useStationTalkText must be used within a StationProvider');
+  return [context.text, context.setText];
+}
+
+/**
  * THE STATION'S PROVIDER, mounted by `StationRoute` above her provider, whose `onOpen` is a press on this stage.
  *
  * THE FOCUS lives here, beside the back-stack it is pushed onto: a station has one thing on its stage, and every region
@@ -97,6 +114,9 @@ export function useStationPref<T>(key: StationPrefKey, initial: T): [T, (next: T
  * and the regions' preferences. It is read once as the station mounts, so a reload puts the stage back as it was, and it is
  * written when the focus or a preference changes and when the page is hidden or leaves (`pagehide`,
  * `visibilitychange` → hidden), which is where the scroll is carried. No timer writes it.
+ *
+ * HIS TYPED WORDS to her (`useStationTalkText`) live here too, in memory only: each arrangement mounts its own tree, so the box's own
+ * state would be lost to the Compact switch. They are not in the record, so a reload starts with an empty box.
  */
 export function StationProvider({ children }: { children: ReactNode }) {
   const { tier, phone, sideways } = useStationWindow();
@@ -110,6 +130,9 @@ export function StationProvider({ children }: { children: ReactNode }) {
   // How many presses have been made on what already stood on the stage. State, because the one-column station's section must
   // answer each press; the stage itself does not change, so nothing else would re-draw it.
   const [restaged, setRestaged] = useState(0);
+  // What he has typed in the talk control's box. State, because it must outlive an arrangement's tree: the Compact switch unmounts
+  // the box one arrangement drew and mounts the other's, which would start empty from a box's own state. Memory only: a reload starts empty.
+  const [talkText, setTalkText] = useState('');
 
   // The stage as the last press left it: the truth `setFocus` and `back` decide from, so they never decide from a render
   // that predates the previous press.
@@ -193,10 +216,13 @@ export function StationProvider({ children }: { children: ReactNode }) {
     [stage, setFocus, restaged, back, tier, phone, sideways, scrollMemory],
   );
   const prefsValue = useMemo<StationPrefs>(() => ({ prefs, setPref }), [prefs, setPref]);
+  const talkTextValue = useMemo<StationTalkText>(() => ({ text: talkText, setText: setTalkText }), [talkText]);
 
   return (
     <StationContext.Provider value={value}>
-      <StationPrefsContext.Provider value={prefsValue}>{children}</StationPrefsContext.Provider>
+      <StationPrefsContext.Provider value={prefsValue}>
+        <StationTalkTextContext.Provider value={talkTextValue}>{children}</StationTalkTextContext.Provider>
+      </StationPrefsContext.Provider>
     </StationContext.Provider>
   );
 }

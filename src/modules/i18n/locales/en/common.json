@@ -3331,6 +3331,7 @@
     },
     "action": {
       "waiting": "Waiting for your word",
+      "waitingShort": "Waiting",
       "verb": {
         "queue": "Queue <target/>",
         "hide": "Hide <target/>",
@@ -3481,28 +3482,6 @@
       "block": "One block of a page in DocSpace",
       "open": "Open in DocSpace"
     },
-    "fallback": {
-      "why": {
-        "chat": "The station has no view of a chat yet.",
-        "card": "The station has no view of this card yet.",
-        "ask": "The station has no view of a waiting ask yet.",
-        "followups": "The station has no view of follow-ups yet.",
-        "check": "The station has no view of a check yet.",
-        "note": "The station has no view of her cards yet.",
-        "walk": "The station has no view of her walkthrough yet.",
-        "page": "The station has no view of a page yet."
-      },
-      "open": {
-        "chat": "Open the chat in CloudCLI",
-        "card": "Open its card in the Runner",
-        "ask": "Open the chat it waits in",
-        "followups": "Open the chat in CloudCLI",
-        "check": "Open CloudCLI",
-        "note": "Open CloudCLI",
-        "walk": "Open CloudCLI",
-        "page": "Open CloudCLI"
-      }
-    },
     "rail": {
       "name": "Where things stand"
     },
@@ -3541,6 +3520,11 @@
     },
     "chat": {
       "moved": "last moved {{when}}",
+      "when": {
+        "today": "{{clock}}",
+        "yesterday": "yesterday {{clock}}",
+        "day": "{{date}} {{clock}}"
+      },
       "open": "Open the chat",
       "say": "Say “What is {{name}} doing?”"
     },
@@ -3593,8 +3577,7 @@
       "followups": "{{label}} has no open follow-ups now",
       "check": "{{label}} is no longer red",
       "note": "{{label}} was taken down",
-      "walk": "The walkthrough ended",
-      "page": "{{label}} is no longer in DocSpace"
+      "walk": "The walkthrough ended"
     },
     "needs": {
       "title": "What needs you",
@@ -3635,6 +3618,11 @@
         "open": "{{count}} open"
       },
       "where": "{{node}} · since {{time}}",
+      "when": {
+        "today": "{{clock}}",
+        "yesterday": "yesterday {{clock}}",
+        "day": "{{date}} {{clock}}"
+      },
       "onStage": "On the stage",
       "openChat": "Open the chat",
       "ask": {

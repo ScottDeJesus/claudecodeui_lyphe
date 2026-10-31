@@ -1,6 +1,6 @@
 import { sessionsDb, type NotificationHistoryRow } from '@/modules/database/index.js';
 import type { DispatcherPicture } from '@/modules/dispatcher/index.js';
-import { listNotificationHistory } from '@/modules/notifications/index.js';
+import { listNotificationHistorySince, NOTIFICATION_HISTORY_WINDOW_MS } from '@/modules/notifications/index.js';
 import type { StationLanded, StationLandedKind } from '@/shared/station-types.js';
 
 import type { CompanionHouse } from '../house.js';
@@ -13,13 +13,21 @@ import { chatNameOf } from '../tools/house-reads.js';
  * seam. A second reader of the runs or of the souls lane would be a second answer to "what finished", free to disagree with what
  * he was told. The same rows reach his pages as they are kept, through `onHistoryKept` (`station-landed-feed.ts`).
  *
- * WHAT COUNTS AS LANDED has one home, `LANDED_KIND_BY_CODE`: four codes. Every other code (an ask, a failure, a pause, the usage
- * family and `dispatcher.limit_paused`) is news and not a landing, and is left out. Ruling 17: never a word about usage or spend.
- * An entry's `title` is the row's own, as kept, and no `meta` is read, so no figure reaches the strip.
+ * THE WEEK IS THE HISTORY'S: `stationLanded` reads every row the history keeps of the last seven days (`listNotificationHistorySince`
+ * over `NOTIFICATION_HISTORY_WINDOW_MS`, the window the history's own prune never cuts into), by time and not by a count of rows.
+ * A landing the house never kept has no row, and nothing here derives one from the dispatcher store or the souls lane.
+ *
+ * WHAT COUNTS AS LANDED has one home, `LANDED_KIND_BY_CODE`: five codes. A feature of an epic finishing is one of them
+ * (`dispatcher.feature_finished`, a `record`: kept for this strip and pushed nowhere, so the strip draws it as `shipped` though the
+ * phone is told only of the epic). Every other code (an ask, a failure, a pause, the usage family and `dispatcher.limit_paused`) is
+ * news and not a landing, and is left out. Ruling 17: never a word about usage or spend. An entry's `title` is the row's own, as
+ * kept, and no `meta` is read, so no figure reaches the strip.
  *
  * THE CHAT THAT DID IT, by kind:
- *   - `shipped` and `epic`: the dispatcher plan's chat (`session_app_id`) while the dispatcher lane still holds the plan, which
- *     it does for a day after the plan ends; for an epic the chat of its lead plan. An older landing honestly names none.
+ *   - `shipped` and `epic`: the row's own `session_id` first, the chat that asked for the work as the dispatcher's endings hand it;
+ *     else the dispatcher plan's chat (`session_app_id`) while the dispatcher lane still holds the plan, which it does for a day after
+ *     the plan ends, and for an epic the chat of its lead plan (`planChatOf`). A landing kept before the house handed the chat, and
+ *     older than the lane's day, honestly names none.
  *   - `landed`: the chat the background work finished in, the history row's own `session_id`.
  *   - `recovered`: none, a check recovering was no chat's doing.
  * A chat is named as the sidebar names it (`chatNameOf`). A chat the house no longer holds names none, whichever kind it came
@@ -30,14 +38,11 @@ import { chatNameOf } from '../tools/house-reads.js';
  * `landsThroughLane`, `dispatcherPictureOrNull`).
  */
 
-/** How far back the strip reads: the last seven days. */
-const LANDED_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-
-/** The most entries the strip is answered, newest first. */
-const LANDED_MAX = 60;
-
-/** Everything an account keeps: the history holds any limit past its own cap to that cap, so the cap is stated once, there. */
-const HISTORY_ROWS_KEPT = Number.MAX_SAFE_INTEGER;
+/**
+ * The most entries the strip is answered, newest first: 300, the most a strip draws (`LANDED_HELD`, `StationLandedContext.tsx`), so the
+ * week stays whole however busy the house was. His week is about 140 landings once a feature of an epic is kept.
+ */
+const LANDED_MAX = 300;
 
 /**
  * Every code that means something landed, and the kind the strip draws it as. The one home of the rule; consumed by `landedOf`
@@ -45,6 +50,7 @@ const HISTORY_ROWS_KEPT = Number.MAX_SAFE_INTEGER;
  */
 export const LANDED_KIND_BY_CODE: ReadonlyMap<string, StationLandedKind> = new Map<string, StationLandedKind>([
   ['dispatcher.finished', 'shipped'],
+  ['dispatcher.feature_finished', 'shipped'],
   ['dispatcher.epic_finished', 'epic'],
   ['run.background_completed', 'landed'],
   ['cerberus.recovered', 'recovered'],
@@ -72,12 +78,17 @@ export function planChatOf(picture: DispatcherPicture | null): (plan: string) =>
   };
 }
 
+/** The chat a row names itself, or `null`: a row kept before the dispatcher's endings handed the chat, and an empty id, name none. */
+function ownChatOf(row: NotificationHistoryRow): string | null {
+  return row.session_id === null || row.session_id === '' ? null : row.session_id;
+}
+
 /** The chat a landing of `kind` came from, or `null` when it names none (see the file's head). */
 function chatOfLanding(row: NotificationHistoryRow, kind: StationLandedKind, planChat: (plan: string) => string | null): string | null {
   switch (kind) {
     case 'shipped':
     case 'epic':
-      return row.plan === null ? null : planChat(row.plan);
+      return ownChatOf(row) ?? (row.plan === null ? null : planChat(row.plan));
     case 'landed':
       return row.session_id;
     case 'recovered':
@@ -115,12 +126,13 @@ export function landedOf(row: NotificationHistoryRow, planChat: (plan: string) =
 }
 
 /**
- * Whether a row's chat is a dispatcher plan's, so naming it takes the lane's picture (`planChatOf`): a shipped feature or epic. The
- * one place the rule lives. Consumed by `stationLanded` here and by the station's landed feed.
+ * Whether naming a row's chat takes the lane's picture (`planChatOf`): a shipped feature or epic that names no chat of its own — a
+ * landing kept before the dispatcher's endings handed the chat. A row that carries its chat never waits on the lane. The one place
+ * the rule lives. Consumed by `stationLanded` here and by the station's landed feed.
  */
-export function landsThroughLane(code: string): boolean {
-  const kind = LANDED_KIND_BY_CODE.get(code);
-  return kind === 'shipped' || kind === 'epic';
+export function landsThroughLane(row: NotificationHistoryRow): boolean {
+  const kind = LANDED_KIND_BY_CODE.get(row.code);
+  return (kind === 'shipped' || kind === 'epic') && ownChatOf(row) === null && row.plan !== null;
 }
 
 /**
@@ -137,16 +149,16 @@ export async function dispatcherPictureOrNull(house: CompanionHouse): Promise<Di
 }
 
 /**
- * The account's landings of the last seven days, newest first, at most 60. The history's rows keep the order they were written
- * in, so this is the order he was told. The lane's picture is read only when a dispatcher landing is among them. Consumed by
- * `landed.routes.ts`, through the companion service's verb that hands its house.
+ * The account's landings of the last seven days, newest first, at most 300 (`LANDED_MAX`). The week is read by time, every row the
+ * history keeps since seven days ago, and the rows keep the order they were written in, so this is the order he was told. The lane's
+ * picture is read only when a dispatcher landing among them names no chat of its own. Consumed by `landed.routes.ts`, through the
+ * companion service's verb that hands its house.
  */
 export async function stationLanded(userId: number, house: CompanionHouse): Promise<StationLanded[]> {
-  const since = Date.now() - LANDED_WINDOW_MS;
-  // A stamp that does not parse is NaN, and NaN is never >= since: such a row is left out rather than guessed at.
-  const rows = listNotificationHistory(userId, HISTORY_ROWS_KEPT)
-    .filter((row) => LANDED_KIND_BY_CODE.has(row.code) && Date.parse(row.at) >= since)
+  const sinceIso = new Date(Date.now() - NOTIFICATION_HISTORY_WINDOW_MS).toISOString();
+  const rows = listNotificationHistorySince(userId, sinceIso)
+    .filter((row) => LANDED_KIND_BY_CODE.has(row.code))
     .slice(0, LANDED_MAX);
-  const planChat = planChatOf(rows.some((row) => landsThroughLane(row.code)) ? await dispatcherPictureOrNull(house) : null);
+  const planChat = planChatOf(rows.some((row) => landsThroughLane(row)) ? await dispatcherPictureOrNull(house) : null);
   return rows.flatMap((row) => landedOf(row, planChat) ?? []);
 }

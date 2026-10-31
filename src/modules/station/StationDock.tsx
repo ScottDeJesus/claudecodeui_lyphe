@@ -56,7 +56,7 @@ const NARROW_FRAME_HOLD = 'max-h-[calc((100dvh-var(--keyboard-height,0px))*0.6)]
 /**
  * The dock's cap in the columns: at most 45% of her column on a wide screen and 40% on a laptop, where the stage beside her
  * takes up to 55%. Written in `cqh` of her column (the shell makes it a size container), because the dock's slot is sized by
- * her column's budget (the shell's slot box: the card at its floor as its basis, growing to its words) and can carry no share
+ * her column's budget (the shell's slot box: the card's head line as its basis, growing to its words) and can carry no share
  * of its own.
  */
 const DOCK_CAP: Record<StationTier, string> = { wide: 'max-h-[45cqh]', laptop: 'max-h-[40cqh]', narrow: NARROW_FRAME_HOLD };
@@ -78,20 +78,25 @@ function keepFieldFocus(event: MouseEvent<HTMLElement>) {
  * THE DRAFT DOCK: her one draft, at the foot of her column, under her conversation and over the talk control (the shell's
  * `dock` slot), so the brief she composes for a chat is where his eyes and his Send are.
  *
- * - WITH A DRAFT it draws the one `CompanionDraftCard`, as her panel draws it, with every rule the card keeps (MAN-9090): his
- *   edit saved when the field blurs and before any send; Send steer only while the target works, and then leading, Send turn
- *   following; a refused send keeping everything on screen with the server's sentence; Clear asking first. Here the target's
- *   name is a press too (`onTargetPress`): "Show <chat> on the stage". Nothing of the brief is drawn twice.
+ * - WITH A DRAFT it draws the one `CompanionDraftCard`, with every rule the card keeps (MAN-9090): his edit saved when the field
+ *   blurs and before any send; Send steer only while the target works, and then leading, Send turn following; a refused send
+ *   keeping everything on screen with the server's sentence; Clear asking first. Here the card draws its HEAD LINE
+ *   (`headLine`): the target with Steer's state and the sends with Clear in one row at its head (the sends wrapping under the
+ *   target where the dock is too narrow for both), a refusal under it, the field under all of it. And the target's name is a
+ *   press (`onTargetPress`): "Show <chat> on the stage". Nothing of the brief is drawn twice.
  * - WITHOUT ONE it is one quiet line in the muted ink (kit `EmptyState` at `sm`): "When she drafts a brief for a session, it
  *   waits here for your Send." It never folds to nothing, so the place keeps its room as drafts come and go.
  *
  * THE ROOM: at most 45% of her column on a wide screen and 40% on a laptop (`DOCK_CAP`), within her column's one budget (the
- * shell's slot box): the card's field gives way first, down to its 88px floor (`useCardFloor`), then her conversation from its
- * share down to its own floor (3.5rem), and only then the dock below its card's floor, scrolling as one region with the card
- * whole inside it — so his sends, a line of the brief and a refusal's sentence stand whenever her conversation is above its
- * floor. The budget reads that floor as the card measures it (`useDockFloor` hands it to the slot). On a phone
- * every press of the card is a 44px catch under a finger (the card's own: its sends, Clear and the target's press), the words
- * stay in the field, never behind a hover, and while he edits the brief the dock stands whole in the frame above the keyboard
+ * shell's slot box): the card's field gives way first, down to nothing (below one line it steps aside whole), while its head
+ * line stands — the dock never goes under
+ * it, so his sends are always in sight — then her conversation from its share down to its own floor (3.5rem), then on a laptop
+ * the stage. The budget reads the head line as the card measures it (`useCardFloor`; `useDockFloor` hands it to the slot), and
+ * while the field holds the focus the slot gives it its 88px back. In the one-column sections the dock stands up to 45% of the
+ * section, its field keeping its 44px catch there under a finger (the dock scrolls it), and while he types to her with the keys
+ * up it draws its head line alone (`StationSections`). Under a finger every
+ * press of the card is a 44px catch (the card's own: its sends, Clear and the target's press), the words stay in the field,
+ * never behind a hover, and while he edits the brief the dock stands whole in the frame above the keyboard
  * (`NARROW_FRAME_HOLD`, the section's lifted cap, and `keepFieldFocus` holding that through a press).
  *
  * `data-station-dock` reads the state: `empty`, `session` or `new`. A pure view: `StationDock` below binds it, and
@@ -120,7 +125,7 @@ export function StationDockView({ tier, draft, name, targetWorking, onEdit, onSe
         <EmptyState size="sm" title={t('station.dock.empty', { defaultValue: 'When she drafts a brief for a session, it waits here for your Send.' })} />
       ) : (
         // A flex column with no automatic minimum (which would count the field's whole basis), so the card gives way with the
-        // dock: inside the card only the field shrinks, and its own 88px floor is what stops it.
+        // dock: inside the card only the field shrinks, down to nothing under its head line.
         <div className="flex min-h-0 flex-col">
           <CompanionDraftCard
             draft={draft}
@@ -128,6 +133,7 @@ export function StationDockView({ tier, draft, name, targetWorking, onEdit, onSe
             targetWorking={targetWorking}
             // The dock is drawn whenever it stands, so the field is always measured.
             visible
+            headLine
             onEdit={onEdit}
             onSend={onSend}
             onClear={onClear}

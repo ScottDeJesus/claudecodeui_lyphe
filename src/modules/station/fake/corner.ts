@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react';
 
+import { MEMORY_NO_ANSWER } from '@/modules/station/hooks/useMemoryLines';
 import { MemoryCornerView } from '@/modules/station/MemoryCorner';
 import { docSpacePageUrl } from '@/modules/widgets';
 import type { CompanionMemoryLines } from '@/shared/companion-types';
@@ -22,7 +23,8 @@ import type { CompanionMemoryLines } from '@/shared/companion-types';
  *
  * THE STATES no picture shows, `CORNER_STATES`, each drawn by the shots probe over the `home` picture: `open` (the seven, no
  * words open), `reading` (the first read still out), `unreadable` (her door's own sentence for a docstore that did not answer)
- * and `failed` (the page's own read failed over the reading it held).
+ * and `failed` (the page's own read failed over the reading it held, in the sentence `useMemoryLines` gives a read the server
+ * never answered: `MEMORY_NO_ANSWER`, never the browser's own words).
  */
 
 /** The bank's page in DocSpace, as the corner's read names it (`BANK_PAGE_ID`). */
@@ -107,5 +109,5 @@ export const CORNER_STATES = {
   open: drawing({ open: true }),
   reading: drawing({ reading: null, open: true, pageUrl: null }),
   unreadable: drawing({ reading: DOOR_DOWN, open: true }),
-  failed: drawing({ failure: 'Failed to fetch', open: true }),
+  failed: drawing({ failure: MEMORY_NO_ANSWER, open: true }),
 };

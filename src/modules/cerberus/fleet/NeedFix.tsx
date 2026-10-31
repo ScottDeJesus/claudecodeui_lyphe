@@ -79,7 +79,7 @@ type NeedFixProps = {
  *
  * Draws nothing for a need with neither.
  *
- * The button is a 44 px catch under a finger below 768 px, the house's touch floor.
+ * The button is a 44 px catch under a finger (a touch screen, or a window under 768 px), the house's touch floor.
  *
  * For Fleet's `NeedsYouCard`, once per card (its `NeedCard`, which the station's check stage draws too).
  */
@@ -156,7 +156,7 @@ export function NeedFix({ need, leaving, onOpen }: NeedFixProps) {
           disabled={leaving}
           busy={starting}
           onClick={(event) => onRun(fix, event.currentTarget)}
-          className="h-auto min-h-9 max-w-full whitespace-normal py-1.5 text-left max-md:min-h-11"
+          className="h-auto min-h-9 max-w-full whitespace-normal py-1.5 text-left finger:min-h-11"
         >
           {starting ? t('cerberus.catalog.running') : t('cerberus.fix.run', { name: fix.name })}
         </Button>

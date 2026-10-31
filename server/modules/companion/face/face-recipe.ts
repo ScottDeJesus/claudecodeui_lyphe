@@ -54,7 +54,7 @@ export type FaceFraming = {
 };
 
 /** The framing every face is made with. Consumed by `face-atlas.ts` (the cut and the pad) and `comfyui.ts` (crop_factor). */
-export const FACE_FRAMING: FaceFraming = { cropFactor: 2.0, discSide: 1.25, discRaise: 0.18, frameSize: 256, pad: 0.5 };
+export const FACE_FRAMING: FaceFraming = { cropFactor: 2.0, discSide: 1.75, discRaise: 0.05, frameSize: 256, pad: 0.5 };
 
 /** The node's own range for each slider; each frame's sum is clamped to it. */
 const SLIDER_RANGES: Record<keyof FaceSliders, readonly [number, number]> = {

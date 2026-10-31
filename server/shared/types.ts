@@ -2778,8 +2778,10 @@ export type QueuedAppendResult =
  * (`code`, ranked by `kind` and `severity`), to whom it belongs (`provider`, `sessionId`), the facts its wording is
  * made from (`meta`) and the key that collapses a repeat (`dedupeKey`, `null` for the composite default of
  * provider, kind, code and session). `provider` is a runtime's name or `'system'` for the house's own (the dispatcher,
- * the stall watchdog); `kind` is one of `action_required`, `stop`, `error`, `limit`, `background` or `info` (the
- * push preference it falls under); `severity` is `info`, `warning` or `error`. `sessionId` is the app session id
+ * the stall watchdog); `kind` is one of `action_required`, `stop`, `error`, `limit`, `background`, `record` or `info` (the
+ * push preference it falls under — except `record`, which is kept and never pushed: the orchestrator hands it to its
+ * listeners and returns before every push gate, and the dispatcher's endings are its one producer); `severity` is `info`,
+ * `warning` or `error`. `sessionId` is the app session id
  * once the orchestrator has normalized it, `null` for an event that belongs to no chat. `createdAt` is ISO-8601 UTC.
  *
  * The orchestrator is JavaScript and builds this by hand; the type states the contract it keeps. A reader of an event

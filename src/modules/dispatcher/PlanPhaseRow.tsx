@@ -26,7 +26,7 @@ export function PlanPhaseRow({ phase, open = false }: { phase: DispatcherPhase; 
 
   return (
     <Collapsible defaultOpen={open} className="min-w-0" data-dispatcher-phase={phase.key} data-phase-status={phase.status}>
-      <CollapsibleTrigger className="flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-1.5 text-left hover:bg-muted">
+      <CollapsibleTrigger className="flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-1.5 text-left hover:bg-muted finger:min-h-11">
         {/* The track's own mark, so the receipt under a node leads with what the node shows; a phase
             not started leads with `·`, since its position follows. */}
         <span className="flex-none font-mono text-xs" aria-hidden="true">{word.key === 'notStarted' ? '·' : word.mark}</span>

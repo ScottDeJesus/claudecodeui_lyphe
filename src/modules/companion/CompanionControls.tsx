@@ -8,7 +8,7 @@ import { CompanionVoiceSwitch } from '@/modules/companion/CompanionVoiceSwitch';
 import { errorMessage } from '@/shared/api';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
 import { useToast } from '@/shared/context/ToastContext';
-import type { CompanionEars, CompanionPresence, CompanionVoice } from '@/shared/types';
+import type { CompanionEars, CompanionVoice } from '@/shared/types';
 import { Button, ConfirmDialog, Select, Switch, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -17,11 +17,6 @@ type CompanionControlsProps = {
   name: string;
   /** Null while the picture loads: every control waits. Model, Live and whether a turn runs (Stop) are read from it. */
   picture: CompanionPicture | null;
-  /**
-   * What she is doing on this page, from `useCompanionPresence`. The rows read the picture's turn for Stop, as the panel's
-   * controls always have (MAN-9089: a consumer may read its own source for its own part), so nothing in this layout reads it.
-   */
-  presence: CompanionPresence;
   /**
    * This page's voice switch: drawn in a row of its own under the controls, "Voice on this device". Absent, there is no
    * row.
@@ -74,6 +69,11 @@ type CompanionControlsProps = {
  * where its box runs out of width (her column at 1440 px, a phone), and the last switch and Clear wrap as one, so Clear never
  * stands alone on a line of its own: "Stop · model · Live" over "Voice on this device · Clear", or, given `ears`, over "Voice on
  * this device" over "Listen for her name on this device · Clear". `align` centres it under a centred head.
+ *
+ * WHAT LIVE DOES, IN WORDS where nothing hovers (a touch screen, `hover: none`): its tooltip's sentence, "On: she hears the
+ * house's alerts and speaks up without being asked.", also stands muted under the line that holds Live: in `line` a line of its
+ * own right after Live ("Stop · model · Live" over the words, over "Voice on this device · Clear"), in `rows` under the controls
+ * row, inside its rules. A pointer keeps the tooltip and is drawn no words (the touch law, INV-10275: nothing said only on hover).
  *
  * A model or Live choice shows at once and holds while its save is out: the picture keeps the old value until the
  * server's settings come back, and a control that snapped back meanwhile would read as refused. A refused save puts
@@ -134,7 +134,7 @@ export function CompanionControls(props: CompanionControlsProps) {
   };
 
   const stopButton = (
-    <Button variant="outline" size="sm" busy={stopping} onClick={stop} className="shrink-0 max-md:h-11 [@media(pointer:coarse)]:h-11" aria-label={t('companion.stopHint', { name })}>
+    <Button variant="outline" size="sm" busy={stopping} onClick={stop} className="shrink-0 finger:h-11" aria-label={t('companion.stopHint', { name })}>
       <Square aria-hidden="true" className="fill-current" />
       {t('companion.stop')}
     </Button>
@@ -156,11 +156,19 @@ export function CompanionControls(props: CompanionControlsProps) {
     <Tooltip content={t('companion.liveHint')} showOnFocus position="bottom">
       {/* A label around the word and the switch, so a press anywhere on it presses the switch: the kit's 30px switch
           gets a 44px catch under a finger. The switch carries the name; the word beside it is for the eye. */}
-      <label className="flex cursor-pointer items-center gap-2 max-md:min-h-11 [@media(pointer:coarse)]:min-h-11">
+      <label data-companion-live="" className="flex cursor-pointer items-center gap-2 finger:min-h-11">
         <span aria-hidden="true" className="text-xs font-medium text-foreground">{t('companion.live')}</span>
         <Switch checked={live} label={t('companion.live')} disabled={!ready || pendingLive !== null} onChange={switchLive} />
       </label>
     </Tooltip>
+  );
+
+  // What Live does, in words where nothing hovers to open its tooltip (a touch screen): muted, under the line that holds Live. A
+  // pointer keeps the tooltip and draws no words. Outside the label, so a tap on the words never flips the switch.
+  const liveWords = (className: string) => (
+    <p data-companion-live-words="" className={cn('hidden text-xs leading-snug text-muted-foreground [@media(hover:none)]:block', className)}>
+      {t('companion.liveHint')}
+    </p>
   );
 
   const clearButton = (
@@ -171,7 +179,7 @@ export function CompanionControls(props: CompanionControlsProps) {
       // The panel holds two Clears: this one wipes her conversation, the draft card's discards the brief.
       aria-label={t('companion.clearLabel', { name })}
       onClick={() => setConfirmingClear(true)}
-      className="shrink-0 text-muted-foreground hover:text-foreground max-md:h-11 [@media(pointer:coarse)]:h-11"
+      className="shrink-0 text-muted-foreground hover:text-foreground finger:h-11"
     >
       {t('companion.clear')}
     </Button>
@@ -203,6 +211,8 @@ export function CompanionControls(props: CompanionControlsProps) {
           {/* A fixed width, so the line does not move as he picks a model with a longer name. */}
           <div className="w-36 min-w-0">{select}</div>
           {liveSwitch}
+          {/* A line of its own, right under the one that holds Live. */}
+          {liveWords(cn('basis-full', props.align === 'center' && 'text-center'))}
           {/* Given the ears, the voice switch stands on its own, and the ears' switch is the one Clear wraps with. */}
           {earsSwitch && voiceSwitch && <div className="flex min-w-0">{voiceSwitch}</div>}
           {/* The last switch and Clear as one: a lone Clear on a line of its own reads as a stray word. The switch's own box is
@@ -228,20 +238,22 @@ export function CompanionControls(props: CompanionControlsProps) {
         <span className="flex-1" />
         {clearButton}
       </div>
+      {/* Inside the controls row's rules, under it: the words belong to its Live, not to the voice row below. */}
+      {liveWords('-mt-1 px-3 pb-2')}
 
       {voiceSwitch && (
-        // Under the controls, its switch closing the row as Clear closes the one above. Below 768 px and on a touch screen the switch's
-        // 44px label is the row's height, so the row adds no padding of its own there.
-        <div data-companion-voice-row="" className="flex items-center border-t border-border px-3 py-1.5 max-md:py-0 [@media(pointer:coarse)]:py-0">
+        // Under the controls, its switch closing the row as Clear closes the one above. Under a finger (a touch screen, or a window
+        // under 768 px) the switch's 44px label is the row's height, so the row adds no padding of its own there.
+        <div data-companion-voice-row="" className="flex items-center border-t border-border px-3 py-1.5 finger:py-0">
           {voiceSwitch}
         </div>
       )}
 
       {earsSwitch && (
-        // Under the voice row, its switch closing the row under the voice row's. Below 768 px and on a touch screen its 44px label
-        // is the row's height, as the voice row's is; while the state's words stand under the label the row keeps its padding there
-        // too, so two lines of words never touch its rules.
-        <div data-companion-ears-row="" className="flex items-center border-t border-border px-3 py-1.5 max-md:py-0 has-[[data-companion-ears-state]]:max-md:py-1.5 [@media(pointer:coarse)]:py-0 [@media(pointer:coarse)]:has-[[data-companion-ears-state]]:py-1.5">
+        // Under the voice row, its switch closing the row under the voice row's. Under a finger its 44px label is the row's height,
+        // as the voice row's is; while the state's words stand under the label the row keeps its padding there too, so two lines of
+        // words never touch its rules.
+        <div data-companion-ears-row="" className="flex items-center border-t border-border px-3 py-1.5 finger:py-0 finger:has-[[data-companion-ears-state]]:py-1.5">
           {earsSwitch}
         </div>
       )}

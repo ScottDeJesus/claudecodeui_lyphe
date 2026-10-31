@@ -6,12 +6,13 @@ import { resizeObserverIn } from '@/shared/utils';
 
 /**
  * The card's floor, from its rows: the bottom of its last in-flow row less its own top (its top border and padding and
- * every row with its gaps), plus its bottom padding and border, with the field counted at its own min-height (88px)
- * instead of its height. The rows' boxes are laid out the same whether or not the dock squeezes the card, so the floor
+ * every row with its gaps), plus its bottom padding and border, with the field counted at its own min-height (the kit's 88px;
+ * in the dock's head line the field's box, at nothing) instead of its height. The rows' boxes are laid out the same whether
+ * or not the dock squeezes the card, so the floor
  * is the same either way — a floor read from `scrollHeight` lost the bottom padding whenever the card overflowed. A row
  * out of the flow (the field's `sr-only` label) is skipped.
  */
-function writeFloor(card: HTMLElement, field: HTMLTextAreaElement) {
+function writeFloor(card: HTMLElement, field: HTMLElement) {
   const view = card.ownerDocument.defaultView;
   if (!view) return;
   const cardBox = card.getBoundingClientRect();
@@ -29,7 +30,8 @@ function writeFloor(card: HTMLElement, field: HTMLTextAreaElement) {
 
 /**
  * Holds a draft card at its own floor: all of it but the field (the target, a notice, the sends, a refusal), plus the
- * field's 88px floor. Explicit, because the card shrinks with the dock (its automatic minimum would count the field's
+ * field's own floor: the TextArea's 88px, or nothing for the box the dock's head line clips it in (`fieldRef` is then that
+ * box). Explicit, because the card shrinks with the dock (its automatic minimum would count the field's
  * whole basis) yet must never fold over its own sends: below this floor the dock scrolls the card whole instead.
  *
  * MEASURED ON BOTH EVENTS THAT MOVE IT: every render (a notice or a refusal came or went, the field changed), and a change
@@ -42,7 +44,7 @@ function writeFloor(card: HTMLElement, field: HTMLTextAreaElement) {
  */
 export function useCardFloor(
   cardRef: RefObject<HTMLElement | null>,
-  fieldRef: RefObject<HTMLTextAreaElement | null>,
+  fieldRef: RefObject<HTMLElement | null>,
   drawn: boolean,
 ) {
   const hostWindow = useHostWindow();

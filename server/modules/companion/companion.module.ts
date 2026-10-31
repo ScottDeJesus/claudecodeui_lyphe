@@ -28,7 +28,7 @@ import { startStationLandedFeed } from './station/station-landed-feed.js';
  * subscriptions to events the house already raises — nothing polls — and both cost nothing for an account whose
  * Live is off. A third subscription tells her nothing: when the chat she is focused on is deleted her focus ends
  * (`startDeletedChatFeed`). A fourth is not hers at all: Kaylee Station's hint (`startStationHint`), which coalesces the
- * four announcements that a chat changed into the one `station_sessions_changed` frame every open page hears; a fifth is the
+ * six announcements that a chat changed into the `station_sessions_changed` frames every open page hears; a fifth is the
  * station's landed feed (`startStationLandedFeed`), which turns each row the notification history keeps that is a landing
  * into one `station_landed` frame to that account's pages. Both start with the feeds and end with them. Building the module
  * launches no process: her conversations start asleep, on an account's first message. The one other thing that wakes her is

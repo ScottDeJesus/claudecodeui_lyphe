@@ -52,7 +52,7 @@ function drawing(her: CompanionPicture | null, presence: CompanionPresence) {
         presence, faceId: her?.face.id ?? null, voice: null, sentences: null, look: null, name, size: px,
       }),
       controls: (align: 'start' | 'center') => createElement(CompanionControls, {
-        name, picture: her, presence, voice: VOICE_ON, layout: 'line', align,
+        name, picture: her, voice: VOICE_ON, layout: 'line', align,
         onModelChange: NO_SAVE, onLiveChange: NO_SAVE, onInterrupt: NO_SAVE, onClear: NO_SAVE,
       }),
       failure: her?.process.state === 'failed' ? { sentence: her.process.error } : null,

@@ -9,8 +9,8 @@ const px = (value: string): number => Number.parseFloat(value) || 0;
 
 /**
  * Writes the dock's floor onto its slot: the card's own floor, as `useCardFloor` measures it into the card's `min-height` (its
- * target, a notice, the sends, a refusal, and the field's 88 px), with the dock's padding and the slot's hairline. Removed while
- * the dock holds no card, so her column's budget stands on its 14.25rem until there is one.
+ * head line — the target, Steer's state, the sends, a refusal and a notice — with its field at nothing), with the dock's padding
+ * and the slot's hairline. Removed while the dock holds no card, so her column's budget stands on its 8rem until there is one.
  */
 function writeFloor(section: HTMLElement) {
   const slot = section.parentElement;
@@ -29,12 +29,11 @@ function writeFloor(section: HTMLElement) {
 }
 
 /**
- * HANDS THE CARD'S FLOOR TO HER COLUMN'S BUDGET. The shell sizes the dock's slot (`SLOT_BOX`): its basis is the card at its floor,
- * and her conversation gives way to it, from its share down to its own floor, before the dock goes below it and scrolls. That
- * floor is the card's to measure — a refused send's sentence or her rewrite's notice under his edit adds lines to it — so it is
- * read off the card and written to the slot as `--station-dock-floor`, the one property the shell's dock box reads. Without it
- * the box stood on its 14.25rem guess, and a refused send's sentence scrolled out of the dock while her conversation kept its
- * share.
+ * HANDS THE CARD'S FLOOR TO HER COLUMN'S BUDGET. The shell sizes the dock's slot (`SLOT_BOX`): its basis is the card's head line,
+ * under which the dock never goes, and her conversation gives way to it, from its share down to its own floor. That floor is the
+ * card's to measure — a refused send's sentence or her rewrite's notice adds lines to it — so it is read off the card and written
+ * to the slot as `--station-dock-floor`, the one property the shell's dock box reads. Without it the box stood on a guess, and a
+ * refused send's sentence scrolled out of the dock while her conversation kept its share.
  *
  * WRITTEN ON THE ONE EVENT THAT MOVES IT: `useCardFloor` writes the card's `min-height` on every render and on a width change, so a
  * `MutationObserver` on the card's `style` hears each new floor and the property is written again — no poll, no timer. Written

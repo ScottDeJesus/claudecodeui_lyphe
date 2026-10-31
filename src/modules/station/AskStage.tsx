@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AskAnswers } from '@/modules/station/AskAnswers';
 import { useStationNeeds } from '@/modules/station/context/StationNeedsContext';
-import { StageGone } from '@/modules/station/FocusFallback';
+import { StageGone } from '@/modules/station/stageStates';
 import { useOpenChatInCloudcli } from '@/modules/station/hooks/useOpenChatInCloudcli';
 import { api, refusalSentence } from '@/shared/api';
 import { STATION_NEED_KINDS } from '@/shared/constants';

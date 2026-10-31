@@ -17,27 +17,76 @@ type SectionPlace = 'conversation' | 'dock' | 'talk' | 'needs' | 'sessions' | 'c
 type Piece = { place: SectionPlace; box: string; held?: boolean };
 
 /**
+ * THE DOCK'S HEAD LINE ALONE, while the keyboard's mark is up and her box (the talk control's field, never the dock's) holds
+ * the focus: the dock's padding and its card's frame step aside (the card's own floor, written on its style, let go with them),
+ * and so does everything in the card but its head line's row and a refused send's sentence: the field, its notice and Send
+ * steer's words. What stands is the one row, its presses at their 44 px. With no draft the dock's quiet line steps aside whole:
+ * it gives him nothing to act on while he types to her. Each class spelled whole, so Tailwind finds it.
+ */
+const DOCK_HEAD_LINE_ALONE = cn(
+  '[html[data-keyboard=up]_&]:group-has-[[data-station-slot=talk]_textarea:focus]/section:has-[[data-station-dock=empty]]:hidden',
+  '[html[data-keyboard=up]_&]:group-has-[[data-station-slot=talk]_textarea:focus]/section:[&_[data-station-dock]]:py-0',
+  '[html[data-keyboard=up]_&]:group-has-[[data-station-slot=talk]_textarea:focus]/section:[&_[data-companion-draft]]:border-0',
+  '[html[data-keyboard=up]_&]:group-has-[[data-station-slot=talk]_textarea:focus]/section:[&_[data-companion-draft]]:bg-transparent',
+  '[html[data-keyboard=up]_&]:group-has-[[data-station-slot=talk]_textarea:focus]/section:[&_[data-companion-draft]]:p-0',
+  '[html[data-keyboard=up]_&]:group-has-[[data-station-slot=talk]_textarea:focus]/section:[&_[data-companion-draft]]:shadow-none',
+  '[html[data-keyboard=up]_&]:group-has-[[data-station-slot=talk]_textarea:focus]/section:[&_[data-companion-draft]]:!min-h-0',
+  '[html[data-keyboard=up]_&]:group-has-[[data-station-slot=talk]_textarea:focus]/section:[&_[data-companion-draft]>:not([data-companion-draft-head]):not([role=alert])]:hidden',
+);
+
+/**
+ * THE DOCK'S FIELD UNDER A FINGER, in the sections alone, where the dock scrolls itself (in her column its field gives way to
+ * nothing and steps aside whole below its first line): its box, which holds the field alone, keeps the field's 44 px catch, the
+ * touch law's press, with the field's top margin and the box's foot (8 + 44 + 4 px), which the card's floor then counts, so the
+ * dock scrolls the field rather than shrink it to a sliver. The field's own floor matches the card's two classes and wins on its
+ * element.
+ */
+const FIELD_UNDER_A_FINGER = cn(
+  'finger:[&_[data-companion-draft-field]]:min-h-14',
+  'finger:[&_[data-companion-draft-field]_textarea]:min-h-11',
+);
+
+/**
+ * THE ROOM HER LINES TAKE BACK while he types to her with the keys up, beside the dock's head line alone: her log's bottom padding
+ * (its newest line stands on the scroller's foot), and her box's own padding over it and all but 4 px under it (the keys stand
+ * right there). Measured on its side at 844×390 under a 190 px keyboard: with the draft's head line her newest line
+ * stands whole, and with no draft her conversation has the dock's quiet line's 43 px too.
+ */
+const LOG_ON_ITS_FOOT = '[html[data-keyboard=up]_&]:group-has-[[data-station-slot=talk]_textarea:focus]/section:[&_[role=log]]:pb-0';
+const BOX_ON_THE_KEYS = cn(
+  '[html[data-keyboard=up]_&]:group-has-[[data-station-slot=talk]_textarea:focus]/section:[&_[data-companion-composer]]:pt-0',
+  '[html[data-keyboard=up]_&]:group-has-[[data-station-slot=talk]_textarea:focus]/section:[&_[data-companion-composer]]:pb-1',
+);
+
+/**
  * WHICH REGIONS MAKE EACH SECTION, the one drawing of it (compact's arrangement draws it, and the phone's draws it again):
  * - Conversation: her conversation, taking the room; her draft dock under it, its own height up to 45% of the section (her
  *   column's own cap for it) and scrolling itself, so a long brief never squeezes her log away; the box to type to her at the
- *   foot (the talk control's composer half: its button stands in compact's head, and the phone's round one in its bar). WHILE HER DRAFT'S FIELD HOLDS THE FOCUS AND THE KEYS
- *   TAKE HIS ROOM (on a touch screen, the one column under 36rem tall: a phone's keyboard up) the cap lifts and the box to type to
- *   her gives way, so the card, its target and its sends stand whole above the keys (the dock's own hold, 60% of the frame over
- *   them), her conversation taking what is left. A press of one of the dock's buttons, or any mouse window however short, folds
- *   nothing.
+ *   foot (the talk control's composer half: its button stands in compact's head, and the phone's round one in its bar). WHILE HER DRAFT'S FIELD HOLDS THE FOCUS AND THE KEYBOARD'S
+ *   MARK IS UP (`html[data-keyboard=up]`, which `useVisualViewportKeyboardOffset` sets on iOS by the visual viewport's gap and on
+ *   Android by a focused field's shrink of the layout viewport) the cap lifts and the box to type to her gives way, so the card,
+ *   its target and its sends stand whole above the keys (the dock's own hold, 60% of the frame over them), her conversation taking
+ *   what is left. The mark says there are keys; the focused field says which box they are for, so a press of one of the dock's
+ *   buttons, or any mouse window however short, folds nothing. WHILE THE MARK IS UP AND HER BOX HOLDS THE FOCUS (he types to
+ *   her, not to the brief) the dock draws its head line alone — the card's one row of the target with Steer's state and the
+ *   sends with Clear, and a refused send's sentence under it (`DOCK_HEAD_LINE_ALONE`) — and her conversation takes the rest, so
+ *   on a phone on its side, where the keys leave the section about 130 px, her lines stay in view while he types; her log's
+ *   bottom padding and her box's own padding give their room to her lines then (`LOG_ON_ITS_FOOT`, `BOX_ON_THE_KEYS`). Her log
+ *   fits whatever room it is given here, its panel's 3.5rem floor let go, so it never runs under the dock or her box. Under a
+ *   finger the dock's field keeps its 44 px catch here, where the dock scrolls itself (`FIELD_UNDER_A_FINGER`).
  * - Needs you: the rail of what needs him, the whole section.
  * - Where things stand: his sessions and the roadmap, taking the room; her memory corner at the foot, closed until he opens
  *   it, and open never more than half the section, so his sessions keep the rest.
  * - Stage: the stage, the whole section; its body scrolls inside it, under its head.
  *
- * The room is read off the arrangement's column as the size container `station-column` (compact's names it; the phone's
- * arrangement, drawing these sections again, names its own column the same to have them answer its keys).
+ * The keyboard rules read the mark alone, never the column's room: the arrangement that draws the sections keeps its own room rule
+ * on top where it has one (compact's fold of the strip and the switch).
  */
 const SECTIONS: Record<StationCompactSection, readonly Piece[]> = {
   conversation: [
-    { place: 'conversation', box: 'min-h-0 flex-1' },
-    { place: 'dock', box: 'max-h-[45%] min-h-0 flex-[0_1_auto] [@media(pointer:coarse)]:[@container_station-column_(max-height:36rem)]:has-[textarea:focus]:max-h-none' },
-    { place: 'talk', box: 'shrink-0 [@media(pointer:coarse)]:[@container_station-column_(max-height:36rem)]:group-has-[[data-station-slot=dock]_textarea:focus]/section:hidden' },
+    { place: 'conversation', box: cn('min-h-0 flex-1 [&_[data-companion-log]]:min-h-0', LOG_ON_ITS_FOOT) },
+    { place: 'dock', box: cn('max-h-[45%] min-h-0 flex-[0_1_auto] [html[data-keyboard=up]_&]:has-[textarea:focus]:max-h-none', DOCK_HEAD_LINE_ALONE, FIELD_UNDER_A_FINGER) },
+    { place: 'talk', box: cn('shrink-0 [html[data-keyboard=up]_&]:group-has-[[data-station-slot=dock]_textarea:focus]/section:hidden', BOX_ON_THE_KEYS) },
   ],
   needs: [{ place: 'needs', box: 'min-h-0 flex-1', held: true }],
   where: [

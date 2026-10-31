@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { FormEvent, KeyboardEvent } from 'react';
+import type { Dispatch, FormEvent, KeyboardEvent, SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionTalkButton } from '@/modules/companion/CompanionTalkButton';
@@ -33,6 +33,18 @@ type CompanionComposerProps = {
    * 34 px over the keyboard while he types, where the indicator's inset still reads 34. Absent, true.
    */
   atScreenFoot?: boolean;
+  /**
+   * His typed words, when the caller keeps them (with `onText`, given together): the field shows them and every keystroke reports
+   * through `onText`. The station holds them in its provider, so the words outlive the tree an arrangement mounts. Absent, the
+   * composer keeps them itself, as her panel's does.
+   */
+  text?: string;
+  /**
+   * A change of the held words (a keystroke, a send emptying the field, a refused send putting them back), a state setter's own
+   * shape: it takes the new words or a function of the words held now. A refused send puts its words back with the function, so it
+   * reads what the box holds when the refusal lands, in whichever tree that is. Given with `text`.
+   */
+  onText?: Dispatch<SetStateAction<string>>;
 };
 
 /**
@@ -49,12 +61,19 @@ type CompanionComposerProps = {
  *
  * A send clears the field at once, so the next thought can start; a send that is refused puts the words back (ahead of
  * anything typed since) and says so under the box. The field stays live while a send is out.
+ *
+ * HIS WORDS are the composer's own until a caller holds them (`text` with `onText`): the station does, so pressing its Compact
+ * switch, which mounts the other arrangement's tree and with it a new box, leaves what he had typed in the box.
  */
-export function CompanionComposer({ name, ready, visible, onSend, talk, touchField = false, atScreenFoot = true }: CompanionComposerProps) {
+export function CompanionComposer({ name, ready, visible, onSend, talk, touchField = false, atScreenFoot = true, text: heldText, onText }: CompanionComposerProps) {
   const { t } = useTranslation();
   const fieldRef = useRef<HTMLTextAreaElement>(null);
-  // What he is typing to her. The composer's own: it is not hers until he sends it.
-  const [text, setText] = useState('');
+  // What he is typing to her when no caller holds it (her panel). Not hers until he sends it.
+  const [ownText, setOwnText] = useState('');
+  const held = heldText !== undefined && onText !== undefined;
+  const text = held ? heldText : ownText;
+  const setText = held ? onText : setOwnText;
+
   // A send is out: the send button is busy, and a second Enter does not send the same words again.
   const [sending, setSending] = useState(false);
   // The last send was refused: the line under the box says so until the next send.
@@ -126,12 +145,12 @@ export function CompanionComposer({ name, ready, visible, onSend, talk, touchFie
             {talk && <CompanionTalkButton state={talk.state} error={talk.error} onToggle={talk.toggle} name={name} />}
           </PromptInputTools>
           {/* A send empties the field, so the button is disabled while it is out without a state of its own. The kit's
-              32px send keeps its size to the eye and takes a 44px catch under a finger (below 768 px, and on a touch screen of any width), Verve's touch floor. */}
+              32px send keeps its size to the eye and takes a 44px catch under a finger (a touch screen, or a window under 768 px), Verve's touch floor. */}
           <PromptInputSubmit
             aria-label={t('companion.composer.send')}
             aria-busy={sending || undefined}
             disabled={!ready || empty}
-            className="relative mb-1 before:absolute before:inset-0 before:content-[''] max-md:before:-inset-1.5 [@media(pointer:coarse)]:before:-inset-1.5"
+            className="relative mb-1 before:absolute before:inset-0 before:content-[''] finger:before:-inset-1.5"
           />
         </div>
       </PromptInput>

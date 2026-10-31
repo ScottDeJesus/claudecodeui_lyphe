@@ -24,14 +24,20 @@ export { spendFreeWording } from '@/modules/notifications/services/notification-
 export type { SpendFreeWording } from '@/modules/notifications/services/notification-spend-free.service.js';
 // startNotificationHistory: used by the server entrypoint, which starts the house's notification history after `listen`
 // and calls the unsubscribe it answers on shutdown. listNotificationHistory: used by the companion module's `list_alerts`,
-// which reads what the house told him lately, and by the station's landed read. onHistoryKept: used by the companion module's
-// station feed, which hears each row the history keeps — after it is stored, with its id — and sends the landings among them
-// to his pages.
+// which reads what the house told him lately. listNotificationHistorySince and NOTIFICATION_HISTORY_WINDOW_MS: used by the
+// companion module's station landed read, which draws the last seven days — every row the history keeps of them — from the
+// history alone. onHistoryKept: used by the companion module's station feed, which hears each row the history keeps — after it is
+// stored, with its id — and sends the landings among them to his pages.
 export {
   listNotificationHistory,
+  listNotificationHistorySince,
   onHistoryKept,
   startNotificationHistory,
 } from '@/modules/notifications/services/notification-history.service.js';
+// The seven days the history keeps every row for, in milliseconds — the window of its prune and of the strip's week. Defined by the
+// database layer that prunes by it (`notification-history.db.ts`) and handed on here, so this barrel is the one door the companion's
+// station read takes it through.
+export { NOTIFICATION_HISTORY_WINDOW_MS } from '@/modules/database/index.js';
 export {
   registerDesktopNotificationClient,
   sendDesktopNotification,

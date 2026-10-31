@@ -47,7 +47,7 @@ type NeedCardProps = {
  * failing, refused: broken now, not close to a limit — also washes the card's head in its tone. A check
  * with no label yet is named by its key, in mono, which then is not written a second time under it.
  * The bar, the wash and the glyph are decoration: the word is written beside them. Its presses are 44 px
- * catches under a finger below 768 px, the house's touch floor.
+ * catches under a finger (a touch screen, or a window under 768 px), the house's touch floor.
  *
  * Used by this file's `NeedsYouCard`, once per card, and by the station module's check stage (`CheckStage`,
  * through the barrel), which draws one red check's card on its stage, with its fix and Diagnose, no Mute, and
@@ -83,7 +83,7 @@ export function NeedCard({ need, leaving, onOpen, onMute, wholeValue = false }: 
           type="button"
           disabled={leaving}
           onClick={() => onOpen(target)}
-          className="min-w-0 flex-1 text-left max-md:min-h-11"
+          className="min-w-0 flex-1 text-left finger:min-h-11"
         >
           <span className="block text-[14.5px] font-medium">
             {check.label ?? <span className="font-mono text-[13px] [overflow-wrap:anywhere]">{check.key}</span>}{' '}
@@ -116,7 +116,7 @@ export function NeedCard({ need, leaving, onOpen, onMute, wholeValue = false }: 
           // No diagnosis since it went bad: asking for one opens the sheet, where its steps arrive.
           <DiagnoseButton node={check.node} checkKey={check.key} label={t('cerberus.diagnosis.diagnose')} disabled={leaving} onStarted={() => onOpen(target)} />
         ) : (
-          <Button variant="outline" size="sm" disabled={leaving} className="max-md:h-11" onClick={() => onOpen(target)}>
+          <Button variant="outline" size="sm" disabled={leaving} className="finger:h-11" onClick={() => onOpen(target)}>
             {t(need.diagnosis.status === 'running' ? 'cerberus.diagnosis.diagnosing' : 'cerberus.diagnosis.see')}
           </Button>
         )}
@@ -125,7 +125,7 @@ export function NeedCard({ need, leaving, onOpen, onMute, wholeValue = false }: 
             variant="ghost"
             size="sm"
             disabled={leaving}
-            className="max-md:h-11"
+            className="finger:h-11"
             // The Mute dialog on this check, which the root opens.
             onClick={() => onMute(check)}
           >

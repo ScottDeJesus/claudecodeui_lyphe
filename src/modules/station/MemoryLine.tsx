@@ -2,27 +2,21 @@ import type { TFunction } from 'i18next';
 import type { ReactNode, TransitionEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { stationStamp } from '@/modules/station/stationClock';
 import type { CompanionMemoryLine } from '@/shared/companion-types';
 import { CardFoldBody, Collapsible, CollapsibleTrigger, FoldChevron } from '@/shared/ui';
-import { formatShortDate } from '@/shared/utils';
 
 /**
  * When he said it, on his clock, in the spelling her `whenWords` gives a moment: "today 4:34 PM", "yesterday 7:34 PM", then
- * the page's one spelling of a day ("Oct 26", with its year once it is not this year's: `formatShortDate`). The clock is the
- * locale's, as her conversation and the strip write it. Null for a memory that records no moment.
+ * the page's one spelling of a day ("Oct 26"; `stationStamp` cuts it, the locale's clock and all). Null for a memory that records
+ * no moment.
  */
 function momentOf(saidAt: string | null, t: TFunction): string | null {
-  if (saidAt === null) return null;
-  const moment = new Date(saidAt);
-  if (Number.isNaN(moment.getTime())) return null;
-  const clock = moment.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  const today = new Date();
-  if (moment.toDateString() === today.toDateString()) return t('station.memory.when.today', { clock, defaultValue: 'today {{clock}}' });
-  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-  if (moment.toDateString() === yesterday.toDateString()) {
-    return t('station.memory.when.yesterday', { clock, defaultValue: 'yesterday {{clock}}' });
-  }
-  return formatShortDate(saidAt);
+  const stamp = saidAt === null ? null : stationStamp(saidAt);
+  if (stamp === null) return null;
+  if (stamp.day === 'today') return t('station.memory.when.today', { clock: stamp.clock, defaultValue: 'today {{clock}}' });
+  if (stamp.day === 'yesterday') return t('station.memory.when.yesterday', { clock: stamp.clock, defaultValue: 'yesterday {{clock}}' });
+  return stamp.date;
 }
 
 type MemoryLineProps = {

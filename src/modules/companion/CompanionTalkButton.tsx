@@ -59,8 +59,9 @@ const KEYCAP = 'rounded-md border border-b-2 border-border bg-muted px-1.5 font-
  * than stacking under it, as Settings' own talk row does), and is the button's description, so a reader hears it with its
  * name; the binding's words follow the button in reading order, and a phone, which hides them, is never told them.
  * BESIDE THE BUTTON where its box has the room (a query container of its own width: 20rem and more, the station's laptop
- * column), so the row is the button's 56 px; UNDER IT in a narrower box (the station's column at 1440 px is 420 px across,
- * and holds the button and the typing box in one row only with the line beneath).
+ * column, and the station's 360 px column, where the button stands across it), so the row is the button's 56 px; UNDER IT in a
+ * narrower box (a laptop column under 38rem gives the button a 12rem cell, holding the button and the typing box in one row only
+ * with the line beneath).
  */
 function LargeTalkButton({ state, error, onToggle, label, bindingLabel, compact = false }: Pick<CompanionTalkButtonProps, 'state' | 'error' | 'onToggle'> & { label: string; bindingLabel: string | null | undefined; compact?: boolean }) {
   const { t } = useTranslation();

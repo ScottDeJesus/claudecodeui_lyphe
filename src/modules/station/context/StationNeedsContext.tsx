@@ -1,8 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
-import { useActionLapse, useCompanion } from '@/modules/companion';
+import { useCompanion } from '@/modules/companion';
 import { useDispatcherPlans } from '@/modules/dispatcher';
+import { useLivePending } from '@/modules/station/hooks/useLivePending';
+import { needsCountOf } from '@/modules/station/needsCount';
 import { api, refusalSentence } from '@/shared/api';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { StationNeed } from '@/shared/station-types';
@@ -47,8 +49,8 @@ function sentenceFor(sentence: string, cause: unknown): Error {
 
 /**
  * Used by the station's rail (`WhatNeedsYou`), which draws the items, and by its three stages (`AskStage`, `FollowupsStage`,
- * `CheckStage`), which say that the thing they were opened on is gone when the list no longer holds it. The compact and phone plans draw
- * the count through `useNeedsCount` below, off the same list, so the count and the rail never disagree.
+ * `CheckStage`), which say that the thing they were opened on is gone when the list no longer holds it. The count of what needs him
+ * is not this list's length: it comes from the one rule (`needsCountOf`), through `useNeedsCount` below and in the rail's head.
  * Throws outside `StationNeedsProvider`, so a consumer placed wrong fails at once.
  */
 export function useStationNeeds(): StationNeedsContextValue {
@@ -58,18 +60,20 @@ export function useStationNeeds(): StationNeedsContextValue {
 }
 
 /**
- * How many things need him: the rail's items and her one pending action, the two things "What needs you" draws. The action counts
- * only while its card is drawn: the server closes a lapsed row at its next prepare, take or cancel and leaves it in her picture
- * until then, while the card and the phone's line go at its deadline (`useActionLapse`), so a lapsed action is counted out with
- * them. `null` until the first read of the items has landed (`needs` null, in flight or failed): the rail says so in its own words,
- * and a 0 here would claim "nothing waits". Used by the compact arrangement's wrapper and the phone's, so the two count the same
- * number. Throws outside `StationNeedsProvider` and outside her provider.
+ * How many things need him, by the one rule (`needsCountOf`) over the live list and her pending action: the rail's items, and her
+ * action as one more unless it answers an Accept or a round the rail holds. The action counts only while its card is drawn: the
+ * server closes a lapsed row at its next prepare, take or cancel and leaves it in her picture until then, while the card and the
+ * phone's line go at its deadline (`useActionLapse`, which `useLivePending` reads), so a lapsed action is counted out with them. `null` until the first read of
+ * the items has landed (`needs` null, in flight or failed): the rail says so in its own words, and a 0 here would claim "nothing
+ * waits". Used by the compact arrangement's wrapper (its "Needs you" button) and the phone's (its bar); the rail's head draws the
+ * same rule over its own props (`WhatNeedsYouView`), so the three say one number. Throws outside `StationNeedsProvider` and outside
+ * her provider.
  */
 export function useNeedsCount(): number | null {
   const { needs } = useStationNeeds();
   const { picture } = useCompanion();
-  const lapsed = useActionLapse(picture?.pending?.expiresAt ?? null);
-  return needs === null ? null : needs.length + (picture?.pending && !lapsed ? 1 : 0);
+  const livePending = useLivePending(picture?.pending ?? null);
+  return needsCountOf(needs, livePending);
 }
 
 /**

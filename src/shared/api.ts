@@ -947,7 +947,7 @@ export const api = {
     // The station's provider reads it at mount, on every `station_sessions_changed` hint and on reconnect.
     station: {
       sessions: () => get('/api/companion/station/sessions', companionOptions()),
-      // `landed` is what landed this week, the strip's line: 200 `{ landed: StationLanded[] }`, newest first, at most 60 of the account's
+      // `landed` is what landed this week, the strip's line: 200 `{ landed: StationLanded[] }`, newest first, at most 300 of the account's
       // last seven days (`[]` for none), or a 503 `{ error }` carrying the sentence when the history cannot be read. It is the account's, not
       // a page's, so it names no `x-companion-client`. The station's landed provider reads it at mount and on reconnect, and folds each
       // `station_landed` frame in between.

@@ -9,12 +9,13 @@ import { useStationLanded } from '@/modules/station/context/StationLandedContext
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
 import { LandedEntry } from '@/modules/station/LandedEntry';
 import { LandedTimeline } from '@/modules/station/LandedTimeline';
+import { stationStamp } from '@/modules/station/stationClock';
 import { StripFailedLine, StripLine, StripQuietLine, StripReadingLine } from '@/modules/station/StripLines';
 import { STATION_COUNT_FORM_CATCH } from '@/shared/constants';
 import type { StationFocus, StationLanded, StationLandedKind, StationSession } from '@/shared/station-types';
 import type { StationDensity, StationRegionProps, Tone } from '@/shared/types';
 import { Badge, Button, Chip, Tooltip } from '@/shared/ui';
-import { cn, formatShortDate } from '@/shared/utils';
+import { cn } from '@/shared/utils';
 
 /**
  * EVERY KIND OF LANDING AS THE STRIP DRAWS IT, the one map of them: its badge's glyph, word and tone, never colour alone (MAN-578).
@@ -40,20 +41,15 @@ function KindBadge({ kind }: { kind: StationLandedKind }) {
 }
 
 /**
- * When a landing (or his last look) was, on his clock: the locale's clock alone today ("14:02"), "yesterday 19:34", and the
- * page's one spelling of a day before that ("Oct 26", `formatShortDate`; the strip reads one week). Nothing for a non-time.
+ * When a landing (or his last look) was, on his clock: the locale's clock alone today ("2:02 PM"), "yesterday 7:34 PM", and the
+ * page's one spelling of a day before that ("Oct 26"; the strip reads one week). `stationStamp` cuts it; nothing for a non-time.
  */
 function whenOf(at: string, t: TFunction): string {
-  const moment = new Date(at);
-  if (Number.isNaN(moment.getTime())) return '';
-  const clock = moment.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  const today = new Date();
-  if (moment.toDateString() === today.toDateString()) return t('station.strip.when.today', { clock, defaultValue: '{{clock}}' });
-  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-  if (moment.toDateString() === yesterday.toDateString()) {
-    return t('station.strip.when.yesterday', { clock, defaultValue: 'yesterday {{clock}}' });
-  }
-  return t('station.strip.when.day', { day: formatShortDate(at), defaultValue: '{{day}}' });
+  const stamp = stationStamp(at);
+  if (stamp === null) return '';
+  if (stamp.day === 'today') return t('station.strip.when.today', { clock: stamp.clock, defaultValue: '{{clock}}' });
+  if (stamp.day === 'yesterday') return t('station.strip.when.yesterday', { clock: stamp.clock, defaultValue: 'yesterday {{clock}}' });
+  return t('station.strip.when.day', { day: stamp.date, defaultValue: '{{day}}' });
 }
 
 /**
@@ -72,7 +68,7 @@ function oldestFirst(landed: StationLanded[]): StationLanded[] {
 type SinceYouLastLookedViewProps = {
   /** `compact`: always the folded line, the fold's press opening and closing the week over the body (the arrangement's). */
   density: StationDensity;
-  /** The week's landings as the read answers them (newest first, at most 60); `null` while the first read is out. */
+  /** The week's landings as the read answers them (newest first, at most 300, the most the strip draws: the week stays whole); `null` while the first read is out. */
   landed: StationLanded[] | null;
   /** His last look (ISO): the line between what he has seen and what is new. `null` when none is on record: then all is new. */
   seenAt: string | null;
