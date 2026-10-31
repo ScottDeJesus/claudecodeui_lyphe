@@ -127,7 +127,11 @@ const HOST_PLACEHOLDER_ROW = /^[a-z][a-z\d+.-]*:\/\/(?:[^/?#@]*@)?\{host\}(?=[:/
  * Never throws: an address that will not parse is handed to `fetch` as it stands, and the probe's
  * own catch turns that into "no icon now".
  */
-function probeTarget(url: string): string {
+function probeTarget(row: string): string {
+  // Trimmed first: the placeholder test is anchored at the start, and a row hand-edited into the
+  // registry file with a leading space (`readEntries` does not trim) must still read as a `{host}` row.
+  // The cache stays keyed by the row as written; only the address that is fetched is trimmed.
+  const url = row.trim();
   if (!HOST_PLACEHOLDER_ROW.test(url)) return url;
   const onLoopback = url.replace(/\{host\}/gi, '127.0.0.1');
   try {
