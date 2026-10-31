@@ -723,7 +723,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGut
 
 ## INV-6010 — WorkspaceFrame's reportCovered is a layout effect — a passive one loses the race with a reply
 
-`WorkspaceFrame` reports whether an application covers the main region with `useLayoutEffect(() => reportCovered(covered), [covered, reportCovered])`. Keep it a layout effect.
+`WorkspaceFrame`'s `CoverReporter` reports whether the main region is covered (an application up over it, or Kaylee Station on screen over the whole frame) with `useLayoutEffect(() => reportCovered(covered), [covered, reportCovered])`. Keep it a layout effect.
 
 why: chat-host's unread rule judges a frame against `covered`. A passive effect runs after the paint that draws the application, and a reply landing in that gap is judged against a chat still in sight. Measured 2026-09-30: as a passive effect it lost the race with a reply that landed 0ms after the drawer closed; as a layout effect that reply lights the dot.
 
@@ -23183,3 +23183,93 @@ measured 2026-10-31 by chain chain-kaylee--attachments--whole-20261031-104402-d3
 probe-key: 12676eb2945aca8188b792ba7f9f5c013b7f704d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-attachments-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-attachments-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/attach-whole-kit.mjs
+
+## INV-10576 — probe — an Escape pressed on the station aborts the chat that is running, unseen, in the held workspace
+
+an Escape pressed on the station aborts the chat that is running, unseen, in the held workspace
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/station-inside-cloudcli/athena-probes/esc-aborts-held-chat.mjs
+echo "[probe exit $?]"
+# expect: `on /station | abort frames sent after one Escape on the station: ["{\"type\":\"chat.abort\",\"sessionId\":\"…\"}"]` while the defect stands (one Haiku turn in /tmp/cloudcli-probe-chat, the scratch chat deleted afterwards); cured, `[]`
+```
+
+measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa, finding H1, HIGH
+probe-key: d55c226128680ee0365299779f1ac2f821a892d7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs
+
+## INV-10577 — probe — the station's chunk failing to load now replaces the whole app, workspace included; before, only the station's own window died
+
+the station's chunk failing to load now replaces the whole app, workspace included; before, only the station's own window died
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/station-inside-cloudcli/athena-probes/chunk-fails-takes-app.mjs
+echo "[probe exit $?]"
+# expect: {"path":"/station","workspaceRailBefore":true,"workspaceRailAfter":false,"wholeAppReplacedByErrorScreen":true,"unhandledRejectionAtIdlePreload":true} while the defect stands; cured, the rail survives (`workspaceRailAfter:true`, `wholeAppReplacedByErrorScreen:false`) and no unhandled rejection
+```
+
+measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa, finding M1, MEDIUM
+probe-key: a325e7a8db467ae6687003ee1dd9abb0c99ebb4f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs
+
+## INV-10578 — probe — the held station is never at rest: its CSS animations run under `visibility:hidden`, 1.8 % → 8 % main-thread time for the whole app after the first visit
+
+the held station is never at rest: its CSS animations run under `visibility:hidden`, 1.8 % → 8 % main-thread time for the whole app after the first visit
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/station-inside-cloudcli/athena-probes/held-station-animates.mjs
+echo "[probe exit $?]"
+# expect: `main-thread busy: workspace never visited station ~1.8% | station held ~8% | animations running inside the held station: ["kaylee-breath","kaylee-sway","kaylee-breath","kaylee-sway"]` while the defect stands; cured, the held figure near the first and the list `[]` (the probe prints in both states; run it alone — two browser probes at once collide on the harness login)
+```
+
+measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa, finding M2, MEDIUM
+probe-key: 540e6ae6c68f3a64c46d71af2ea9b298b439ca47
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs
+
+## INV-10579 — probe — React Router warns twice on every switch, because the three child routes of the one layout have no element
+
+React Router warns twice on every switch, because the three child routes of the one layout have no element
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/station-inside-cloudcli/athena-probes/router-warning.mjs
+echo "[probe exit $?]"
+# expect: `… warnings for one switch each way: 4` while the defect stands; cured, 0
+```
+
+measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa, finding L1, LOW
+probe-key: 531cee5912a267c0e124afe26f5d78f2eb25a3ba
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs
+
+## INV-10580 — probe — healed means deleted, left undone in four places
+
+healed means deleted, left undone in four places
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/station-inside-cloudcli/athena-probes/stale-names.sh
+echo "[probe exit $?]"
+# expect: four lines each ending `: 1` while the staleness stands; cured, every count is 0
+```
+
+measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa, finding L2, LOW
+probe-key: e0ffbe155eda27a53df70c10f08d3decbe56fc4d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs
+
+## INV-10581 — probe — two station probes still assert the window that is gone (the brief: "update any probe that relies on the separate window")
+
+two station probes still assert the window that is gone (the brief: "update any probe that relies on the separate window")
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -c "waitForEvent('page'" .verify/kaylee-station-whole.mjs .verify/station-needs-live.mjs; grep -c "window.name).catch(() => '')) === 'kaylee-station'" .verify/kaylee-station-whole.mjs
+echo "[probe exit $?]"
+# expect: `…whole.mjs:1`, `…needs-live.mjs:1` and `1` while they assert a window; cured, 0 / 0 / 0
+```
+
+measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa, finding L3, LOW
+probe-key: 961d86f3c6bb0bb72e0221a86b18e354a78142a1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs

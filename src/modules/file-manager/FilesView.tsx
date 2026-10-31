@@ -5,6 +5,7 @@ import { FileManager } from '@/modules/file-manager/FileManager';
 import { pinFolder, unpinFolder } from '@/modules/file-manager/hooks/useFilesPins';
 import { selectFilesRoot, useSelectedFilesRoot } from '@/modules/file-manager/hooks/useSelectedFilesRoot';
 import { FolderBrowserModal, createProjectRequest } from '@/modules/project-creation-wizard';
+import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import { useToast } from '@/shared/context/ToastContext';
 import { Button, Chip, EmptyState } from '@/shared/ui';
 import type { FileOpenRequest, FilesRoot, ProjectChoice } from '@/shared/types';
@@ -158,6 +159,7 @@ export function FilesView({ roots, projectChoices, openRequest, onRequestHandled
   // no Escape of its own, and it is shared with the wizard — so this view makes it a dialog from outside: the wrapper names
   // it, focus moves in once it has loaded, Tab stays inside it, and Escape closes it.
   const browserRef = useRef<HTMLDivElement>(null);
+  const isPageHeld = useIsPageHeld();
   useEffect(() => {
     const dialog = browserRef.current;
     if (!browserOpen || !dialog) return undefined;
@@ -179,6 +181,8 @@ export function FilesView({ roots, projectChoices, openRequest, onRequestHandled
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      // The station on screen covers this view: its Tab and Escape are not this dialog's.
+      if (isPageHeld()) return;
       // Escape in the new-folder field is that field's own (it cancels the field), not the dialog's.
       if (event.key === 'Escape' && !(event.target instanceof HTMLInputElement)) {
         event.preventDefault();
@@ -200,7 +204,7 @@ export function FilesView({ roots, projectChoices, openRequest, onRequestHandled
       watcher?.disconnect();
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [browserOpen, handleBrowserClosed]);
+  }, [browserOpen, handleBrowserClosed, isPageHeld]);
 
   // The browser answered a folder path. A folder already on the strip is selected; one the app knows as a
   // project is pinned as it is; one it has never opened is registered first, through the wizard's own door.

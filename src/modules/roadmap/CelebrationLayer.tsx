@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Moment } from '@/modules/roadmap/celebrationContext';
 import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
+import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import { Badge, Button, Card } from '@/shared/ui';
 import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
 import { cn, formatShortDate } from '@/shared/utils';
@@ -241,14 +242,16 @@ export function CelebrationLayer({ moment, onSkip, scope }: CelebrationLayerProp
   // MAN-741), a menu or select open on the face asks to keep it (`otherOverlayHoldsEscape`), and the
   // chat beside the widget keeps its own.
   const holding = moment?.level === 'milestone' && phase === 'holding';
+  const isPageHeld = useIsPageHeld();
   useEffect(() => {
     if (!holding) return undefined;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !otherOverlayHoldsEscape(document)) skip();
+      // The station on screen covers this page: an Escape typed there does not skip a celebration nobody sees.
+      if (event.key === 'Escape' && !isPageHeld() && !otherOverlayHoldsEscape(document)) skip();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [holding, skip]);
+  }, [holding, isPageHeld, skip]);
 
   // The reached milestone's size, the banner's figures, off the roadmap on screen.
   const standing = moment ? selected?.milestones.find((milestone) => milestone.name === moment.name)?.standing : undefined;

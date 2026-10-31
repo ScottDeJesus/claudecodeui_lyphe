@@ -23,7 +23,7 @@ function isTextField(target: EventTarget | null): boolean {
 
 /**
  * Keeps the fixed workspace shell above the virtual keyboard and writes the keyboard's MARK, from one handler. Consumed by
- * project-workspace's route (the workspace shell) and by the station's route (the station's root), each of which draws a fixed frame.
+ * project-workspace's route (the workspace shell), which stays mounted under Kaylee Station: the station's fixed root rides it too.
  *
  * `--keyboard-height` on the root is the visual viewport's gap: `innerHeight` less `visualViewport.height`, which a fixed frame's
  * `bottom` reads. It is the iOS lift: iOS Safari leaves the layout viewport whole and slides the visual one up over the keys.
@@ -48,9 +48,7 @@ function isTextField(target: EventTarget | null): boolean {
  * strip's line and the switch, while the column is short) and the sections (the dock's cap and the talk control's box, while the
  * dock's own field holds the focus). Each reads only the mark.
  *
- * It writes both once as it mounts too. The two routes take turns on a phone (`/` and `/station`, the station a lazy chunk with a
- * gap while it loads), so a keyboard that closed while neither was mounted sent its events to no one, and the variable and the mark
- * would otherwise keep what they held before: the new route's frame would stand that high over a dead band.
+ * It writes both once as it mounts too, so the variable and the mark start from what the viewport says at that moment.
  */
 export function useVisualViewportKeyboardOffset() {
   useEffect(() => {

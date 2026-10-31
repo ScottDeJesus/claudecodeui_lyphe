@@ -85,11 +85,12 @@ export default function App() {
                         <Routes>
                           {/* ONE layout element for the app's three paths, so a move between them unmounts nothing: the workspace stays mounted while
                               `/station` is on screen, and the station, drawn inside the workspace's own chat host and Kaylee's provider, stays mounted
-                              after its first visit. The paths below only say which addresses exist; the layout reads the router and draws the right page. */}
+                              after its first visit. The paths below only say which addresses exist; the layout reads the router and draws the right page, so each
+                              has `element={null}`: a leaf with no element at all makes the router warn on every move that it will render an empty Outlet. */}
                           <Route element={<ProjectWorkspaceRoute stationLayer={<StationLayer />} />}>
-                            <Route path="/" />
-                            <Route path="/session/:sessionId" />
-                            <Route path={STATION_PATH} />
+                            <Route path="/" element={null} />
+                            <Route path="/session/:sessionId" element={null} />
+                            <Route path={STATION_PATH} element={null} />
                           </Route>
                         </Routes>
                       </Router>

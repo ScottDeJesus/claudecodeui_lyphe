@@ -5,6 +5,7 @@ import { ArrowDownIcon } from 'lucide-react';
 import { useTasksSettings } from '@/modules/task-master';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import PermissionContext from '@/modules/chat/context/PermissionContext';
 import type { TokenUsageSurface } from '@/modules/chat/composer/TokenUsageSummary';
 import type { ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
@@ -109,6 +110,7 @@ function ChatInterface({
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const { subscribe, isConnected } = useWebSocket();
   const hostWindow = useHostWindow();
+  const isPageHeld = useIsPageHeld();
   // The transcript assembles what an export needs; two surfaces draw the button from it. On a phone
   // that is the workspace header (published upward, as before); on a desktop it is the composer,
   // beside the model and the edit mode, which is why it is also kept here.
@@ -403,6 +405,10 @@ function ChatInterface({
       if (event.key !== 'Escape' || event.repeat || event.defaultPrevented) {
         return;
       }
+      // The station on screen covers this chat (it stays mounted under it): an Escape typed there is the station's, and must not end a turn nobody is looking at.
+      if (isPageHeld()) {
+        return;
+      }
 
       event.preventDefault();
       handleAbortSession();
@@ -416,7 +422,7 @@ function ChatInterface({
     return () => {
       hostDocument.removeEventListener('keydown', handleGlobalEscape, { capture: true });
     };
-  }, [canAbortSession, handleAbortSession, hostWindow]);
+  }, [canAbortSession, handleAbortSession, hostWindow, isPageHeld]);
 
   useEffect(() => {
     return () => {

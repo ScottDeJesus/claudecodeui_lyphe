@@ -181,7 +181,7 @@ function Sidebar({
     sidebarVisible,
   });
 
-  // The `pwa-mode` class the workspace's frame keys on (src/index.css); the station's route calls the same hook.
+  // The `pwa-mode` class the workspace's frame keys on (src/index.css); this stays mounted under Kaylee Station, so the station's frame has it too.
   usePwaModeClass();
 
   const handleProjectCreated = () => {

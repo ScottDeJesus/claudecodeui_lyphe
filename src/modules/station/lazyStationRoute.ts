@@ -9,7 +9,11 @@ const loadStationRoute = () => import('@/modules/station/StationRoute').then((m)
  */
 export const StationRoute = lazy(loadStationRoute);
 
-/** Starts the chunk's fetch without mounting anything, so the first visit finds it already here. Called once by `StationLayer`, when the browser is idle. */
+/**
+ * Starts the chunk's fetch without mounting anything, so the first visit finds it already here. Called once by `StationLayer`, when the browser is idle. A fetch
+ * that fails (a hashed file a deploy removed, a dropped connection) is not this call's to report: the first visit asks for the same chunk, meets the same
+ * failure, and `StationLayer`'s boundary says so there, where he is waiting for it.
+ */
 export function preloadStationRoute(): void {
-  void loadStationRoute();
+  loadStationRoute().catch(() => undefined);
 }

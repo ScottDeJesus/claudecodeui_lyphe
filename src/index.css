@@ -1029,3 +1029,13 @@
     display: none;
   }
 }
+
+/* A page of the app held out of reach (`shared/ui/HeldPage.tsx`: the workspace while Kaylee Station is on screen, the station while the workspace is) stays
+   mounted and invisible, and a hidden subtree still runs its CSS animations: her portrait's breath and sway kept the whole app at four times its rest cost on the
+   main thread. Paused while held, they pick up where they stopped when the page comes back. One selector over the whole subtree, because no className can reach
+   every animated node (and the pseudo-elements some draw on). */
+[data-held-page] *,
+[data-held-page] *::before,
+[data-held-page] *::after {
+  animation-play-state: paused !important;
+}

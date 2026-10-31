@@ -10247,7 +10247,6 @@ CloudCLI's address book and the two doors between its workspace and Kaylee Stati
 - "The workspace location he came from" is held by the layout (`useHeldWorkspace`), not by a history walk: the last location that was not `/station`. The browser's Back from `/station` still goes where the history says.
 - "Open the chat" of the station's chat, ask and follow-ups stages is not a door of this file: it is `useStationDoors().openChatInWorkspace(sessionId)` (`useOpenChatInCloudcli`), which the workspace's `CompanionHost` answers exactly as it answers her own order to open that chat (the Chat view forward, `/session/<id>`, the chat floated over an application that covers the page).
 - `routerBasename` is defined here and nowhere else. why not `src/shared/utils.ts`: 829 lines (2026-10-31), past the 800 ceiling and gaining nothing.
-- There is no window of the station's own any more: no `kaylee-station` or `cloudcli` window name, no `window.opener` reach-back, no page-name copy to forget on a new window (the one tab holds one `companion-client-id`).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts
 
@@ -10417,7 +10416,7 @@ THE STATION'S FIRST PRESS UNLOCKS HER VOICE: a press anywhere calls `takeFloor` 
 | finger `pointerup` (the tap) | active | the one call |
 | swipe: `pointerdown`, then `pointercancel` | never active | none |
 | `keydown`, Escape excepted | active | the one call |
-Each handler returns unless `navigator.userActivation.isActive` (a browser without it counts as active); the first call inside an activation takes all three listeners off. Whether iOS Safari counts a touch `pointerup` as a gesture is unmeasured. `sendText` unlocks the page's audio too; no second unlock path. Proof: `node .verify/kaylee-station-center-live.mjs`; a finger's tap: leg 4 of `.verify/kaylee-station-check-sheet-live.mjs` (MAN-9391).
+Each handler returns unless `navigator.userActivation.isActive` (a browser without it counts as active); the first call inside an activation takes all three listeners off. why three events: a one-shot spent on a phone's `pointerdown` unlocked nothing and left every alert she speaks unasked silent. why the gate: `takeFloor` also asks the server for her floor, and a browser refuses a `resume()` made outside an activation; each swipe cost both until the first tap. Proof counts: `.verify/kaylee-station-center-live.mjs` reads the floor calls (one on the first pointerdown, none on the next key or pointer; after a reload, one on the first key, none on the pointer after it). Whether iOS Safari counts a touch `pointerup` as a gesture is unmeasured. `sendText` unlocks the page's audio too; no second unlock path. Proof: `node .verify/kaylee-station-center-live.mjs`; a finger's tap: leg 4 of `.verify/kaylee-station-check-sheet-live.mjs` (MAN-9391).
 
 ## useCardsTakeStage — `hooks/useCardsTakeStage.ts`
 HER NEW CARD AND HER WALK TAKE THE STAGE ("one focus at a time"): from `useCompanion().picture`, a card with a higher id than any seen puts `{ kind: 'note', id, label }` on the stage and a walk whose `updatedAt` moved puts `{ kind: 'walk', label }` there (walk wins when both land); the replaced focus goes on the back-stack. The first picture is only noted, so a reload never steals the restored stage; a walk already on the stage is left alone (`restaged`, MAN-9249); a card taken down, a walk ended and his Clear put nothing up. Runs on the picture her frames fold: no timer.
@@ -10427,6 +10426,7 @@ HER NEW CARD AND HER WALK TAKE THE STAGE ("one focus at a time"): from `useCompa
 |---|---|---|
 | not mounted | the station has never been on screen | nothing |
 | loading | on screen, the chunk not here | the `bg-background` placeholder |
+| failed | the chunk would not load, or the station threw | `StationFailed` (`StationLayer.tsx`): a warn banner over the page while the station is on screen, with "CloudCLI" (back to the workspace) and a reload; the workspace is untouched. The idle preload swallows its own failure: the first visit meets the same one here |
 | mounted | | the layout (MAN-9230) with the regions `STATION_REGIONS` holds and the stage; held out of reach while the workspace shows |
 - Empty state: no focus on the stage and no region registered = the empty stage alone under the bar.
 - Compact form and touch: none of its own; the shell's (MAN-9230, MAN-9337, INV-10275).
@@ -10457,7 +10457,7 @@ node .verify/kaylee-station-live.mjs --turn   # + one typed Haiku turn
 | DocSpace origin | `resolveDocSpaceOrigin()` run in the page | |
 
 ## What `kaylee-station-live.mjs` checks
-1. Route: wears a stored light preference (the station is not held dark); the workspace light after leaving.
+1. Route: wears his stored light preference, as the workspace does; the workspace is light after leaving it.
 2. 1440×900 (`wide`) and 1280×800 (`laptop`): the bar and the empty stage.
 3. Card stage, from a stored record seeded on the workspace page (a record seeded while the station is mounted is overwritten as it leaves): feature facts, a reload keeps the focus, the presence frame (`sessionId: null`, `visible`, this page's `clientId`, `view`), the epic panel ("Milestone 3"), Back, ✕ (presence `view: null`; the record holds the cleared focus on its stack), the arc's deck alone, a missing name ("no longer on the roadmap"), a page's DocSpace link (`target=_blank`).
 4. Plan card: the lane given an Accept ask by the page's own lane (`lib/ask-lane.mjs`; the store is never asked or written; nothing pressed): the census whole with Queue, Hide, Rework; only `POST /api/companion/floor` and `POST /api/auth/refresh` were written.
@@ -10484,14 +10484,13 @@ node .verify/station-doors.mjs   # no model call, no write to the account
 ```
 - Gitignored (`.verify/`). Signed in as account 1 (`verve`) on `:5183` against `:3011`. Her voice switch is `off` on every page (`companion-voice`), so nothing is synthesized and no Gemini is spent. Exit 1 on any FAIL; ends `ALL PASS` or `FAILED: …`.
 - Shots: `.verify/shots/station-doors-*.png` (`palette-1440x900`, `station-1440x900`, `panel-head-1440x900`, `panel-head-390x844`, `station-390x844`, `station-keyboard-390x844`, `back-390x844`, `side-station-844x390`).
-- 2026-10-31: ends `ALL PASS`, 29 checks.
+- 2026-10-31: ends `ALL PASS`, 24 checks.
 
 ## Desktop 1440×900
 `window.open` on the workspace page is wrapped only to record each call and each `.focus()` on the handle; the real one still runs.
 1. Ctrl+K lists "Open Kaylee Station", in her group, whose heading is her name as he set it.
-2. Choosing it shows `/station` in THIS tab: one page in the context, `window.open` never called, the page not reloaded; "CloudCLI" returns to the workspace location he came from.
-3. A marker is set on the station window's document; a second press leaves one page of that name, two pages in all, `.focus()` called on the handle twice, and the marker still there (the document was not navigated).
-4. Her panel's head carries one button, `aria-label` "Open Kaylee Station"; pressing it lands in the same window (still one page of that name).
+2. Choosing it shows `/station` in THIS tab: one page in the context, `window.open` never called, a marker set on `window` before still there (no reload); "CloudCLI" returns to the workspace location he came from, in this tab.
+3. Her panel's head carries one button, `aria-label` "Open Kaylee Station"; pressing it shows `/station` in the same tab: still one page, `window.open` never called.
 
 ## Phone — iPhone 13 descriptor, 390×844, touch, as the home-screen app
 - `navigator.standalone` is set by an init script before load. The five safe-area variables (`--safe-area-inset-top/bottom/left/right`, `--header-safe-area-top`) are injected after load, as `settings-pwa-bleed.mjs` does: 47 px top, 34 px bottom.
@@ -10499,11 +10498,11 @@ node .verify/station-doors.mjs   # no model call, no write to the account
   1. `pwa-mode` on html and body in the workspace.
   2. Her panel's head button is a 44×44 catch (hit-tested down and across its centre; the same as her close).
   3. A tap moves the SAME page to `/station`: one page in the context, a marker set on `window` before survives (no reload).
-  4. `pwa-mode` on html and body on `/station`, where no sidebar mounts (`usePwaModeClass`).
+  4. `pwa-mode` on html and body on `/station`: the workspace's sidebar (`usePwaModeClass`) is held under the station and keeps it there.
   5. Her top row `[data-station-phone-top]` and the shell's root stand at or below 47 px. The phone draws no `StationBar`: her head is the top row.
   6. `[data-station-phone-bar]` pads its foot 34 px and the lowest press of it ends at or above 844 − 34.
-  7. Every button, link, tab and field in the shell is a 44 px catch tall.
-  8. Keyboard: Chromium has no on-screen keyboard and the viewport meta forbids the zoom that would shrink the visual viewport. So `visualViewport.height` is redefined 300 px short and its own `resize` event fired. `--keyboard-height` reads `300px` and the root's bottom is 544; told back, `0px` and 844. This shows the wiring (`useVisualViewportKeyboardOffset` on the route), not iOS.
+  7. Every button, link, tab and field in the shell is a 44 px catch tall; the attachments' `input[type=file]` is skipped (clipped to 1 px, never pressed).
+  8. Keyboard: Chromium has no on-screen keyboard and the viewport meta forbids the zoom that would shrink the visual viewport. So `visualViewport.height` is redefined 300 px short and its own `resize` event fired. `--keyboard-height` reads `300px` and the root's bottom is 544; told back, `0px` and 844. This shows the wiring (`useVisualViewportKeyboardOffset` in `ProjectWorkspaceRoute`), not iOS.
   9. Her menu's trigger (`[data-station-phone-top] .vv-menu__trigger`) then `[data-station-back-to-cloudcli]` tap back to `/` on the same page; the context held one page throughout.
 
 ## Phone on its side, in a plain tab — 844×390, touch, not the home-screen app
@@ -10593,9 +10592,9 @@ The station shell whole on the live client, three typed Haiku turns (seam J of `
 node .verify/kaylee-station-whole.mjs
 ```
 - Gitignored (`.verify/`). Account 1 (`verve`), `:5183` against `:3011`, 1440×900. PASS/FAIL per line, exit 1 on any FAIL; ends `ALL PASS` or `FAILED: …`.
-- Spends three Haiku turns. No Gemini: `companion-voice` = `off` on every page (init script on the context) and on the opener, which is then reloaded (`reloadApp`, gated on `RAIL` within `APP_BOOT_MS`) because her provider reads the switch once at load. The last check counts requests to `/api/companion/speech*` on every page; none allowed.
+- Spends three Haiku turns. No Gemini: `companion-voice` = `off` on every page (init script on the context) and on the workspace page, which is then reloaded (`reloadApp`, gated on `RAIL` within `APP_BOOT_MS`) because her provider reads the switch once at load. The last check counts requests to `/api/companion/speech*` on every page; none allowed.
 - Her model: set to `haiku` (`PUT /api/companion/settings`); throws before typing unless it reads back `haiku`; `finally` puts back what was found.
-- Leaves behind: model as found; scratch chat deleted; the `kaylee-station` record removed from the opener's `localStorage`.
+- Leaves behind: model as found; scratch chat deleted; the `kaylee-station` record removed from the page's `localStorage`.
 - Evidence: `.verify/shots/station-whole-1…9-*.png`; `.verify/shots/station-whole-her-lines.txt` = per typed turn `--- typed:`, the message's lines before `<register>`, `--- she said:` (rewritten every run, in `finally`).
 
 ## Read off the box at run time
@@ -10615,8 +10614,8 @@ The station has no composer (the talk region is a later plan's). The turn is the
 ## Steps and what each checks
 | step | checks |
 |---|---|
-| 1 palette | Ctrl+K, "kaylee", "Open Kaylee Station" opens window `kaylee-station` at `/station`; dark; seeded focus drawn; its `companion-client-id` ≠ the opener's; a second press: `focus()` called once, document not navigated again, one page named `kaylee-station`, two pages in the context; the station's own `POST /api/companion/floor` at mount |
-| 2 "open the roadmap card for kaylee eyes" | first message's `<view>` = `cardViewLine(TOP)`; stored focus `kaylee--eyes` with a label; stack `BEHIND\|TOP`; one Back; the opener's `framenavigated` list empty |
+| 1 palette | Ctrl+K, "kaylee", "Open Kaylee Station" shows `/station` in THIS tab: one page in the context (the station is the workspace page, MAN-9426); `companion-voice` `off`; seeded focus drawn; a `POST /api/companion/floor` under the page's own name at mount |
+| 2 "open the roadmap card for kaylee eyes" | first message's `<view>` = `cardViewLine(TOP)`; stored focus `kaylee--eyes` with a label; stack `BEHIND\|TOP`; one Back; the page's `framenavigated` list empty |
 | 3 "what am I looking at?" | JSONL `<view>` === `cardViewLine(EYES, <stage h2>)` (`card=` is the stage head); answer names the card (word-wise: possessive `'s` dropped, bare plural `s` accepted); station's `chat.presence` held that card with `sessionId: null`, `visible: true`, its own `clientId` |
 | 4 Back, reload | Back returns `TOP`, stack `BEHIND`; after reload same kind, title, focus, stack, Back present; reloaded station POSTs the floor again under the same name |
 | 5 floor | see below |
@@ -10635,10 +10634,11 @@ The station has no composer (the talk region is a later plan's). The turn is the
 |---|---|
 | another session's page or message moves her one floor or conversation mid-run | rerun; `takeFloor` retakes before each typed turn except step 5's |
 | the API hands over to a new process mid-turn (a save under `server/`) | presence is empty; first message carries `<view>none</view>`; `serverPids()` logs the ids before and after the first turn, and check 2's detail has `serverRestarted` |
-| the record is seeded while the station is mounted | it is overwritten as the station leaves; seeded from the opener only |
+| the record is seeded while the station is mounted | it is overwritten as the station leaves; seeded on the workspace page before the station is first shown |
+| step 1's mount floor-post check on a page that already holds her floor | `takeFloor` posts only when the page does not hold the floor (MAN-9250): that run finds no post. Unmeasured |
 | the scratch chat has never been spoken to | its own 404 (status 404, url holding the chat id; `token-usage` when measured) is filtered from the console check; every other failed load is named |
 
-- 2026-10-30: `ALL PASS` in 7 of 11 runs; the other 4 were the shared-state cases above. The fix-pass edit (step 5's order and `postedAt` check, the opener reload, the speech counter, the word-wise name match, the `card=` comparison) is `node --check`ed only.
+- 2026-10-30: `ALL PASS` in 7 of 11 runs; the other 4 were the shared-state cases above. The fix-pass edit (step 5's order and `postedAt` check, the opener reload, the speech counter, the word-wise name match, the `card=` comparison) is `node --check`ed only. 2026-10-31: the one-tab edit (step 1, the station as the workspace page, step 5's second page) is `node --check`ed only; not run.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-station-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/station-whole-her-lines.txt
 
@@ -10744,13 +10744,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station
 
 ## MAN-9258 — The phone's frame — usePwaModeClass, useVisualViewportKeyboardOffset and pwa-status-clear: status bar, keyboard and home indicator for a fixed full-screen page
 
-The phone's frame for a fixed full-screen page: the home-screen app's status bar and notch cleared, the on-screen keyboard cleared, the home indicator cleared. Two hooks in `src/shared/hooks/`, one CSS class. A page whose root is a `pwa-status-clear fixed inset-0` box calls both hooks; the workspace (`WorkspaceFrame`) and Kaylee Station (`StationShell`, MAN-9230) are the two such pages. Station's side: MAN-9250. Probe: MAN-9253.
+The phone's frame for a fixed full-screen page: the home-screen app's status bar and notch cleared, the on-screen keyboard cleared, the home indicator cleared. Two hooks in `src/shared/hooks/`, one CSS class. A page whose root is a `pwa-status-clear fixed inset-0` box rides both hooks; the workspace (`WorkspaceFrame`) and Kaylee Station (`StationShell`, MAN-9230) are the two such pages. The workspace stays mounted under the station (MAN-9426), so its two calls are the whole page's: the station calls neither. Station's side: MAN-9250. Probe: MAN-9253.
 
 | piece | where | does | callers |
 |---|---|---|---|
-| `usePwaModeClass(): void` | `usePwaModeClass.ts` | toggles `pwa-mode` on `<html>` AND `<body>` to `useDeviceSettings({ trackMobile: false }).isPWA` in an effect. `isPWA` re-reads on the display-mode media query's `change`: no timer. Both elements: the stylesheet keys on body, the chat's picture-in-picture window mirrors both | `Sidebar` (the workspace's shell), `StationRoute`. why a hook: no sidebar mounts on `/station` |
+| `usePwaModeClass(): void` | `usePwaModeClass.ts` | toggles `pwa-mode` on `<html>` AND `<body>` to `useDeviceSettings({ trackMobile: false }).isPWA` in an effect. `isPWA` re-reads on the display-mode media query's `change`: no timer. Both elements: the stylesheet keys on body, the chat's picture-in-picture window mirrors both | `Sidebar` (the workspace's shell), held under the station and never unmounted |
 | `pwa-status-clear` | `src/index.css` | `body.pwa-mode .pwa-status-clear { top: var(--header-total-padding); left: var(--safe-area-inset-left); right: var(--safe-area-inset-right) }`. `--header-total-padding` = `--header-safe-area-top` + the base padding. OPT-IN: only a frame's persistent chrome takes it; an overlay never does (it covers the screen and pads its own content) | `WorkspaceFrame`'s root and mobile drawer, `StationShell`'s root |
-| `useVisualViewportKeyboardOffset(): void` | `useVisualViewportKeyboardOffset.ts` | from one handler, ONCE as it mounts and on every read below, writes `--keyboard-height` on `<html>` = `max(0, innerHeight - visualViewport.height)` (the iOS lift: the frame's `bottom: var(--keyboard-height, 0px)` rides it) and the keyboard's MARK `data-keyboard` on `<html>` = `up` or `down` (§"The mark"). Each is written only when it changes | `ProjectWorkspaceRoute`, `StationRoute`; `usePanelViewport` (chat-host) reads the variable; every arrangement of the station reads the mark (§"The mark") |
+| `useVisualViewportKeyboardOffset(): void` | `useVisualViewportKeyboardOffset.ts` | from one handler, ONCE as it mounts and on every read below, writes `--keyboard-height` on `<html>` = `max(0, innerHeight - visualViewport.height)` (the iOS lift: the frame's `bottom: var(--keyboard-height, 0px)` rides it) and the keyboard's MARK `data-keyboard` on `<html>` = `up` or `down` (§"The mark"). Each is written only when it changes | `ProjectWorkspaceRoute`; `usePanelViewport` (chat-host) reads the variable; every arrangement of the station reads the mark (§"The mark") |
 
 ## The mark — `data-keyboard`
 One attribute both platforms set, for CSS to key on (`html[data-keyboard=up]`). `up` under either rule:
@@ -10766,7 +10766,7 @@ One attribute both platforms set, for CSS to key on (`html[data-keyboard=up]`). 
 - Known edge (open, operator's call): the mark and `--keyboard-height` read an iOS zoom as a gap, so compact's fold would fold with no keys; compact's fold asks no focused field.
 
 ## Mount write, home indicator, emulation
-- The mount write: `/` and `/station` take turns on a phone and the station is a lazy chunk. A keyboard that closed while neither was mounted sent its `resize` to no one, and the variable and the mark kept what they held before: the new frame stood that high over a dead band.
+- The mount write: the hook writes both once as it mounts, so they start from what the viewport says at that moment.
 - The home indicator: the page's last row pads `pb-[var(--safe-area-inset-bottom)]` (`StationShell`'s `<main>`). `--safe-area-inset-*` are `env(safe-area-inset-*)` with a `constant()` fallback (`src/index.css`).
 - Chromium answers `env()` with 0 and has no on-screen keyboard. The house's emulation: `navigator.standalone` set by an init script before load, the five safe-area variables (`--safe-area-inset-top/bottom/left/right`, `--header-safe-area-top`) set on the root after it (`.verify/settings-pwa-bleed.mjs`; `.verify/station-doors.mjs` does the same at 47 px and 34 px), and for the keyboard: iOS's rule by `visualViewport.height` redefined with its `resize` fired (that shows the wiring, not iOS), Android's by `page.setViewportSize` to a shorter window with a text field focused (`.verify/kaylee-station-phone-live.mjs`, MAN-9378).
 
@@ -14311,7 +14311,7 @@ Root `<div data-station-phone=<section> data-station-phone-form=upright|sideways
 |---|---|---|
 | top row | `[data-station-phone-top]` `relative z-20 shrink-0 border-b` round `[data-station-slot=head]` | her face, name and state, the `trail`, her one menu (MAN-9371). `z-20` is a stacking context over the week's `z-10`. why: at `z-[1]` the opened week covered the menu panel's first line (Stop while she runs) and took its tap |
 | the count | `[data-station-phone-needs=<n>\|unread]`, ghost icon `Button`: `Inbox` + a `warn` `Badge` of n (neutral at 0, none at null) | in `trail`; press = `onSection('needs')`; name `station.compact.needsPress`, `station.compact.needsPressUnread` at null |
-| strip line | upright only: `[data-station-phone-strip=line\|open]` under the row, `[data-station-slot=strip]` `px-3 py-1` | `inert` + `aria-hidden` (`STATION_OUT_OF_REACH`) while the week is open |
+| strip line | upright only: `[data-station-phone-strip=line\|open]` under the row, `[data-station-slot=strip]` `px-3 py-1` | `inert` + `aria-hidden` (`OUT_OF_REACH`) while the week is open |
 | the week | `[data-station-phone-week]` `absolute inset-x-0 top-0 z-10 bg-background shadow-lift` | upright: from the strip line's top, `min-h-full`, over line and middle. Sideways: at the middle's top, its own height. Nothing under it moves |
 | middle | `[data-station-phone-middle]` `relative flex min-h-0 flex-1`, `[&_*]:overscroll-contain` | taps only: no swipe moves between sections (the edge swipe is the browser's Back, the cards scroll sideways) |
 | foot | `[data-station-phone-foot]`: pending line, talk error, bar | hidden while `html[data-keyboard=up]`, except while `talk.press.state === 'listening'` (MAN-9376) |
@@ -14510,7 +14510,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/station-phone.mjs
 | piece | where | use |
 |---|---|---|
 | `STATION_SIDEWAYS_CATCH`, `STATION_COUNT_FORM_CATCH` | `src/shared/constants.ts` | the catches above |
-| `STATION_OUT_OF_REACH` | `src/shared/constants.ts` | `inert` + `aria-hidden` on the strip's line under the week |
+| `OUT_OF_REACH` | `src/shared/constants.ts` | `inert` + `aria-hidden` on the strip's line under the week (and on a held page: MAN-9426) |
 | `isDrawn(node)` | `src/shared/utils.ts` | false for `undefined`, `null`, `false`; the shell, the sections, compact and the phone ask it of every slot |
 | `StationHeadRow`, `StationArrangement` (`'phone'`) | `src/shared/types.ts` | the head's `row`; the shell's arrangement |
 
@@ -15600,7 +15600,11 @@ The shell's effects and doors (a notification's landing in `ProjectEffects`, her
 | `registerWorkspaceChatOpen(open)` / `openChatInWorkspace(sessionId)` | `CompanionHost` registers its one way to bring a chat forward (the Chat view, `/session/<id>`, floated over an application that covers the page); the station's "Open the chat" (`useOpenChatInCloudcli`) calls it |
 
 ## `HeldPage` — `src/shared/ui/HeldPage.tsx`
-`<div className="contents invisible" inert aria-hidden>` while `held`. `contents`: the page inside stands where it would stand alone. `invisible` is `visibility: hidden`, which keeps layout and every scroll position (`display: none` loses them) and takes the subtree out of focus, pointing and the reading order; `OUT_OF_REACH` (`inert` + `aria-hidden`, `src/shared/constants.ts`) says it outright. Worn by the workspace's frame (`HeldWorkspace` in `WorkspaceFrame.tsx`) and the station's layer (`HeldStation` in `StationRoute.tsx`), each in a component of its own so a switch re-renders the wrapper and not the page (its children are the element it already built).
+`<div className="contents invisible" inert aria-hidden data-held-page>` while `held`, inside `HeldPageStateProvider` (`src/shared/context/HeldPageContext.tsx`). `contents`: the page inside stands where it would stand alone. `invisible` is `visibility: hidden`, which keeps layout and every scroll position (`display: none` loses them) and takes the subtree out of focus, pointing and the reading order; `OUT_OF_REACH` (`inert` + `aria-hidden`, `src/shared/constants.ts`) says it outright. Worn by the workspace's frame (`HeldWorkspace` in `WorkspaceFrame.tsx`) and the station's layer (`HeldStation` in `StationRoute.tsx`), each in a component of its own so a switch re-renders the wrapper and not the page (its children are the element it already built).
+
+`[data-held-page] *` pauses every CSS animation under it (`src/index.css`): a hidden subtree still runs them, and her portrait's breath and sway kept the whole app at about four times its rest cost on the main thread.
+
+`useIsPageHeld()` answers, as a function over a ref (so a switch re-renders nobody), whether the page the caller belongs to is held. A `keydown` listener bound to the `document` or the `window` is not stopped by `inert` or `visibility`, so each one that acts when nothing is open asks first and returns while its page is held. Gated: the chat's global Escape that aborts a turn (`ChatInterface`), the PRD editor's Escape and Ctrl+S (`usePrdKeyboardShortcuts`), the files browser's Tab trap and Escape (`FilesView`), the celebration's Escape (`CelebrationLayer`), the mark screen's keys (`MarkScreen`), and the chat gutters' and widgets' fullscreen Escape (`ChatGutterLayout`, `WidgetFrame`: those two also stop the key's propagation). Not gated: the listeners of a menu, dialog, select, popover or lightbox, which stand only while it is open, and the ones scoped to focus inside their own container. A new view with a document-level key listener that acts on a bare key gates it the same way.
 
 ## What stands down on the covered page
 | page | what | how |
@@ -15614,6 +15618,7 @@ The shell's effects and doors (a notification's landing in `ProjectEffects`, her
 | station | his last look | `StationLandedProvider` hears the look-aways only while the station shows, and stamps when it leaves |
 
 ## `StationLayer` — `station/StationLayer.tsx` (the station module's one public export)
+An `ErrorBoundary` stands between the station and the workspace's own: a chunk that cannot load or a station that throws is `StationFailed`'s page (MAN-9250), never the app's error screen.
 Mounts `StationRoute` (the lazy chunk, `lazyStationRoute.ts`) the first time the station is on screen and keeps it mounted: every later switch is a change of `visibility`, with nothing fetched or built. The chunk is fetched when the browser is idle (`requestIdleCallback`, else 3 s) by `preloadStationRoute()`, so the first visit is a mount and not a download. Until the chunk is here a placeholder (`bg-background`, the theme he chose) stands over the workspace, only while the station is on screen. The route element is memoized: this component re-renders on every switch and a fresh element would re-render the whole station.
 
 ## One of each
@@ -15629,4 +15634,4 @@ The station wears the app's theme: nothing holds it over his choice, and a chang
 - Focus is not handed across: leaving a page drops the keyboard to `body`, and Tab then starts at the page on screen.
 - A modal portalled to `body` by the station (a check's sheet, a roadmap dialog) stays open over the workspace if the browser's Back leaves `/station` while it is open (the app's own "CloudCLI" cannot be pressed under a modal).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/CompanionHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/CompanionHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/lazyStationRoute.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/HeldPageContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx

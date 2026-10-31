@@ -1,7 +1,11 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
+import { useTranslation } from 'react-i18next';
 
 import { preloadStationRoute, StationRoute } from '@/modules/station/lazyStationRoute';
-import { useStationShowing } from '@/shared/context/StationLayerContext';
+import { backToCloudcli } from '@/shared/cloudcliDoors';
+import { useStationDoors, useStationShowing } from '@/shared/context/StationLayerContext';
+import { Banner, Button } from '@/shared/ui';
 
 /**
  * The station's chunk is fetched once the browser has nothing else to do, a few seconds after the app is up (`requestIdleCallback`; a browser without it
@@ -15,6 +19,38 @@ function StationPlaceholder() {
 }
 
 /**
+ * What the page shows where the station cannot be: its chunk would not load (a hashed file a deploy removed, a dropped connection: a `lazy` import that
+ * failed stays failed until the page loads again) or it threw while drawing. A warn banner over the page, only while the station is on screen, with the way back to
+ * the workspace and a reload; the workspace under it is untouched, where without this boundary the failure climbs to the app's own and replaces the rail, the open chat
+ * and every draft with its error screen.
+ */
+function StationFailed({ showing }: { showing: boolean }) {
+  const { t } = useTranslation();
+  const doors = useStationDoors();
+  if (!showing) return null;
+  return (
+    <div role="alert" className="fixed inset-0 grid place-items-center overflow-auto bg-background p-4" data-station-failed="">
+      <Banner
+        tone="warn"
+        action={(
+          <div className="flex flex-none gap-2">
+            <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs finger:h-11" onClick={() => backToCloudcli(doors.navigate, doors.workspacePath())}>
+              {t('station.bar.back', { defaultValue: 'CloudCLI' })}
+            </Button>
+            <Button variant="tonal" size="sm" className="h-8 px-2.5 text-xs finger:h-11" onClick={() => window.location.reload()}>
+              {t('viewBoundary.reload')}
+            </Button>
+          </div>
+        )}
+      >
+        <p className="text-sm font-medium">{t('viewBoundary.failed', { view: 'Kaylee Station' })}</p>
+        <p className="mt-0.5 text-xs">{t('viewBoundary.failedDetail', { view: 'Kaylee Station' })}</p>
+      </Banner>
+    </div>
+  );
+}
+
+/**
  * Kaylee Station's door into the app, rendered by `src/App.tsx` as the workspace's `stationLayer`: the one entry of the station's lazy chunk.
  *
  * THE STATION MOUNTS ON ITS FIRST VISIT AND STAYS MOUNTED. Mounting it when `/station` is first on screen (and not before) keeps the workspace's own
@@ -23,7 +59,8 @@ function StationPlaceholder() {
  * fetched when the browser is idle (`preloadStationRoute`), so even the first visit is a mount and not a download.
  *
  * Until the chunk is here the placeholder stands over the workspace, only while the station is the page on screen: a press back to the workspace
- * before the chunk arrives is never covered by it.
+ * before the chunk arrives is never covered by it. A chunk that cannot load, or a station that throws, is `StationFailed`'s page and nothing more: the
+ * boundary stands between the station and the workspace's own.
  */
 export function StationLayer() {
   const showing = useStationShowing();
@@ -45,5 +82,12 @@ export function StationLayer() {
   const route = useMemo(() => <StationRoute />, []);
 
   if (!visited) return null;
-  return <Suspense fallback={showing ? <StationPlaceholder /> : null}>{route}</Suspense>;
+  return (
+    <ErrorBoundary
+      onError={(error) => console.error('Kaylee Station failed to load', error)}
+      fallbackRender={() => <StationFailed showing={showing} />}
+    >
+      <Suspense fallback={showing ? <StationPlaceholder /> : null}>{route}</Suspense>
+    </ErrorBoundary>
+  );
 }
