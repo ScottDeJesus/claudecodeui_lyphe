@@ -1,10 +1,16 @@
 import fs from 'node:fs/promises';
 import sharp from 'sharp';
+import { ACCENT_PALETTES, accentAssetDir } from '../../shared/accentPalettes.js';
 
 /**
  * Every app icon, rendered from one square source: the web's tab icon, logos and PWA set, the iOS
  * touch icon, and the desktop app's macOS `.icns` and Windows `.ico`. Change the mark by replacing
  * the source and re-running `npm run icons`; nothing else draws it.
+ *
+ * The web set is written once for the default green (`public/`) and once more for every accent
+ * palette in shared/accentPalettes.js (`public/accent/<name>/`, the same layout plus a manifest
+ * whose icon paths point there). The palette copies are recoloured from this same source, the way
+ * the dark mark is, never kept as files of their own. The desktop app stays green.
  *
  * Rounded icons carry a 25% corner in their alpha, the shape of the app's earlier logo tile; the macOS
  * ones also keep Apple's transparent margin so the Dock draws them at native size. The
@@ -13,23 +19,29 @@ import sharp from 'sharp';
  */
 
 const SOURCE = 'electron/assets/app-icon-source.png';
-const DARK_SOURCE = darkSource();
 const PUBLIC = 'public';
 const ELECTRON = 'electron/assets';
 
+/** The source's three colours: the white tile and the mark's two greens (accent-ink light, accent dark). */
+const SOURCE_COLOURS = [[255, 255, 255], [28, 125, 84], [76, 196, 147]];
+/** The dark tile: Verve dark `--surface2`, a step off the dark card so the tile still reads. */
+const DARK_TILE = [36, 37, 47];
+
+function rgbOf(hex) {
+  const value = parseInt(hex.slice(1), 16);
+  return [value >> 16 & 255, value >> 8 & 255, value & 255];
+}
+
 /**
- * The dark-mode mark, recoloured from the one source rather than kept as a second file to drift.
- * The source is three colours and their antialiased blends — the white tile and the mark's two
- * greens. Each pixel is split into its share of those three (barycentric, least squares on the
- * plane they span) and rebuilt from the dark palette, so every edge blend lands on the matching
- * dark blend. The tile is Verve dark `--surface2`, a step off the dark card so the tile still
- * reads; the greens are the dark theme's accent pair.
+ * The source recoloured, rather than kept as another file to drift. The source is three colours
+ * and their antialiased blends. Each pixel is split into its share of those three (barycentric,
+ * least squares on the plane they span) and rebuilt from `to` — the tile, then the two marks — so
+ * every edge blend lands on the matching blend of the new colours. The dark mark is the dark
+ * theme's accent pair on the dark tile; an accent palette's marks are its own ladder's colours.
  */
-async function darkSource() {
-  const light = [[255, 255, 255], [28, 125, 84], [76, 196, 147]];
-  const dark = [[36, 37, 47], [76, 196, 147], [169, 232, 203]];
+async function recolour(to) {
   const { data, info } = await sharp(SOURCE).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-  const [w, a, b] = light;
+  const [w, a, b] = SOURCE_COLOURS;
   const u = a.map((v, i) => v - w[i]);
   const v = b.map((x, i) => x - w[i]);
   const dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
@@ -41,7 +53,7 @@ async function darkSource() {
     const s = Math.min(1, Math.max(0, (vv * pu - uv * pv) / det));
     const t = Math.min(1 - s, Math.max(0, (uu * pv - uv * pu) / det));
     for (let c = 0; c < 3; c += 1) {
-      out[i + c] = Math.round(dark[0][c] * (1 - s - t) + dark[1][c] * s + dark[2][c] * t);
+      out[i + c] = Math.round(to[0][c] * (1 - s - t) + to[1][c] * s + to[2][c] * t);
     }
   }
   return sharp(out, { raw: info }).png().toBuffer();
@@ -64,8 +76,8 @@ function rounded(size, web = true, source = SOURCE) {
   return encode(image, web).toBuffer();
 }
 
-function square(size) {
-  return encode(sharp(SOURCE).resize(size, size, { kernel: 'lanczos3' }), true).toBuffer();
+function square(size, source = SOURCE) {
+  return encode(sharp(source).resize(size, size, { kernel: 'lanczos3' }), true).toBuffer();
 }
 
 /** Apple's icon grid: the art sits in 824 of 1024, with a transparent margin all round. */
@@ -121,18 +133,46 @@ async function ico(sizes) {
   return Buffer.concat([header, ...pngs]);
 }
 
-const darkMark = await DARK_SOURCE;
+/** The web's icons in `dir`: the light set, and the dark theme's tab icon and in-app logos (`AppLogo`,
+ *  ThemeContext's favicon swap). The PWA, iOS and desktop icons stay light: the OS draws them, and
+ *  none of them can follow a theme. */
+function webIcons(dir, lightMark, darkMark) {
+  return [
+    ...[72, 96, 128, 144, 152, 192, 384, 512].map((size) => write(`${dir}/icons/icon-${size}x${size}.png`, rounded(size, true, lightMark))),
+    ...[32, 64, 128, 256, 512].map((size) => write(`${dir}/logo-${size}.png`, rounded(size, true, lightMark))),
+    write(`${dir}/favicon.png`, rounded(64, true, lightMark)),
+    ...[32, 64, 128, 256, 512].map((size) => write(`${dir}/logo-dark-${size}.png`, rounded(size, true, darkMark))),
+    write(`${dir}/favicon-dark.png`, rounded(64, true, darkMark)),
+    write(`${dir}/icons/apple-touch-icon.png`, square(180, lightMark)),
+    write(`${dir}/icons/icon-maskable-512x512.png`, square(512, lightMark)),
+  ];
+}
+
+/**
+ * One accent palette's web set under `public/accent/<name>/`, marks taken from its own ladder: the
+ * light tile carries accent-ink and the dark accent (the roles the green marks are), the dark tile
+ * the dark accent and the dark accent-ink. Its manifest is the default one with every icon path
+ * moved under the palette's directory, so the installed app wears the palette too.
+ */
+async function accentPaletteIcons(name, palette) {
+  const urlDirectory = accentAssetDir(name);
+  const dir = `${PUBLIC}${urlDirectory}`;
+  await fs.mkdir(`${dir}/icons`, { recursive: true });
+  const lightMark = await recolour([SOURCE_COLOURS[0], rgbOf(palette.light.accentInk), rgbOf(palette.dark.accent)]);
+  const darkMark = await recolour([DARK_TILE, rgbOf(palette.dark.accent), rgbOf(palette.dark.accentInk)]);
+  const manifest = JSON.parse(await fs.readFile(`${PUBLIC}/manifest.json`, 'utf8'));
+  manifest.icons = manifest.icons.map((icon) => ({ ...icon, src: `${urlDirectory}${icon.src}` }));
+  await Promise.all([
+    ...webIcons(dir, lightMark, darkMark),
+    fs.writeFile(`${dir}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`),
+  ]);
+}
+
+const darkMark = await recolour([DARK_TILE, [76, 196, 147], [169, 232, 203]]);
 
 await Promise.all([
-  ...[72, 96, 128, 144, 152, 192, 384, 512].map((size) => write(`${PUBLIC}/icons/icon-${size}x${size}.png`, rounded(size))),
-  ...[32, 64, 128, 256, 512].map((size) => write(`${PUBLIC}/logo-${size}.png`, rounded(size))),
-  write(`${PUBLIC}/favicon.png`, rounded(64)),
-  // The dark theme's tab icon and in-app logos (`AppLogo`, ThemeContext's favicon swap). The PWA,
-  // iOS and desktop icons stay light: the OS draws them, and none of them can follow a theme.
-  ...[32, 64, 128, 256, 512].map((size) => write(`${PUBLIC}/logo-dark-${size}.png`, rounded(size, true, darkMark))),
-  write(`${PUBLIC}/favicon-dark.png`, rounded(64, true, darkMark)),
-  write(`${PUBLIC}/icons/apple-touch-icon.png`, square(180)),
-  write(`${PUBLIC}/icons/icon-maskable-512x512.png`, square(512)),
+  ...webIcons(PUBLIC, SOURCE, darkMark),
+  ...Object.entries(ACCENT_PALETTES).map(([name, palette]) => accentPaletteIcons(name, palette)),
   write(`${ELECTRON}/logo-macos.png`, macRounded(1024)),
   write(`${ELECTRON}/logo-macos.icns`, icns([
     ['icp4', 16], ['icp5', 32], ['icp6', 64], ['ic07', 128], ['ic08', 256], ['ic09', 512], ['ic10', 1024],

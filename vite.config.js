@@ -5,6 +5,7 @@ import { getConnectableHost, normalizeLoopbackHost } from './shared/networkHosts
 import keepPageOnReconnect from './vite-plugins/keepPageOnReconnect.js'
 import compressResponses from './vite-plugins/compressResponses.js'
 import precompressedAssets from './vite-plugins/precompressedAssets.js'
+import accentPalette from './vite-plugins/accentPalette.js'
 
 // The client shows the installed package version so it can be compared against the
 // version the server process is actually running. Importing package.json here and
@@ -36,7 +37,8 @@ export default defineConfig(({ mode }) => {
     // envelope; a save still lands through HMR exactly as before.
     // precompressedAssets: the production client on :5184 (`vite preview`) — Brotli twins written at
     // build time, served with a year's cache on hashed assets.
-    plugins: [react(), keepPageOnReconnect(), compressResponses(), precompressedAssets()],
+    // accentPalette: this box's accent colour from VITE_ACCENT; unset leaves the page green.
+    plugins: [react(), keepPageOnReconnect(), compressResponses(), precompressedAssets(), accentPalette(env.VITE_ACCENT)],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version)
     },

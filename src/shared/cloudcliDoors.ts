@@ -20,6 +20,13 @@ export type CloudcliDoorWhere = { phone: boolean; pwa: boolean };
 const DEPLOYMENT_ASSET_DIRECTORIES = new Set(['assets', 'static', 'icons', 'images']);
 
 /**
+ * The folder a box's accent palette keeps its own copies of the icons in: `<mount>/accent/<name>/`
+ * (vite-plugins/accentPalette.js). Two segments that are static files' address, like `icons`, and
+ * never part of where the app is mounted.
+ */
+const ACCENT_PALETTE_DIRECTORY = 'accent';
+
+/**
  * Detect the router basename from explicit runtime config or deployment hints.
  *
  * CloudCLI can be served from a path prefix by a reverse proxy, for example:
@@ -92,11 +99,19 @@ export function routerBasename(): string {
           // the app is mounted. This must also run for a single segment:
           //   /icons/icon-192x192.png       -> ''
           //   /ai/icons/icon-192x192.png    -> '/ai'
+          //   /accent/blue/favicon.png      -> ''
+          //   /ai/accent/blue/icons/icon-192x192.png -> '/ai'
           // The previous implementation only stripped while more than one
           // segment remained, which incorrectly turned root deployments into a
           // Router basename of /icons and caused a blank page after login.
-          while (segments.length > 0 && DEPLOYMENT_ASSET_DIRECTORIES.has(segments[segments.length - 1])) {
-            segments.pop();
+          while (segments.length > 0) {
+            if (DEPLOYMENT_ASSET_DIRECTORIES.has(segments[segments.length - 1])) {
+              segments.pop();
+            } else if (segments[segments.length - 2] === ACCENT_PALETTE_DIRECTORY) {
+              segments.splice(-2);
+            } else {
+              break;
+            }
           }
 
           normalized = segments.length > 0 ? `/${segments.join('/')}` : '';

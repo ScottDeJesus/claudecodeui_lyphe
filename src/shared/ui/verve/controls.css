@@ -337,8 +337,9 @@
   border-radius: 50%;
   border: 2px solid var(--surface);
   /* Identity colour: a person's avatar keeps its hue in both modes, so these three gradients
-   * (verbatim from _ds_bundle.js:13, hue0 here and hue1/hue2 below) do not flip with theme. */
-  background: linear-gradient(135deg, #2fa876, #6fd0a8);
+   * (from _ds_bundle.js:13, hue0 here and hue1/hue2 below) do not flip with theme. hue0 is the
+   * accent's own pair (tokens.css `--accent-fixed`), so it follows a box's accent palette. */
+  background: linear-gradient(135deg, var(--accent-fixed), var(--accent-fixed-end));
   color: #fff;
   font-weight: 700;
   box-sizing: border-box;

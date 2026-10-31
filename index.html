@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
+    <!-- The ACCENT_ASSETS placeholder in the three links below is empty for the default green and
+         `/accent/<name>` under a VITE_ACCENT palette (vite-plugins/accentPalette.js): the icons are
+         that palette's recoloured copies. -->
+    <link rel="icon" type="image/png" href="%ACCENT_ASSETS%/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>LypheCLI</title>
 
@@ -17,7 +20,7 @@
     />
 
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json" crossorigin="use-credentials"  />
+    <link rel="manifest" href="%ACCENT_ASSETS%/manifest.json" crossorigin="use-credentials"  />
     
     <!-- iOS Safari PWA Meta Tags -->
     <meta name="mobile-web-app-capable" content="yes" />
@@ -25,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="LypheCLI" />
     
     <!-- iOS Safari Icons -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%ACCENT_ASSETS%/icons/apple-touch-icon.png" />
     
     <!-- Theme Color -->
     <meta name="theme-color" content="#f7f7f9" />
@@ -136,7 +139,10 @@
             '<div style="font-size:13px;line-height:1.5;opacity:0.7;margin-bottom:16px">' +
             'The app did not finish drawing. The server may be mid-restart — reloading usually clears it.</div>' +
             '<button onclick="location.reload()" style="border:0;border-radius:8px;padding:8px 16px;' +
-            'background:#2fa876;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Reload</button>' +
+            // `--accent-fixed` is set by the inline accent <style> in this very document, so the button
+            // keeps the box's accent even when the bundle (and tokens.css) never arrived; the literal is
+            // the default green.
+            'background:var(--accent-fixed,#2fa876);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Reload</button>' +
             '</div>';
           root.appendChild(node);
         }

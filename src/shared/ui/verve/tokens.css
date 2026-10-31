@@ -4,7 +4,7 @@
  * ({colors,typography,spacing,motion,base}.css). Copied, not imported: the design source is
  * never loaded at runtime.
  *
- * Four deliberate changes from the source, and only four:
+ * Five deliberate changes from the source, and only five:
  *   1. Verve's `.vv-dark, body.vv-dark` selector is written as `.dark` — the one dark selector
  *      this app already has (ThemeContext puts it on <html>). No `vv-dark` class exists here.
  *   2. `--on-accent` is added to both blocks. Verve has no token for the ink that sits ON the
@@ -23,6 +23,13 @@
  *      footer link went 0px → 10px. `outline` already follows the element's own radius, so
  *      nothing is lost. It went unnoticed until Phase 2 removed `focus-visible:outline-none`
  *      from Button's cva, which had been hiding the ring that makes the jump visible.
+ *   5. `--accent-fixed` and `--accent-fixed-end` are added: the accent as it stands in LIGHT,
+ *      held in both themes, for the three places that never flip with the theme (the `vv-ring`
+ *      pulse, the default avatar, the failure-screen buttons) and used to spell the green as a
+ *      literal. And the accent ladder below is the DEFAULT one: a box can wear another palette
+ *      through `VITE_ACCENT` (shared/accentPalettes.js), which vite-plugins/accentPalette.js
+ *      writes over these tokens at the root. Green that means "healthy" (`--pos-*`,
+ *      `--success-dot`) is never part of a palette.
  *
  * `fonts.css` is NOT copied — its Google Fonts `@import` is served by the <link> in index.html,
  * which preconnects and so lands the faces a round trip sooner.
@@ -44,12 +51,15 @@
   --ink-faint:#8a8c99;
   --border:#e4e5ec;
   --border-strong:#d8d9e2;
-  /* accent — one green, used sparingly: actions and focus only */
+  /* accent — one green by default, used sparingly: actions and focus only */
   --accent:#2fa876;
   --accent-deep:#22855c;
   --accent-ink:#1c7d54;
   --accent-soft:#e3f4ec;
   --accent-soft-hover:#d2ecdf;
+  /* the accent as it stands in light, held in both themes (see the header note) */
+  --accent-fixed:#2fa876;
+  --accent-fixed-end:#6fd0a8;
   /* the inks that sit ON a filled accent / danger surface (see the header note) */
   --on-accent:#ffffff;
   --on-danger:#ffffff;
@@ -168,7 +178,7 @@
 @keyframes vv-spin-hue{0%,100%{border-top-color:var(--accent)}50%{border-top-color:#e0713a}}
 @keyframes vv-shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
 @keyframes vv-swirl{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes vv-ring{0%{box-shadow:0 0 0 0 rgba(47,168,118,.35)}100%{box-shadow:0 0 0 9px rgba(47,168,118,0)}}
+@keyframes vv-ring{0%{box-shadow:0 0 0 0 rgb(from var(--accent-fixed) r g b / .35)}100%{box-shadow:0 0 0 9px rgb(from var(--accent-fixed) r g b / 0)}}
 @keyframes vv-toast-out{to{opacity:0;filter:blur(8px);transform:translateY(-16px) scale(1.06)}}
 @keyframes vv-drift{0%{transform:translate(0,0) scale(1)}33%{transform:translate(60px,-40px) scale(1.15)}66%{transform:translate(-40px,30px) scale(0.95)}100%{transform:translate(0,0) scale(1)}}
 @keyframes vv-drift2{0%{transform:translate(0,0) scale(1)}50%{transform:translate(-70px,50px) scale(1.2)}100%{transform:translate(0,0) scale(1)}}
