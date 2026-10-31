@@ -66,7 +66,7 @@ export type CompanionStoredState = {
 /** A draft as a caller hands it over: the store stamps `updatedAt`. Consumed by `companion.service.ts`, which writes the draft for the routes and her tools. */
 export type CompanionDraftInput = Omit<CompanionDraft, 'updatedAt'>;
 
-/** A walkthrough as a caller hands it over: the store stamps `updatedAt`. Consumed by `companion.service.ts`, which writes the walk for her `walk` tool. */
+/** A walkthrough as a caller hands it over: the store stamps `updatedAt`. Consumed by `companion-walk.ts`, which moves the held walk for his press. */
 export type CompanionWalkInput = Omit<CompanionWalk, 'updatedAt'>;
 
 /**
@@ -138,8 +138,10 @@ export type CompanionStore = {
   listNotes(): CompanionNote[];
   /** `companion_note_removed`, only when this account had the note. Answers whether it did. */
   removeNote(id: number): boolean;
+  /** `companion_note_pinned` with the card's id and the state it is in now, only when this account had the card (a card already in that state is told again, so a page that missed it learns it). Answers whether it did. */
+  setNotePinned(id: number, pinned: boolean): boolean;
   emit(frame: CompanionEmittedFrame): void;
-  /** Deletes the log and notes, empties the state (a standing action's row in `companion_actions` ends `cancelled`, and stays; one a take is carrying out is the take's to end), then `companion_cleared`. */
+  /** Deletes the log and the UNPINNED notes (a pinned card is his keep), empties the state (a standing action's row in `companion_actions` ends `cancelled`, and stays; one a take is carrying out is the take's to end), then `companion_cleared`. */
   clearAccount(): void;
 };
 
@@ -337,6 +339,12 @@ export function createCompanionStore(userId: number): CompanionStore {
       const removed = companionDb.removeNote(userId, id);
       if (removed) send({ kind: 'companion_note_removed', id });
       return removed;
+    },
+
+    setNotePinned(id, pinned) {
+      const found = companionDb.setNotePinned(userId, id, pinned);
+      if (found) send({ kind: 'companion_note_pinned', id, pinned });
+      return found;
     },
 
     emit: send,

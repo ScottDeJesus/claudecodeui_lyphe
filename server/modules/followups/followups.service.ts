@@ -43,7 +43,7 @@ import {
  *
  * Consumers: `followups.routes.ts` (the widget's door) and `followups.command-routes.ts` (the `followups`
  * command's), handed this object — so the two doors refuse alike and both send the frame. The companion
- * module reads through `listOpenForAccount`, by way of the barrel's `listOpenFollowups`; the dispatcher
+ * module reads through `listOpenForAccount` and `listOpenGroupsForAccount`, by way of the barrel's `listOpenFollowups` and `listOpenFollowupGroups`; the dispatcher
  * module's watcher calls `closeForCompletions`, by way of the barrel's `closeFollowupsForCompletions`.
  */
 
@@ -217,6 +217,15 @@ export const followupsService = {
             .slice(0, bounded);
 
     return rows.map((row) => ({ sessionId: row.session_id, followup: toFollowup(row) }));
+  },
+
+  /**
+   * The account's open items grouped by chat, the chat with the newest one first: each group is the chat's app session id, how many
+   * open items it holds and the newest of them, mapped as the widget maps it. The count is the table's own for the account, so it is
+   * never a count of a capped read (`listOpenForAccount`'s ceiling cuts rows before any grouping). The station's read.
+   */
+  listOpenGroupsForAccount(userId: number): Array<{ sessionId: string; count: number; newest: Followup }> {
+    return followupsDb.listOpenGroupsOfUser(userId).map((row) => ({ sessionId: row.session_id, count: row.open_count, newest: toFollowup(row) }));
   },
 
   /**

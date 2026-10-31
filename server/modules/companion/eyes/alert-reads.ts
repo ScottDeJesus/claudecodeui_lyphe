@@ -13,6 +13,7 @@ import { toolLine } from '../session/companion-prompt.js';
 import type { CompanionToolDeps } from '../tools/companion-tools.js';
 import { chatNameOf, UNTITLED_CHAT } from '../tools/house-reads.js';
 
+import { LIST_ABOUT_NOTHING } from './card-shapes.js';
 import { cappedLines, toPanel, whenWords } from './eyes-answer.js';
 
 /**
@@ -34,7 +35,7 @@ import { cappedLines, toPanel, whenWords } from './eyes-answer.js';
  * never usage or spend). The wording it reads is already
  * taken clear of every figure (`spendFreeWording`, applied when the row was written).
  *
- * `panel: true` puts the whole answer on his panel as a note. No eyes tool moves her focus or her activity: a read here
+ * `panel: true` puts the whole answer on his panel as a card. No eyes tool moves her focus or her activity: a read here
  * runs as `thinking`, and it names a chat only to say its name.
  *
  * Consumer: `tools/companion-tools.ts` (`buildCompanionTools`), once per account.
@@ -167,7 +168,7 @@ async function readAlerts(deps: CompanionToolDeps, scope: string): Promise<{ tit
 function listAlerts(deps: CompanionToolDeps, args: { scope: string; panel?: boolean }): Promise<ToolTextResult> {
   return guardedToolResult('list_alerts', 'read the alerts', async () => {
     const { title, text } = await readAlerts(deps, args.scope.trim());
-    return args.panel === true ? toPanel(deps, title, textResult(text)) : textResult(text);
+    return args.panel === true ? toPanel(deps, title, textResult(text), LIST_ABOUT_NOTHING) : textResult(text);
   });
 }
 
@@ -187,7 +188,7 @@ export function alertReads(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
           .min(1)
           .max(200)
           .describe('recent: the newest 20 things the house told him, newest first. waiting: what his inbox holds now (memory proposals, heal friction, asks on the roadmap). Anything else is a phrase searched over what the house told him.'),
-        panel: z.boolean().optional().describe('true puts the whole answer on his panel as a note instead of in your context.'),
+        panel: z.boolean().optional().describe('true puts the whole answer on his panel as a card instead of in your context.'),
       },
       (args) => listAlerts(deps, args),
       { annotations: { readOnlyHint: true } }

@@ -17,7 +17,7 @@ import type { CompanionToolDeps } from './companion-tools.js';
  *     focus is rewritten, and announced to the pages, only when the chat moved or was renamed;
  *   - `withActivity`: while a tool runs her activity is the tool's (what the panel's status line says), and
  *     when it ends she is `thinking` again (or back at a parallel tool still running);
- *   - `openOnFloor`: "the app brings that chat, card or page up" is told to the page that holds the floor ALONE
+ *   - `openOnFloor`: "the app brings that chat, card, page or check up" is told to the page that holds the floor ALONE
  *     (`companion_open` carries its client id and the spoken `label` the door resolved; every other page ignores it),
  *     and to nobody while no page holds the floor;
  *   - `refuse`: a refusal is `isError` text that says what to do next, never a throw;

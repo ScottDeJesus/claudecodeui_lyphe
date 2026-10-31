@@ -3,17 +3,19 @@ import { isSayableName } from '@/shared/sayable-name.js';
 import { textResult, type ToolTextResult } from '@/shared/tool-text-result.js';
 
 import { characterCount } from '../companion-input.js';
+import { LIST_ABOUT_NOTHING } from '../eyes/card-shapes.js';
 import { toPanel, whenWords } from '../eyes/eyes-answer.js';
 import type { CompanionToolDeps } from '../tools/companion-tools.js';
 
 import { onBank } from './bank-chain.js';
 import { bankDoor, isUnanswered, type BankAnswer, type BankRow } from './bank-door.js';
+import { announceMemoryChanged } from './memory-announce.js';
 import { findHisLine, firstQuote, memoryBody, MEMORY_BODY_MAX, quoteLine, quotesAlike, quotesOf, SAME_SUBJECT_LOGIT, type HisLine, type KeptWhy } from './memory-words.js';
 
 /**
  * HER THREE VERBS ON HER BANK, and the one clear: `recall`, `remember`, `forget` and `clearMemory`. Every read and every write goes
  * through her door (`bank-door.ts`), and every write runs inside `onBank` (`bank-chain.ts`), so one bank write runs at a time whichever
- * account asked. The words of a memory are `memory-words.ts`'s: the SERVER writes a memory's body from his spoken log lines (ruling 4),
+ * account asked; each that changed the bank, or may have (a write the door did not answer), then sends the hint `announceMemoryChanged` (`memory-announce.ts`), once, and a refusal that changed nothing sends none. The words of a memory are `memory-words.ts`'s: the SERVER writes a memory's body from his spoken log lines (ruling 4),
  * and she writes only its title and one line of context. CloudCLI stores no memory (ruling 1): the only thing kept here is the forget
  * guard's log id, in `companion_state.memory_forget_line`.
  *
@@ -112,7 +114,7 @@ async function recalled(deps: CompanionToolDeps, about: string): Promise<{ answe
  */
 export async function recall(deps: CompanionToolDeps, input: { about: string; panel?: boolean }): Promise<ToolTextResult> {
   const { answer, carded } = await recalled(deps, input.about.trim());
-  return input.panel === true && carded ? toPanel(deps, 'From her memory', answer) : answer;
+  return input.panel === true && carded ? toPanel(deps, 'From her memory', answer, LIST_ABOUT_NOTHING) : answer;
 }
 
 /** `remember`'s refusal of a door's sentence, for a call that read the bank (nothing was written). */
@@ -122,8 +124,11 @@ const notKept = (sentence: string): ToolTextResult => textResult(`Not kept: ${cl
  * `remember`'s refusal of a WRITE the door would not take. "Did not answer" is this side giving up, not the door's word that it wrote
  * nothing, so for it the outcome is unknown and she is told to recall before asking again (an at-once retry would keep a second copy).
  */
-const writeFailed = (sentence: string): ToolTextResult =>
-  isUnanswered(sentence) ? textResult(`Not confirmed: ${closed(sentence)} It may have been kept: recall before asking again.`, true) : notKept(sentence);
+const writeFailed = (sentence: string): ToolTextResult => {
+  if (!isUnanswered(sentence)) return notKept(sentence);
+  announceMemoryChanged(); // the door finishes a write it was handed, so the memory may have landed: the corner reads again (best effort, the write may land after that read)
+  return textResult(`Not confirmed: ${closed(sentence)} It may have been kept: recall before asking again.`, true);
+};
 
 /** The first quote of a body, cut for an answer, or `null` when it quotes no one. */
 const quoted = (body: string): string | null => firstQuote(body, QUOTE_CUT);
@@ -218,8 +223,10 @@ async function rememberInOrder(deps: CompanionToolDeps, input: RememberInput): P
  * `also`, when a held one scores at or over `SAME_SUBJECT_LOGIT` against it: she then says it `corrects` that memory or stands `also`.
  * The two together are refused. The whole of it runs inside `onBank`. Consumed by `memory-tools.ts`.
  */
-export function remember(deps: CompanionToolDeps, input: RememberInput): Promise<ToolTextResult> {
-  return onBank(() => rememberInOrder(deps, input));
+export async function remember(deps: CompanionToolDeps, input: RememberInput): Promise<ToolTextResult> {
+  const answer = await onBank(() => rememberInOrder(deps, input));
+  if (answer.isError !== true) announceMemoryChanged(); // only a memory kept or corrected answers without `isError`; an unconfirmed write announced itself in `writeFailed`, every other refusal changed nothing
+  return answer;
 }
 
 /** `forget`, in order: his line (new since the last forget), every token read before any is retired, then the retires one by one. */
@@ -249,12 +256,15 @@ async function forgetInOrder(deps: CompanionToolDeps, input: { memories: string[
       const stopped = closed(retired.sentence);
       // "Did not answer" leaves the outcome unknown (the door may still retire it), so it is never told as "nothing was forgotten".
       const unknown = isUnanswered(retired.sentence);
+      // Announced first, so a failing `writeState` below cannot cost the corner its read: the bank changed (`gone`), or may have (`unknown`).
+      if (gone.length > 0 || unknown) announceMemoryChanged();
       if (gone.length === 0) return deps.refuse(unknown ? `Not confirmed: ${stopped} It may have been forgotten: recall before asking again.` : `Nothing was forgotten: ${stopped}`);
       companionDb.writeState(deps.userId, { memory_forget_line: line.id });
       return deps.refuse(`Forgot ${gone.length}: ${gone.join(', ')}. Then ${memory.token} (${memory.title}) stopped it: ${stopped}${unknown ? ' It may have been forgotten too.' : ''} Ask again with a new word of his for the rest.`);
     }
     gone.push(memory.title);
   }
+  announceMemoryChanged(); // before `writeState`: the retires have landed whether or not the state write does
   companionDb.writeState(deps.userId, { memory_forget_line: line.id });
   return textResult(`Forgot ${gone.length}: ${gone.join(', ')}. The docstore's history keeps them.`);
 }
@@ -280,10 +290,12 @@ async function clearInOrder(cause: ClearCause): Promise<ClearAnswer> {
     if (!retired.ok) {
       const before = forgotten === 0 ? '' : `${forgotten} of ${listed.value.length} were forgotten before it: `;
       const unknown = isUnanswered(retired.sentence) ? ' That one may have been forgotten too.' : '';
+      if (forgotten > 0 || unknown !== '') announceMemoryChanged(); // a clear that stops part way retired `forgotten`, or the retire that stopped it may have landed: the bank changed, or may have
       return { ok: false, sentence: `${before}${closed(retired.sentence)}${unknown}` };
     }
     forgotten += 1;
   }
+  announceMemoryChanged();
   return { ok: true, forgotten };
 }
 

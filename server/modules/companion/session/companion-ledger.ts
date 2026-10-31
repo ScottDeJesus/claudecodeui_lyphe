@@ -32,7 +32,7 @@ export type StopSource = 'operator' | 'server';
 
 /**
  * One message of ours, as assembled and pushed (`message`, whose id is `uuid`), with his raw `words` when it is his (so it can
- * be assembled again and kept: `body` `''` with `via` `'spoken'` is a press that carried no words, `at` is when he said it) and
+ * be assembled again and kept: `body` `''` with `via` `'spoken'` is a press that carried no words, or only her name with `heard: 'name'`; `at` is when he said it) and
  * `stoppedBy` once the turn it was in was stopped (`null` before, and for a message pushed after the stop). Consumed by
  * `companion-session.ts`.
  */

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 import { useCompanionFab } from '@/modules/companion/hooks/useCompanionFab';
 import { useCompanionVoice } from '@/modules/companion/hooks/useCompanionVoice';
+import { useEars } from '@/modules/companion/hooks/useEars';
 import { useTalkBinding } from '@/modules/companion/hooks/useTalkBinding';
 import { useTalkPress } from '@/modules/companion/hooks/useTalkPress';
 import { isCompanionPicture, isOpenTarget, reduceCompanion } from '@/modules/companion/utils/companionReducer';
@@ -10,7 +11,7 @@ import type { PcmPlayer } from '@/modules/companion/utils/pcmPlayer';
 import { api, refusalSentence } from '@/shared/api';
 import type { CompanionFrame, CompanionOpenTarget, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-import type { CompanionVoice, TalkPress } from '@/shared/types';
+import type { CompanionEars, CompanionVoice, TalkPress } from '@/shared/types';
 import type { DockableFabPosition } from '@/shared/ui';
 import { companionClientId } from '@/shared/utils';
 
@@ -49,6 +50,20 @@ type CompanionContextValue = {
    */
   cancelAction: (actionId: string) => Promise<void>;
   dismissNote: (id: number) => Promise<void>;
+  /**
+   * His Pin (`pinned` true) or Unpin on the card `id`: a pinned card is his keep, which Clear leaves and she cannot take down. On the
+   * server's 2xx the page folds `companion_note_pinned` itself, unless the socket has delivered one since the press began (that frame is the
+   * newer word), so the button does not show the old state while its frame is in flight. Rejects with the server's sentence (a 404 for a card already taken down).
+   */
+  pinNote: (id: number, pinned: boolean) => Promise<void>;
+  /**
+   * His Back or Next on the walk: the one held walk's cursor goes to item `at` (from 1), the same cursor her `walk` tool moves. On the
+   * 2xx the page folds the walk at `at`, unless a `companion_walk` reached the socket since the press began; she is told nothing now, and the shell's `<view kind="walk">` carries it with his next word.
+   * Rejects with the server's own sentence when it refuses (no walk held, or `at` past the last item).
+   */
+  moveWalk: (at: number) => Promise<void>;
+  /** His × on the walk: it ends, and the page folds `companion_walk` null on the 2xx unless a `companion_walk` reached the socket since the press began (a walk already ended is no error). */
+  endWalk: () => Promise<void>;
   /** Stops her own turn. */
   interrupt: () => Promise<void>;
   /** Wipes her conversation and everything she keeps. */
@@ -66,6 +81,13 @@ type CompanionContextValue = {
    * floor plays, and only while the switch is on; `useCompanionPresence` reads `speaking` and `cut` with the press into her status line's state.
    */
   voice: CompanionVoice;
+  /**
+   * This page's ears: `on` / `setOn` the per-device switch (`companion-ears` in localStorage, off by default), `state` what they are doing
+   * (the switch row draws it), and `reason` the sentence when they cannot listen. Her name opens the same ONE press as `talk` (the page that
+   * holds the floor listens, and only when the switch is on, the page has been touched and it has a microphone); read by `CompanionControls`
+   * through the panel and the station's head.
+   */
+  ears: CompanionEars;
   /**
    * The id of the chat she opened in the last four seconds — the chat a send went to, or one she was told to open (counted from
    * the `companion_open` frame for a chat target that this page heard) — else null. `useAvatarTarget` points the button at that chat's
@@ -121,7 +143,7 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
 /**
  * Used by the project-workspace module's shell, which holds it above the whole workspace, so her disc, her cell in the rail, her panel and the command palette's
  * "Talk to Kaylee" share one picture. She is box-wide, tied to no chat, route or project: the one thing she asks of the page
- * is to open a chat, a card or a page, and she does it through `onOpen`, which the composition root answers with its own navigation.
+ * is to open a chat, a card, a page or a check, and she does it through `onOpen`, which the composition root answers with its own navigation.
  *
  * THE PICTURE IS SEEDED, THEN KEPT. It is read once with `GET /api/companion` and from then on folded, frame by frame, from
  * the one socket (`companion_*` frames) through the pure reducer. It is read again whenever the frames can no longer be
@@ -134,7 +156,7 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  * lands, so a frame the answer predates is not lost; the reducer folds a frame twice without harm. A clear is the exception:
  * it drops the queue and discards a read that was out, because the read that follows it is the one that counts.
  *
- * AN OPEN IS ANSWERED ONLY BY THE PAGE THAT HOLDS THE FLOOR. `companion_open` carries a target (a chat, a card or a page), the
+ * AN OPEN IS ANSWERED ONLY BY THE PAGE THAT HOLDS THE FLOOR. `companion_open` carries a target (a chat, a card, a page or a check), the
  * `floor` it is addressed to and the spoken `label` the door resolved for it; `onOpen(target, label)` is called only when that is
  * this page's client id (the workspace ignores the label; the station's stage names what she opened by it). Every other page of the
  * account hears the frame too and does nothing with it, so she opens a thing where he is, not on every screen he has open;
@@ -149,6 +171,10 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  * THE PAGE'S ONE TALK PRESS lives here: `useTalkPress` is called once, and `useTalkBinding` beside it binds the account's
  * `talkBinding` (from the picture's settings, so a re-bind on any page reaches every page by its settings frame) to that press.
  * A press never opens her panel; the press route takes the floor itself.
+ *
+ * THE PAGE'S EARS live beside the press (`useEars`): a second way into that ONE press, by her name. They listen only on the page that
+ * holds the floor, with the per-device switch on, after the page's first touch, on a secure page with a microphone; the press gives them its
+ * name door (`byName`) and they give the press `finish`, for his button ending a name press.
  *
  * THE PAGE'S ONE VOICE lives here too (`useCompanionVoice`): the player, the switch, and the pull that plays her sentences while
  * the picture's `floor` is this page's client id. The press is handed the voice, so it can cut her off. The player is unlocked in
@@ -175,7 +201,20 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
   // Stable for the page's life (unlike `speech`, which moves with every sentence), so the callbacks below keep their identity.
   const { unlock: unlockVoice, silence: silenceVoice } = speech;
   // The page's one press, and the key or mouse button he bound to it. The press is not state of the picture: it is this page's mic.
-  const talk = useTalkPress(speech);
+  // The ears take the press's name door and hand back `finish`, which the press calls when his button ends a name press: the press is
+  // called first, so it reaches `finish` through this ref, set once the ears have been called.
+  const finishNamePressRef = useRef<() => void>(() => undefined);
+  const finishNamePress = useCallback(() => finishNamePressRef.current(), []);
+  const press = useTalkPress(speech, finishNamePress);
+  const { ears, finish: finishEars } = useEars({
+    picture, clientId, herVoiceSounding: speech.voice.speaking !== null, buttonRecording: press.buttonRecording, door: press.byName,
+  });
+  useEffect(() => {
+    finishNamePressRef.current = finishEars;
+  }, [finishEars]);
+  // What consumers read of the press: its state, its toggle and its error. The door and the recorder's state are the ears' business.
+  const { state: talkState, toggle: talkToggle, error: talkError } = press;
+  const talk = useMemo<TalkPress>(() => ({ state: talkState, toggle: talkToggle, error: talkError }), [talkState, talkToggle, talkError]);
   useTalkBinding(picture?.settings.talkBinding ?? null, talk.toggle);
 
   // Whether a read of the picture is out, so a second request waits for it rather than racing it.
@@ -186,6 +225,9 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
   const queuedRef = useRef<CompanionFrame[]>([]);
   // False once the provider unmounted: a read that lands then sets nothing.
   const aliveRef = useRef(false);
+  // How many frames of each kind the socket has delivered. A press's echo reads the count of its kind before it asks and again when the
+  // answer lands: a frame that came in between is the server's newer word, and the echo then stands down instead of stepping the page back.
+  const heardRef = useRef<Partial<Record<CompanionFrame['kind'], number>>>({});
   // The latest `onOpen`, read when a frame arrives, so a new callback each render does not resubscribe the socket.
   const onOpenRef = useRef(onOpen);
 
@@ -292,6 +334,7 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
       if (frame.floor === clientId) onOpenRef.current(target, typeof frame.label === 'string' ? frame.label : '');
       return;
     }
+    heardRef.current[frame.kind] = (heardRef.current[frame.kind] ?? 0) + 1;
     fold(frame);
   }), [subscribe, seed, fold, clientId]);
 
@@ -365,6 +408,30 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
     await ensureOk(await api.companion.dismissNote(id));
   }, []);
 
+  // The three presses of the stage answer 204, so each folds the frame its route sent as a fallback for a socket that has not spoken: a
+  // press does not look unanswered for as long as its frame is in flight, or for good while the socket is down. If a frame of its kind
+  // reached the socket while the request was out, that frame is the newer word (his own press, or another page's) and the echo stands
+  // down: folded after it, the press's value would step the page back, and nothing would correct it.
+  const pinNote = useCallback(async (id: number, pinned: boolean) => {
+    const heard = heardRef.current.companion_note_pinned ?? 0;
+    await ensureOk(await api.companion.notes.pin(id, pinned));
+    if ((heardRef.current.companion_note_pinned ?? 0) === heard) fold({ kind: 'companion_note_pinned', id, pinned });
+  }, [fold]);
+
+  // Only the cursor is the press's own: the rest of the walk (its chat and its items) is read from the picture when the answer lands, not when the press began.
+  const moveWalk = useCallback(async (at: number) => {
+    const heard = heardRef.current.companion_walk ?? 0;
+    await ensureOk(await api.companion.walk.move(at));
+    if ((heardRef.current.companion_walk ?? 0) !== heard) return;
+    setPicture((held) => (held?.walk ? reduceCompanion(held, { kind: 'companion_walk', walk: { ...held.walk, at } }) : held));
+  }, []);
+
+  const endWalk = useCallback(async () => {
+    const heard = heardRef.current.companion_walk ?? 0;
+    await ensureOk(await api.companion.walk.end());
+    if ((heardRef.current.companion_walk ?? 0) === heard) fold({ kind: 'companion_walk', walk: null });
+  }, [fold]);
+
   // Stop stops her turn, and her voice with it: a sentence already queued in the player would otherwise finish after the word.
   const interrupt = useCallback(async () => {
     silenceVoice();
@@ -378,13 +445,13 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
   const value = useMemo<CompanionContextValue>(
     () => ({
       picture, readFailure: picture === null ? readFailure : null, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft,
-      clearDraft, cancelAction, dismissNote, interrupt, clear, talk,
-      voice: speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
+      clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear, talk,
+      voice: speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
       progress: speech.progress,
     }),
     [
-      picture, readFailure, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, interrupt, clear,
-      talk, speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress,
+      picture, readFailure, reread, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear,
+      talk, speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress,
     ],
   );
 

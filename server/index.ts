@@ -396,8 +396,8 @@ app.use('/api/dispatch-souls', authenticateToken, dispatchSouls.router);
 // and she acts on chats through the same runtime gateway the chat socket uses, so an act of hers is the page's own.
 // Built HERE, after the lanes above, because her reads go through the same readers the panels use, and those
 // handles exist only on the module instances this file holds: the roadmap and dispatcher pictures, a card's
-// text, the souls lane's launches, Cerberus's overview and the heal service, and the two doors her acts on his spoken
-// word go through (the dispatcher's `relay`, the souls lane's `resumeRun`). That is the house she is handed
+// text, the souls lane's launches, Cerberus's overview and the heal service, and the two doors her acts on his
+// word, spoken or typed, go through (the dispatcher's `relay`, the souls lane's `resumeRun`). That is the house she is handed
 // (`companion/house.ts`), the way she is handed the chat gateway. Nothing catches a request between her mount
 // and the lanes', because she is mounted after them.
 const companion = createCompanionModule({

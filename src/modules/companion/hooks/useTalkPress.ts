@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import type { NamePressDoor } from '@/modules/companion/hooks/useEars';
 import { api, refusalCode, refusalSentence } from '@/shared/api';
 import { useMicRecorder } from '@/shared/hooks/useMicRecorder';
 import type { TalkPress } from '@/shared/types';
@@ -11,6 +12,9 @@ const LOGGED_REFUSALS: ReadonlySet<string> = new Set(['COMPANION_SPEECH_REFUSED'
 const UPLOAD_FAILED = 'Your recording could not be sent.';
 
 type MicClip = { blob: Blob; mimeType: string; durationMs: number };
+
+/** What `useTalkPress` answers: the press consumers read (`TalkPress`), the door her ears open it by, and whether the button's recorder records. */
+type TalkPressWithDoor = TalkPress & { byName: NamePressDoor; buttonRecording: boolean };
 
 /**
  * What a press asks of her voice on this page, handed in by CompanionProvider from `useCompanionVoice`. `unlock` opens the
@@ -24,6 +28,18 @@ type TalkVoice = { unlock: () => void; cutOff: () => Promise<void> | null; relea
  * Used by this module's CompanionProvider, which calls it ONCE per page: the one press state that the panel's talk button and
  * the bound key or mouse button (`useTalkBinding`) read, and that `useCompanionPresence` reads from the context's `talk` into
  * her status line's state. A second call would be a second mic and a second state.
+ *
+ * THE NAME DOOR. Her ears (`useEars`) are a second way into this ONE press: `byName.open()` is the opening half of a press (it
+ * holds her voice and cuts a sentence on its way, clears the error and shows Listening, but does not `unlock`: there is no gesture,
+ * and the page's first touch already armed the ears), and `byName.close(clip)` its closing half (it releases her voice, counts the
+ * clip as being heard, and uploads it through `api.companion.press` with `opened = 'name'`, after the owed cut has settled). The
+ * ears hold the mic, not this hook, so the recorder below is never started by a name. `state` is `listening` while the button
+ * records or a name press is open. `toggle()` while a name press is open is the button ending it: it asks the ears to finish
+ * (`finishNamePress`, cause `press`) and counts the clip at the press, so the state goes from Listening to Transcribing with no idle
+ * frame between, and the close that follows does not count it again. Her name while his button records is ignored: the ears are
+ * told when the button records (`buttonRecording`), and an open that still lands in that gap is refused here.
+ * `finishNamePress` is the ears' `finish`, reached through the provider (the ears are called after this hook, since they take its
+ * door); it is only called from a press, never while rendering.
  *
  * TAP TO TALK. The first `toggle()` opens the mic and records; the second stops it and uploads the clip with its duration
  * through `api.companion.press`. The state runs idle → listening → transcribing → idle. The mic is open only while recording
@@ -50,7 +66,7 @@ type TalkVoice = { unlock: () => void; cutOff: () => Promise<void> | null; relea
  * that was refused or failed (no Gemini key, a refused key, a failed call) is the server's system line in her log, so the
  * state just goes back to idle. The error stays until the next press.
  */
-export function useTalkPress(voice: TalkVoice): TalkPress {
+export function useTalkPress(voice: TalkVoice, finishNamePress: () => void): TalkPressWithDoor {
   const { unlock, cutOff, release } = voice;
   // How many clips are between the stop press and the server's answer. A count, not a flag: a press that starts a new
   // recording while an earlier clip is out leaves that one in flight, and the state must still return to idle exactly once.
@@ -70,6 +86,12 @@ export function useTalkPress(voice: TalkVoice): TalkPress {
   const aliveRef = useRef(true);
   // The cut the last press owed, settled or not; a clip's upload waits behind it. Never rejects.
   const cutOwedRef = useRef<Promise<void>>(Promise.resolve());
+  // True from the moment her name opens a recording until it closes: with the button's recorder it makes the state `listening`.
+  const [nameOpen, setNameOpen] = useState(false);
+  // The same fact for the presses and the door, which read it as it stands at the moment, never from a render.
+  const nameOpenRef = useRef(false);
+  // True once a toggle has counted the open name press's clip as being heard, so the close that follows does not count it again.
+  const nameCountedRef = useRef(false);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -79,10 +101,10 @@ export function useTalkPress(voice: TalkVoice): TalkPress {
   }, []);
 
   /** Sends one clip and settles the count. A refused or failed hearing is the server's line in her log, not an error here. */
-  const sendClip = useCallback(async (clip: MicClip) => {
+  const sendClip = useCallback(async (clip: MicClip, opened: 'button' | 'name' = 'button') => {
     try {
       await cutOwedRef.current;
-      const response = await api.companion.press(clip.blob, clip.mimeType, clip.durationMs);
+      const response = await api.companion.press(clip.blob, clip.mimeType, clip.durationMs, opened);
       if (response.ok) return;
       if (LOGGED_REFUSALS.has((await refusalCode(response)) ?? '')) return;
       if (aliveRef.current) setError((await refusalSentence(response)) ?? UPLOAD_FAILED);
@@ -127,18 +149,32 @@ export function useTalkPress(voice: TalkVoice): TalkPress {
     });
   }, [inTurn, stopMic, sendClip]);
 
+  /** The opening half of every press, the button's and the name's: holds her voice and cuts a sentence on its way; the clip's upload waits for the cut. */
+  const holdHerVoice = useCallback(() => {
+    const owed = cutOff();
+    if (owed !== null) {
+      const earlier = cutOwedRef.current;
+      cutOwedRef.current = earlier.then(() => owed);
+    }
+  }, [cutOff]);
+
   const toggle = useCallback(() => {
     // Inside the press's gesture, before anything else: the browser unlocks the page's audio only here.
     unlock();
+    if (nameOpenRef.current && !wantedRef.current) {
+      // His button ends a name press: the ears finish it (the clip comes back through `byName.close`), and the clip is counted now.
+      if (!nameCountedRef.current) {
+        nameCountedRef.current = true;
+        setHearing((count) => count + 1);
+      }
+      finishNamePress();
+      return;
+    }
     if (wantedRef.current) {
       // The press that ends his recording: her voice may be asked for again.
       release();
     } else {
-      const owed = cutOff();
-      if (owed !== null) {
-        const earlier = cutOwedRef.current;
-        cutOwedRef.current = earlier.then(() => owed);
-      }
+      holdHerVoice();
     }
     pressCountRef.current += 1;
     const press = pressCountRef.current;
@@ -162,9 +198,34 @@ export function useTalkPress(voice: TalkVoice): TalkPress {
         if (aliveRef.current) setError(failure instanceof Error ? failure.message : String(failure));
       }
     });
-  }, [unlock, cutOff, release, finish, inTurn, startMic]);
+  }, [unlock, holdHerVoice, release, finish, finishNamePress, inTurn, startMic]);
 
-  const state = mic.state === 'recording' ? 'listening' : hearing > 0 ? 'transcribing' : 'idle';
+  const byName = useMemo<NamePressDoor>(() => ({
+    open() {
+      // His button records (or is about to): the press is his, and her name is ignored.
+      if (wantedRef.current || nameOpenRef.current) return;
+      nameOpenRef.current = true;
+      setNameOpen(true);
+      holdHerVoice();
+      setError(null);
+    },
+    close(clip) {
+      // An open that was refused (the button recorded) has no press to close.
+      if (!nameOpenRef.current) return;
+      nameOpenRef.current = false;
+      setNameOpen(false);
+      release();
+      if (nameCountedRef.current) nameCountedRef.current = false;
+      else setHearing((count) => count + 1);
+      void sendClip(clip, 'name');
+    },
+  }), [holdHerVoice, release, sendClip]);
+
+  const buttonRecording = mic.state === 'recording';
+  const state = buttonRecording || nameOpen ? 'listening' : hearing > 0 ? 'transcribing' : 'idle';
   // One object per change, so the provider's context value moves only when the press does.
-  return useMemo<TalkPress>(() => ({ state, toggle, error }), [state, toggle, error]);
+  return useMemo<TalkPressWithDoor>(
+    () => ({ state, toggle, error, byName, buttonRecording }),
+    [state, toggle, error, byName, buttonRecording],
+  );
 }

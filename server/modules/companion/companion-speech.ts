@@ -11,11 +11,13 @@ import { utteranceOf, type Utterance } from './companion-utterance.js';
  * Her voice for a page: the speech door's verbs, `speak` (`GET /speech/:turnId/:index`) and `cut` (`POST /cut`).
  *
  * A PAGE PULLS A SENTENCE and the server speaks it for that page alone. The request must come from the page that holds the
- * floor (409 `COMPANION_NOT_FLOOR` for any other, so two open pages cannot both spend) and name a sentence of her CURRENT
- * turn (404 `COMPANION_NO_SENTENCE` for an unknown turn or index, a turn that is over or a log that was cleared). The sentence
- * is rebuilt from its log row (`companion-utterance.ts`): a sentence with nothing to say is not synthesized (204). The audio
- * is then Gemini's streamed synthesis (`synthesizeSentence`), piped on as it arrives and kept in the account's cache
- * (`companion-speech-cache.ts`) for the rest of the turn, so a second request for the sentence costs no second call.
+ * floor (409 `COMPANION_NOT_FLOOR` for any other, so two open pages cannot both spend) and name a sentence her log holds and
+ * that is still fresh (404 `COMPANION_NO_SENTENCE` for an unknown turn or index, a log that was cleared, or a sentence of a
+ * turn that is not her current one and was written over five minutes ago). A turn that begins while a page is still hearing
+ * the one before, and a server restart, leave the rest of that reply speakable. The sentence is rebuilt from its log row
+ * (`companion-utterance.ts`): a sentence with nothing to say is not synthesized (204). The audio is then Gemini's streamed
+ * synthesis (`synthesizeSentence`), piped on as it arrives and kept in the account's cache (`companion-speech-cache.ts`)
+ * until the next turn begins or the cache expires, so a second request for the sentence costs no second call.
  *
  * A CALL GOOGLE REFUSES (no key, a refused key) is 409 `COMPANION_SPEECH_REFUSED` with Google's sentence as the message, and
  * the turn's panel gains ONE system line, "I could not speak: <sentence>", however many sentences are refused after it. Any
@@ -45,8 +47,11 @@ type CutRequest = { turnId: string; heard: number | null; interrupted: number | 
 /** What the speech door needs of the service: an account's Kaylee. */
 type SpeechDeps = { accountOf(userId: number): CompanionAccount };
 
+/** How long after it was written a sentence of a turn that is no longer her current one may still be spoken, in ms: a turn that begins while she is being heard, and a server restart, must not make the rest of a reply unspeakable; five minutes bounds what a page can spend to the sentences of the last five minutes. */
+const SENTENCE_SPEAKABLE_MS = 5 * 60_000;
+
 const noSentence = (): AppError =>
-  new AppError('She has no such sentence to say: it is not in her current turn.', { code: 'COMPANION_NO_SENTENCE', statusCode: 404 });
+  new AppError('She has no such sentence to say: it is unknown or too old to speak.', { code: 'COMPANION_NO_SENTENCE', statusCode: 404 });
 
 const notFloor = (): AppError =>
   new AppError('Another page holds the floor, so her voice plays there; this page shows her words only.', { code: 'COMPANION_NOT_FLOOR', statusCode: 409 });
@@ -117,12 +122,13 @@ function startSynthesis(account: CompanionAccount, { turnId, index }: SpeechRequ
 async function serve(account: CompanionAccount, client: string, request: SpeechRequest, signal: AbortSignal, noteSource: (source: 'cache' | 'gemini') => void): Promise<SpeechReply> {
   const { userId, store, speechCache } = account;
   if (store.readState().floor !== client) throw notFloor();
-  if (!speechCache.isCurrent(request.turnId)) throw noSentence();
 
   let entry = speechCache.find(request.turnId, request.index);
   if (entry === undefined) {
     const row = store.readSentence(request.turnId, request.index);
     if (row === null) throw noSentence();
+    // The running turn is exempt from the window: a long turn is not made unspeakable under the page still listening.
+    if (!speechCache.isCurrent(request.turnId) && Date.now() - Date.parse(row.at) > SENTENCE_SPEAKABLE_MS) throw noSentence();
     const utterance = utteranceOf(row, readCompanionSettings(userId).deliveryNote);
     if (utterance === null) return { kind: 'nothing' };
     entry = startSynthesis(account, request, utterance);

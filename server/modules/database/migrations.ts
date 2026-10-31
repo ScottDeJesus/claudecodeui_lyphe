@@ -664,8 +664,8 @@ const addCompanionNoteShapeColumns = (db: Database): void => {
 
 /**
  * Adds `companion_actions.armed_from`: when the action's ceremony began. A prepare that re-arms an action which lapsed (the same
- * action on the same target) carries the first prepare's stamp here, so her read-back from before the lapse and his yes since
- * still count. NULL means the ceremony began at the row's own `prepared_at`, which is every row before this column.
+ * action on the same target) carries the first prepare's stamp here, so her read-back from before the lapse
+ * still counts. NULL means the ceremony began at the row's own `prepared_at`, which is every row before this column.
  *
  * The same release ends the old ceremony's standing cards, once, with the column: a pending action stored before it has no
  * `armedFrom` (and may be an `open`, which has no pending action now), so the store would drop it with a warning at every read of the

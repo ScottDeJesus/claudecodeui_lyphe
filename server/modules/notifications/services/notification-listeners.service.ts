@@ -22,8 +22,8 @@ const listeners = new Set<NotificationListener>();
 
 /**
  * Hears every event the orchestrator is handed, normalized, before any push preference or dedupe. Returns the
- * unsubscribe, which is idempotent. Consumed by the companion module's alert feed and by this module's notification history
- * (`notification-history.service.ts`, which keeps a row for every event it hears).
+ * unsubscribe, which is idempotent. Consumed by the companion module's alert feed and station hint, and by this module's
+ * notification history (`notification-history.service.ts`, which keeps a row for every event it hears).
  */
 export function onNotification(listener: NotificationListener): () => void {
   listeners.add(listener);

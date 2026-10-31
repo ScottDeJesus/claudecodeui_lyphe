@@ -2,13 +2,13 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import type { AnimationEvent, CSSProperties, ReactNode, TransitionEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { CompanionAvatar } from '@/modules/companion/CompanionAvatar';
 import '@/modules/companion/CompanionFab.css';
+import { CompanionFace } from '@/modules/companion/CompanionFace';
 import { useCompanion } from '@/modules/companion/context/CompanionContext';
 import { useAvatarTarget } from '@/modules/companion/hooks/useAvatarTarget';
 import { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
 import { useCompanionSize } from '@/modules/companion/hooks/useCompanionSize';
-import { useFaceInputs } from '@/modules/companion/hooks/useFaceInputs';
+import { useFaceLook } from '@/modules/companion/hooks/useFaceInputs';
 import { useReducedMotion } from '@/modules/companion/hooks/useReducedMotion';
 import { useSizeEasing } from '@/modules/companion/hooks/useSizeEasing';
 import { avatarPlacement } from '@/modules/companion/utils/avatarPlacement';
@@ -278,9 +278,9 @@ function readSafeInsets() {
  * look, and toggles the panel; CompanionFabView draws it.
  *
  * THE LABEL is her name and her presence in words, the sentence her face carries as its own accessible name
- * (`presenceWords`); her name is the one he set, the default while the page has not read it. Her face is told her `picture.face.id`, the
- * page player's `level` and `progress` (stable functions, so a level sixty times a second redraws nothing in React), the sentences she
- * says and the look (`useFaceInputs`).
+ * (`presenceWords`); her name is the one he set, the default while the page has not read it. Her face is `CompanionFace`, the
+ * binding of the provider to the portrait that the station draws too; this file hands it only what is the disc's own, its size
+ * and the look it is drawing (`useFaceLook`).
  *
  * THE LOOK'S PLACE. `useAvatarTarget` picks the anchor and measures it; `avatarPlacement` says where beside it she stands,
  * clamped inside the window's safe area. Both depend on the window's size, which the placement reads, so the size is
@@ -289,7 +289,7 @@ function readSafeInsets() {
  */
 export function CompanionFab() {
   const { t } = useTranslation();
-  const { picture, open, setOpen, fabPosition, moveFab, dockRect, setFabAway, level, progress, voice, clientId } = useCompanion();
+  const { picture, open, setOpen, fabPosition, moveFab, dockRect, setFabAway } = useCompanion();
   const presence = useCompanionPresence();
   const size = useCompanionSize(presence);
   const name = picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
@@ -320,10 +320,7 @@ export function CompanionFab() {
 
   // Under reduced motion she jumps: no glide ends and the view never lands, so a drawn look counts as landed at once.
   const faceLook = look !== null && drawn !== null && drawn.key === look.key ? { rect: look.rect, landed: drawn.landed || reducedMotion } : null;
-  const faceInputs = useFaceInputs({
-    picture, voice, clientId, anchor: faceLook?.rect ?? null, rest: restRect, target, size, landed: faceLook?.landed ?? false,
-  });
-  const faceVoice = useMemo(() => ({ level, progress }), [level, progress]);
+  const lookOffset = useFaceLook({ anchor: faceLook?.rect ?? null, rest: restRect, target, size, landed: faceLook?.landed ?? false });
 
   useEffect(() => {
     setFabAway(holding);
@@ -334,12 +331,7 @@ export function CompanionFab() {
   return (
     <CompanionFabView
       label={presenceWords(t, name, presence)}
-      face={
-        <CompanionAvatar
-          presence={presence} faceId={picture?.face.id ?? null} voice={faceVoice} sentences={faceInputs.sentences} look={faceInputs.look}
-          size={size - FACE_RIM_PX} name={name}
-        />
-      }
+      face={<CompanionFace size={size - FACE_RIM_PX} look={lookOffset} />}
       size={size}
       position={fabPosition}
       dockRect={dockRect}

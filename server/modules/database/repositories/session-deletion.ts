@@ -36,3 +36,30 @@ export function announceSessionsDeleted(sessionIds: string[]): void {
     }
   }
 }
+
+type SessionArchiveListener = (sessionId: string, isArchived: boolean) => void;
+
+const archiveListeners = new Set<SessionArchiveListener>();
+
+/**
+ * Subscribes to a chat being archived or restored (`isArchived` true or false): the row stays, but a list of his chats gains or
+ * loses it. The sidebar's archive and restore write the flag and broadcast nothing, so the station's hint hears it here. Returns
+ * the unsubscribe. Consumed by `modules/companion/station/station-hint.ts`, through the database barrel.
+ */
+export function onSessionArchiveChanged(listener: SessionArchiveListener): () => void {
+  archiveListeners.add(listener);
+  return () => {
+    archiveListeners.delete(listener);
+  };
+}
+
+/** Tells every subscriber that this chat row was archived or restored. Consumed by `sessions.db.ts`' `updateSessionIsArchived`; synchronous, after the write, and a listener that throws is logged and stops no other. */
+export function announceSessionArchiveChanged(sessionId: string, isArchived: boolean): void {
+  for (const listener of archiveListeners) {
+    try {
+      listener(sessionId, isArchived);
+    } catch (error) {
+      console.error('[Sessions] a listener of archived chats failed:', error);
+    }
+  }
+}

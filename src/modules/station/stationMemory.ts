@@ -1,5 +1,5 @@
 import type { StationFocus } from '@/shared/station-types';
-import type { StationPrefKey, StationRegion } from '@/shared/types';
+import type { StationCompactSection, StationPrefKey, StationRegion } from '@/shared/types';
 
 /** The localStorage key the station keeps its one record under: per device, as a window's size and its pointer are. */
 export const STATION_STORAGE_KEY = 'kaylee-station';
@@ -18,8 +18,11 @@ export type StationRecord = {
   prefs: Partial<Record<StationPrefKey, unknown>>;
 };
 
-/** The preferences a record may hold: a stored key outside this list is from another build and is dropped on read. */
-const PREF_KEYS: readonly StationPrefKey[] = ['stripCollapsed', 'cornerOpen', 'compact'];
+/** The preferences a record may hold as flags: a stored key outside this list, `compactSection` and `compactSectionAside` is from another build and is dropped on read. */
+const FLAG_PREF_KEYS: readonly StationPrefKey[] = ['stripCollapsed', 'cornerOpen', 'compact', 'asleepOpen', 'completeOpen'];
+
+/** The sections the one-column station shows, which a stored `compactSection` must be one of. */
+const COMPACT_SECTIONS: readonly StationCompactSection[] = ['conversation', 'needs', 'where', 'stage'];
 
 /** A record with nothing remembered: a first visit, or a stored record that could not be read. */
 export function emptyStationRecord(): StationRecord {
@@ -82,6 +85,19 @@ export function focusKey(focus: StationFocus): string {
   }
 }
 
+/**
+ * `stack` less the focuses on its end that are `focus` itself: Back never returns to what is already on the stage. A thing
+ * cleared with ✕ and staged again, or reached again from the one before it, would otherwise leave itself as its own Back — a
+ * press drawn that changes nothing.
+ */
+export function backableFrom(stack: StationFocus[], focus: StationFocus | null): StationFocus[] {
+  if (focus === null) return stack;
+  const here = focusKey(focus);
+  let end = stack.length;
+  while (end > 0 && focusKey(stack[end - 1]) === here) end -= 1;
+  return end === stack.length ? stack : stack.slice(0, end);
+}
+
 /** The record this device holds, read as the station mounts. A missing, unreadable or foreign record is an empty one. */
 export function readStationRecord(): StationRecord {
   let raw: unknown;
@@ -103,12 +119,20 @@ export function readStationRecord(): StationRecord {
   }
   const prefs: StationRecord['prefs'] = {};
   if (isRecord(raw.prefs)) {
-    for (const key of PREF_KEYS) {
-      if (key in raw.prefs) prefs[key] = raw.prefs[key];
+    for (const key of FLAG_PREF_KEYS) {
+      // A flag stored as anything else (a hand-edited record, another build's) reads as no preference, so its region keeps its default.
+      if (typeof raw.prefs[key] === 'boolean') prefs[key] = raw.prefs[key];
     }
+    // The section the one column showed: a word of the four, else no preference and the column opens on the conversation.
+    const section = raw.prefs.compactSection;
+    if (COMPACT_SECTIONS.some((each) => each === section)) prefs.compactSection = section;
+    // The section it was pulled from: a word of the three it can come from (never `stage`, the one it was pulled to), else none.
+    const aside = raw.prefs.compactSectionAside;
+    if (COMPACT_SECTIONS.some((each) => each !== 'stage' && each === aside)) prefs.compactSectionAside = aside;
   }
-  const stack = Array.isArray(raw.stack) ? raw.stack.filter(isStationFocus).slice(-BACK_STACK_DEPTH) : [];
-  return { focus: isStationFocus(raw.focus) ? raw.focus : null, stack, scroll, prefs };
+  const focus = isStationFocus(raw.focus) ? raw.focus : null;
+  const stack = backableFrom(Array.isArray(raw.stack) ? raw.stack.filter(isStationFocus).slice(-BACK_STACK_DEPTH) : [], focus);
+  return { focus, stack, scroll, prefs };
 }
 
 /** Writes the record. A store that refuses (full, or private browsing) is said once per failure and the station carries on in memory. */

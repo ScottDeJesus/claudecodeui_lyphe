@@ -52,7 +52,7 @@ const DEFAULT_CHILD_PATH = '/usr/local/bin:/usr/bin:/bin';
  * names that say WHOSE SESSION a command runs in. This server is nobody's Claude session, whatever shell it was started
  * from, and the dispatcher reads those names as exactly that:
  * - `accept` refuses inside a Claude session (the operator's press on a prompt this lane raised is his own, and must land),
- *   and so does every door that carries Kaylee's relay of his spoken word — only this server and his terminal may write
+ *   and so does every door that carries Kaylee's relay of his word — only this server and his terminal may write
  *   "the operator said";
  * - `tell` writes the session it finds onto the outing it queues, where a stray id would own the designer's next load;
  * - a promote pressed on the screen is the operator's own and queues a design owned by no session, which the app's own

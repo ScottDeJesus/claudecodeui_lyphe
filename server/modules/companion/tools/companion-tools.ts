@@ -38,7 +38,7 @@ import { sessionTools } from './session-tools.js';
  *   - `setFocus`: a tool that names a chat makes it her FOCUS. The harness infers it; there is no focus tool;
  *   - `withActivity`: while a tool runs it sets her activity (what the panel's status line says), and when
  *     the tool ends she is `thinking` again;
- *   - `openOnFloor`: "the app brings that chat, card or page up" happens on the page that holds the floor alone;
+ *   - `openOnFloor`: "the app brings that chat, card, page or check up" happens on the page that holds the floor alone;
  *   - `refuse`: a refusal is `isError` text that says what to do next, never a throw.
  *
  * Consumers: `companion-account.ts` (builds the deps and the definitions for one account's session) and every

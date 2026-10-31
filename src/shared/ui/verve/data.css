@@ -54,13 +54,23 @@
 @media (max-width: 480px) {
   .vv-segmented__option { gap: 5px; padding: 0 8px; }
 }
+/* An option's detail (Kaylee Station's "Stage" and the label of what stands there) is the one thing in the tray that gives
+ * way: beside it the other options never shrink (a weighted shrink still took a fraction of a pixel from each, and a label
+ * whose box is its words' own width ellipsised at 0.07px short), its word holds and its detail ellipsises. Clipped, never
+ * spilt onto a neighbour, in a tray too narrow for the words themselves, which the caller does not draw. */
+.vv-segmented:has(> .vv-segmented__option > .vv-segmented__detail) > .vv-segmented__option { flex-shrink: 0; }
+.vv-segmented:has(> .vv-segmented__option > .vv-segmented__detail) > .vv-segmented__option:has(> .vv-segmented__detail) { flex-shrink: 1; overflow: hidden; }
+.vv-segmented__option:has(> .vv-segmented__detail) > .vv-segmented__label { flex: none; }
+.vv-segmented__detail { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 400; color: var(--ink-muted); }
 .vv-segmented__option:hover { color: var(--ink-mid); }
 .vv-segmented__option[aria-checked='true'] {
   background: var(--surface);
   color: var(--ink);
   box-shadow: var(--shadow-rest);
 }
-@media (pointer: coarse) {
+/* Verve's 44px on a touch screen, and in any window under 768px, the house's mobile breakpoint, where Kaylee Station's
+ * touch law holds every press to a finger's size whatever points at it. */
+@media (pointer: coarse), (max-width: 767.98px) {
   .vv-segmented__option { min-height: 44px; }
 }
 /* The count is the same pill `Tabs` draws (`.vv-tabs__count`, feedback.css), read off the same two tone tokens; it

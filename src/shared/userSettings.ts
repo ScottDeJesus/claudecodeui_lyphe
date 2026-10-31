@@ -60,6 +60,8 @@ export type UserPreferences = {
   roadmapSeen: unknown;
   /** The folders pinned on the Files tab's strip, one entry list written by entry patch (`writeUserPreferenceEntries`): `{ pinned: string[] }` — each entry a folder's absolute path, which is also its own key, in pin order (the newest last). Pins follow the operator to every device, and a pin made on one must survive a stale device's write: `{ pinned: { [path]: path } }` adds a pin and `{ pinned: { [path]: null } }` removes it, neither touching another. See `modules/file-manager/hooks/useFilesPins.ts`. */
   filesPins: unknown;
+  /** When he last looked away from Kaylee Station, as an ISO stamp, or null before he ever has. Written WHOLE — the last look-away on any device wins, which is what "the last look" means — by the station's provider on each look-away (its document hidden, the page gone, its window blurring after a focus, the station route unmounting) and on his "<n> new" press, and never on a timer. A page that sat open while another device wrote it takes the server's stamp when it comes back (`adoptUserPreference`), if that stamp is the newer. A landing is new when its `at` is after this stamp; null makes every landing of the week new. See `modules/station/context/StationLandedContext.tsx`. */
+  stationSeenAt: string | null;
 };
 
 export type UserPreferenceKey = keyof UserPreferences;
@@ -109,6 +111,7 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string | null> = {
   roadmapSelected: null,
   roadmapSeen: null,
   filesPins: null,
+  stationSeenAt: null,
 };
 
 const PREFERENCE_KEYS = Object.keys(LEGACY_STORAGE_KEYS) as UserPreferenceKey[];
@@ -293,7 +296,17 @@ function refreshForRetry(key: UserPreferenceKey, sent: unknown): unknown {
   return { sessions, order: Object.keys(sessions) };
 }
 
-function flushServerWrites(): void {
+/**
+ * The most a `keepalive` save may carry. Browsers cap the bytes of keepalive requests in flight at 64 KiB and refuse a request over
+ * the cap outright, so a bigger save goes the ordinary way and only does not outlive a closing page (the notes autosave's rule).
+ */
+const KEEPALIVE_BODY_MAX_BYTES = 60_000;
+
+/** Whether `updates` may go as a `keepalive` request, the kind that outlives the page that sent it. */
+const fitsKeepalive = (updates: PreferenceRecord): boolean => new Blob([JSON.stringify(updates)]).size <= KEEPALIVE_BODY_MAX_BYTES;
+
+/** Sends the pending writes now. `keepalive` is for a flush made as the page may be leaving (`flushUserPreferences`). */
+function flushServerWrites(keepalive = false): void {
   serverWriteTimer = null;
   const updates = pendingServerWrites;
   pendingServerWrites = {};
@@ -344,7 +357,7 @@ function flushServerWrites(): void {
   try {
     // `authenticatedFetch` resolves for every answer the server gives, so a 500 or a 401 reaches
     // this store only by reading the response: without this, every HTTP failure was silent.
-    void api.user.savePreferences(updates as Record<string, unknown>)
+    void api.user.savePreferences(updates as Record<string, unknown>, keepalive && fitsKeepalive(updates) ? { keepalive: true } : undefined)
       .then((response) => {
         if (!response.ok) {
           status = response.status;
@@ -466,6 +479,36 @@ export function writeUserPreferences(updates: PreferenceRecord): void {
   preferences = { ...preferences, ...changed };
   writeMirror();
   if (Object.keys(wired).length > 0) queueServerWrite(wired);
+  notifyListeners();
+}
+
+/**
+ * Sends what is waiting for the server now, instead of at the end of the debounce. For a writer whose write is a LOOK-AWAY
+ * (`StationLandedProvider`'s last look): the page that wrote it may be frozen or gone 400 ms later, and a phone is frozen
+ * almost at once, so a stamp left for the timer would reach the server only when he came back. While saves are failing
+ * (`failedServerWrites > 0`) nothing is sent early: the write that was just queued goes at the end of its 400 ms debounce, as any
+ * write does (a new write re-arms the timer, so it never waits out the retry delay), and a page that closes in that window loses it.
+ */
+export function flushUserPreferences(): void {
+  if (serverWriteTimer === null || failedServerWrites > 0) return;
+  clearTimeout(serverWriteTimer);
+  flushServerWrites(true);
+}
+
+/**
+ * Takes a value the SERVER holds for one preference into this device's copy, and sends nothing back. For a reader that asks the
+ * server again after the page was away, because another device may have written the preference since the sign-in read
+ * (`StationLandedProvider`: the last look another device wrote). The CALLER decides that the server's value is the one to keep;
+ * a write of the same key still waiting to be sent is newer than anything the server holds, so it is left alone. Only for a key
+ * written whole: an entry-patched key or `chatGutters` merges on the server, and a copy adopted whole would erase this device's entries.
+ */
+export function adoptUserPreference(key: UserPreferenceKey, value: unknown): void {
+  if (ENTRY_PATCHED_KEYS.has(key) || key === 'chatGutters') {
+    throw new Error(`adoptUserPreference: ${key} merges on the server and cannot be adopted whole`);
+  }
+  if (key in pendingServerWrites || JSON.stringify(preferences[key]) === JSON.stringify(value)) return;
+  preferences = { ...preferences, [key]: value };
+  writeMirror();
   notifyListeners();
 }
 

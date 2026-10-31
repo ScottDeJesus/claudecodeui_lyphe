@@ -298,7 +298,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/index.ts,
 
 The kit `Menu` (`src/shared/ui/Menu.tsx`) keeps its panel inside the window's width, and a finger outside it dismisses on LIFT, not on landing.
 
-- who: `MarkPresses` (Rename to…) and `FacePhoto` (Missed one's kind menu). Found on the Mark screen at 390: the 248 px Rename panel hung from a trigger at x=152 and ran 10 px off the window; a swipe beside the 842 px panel scrolled the pane and CLOSED it.
+- who: `MarkPresses` (Rename to…) and `FacePhoto` (Missed one's kind menu); and the station's compact head, her controls as a `panel` (`{ panel, label }`: MAN-9016, MAN-9314), where both rules below hold and `width` is a most, never a floor (`.vv-menu__panel--controls`: the window less 16 px). Found on the Mark screen at 390: the 248 px Rename panel hung from a trigger at x=152 and ran 10 px off the window; a swipe beside the 842 px panel scrolled the pane and CLOSED it.
 - width: `useEdgeShift(panelRef, active, hostWindow)` (`src/shared/ui/useEdgeShift.ts`) returns a whole-pixel nudge the panel wears as `style.translate`, 8 px clear of both edges. Used by `Menu` (`active` = `open`) and by `ActionMenu` in place (`active` = `isOpen && !portal`; the portal path clamps itself).
   - `translate`, NOT `transform`: both panels enter on `vv-pop` (`animation-fill-mode: both`), which owns `transform` for the panel's whole life and beats an inline one. A `transform: translateX` shift never moves the box, so "measure minus the shift applied" flips between two answers and React throws "Maximum update depth exceeded" (2026-10-20, in-place `ActionMenu` opened near the left edge of a 390 window).
   - the measure reads the rect (with the shift already applied taken off) and corrects the entrance's `scale(.96)` from `offsetWidth` (INV-4357). It runs after every commit and on the host window's `resize`.
@@ -614,7 +614,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/reposito
 
 `claudePermissions` is `{ allowedTools: string[], disallowedTools: string[], skipPermissions: boolean, permissionMode?: string }`: Claude's tool rules for the account. It is the fourth entry-listed preference, beside `dispatcher` (INV-4406), `roadmapSeen` (INV-6580) and `filesPins` (INV-9662), and the only one whose callers write the WHOLE document.
 
-- Two kinds of writer change its lists: a page (the chat's "always", `saveClaudePermissions`, and the Settings autosave, `writeUserPreferences`) and the server (her "always" receipt, `rememberAllowedTool` in `server/modules/companion/tools/act-tools.ts`). A page's copy is read at sign-in and never again, so a page open since before her receipt wrote its old list back and erased the entry she had remembered (reproduced 2026-10-28: the receipt's entry gone after the page's next grant).
+- Two kinds of writer change its lists: a page (the chat's "always", `saveClaudePermissions`, and the Settings autosave, `writeUserPreferences`) and the server (her "always" receipt, `rememberAllowedTool` in `server/modules/companion/tools/ask-decision.ts`). A page's copy is read at sign-in and never again, so a page open since before her receipt wrote its old list back and erased the entry she had remembered (reproduced 2026-10-28: the receipt's entry gone after the page's next grant).
 - The callers keep handing `writeUserPreference` / `writeUserPreferences` the whole document. The store makes the wire value from the difference between that document and the copy this device held (`wireOf` in `src/shared/userSettings.ts`, `entryDocumentDiff` in `src/shared/preferenceEntryPatch.ts`): `{ allowedTools: { [rule]: rule } }` adds, `{ [rule]: null }` removes, the other fields ride beside the lists as plain values that replace, and a write that differs from the held copy in nothing sends nothing. `WHOLE_DOCUMENT_ENTRY_KEYS` (the client) holds the key. why: a caller never has to know the lists are entry lists, and a writer added later is safe by construction.
 - The key is in all four lists, and they change together in the same piece of work: `ENTRY_PATCHED_KEYS` and `WHOLE_DOCUMENT_ENTRY_KEYS` (`src/shared/userSettings.ts`), `STRING_ONLY_ENTRY_KEYS` (`src/shared/preferenceEntryPatch.ts`), and `ENTRY_LISTED_KEYS` with `STRING_ONLY_KEYS` (`server/modules/database/repositories/user-preferences.db.ts`). A client that sends patches to a server without the key stores the patch object as the document: the server half is live before the client's.
 - The merge keeps the newest 200 entries of a list (`ENTRY_LIST_CAP`, newest last), as for every entry-listed key (MAN-7655): a stored list of more than 200 rules loses its oldest on the next patch, `disallowedTools` included, where a whole array replaced the list uncapped. No account is near it (the largest stored list is 1); a key that needs more is exempted from the cap in both halves.
@@ -629,7 +629,7 @@ cd /home/lyphe/.claude/claudecodeui_lyphe && grep -cE "ENTRY_PATCHED_KEYS.*'clau
 expect: 1 on every line — a 0 is a key in one list only (the client sends patches the server stores whole, or the server patches what the client sends whole)
 ```
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/chatPermissions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-permissions-stale-page.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/chatPermissions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-permissions-stale-page.mjs
 
 ## INV-10035 — probe — MEDIUM — a person's untick of a completion-closed follow-up is undone by the next picture (seconds)
 
@@ -771,3 +771,94 @@ measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414,
 probe-key: d8c99da807c52e6a873ddd3787d7f406bc83e86c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
+
+## INV-10425 — probe — MEDIUM — a dead refresh token shows `expired` for ONE poll; from the next one the gauge says `credentials`, blank, with no sign-in instruction
+
+MEDIUM — a dead refresh token shows `expired` for ONE poll; from the next one the gauge says `credentials`, blank, with no sign-in instruction
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/usage-gauge-renews-login/athena-probes/run.sh realdead
+echo "[probe exit $?]"
+# expect: poll 2 and poll 3 read reason="expired" with windows=2 (today: reason="credentials" windows=0). It runs the real claude CLI on a FAKE login in a scratch config dir (a fake refresh token is sent to the real token endpoint and refused); it never touches ~/.claude. About 6 s.
+```
+
+measured 2026-10-30 by chain chain-usage-gauge-renews-login-20261030-164930-1667, finding M1, MEDIUM
+probe-key: c31b217c7ed9e8fa0b7f5ce0b22c0f3887ca416a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-login-renewal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-10426 — probe — LOW — one cooldown stamp serves every cause, so a transient failure (or a 401 on a live pass) blocks the renewal that would have worked, and the screen says "sign in again"
+
+LOW — one cooldown stamp serves every cause, so a transient failure (or a 401 on a live pass) blocks the renewal that would have worked, and the screen says "sign in again"
+
+```probe
+P=/home/lyphe/.claude/state/pipeline-reviews/usage-gauge-renews-login/athena-probes
+bash "$P/run.sh" outage; bash "$P/run.sh" cooldown-401
+echo "[probe exit $?]"
+# expect: the "+31 s" line of outage and the "+6 min" line of cooldown-401 read reason="" and claude-spawns=2 once a transient failure does not hold the long wait (today: reason="expired", claude-spawns=1 on both)
+```
+
+measured 2026-10-30 by chain chain-usage-gauge-renews-login-20261030-164930-1667, finding L1, LOW
+probe-key: 7815ecbb67c24a9e4d5bc4d5eb884f30a71b2f2f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-login-renewal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-10427 — probe — LOW — a successful renewal moves the stamp, and a usage fetch that fails right after it surrenders the last good numbers
+
+LOW — a successful renewal moves the stamp, and a usage fetch that fails right after it surrenders the last good numbers
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/usage-gauge-renews-login/athena-probes/run.sh renew-then-net
+echo "[probe exit $?]"
+# expect: the last line reads windows=2 staleSince=set once the last good survives a renewal (today: reason="network" windows=0 staleSince=null)
+```
+
+measured 2026-10-30 by chain chain-usage-gauge-renews-login-20261030-164930-1667, finding L2, LOW
+probe-key: 7901ca3598a57507a6037108f3e60dacb5418820
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-login-renewal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-10428 — probe — LOW — with `CLAUDE_CONFIG_DIR` set, the token comes from the config dir but the account label (and the pacer's filing key) still come from `~/.claude.json`
+
+LOW — with `CLAUDE_CONFIG_DIR` set, the token comes from the config dir but the account label (and the pacer's filing key) still come from `~/.claude.json`
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/usage-gauge-renews-login/athena-probes/run.sh digest
+echo "[probe exit $?]"
+# expect: the reading names the same digest as the token's own login (a3570d11) once the identity read follows the config dir too (today: it names HOME's login, 1443511f)
+```
+
+measured 2026-10-30 by chain chain-usage-gauge-renews-login-20261030-164930-1667, finding L3, LOW
+probe-key: 5fba552ea9dc6c117fc8eff3f7472a6b471202c5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-login-renewal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-10429 — probe — LOW — the cooldown's answer contradicts the type's own definition of `renewed`
+
+LOW — the cooldown's answer contradicts the type's own definition of `renewed`
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/usage-gauge-renews-login/athena-probes/run.sh verb-twice
+echo "[probe exit $?]"
+# expect: the second line reads renewed=true once the cooldown answer reports the file's clock like the first (today: renewed=false attempted=false expiresAt-live=true)
+```
+
+measured 2026-10-30 by chain chain-usage-gauge-renews-login-20261030-164930-1667, finding L4, LOW
+probe-key: d801ea14f52999b75fc407989973939d7b9a8188
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-login-renewal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-10430 — probe — LOW — the change made three statements false and left them (healed means deleted)
+
+LOW — the change made three statements false and left them (healed means deleted)
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/usage-gauge-renews-login/athena-probes/stale-docs.sh
+echo "[probe exit $?]"
+# expect: 0 on all three lines once the sentences are corrected (today: 1, 1, 1)
+```
+
+measured 2026-10-30 by chain chain-usage-gauge-renews-login-20261030-164930-1667, finding L5, LOW
+probe-key: 10bc211978d758b1c34fa208bc25ecc0c3990030
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-login-renewal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts

@@ -17,6 +17,7 @@ const DEGRADED_REASONS: Record<string, string> = {
   pending: 'a fresh reading is on its way',
   shape: 'the provider answered in a shape this app did not recognise',
   credentials: 'the saved login could not be read',
+  expired: 'the saved login has expired and could not be renewed; sign in again with claude /login',
   auth: 'the provider refused the login',
   network: 'the provider could not be reached',
   throttled: 'the provider is limiting how often it will answer',

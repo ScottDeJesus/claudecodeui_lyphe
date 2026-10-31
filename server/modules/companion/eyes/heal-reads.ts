@@ -3,6 +3,7 @@ import { textResult, type ToolTextResult } from '@/shared/tool-text-result.js';
 
 import type { CompanionToolDeps } from '../tools/companion-tools.js';
 
+import { LIST_ABOUT_NOTHING, NOTE_ABOUT_NOTHING } from './card-shapes.js';
 import { answerRead } from './eyes-answer.js';
 import { clipLine, counted, epochWords } from './line-words.js';
 
@@ -122,7 +123,7 @@ export async function readHeal(
     const answer = await deps.house.heal.summary();
     if (!answer.ok) return deps.refuse(`The heal list could not be read: ${answer.message}. Say so, and try again in a moment.`);
     const text = keyword === 'summary' ? summaryText(answer.value) : cyclesText(answer.value);
-    return answerRead(deps, { panel, title: `Heal: ${keyword}`, text, label: 'heal', brief: SUMMARY_BRIEF, intro: '' }, signal);
+    return answerRead(deps, { panel, title: `Heal: ${keyword}`, text, label: 'heal', brief: SUMMARY_BRIEF, intro: '', shape: LIST_ABOUT_NOTHING }, signal);
   }
 
   if (!KIND_WORD.test(scope)) return deps.refuse('read_heal takes summary, cycles, or one friction kind such as tool-error; read_heal summary names the kinds.');
@@ -137,5 +138,5 @@ export async function readHeal(
   const read = items.length > KIND_ROWS ? `; the newest ${KIND_ROWS} are read` : '';
   const intro = `The ledger's newest ${items.length} rows of kind ${keyword} (${items.length - ignored} live, ${ignored} ignored)${read}, newest first:`;
   const text = items.slice(0, KIND_ROWS).map(itemLine).join('\n');
-  return answerRead(deps, { panel, title: `Heal: ${keyword}`, text, label: `heal-${keyword}`, brief: KIND_BRIEF, intro }, signal);
+  return answerRead(deps, { panel, title: `Heal: ${keyword}`, text, label: `heal-${keyword}`, brief: KIND_BRIEF, intro, shape: NOTE_ABOUT_NOTHING }, signal);
 }

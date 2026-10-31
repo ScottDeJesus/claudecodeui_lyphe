@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect } from 'react';
+import { memo, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -7,6 +7,7 @@ import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import { useUiPreferences, useSetUiPreference } from '@/shared/context/UiPreferencesContext';
 import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
 import { usePageTitle } from '@/shared/hooks/usePageTitle';
+import { usePwaModeClass } from '@/shared/hooks/usePwaModeClass';
 import { useSidebarController } from '@/modules/sidebar/hooks/useSidebarController';
 import { useTaskMaster, useTasksSettings } from '@/modules/task-master';
 import { usePaletteOps } from '@/modules/command-palette';
@@ -180,14 +181,8 @@ function Sidebar({
     sidebarVisible,
   });
 
-  useEffect(() => {
-    if (typeof document === 'undefined') {
-      return;
-    }
-
-    document.documentElement.classList.toggle('pwa-mode', isPWA);
-    document.body.classList.toggle('pwa-mode', isPWA);
-  }, [isPWA]);
+  // The `pwa-mode` class the workspace's frame keys on (src/index.css); the station's route calls the same hook.
+  usePwaModeClass();
 
   const handleProjectCreated = () => {
     void paletteOps.refreshProjects();

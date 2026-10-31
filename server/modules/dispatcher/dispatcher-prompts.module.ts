@@ -66,7 +66,7 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
   stop(): void;
   /** The card's own door — the ask as the card drew it, and the operator's decision (`DispatcherAsks.answer`). */
   answer(ask: DispatcherAsk, decision: ProviderPermissionDecision): Promise<DispatcherCardAnswer>;
-  /** Kaylee's door — the ask as she read it back, the reply his spoken word makes, and his press (`DispatcherAsks.answerOnHisWord`). */
+  /** Kaylee's door — the ask as she read it back, the reply his word makes, and his press (`DispatcherAsks.answerOnHisWord`). */
   answerOnHisWord: DispatcherAsks['answerOnHisWord'];
 } {
   const { commands, log } = dependencies;

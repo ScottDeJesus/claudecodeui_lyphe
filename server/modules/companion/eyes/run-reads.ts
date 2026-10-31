@@ -7,6 +7,7 @@ import { guardedToolResult, textResult, type ToolTextResult } from '@/shared/too
 import { toolLine } from '../session/companion-prompt.js';
 import type { CompanionToolDeps } from '../tools/companion-tools.js';
 
+import { LIST_ABOUT_NOTHING } from './card-shapes.js';
 import { cappedLines, toPanel } from './eyes-answer.js';
 import { runLines, runScopeOf, RUNS_MAX } from './run-list.js';
 import { resolveRun } from './run-resolve.js';
@@ -42,7 +43,7 @@ function listRuns(deps: CompanionToolDeps, args: { scope: string; panel?: boolea
     const scope = runScopeOf(args.scope);
     const { lines, notes, none } = await runLines(deps.house, scope, Date.now() / 1000);
     const text = [...notes, lines.length === 0 ? none : cappedLines(lines, RUNS_MAX)].join('\n');
-    return args.panel === true ? toPanel(deps, `Runs: ${args.scope.trim()}`, textResult(text)) : textResult(text);
+    return args.panel === true ? toPanel(deps, `Runs: ${args.scope.trim()}`, textResult(text), LIST_ABOUT_NOTHING) : textResult(text);
   });
 }
 
@@ -59,8 +60,8 @@ function readRun(deps: CompanionToolDeps, args: { run: string; scope: string; pa
   });
 }
 
-/** The panel flag both tools take: the answer goes on his panel as a note instead of into her context. */
-const panelFlag = z.boolean().optional().describe('true puts the whole answer on his panel as a note and tells you only that it is there; leave out to read it yourself.');
+/** The panel flag both tools take: the answer goes on his panel as a card instead of into her context. */
+const panelFlag = z.boolean().optional().describe('true puts the whole answer on his panel as a card and tells you only that it is there; leave out to read it yourself.');
 
 /**
  * The definitions of `list_runs` and `read_run`, built with the SDK's `tool()` and zod. Both are marked read-only: they change

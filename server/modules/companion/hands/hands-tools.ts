@@ -14,33 +14,34 @@ import type { CompanionToolDeps } from '../tools/companion-tools.js';
 
 import { carryOut, endLapsedAction, isCarryingOut, withdrawStandingAction } from './action-end.js';
 import { fireAction } from './action-doors.js';
-import { clockOf, doneOf, nextStepFor, rearmStepFor, SAY_VERB, systemLine } from './action-prompts.js';
+import { clockOf, doneOf, nextStepFor, recordedAs, rearmStepFor, SAY_VERB, systemLine } from './action-prompts.js';
 import { prepareRecipe, type PrepareInput } from './action-recipe.js';
 import { rearmOf } from './action-rearm.js';
 import { checkHisWord } from './action-word.js';
 import { directTools } from './direct-tools.js';
 
 /**
- * Her hands: `prepare_action`, `take_action` and `cancel_action` for the eleven actions that change the house, and `open` and
- * `close_followup` (`direct-tools.ts`), which do not wait. The ruling of 2026-10-29: "Keep the full ceremony only for the actions that
- * change the house: queue, hide, show, rework, answer, recut, stop, resume, kick, resume_run, clear_memory"; "only on my explicit spoken word
- * for that specific card, never on her own judgment"; "My 'yes' should count". For those eleven "raise the lapse from five minutes to
- * thirty, and when it does lapse, let her re-arm it and accept my next yes without me having to say the title". The SERVER holds that
- * line, in two steps:
+ * Her hands: `prepare_action`, `take_action` and `cancel_action` for the eleven actions that change the house (queue, hide, show,
+ * rework, answer, recut, stop, resume, kick, resume_run, clear_memory), and `open` and `close_followup` (`direct-tools.ts`), which do
+ * not wait. Whether he agreed to one, and when, is KAYLEE'S judgment, made in the conversation like everything else he says, and no
+ * one else's (Scott, 2026-10-30): the server reads none of his words, a line he typed on her panel counts as much as one he spoke, and
+ * she cancels with `cancel_action` when he declines or she judges he does not want it. What the SERVER holds is that the action is on
+ * his panel and she read it back since it went up, in two steps:
  *
  *   1. `prepare_action` resolves the target, checks the action can be done now, PINS what it acts on (`action-recipe.ts`), checks
- *      that every line it carries is one of his spoken lines of the last 30 minutes, records the action in `companion_actions` and
+ *      that every line it carries is one of his lines of the last 30 minutes, records the action in `companion_actions` and
  *      puts it on her panel as the ONE pending action (`store.setPending`), replacing one already standing. It answers what she does
- *      next (`nextStepFor`: read it back, then his word) and the words that fire it. It lapses thirty minutes on. A prepare of the same
- *      action on the same target as the one that lapsed last RE-ARMS it (`action-rearm.ts`): the new action keeps the first prepare's
- *      stamp as `armedFrom`, so her read-back from before the lapse and his yes since still count.
- *   2. `take_action(said)` fires it, only when `checkHisWord` (`action-word.ts`) answers ok on the rows of her log since `armedFrom`: she
- *      read it back to him, and his line was SPOKEN, is his yes or names the target and says the action's word, and is an order.
- *      Otherwise it is refused with the sentence that says what is missing and the action stays on his panel, its row keeping that
- *      sentence as its `answer`. `cancel_action` takes it down.
+ *      next (`nextStepFor`: read it back in her own words, then decide whether he agreed). It lapses thirty minutes on. A prepare of the same thing as
+ *      the ceremony before it, once that lapsed, was refused by the door or was replaced, RE-ARMS it (`action-rearm.ts`): the new action
+ *      keeps the first prepare's stamp as `armedFrom`, so her read-back from before still counts.
+ *   2. `take_action(said)` fires it when she calls it, only if `checkHisWord` (`action-word.ts`) answers ok on the rows of her log
+ *      since `armedFrom`: she read it back to him. It also chooses which line of his is the RECORD of his word (the one `said` equals,
+ *      else his newest). Otherwise it is refused with the sentence that says what is missing and the action stays on his panel, its row
+ *      keeping that sentence as its `answer`. A take that fires answers with the line it recorded (`recordedAs`), so she sees when it is not the one
+ *      she passed. `cancel_action` takes it down.
  *
  * A take fires through the house's own door (`action-doors.ts`) carrying kaylee--press's record of his word: who, when, what he
- * said, which press of his it was. It CLAIMS the action's row first (the firing line is written on it), and from then to the end
+ * said, which line of his it was. It CLAIMS the action's row first (the firing line is written on it), and from then to the end
  * of the door nothing else may end, replace or fire that action (`action-end.ts`): his ×, a newer prepare, a lapse, a Clear and a
  * second take all leave it to the take. The row then ends with the door's outcome and sentence, a `system` line goes on her
  * panel, and the pending action leaves it. Each of the three first ends an action it finds past its time `expired`; nothing times
@@ -116,13 +117,10 @@ function prepareAction(deps: CompanionToolDeps, input: PrepareInput): Promise<To
       throw error;
     }
 
-    const { action, target, say } = pending;
+    const { action, target } = pending;
     const replacing = replaced === null ? '' : ` That replaced "${replaced.say}", which was waiting.`;
-    const nextStep = rearm === null ? nextStepFor(action, target, say, readBack) : rearmStepFor(action, target, say, readBack, rearm.lapsedAt);
-    return textResult(
-      `On his panel, waiting for his word: ${SAY_VERB[action].toLowerCase()} ${target.spoken}. ${nextStep} `
-      + `A line he typed never fires it. It lapses at ${clockOf(pending.expiresAt)}.${replacing}`,
-    );
+    const nextStep = rearm === null ? nextStepFor(readBack) : rearmStepFor(readBack, rearm.endedAs);
+    return textResult(`On his panel, waiting for his answer: ${SAY_VERB[action].toLowerCase()} ${target.spoken}. ${nextStep} It lapses at ${clockOf(pending.expiresAt)}.${replacing}`);
   });
 }
 
@@ -145,11 +143,12 @@ function takeAction(deps: CompanionToolDeps, said: string): Promise<ToolTextResu
     const standing = lapsed ?? deps.store.readState().pending;
     if (lapsed === null && standing !== null && isCarryingOut(deps.userId, standing.id)) return deps.refuse(BEING_CARRIED_OUT);
     // A lapsed action reads no lines: the check answers the lapse first, with the sentence that says when. A live one reads every line since
-    // its ceremony began, which for a re-arm is the first prepare's stamp: her read-back and his yes from before the lapse stand.
+    // its ceremony began, which for a re-arm is the first prepare's stamp: her read-back from before the lapse stands.
     const lines = standing === null || lapsed !== null ? [] : companionDb.heardSince(deps.userId, standing.armedFrom);
-    const verdict = checkHisWord({ pending: standing, said, now: new Date(nowMs).toISOString(), lines });
+    const newestLine = companionDb.newestOperatorLine(deps.userId, true);
+    const verdict = checkHisWord({ pending: standing, said, now: new Date(nowMs).toISOString(), lines, newestLine });
     if (!verdict.ok) {
-      // The row says why his line did not fire it, as her answer does.
+      // The row says why the take did not fire it, as her answer does.
       if (standing !== null && lapsed === null) companionDb.noteRefusal(deps.userId, standing.id, verdict.sentence);
       return deps.refuse(verdict.sentence);
     }
@@ -170,7 +169,7 @@ function takeAction(deps: CompanionToolDeps, said: string): Promise<ToolTextResu
       if (deps.store.readState().pending?.id === standing.id) deps.store.setPending(null);
       if (answer.outcome === 'refused') return deps.refuse(`Not done: ${answer.said}`);
       const happened = doneOf(standing.action, standing.target.spoken);
-      return textResult(`Done on his word: ${happened}${answer.outcome === 'already' ? ' (it was already so)' : ''}. ${answer.said}`);
+      return textResult(`Done on his word: ${happened}${answer.outcome === 'already' ? ' (it was already so)' : ''}. ${answer.said} ${recordedAs(line.text)}`);
     });
   });
 }
@@ -190,11 +189,11 @@ function cancelAction(deps: CompanionToolDeps): Promise<ToolTextResult> {
   });
 }
 
-/** The `said` field of `take_action`, in the prompt's register: his newest spoken line, as logged, after your read-back. */
-const SAID_DESCRIPTION = `His newest spoken line, exactly as logged: his yes ("Yes.", "Go ahead.") or a line that names the card on his panel and says the action. Say it back to him in plain words first and pass the line he says after that. Never a line you wrote and never a line he typed. The server checks the line and refuses what does not count, so when he spoke a line that names the card and plausibly says the action (a transcript may hear "queue" as "cue"), pass it as logged rather than asking him to say it again.`;
+/** The `said` field of `take_action`, in the prompt's register: his line as logged, the record of what he said. */
+const SAID_DESCRIPTION = `His line as your log holds it, spoken or typed: the record of what he said. You decide, from the conversation, whether and when he agreed; there are no set words. The server only confirms you read the action back to him, and records his logged line that equals what you pass; when none equals it, it records his newest line instead and your answer says which. Read it back to him first, and when you judge he agreed, pass his line exactly as logged. Never a line you wrote, and never a call on your own words.`;
 
 /** One line of his, carried: the field the two arrays of lines share. */
-const spokenLines = z.array(z.string().trim().min(1).max(8000)).min(1).max(20);
+const carriedLines = z.array(z.string().trim().min(1).max(8000)).min(1).max(20);
 
 /**
  * The definitions of `prepare_action`, `take_action` and `cancel_action` (the order her prompt lists them) and of `open` and
@@ -208,8 +207,8 @@ export function handsTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
       {
         action: z.enum(ACTIONS, { error: WRONG_ACTION }).describe('queue, hide and rework answer an open Accept prompt (hide and rework also act with none open); answer sends his answers to an open questions round; show, recut, stop, resume and kick act on a card; resume_run resumes a stopped chain with his rulings; clear_memory forgets every memory you keep. Opening something and ticking off a follow-up are not prepared: they are the open and close_followup tools.'),
         target: z.string().trim().min(1).max(300).describe('What it acts on, with every word of the name as he said it, even a word that is also an action ("probe eyes accept" is one card\'s name, though accept is also what queue is called): a card (feature or epic) by its name or title, a run by the id list_runs prints or by its plan and task, your memory as "your memory". When the answer lists several cards the name fits, call again with the full name of the one he meant.'),
-        words: spokenLines.optional().describe('For rework (his notes) and resume_run (his rulings): his own spoken lines, each exactly as he said it in the last 30 minutes. Never your words, never a line he typed.'),
-        answers: z.array(z.object({ question: z.number().int().min(1), words: spokenLines })).max(20).optional().describe('For answer: one group per question he answered, by its number from 1, each group his own spoken lines exactly as he said them.'),
+        words: carriedLines.optional().describe('For rework (his notes) and resume_run (his rulings): his own lines, spoken or typed, each exactly as he said it in the last 30 minutes. Never your words.'),
+        answers: z.array(z.object({ question: z.number().int().min(1), words: carriedLines })).max(20).optional().describe('For answer: one group per question he answered, by its number from 1, each group his own lines, spoken or typed, exactly as he said them.'),
       },
       (args) => prepareAction(deps, args),
     ),

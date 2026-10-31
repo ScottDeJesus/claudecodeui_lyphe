@@ -2,9 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 
 import { useStationWindow } from '@/modules/station/hooks/useStationWindow';
-import { followScroll } from '@/modules/station/stationScroll';
+import { FOLLOWS_END, followScroll } from '@/modules/station/stationScroll';
 import {
   BACK_STACK_DEPTH,
+  backableFrom,
   focusKey,
   readStationRecord,
   writeStationRecord,
@@ -21,9 +22,18 @@ type StationContextValue = {
   focus: StationFocus | null;
   /**
    * Puts `next` on the stage; the focus it replaces is pushed onto the back-stack (ten deep). Pressing what is already there
-   * changes nothing. `null` (the stage's ✕) empties the stage, and what was there is one Back away.
+   * changes nothing. `null` (the stage's ✕) empties the stage and leaves what was there on the stack: the empty stage draws no
+   * Back, so it is the Back of the next, different thing staged. Staging that same thing again takes it off the stack, so a
+   * Back never returns to what is already on the stage.
    */
   setFocus: (next: StationFocus | null) => void;
+  /**
+   * How many times `setFocus` has been handed the thing that already stands on the stage (it changes nothing there). A press on
+   * what is already staged still asks to be shown it, and a focus that did not change cannot say so: the one-column station
+   * reads this count to select its Stage section (`useStationSection`). Counts calls, never time; a caller that only keeps the
+   * stage current (her walk moving while it stands) does not call `setFocus` with what stands, so it never counts.
+   */
+  restaged: number;
   /** Puts the most recent replaced focus back on the stage and pops it. Nothing when the back-stack is empty. */
   back: () => void;
   /** Whether Back has a focus to return to. */
@@ -32,9 +42,13 @@ type StationContextValue = {
   tier: StationTier;
   /** True in a window under 768 px wide, or a touch window under 500 px tall (a phone on its side). */
   phone: boolean;
+  /** True in a touch window under 500 px tall: the phone on its side, whose rows are the slimmer ones. Always inside `phone`. */
+  sideways: boolean;
   /**
    * A region's scroll memory, as a ref callback for its scroller: the stored `scrollTop` is put back as the node mounts and
-   * each newer one is remembered from its `scroll` events. The same callback comes back for the same region.
+   * each newer one is remembered from its `scroll` events, except a place at the end of a scroller that follows its own end (the
+   * conversation's log: `FOLLOWS_END`), which is no place, so a log that grew while he was away still opens at its newest line.
+   * The same callback comes back for the same region.
    */
   scrollMemory: (region: StationRegion) => (node: HTMLElement | null) => void;
 };
@@ -49,7 +63,7 @@ const StationContext = createContext<StationContextValue | null>(null);
 const StationPrefsContext = createContext<StationPrefs | null>(null);
 
 /**
- * The station's context: the focus and its back-stack, the tier and whether the window is a phone's, the scroll memory.
+ * The station's context: the focus and its back-stack, the tier and whether the window is a phone's (and on its side), the scroll memory.
  * Used by the station's shell, bar, stage and regions, and by the doors they press. Throws outside `StationProvider`, so
  * a consumer placed wrong fails at once.
  */
@@ -74,7 +88,7 @@ export function useStationPref<T>(key: StationPrefKey, initial: T): [T, (next: T
 }
 
 /**
- * THE STATION'S PROVIDER, mounted by `StationRoute` beneath her provider.
+ * THE STATION'S PROVIDER, mounted by `StationRoute` above her provider, whose `onOpen` is a press on this stage.
  *
  * THE FOCUS lives here, beside the back-stack it is pushed onto: a station has one thing on its stage, and every region
  * that can put a thing there (a press on a session, a need, a card) reaches the stage through `setFocus`.
@@ -85,7 +99,7 @@ export function useStationPref<T>(key: StationPrefKey, initial: T): [T, (next: T
  * `visibilitychange` → hidden), which is where the scroll is carried. No timer writes it.
  */
 export function StationProvider({ children }: { children: ReactNode }) {
-  const { tier, phone } = useStationWindow();
+  const { tier, phone, sideways } = useStationWindow();
   // The record this device held as the station mounted: the starting point of the three pieces of state below, read once.
   const [initial] = useState<StationRecord>(readStationRecord);
   // The stage as React draws it. State, so a focus change re-draws the stage and every region that reads it; mirrored by
@@ -93,6 +107,9 @@ export function StationProvider({ children }: { children: ReactNode }) {
   const [stage, setStage] = useState<StageState>({ focus: initial.focus, stack: initial.stack });
   // The regions' preferences. State, because a region draws from its preference and a change must re-draw it.
   const [prefs, setPrefs] = useState<StationRecord['prefs']>(initial.prefs);
+  // How many presses have been made on what already stood on the stage. State, because the one-column station's section must
+  // answer each press; the stage itself does not change, so nothing else would re-draw it.
+  const [restaged, setRestaged] = useState(0);
 
   // The stage as the last press left it: the truth `setFocus` and `back` decide from, so they never decide from a render
   // that predates the previous press.
@@ -116,15 +133,19 @@ export function StationProvider({ children }: { children: ReactNode }) {
   const setFocus = useCallback((next: StationFocus | null) => {
     const held = stageRef.current;
     const same = next === null ? held.focus === null : held.focus !== null && focusKey(held.focus) === focusKey(next);
-    if (same) return;
-    const stack = held.focus === null ? held.stack : [...held.stack, held.focus].slice(-BACK_STACK_DEPTH);
-    commit({ focus: next, stack });
+    if (same) {
+      if (next !== null) setRestaged((count) => count + 1);
+      return;
+    }
+    const pushed = held.focus === null ? held.stack : [...held.stack, held.focus].slice(-BACK_STACK_DEPTH);
+    commit({ focus: next, stack: backableFrom(pushed, next) });
   }, [commit]);
 
   const back = useCallback(() => {
     const { stack } = stageRef.current;
     if (stack.length === 0) return;
-    commit({ focus: stack[stack.length - 1], stack: stack.slice(0, -1) });
+    const returned = stack[stack.length - 1];
+    commit({ focus: returned, stack: backableFrom(stack.slice(0, -1), returned) });
   }, [commit]);
 
   const setPref = useCallback((key: StationPrefKey, value: unknown) => {
@@ -137,7 +158,10 @@ export function StationProvider({ children }: { children: ReactNode }) {
     let release: (() => void) | null = null;
     const bind = (node: HTMLElement | null) => {
       release?.();
-      release = node === null ? null : followScroll(node, scrollRef.current[region] ?? 0, (top) => { scrollRef.current[region] = top; });
+      release = node === null ? null : followScroll(node, scrollRef.current[region] ?? 0, (top) => {
+        if (top === null) delete scrollRef.current[region];
+        else scrollRef.current[region] = top;
+      }, FOLLOWS_END.has(region));
     };
     binders.current.set(region, bind);
     return bind;
@@ -149,7 +173,9 @@ export function StationProvider({ children }: { children: ReactNode }) {
     writeStationRecord({ ...latest.current, scroll: scrollRef.current });
   }, [stage, prefs]);
 
-  // And when the page is hidden or leaves, which is when the scroll the listeners have kept is carried into it.
+  // And when the page is hidden or leaves, which is when the scroll the listeners have kept is carried into it. The station
+  // is also left by the app's own router (a phone's and the home-screen app's doors navigate in the same window, so no
+  // `pagehide` comes): the provider's unmount writes it too.
   useEffect(() => {
     const write = () => writeStationRecord({ ...latest.current, scroll: scrollRef.current });
     const writeWhenHidden = () => { if (document.visibilityState === 'hidden') write(); };
@@ -158,12 +184,13 @@ export function StationProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener('pagehide', write);
       document.removeEventListener('visibilitychange', writeWhenHidden);
+      write();
     };
   }, []);
 
   const value = useMemo<StationContextValue>(
-    () => ({ focus: stage.focus, setFocus, back, canGoBack: stage.stack.length > 0, tier, phone, scrollMemory }),
-    [stage, setFocus, back, tier, phone, scrollMemory],
+    () => ({ focus: stage.focus, setFocus, restaged, back, canGoBack: stage.stack.length > 0, tier, phone, sideways, scrollMemory }),
+    [stage, setFocus, restaged, back, tier, phone, sideways, scrollMemory],
   );
   const prefsValue = useMemo<StationPrefs>(() => ({ prefs, setPref }), [prefs, setPref]);
 

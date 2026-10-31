@@ -50,8 +50,11 @@ function afterLastSentence(log: CompanionLogEntry[], turnId: string): number {
  * Sentence k is asked for as soon as its frame (a kaylee row of the picture's log) has arrived and nothing is asked for and
  * waiting to sound: at once when the player is idle, otherwise when k-1 starts. A page that joins a turn mid-way starts with
  * the next sentence whose frame arrives. A 204 and any 5xx are skipped; a 409 (refused, or not the floor), a 404 and any other
- * refusal end the pull for the turn; a new running turn resets it; a re-seeded picture leaves it where it was. While his mic is
- * open (from `cutOff` to `release`) nothing is asked for.
+ * refusal end the pull for the turn. A turn that begins while another is being heard (an alert pushed while she speaks) is
+ * QUEUED, never followed at once: the heard turn's remaining sentences are asked for first, and the queued turn is spoken
+ * from its first sentence after the heard one's last, so a turn ending, or a 404/409 ending it, hands the pull on to the
+ * queue. Only a cut, Stop, Clear, the floor moving or the switch going off empties the queue. A re-seeded picture leaves the
+ * pull where it was. While his mic is open (from `cutOff` to `release`) nothing is asked for.
  */
 export function createSpeechPull(player: PcmPlayer, setSpeaking: (sentence: CompanionSentenceRef | null) => void) {
   // Null while the page does not hold the floor with its voice on; the pull does nothing then.
@@ -61,6 +64,8 @@ export function createSpeechPull(player: PcmPlayer, setSpeaking: (sentence: Comp
   // True from the talk press that opens his mic until the press that ends it: nothing is asked for while he records, so her voice
   // never goes into his clip. Held by the engine and not by a turn's pull, so a turn that begins while he records is held too.
   let held = false;
+  // The turns that began while the pull's turn is still being spoken, oldest first: each is followed from its first sentence once the one before has nothing left to ask.
+  const queued: string[] = [];
 
   /** Speaking ends only when the player is silent AND nothing is on its way: a sentence's `end` and the next one's `start` are two callbacks, and nulling between them would blink. */
   function settleSpeaking(): void {
@@ -74,7 +79,7 @@ export function createSpeechPull(player: PcmPlayer, setSpeaking: (sentence: Comp
     pull.pending = null;
   }
 
-  /** Begins a turn's pull at `next`; whatever was asked for the turn before is hung up, what it already queued plays out. */
+  /** Moves the pull onto a turn at `next`: called once the turn before has nothing left to ask, or to skip what landed while his mic was open. A request still in flight for the turn before is hung up, what the player already holds plays out. */
   function follow(turnId: string | null, next: number): void {
     hangUp();
     pull = { turnId, next, stopped: false, pending: null };
@@ -103,7 +108,7 @@ export function createSpeechPull(player: PcmPlayer, setSpeaking: (sentence: Comp
       if (response.status !== 204) console.warn(`[Companion] Her sentence ${asked.turnId}/${asked.index} could not be spoken (${response.status}); skipping it.`);
     } else {
       // 409 COMPANION_SPEECH_REFUSED (the server has written the panel's line), 409 COMPANION_NOT_FLOOR (the floor frame is on its way),
-      // 404 (the turn is over or cleared), or a refusal that would repeat for every sentence: nothing more is asked this turn.
+      // 404 (the sentence is unknown, cleared or too old to speak), or a refusal that would repeat for every sentence: nothing more is asked this turn.
       current.stopped = true;
       if (response.status !== 409 && response.status !== 404) console.warn(`[Companion] Her voice was refused (${response.status}); not asking for more of this turn.`);
     }
@@ -120,36 +125,58 @@ export function createSpeechPull(player: PcmPlayer, setSpeaking: (sentence: Comp
     pump();
   }
 
-  /** She is to be quiet but the page still holds the floor (Stop, Clear, a cut): what plays stops, nothing more of the turn is asked. */
+  /**
+   * She is to be quiet but the page still holds the floor (Stop, Clear, a cut): what plays stops, the queue is emptied and nothing
+   * more of the turn is asked. A turn running other than the pull's is the one his Stop or press interrupts, so the pull hops
+   * onto it stopped and its sentences are not read out either.
+   */
   function silence(): void {
     hangUp();
-    if (pull !== null) pull.stopped = true;
+    queued.length = 0;
+    if (pull !== null) {
+      const running = seen?.turnId ?? null;
+      if (running !== null && running !== pull.turnId) pull = { turnId: running, next: 0, stopped: true, pending: null };
+      else pull.stopped = true;
+    }
     player.stop();
     setSpeaking(null);
   }
 
-  /** Asks for the next sentence when its frame has arrived and nothing is asked for and waiting to sound. */
+  /**
+   * Asks for the next sentence of the pull's turn when its frame has arrived and nothing is asked for and waiting to sound. When
+   * that turn is spoken to its end (or stopped for good) the pull moves on to the oldest queued turn, from its first sentence.
+   */
   function pump(): void {
-    if (held || pull === null || seen === null || pull.stopped || pull.turnId === null || pull.pending !== null) return;
-    const index = nextSentenceIndex(seen.log, pull.turnId, pull.next);
-    if (index === null) return;
-    const asked: Pending = { turnId: pull.turnId, index, controller: new AbortController(), enqueued: false };
-    pull.pending = asked;
-    api.companion.speech(asked.turnId, asked.index, asked.controller.signal).then(
-      (response) => answer(asked, response),
-      (failure: unknown) => failed(asked, failure),
-    );
+    if (held || pull === null || seen === null || pull.pending !== null) return;
+    if (!pull.stopped && pull.turnId !== null) {
+      const index = nextSentenceIndex(seen.log, pull.turnId, pull.next);
+      if (index !== null) {
+        const asked: Pending = { turnId: pull.turnId, index, controller: new AbortController(), enqueued: false };
+        pull.pending = asked;
+        api.companion.speech(asked.turnId, asked.index, asked.controller.signal).then(
+          (response) => answer(asked, response),
+          (failure: unknown) => failed(asked, failure),
+        );
+        return;
+      }
+      // Still running: its next frame is on its way, and a queued turn waits for it.
+      if (seen.turnId === pull.turnId) return;
+    }
+    const next = queued.shift();
+    if (next === undefined) return;
+    follow(next, 0);
+    pump();
   }
 
   return {
-    /** The page folded a picture: a new running turn resets the pull; a sentence that arrived is asked for when it is its turn. */
+    /** The page folded a picture: a new running turn is queued behind the one being heard, and a sentence that arrived is asked for when it is its turn. */
     see(picture: CompanionPicture): void {
       seen = picture;
       if (pull === null) return;
       if (picture.turnId !== null) {
-        if (picture.turnId !== pull.turnId) follow(picture.turnId, 0);
-      } else {
-        // No turn is running. One the page never followed (it began and ended while the socket was down) is not read out late.
+        if (picture.turnId !== pull.turnId && !queued.includes(picture.turnId)) queued.push(picture.turnId);
+      } else if (queued.length === 0 && (pull.turnId === null || nextSentenceIndex(picture.log, pull.turnId, pull.next) === null)) {
+        // No turn is running and the heard one has nothing left to ask. A turn the page never followed (it began and ended while the socket was down) is not read out late.
         const newest = newestSentenceTurn(picture.log);
         if (newest !== null && newest !== pull.turnId) follow(newest, afterLastSentence(picture.log, newest));
       }
@@ -158,6 +185,7 @@ export function createSpeechPull(player: PcmPlayer, setSpeaking: (sentence: Comp
 
     /** The page holds the floor with its voice on. A turn already running is joined at its next frame, not its first. */
     arm(): void {
+      queued.length = 0;
       const turnId = seen?.turnId ?? (seen === null ? null : newestSentenceTurn(seen.log));
       follow(turnId, seen === null || turnId === null ? 0 : afterLastSentence(seen.log, turnId));
       pump();
@@ -166,6 +194,7 @@ export function createSpeechPull(player: PcmPlayer, setSpeaking: (sentence: Comp
     /** The floor moved on, the switch went off or the page is going: silence at once and ask for nothing. */
     disarm(): void {
       hangUp();
+      queued.length = 0;
       pull = null;
       player.stop();
       setSpeaking(null);
@@ -200,13 +229,19 @@ export function createSpeechPull(player: PcmPlayer, setSpeaking: (sentence: Comp
 
     /**
      * The press that ends his recording (or a mic that never opened): the pull is asked again. What she said while his mic was open
-     * is not read out afterwards, since he talked over it; her answer to him is a sentence whose frame arrives after this. (His
-     * message may be folded into the turn she is in, so the turn is not silenced for good.)
+     * is not read out afterwards, since he talked over it, a turn that began meanwhile included: the pull lands on the newest
+     * turn after its last sentence, and her answer to him is a sentence whose frame arrives after this. (His message may be
+     * folded into the turn she is in, so the turn is not silenced for good.)
      */
     release(): void {
       if (!held) return;
       held = false;
-      if (pull !== null && pull.turnId !== null && seen !== null) pull.next = Math.max(pull.next, afterLastSentence(seen.log, pull.turnId));
+      const last = queued.length > 0 ? queued[queued.length - 1] : (pull?.turnId ?? null);
+      queued.length = 0;
+      if (pull !== null && seen !== null && last !== null) {
+        if (last !== pull.turnId) follow(last, afterLastSentence(seen.log, last));
+        else pull.next = Math.max(pull.next, afterLastSentence(seen.log, last));
+      }
       pump();
     },
 

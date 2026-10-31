@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
+import { OWNS_ESCAPE, overlayInFrontHoldsEscape } from '@/shared/ui/overlayEscape';
 import { useEdgeShift } from '@/shared/ui/useEdgeShift';
 
 type MenuItem = {
@@ -14,18 +14,29 @@ type MenuItem = {
 
 type MenuProps = {
   trigger: ReactNode;
-  items: MenuItem[];
-  onSelect: (id: string) => void;
   /** Panel width in px. The panel hangs from the trigger's left edge, so a width sizes what hangs there. */
   width?: number;
-};
+} & (
+  | { items: MenuItem[]; onSelect: (id: string) => void }
+  | {
+      /**
+       * A PANEL OF THE CALLER'S OWN CONTROLS in place of a choice list (a picker, switches, buttons), hung under the trigger
+       * with the same dismissal and the same width rule. Named by `label` and announced as a dialog: it holds controls, not
+       * menu items, so it is no `role="menu"`. The station's compact head is the site: her controls behind "Her controls".
+       */
+      panel: ReactNode;
+      /** The panel's name for a screen reader ("Her controls"). */
+      label: string;
+    }
+);
 
 /**
  * A choice list hung under whatever the caller hands in as its trigger.
  *
  * Used by the affected-areas module: `MarkPresses`' Rename to… and `FacePhoto`'s kind menu for a
- * missed area. A Select owns ONE value and shows it in its own trigger; a Menu decorates a trigger
- * the caller already drew.
+ * missed area; and, as a panel of controls (`panel`), by the station module's compact head: her
+ * controls behind "Her controls". A Select owns ONE value and shows it in its own trigger; a Menu
+ * decorates a trigger the caller already drew.
  *
  * Dismissal is two-way for the same reason Select's is: a pointer outside closes it, and
  * Escape closes it without moving the pointer, handing focus back to the trigger rather than
@@ -40,15 +51,26 @@ type MenuProps = {
  * panel. The browser tells a scroll from a tap afterwards — `pointerup` for a tap, `pointercancel` for a scroll,
  * measured at 390 × 664 with CDP touch — so a touch (or pen) outside waits for it. A mouse has no such ambiguity
  * and still closes on the press.
+ *
+ * A PANEL OF CONTROLS (`panel`) holds overlays of its own that are drawn on `body`: a `Select`'s list, a `ConfirmDialog`.
+ * A press inside one is outside the panel in the document but inside it in the React tree, and closing on it would unmount
+ * the picker under the press and lose the choice; so a press is "inside" by the tree (`onPointerDownCapture`, which React
+ * delivers through portals), never by the document alone. Escape stands down while a panel drawn in front of this one
+ * owns the key (a picker's list open inside it), so one press closes the list and the next the menu.
  */
-export function Menu({ trigger, items, onSelect, width }: MenuProps) {
+export function Menu(props: MenuProps) {
+  const { trigger, width } = props;
   const hostWindow = useHostWindow();
   // Whether the panel is showing. Not derivable: `selected` is the choice already made, and
   // the panel is open precisely while the reader is reconsidering it.
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLUListElement>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  // The last press React delivered to this menu's tree (its trigger, its panel, or an overlay a control in the panel drew on
+  // `body`), so the document's listener can tell it from a press outside: the same native event, seen by both.
+  const pressInside = useRef<Event | null>(null);
+  const panelId = useId();
   const edgeShift = useEdgeShift(panelRef, open, hostWindow);
 
   useEffect(() => {
@@ -57,7 +79,7 @@ export function Menu({ trigger, items, onSelect, width }: MenuProps) {
     // The finger now down outside the panel, waiting to be told whether it is a tap or a scroll.
     let stopWaitingForLift = () => {};
     const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (!rootRef.current || rootRef.current.contains(event.target as Node)) return;
+      if (!rootRef.current || rootRef.current.contains(event.target as Node) || pressInside.current === event) return;
       if (event.pointerType !== 'touch' && event.pointerType !== 'pen') {
         setOpen(false);
         return;
@@ -78,7 +100,7 @@ export function Menu({ trigger, items, onSelect, width }: MenuProps) {
       };
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || overlayInFrontHoldsEscape(panelRef.current, hostWindow.document)) return;
       setOpen(false);
       triggerRef.current?.focus();
     };
@@ -97,38 +119,60 @@ export function Menu({ trigger, items, onSelect, width }: MenuProps) {
   }, [open, hostWindow]);
 
   const choose = (id: string) => {
-    onSelect(id);
+    if ('onSelect' in props) props.onSelect(id);
     setOpen(false);
     triggerRef.current?.focus();
   };
 
+  // `minWidth` travels with `width`, or the prop does nothing below 200px: feedback.css gives the panel a 200px floor for the
+  // callers that pass no width, and a floor beats an inline width. A prop ignored across a third of its range is worse than
+  // no prop at all (doctrine §8). A panel of controls takes `width` as a most, never a floor: the window less the edge shift's
+  // margins comes first (`.vv-menu__panel--controls`' max-width), so on a phone narrower than the panel its controls wrap.
+  const panelStyle = {
+    ...(width ? { width, ...('items' in props ? { minWidth: width } : null) } : null),
+    translate: edgeShift ? `${edgeShift}px` : undefined,
+  };
+
   return (
-    <div className="vv-menu inline-block" ref={rootRef}>
+    <div className="vv-menu inline-block" ref={rootRef} onPointerDownCapture={(event) => { pressInside.current = event.nativeEvent; }}>
       <button
         ref={triggerRef}
         type="button"
         className="vv-menu__trigger"
-        aria-haspopup="menu"
+        aria-haspopup={'panel' in props ? 'dialog' : 'menu'}
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
       >
         {trigger}
       </button>
 
-      {open && (
+      {open && 'panel' in props && (
+        <div
+          ref={(node) => { panelRef.current = node; }}
+          id={panelId}
+          role="dialog"
+          aria-label={props.label}
+          className="vv-menu__panel vv-menu__panel--controls"
+          // The panel owns Escape while it is up — see `shared/ui/overlayEscape`.
+          {...OWNS_ESCAPE}
+          style={panelStyle}
+        >
+          {props.panel}
+        </div>
+      )}
+
+      {open && 'items' in props && (
         <ul
-          ref={panelRef}
+          ref={(node) => { panelRef.current = node; }}
+          id={panelId}
           className="vv-menu__panel"
           role="menu"
           // The panel owns Escape while it is up — see `shared/ui/overlayEscape`.
           {...OWNS_ESCAPE}
-          // `minWidth` travels with `width`, or the prop does nothing below 200px: feedback.css
-          // gives the panel a 200px floor for the callers that pass no width, and a floor beats
-          // an inline width. A prop ignored across a third of its range is worse than no prop
-          // at all (doctrine §8).
-          style={{ ...(width ? { width, minWidth: width } : null), translate: edgeShift ? `${edgeShift}px` : undefined }}
+          style={panelStyle}
         >
-          {items.map((item) => (
+          {props.items.map((item) => (
             <li
               key={item.id}
               className="vv-menu__item flex items-start justify-between gap-3"

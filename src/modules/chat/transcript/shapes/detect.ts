@@ -2,8 +2,8 @@
  * Every trigger the markdown shapes fire on, behind one import path.
  *
  * This file holds no logic. The grammars live in `shapes/detect/`, one pure module per family —
- * `tables` (the number grammar and the table classes), `fences` (stat tiles, delta tone, diff
- * lines, the long-output fold), `prose` (alert kind, verdict, lead-in line), `listMarks` (time
+ * `tables` (the number grammar and the table classes), `fences` (stat tiles, delta tone, the
+ * long-output fold), `prose` (alert kind, verdict, lead-in line), `listMarks` (time
  * tokens, check glyphs), `fileRefs` (the one file-reference grammar and its prose scanner) and
  * `inlineMarks` (hex colour, key combo). Every consumer imports THIS path, so splitting the
  * families moved no call site; a new trigger goes in its family's module and gets its name added
@@ -32,7 +32,6 @@ export {
   LONG_OUTPUT_LINES,
   LONG_OUTPUT_PREVIEW_LINES,
   parseStatsFence,
-  splitDiffLine,
 } from '@/modules/chat/transcript/shapes/detect/fences';
 
 export type { AlertKind } from '@/modules/chat/transcript/shapes/detect/prose';

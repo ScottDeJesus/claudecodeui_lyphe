@@ -103,15 +103,29 @@ export function chatNameOf(sessionId: string): string {
   return oneLine(sessionsDb.getSessionById(sessionId)?.custom_name ?? '') || UNTITLED_CHAT;
 }
 
-/**
- * Every chat of his with its state, ONE liveness read for all: waiting first, then working, then live, then
- * asleep, each most recent first. Consumed by `session-tools.ts`'s `list_sessions` and the roster below.
- */
-export function chatRows(): ChatRow[] {
-  const chats = listHisChats();
+/** The chats with their states, ONE liveness read for all: waiting first, then working, then live, then asleep, each most recent first inside its state. */
+function withStates(chats: HisChat[]): ChatRow[] {
   const states = chatStates(chats.map((chat) => chat.sessionId));
   const rank: Record<ChatState, number> = { waiting: 0, working: 1, live: 2, asleep: 3 };
   return chats.map((chat, index) => ({ chat, state: states[index] })).sort((a, b) => rank[a.state] - rank[b.state]); // stable: recency survives inside a state
+}
+
+/**
+ * Every chat of his with its state, ONE liveness read for all: waiting first, then working, then live, then
+ * asleep, each most recent first. Consumed by `session-tools.ts`'s `list_sessions`, the roster below, `station/station-sessions.ts`
+ * (the rows of the station's left rail, in this order) and `station/need-readers.ts` (the waiting asks).
+ */
+export function chatRows(): ChatRow[] {
+  return withStates(listHisChats());
+}
+
+/**
+ * The non-archived app chats of hidden roots with their state, in `chatRows`' order ("hidden is not gone"): a probe's scratch chats are
+ * among them, and they are never his chats, so no list of his chats shows them. Consumed by `station/need-readers.ts` alone: a permission
+ * raised in a scratch folder still holds that chat, and the station's needs list is the one place it can be answered from.
+ */
+export function hiddenChatRows(): ChatRow[] {
+  return withStates(chatsInRoots('hidden'));
 }
 
 //----------------- RESOLVING A NAME ------------

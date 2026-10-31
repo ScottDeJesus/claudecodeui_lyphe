@@ -8,6 +8,7 @@ import { NOTE_TEXT_MAX, NOTE_TITLE_MAX } from '../tools/draft-tools.js';
 import { companionScratchDir, nextScratchFile, pruneScratch, runDactylRead } from '../tools/transcript-render.js';
 import { DACTYL_WINDOW_BUDGET, LINE_NUMBER_BYTES } from '../tools/transcript-turns.js';
 
+import { NOTE_ABOUT_NOTHING, type CardShape } from './card-shapes.js';
 import { parseStamp, shortDate } from './panel-words.js';
 
 /**
@@ -19,7 +20,7 @@ import { parseStamp, shortDate } from './panel-words.js';
  * construction: a list is one line per item and capped; a read takes a scope; an answer of 2,000 characters or fewer
  * is handed over whole, and a longer one is rendered to the next numbered file of her scratch and answered by a
  * dactyl under the scope's fixed brief, with the file named so a sharper question can go to `ask_dactyl`. A dactyl
- * runs on Claude, never on Gemini. With `panel: true` the whole answer goes on his panel as a note instead.
+ * runs on Claude, never on Gemini. With `panel: true` the whole answer goes on his panel as a card instead, of the kind the reader says.
  *
  * NEVER USAGE OR SPEND (ruling 1). These helpers take strings, never objects, so no renderer can dump a record into
  * them; every dactyl brief here ends `NO_SPEND`, and the callers cut cost lines out of what they render.
@@ -130,18 +131,19 @@ function cutTo(text: string, max: number, ending: string): string {
 }
 
 /**
- * `panel: true`: the answer goes on his panel as a note card, the way `show_note` does, and she is told only that it is
+ * `panel: true`: the answer goes on his panel as a card, the way `show_note` does (but of the reader's own kind), and she is told only that it is
  * there ("On his panel: <title>."): the answer never enters her context. The title is cut to 80 characters and the
  * text to 4,000, ending "… narrow it to see the rest" when cut. An `isError` answer is a refusal she must read, so it
  * goes back to her untouched and no card is made. A panel read hands this the WHOLE text (`textResult(text)`), never the
- * answer of `wholeOrDigest`, which would spend a dactyl and put a digest and her scratch path on his panel. Consumed by every
- * eyes tool that takes `panel`.
+ * answer of `wholeOrDigest`, which would spend a dactyl and put a digest and her scratch path on his panel. `shape` is the card's
+ * `kind` and what it is about (`card-shapes.ts`, the table), said by the reader that knows what it read; left out, the card is a
+ * `note` about nothing. Consumed by every eyes tool that takes `panel`.
  */
-export function toPanel(deps: CompanionToolDeps, title: string, answer: ToolTextResult): ToolTextResult {
+export function toPanel(deps: CompanionToolDeps, title: string, answer: ToolTextResult, shape: CardShape = NOTE_ABOUT_NOTHING): ToolTextResult {
   if (answer.isError) return answer;
   const heading = cutTo(title.replace(/\s+/g, ' ').trim() || 'From the house', NOTE_TITLE_MAX, '…');
   const text = cutTo(answer.content.map((block) => block.text).join('\n'), NOTE_TEXT_MAX, '… narrow it to see the rest');
-  deps.store.addNote({ title: heading, text });
+  deps.store.addNote({ title: heading, text, kind: shape.kind, ref: shape.ref });
   return textResult(`On his panel: ${heading}.`);
 }
 
@@ -149,16 +151,17 @@ export function toPanel(deps: CompanionToolDeps, title: string, answer: ToolText
  * The one ending of a read that answers a body of text: with `panel` the WHOLE of `intro` and `text` goes on his panel
  * under `title` (`toPanel`, never through a dactyl); without it the answer is `wholeOrDigest`'s, whole when it is short and a
  * dactyl's digest under `brief` when it is long. `label` names the kind of read in the scratch file. The two are one function
- * so no read can hand `toPanel` a digest, which would put a dactyl's lines and her scratch path on his panel. Consumed by the
- * reads that take `panel` and answer more than a few lines (`panel-reads.ts` and its panel files).
+ * so no read can hand `toPanel` a digest, which would put a dactyl's lines and her scratch path on his panel, and so the card's
+ * `shape` (its kind and what it is about) is set where the whole text is. Only a card on his panel has a shape: a read answered to her
+ * ignores it. Consumed by the reads that take `panel` and answer more than a few lines (`panel-reads.ts` and its panel files).
  */
 export function answerRead(
   deps: CompanionToolDeps,
-  input: { panel: boolean; title: string; text: string; label: string; brief: string; intro: string },
+  input: { panel: boolean; title: string; text: string; label: string; brief: string; intro: string; shape: CardShape },
   signal?: AbortSignal
 ): Promise<ToolTextResult> | ToolTextResult {
-  const { panel, title, text, label, brief, intro } = input;
-  if (panel) return toPanel(deps, title, textResult([intro, text].filter((part) => part !== '').join('\n')));
+  const { panel, title, text, label, brief, intro, shape } = input;
+  if (panel) return toPanel(deps, title, textResult([intro, text].filter((part) => part !== '').join('\n')), shape);
   return wholeOrDigest(deps, { text, label, brief, intro }, signal);
 }
 

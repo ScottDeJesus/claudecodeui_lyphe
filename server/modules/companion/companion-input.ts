@@ -13,7 +13,7 @@ import { AppError } from '@/shared/utils.js';
  * The reader of the page's client id is here as well: every route reads the `x-companion-client` header, because the
  * floor — the page she acts on — is whichever client id typed to her last or opened her panel.
  *
- * Consumers: `companion.routes.ts` (the body, header and path readers, all limits), `companion-settings.ts` (the 400
+ * Consumers: `companion.routes.ts` and `cards.routes.ts` (the body, header and path readers, all limits), `companion-settings.ts` (the 400
  * its saves refuse with) and the draft tool (`tools/draft-tools.ts`: `DRAFT_TEXT_MAX`, `characterCount`).
  */
 
@@ -31,8 +31,8 @@ const CLIENT_ID_SHAPE = /^[A-Za-z0-9._:-]{1,100}$/;
 
 /**
  * The 400 every refusal of her input is: `sentence` names the field and its limit, `field` rides in `details`.
- * Consumed by `companion-settings.ts` (a setting past its limit), `companion.routes.ts` (a note id that is not a
- * number) and `companion-press.ts` (a transcript past a typed line's limit); the readers below raise it too.
+ * Consumed by `companion-settings.ts` (a setting past its limit) and `companion-press.ts` (a transcript past a typed
+ * line's limit); the readers below raise it too, a note id that is not a number among them.
  */
 export function inputInvalid(sentence: string, field?: string): AppError {
   return new AppError(sentence, {
@@ -59,7 +59,7 @@ export function geminiRefusal(answer: { reason: 'no_key' | 'refused' | 'failed';
 /**
  * The page that sent this request, or `null` for a request that names none (a script, `curl`). A header that is
  * there and is not an id of the allowed shape is refused rather than read as none, so a page with a broken id
- * hears of it. Consumed by `companion.routes.ts`.
+ * hears of it. Consumed by `companion.routes.ts` and `cards.routes.ts`.
  */
 export function readClientId(request: Request): string | null {
   const header = request.header(COMPANION_CLIENT_HEADER);
@@ -81,7 +81,7 @@ export function requireClientId(request: Request): string {
  * The JSON object a write carries, or the 400 that says the body must be one. A request that carries no JSON at
  * all (no body, or a `text/plain` one) is refused here rather than read as `{}`: `express.json()` leaves `{}`
  * for both, and a settings save that sent nothing must not answer 200 and tell every page it saved. An empty
- * JSON object sent as JSON is a real, empty patch and passes. Consumed by `companion.routes.ts`.
+ * JSON object sent as JSON is a real, empty patch and passes. Consumed by `companion.routes.ts` and `cards.routes.ts`.
  */
 export function readBodyObject(request: Request): Record<string, unknown> {
   const body: unknown = request.body;
@@ -114,6 +114,25 @@ export function readBodyWholeNumber(body: Record<string, unknown>, field: string
 }
 
 /**
+ * One whole-number field of a JSON body, `min` or more with no ceiling of its own, or the 400 naming the field: a number past
+ * what a double holds exactly, a fraction, text and a missing field all read as "not a whole number". For a field whose own
+ * limit belongs to the service (a walk's item past the last is the walk's sentence, not a malformed body). Unlike
+ * `readBodyWholeNumber`, a string of digits is not a number here. Consumed by `cards.routes.ts` (`at` of `PUT /walk`).
+ */
+export function readBodyWholeNumberAtLeast(body: Record<string, unknown>, field: string, min: number): number {
+  const value = body[field];
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min) throw inputInvalid(`${field} must be a whole number of ${min} or more.`, field);
+  return value;
+}
+
+/** One true-or-false field of a JSON body, or the 400 naming the field: a string "true" is not a boolean. Consumed by `cards.routes.ts` (`pinned` of `PUT /notes/:id/pin`). */
+export function readBodyFlag(body: Record<string, unknown>, field: string): boolean {
+  const value = body[field];
+  if (typeof value !== 'boolean') throw inputInvalid(`${field} must be true or false.`, field);
+  return value;
+}
+
+/**
  * One text field of a body, trimmed, of 1 to `max` characters — or the 400 naming the field and its limit. Trimmed
  * because a message of nothing but whitespace is no message, and what is stored is what she is shown. Consumed by
  * `companion.routes.ts` (`text` of `/messages` and of `PUT /draft`).
@@ -137,6 +156,15 @@ const SENTENCE_INDEX_MAX = 100_000;
 const turnIdInvalid = (field: string): AppError => inputInvalid(`${field} must be 1-100 characters of letters, digits, _ and -.`, field);
 const indexInvalid = (field: string, nullable: boolean): AppError =>
   inputInvalid(`${field} must be a whole number from 0 to ${SENTENCE_INDEX_MAX}${nullable ? ', or null' : ''}.`, field);
+
+/**
+ * A note's id from its path segment: a whole number of 1 or more, with no sign and no leading zero, or the 400 that says so. Consumed by
+ * `companion.routes.ts` (`DELETE /notes/:id`) and `cards.routes.ts` (`PUT /notes/:id/pin`), which read one card's id the one way.
+ */
+export function readNoteIdParam(raw: string): number {
+  if (!/^[1-9]\d{0,14}$/.test(raw)) throw inputInvalid('id must be a whole number of 1 or more.', 'id');
+  return Number(raw);
+}
 
 /** A turn id from the path of the speech door, or the 400 naming `turnId`. Consumed by `companion.routes.ts`. */
 export function readTurnIdParam(raw: string): string {

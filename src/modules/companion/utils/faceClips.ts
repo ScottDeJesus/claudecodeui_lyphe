@@ -30,8 +30,8 @@ function plan(motion: FaceMotion, frames: number[], fps: number): ClipPlan {
 
 /**
  * Used by `faceEngine.ts`: the clip a sound starts, or null for a tag that plays nothing. The bake's recipe fixes the frames:
- * the laugh, giggle and sigh play their `clips`; the gasp plays its first frame, the surprised face, then its second; the tsk
- * shakes between the two 10-degree turns; the breath has no frames, only its motion.
+ * the laugh, giggle, sigh and gasp play their `clips` as the manifest lists them (the gasp's list already holds the surprised
+ * face between its two frames); the tsk shakes between the two 10-degree turns; the breath has no frames, only its motion.
  */
 export function clipForSound(tag: string, manifest: CompanionFaceManifest): ClipPlan | null {
   const motion = CLIP_OF_SOUND.get(tag);
@@ -39,11 +39,8 @@ export function clipForSound(tag: string, manifest: CompanionFaceManifest): Clip
     case 'laugh':
     case 'giggle':
     case 'sigh':
+    case 'gasp':
       return plan(motion, manifest.clips[motion].frames, manifest.clips[motion].fps);
-    case 'gasp': {
-      const [first, second] = manifest.clips.gasp.frames;
-      return plan('gasp', [first, manifest.states.surprise, second], manifest.clips.gasp.fps);
-    }
     case 'shake':
       return plan('shake', [manifest.poses.left_10, manifest.poses.right_10, manifest.poses.left_10, manifest.poses.right_10], SHAKE_FPS);
     case 'breath':

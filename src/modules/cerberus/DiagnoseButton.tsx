@@ -26,8 +26,10 @@ type DiagnoseButtonProps = {
  * `disabled`, so the focus stays on the button for the hand that pressed it, and for as long as `onStarted` takes
  * after it. A refusal (a diagnosis already going on the check) is the provider's toast and leaves the button as it was.
  *
- * For the cerberus module's `NeedsYouCard`, where a need with no diagnosis since it went bad offers it, and
- * `SelectedCheck`, the sheet's action row.
+ * A 44 px catch under a finger below 768 px, the house's touch floor.
+ *
+ * For the cerberus module's `NeedsYouCard`, where a need with no diagnosis since it went bad offers it (its `NeedCard`,
+ * which the station's check stage draws too), and `SelectedCheck`, the sheet's action row.
  */
 export function DiagnoseButton({ node, checkKey, label, disabled = false, onStarted }: DiagnoseButtonProps) {
   const { t } = useTranslation();
@@ -47,7 +49,7 @@ export function DiagnoseButton({ node, checkKey, label, disabled = false, onStar
   };
 
   return (
-    <Button variant="outline" size="sm" disabled={disabled} busy={pressing} onClick={() => void onPress()}>
+    <Button variant="outline" size="sm" disabled={disabled} busy={pressing} className="max-md:h-11" onClick={() => void onPress()}>
       {pressing ? t('cerberus.diagnosis.diagnosing') : label}
     </Button>
   );

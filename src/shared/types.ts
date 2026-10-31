@@ -7,6 +7,7 @@ import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, Read
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
 import type { CompanionLogEntry, CompanionSessionRef } from '@/shared/companion-types';
+import type { StationAskKind, StationNeed } from '@/shared/station-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
 
@@ -1063,6 +1064,12 @@ export type CompanionSentenceRef = { turnId: string; index: number };
  */
 export type CompanionVoice = { on: boolean; setOn: (on: boolean) => void; speaking: CompanionSentenceRef | null; cut: boolean };
 
+/** What her ears are doing on this page, as her controls draw it. */
+export type CompanionEarsState = 'off' | 'needs-touch' | 'elsewhere' | 'readying' | 'waiting' | 'hearing' | 'unavailable';
+
+/** This page's ears: the per-device switch, their state, and the sentence for `unavailable` (null otherwise). Read by CompanionControls through the provider. */
+export type CompanionEars = { on: boolean; setOn: (on: boolean) => void; state: CompanionEarsState; reason: string | null };
+
 // ---------------------------
 
 //----------------- HER FACE'S INPUTS ON THE PAGE ------------
@@ -1077,14 +1084,14 @@ export type CompanionSoundProgress = { turnId: string; index: number; elapsed: n
 /**
  * What her face reads of the page's voice: `level()` is the loudness of what sounds, 0..1, and `progress()` the sentence sounding.
  * Both are functions, never props that change, so a level sixty times a second never redraws React. Null where a face hears no voice
- * (Settings' preview). Handed by the companion module's CompanionFab to CompanionAvatar and on to CompanionPortrait.
+ * (Settings' preview). Handed by the companion module's CompanionFace to CompanionAvatar and on to CompanionPortrait.
  */
 export type CompanionFaceVoice = { level: () => number; progress: () => CompanionSoundProgress | null };
 
 /**
  * The sentences her face reads from her log: `playing` the one this page's player is sounding (its mood, text and sounds), `newest` the
  * newest of hers in the running turn, read only by a page that plays no voice, and `turnRunning` whether a turn is under way. Derived by
- * the companion module's `useFaceInputs`; handed through CompanionAvatar to CompanionPortrait.
+ * the companion module's `useFaceSentences`; handed through CompanionAvatar to CompanionPortrait.
  */
 export type CompanionFaceSentences = { playing: CompanionLogEntry | null; newest: CompanionLogEntry | null; turnRunning: boolean };
 
@@ -1130,8 +1137,9 @@ export type CompanionPresenceState =
  * set up and not begun); each is null when her activity names none. They are carried whatever the `state`, so a
  * page-owned state such as 'listening' still knows where she was looking. One value per change of its parts, so a
  * consumer that memoizes on it redraws only when she does. Built by the companion module's `useCompanionPresence` and
- * read by two of its consumers: CompanionHeader, whose status line CompanionPanel hands it to, and CompanionFab, which
- * draws it as the button's face and label and points the button by it (`useAvatarTarget`).
+ * read by its consumers: CompanionStatus (the panel header's line, which CompanionPanel hands it to, and the station head's),
+ * CompanionFab (the button's label and size, and where it points: `useAvatarTarget`) and CompanionFace (her face, on the
+ * button and on the station's head).
  */
 export type CompanionPresence = {
   state: CompanionPresenceState;
@@ -2675,7 +2683,8 @@ export type ClaudeUsagePace = {
  *
  * `account` is the digest of the login these figures were read from (`liveAccountDigest()`), so the
  * panel can tell whether they belong to the account in use; `''` is "could not be told". An expired
- * sign-in token is degraded `credentials`, and no request is sent with it.
+ * sign-in token is renewed before anything is sent; one that could not be renewed, or that the CLI cleared, is degraded `expired`,
+ * and a login file that cannot be read is degraded `credentials`.
  */
 export type ClaudeUsage =
   | { reachable: true; windows: ClaudeUsageWindow[]; account?: string; degraded: boolean; reason: string; staleSince: number | null; checkedAt: number; /** The pacer's projection, in percent, when the route attached one; absent draws no tick, no mark and no caption. */ pace?: ClaudeUsagePace }
@@ -3931,10 +3940,27 @@ export type ClaudeApiCardView = {
 //----------------- KAYLEE STATION ------------
 
 /**
- * Which arrangement of the station's regions fits the window: `wide`, `laptop` (a small laptop's window) or `narrow` (a phone).
- * Read from the window's width on `resize` by the station's context and handed to every region as `StationRegionProps.tier`.
+ * How wide the window is, by the station's two edges: `wide` (1360 px and up), `laptop` (a small laptop's window, 1024 px and up)
+ * or `narrow` (below 1024 px, a phone included), where the station is always compact. Read from the window's width on `resize`
+ * by the station's context and handed to every region as `StationRegionProps.tier`.
  */
 export type StationTier = 'wide' | 'laptop' | 'narrow';
+
+/**
+ * How the station's shell arranges its regions: `wide` (four columns), `laptop` (three), `compact` (one column under her head,
+ * one switch between its sections) or `phone` (her head as the top row, the section in the middle, a bottom bar of the sections
+ * round the talk control, for the thumb). Computed by `StationShell` from the window's `tier`, `useStation().phone` and his
+ * `compact` switch: compact below 1024 px (the tier `narrow`) and wherever his switch is on. Drawn by `StationShellView`, which
+ * draws the bar in every arrangement but the phone's.
+ */
+export type StationArrangement = 'wide' | 'laptop' | 'compact' | 'phone';
+
+/**
+ * The bar's "Compact" switch: whether his switch is on (the station pref `compact`, per device) and its press. `StationShell`
+ * reads it and hands it through `StationShellView` to `StationBar`, or null where it would change nothing (below 1024 px,
+ * where compact is the only arrangement), and the bar then draws none.
+ */
+export type StationCompactSwitch = { on: boolean; onChange: (on: boolean) => void };
 
 /**
  * The named places of the station's layout that a region fills: `strip`, `sessions`, `corner`, `head`, `conversation`, `dock`,
@@ -3950,12 +3976,62 @@ export type StationRegion = StationSlot | 'roadmap' | 'stage';
 
 /**
  * The station's own preferences, remembered per window by `useStationPref`: `stripCollapsed` (the strip is folded),
- * `cornerOpen` (the corner is open) and `compact` (the regions draw in their denser form).
+ * `cornerOpen` (the corner is open), `compact` (his switch for the one-column arrangement), `asleepOpen` (the left rail's fold
+ * of his asleep chats is open), `completeOpen` (its fold of the roadmap's complete epics is open), `compactSection` (the
+ * section the one-column arrangement shows, a `StationCompactSection`) and `compactSectionAside` (the section he was in when the
+ * stage pulled him to it, which clearing the stage returns him to: a `StationCompactSection` other than `stage`, or none).
  */
-export type StationPrefKey = 'stripCollapsed' | 'cornerOpen' | 'compact';
+export type StationPrefKey =
+  | 'stripCollapsed' | 'cornerOpen' | 'compact' | 'asleepOpen' | 'completeOpen' | 'compactSection' | 'compactSectionAside';
 
 /**
- * The props every region of the station's layout takes: the `tier` it is drawn in. A region draws itself for the tier it is given
- * and never reads the window's width on its own.
+ * The section the one-column station shows under her head: `conversation` (her conversation, her draft and the box to type to
+ * her), `needs` (what needs him), `where` (his sessions, the roadmap and her memory corner) or `stage` (whatever is in focus).
+ * Held per device by the station pref `compactSection`; drawn by the compact arrangement (its switch) and the phone's (its bar).
  */
-export type StationRegionProps = { tier: StationTier };
+export type StationCompactSection = 'conversation' | 'needs' | 'where' | 'stage';
+
+/**
+ * The props every region of the station's layout takes: the `tier` it is drawn in, and its `density`: `full` in the columns,
+ * `compact` in the one-column arrangement, where a region whose drawing differs draws its denser form (one-line rows, her
+ * controls behind one menu) and every other region draws as in full. A region draws itself for what it is given and never
+ * reads the window's width or the arrangement on its own.
+ */
+export type StationRegionProps = { tier: StationTier; density: StationDensity };
+
+/**
+ * How densely a region of the station draws: `full` (the columns) or `compact` (the one-column arrangement). The second half
+ * of `StationRegionProps`, and the prop each region's view takes.
+ */
+export type StationDensity = 'full' | 'compact';
+
+/**
+ * Her head drawn as the phone's top row, the bar and her head in one: what the phone's arrangement (`StationPhoneView`) hands the
+ * head's region, and `StationHeadView` draws from. `sideways`: the phone on its side, her face at 32 px in a 40 px row (44 px
+ * upright). `trail`: what stands after her words and before her menu, the arrangement's own (the count of what needs him and, on
+ * its side, the strip's line). `onBackToCloudcli`: "CloudCLI" in her menu, the shell's way back in the same window.
+ */
+export type StationHeadRow = { sideways: boolean; trail: ReactNode; onBackToCloudcli: () => void };
+
+/**
+ * One word or line the station draws: its locale `key` and its `english`, the `defaultValue` it is drawn with when the locale holds
+ * none. The station's tables of words (the rail's fault lines, its item's status words, the ask's wells, `STATION_NEED_KINDS`)
+ * are made of these, so each is drawn as `t(words.key, words.english)`.
+ */
+export type LocaleWords = { key: string; english: string };
+
+/**
+ * What an item of the station's right rail says it is: its need's kind (`StationNeed.kind`), with a chat's ask told apart by its
+ * own kind (`StationAskKind`: a `permission`, a `question` the chat asked, a `plan` to approve) — seven in all. The key of
+ * `STATION_NEED_KINDS`, which gives each its glyph, its word, its tone and its one act.
+ */
+export type StationNeedKind = Exclude<StationNeed['kind'], 'ask'> | StationAskKind;
+
+/**
+ * Her mark on the station's left rail, while her activity names one of his chats (she is reading it, drafting for it or walking
+ * it): that chat's `sessionId`, her `initial` (her name's first letter, as her disc draws it) and the `words` that say what she
+ * is doing there ("Kaylee is reading Bugfixes"). Built by the rail's region (`WhereThingsStand`) from her activity, drawn by its
+ * sessions section (`SessionRows`) on the chat's row, and on the asleep fold's head while that fold hides the row; the
+ * fixtures (`fake/sessions.ts`) hold one for the `walkthrough` picture.
+ */
+export type StationHerMark = { sessionId: string; initial: string; words: string };

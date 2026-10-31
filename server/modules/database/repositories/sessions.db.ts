@@ -1,7 +1,7 @@
 import { getConnection } from '@/modules/database/connection.js';
 import { followupsDb } from '@/modules/database/repositories/followups.db.js';
 import { projectsDb } from '@/modules/database/repositories/projects.db.js';
-import { announceSessionsDeleted } from '@/modules/database/repositories/session-deletion.js';
+import { announceSessionArchiveChanged, announceSessionsDeleted } from '@/modules/database/repositories/session-deletion.js';
 import { SESSION_UNREAD_SQL } from '@/modules/database/repositories/session-user-state.db.js';
 import { NEXT_TOP_SIMPLE_LIST_RANK_SQL } from '@/modules/database/repositories/simple-list-ladder.db.js';
 import { normalizeProjectPath } from '@/shared/utils.js';
@@ -946,11 +946,12 @@ export const sessionsDb = {
    */
   updateSessionIsArchived(sessionId: string, isArchived: boolean): void {
     const db = getConnection();
-    db.prepare(
+    const { changes } = db.prepare(
       `UPDATE sessions
        SET isArchived = ?
        WHERE session_id = ?`
     ).run(isArchived ? 1 : 0, sessionId);
+    if (changes > 0) announceSessionArchiveChanged(sessionId, isArchived);
   },
 
   deleteSessionById(sessionId: string): boolean {

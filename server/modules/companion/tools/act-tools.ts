@@ -1,16 +1,14 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 
-import { userPreferencesDb } from '@/modules/database/index.js';
 import { sessionsService } from '@/modules/providers/index.js';
 import { abortChatRun, answerChatPermission, broadcastSessionUpserted } from '@/modules/websocket/index.js';
 import type { CompanionSessionRef } from '@/shared/companion-types.js';
-import { isRecord } from '@/shared/document-fields.js';
 import { guardedToolResult, textResult, type ToolTextResult } from '@/shared/tool-text-result.js';
 
 import { toolLine } from '../session/companion-prompt.js';
 
-import { answerFor, oldestPendingAsk } from './ask-decision.js';
+import { answerFor, oldestPendingAsk, rememberAllowedTool } from './ask-decision.js';
 import type { CompanionToolDeps } from './companion-tools.js';
 import { listHisChats, resolveChat } from './house-reads.js';
 
@@ -25,7 +23,7 @@ import { listHisChats, resolveChat } from './house-reads.js';
  *     new name from without a reload;
  *   - `answer_session` answers the OLDEST ask the chat is waiting on through the runtime's own resolver
  *     (`answerChatPermission`); what an answer means to each kind of ask is `ask-decision.ts`'s. Only the "always"
- *     answer does more: it writes the rule into his `claudePermissions` preference first (`rememberAllowedTool`),
+ *     answer does more: it writes the rule into his `claudePermissions` preference first (`rememberAllowedTool`, `ask-decision.ts`),
  *     the way the page's "Allow and remember" does before it answers, so a failed write leaves the ask unanswered
  *     and the call can simply be made again.
  *
@@ -44,9 +42,6 @@ const CHAT_NAME_MAX = 60;
 
 /** The longest free answer to a question: an answer, not a brief. */
 const ANSWER_MAX = 2_000;
-
-/** The key his tool permissions are stored under (`UserPreferences.claudePermissions`), the one the page's Settings reads and writes. */
-const CLAUDE_PERMISSIONS_KEY = 'claudePermissions';
 
 /** What one handler hands back: its text, and the chat as it stands afterwards when that changed (a rename changes the name the focus carries). */
 type Acted = { result: ToolTextResult; chat?: CompanionSessionRef };
@@ -68,32 +63,6 @@ function onNamedChat(
     const acted = await act(found.chat);
     deps.setFocus(acted.chat ?? found.chat);
     return acted.result;
-  });
-}
-
-/** The strings of a stored list; anything else in it is not a rule and is dropped. */
-const stringsOf = (value: unknown): string[] => (Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []);
-
-/**
- * Writes `entry` into the account's `claudePermissions`: added to `allowedTools` when it is not there, removed from
- * `disallowedTools` when it is (an entry he once denied and now allows is allowed, not both), every other key of the
- * preference left as it was. The page's `grantClaudeToolPermission` does the same merge on its own copy, and the page's store
- * sends the DIFFERENCE from the copy it held (INV-10017), so a page open since before this write cannot erase the entry this
- * remembered. Synchronous on purpose: read and write share no `await`, so two chats answered "always" in parallel cannot both
- * read the list before either writes it and lose an entry.
- */
-function rememberAllowedTool(userId: number, entry: string): void {
-  const stored = userPreferencesDb.getPreferences(userId)[CLAUDE_PERMISSIONS_KEY];
-  const current = isRecord(stored) ? stored : {};
-  const allowedTools = stringsOf(current.allowedTools);
-  const disallowedTools = stringsOf(current.disallowedTools);
-  if (allowedTools.includes(entry) && !disallowedTools.includes(entry)) return;
-  userPreferencesDb.savePreferences(userId, {
-    [CLAUDE_PERMISSIONS_KEY]: {
-      ...current,
-      allowedTools: allowedTools.includes(entry) ? allowedTools : [...allowedTools, entry],
-      disallowedTools: disallowedTools.filter((tool) => tool !== entry),
-    },
   });
 }
 

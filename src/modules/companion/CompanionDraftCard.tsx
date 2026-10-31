@@ -1,6 +1,6 @@
 import { MessageSquarePlus, Send } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { useCardFloor } from '@/modules/companion/hooks/useCardFloor';
 import { useGrowingField } from '@/modules/companion/hooks/useGrowingField';
@@ -24,6 +24,8 @@ type CompanionDraftCardProps = {
   /** Sends the draft as it stands. A refused send rejects with the server's sentence, which the card shows. */
   onSend: (mode: SendMode) => Promise<void>;
   onClear: () => Promise<void>;
+  /** The station's press on the target's name, which puts the session on its stage; absent, the name is text (her panel). */
+  onTargetPress?: () => void;
 };
 
 /** The house's eyebrow (MAN-742): it names the card, and states nothing on its own. */
@@ -31,11 +33,15 @@ const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
 
 /**
  * THE DRAFT: the one thing ever sent to a chat, so its target and its words are always on screen and his to edit.
- * Drawn by this module's CompanionPanel, last in the dock, right above the composer.
+ * Drawn in two homes, each the one editor of the one draft: this module's CompanionPanel, last in her dock right above the
+ * composer, and the station module's dock (`StationDock`), at the foot of her column over the talk control, which also hands
+ * `onTargetPress`.
  *
  * TOP: "DRAFT" and the target — "For Kanban lanes · claudecodeui_lyphe", or "New chat in claudecodeui_lyphe" — where the
  * chat's name keeps its room and the project gives way first; under it "Working now" while that chat runs a turn, and when
- * she last changed the draft. BODY: the words, in a field he can edit that grows with them into whatever room the dock
+ * she last changed the draft. Given `onTargetPress` (the station), a chat's name is a link-styled press named "Show Kanban
+ * lanes on the stage", a 44px catch below 768px and under a finger (`max-md:` beside `(pointer:coarse)`, the touch law, INV-10275); a new chat has no session to show, so its target stays words, as the
+ * panel's always does. BODY: the words, in a field he can edit that grows with them into whatever room the dock
  * leaves — the notes give way first, down to their floor — and scrolls inside past that, never below its 88px floor, so a
  * brief built over a walkthrough is read as whole as the screen allows. Only the field gives way inside the card: the
  * target, the notice and the sends always stand. FOOT: the sends and Clear. While the target is working, Send steer leads
@@ -48,7 +54,7 @@ const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
  * with Use hers, never silently kept or dropped — and his own save coming back while he types on is his, never hers.
  * A refused send or save leaves everything on screen and says why.
  */
-export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit, onSend, onClear }: CompanionDraftCardProps) {
+export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit, onSend, onClear, onTargetPress }: CompanionDraftCardProps) {
   const { t } = useTranslation();
   const pushToast = useToast();
   const fieldId = useId();
@@ -58,8 +64,9 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
   const [edit, setEdit] = useState<string | null>(null);
   // The draft text his edit started from: a draft that moves off it (and not onto his own words) is her rewrite.
   const [editBase, setEditBase] = useState('');
-  // The words his latest save carried. A draft that arrives equal to them is his own save's echo — he may have typed on
-  // since — so it becomes the edit's new base instead of reading as her rewrite.
+  // The words his latest save carried, AS THE SERVER STORES THEM (trimmed: `PUT /draft` keeps no leading or trailing blank).
+  // A draft that arrives equal to them is his own save's echo — he may have typed on since — so it becomes the edit's new
+  // base instead of reading as her rewrite; an edit ending in a space or a newline would otherwise never match its echo.
   const [ownSave, setOwnSave] = useState<string | null>(null);
   // The send that is out, so its button is busy and neither can be pressed twice; null when none is.
   const [sending, setSending] = useState<SendMode | null>(null);
@@ -114,7 +121,7 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
     if (edit === null || edit === draft.text || edit === savedRef.current) return Promise.resolve();
     if (savingRef.current?.words === edit) return savingRef.current.done;
     const words = edit;
-    setOwnSave(words);
+    setOwnSave(words.trim());
     const done = onEdit(words)
       .then(() => { savedRef.current = words; })
       .finally(() => {
@@ -165,7 +172,7 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
         disabled={empty || (sending !== null && sending !== mode)}
         onClick={() => send(mode)}
         data-companion-send={mode}
-        className="[@media(pointer:coarse)]:h-11"
+        className="max-md:h-11 [@media(pointer:coarse)]:h-11"
       >
         {lead && <Send aria-hidden="true" />}
         {t(mode === 'steer' ? 'companion.draft.sendSteer' : 'companion.draft.sendTurn')}
@@ -180,7 +187,35 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
         <div className="flex min-w-0 items-baseline gap-2 text-sm">
           <span className={cn(EYEBROW, 'shrink-0')}>{t('companion.draft.title')}</span>
           {draft.target.kind === 'new' && <MessageSquarePlus aria-hidden="true" className="size-3.5 shrink-0 self-center text-muted-foreground" />}
-          <span data-companion-draft-target="" className="min-w-0 truncate font-medium text-foreground">{target}</span>
+          {draft.target.kind === 'session' && onTargetPress !== undefined ? (
+            // "For" stays words and the chat's name is the press, so its name ("Show Kanban lanes on the stage") holds the
+            // words on screen, in the accent's readable ink (the fill's green is under 4.5:1 on light). This span does not
+            // clip: the catch (`::before`) reaches past the line, under a finger up into the card's padding and never down
+            // over the passive line under it; the name truncates inside.
+            <span data-companion-draft-target="" className="flex min-w-0 items-baseline gap-1 font-medium text-foreground">
+              <Trans
+                t={t}
+                i18nKey="companion.draft.forChatPress"
+                // The name rides as the slot's own child, so a name holding "<" reads as written.
+                components={{
+                  chat: (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      aria-label={t('companion.draft.showOnStage', { chat: draft.target.session.name })}
+                      onClick={onTargetPress}
+                      data-companion-draft-target-press=""
+                      className="relative h-auto min-w-0 justify-start px-0 py-0 text-sm font-medium text-accent-ink before:absolute before:-inset-x-1 before:-inset-y-1 before:content-[''] max-md:before:-top-7 max-md:before:bottom-0 [@media(pointer:coarse)]:before:-top-7 [@media(pointer:coarse)]:before:bottom-0"
+                    >
+                      <span className="min-w-0 truncate">{draft.target.session.name}</span>
+                    </Button>
+                  ),
+                }}
+              />
+            </span>
+          ) : (
+            <span data-companion-draft-target="" className="min-w-0 truncate font-medium text-foreground">{target}</span>
+          )}
           {/* Shrinks four times as fast as the name: the chat he knows is named before the project it lives in. */}
           {draft.target.kind === 'session' && <span className="min-w-0 shrink-[4] truncate text-xs text-muted-foreground">· {draft.target.session.project}</span>}
         </div>
@@ -228,7 +263,7 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
           // from the sends, never under the lead one.
           aria-label={t('companion.draft.clearLabel')}
           onClick={() => setConfirmingClear(true)}
-          className="ml-auto text-muted-foreground hover:text-foreground [@media(pointer:coarse)]:h-11"
+          className="ml-auto text-muted-foreground hover:text-foreground max-md:h-11 [@media(pointer:coarse)]:h-11"
         >
           {t('companion.draft.clear')}
         </Button>

@@ -120,6 +120,10 @@ export { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/shared/ui/D
 // Promote and Update wardens dialogs are framed by it: a kit piece rather than the module's own because Verve draws it, so
 // the next module with a form to raise composes the frame instead of building another.
 export { DialogFrame } from '@/shared/ui/DialogFrame';
+// A unified diff's lines, each painted by its kind through `data-tone` with its +, − and @@ kept in the text — the non-colour
+// channel. The chat's `DiffBlock` draws a ```diff fence with it and the station's diff card draws a card's diff with it: one
+// drawing, so a card can never drift from the chat's. Its caller's container owns the sideways scroll.
+export { DiffLines } from '@/shared/ui/DiffLines';
 export { DockableFab } from '@/shared/ui/DockableFab';
 export type { DockableFabPosition } from '@/shared/ui/DockableFab';
 export { ResizeGrip } from '@/shared/ui/ResizeGrip';

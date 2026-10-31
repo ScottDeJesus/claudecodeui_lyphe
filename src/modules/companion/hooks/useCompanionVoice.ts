@@ -51,11 +51,13 @@ type CompanionVoiceHook = {
  * from the other. Only the page that holds the floor plays, and only while its switch is on (localStorage
  * `companion-voice`, on until turned off); every other page shows her words and makes no speech request.
  *
- * THE PULL asks for each sentence of the current turn in index order, at most one ahead of the one sounding. Sentence k is
+ * THE PULL asks for each sentence of the turn it is hearing in index order, at most one ahead of the one sounding. Sentence k is
  * asked for as soon as its frame has arrived and nothing is asked for and waiting, which is when k-1 starts (or at once,
  * when the player is idle). A page that takes the floor mid-turn starts with the next sentence whose frame arrives. A 204
- * and a 502 are skipped; a 409 (refused, or not the floor) and a 404 end the pull for the turn; a new turn resets it. A
- * socket reconnect re-seeds the picture and leaves the pull where it was. A page that stops holding the floor, or turns
+ * and a 502 are skipped; a 409 (refused, or not the floor) and a 404 end the pull for the turn. A turn that begins while
+ * another is being heard (an alert) is queued and spoken from its first sentence after the heard one's last; only a cut,
+ * Stop, Clear, the floor moving or the switch going off empties the queue. A socket reconnect re-seeds the picture and
+ * leaves the pull where it was. A page that stops holding the floor, or turns
  * its switch off, stops its player at once. Nothing polls: the pull moves on a frame, an answer, or the player's start.
  *
  * The status the panel reads is ONE state: `speaking` is the sentence the player is sounding, held from its start until the

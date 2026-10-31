@@ -9,6 +9,7 @@ import { signalOf } from '../tools/read-tools.js';
 
 import { blockSection, descriptionOf, outlineLine, pageText, sectionsHolding } from './doc-render.js';
 import { DID_NOT_ANSWER, resolvePage, searchPages, type DocHit, type DocPage } from './docspace-client.js';
+import { aboutPage, LIST_ABOUT_NOTHING, type CardShape } from './card-shapes.js';
 import { cappedLines, toPanel, wholeOrDigest } from './eyes-answer.js';
 
 /**
@@ -23,7 +24,7 @@ import { cappedLines, toPanel, wholeOrDigest } from './eyes-answer.js';
  *     under "What does this page say: its purpose, its main points, and anything it asks or decides?";
  *   - a block's id: that block, whole or digested under "What does this block say?";
  *   - anything else is a phrase: the blocks that hold it (without regard to case), whole or digested under "What does this page say about: …?".
- * `panel: true` puts the answer's whole text on his panel as a note (a digest is not made for it). A page ArchPulse does
+ * `panel: true` puts the answer's whole text on his panel as a card (a digest is not made for it). A page ArchPulse does
  * not answer for is told in one sentence ("DocSpace (ArchPulse on :8005) did not answer: …") and never guessed at. Her prompt's own line is each tool's
  * description (`toolLine`). No usage or spend appears in any answer.
  *
@@ -48,7 +49,7 @@ const BLOCK_BRIEF = 'What does this block say? At most 12 lines; cite L<n>.';
 const phraseBrief = (phrase: string): string => `What does this page say about: ${phrase}? At most 12 lines; cite L<n>.`;
 
 /** The `panel` argument both tools take. */
-const panelFlag = z.boolean().optional().describe('true puts the whole answer on his panel as a note instead of in your context; you are then told only that it is there.');
+const panelFlag = z.boolean().optional().describe('true puts the whole answer on his panel as a card instead of in your context; you are then told only that it is there.');
 
 /** A line's worth of a stored text: whitespace folded to single spaces. */
 const oneLine = (text: string): string => text.replace(/\s+/g, ' ').trim();
@@ -77,7 +78,7 @@ function searchDocs(deps: CompanionToolDeps, args: { phrase: string; panel?: boo
     // ArchPulse hands back at most as many pages as it was asked for (and no more than 500): at that count the pages left out are a floor, not a count.
     const text = found.value.length >= SEARCH_ASKED ? capped.replace(/(^|\n)And (\d+) more;/, '$1At least $2 more;') : capped;
     const answer = textResult(text);
-    return args.panel === true ? toPanel(deps, `DocSpace: ${oneLine(args.phrase)}`, answer) : answer;
+    return args.panel === true ? toPanel(deps, `DocSpace: ${oneLine(args.phrase)}`, answer, LIST_ABOUT_NOTHING) : answer;
   });
 }
 
@@ -102,16 +103,16 @@ function outline(deps: CompanionToolDeps, page: DocPage, panel: boolean): ToolTe
   const lines = cappedLines(page.blocks.map((block, index) => outlineLine(block, index + 1)), OUTLINE_MAX);
   const about = aboutLine(page);
   const answer = textResult(`${pageHeading(page)}, ${page.blocks.length} ${page.blocks.length === 1 ? 'block' : 'blocks'}:\n${about === '' ? '' : `${about}\n`}${lines}`);
-  return panel ? toPanel(deps, `${page.title} · outline`, answer) : answer;
+  return panel ? toPanel(deps, `${page.title} · outline`, answer, aboutPage(page.id, null)) : answer;
 }
 
-/** One rendered text, as the answer: on his panel whole, or handed over whole / digested under `brief`. */
+/** One rendered text, as the answer: on his panel whole as a card of `shape` (a page card about the page, or the block read), or handed over whole / digested under `brief`. */
 function answerText(
   deps: CompanionToolDeps,
-  read: { text: string; label: string; brief: string; intro: string; panelTitle: string; panel: boolean },
+  read: { text: string; label: string; brief: string; intro: string; panelTitle: string; panel: boolean; shape: CardShape },
   signal: AbortSignal | undefined
 ): Promise<ToolTextResult> | ToolTextResult {
-  if (read.panel) return toPanel(deps, read.panelTitle, textResult(read.text));
+  if (read.panel) return toPanel(deps, read.panelTitle, textResult(read.text), read.shape);
   return wholeOrDigest(deps, { text: read.text, label: read.label, brief: read.brief, intro: read.intro }, signal);
 }
 
@@ -123,13 +124,14 @@ function readScope(deps: CompanionToolDeps, page: DocPage, scope: string, panel:
   if (page.blocks.length === 0) return textResult(noBlocks(page));
   if (keyword === 'whole') {
     const intro = `${heading}, ${page.blocks.length} ${page.blocks.length === 1 ? 'block' : 'blocks'}:`;
-    return answerText(deps, { text: pageText(page), label: 'doc-whole', brief: WHOLE_BRIEF, intro, panelTitle: page.title, panel }, signal);
+    return answerText(deps, { text: pageText(page), label: 'doc-whole', brief: WHOLE_BRIEF, intro, panelTitle: page.title, panel, shape: aboutPage(page.id, null) }, signal);
   }
 
   const index = page.blocks.findIndex((block) => block.id === scope);
   if (index !== -1) {
     const text = blockSection(page.blocks[index], index + 1);
-    return answerText(deps, { text, label: 'doc-block', brief: BLOCK_BRIEF, intro: `${heading}, block ${index + 1}:`, panelTitle: `${page.title} · block ${index + 1}`, panel }, signal);
+    const shape = aboutPage(page.id, page.blocks[index].id);
+    return answerText(deps, { text, label: 'doc-block', brief: BLOCK_BRIEF, intro: `${heading}, block ${index + 1}:`, panelTitle: `${page.title} · block ${index + 1}`, panel, shape }, signal);
   }
   // A block id the page does not hold is a mistake to correct, not a phrase to search for.
   if (/^blk-/.test(scope)) return deps.refuse(`${heading} has no block ${scope}; read_doc with scope outline lists its blocks.`);
@@ -140,7 +142,8 @@ function readScope(deps: CompanionToolDeps, page: DocPage, scope: string, panel:
   // The parts a phrase is searched in: the page's description (when it has one) and its blocks.
   const parts = page.blocks.length + (descriptionOf(page) === '' ? 0 : 1);
   const intro = `${heading}: ${sections.length} of ${parts} ${parts === 1 ? 'part holds' : 'parts hold'} "${phrase}" (the page's description and blocks):`;
-  return answerText(deps, { text: sections.join('\n\n'), label: 'doc-phrase', brief: phraseBrief(phrase), intro, panelTitle: `${page.title} · ${phrase}`, panel }, signal);
+  const shape = aboutPage(page.id, null);
+  return answerText(deps, { text: sections.join('\n\n'), label: 'doc-phrase', brief: phraseBrief(phrase), intro, panelTitle: `${page.title} · ${phrase}`, panel, shape }, signal);
 }
 
 /** `read_doc`: resolves the page by its id or exact title, then reads the scope. Moves neither her focus nor her activity. */

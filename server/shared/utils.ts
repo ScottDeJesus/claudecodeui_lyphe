@@ -1599,11 +1599,26 @@ export function expandHome(value: string): string {
 /**
  * Where Claude Code keeps its settings and login: `CLAUDE_CONFIG_DIR` when set, else `~/.claude`.
  *
- * Consumers: `claude-auth.provider.ts` (where the login's credentials live) and
- * `claude-account-default-model.ts` (the user settings' `model`, the account's default).
+ * Consumers: `claude-auth.provider.ts` (where the login's credentials live),
+ * `claude-account-default-model.ts` (the user settings' `model`, the account's default),
+ * `claude-login-renewal.ts` (the CLI's config dir for the renewal, and where it re-reads the pass's
+ * clock) and `usage.service.ts` (the credentials file the usage meter reads).
  */
 export function claudeConfigDir(): string {
   return process.env.CLAUDE_CONFIG_DIR?.trim() || path.join(os.homedir(), '.claude');
+}
+
+/**
+ * Whether the CLI's config directory is the default `~/.claude`, the one whose `~/.claude.json` names the
+ * signed-in account. With `CLAUDE_CONFIG_DIR` pointing elsewhere the CLI keeps its identity file and its
+ * tokens THERE, so a read of `~/.claude.json` would name a login other than the tokens' — a confident wrong
+ * name. A reader of that file asks this first and says nothing when the answer is `false`.
+ *
+ * Consumers: `claude-auth.provider.ts` (the status line falls back to "Authenticated" instead of the
+ * door's email) and `usage.service.ts` (the meter's account digest is `''`, "could not be told").
+ */
+export function claudeConfigDirIsDefault(): boolean {
+  return path.resolve(claudeConfigDir()) === path.join(os.homedir(), '.claude');
 }
 
 /**

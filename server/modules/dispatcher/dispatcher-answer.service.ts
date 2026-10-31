@@ -9,8 +9,8 @@ import { firstLine } from './dispatcher-ask.transport.js';
  * The operator's answer to a prompt this lane raised, read and carried to the plan.
  *
  * THE ANSWER IS HIS, WORD FOR WORD, and it goes through the dispatcher's own doors and no other. THERE ARE THREE
- * DOORS: the plan's card and the phone's push, where he presses, and Kaylee, who carries his SPOKEN word for that
- * specific card with kaylee--press's record of it — who spoke, when, and what he said (`relayRecord`) — which the
+ * DOORS: the plan's card and the phone's push, where he presses, and Kaylee, who carries his word, spoken or typed, for that
+ * specific card with kaylee--press's record of it — who said it, when, and what he said (`relayRecord`) — which the
  * dispatcher's door checks and lands as a `relayed` line beside the act. That door is the dispatcher's own: `dispatcher accept
  * --by app:kaylee --relay <record>` and `--relay` on `tell`. It refuses a record it cannot take (one written inside a Claude
  * session, one naming another card, a token that is not the `--lock`, a stale `--lock`) as a `REFUSED …` line, exit 2, which
@@ -57,7 +57,7 @@ export type AskReply =
  * Which door the press came through — named in `approved_by` (`app:card`, `app:phone`, `app:kaylee`). `'card'` is
  * the plan's own card in the Roadmap tab's In flight face and the Runs widget, which answers over its own HTTP door
  * (`dispatcher-answer.routes.ts`) rather than through a runtime's gateway; `'phone'` is a push's
- * button, which walks that gateway (`ntfy-action.routes.ts`); `'kaylee'` is his spoken word carried by Kaylee,
+ * button, which walks that gateway (`ntfy-action.routes.ts`); `'kaylee'` is his word, spoken or typed, carried by Kaylee,
  * which arrives through `DispatcherAsks.answerOnHisWord` with its record (`CarryRelay`) and is refused without one.
  */
 export type AnswerDoor = 'card' | 'phone' | 'kaylee';

@@ -36,8 +36,9 @@ const RING_RADIUS = 45;
 /**
  * Kaylee's face, "the light that guides this project": her portrait, the one photographed face the bake made and the page plays
  * from memory (`CompanionPortrait`), with her marks drawn over it in code (SVG and CSS on Verve's tokens), so the marks follow the
- * theme and scale without blur. Used by this module's button (CompanionFab), which draws her in its floating disc, and by
- * Settings' face card; the face fills the square it is given and owns no chrome.
+ * theme and scale without blur. Used by this module's CompanionFace (the provider-bound face that the button's floating disc
+ * and the station's head draw), by Settings' face card, and by the station module's fixtures, which draw her on fixture
+ * presences; the face fills the square it is given and owns no chrome.
  *
  * LAYERS, bottom to top: the disc's own ground (the button's, which shows until the sheets are decoded and then gives way to her
  * face fading in); the portrait; the marks. A box with no face made yet (`faceId` null) draws her initial in the kit's `Avatar`

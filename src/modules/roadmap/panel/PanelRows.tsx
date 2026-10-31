@@ -55,7 +55,8 @@ export function PanelHead({ id, title, sub, action }: PanelHeadProps) {
  * A state's dot as the panel paints it: the tree's own paint (`ROADMAP_DOT_PAINT`), a filled disc with its
  * ring, hollow for an idea. Decorative: the words beside it say the state.
  *
- * Used by the roadmap module's panel: its rows (here) and the feature's State fact (`panel/FeaturePanel`).
+ * Used by the roadmap module's panel: its rows (here) and the feature's State fact (`panel/FeaturePanel`); and,
+ * through the roadmap barrel, by the station module's left rail (`RoadmapRows`), on each feature's row.
  */
 export function PanelDot({ state }: { state: RoadmapDotState }) {
   const paint = ROADMAP_DOT_PAINT[state];

@@ -24,9 +24,12 @@ export { spendFreeWording } from '@/modules/notifications/services/notification-
 export type { SpendFreeWording } from '@/modules/notifications/services/notification-spend-free.service.js';
 // startNotificationHistory: used by the server entrypoint, which starts the house's notification history after `listen`
 // and calls the unsubscribe it answers on shutdown. listNotificationHistory: used by the companion module's `list_alerts`,
-// which reads what the house told him lately.
+// which reads what the house told him lately, and by the station's landed read. onHistoryKept: used by the companion module's
+// station feed, which hears each row the history keeps — after it is stored, with its id — and sends the landings among them
+// to his pages.
 export {
   listNotificationHistory,
+  onHistoryKept,
   startNotificationHistory,
 } from '@/modules/notifications/services/notification-history.service.js';
 export {
@@ -47,7 +50,8 @@ export {
 // stage), named in the message she is pushed so "this one" means what he is looking at.
 export { viewTargetOf } from '@/modules/notifications/services/session-presence.service.js';
 // onNotification: used by the companion module's alert feed, which hears every event the orchestrator is handed
-// — before any push preference or dedupe — and turns the few that are her business into what she says unasked.
+// — before any push preference or dedupe — and turns the few that are her business into what she says unasked; and by
+// its station hint, which counts the two codes that mean an ask was raised as a chat changing.
 export { onNotification } from '@/modules/notifications/services/notification-listeners.service.js';
 // Used by the server entrypoint to mount the public tap-to-answer route at /api/ntfy/act.
 export { createNtfyActionRoutes } from '@/modules/notifications/ntfy-action.routes.js';

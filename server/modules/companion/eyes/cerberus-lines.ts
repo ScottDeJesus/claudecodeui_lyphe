@@ -20,7 +20,7 @@ import { clipLine } from './line-words.js';
  * the time its status began, and the strip of recent minutes of the SERVICE it belongs to (`cells`, one per minute). The stored
  * history behind a check is the tab's own sheet and is not read here.
  *
- * Consumer: `house-reads.ts` (`read_cerberus`).
+ * Consumers: `house-reads.ts` (`read_cerberus`) and `hands/action-targets.ts` (`open` finds a check through `findChecksToOpen`, `withoutUsageChecks` and `checkName`).
  */
 
 /** The tab's word for each status, verbatim from `cerberus.status.*` of the locale (`.verify/companion-eyes-house.mjs` keeps them equal). Consumed here and by that probe. */
@@ -87,8 +87,8 @@ export function withoutUsageChecks(overview: CerberusOverview): CerberusOverview
 /** An epoch-millisecond moment as he would say it. */
 const at = (ms: number): string => whenWords(new Date(ms).toISOString());
 
-/** A check as the tab names it: its plain-English label, else its key. */
-const checkName = (check: CerberusCheckView): string => check.label ?? check.key;
+/** A check as the tab names it: its plain-English label, else its key. Consumed here and by `hands/action-targets.ts`, which says a check by it. */
+export const checkName = (check: CerberusCheckView): string => check.label ?? check.key;
 
 /** A check's path as `read_cerberus` takes it back: `<node>/<service>/<check>`. */
 const checkPath = (check: CerberusCheckView): string => `${check.node}/${check.key}`;
@@ -158,6 +158,44 @@ export function findChecks(overview: CerberusOverview, scope: string): FoundChec
   return all.filter(({ check }) =>
     [checkPath(check), check.label ?? '', check.serviceLabel ?? '', check.value ?? ''].some((field) => field.toLowerCase().includes(wanted))
   );
+}
+
+/** The words of a phrase or a name as a person says them: lowercase runs of letters and digits ("Blank-initial uploads" is blank, initial, uploads). */
+const wordsOf = (text: string): string[] => text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+
+/** Whether `phrase` stands whole, in order and unbroken, among `name`'s words. */
+function holdsWords(name: string[], phrase: string[]): boolean {
+  for (let start = 0; start + phrase.length <= name.length; start += 1) {
+    if (phrase.every((word, offset) => name[start + offset] === word)) return true;
+  }
+  return false;
+}
+
+/** The checks `findChecksToOpen` found, and whether they fit by the exact path or the exact name (`exact`) or only by words inside a name. */
+export type ChecksToOpen = { checks: FoundCheck[]; exact: boolean };
+
+/**
+ * The checks an ACTING resolver finds for a phrase, tighter than `findChecks` (which browses): a phrase names a check only by its exact
+ * path (`<node>/<service>/<check>`, or `<service>/<check>` alone), by its exact name (the label the tab shows, else its key: case and
+ * punctuation set aside), or, failing both, by standing whole among the words of its name. Never by a service's label or by what the
+ * check's last reading says, so a word in a value or a service never makes a check of it. `exact` says which rung answered; the caller
+ * lets a name that fits only by words give way to any other kind that fits. Consumed by `hands/action-targets.ts` (`open`).
+ */
+export function findChecksToOpen(overview: CerberusOverview, scope: string): ChecksToOpen {
+  const wanted = scope.trim().toLowerCase();
+  const phrase = wordsOf(wanted);
+  const all = overview.nodes.flatMap((node) => node.services.flatMap((service) => service.checks.map((check) => ({ check, service }))));
+  const byPath = all.filter(({ check }) => checkPath(check).toLowerCase() === wanted || check.key.toLowerCase() === wanted);
+  if (byPath.length > 0) return { checks: byPath, exact: true };
+  if (phrase.length === 0) return { checks: [], exact: false };
+  const byName = all.filter(({ check }) => wordsOf(checkName(check)).join(' ') === phrase.join(' '));
+  if (byName.length > 0) return { checks: byName, exact: true };
+  return { checks: all.filter(({ check }) => holdsWords(wordsOf(checkName(check)), phrase)), exact: false };
+}
+
+/** One line per check for a refusal that must say which is which: its name, its path and its word, and never its reading. */
+export function choiceLines(found: FoundCheck[]): string[] {
+  return found.map(({ check }) => [checkName(check), checkPath(check), statusWord(check.status)].join(' · '));
 }
 
 /** One line per found check, for a phrase that fits several: the check, its path and its word. */

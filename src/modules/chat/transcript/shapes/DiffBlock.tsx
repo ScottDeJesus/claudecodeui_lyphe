@@ -3,13 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import type { Tone } from '@/shared/types';
-import { copyTextToClipboard, cn } from '@/shared/utils';
-import { splitDiffLine } from '@/modules/chat/transcript/shapes/detect';
+import { DiffLines } from '@/shared/ui';
+import { copyTextToClipboard, splitDiffLine } from '@/shared/utils';
 import { ShapeFrame } from '@/modules/chat/transcript/shapes/ShapeFrame';
 import { useShapeInteractive } from '@/modules/chat/transcript/shapes/useShapeCollapse';
-
-type DiffLineKind = ReturnType<typeof splitDiffLine>;
 
 type DiffBlockProps = {
   /** The fence body verbatim — what is drawn line by line and what the copy action copies. */
@@ -18,38 +15,16 @@ type DiffBlockProps = {
 };
 
 /**
- * The tone each kind of line wears, as `data-tone`. Colour is the token swap tokens.css makes for
- * that attribute and never a class of this file's: added lines are `positive`, removed lines
- * `danger`, a hunk header `info`. Meta and context lines carry no tone at all — they are the
- * frame of the change, not the change.
- */
-const TONE_BY_KIND: Record<DiffLineKind, Tone | undefined> = {
-  add: 'positive',
-  remove: 'danger',
-  hunk: 'info',
-  meta: undefined,
-  context: undefined,
-};
-
-/** The paint of each kind, read off the `--tone-*` properties its `data-tone` sets. */
-const CLASS_BY_KIND: Record<DiffLineKind, string> = {
-  add: 'bg-[color:var(--tone-soft)] text-[color:var(--tone-ink)]',
-  remove: 'bg-[color:var(--tone-soft)] text-[color:var(--tone-ink)]',
-  hunk: 'bg-muted/60 text-[color:var(--tone-ink)]',
-  meta: 'font-semibold text-muted-foreground',
-  context: 'text-foreground',
-};
-
-/**
  * A `diff` fence coloured by line kind: added, removed, hunk, meta and context.
  *
- * Used by `code/CodeFence.tsx` and nothing else. It reads the fence TEXT through `splitDiffLine`
- * and nothing more, so it takes no dependency on `ToolDiffViewer`'s `createDiff` contract — that
- * viewer diffs two strings it was handed, and a fence is a diff someone already wrote.
+ * Used by `code/CodeFence.tsx` and nothing else. It reads the fence TEXT and nothing more, so it
+ * takes no dependency on `ToolDiffViewer`'s `createDiff` contract — that viewer diffs two strings
+ * it was handed, and a fence is a diff someone already wrote.
  *
- * Every line the author wrote is drawn, verbatim and in order, and the `+` / `-` / `@@` that open
- * each one stay in the text: they are the non-colour channel, and removing them to lean on the
- * tint alone would render less than the markdown this replaced.
+ * The lines are the kit's `DiffLines`, the one drawing of a diff the station's diff card shares:
+ * every line the author wrote, verbatim and in order, its `+` / `-` / `@@` kept as the non-colour
+ * channel. What stays here is the frame — the count in the header, the copy action, and the
+ * sideways scroll that keeps a wide line from wrapping.
  *
  * The header carries the count of added and removed lines, so the size of the change is readable
  * before the body is, and the copy action — which always copies the whole fence — is not drawn at
@@ -71,9 +46,9 @@ export function DiffBlock({ raw, collapseKey }: DiffBlockProps) {
     return () => hostWindow.clearTimeout(timer);
   }, [copied, hostWindow]);
 
-  const lines = useMemo(() => raw.split('\n').map((text) => ({ text, kind: splitDiffLine(text) })), [raw]);
-  const added = lines.filter((line) => line.kind === 'add').length;
-  const removed = lines.filter((line) => line.kind === 'remove').length;
+  const kinds = useMemo(() => raw.split('\n').map(splitDiffLine), [raw]);
+  const added = kinds.filter((kind) => kind === 'add').length;
+  const removed = kinds.filter((kind) => kind === 'remove').length;
 
   const actions = (
     <>
@@ -111,22 +86,9 @@ export function DiffBlock({ raw, collapseKey }: DiffBlockProps) {
   return (
     <ShapeFrame kind="diff" title={t('shapes.titles.diff')} collapseKey={collapseKey} actions={actions}>
       {/* The frame's inset is cancelled so each line's tint runs edge to edge, and the body scrolls
-          sideways rather than wrapping — a wrapped diff line reads as two lines, one of them
-          unmarked. `w-max min-w-full` keeps every tint as wide as the widest line. */}
+          sideways rather than wrapping; `py-2` puts the vertical inset back inside the scroller. */}
       <div className="-mx-3 -my-2 overflow-x-auto">
-        <div className="w-max min-w-full py-2 font-mono text-md-code leading-relaxed">
-          {lines.map((line, index) => (
-            <div
-              key={index}
-              data-diff-line={line.kind}
-              data-tone={TONE_BY_KIND[line.kind]}
-              // `min-h` so a blank context line keeps its row instead of collapsing to nothing.
-              className={cn('min-h-[1.625em] whitespace-pre px-3', CLASS_BY_KIND[line.kind])}
-            >
-              {line.text}
-            </div>
-          ))}
-        </div>
+        <DiffLines text={raw} className="py-2" />
       </div>
     </ShapeFrame>
   );

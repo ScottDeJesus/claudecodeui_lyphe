@@ -30,7 +30,7 @@ The Cerberus tab: the fleet's health, on the views rail's house run. One provide
 | the routes the client reads | MAN-7802 (`cloudcli:server/modules/cerberus`) | `server/modules/cerberus/cerberus.routes.ts` |
 
 ## Rules of the module
-- Other modules reach it only through `src/modules/cerberus/index.ts`: `CerberusProvider`, `useCerberusNeeds`, `CerberusPanel` (`lazy`). Files inside import siblings by path, never through the barrel. The two modules it reaches are `src/modules/affected-areas` (`AffectedAreasView`) and `src/modules/carrier-bulletins` (`BulletinsView`), each through its `index.ts`; the surround both views are mounted in is the shared `ViewBoundary` (`src/shared/ui/ViewBoundary.tsx`, MAN-8917), drawn by `KeptView` (MAN-8918).
+- Other modules reach it only through `src/modules/cerberus/index.ts`: `CerberusProvider`, `useCerberusNeeds`, `CerberusPanel` (`lazy`), and for the station's check stage `useCerberusNeedOf` (MAN-7871), `NeedCard` and `CheckSheet` (MAN-7879, MAN-7878). Files inside import siblings by path, never through the barrel. The two modules it reaches are `src/modules/affected-areas` (`AffectedAreasView`) and `src/modules/carrier-bulletins` (`BulletinsView`), each through its `index.ts`; the surround both views are mounted in is the shared `ViewBoundary` (`src/shared/ui/ViewBoundary.tsx`, MAN-8917), drawn by `KeptView` (MAN-8918).
 - Types are `type`, never `interface`. A type two files share lives in `src/shared/types.ts` (`TimelineEvent`, `CerberusView`, `CerberusSheetTarget`, `FleetLayout`, `FleetEntry`, …). `src/shared/cerberus-types.ts` is read, never redefined.
 - Every endpoint is a verb of `api.cerberus` in `src/shared/api.ts`.
 - Layout of the module: `context/` (provider), `hooks/`, `utils/` (pure), `fleet/`, `sheet/`, `history/`, `catalog/` (the Catalog view), `modals/` (the dialogs).
@@ -174,8 +174,8 @@ The browser's one reader of Cerberus: a provider holds the overview for every re
 ## Files
 | file | holds |
 |---|---|
-| `src/modules/cerberus/index.ts` | barrel: `CerberusProvider`, `useCerberusNeeds`, `CerberusPanel` (lazy) |
-| `src/modules/cerberus/context/CerberusContext.ts` | `CerberusContext` (default `null`), type `CerberusValue`, hooks `useCerberus`, `useCerberusNeeds`; no component |
+| `src/modules/cerberus/index.ts` | barrel: `CerberusProvider`, `useCerberusNeeds`, `useCerberusNeedOf`, `CerberusPanel` (lazy), `NeedCard`, `CheckSheet` (the station's check stage reads the hook and draws both) |
+| `src/modules/cerberus/context/CerberusContext.ts` | `CerberusContext` (default `null`), type `CerberusValue`, hooks `useCerberus`, `useCerberusNeeds`, `useCerberusNeedOf`; no component |
 | `src/modules/cerberus/context/CerberusProvider.tsx` | `CerberusProvider` only |
 | `src/modules/cerberus/context/ProjectChoicesContext.ts` | `ProjectChoicesContext` (default `null`) and `useProjectChoices()`: the workspace's projects, provided by `CerberusPanel` from its `projectChoices` prop and read by `NodeProjects`; no component |
 | `src/modules/cerberus/hooks/useCheckDetail.ts` | `useCheckDetail` |
@@ -192,8 +192,9 @@ The browser's one reader of Cerberus: a provider holds the overview for every re
 
 ## Mount and barrel
 - `src/App.tsx`: `<CerberusProvider>` directly inside `<HealProvider>`, wrapping `<Router>`; inside the auth gate, below `WebSocketProvider`. why: `api.cerberus` is authenticated; `cerberus_changed` arrives on the one socket; above the Router the rail's badge is honest on every view.
-- The barrel exports `CerberusPanel` too, as `lazy(() => import(...))`: the panel is the tab's whole tree, its own chunk, loaded on the tab's first open (`WorkspaceMain` renders it inside its `Suspense`). Nothing else. Module files import siblings by path, never through the barrel.
+- The barrel exports `CerberusPanel` too, as `lazy(() => import(...))`: the panel is the tab's whole tree, its own chunk, loaded on the tab's first open (`WorkspaceMain` renders it inside its `Suspense`). The barrel also re-exports `NeedCard` and `CheckSheet`, both reading the provider App mounts. Nothing else. Module files import siblings by path, never through the barrel.
 - `useCerberus()` throws outside the provider (`useCerberus must be used within a CerberusProvider`).
+- `useCerberusNeedOf(node, key)` → `{ need, unreachable, retry }`, read by the station's `CheckStage` (MAN-9283): `need` is the entry of `overview.needsYou` whose `check.node` and `check.key` (`<service>/<id>`) match, in whatever status it holds now; `undefined` while the overview has not been read, `null` once the check needs no one (recovered, a mute covers it, or gone). `unreachable` is the provider's own (no read has ever answered and the last one failed); `retry()` reads the overview again (`refresh`). why: not asked yet is not "recovered", and a failed read is not "waiting".
 - `useCerberusNeeds()` = `overview?.counts.needsYou ?? 0`. Read by `useRailBadges` for the Cerberus button's badge on the views rail (MAN-7866), so the rail and the tab's headline are the same number.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/ProjectChoicesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCheckDetail.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusTime.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
@@ -557,13 +558,13 @@ The check sheet on the library's `Sheet`: one service's checks and one of them i
 ## Files
 | file | holds |
 |---|---|
-| `src/modules/cerberus/sheet/CheckSheet.tsx` | `CheckSheet({ open, onClose, node, service, check, lookupAt?, onMute })`: the container; `CheckSheetBody`, `SheetSection`, `ReadingPlaceholder` |
+| `src/modules/cerberus/sheet/CheckSheet.tsx` | `CheckSheet({ open, onClose, node, service, check, lookupAt?, run?, onMute?, onPromote?, width? })`: the container; `CheckSheetBody`, `SheetSection`, `ReadingPlaceholder` |
 | `src/modules/cerberus/sheet/CheckRows.tsx` | `CheckRows({ checks, selectedKey, serviceName, onSelect })` |
-| `src/modules/cerberus/sheet/SelectedCheck.tsx` | `SelectedCheck({ check, editor, onName, onMute, onUnmute })` |
+| `src/modules/cerberus/sheet/SelectedCheck.tsx` | `SelectedCheck({ check, editor, onName, onMute?, onUnmute })` (no `onMute`: no Mute button) |
 | `src/modules/cerberus/sheet/CheckLabelEditor.tsx` | `CheckLabelEditor({ value, onSave, onCancel, busy })` |
 
 ## `CheckSheet` — layout and reads
-- Props: `node` (`eis1`, or `center`), `service` (id), `check` (id within the service: the key after the first `/`), `lookupAt?` (epoch ms; omitted = now), `onMute(check)`: the root opens its Mute dialog in front of the sheet.
+- Props: `node` (`eis1`, or `center`), `service` (id), `check` (id within the service: the key after the first `/`), `lookupAt?` (epoch ms; omitted = now), `onMute?(check)`: the root opens its Mute dialog in front of the sheet; absent, the sheet offers no Mute. `onPromote?(diagnosis, check)`: the root opens its Promote dialog; absent, no "Add to catalog". `width?`: any CSS width, else the kit `Sheet`'s `min(600px, 100%)`. The station's check stage (MAN-9283) passes neither callback and a `width`.
 - Title: the service's label, else its id. Under it, top to bottom: raw line (`sheet.raw`; `sheet.rawHub` when the node's `wardenVersion` is null), `CheckRows`, `SelectedCheck`, Fix output (`FixOutput`), `DiagnosisPanel` (while the check has a diagnosis, keyed by its id: MAN-7932), "Fixes in the catalog" (`CheckFixes`), then the check's own sections. Fix output shows, in this order: the run the last Run now pressed in this sheet started (`startedRuns`, by check id, from the press's own answer through `runEntry`'s `onStarted`; it holds when a newer run of the check begins); else the run the sheet was opened on (a Needs-you card's strip hands its id as `run`), whatever newer run the check's read names, so opening an older run never lands on a newer one, and a sibling check has no opened run; else the check's newest run within the hour (`detail.run`). A run of the shown diagnosis's proposal is left out of Fix output: the panel draws it under its proposal, so it is never drawn twice. With neither, no Fix output; "Fixes in the catalog" waits for the check's read.
 - `CheckSheetBody` holds every read; `Sheet` mounts it only while open. Keyed `<node>/<service>/<check>@<lookupAt|now>`: each opening, and a sheet sent to another check or minute, starts fresh (row, moment, editor closed).
 - Two reads; the sheet never blanks while one is out:
@@ -691,6 +692,7 @@ Takes `t` and `now` from the caller, so a sentence is a function of what it is h
 - Cards in the read model's order, kept as sent (`needsYouOrder`, MAN-7808: worst first — refused, failing, close to the limit — then oldest `since`); each: round glyph (the status's icon), label (else key in mono) and `needs.word`, where and since (`needs.where`, `needs.whereNoSince`), the raw key, the value cut at two lines (`title` carries the whole), Mute.
 - Severity on the card, all from `STATUS_TABLE` (MAN-7873): the `<li>` carries `data-tone`; a 4 px `bg-tone-dot` bar runs down its left edge (`absolute inset-y-0 left-0 w-1`). A status whose cell is `solid` (failing, refused) also tints the head row with `bg-tone-soft`; `warn` keeps the bar only.
 - Under the tint the "where" line is `text-secondary-foreground` and the raw key `text-muted-foreground`, each one ink darker than on a plain card. why: on the light refused tint they measured 4.43:1 and 2.92:1; one step up, 7.46:1 and 4.43:1.
+- `NeedCard({ need, leaving, onOpen, onMute?, wholeValue? })` is one card, exported through the barrel for the station's check stage (MAN-9283). `onMute` absent: no Mute is drawn (a host with no Mute dialog offers none). `wholeValue`: the value is drawn whole, with no two-line cut and no `title`; the tab omits it. Below 768 px the name press, Diagnose / See diagnosis, Run (`NeedFix`) and Mute are 44 px catches (`max-md`).
 - Quiet (`needs` empty): `needs.quiet` and `needs.quietPassing_*`.
 - No cap on the cards: with dozens, the fleet drops below the fold. 2026-10-06: 19 cards stood 3,925 px tall on a phone and 1,117 px at 1440.
 - Muted list while any mute is set: `needs.mutedTitle`, `needs.mutedItem`, `needs.mutedMeta` (`hm(until)`, minutes left from `now`, reason), Unmute.

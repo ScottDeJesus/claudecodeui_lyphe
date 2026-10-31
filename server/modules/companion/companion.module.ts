@@ -10,6 +10,7 @@ import { startDeletedChatFeed } from './feeds/deleted-chat-feed.js';
 import { startFocusFeed } from './feeds/focus-feed.js';
 import type { CompanionHouse } from './house.js';
 import { startStationHint } from './station/station-hint.js';
+import { startStationLandedFeed } from './station/station-landed-feed.js';
 
 /**
  * Builds Kaylee's module for the server entrypoint: the router it mounts at `/api/companion` behind
@@ -27,16 +28,18 @@ import { startStationHint } from './station/station-hint.js';
  * subscriptions to events the house already raises — nothing polls — and both cost nothing for an account whose
  * Live is off. A third subscription tells her nothing: when the chat she is focused on is deleted her focus ends
  * (`startDeletedChatFeed`). A fourth is not hers at all: Kaylee Station's hint (`startStationHint`), which coalesces the
- * four announcements that a chat changed into the one `station_sessions_changed` frame every open page hears. It starts
- * with the feeds and ends with them. Building the module launches no process: her conversations start asleep, on an
- * account's first message. The one other thing that wakes her is `resendUnanswered`, which the entrypoint calls among the
- * duties of the sole server (after a handover, once the predecessor is gone): the words her last process was given and
- * never answered are said to her again, and she answers them with nobody speaking.
+ * four announcements that a chat changed into the one `station_sessions_changed` frame every open page hears; a fifth is the
+ * station's landed feed (`startStationLandedFeed`), which turns each row the notification history keeps that is a landing
+ * into one `station_landed` frame to that account's pages. Both start with the feeds and end with them. Building the module
+ * launches no process: her conversations start asleep, on an account's first message. The one other thing that wakes her is
+ * `resendUnanswered`, which the entrypoint calls among the duties of the sole server (after a handover, once the predecessor
+ * is gone): the words her last process was given and never answered are said to her again, and she answers them with nobody
+ * speaking.
  *
- * `stop()` unsubscribes the feeds and the station's hint FIRST, so nothing new is pushed to a conversation that is winding down, then
- * runs the service's `stopAll` — each running conversation is interrupted and its input ended, and a message that
- * arrives after it is refused with a 503 — beside the face service's `stop`, which aborts the running face bake; the
- * entrypoint's shutdown awaits both before it stops anything else.
+ * `stop()` unsubscribes the feeds, the station's hint and its landed feed FIRST, so nothing new is pushed to a conversation
+ * that is winding down, then runs the service's `stopAll` — each running conversation is interrupted and its input ended, and
+ * a message that arrives after it is refused with a 503 — beside the face service's `stop`, which aborts the running face
+ * bake; the entrypoint's shutdown awaits both before it stops anything else.
  *
  * The face service starts here too (`faceService.start()`): it registers the seed photo, queues the original's bake when it
  * is not made, resumes every account's pending bake and prunes (`face/face.service.ts`). Its work runs in the background and
@@ -53,6 +56,7 @@ export function createCompanionModule({ runtime, house }: { runtime: ProviderRun
   const stopFocusFeed = startFocusFeed(companionService);
   const stopDeletedChatFeed = startDeletedChatFeed(companionService);
   const stopStationHint = startStationHint();
+  const stopStationLandedFeed = startStationLandedFeed(house);
   faceService.start();
   return {
     router: createCompanionRoutes(companionService),
@@ -62,6 +66,7 @@ export function createCompanionModule({ runtime, house }: { runtime: ProviderRun
       stopFocusFeed();
       stopDeletedChatFeed();
       stopStationHint();
+      stopStationLandedFeed();
       // The running bake is aborted beside the sessions' wind-down, so ComfyUI and the bake lock are gone before the process is.
       return Promise.all([companionService.stopAll(), faceService.stop()]).then(() => undefined);
     },

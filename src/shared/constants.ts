@@ -17,17 +17,32 @@ import {
   List,
   MessageCircleQuestion,
   MessageSquare,
+  MessagesSquare,
   Route,
+  ShieldAlert,
   ShieldCheck,
+  ShieldQuestion,
+  Stamp,
   StickyNote,
   type LucideIcon,
 } from 'lucide-react';
-import type { ComponentType } from 'react';
+import type { ComponentType, HTMLAttributes } from 'react';
 
 import type { CompanionNoteKind } from '@/shared/companion-types';
 import type { RoadmapEpicWord, RoadmapFeatureWord, RoadmapMilestoneWord } from '@/shared/roadmap-types';
 import type { StationFocusKind } from '@/shared/station-types';
-import type { AffectedAreasTrouble, FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, RoadmapDotState, SettingsMainTab } from '@/shared/types';
+import type {
+  AffectedAreasTrouble,
+  FileStatusCode,
+  LLMProvider,
+  McpProvider,
+  McpScope,
+  McpTransport,
+  RoadmapDotState,
+  LocaleWords,
+  SettingsMainTab,
+  StationNeedKind,
+} from '@/shared/types';
 import type { UserPreferenceKey } from '@/shared/userSettings';
 
 /** The four buckets the git changes view sorts working-tree files into. */
@@ -421,6 +436,9 @@ export const RAIL_BUTTON_UNLIT = 'text-muted-foreground hover:bg-secondary hover
  * Used with `RAIL_BUTTON_BASE` by the project-workspace module's RailButton (the view on screen) and by the companion
  * module's door (CompanionDock.tsx's CompanionDoorView, her panel open); and on its own by the companion module's
  * dock cell (CompanionDockView: her disc seated, her panel open). So a lit door, a lit seat and a lit view are one look.
+ * The station module's left rail lights a row in it too (`RailRow`: the session, epic or feature on the stage, as
+ * `aria-current`), its bar drawn inside the row's left edge, where a fold's clipping body cannot cut it: a lit thing is
+ * one look on every rail.
  */
 export const RAIL_BUTTON_LIT =
   'bg-accent-soft text-accent-ink hover:bg-accent-soft-hover before:absolute before:-left-0.5 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2 before:rounded-r-[2px] before:bg-accent-ink forced-colors:before:bg-[Highlight] md:before:-left-1';
@@ -650,3 +668,92 @@ export const STATION_FOCUS_GLYPHS: Record<StationFocusKind, { icon: LucideIcon; 
   walk: { icon: Footprints, wordKey: 'station.focusKind.walk' },
   page: { icon: FileText, wordKey: 'station.focusKind.page' },
 };
+
+// ---------------------------
+
+//----------------- STATION NEED KINDS ------------
+
+/**
+ * Each kind of thing that needs him on the station's right rail (`StationNeedKind`), as its item and the ask's stage draw it:
+ * `icon` its lucide mark and `word` its word (Accept, Questions, Permission, Question, Plan, Follow-ups, Red check), always drawn
+ * together (MAN-578); `warn` whether it wears the warn tone — an Accept and a red check, what stands waiting on him, amber and
+ * never red (MAN-577); and `act` the one act its item offers. "Queue…", "Answer…" and "Allow…" carry the ellipsis that says more
+ * comes: the press brings the whole onto the stage, where the owner's own form fires it. "Open" opens at once, because opening is
+ * harmless. Each word is its locale key with its English. Read by the station's `NeedItem` (the rail's item) and `AskStage`
+ * (an ask's kind, said over what it would do).
+ */
+export const STATION_NEED_KINDS: Readonly<Record<StationNeedKind, { icon: LucideIcon; word: LocaleWords; warn: boolean; act: LocaleWords }>> = {
+  accept: {
+    icon: Stamp,
+    word: { key: 'station.needs.kind.accept', english: 'Accept' },
+    warn: true,
+    act: { key: 'station.needs.act.queue', english: 'Queue…' },
+  },
+  questions: {
+    icon: MessagesSquare,
+    word: { key: 'station.needs.kind.questions', english: 'Questions' },
+    warn: false,
+    act: { key: 'station.needs.act.answer', english: 'Answer…' },
+  },
+  permission: {
+    icon: ShieldQuestion,
+    word: { key: 'station.needs.kind.permission', english: 'Permission' },
+    warn: false,
+    act: { key: 'station.needs.act.allow', english: 'Allow…' },
+  },
+  question: {
+    icon: MessageCircleQuestion,
+    word: { key: 'station.needs.kind.question', english: 'Question' },
+    warn: false,
+    act: { key: 'station.needs.act.answer', english: 'Answer…' },
+  },
+  plan: {
+    icon: ClipboardList,
+    word: { key: 'station.needs.kind.plan', english: 'Plan' },
+    warn: false,
+    act: { key: 'station.needs.act.allow', english: 'Allow…' },
+  },
+  followups: {
+    icon: ListChecks,
+    word: { key: 'station.needs.kind.followups', english: 'Follow-ups' },
+    warn: false,
+    act: { key: 'station.needs.act.open', english: 'Open' },
+  },
+  check: {
+    icon: ShieldAlert,
+    word: { key: 'station.needs.kind.check', english: 'Red check' },
+    warn: true,
+    act: { key: 'station.needs.act.open', english: 'Open' },
+  },
+};
+
+// ---------------------------
+
+//----------------- THE STATION'S BOXES OUT OF REACH ------------
+
+/**
+ * The props that take a box of Kaylee Station out of the tab order, the reading order and the press while it stands drawn under
+ * something or behind it: `inert` (spelled as the string React 18 carries) and `aria-hidden`. Spread on the box: by compact's and
+ * the phone's arrangements on the strip's line (and compact's switch) while the strip's week stands over them, and by the sections
+ * on every section not shown.
+ */
+export const STATION_OUT_OF_REACH = { inert: '', 'aria-hidden': true } as unknown as HTMLAttributes<HTMLDivElement>;
+
+// ---------------------------
+
+//----------------- THE STATION PHONE'S SIDEWAYS CATCH ------------
+
+/**
+ * A press of Kaylee Station's phone top row on its side, where the row is 40 px: drawn 40 px tall, its catch grown over and under
+ * it by a transparent `::before`, so a finger still has 44 px (the touch law's own way to grow a press without moving its
+ * neighbours, INV-10275). The `::before` stands on the press's padding box and reaches 4 px past it: worn by two borderless ghost
+ * presses, her menu's trigger (the station's `HeadRow`) and the count of what needs him (`StationPhoneView`), whose catch is 48 px.
+ */
+export const STATION_SIDEWAYS_CATCH = "relative h-10 before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']";
+
+/**
+ * A press of the strip's count form (the phone's 40 px top row on its side) that keeps its own drawn size: its catch grown 8 px past
+ * its padding box by a transparent `::before`, so its 32 px pill or 36 px outlined box (a 1.5 px border inside it) catches 44 px
+ * and more. Worn by the strip's "<n> new" chip (`SinceYouLastLooked`) and its Try again (`StripLines`).
+ */
+export const STATION_COUNT_FORM_CATCH = "relative before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']";

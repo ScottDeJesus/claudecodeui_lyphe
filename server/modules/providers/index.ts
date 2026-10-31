@@ -30,6 +30,11 @@ export { buildClaudeToolPermissionEntry } from './list/claude/claude-tool-permis
 // ride the account the house chose exactly as a chat's process does.
 export { launchAccountEnv } from './list/claude/claude-launch-account.js';
 
+// renewSavedLogin: used by the accounts module's usage meter, which reads usage with the pass in the saved login's
+// credentials file and calls this when that pass has expired — only a CLI run on the login renews it, and no chat here
+// rides it. The verb starts `claude auth status` on the file and answers whether the pass is live afterwards.
+export { renewSavedLogin } from './list/claude/claude-login-renewal.js';
+
 // diagnoseProjectFolder: used by the projects module's list to mark a project whose folder is gone,
 // with the same test the Claude run's pre-flight refuses a start by — one folder test, not two.
 export { diagnoseProjectFolder } from './list/claude/claude-project-folder.js';

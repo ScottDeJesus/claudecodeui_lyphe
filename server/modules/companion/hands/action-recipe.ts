@@ -15,7 +15,7 @@ import { inOrderSaid, resolveCarriedLines } from './carried-lines.js';
  * THE RECIPE OF EACH OF THE ELEVEN ACTIONS THAT WAIT FOR HIS WORD: what it takes, what it checks at prepare, what it pins and what she reads back. The
  * prepare is where an action is fixed to what he is shown: the target is resolved, the action is checked to be doable NOW (an
  * Accept prompt is open, the follow-up is open, the run is stopped), the ask and its lock token or the chain or the follow-up is
- * PINNED, and every line the action carries is checked to be one of his spoken lines of the last 30 minutes. (An open and a close
+ * PINNED, and every line the action carries is checked to be one of his lines (spoken or typed) of the last 30 minutes. (An open and a close
  * have no recipe: `direct-tools.ts` does them the moment he asks.) Nothing here moves
  * anything in the house: it answers a `PreparedAction` for `hands-tools.ts` to put on his panel, or the sentence that refuses and
  * says what to do next.
@@ -116,7 +116,7 @@ function prepareShow(found: CardFound): Preparation {
 function prepareRework(deps: CompanionToolDeps, input: PrepareInput, found: CardFound): Preparation {
   const { target, card, book } = found;
   if (input.words === undefined || input.words.length === 0) {
-    return refuse('A Rework carries his notes, in his own spoken words. Ask him what to change, let him say it aloud, then prepare again with words: his lines exactly as he said them.');
+    return refuse('A Rework carries his notes, in his own words. Ask him what to change, let him say it, then prepare again with words: his lines exactly as he said them.');
   }
   const ask = openAsk(card, book);
   if (ask?.kind === 'questions') return refuse(`${target.spoken} has a questions round open, not an Accept; his answers go with answer, not rework.`);
@@ -139,7 +139,7 @@ function prepareAnswer(deps: CompanionToolDeps, input: PrepareInput, found: Card
   const ask = openAsk(card, book);
   if (ask?.kind !== 'questions') return refuse(`No questions round is open on ${target.spoken}; read_card with scope questions shows whether there is one.`);
   const groups = input.answers ?? [];
-  if (groups.length === 0) return refuse('An answer round carries his answers, in his own spoken words: one group per question, by its number. Read him the questions, let him answer aloud, then prepare again with answers.');
+  if (groups.length === 0) return refuse('An answer round carries his answers, in his own words: one group per question, by its number. Read him the questions, let him answer, then prepare again with answers.');
   const numbers = groups.map((group) => group.question);
   const outside = numbers.find((number) => number > ask.questions.length);
   if (outside !== undefined) return refuse(`${target.spoken} has ${ask.questions.length} ${ask.questions.length === 1 ? 'question' : 'questions'}; question ${outside} is not one of them.`);
@@ -187,7 +187,7 @@ function prepareVerb(input: PrepareInput, found: CardFound): Preparation {
 
 async function prepareResumeRun(deps: CompanionToolDeps, input: PrepareInput): Promise<Preparation> {
   if (input.words === undefined || input.words.length === 0) {
-    return refuse('A resumed run carries his rulings, in his own spoken words. Ask him what to rule, let him say it aloud, then prepare again with words: his lines exactly as he said them.');
+    return refuse('A resumed run carries his rulings, in his own words. Ask him what to rule, let him say it, then prepare again with words: his lines exactly as he said them.');
   }
   const chain = await findChain(deps.house, input.target);
   if (!chain.ok) return refuse(chain.sentence);
@@ -205,7 +205,7 @@ async function prepareResumeRun(deps: CompanionToolDeps, input: PrepareInput): P
 }
 
 /**
- * `clear_memory`: her whole bank, which only his spoken word clears. The target must name her memory ("memory", "your memory"), and
+ * `clear_memory`: her whole bank, which only his word clears. The target must name her memory ("memory", "your memory"), and
  * the count is read from the bank itself so the card and her read-back say how many she would forget. An empty bank has nothing to
  * clear, and a door that does not answer is a refusal, not a card that fires into the dark.
  */
@@ -254,7 +254,7 @@ export async function prepareRecipe(deps: CompanionToolDeps, input: PrepareInput
     else prepared = prepareVerb(input, found.value);
   }
   if (prepared.ok && !canBeNamed(prepared.prepared.target, action)) {
-    return refuse(`No line of his can fire this: "${prepared.prepared.target.spoken}" has no word of its own that is not the action itself or a filler word. Tell him it cannot be done by voice.`);
+    return refuse(`"${prepared.prepared.target.spoken}" has no word of its own that is not the action itself or a filler word, so no read-back of it can be recognised. Tell him it cannot be done from here.`);
   }
   return prepared;
 }

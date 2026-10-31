@@ -2,7 +2,7 @@
 
 ## INV-205 — Question cards share three parts
 
-`AskUserQuestionPanel` (pending) and `AnsweredQuestion` (answered) render one question from the same `QuestionText` and `QuestionOptionRow`; the dispatcher module's `RoundAnswer` (a round's options) does too, through `@/shared/ui`. `QuestionText` alone, through the chat barrel, also draws the dispatcher's `LockAnswer` (the Accept census) and the companion's `CompanionActionCard` (the prompt of an action waiting for his word). A style change to either part changes every card.
+`AskUserQuestionPanel` (pending) and `AnsweredQuestion` (answered) render one question from the same `QuestionText` and `QuestionOptionRow`; the dispatcher module's `RoundAnswer` (a round's options) does too, through `@/shared/ui`, and so does the station's ask stage (`AskAnswers`, a chat's question: MAN-9282). `QuestionText` alone, through the chat barrel, also draws the dispatcher's `LockAnswer` (the Accept census) and the companion's `CompanionActionCard` (the prompt of an action waiting for his word). A style change to either part changes every card.
 
 1. `QuestionOptionRow` inside an option group takes `choice`: `'radio'` (single-select) or `'checkbox'` (multi-select) gives `role` plus `aria-checked`. why: `aria-pressed` inside a radiogroup announces a one-way pick as a toggle.
 2. `QuestionOptionRow` with no `choice` is a toggle button with `aria-pressed` — only the "Other" row, which sits outside the group and really switches off.
@@ -12,5 +12,6 @@
 6. `AnsweredQuestion.parseAnswer` assumes the panel writes a multi-select answer as chosen labels joined by `", "`, typed note last. Change the panel's answer format and `parseAnswer` in the same edit.
 7. The answered card shows option rows only for an answer that is WHOLLY known labels. Option rows for "option plus note" need the panel to send structured answers (chosen options and the note kept separate); that changes what the model receives, so the operator decides.
 8. Below the `sm` breakpoint the panel's footer hides the Esc/Enter key hints and wraps, action buttons pushed right. why: a long translation clipped Submit at 390px.
+9. Below `md` (768 px) `QuestionOptionRow` is a 44 px catch (`max-md:min-h-11`): the station's touch law (INV-10275) holds the ask stage's options to it, and every card that draws the row gets it.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/ContentRenderers/AnsweredQuestion.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/ContentRenderers/QuestionText.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/QuestionOptionRow.tsx

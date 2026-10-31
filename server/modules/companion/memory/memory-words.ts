@@ -7,14 +7,14 @@
  * as a quote of his: her context is folded onto one line behind its own label, so it can never begin a `He said (…)` line.
  *
  * HIS WORDS ARE HIS SPOKEN LINES. A memory carries only a line he SAID: a `companion_log` row with role `operator` and via `spoken` (a
- * talk press, `companion-press.ts`), found by its exact text with whitespace folded (`findHisLine`). It is the definition eyes' hands use
- * for his word (`checkHisWord`, `hands/action-word.ts`), so "what he said" means one thing across her hands and her memory, and a typed
- * line (every probe of the arc is typed or fed as a clip on account 1) never becomes a memory of his.
+ * talk press, `companion-press.ts`), found by its exact text with whitespace folded (`findHisLine`). A typed line (every probe of the arc
+ * is typed or fed as a clip on account 1) never becomes a memory of his. (Her hands take a typed line as his word as well as a spoken one,
+ * `hands/action-word.ts`; a memory is stricter, because it outlives the conversation.)
  *
  * `spoken` IS THE LOG'S WORD FOR A TALK PRESS AND ITS TRANSCRIPT, NOT PROOF OF SPEECH. The press door logs any clip longer than
  * `EMPTY_PRESS_UNDER_MS` as `spoken` with whatever the transcriber wrote: measured 2026-10-29, two seconds of digital silence came
- * back as "No.", and so would be found here as his line. So a memory is "what his press was heard to say", exactly the footing of
- * `checkHisWord`; no doc or sentence built on this module claims a memory proves he said it.
+ * back as "No.", and so would be found here as his line. So a memory is "what his press was heard to say"; no doc or sentence built on
+ * this module claims a memory proves he said it.
  *
  * THE SAME SUBJECT is `SAME_SUBJECT_LOGIT`'s measurement, below: a net for a correction, not a guarantee. A memory whose quotes are
  * exactly the new one's is never kept twice (`quotesAlike`).
@@ -65,7 +65,7 @@ const JUDGMENT: Record<Exclude<KeptWhy, 'asked'>, string> = {
   brief: 'how he likes a brief written',
 };
 
-/** A line as every comparison here reads it: trimmed, every run of whitespace one space (`checkHisWord`'s own fold). It is also what keeps one quote on one line. */
+/** A line as every comparison here reads it: trimmed, every run of whitespace one space It is also what keeps one quote on one line. */
 const folded = (text: string): string => text.trim().replace(/\s+/g, ' ');
 
 /**

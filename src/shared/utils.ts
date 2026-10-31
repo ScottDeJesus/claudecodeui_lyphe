@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from 'clsx';
+import type { ReactNode } from 'react';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
@@ -53,6 +54,19 @@ const twMerge = extendTailwindMerge({
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+// ---------------------------
+
+//----------------- A NODE THAT DRAWS SOMETHING ------------
+
+/**
+ * Whether a React node draws something: anything but `undefined`, `null` and `false`, the three a slot left empty or a
+ * condition that failed hands a layout. Kaylee Station's layouts ask it of every slot they place (the shell's columns, compact's
+ * and the phone's arrangements, the sections, the strip's week), so a place with nothing in it draws no box of its own.
+ */
+export function isDrawn(node: ReactNode): boolean {
+  return node !== undefined && node !== null && node !== false;
 }
 
 // ---------------------------
@@ -700,18 +714,35 @@ export function companionClientId(): string {
   return companionClientIdInMemory;
 }
 
+/**
+ * Takes this page's name to her out of a window this page has just opened, before that window's document has loaded, so it
+ * mints a name of its own. A window opened with `window.open` starts with a COPY of its opener's sessionStorage, and the name
+ * lives there: left alone, the new window would be the same page to her as this one, answer the same `companion_open`, and
+ * (the later of two same-named pages) speak her `<view>` over this one's. Reached through the window's own storage, which is
+ * readable while it still holds its initial document; a window that cannot be read is left as it is.
+ *
+ * Consumed by `src/shared/cloudcliDoors.ts`, which opens every window the station opens for CloudCLI.
+ */
+export function forgetCompanionClientIdIn(opened: Window): void {
+  try {
+    opened.sessionStorage.removeItem(COMPANION_CLIENT_STORAGE_KEY);
+  } catch (error) {
+    console.warn('[Companion] Could not clear the page name a new window inherited:', error);
+  }
+}
+
 // ---------------------------
 
 //----------------- A RECORDED CLIP'S FILE NAME ------------
 
 /**
  * The name a recorded clip is uploaded under, by its MIME type: `recording.m4a` for mp4 audio, `recording.ogg` for ogg,
- * `recording.webm` otherwise (what the mic's recorder makes on Chromium and Firefox). The server types the clip by this
- * extension, so every upload of the mic names it the same way. Used by `useVoiceInput` (the chat's mic) and
- * `api.companion.press` (the talk button's clip).
+ * `recording.wav` for wav (the clip her ears cut after hearing her name), `recording.webm` otherwise (what the mic's recorder
+ * makes on Chromium and Firefox). The server types the clip by this extension, so every upload of the mic names it the same
+ * way. Used by `useVoiceInput` (the chat's mic) and `api.companion.press` (the talk button's clip and a name press's).
  */
 export function recordingFileName(mimeType: string): string {
-  const extension = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : 'webm';
+  const extension = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : mimeType.includes('wav') ? 'wav' : 'webm';
   return `recording.${extension}`;
 }
 
@@ -777,4 +808,22 @@ export function isBlockedAsMixedContent(address: string, pageProtocol: string): 
   } catch {
     return false;
   }
+}
+
+// ---------------------------
+
+//----------------- A UNIFIED DIFF'S LINES ------------
+
+/**
+ * Which kind of diff line this is: `meta`, `hunk`, `add`, `remove` or `context`. `+++`/`---` are tested first, or a header
+ * reads as a change. Read by `DiffLines` (the kit's drawing of a diff) and by the chat's `DiffBlock`, whose header counts the
+ * added and removed lines.
+ */
+export function splitDiffLine(line: string): 'add' | 'remove' | 'hunk' | 'meta' | 'context' {
+  if (line.startsWith('+++') || line.startsWith('---')) return 'meta';
+  if (line.startsWith('diff ') || line.startsWith('index ')) return 'meta';
+  if (line.startsWith('@@')) return 'hunk';
+  if (line.startsWith('+')) return 'add';
+  if (line.startsWith('-')) return 'remove';
+  return 'context';
 }

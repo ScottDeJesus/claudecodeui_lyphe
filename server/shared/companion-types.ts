@@ -195,20 +195,19 @@ export type CompanionProcess = { state: 'asleep' | 'waking' | 'awake' | 'failed'
 export type CompanionTurnOutcome = 'answered' | 'stopped' | 'failed';
 
 /**
- * The thirteen things she does in the house. Eleven change it, and each of those waits for his spoken word, never her
- * own judgment (`CompanionCeremonyAction`). The dispatcher's own: `queue`, `hide` and `rework` answer a plan's open Accept
+ * The thirteen things she does in the house. Eleven change it, and each of those waits for his word, which Kaylee judges from the
+ * conversation after she has read the action back (`CompanionCeremonyAction`). The dispatcher's own: `queue`, `hide` and `rework` answer a plan's open Accept
  * prompt (`hide` and `rework` also act on a card with none open), `answer` sends his answers to an open questions round,
  * and `show`, `recut`, `stop`, `resume` and `kick` act on a card. `resume_run` resumes a chain that is not running, with
- * his rulings. `clear_memory` retires every memory of her own bank, which only he can ask of her, in the words he says
- * aloud. The other two are harmless and are done the moment he asks, with no pending action: `open` brings a card,
- * run, page or chat up on his screen, and `close_followup` ticks one of his follow-ups off. All thirteen are kinds of a row of her
+ * his rulings. `clear_memory` retires every memory of her own bank, which only he can ask of her. The other two are harmless and are done the moment he asks, with no pending action: `open` brings a card,
+ * run, page, chat or Cerberus check up on his screen, and `close_followup` ticks one of his follow-ups off. All thirteen are kinds of a row of her
  * record of actions and verbs of the panel; a pending action holds only the eleven (the server types it so: `CompanionStoredPending`).
  */
 export type CompanionActionKind = 'queue' | 'hide' | 'show' | 'rework' | 'answer' | 'recut' | 'stop' | 'resume' | 'kick' | 'resume_run' | 'open' | 'close_followup' | 'clear_memory';
 
 /**
- * The eleven actions that change the house and take the whole ceremony: prepared onto his panel, read back to him, fired by his
- * spoken word, lapsing thirty minutes on. Every kind but the two harmless ones (`open`, `close_followup`), which she does at once.
+ * The eleven actions that change the house and take the whole ceremony: prepared onto his panel, read back to him, fired when
+ * Kaylee judges he agreed, lapsing thirty minutes on. Every kind but the two harmless ones (`open`, `close_followup`), which she does at once.
  * Used by the hands' words, recipes and doors (`server/modules/companion/hands/`) and by the stored pending action
  * (`companion-pending.ts`), so no word of the ceremony is kept for an action that has none.
  */
@@ -216,7 +215,7 @@ export type CompanionCeremonyAction = Exclude<CompanionActionKind, 'open' | 'clo
 
 /**
  * What an action acts on, told apart by `kind`. `spoken` is the name he says it by: the card draws it and
- * the check of his word reads it. A `card` is a plan or an epic by the dispatcher's name (`arc` the epic a
+ * her read-back is recognised by it. A `card` is a plan or an epic by the dispatcher's name (`arc` the epic a
  * plan belongs to, `null` for an epic or a plan with none); a `run` is a chain id or a soul launch id
  * (`plan` the plan a chain builds, `null` for a soul's); a `page` is a DocSpace page (`blockId` the block
  * an open lands on, `null` for the page); a `chat` is an app session id; a `followup` is one of his
@@ -236,18 +235,18 @@ export type CompanionActionTarget =
   | { kind: 'check'; node: string; key: string; spoken: string };            // what her open records for a check (key `<service>/<id>`); never a pending action
 
 /**
- * One of his spoken lines, carried verbatim into an action: its `logId` in her log, its `at` time and its
- * `text` exactly as he said it. Notes, rulings and answers travel only this way — never in her words, and
- * never from a line he typed. Carried by `CompanionPendingAction.carried`.
+ * One of his lines (spoken or typed), carried verbatim into an action: its `logId` in her log, its `at` time and its
+ * `text` exactly as he said it. Notes, rulings and answers travel only this way — never in her words.
+ * Carried by `CompanionPendingAction.carried`.
  */
 export type CompanionCarriedLine = { logId: number; at: string; text: string };
 
 /**
  * The one action waiting for his word, as her panel's card draws it. `id` names the action (its row in
  * the house's record of her actions); `prompt` is the Accept census, or the open questions with their
- * options, as the card shows them (`null` when the action has none); `carried` is his own spoken lines it
+ * options, as the card shows them (`null` when the action has none); `carried` is his own lines it
  * carries — notes or rulings under a `null` label, or one group per question with the question as its
- * `label` — each line verbatim; `say` is what he says aloud to fire it ("Queue Kaylee's eyes"); `preparedAt`
+ * `label` — each line verbatim; `say` is the action as one order ("Queue Kaylee's eyes"), the name her answers and the panel's record give it, which no page draws; `preparedAt`
  * is when it went on his panel and `expiresAt` when it lapses (thirty minutes on). Held in her state beside
  * the draft and announced by `companion_pending`. What the prepare pinned (the ask and its lock token, the
  * chain, the follow-up) is the server's alone and is never part of this shape.
@@ -258,7 +257,7 @@ export type CompanionPendingAction = {
   target: CompanionActionTarget;
   prompt: string | null;                                        // the Accept census, or the questions with their options, as the card shows them
   carried: Array<{ label: string | null; lines: CompanionCarriedLine[] }>;  // notes or rulings (label null), or one group per question (label = the question)
-  say: string;                                                  // what he says to fire it: "Queue Kaylee's eyes"
+  say: string;                                                  // the action as one order, "Queue Kaylee's eyes": named in her answers and the panel's record; no page draws it
   preparedAt: string;
   expiresAt: string;
 };
@@ -266,7 +265,7 @@ export type CompanionPendingAction = {
 /**
  * Where an open lands, on the page that holds the floor: a `chat` by its app session id, a roadmap `card`
  * by its plan's name, a DocSpace `page` (and `blockId`, `null` for the page itself), or a service `check`
- * by its `node` and its `key` (`<service>/<id>`), which only the station draws. Carried by
+ * by its `node` and its `key` (`<service>/<id>`), which the station puts on its stage and the workspace on its Cerberus tab. Carried by
  * `companion_open`.
  */
 export type CompanionOpenTarget =
@@ -385,8 +384,9 @@ export type CompanionPicture = {
  * station's stage names what she opened by it; the workspace ignores it); `companion_floor` says the
  * floor moved: `floor` is the client id of the page that holds it now, so the page whose own id equals it
  * may play her voice and every other page shows the text only (sent on every write of the floor, whether
- * or not the holder changed); `companion_cleared` says the account's log, notes and pending action were
- * cleared, with her conversation, and the panel empties; `companion_face` carries the account's face after an
+ * or not the holder changed); `companion_cleared` says the account's log, unpinned notes and pending action were
+ * cleared, with her conversation, and the panel empties but for the cards he pinned, which Clear keeps;
+ * `companion_face` carries the account's face after an
  * upload, a restore, each frame a bake renders and the bake's end.
  */
 export type CompanionFrame =

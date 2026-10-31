@@ -17,5 +17,5 @@ export { resolveEmbedUrl } from '@/modules/widgets/embedUrl';
 export { resolveDocSpaceOrigin } from '@/modules/widgets/docspaceOrigin';
 // A link into DocSpace's studio for a page, or one block of it, built on that same origin: the ONE builder of a DocSpace page
 // link. Its consumers are src/modules/companion (Settings' "Open her memory") and src/modules/station (the page stage's
-// "Open in DocSpace"); the cards plan's page card and the memory corner will read it too.
+// "Open in DocSpace", the memory corner's "Open the full page" and the note stage's page card).
 export { docSpacePageUrl } from '@/modules/widgets/docspaceOrigin';

@@ -2,21 +2,23 @@ import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod';
 
 import { CLAUDE_MODEL_VALUE_BY_ALIAS, type ClaudeModelAlias } from '@/modules/providers/index.js';
-import type { CompanionDraftTarget, CompanionNote, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
+import type { CompanionDraftTarget, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
 import { guardedToolResult, textResult, type ToolTextResult } from '@/shared/tool-text-result.js';
 
 import { characterCount, DRAFT_TEXT_MAX } from '../companion-input.js';
-import { escapeText } from '../session/companion-envelopes.js';
+import { noWalkSentence, walkBeyondSentence } from '../companion-walk.js';
 import { toolLine } from '../session/companion-prompt.js';
 
 import type { CompanionToolDeps } from './companion-tools.js';
+import { dismissNoteTool } from './dismiss-note-tool.js';
 import { resolveChat, resolveProject } from './house-reads.js';
 
 /**
  * The six tools that put her work on his screen and send it: `update_draft` (the one brief she keeps, with its
- * target; an empty text clears both), `show_note` (a card, for what is better seen than heard) and `dismiss_note`
- * (takes one down), `walk` (the walkthrough's cursor), and `send_to_session` / `create_session` (the draft going
- * out). The first four write through the account's store, so the matching frame (`companion_draft`, `companion_note`,
+ * target; an empty text clears both), `show_note` (a card of hers, a `note` or a `list`, for what is better seen than heard) and
+ * `dismiss_note` (takes one down; its definition is `dismiss-note-tool.ts`'s, which leaves the cards he pinned), `walk` (the
+ * walkthrough's cursor), and `send_to_session` / `create_session` (the draft going out). The first four write through the
+ * account's store, so the matching frame (`companion_draft`, `companion_note`,
  * `companion_note_removed`, `companion_walk`) reaches his panel the moment she calls it, and the answer is one plain
  * sentence.
  *
@@ -33,7 +35,8 @@ import { resolveChat, resolveProject } from './house-reads.js';
  * THE WALK'S CURSOR lives in the store, because her conversation's hold on it does not survive her own compaction or a turn
  * to another chat: `walk` carries the cursor, the store holds it, and `<state>` restates it after a compaction.
  * One walk per account; a call that would MOVE it by naming another chat without `items` is refused rather
- * than guessed at, while `at` 0 ends the held walk whichever chat is named (its own chat may be gone).
+ * than guessed at, while `at` 0 ends the held walk whichever chat is named (its own chat may be gone). His own Back, Next and ×
+ * move the same cursor through `companion-walk.ts`, which words the two refusals they share with this tool.
  *
  * A tool that names a chat makes it her focus (`update_draft` for a chat, `walk`, and a send once it has gone), and
  * sets her activity while it runs (`drafting`, `walking`) through the harness's `withActivity`. A refusal is `isError` text that
@@ -133,33 +136,15 @@ function updateDraft(deps: CompanionToolDeps, args: { session?: string; project?
   });
 }
 
-/** `show_note`: one card on his panel; it stays until he dismisses it or she does (`dismiss_note`). The answer names the card's number, which is how she can take it down. */
-function showNote(deps: CompanionToolDeps, args: { title: string; text: string }): Promise<ToolTextResult> {
+/**
+ * `show_note`: one card on his panel, of the `kind` she says (her own words, a `note`, unless she says `list`) and about nothing; it
+ * stays until he dismisses it or she does (`dismiss_note`, unless he pins it). The answer names the card's number, which is how she
+ * can take it down.
+ */
+function showNote(deps: CompanionToolDeps, args: { title: string; text: string; kind?: 'note' | 'list' }): Promise<ToolTextResult> {
   return guardedToolResult('show_note', 'put the note on his panel', () => {
-    const note = deps.store.addNote({ title: args.title, text: args.text });
+    const note = deps.store.addNote({ title: args.title, text: args.text, kind: args.kind ?? 'note', ref: null });
     return textResult(`On his panel as card ${note.id}.`);
-  });
-}
-
-/**
- * A card as her answers name it: its number and its title on one line (`2 "Lane diff"`), so she can say which card went
- * and choose between old ones. The title is stored text, escaped as an envelope escapes it (`escapeText`).
- */
-const cardLabel = (card: CompanionNote): string => `${card.id} "${escapeText(card.title.replace(/\s+/g, ' ').trim())}"`;
-
-/**
- * `dismiss_note`: takes one card off his panel, the one by its number or, with none given, the newest (the highest
- * number). It goes through the store's `removeNote`, as the panel's ✕ does (`DELETE /notes/:id`), so only this account's
- * cards can be named. A number that is not up is refused naming the ones that are, each with its title, so she can correct
- * herself. A card he dismissed in the same instant is not a refusal: the store answers `false` and the card is gone either way.
- */
-function dismissNote(deps: CompanionToolDeps, args: { note?: number }): Promise<ToolTextResult> {
-  return guardedToolResult('dismiss_note', 'take the card down', () => {
-    const cards = [...deps.store.listNotes()].sort((a, b) => a.id - b.id);
-    if (cards.length === 0) return deps.refuse('There is no card on his panel.');
-    const card = args.note === undefined ? cards[cards.length - 1] : cards.find((candidate) => candidate.id === args.note);
-    if (card === undefined) return deps.refuse(`No card ${args.note} is on his panel; up now: ${cards.map(cardLabel).join(', ')}.`);
-    return textResult(`Card ${cardLabel(card)} ${deps.store.removeNote(card.id) ? 'taken down' : 'was already gone'}.`);
   });
 }
 
@@ -184,7 +169,7 @@ function announceWalk(deps: CompanionToolDeps, chat: CompanionSessionRef | null,
  * must never depend on resolving it. The focus follows the chat named only when it can still be named.
  */
 function endWalk(deps: CompanionToolDeps, held: CompanionWalk | null, session: string): Promise<ToolTextResult> {
-  if (held === null) return Promise.resolve(textResult('There is no walkthrough open, so there is nothing to end.'));
+  if (held === null) return Promise.resolve(textResult(noWalkSentence('end')));
   deps.store.setWalk(null);
   const named = resolveChat(session);
   return announceWalk(deps, named.ok ? named.chat : null, `Walkthrough of ${held.session.name} ended.`);
@@ -215,9 +200,7 @@ function walk(deps: CompanionToolDeps, args: { session: string; items?: string[]
           : otherWalkSentence(held.session.name, chat.name)
       );
     }
-    if (args.at > items.length) {
-      return deps.refuse(`at is ${args.at}, but the walkthrough has ${items.length} ${items.length === 1 ? 'item' : 'items'}: use 1 to ${items.length}, or 0 to end it.`);
-    }
+    if (args.at > items.length) return deps.refuse(walkBeyondSentence(args.at, items.length));
     deps.store.setWalk({ session: chat, items, at: args.at });
     return announceWalk(deps, chat, `Item ${args.at} of ${items.length}: ${items[args.at - 1]}.`);
   });
@@ -265,18 +248,12 @@ export function draftTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
       toolLine('show_note'),
       {
         title: z.string().trim().min(1).max(NOTE_TITLE_MAX).describe('The card\'s heading: a few words.'),
-        text: z.string().trim().min(1).max(NOTE_TEXT_MAX).describe('What goes on the card: the list, the path, the diff or the numbers, as plain text.'),
+        text: z.string().trim().min(1).max(NOTE_TEXT_MAX).describe('What goes on the card: the list, the path or the numbers, as plain text.'),
+        kind: z.enum(['note', 'list']).optional().describe('note (the default) for your own words; list when the card is a list of things, one to a line. What a read puts on his panel says its own kind.'),
       },
       (args) => showNote(deps, args)
     ),
-    tool(
-      'dismiss_note',
-      toolLine('dismiss_note'),
-      {
-        note: z.number().int().min(1).optional().describe('The card\'s number, as show_note answered it. Leave out to take down the newest card.'),
-      },
-      (args) => dismissNote(deps, args)
-    ),
+    dismissNoteTool(deps),
     tool(
       'update_draft',
       toolLine('update_draft'),

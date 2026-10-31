@@ -40,7 +40,7 @@ const FIRST_READ_WAIT_MS = 5000;
  * reading is synchronous and seeded when it is built, so this answers at once; `null` is the shared lane's type, never
  * a case this lane meets. The entrypoint passes `launches` on to the companion's house
  * (`CompanionHouse.launches`), and `resumeRun(order)` after it (`CompanionHouse.resumeRun`): a chain resumed with his
- * rulings on his spoken word, through the plan-runner's own door with kaylee--press's record of it
+ * rulings on his word, spoken or typed, through the plan-runner's own door with kaylee--press's record of it
  * (`run-resume.service.ts`) — this lane owns the runs on this server.
  */
 export type DispatchSoulsModule = {

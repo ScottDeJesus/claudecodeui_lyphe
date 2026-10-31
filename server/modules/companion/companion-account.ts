@@ -41,7 +41,7 @@ import { createToolDeps } from './tools/tool-deps.js';
  */
 
 /**
- * One account's Kaylee: her `store`, her live `session`, the `speechCache` of her current turn's audio and the `activity` as
+ * One account's Kaylee: her `store`, her live `session`, the `speechCache` of her sentences' audio and the `activity` as
  * last announced to the pages. Consumed by `companion.service.ts`, `companion-speech.ts` and `companion-picture.ts`.
  */
 export type CompanionAccount = {

@@ -6,7 +6,7 @@ import type { CompanionProcess } from '@/shared/companion-types.js';
 
 import type { UnansweredMessage } from '../companion-unanswered.js';
 
-import { emptyPressEnvelope, operatorEnvelope } from './companion-envelopes.js';
+import { calledEnvelope, emptyPressEnvelope, operatorEnvelope } from './companion-envelopes.js';
 import { failureSentence, readLoopEvent, type CompanionLoopEvent } from './companion-events.js';
 import { resumableSessionId, unexpectedTools } from './companion-launch.js';
 import { createHandoverGate } from './companion-handover-gate.js';
@@ -65,9 +65,11 @@ type Launch = { cli: CompanionCli; shape: string; initSeen: boolean; resumeRefus
 /** A stop whose turn has not yet reported its result: the launch concerned, a promise that settles when the wait is over and the way to settle it. */
 type Stop = { launch: Launch; over: Promise<void>; end(): void };
 
-/** His words as an envelope: the empty press is its own tag. */
-const wordsEnvelope = (words: { body: string; via: 'typed' | 'spoken' }): string =>
-  words.body === '' && words.via === 'spoken' ? emptyPressEnvelope() : operatorEnvelope(words.body, words.via);
+/** His words as an envelope: the empty press is its own tag, and so is a call by name (`heard: 'name'`), which a replay must not read as the empty one. */
+const wordsEnvelope = (words: Pick<UnansweredMessage, 'body' | 'via' | 'heard'>): string => {
+  if (words.body !== '' || words.via !== 'spoken') return operatorEnvelope(words.body, words.via);
+  return words.heard === 'name' ? calledEnvelope() : emptyPressEnvelope();
+};
 
 /** Consumed by `companion-account.ts`: one call per account, made lazily on the account's first use. */
 export function createCompanionSession(deps: CompanionSessionDeps): CompanionSession {
@@ -374,7 +376,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     console.log(`[Companion] account ${userId}: re-sending ${entries.length} message(s) her last process never answered`);
     for (const entry of entries) {
       try {
-        push(wordsEnvelope(entry), { body: entry.body, via: entry.via, at: entry.at, cut: entry.cut }, entry);
+        push(wordsEnvelope(entry), { body: entry.body, via: entry.via, at: entry.at, heard: entry.heard, cut: entry.cut }, entry);
       } catch (error) {
         // Left in the list, it is tried again at the next boot.
         console.error(`[Companion] account ${userId}: a message her last process never answered could not be sent again`, error);
@@ -426,9 +428,9 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     }
   }
 
-  /** His words, kept until answered (`at` is when he said them). `''` spoken is a press that carried no words. */
-  function pushHis(body: string, via: 'typed' | 'spoken'): void {
-    push(wordsEnvelope({ body, via }), { body, via, at: new Date().toISOString() });
+  /** His words, kept until answered (`at` is when he said them). `''` spoken is a press that carried no words; with `heard: 'name'` it is a press that was only her name. */
+  function pushHis(body: string, via: 'typed' | 'spoken', heard?: 'name'): void {
+    push(wordsEnvelope({ body, via, heard }), { body, via, at: new Date().toISOString(), ...(heard === undefined ? {} : { heard }) });
   }
 
   /** Starts her process if it is closed, with nothing in it: the idle closer is armed with the launch, so a message that never comes costs a process until the window ends. */
@@ -489,6 +491,9 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     },
     pushOperatorEmpty() {
       pushHis('', 'spoken');
+    },
+    pushOperatorCalled() {
+      pushHis('', 'spoken', 'name');
     },
     pushAlerts(blocks) {
       if (blocks.length > 0) push(blocks.join('\n'), null);

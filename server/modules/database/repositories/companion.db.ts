@@ -118,19 +118,18 @@ export type CompanionNoteRow = {
   pinned: number;
 };
 
-/** One log line as the check of his word reads it: who said it, how and when, with its words. Only his lines (`operator`) and hers (`kaylee`) are ever read this way. */
+/** One log line as `take_action` reads it: who said it, and when, with its words. His lines (`operator`, spoken or typed) and hers (`kaylee`) are the only ones read this way. */
 export type CompanionHeardRow = {
   id: number;
   at: string;
   role: 'operator' | 'kaylee';
-  via: 'typed' | 'spoken' | null;
   text: string;
 };
 
 /** One account's faces as the face service's start and prune read them: the face it draws and the one being made (each NULL for none). */
 export type CompanionFaceRow = Pick<CompanionStateRow, 'user_id' | 'face_id' | 'face_pending_id'>;
 
-/** What `clearAccount` removed and whether a state row was there to reset. */
+/** What `clearAccount` removed (`notesRemoved` counts the unpinned cards; the pinned stay) and whether a state row was there to reset. */
 export type CompanionClearResult = {
   logRemoved: number;
   notesRemoved: number;
@@ -302,17 +301,17 @@ export const companionDb = {
 
   /**
    * His lines and hers (`operator` and `kaylee` rows) logged after `since`, oldest first, at most `COMPANION_LOG_KEEP` —
-   * the whole of what the log keeps for the account, which is the most a check of his word can need. `since` is an
+   * the whole of what the log keeps for the account, which is the most `take_action` can need. `since` is an
    * ISO-8601 stamp; the stamps are fixed-width UTC, so the comparison is a text comparison and a line logged in the very
    * millisecond of `since` is not after it. A `since` that is not such a stamp (`''` would be "before every line") throws:
-   * a check that reads "after the card went up" must not fail open. The panel's own lines (`alert`, `system`) are not his
+   * a check that reads "since the ceremony began" must not fail open. The panel's own lines (`alert`, `system`) are not his
    * words and are never read.
    */
   heardSince(userId: number, since: string): CompanionHeardRow[] {
     if (!isStoreStamp(since)) throw new Error(`heardSince needs a stored stamp (ISO-8601 UTC with milliseconds), not ${JSON.stringify(since)}.`);
     return getConnection()
       .prepare(
-        `SELECT id, at, role, via, text FROM companion_log
+        `SELECT id, at, role, text FROM companion_log
          WHERE user_id = ? AND role IN ('operator', 'kaylee') AND at > ?
          ORDER BY id LIMIT ?`
       )
@@ -320,13 +319,15 @@ export const companionDb = {
   },
 
   /**
-   * His newest line of any kind (`operator` rows, spoken or typed), or `null` when he has said nothing. The trigger a harmless
-   * action's record carries as its `said` (`open` and `close_followup` are done at once and wait for no word, so the line is the
-   * record's, never a check). Consumed by `hands/direct-tools.ts`.
+   * His newest line of any kind (`operator` rows, spoken or typed), or `null` when he has said nothing. With `withWords`, a press that
+   * heard nothing (logged with no text) is skipped, for a record of his word cannot be empty. The trigger a harmless action's record
+   * carries as its `said` (`open` and `close_followup` are done at once and wait for no word), and, `withWords`, the last-resort record of
+   * a `take_action` when no line of his stands since the read-back. Consumed by `hands/direct-tools.ts` and `hands/hands-tools.ts`.
    */
-  newestOperatorLine(userId: number): CompanionHeardRow | null {
+  newestOperatorLine(userId: number, withWords: boolean = false): CompanionHeardRow | null {
+    const words = withWords ? `AND trim(text, ' ' || char(9) || char(10) || char(13)) <> ''` : '';
     const row = getConnection()
-      .prepare(`SELECT id, at, role, via, text FROM companion_log WHERE user_id = ? AND role = 'operator' ORDER BY id DESC LIMIT 1`)
+      .prepare(`SELECT id, at, role, text FROM companion_log WHERE user_id = ? AND role = 'operator' ${words} ORDER BY id DESC LIMIT 1`)
       .get(userId) as CompanionHeardRow | undefined;
     return row ?? null;
   },
@@ -365,7 +366,20 @@ export const companionDb = {
   },
 
   /**
-   * Clear: deletes the account's log and cards and empties its state's conversation (its id, shape and handover), focus, draft,
+   * Sets one of the account's cards pinned or not, reporting whether a row of that account was there: `false` for an id of another
+   * account or a card already taken down. A card already in the state asked for still answers `true` (the statement matches the
+   * row whether or not the value moves), so his press is idempotent.
+   */
+  setNotePinned(userId: number, id: number, pinned: boolean): boolean {
+    const result = getConnection()
+      .prepare('UPDATE companion_notes SET pinned = ? WHERE id = ? AND user_id = ?')
+      .run(pinned ? 1 : 0, id, userId);
+
+    return result.changes > 0;
+  },
+
+  /**
+   * Clear: deletes the account's log and its UNPINNED cards — a pinned card is his keep and survives it — and empties its state's conversation (its id, shape and handover), focus, draft,
    * pending action, unanswered messages and walkthrough — in one transaction. `floor` stays (which client holds the floor
    * is no part of her conversation), and so do her face columns (Clear wipes her memory, not her look), and so does `memory_forget_line`: log ids are AUTOINCREMENT and never reused, so the id of the line
    * the last forget of her memory used stays a true lower bound after the log it named is gone, and a line he says next always has a
@@ -384,7 +398,7 @@ export const companionDb = {
       const clearedAt = new Date().toISOString();
       db.prepare(`UPDATE companion_actions SET ended_at = ?, outcome = 'cancelled' WHERE user_id = ? AND outcome IS NULL AND said_log_id IS NULL`).run(clearedAt, userId);
       const logRemoved = db.prepare('DELETE FROM companion_log WHERE user_id = ?').run(userId).changes;
-      const notesRemoved = db.prepare('DELETE FROM companion_notes WHERE user_id = ?').run(userId).changes;
+      const notesRemoved = db.prepare('DELETE FROM companion_notes WHERE user_id = ? AND pinned = 0').run(userId).changes;
       const stateReset =
         db
           .prepare(

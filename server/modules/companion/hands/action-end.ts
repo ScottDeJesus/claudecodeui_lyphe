@@ -23,8 +23,8 @@ import type { CompanionStore } from '../companion-store.js';
  * Consumers: `hands-tools.ts` (all three tools) and `companion.service.ts` (`cancelAction`, his ×).
  */
 
-/** What a row says when the process that was carrying its action out is gone: the door may or may not have run. */
-const MAY_HAVE_GONE_THROUGH = 'The server stopped while this was being carried out, so it may have gone through; check before preparing it again.';
+/** What a row says when the process that was carrying its action out is gone: the door may or may not have run. Consumed by `action-rearm.ts`, which never re-arms a row that says it. */
+export const MAY_HAVE_GONE_THROUGH = 'The server stopped while this was being carried out, so it may have gone through; check before preparing it again.';
 
 /** The actions a take of this process is carrying out, per account. */
 const carryingOut = new Map<number, Set<string>>();

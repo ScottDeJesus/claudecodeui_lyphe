@@ -81,6 +81,8 @@ const STATE_TILT: Partial<Record<CompanionPresenceState, number>> = { listening:
  * Used by the portrait and by `.verify`'s replay: every frame's name in the bake's convention, by index —
  * `mood.<mood>.<mouth>`, `blink.<mood>.half` and `.closed`, `gaze.<gaze>`, `pose.<pose>`, `state.listening`, `state.failed`,
  * `state.surprise` and `clip.<clip>.<n>`. A frame two things point at keeps the first name; one nothing points at is `frame.<n>`.
+ * A clip's own frames are numbered from 0 without the frames another table already names: the gasp's playlist is
+ * `clip.gasp.0`, `state.surprise`, `clip.gasp.1`, as the bake names them.
  */
 export function frameNames(manifest: CompanionFaceManifest): string[] {
   const names = manifest.frames.map((_, index) => `frame.${index}`);
@@ -98,7 +100,14 @@ export function frameNames(manifest: CompanionFaceManifest): string[] {
   for (const [gaze, index] of Object.entries(manifest.gaze)) claim(index, `gaze.${gaze}`);
   for (const [pose, index] of Object.entries(manifest.poses)) claim(index, `pose.${pose}`);
   for (const [state, index] of Object.entries(manifest.states)) claim(index, `state.${state}`);
-  for (const [clip, { frames }] of Object.entries(manifest.clips)) frames.forEach((index, n) => claim(index, `clip.${clip}.${n}`));
+  for (const [clip, { frames }] of Object.entries(manifest.clips)) {
+    let n = 0;
+    for (const index of frames) {
+      if (claimed.has(index)) continue;
+      claim(index, `clip.${clip}.${n}`);
+      n += 1;
+    }
+  }
   return names;
 }
 

@@ -92,10 +92,10 @@ const buildEndingEvent = createNotificationEvent as (input: {
  *   - `picture()` is the lane's picture behind `whenLanded`, bounded exactly as the router's `current` is: `null`
  *     while this boot's first reading has not landed;
  *   - `cardText(name)` is `dispatcher show <name>`, run with the lane's own command and child environment;
- *   - `relay(order)` carries one act of Kaylee's on his spoken word, with kaylee--press's record of it: the answer to an
+ *   - `relay(order)` carries one act of Kaylee's on his word, spoken or typed, with kaylee--press's record of it: the answer to an
  *     open prompt goes through the book of the open asks as its third door (`kaylee`, beside the card and the phone), every
  *     other act is a dispatcher verb of its own run with `--relay` (`dispatcher-relay.service.ts`). The companion's house
- *     hands it to her `take_action` (`CompanionHouse.relay`).
+ *     hands it to her `take_action` (`CompanionHouse.relay`). An act the dispatcher took pokes the lane, as the card's verbs do.
  */
 export type DispatcherModule = {
   router: Router;
@@ -211,8 +211,13 @@ export function createDispatcherModule(): DispatcherModule {
     // A read waits, bounded, for this boot's first reading rather than being handed a picture nobody
     // has read; past the bound it is told so, and the landing's own frame fills the tab.
     current: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
-    runVerb: (verb: DispatcherVerb, plan: string, verbArgs?: readonly string[]) =>
-      runDispatcherVerb(verb, plan, commands, verbArgs),
+    // A verb the dispatcher took pokes the lane (`PolledLane.poke`, as the roadmap's writes do): the card, the Inbox and the
+    // station's rail redraw on the picture that follows the press, not up to two seconds later on the next poll.
+    runVerb: async (verb: DispatcherVerb, plan: string, verbArgs?: readonly string[]) => {
+      const result = await runDispatcherVerb(verb, plan, commands, verbArgs);
+      if (result.ok) watcher.poke();
+      return result;
+    },
     // The dispatcher's own `offpeak` verb prints the hour, so the card's `Resume at …` button shows the
     // moment this box will really start a plan.
     offpeak: createOffpeakClock({ bin, timeoutMs: VERB_TIMEOUT_MS }),
@@ -220,7 +225,15 @@ export function createDispatcherModule(): DispatcherModule {
   // The card's own door, beside the verbs and the reads: `POST /api/dispatcher/answer`. Mounted on
   // the lane's router rather than written into it because it answers through the PROMPTS root, whose
   // book owns the ask, and because that router is at its size ceiling already.
-  router.use(createDispatcherAnswerRouter({ answer: prompts.answer }));
+  router.use(createDispatcherAnswerRouter({
+    // An answer the dispatcher took pokes the lane for the same reason a verb does: an Accept answered from the card leaves the
+    // card, the Inbox and the station's rail on the next picture, which the poke brings within moments.
+    answer: async (ask, decision) => {
+      const reply = await prompts.answer(ask, decision);
+      if (reply.outcome === 'took') watcher.poke();
+      return reply;
+    },
+  }));
 
   return {
     router,
@@ -231,8 +244,14 @@ export function createDispatcherModule(): DispatcherModule {
     },
     picture: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
     cardText: (name: string) => readCardText(name, commands),
-    relay: (order: RelayOrder) => isLockOrder(order)
-      ? prompts.answerOnHisWord(order.ask, replyOfLockOrder(order), order.press).then(relayAnswerOf)
-      : relayOrder(order, commands, (line) => console.log(line)),
+    relay: async (order: RelayOrder) => {
+      const answer = await (isLockOrder(order)
+        ? prompts.answerOnHisWord(order.ask, replyOfLockOrder(order), order.press).then(relayAnswerOf)
+        : relayOrder(order, commands, (line) => console.log(line)));
+      // His word, carried by Kaylee, is the third door beside the card's verbs and answers, and it pokes the lane for the same reason they do: the card, the
+      // Inbox and the station's rail leave the Accept on the picture that follows his yes, not up to two seconds later on the next poll.
+      if (answer.outcome === 'took') watcher.poke();
+      return answer;
+    },
   };
 }

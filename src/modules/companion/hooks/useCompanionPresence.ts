@@ -55,8 +55,9 @@ function presenceStateOf(
 }
 
 /**
- * Used by this module's CompanionPanel, which hands the result to the header's status line, and by CompanionFab, which draws it
- * as the button's face and label: both read one state, so the line and the face change in the same frame. THE ONE RESOLVER of
+ * Used by this module's CompanionPanel, which hands the result to the header's status line (CompanionStatus), by CompanionFab,
+ * which draws it as the button's label, by CompanionFace, which draws it as her face (the button's, and the station's), and by the
+ * station's head, through the barrel, for its status line: all read one state, so the line, the label and the face change in the same frame. THE ONE RESOLVER of
  * Kaylee's picture (`picture.process`, `picture.activity`), the page's talk press (`talk.state`) and the page's player
  * (`voice.speaking`, `voice.cut`) into a state: whatever draws what she is doing reads that state from here, so no two
  * consumers can resolve them differently. A consumer may still read one source for its own part (the talk button reads
