@@ -39,7 +39,7 @@ function drawing(her: CompanionPicture | null, press: Partial<TalkPress> = {}, p
       bindingLabel: her?.settings.talkBinding?.label ?? null,
       onSend: NO_SEND,
       ready: her !== null,
-    } satisfies Omit<ComponentProps<typeof StationTalkView>, 'tier' | 'density'>,
+    } satisfies Omit<ComponentProps<typeof StationTalkView>, 'density'>,
   };
 }
 

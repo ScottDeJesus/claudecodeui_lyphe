@@ -1,14 +1,25 @@
+import { ImageOffIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { api } from '@/shared/api';
 import type { ChatImage } from '@/shared/types';
 import { Lightbox } from '@/shared/ui';
+import { useOutsideImage } from '@/modules/chat/transcript/transcriptPictures';
+
+/** `default`, the chat's 112 px cards; `small`, 28 px squares on one line. */
+type ChatImageSize = 'default' | 'small';
 
 type ChatMessageImagesProps = {
   images: ChatImage[];
   projectId?: string | null;
   /** `end` for a user turn's right-aligned cards (default); `start` for a picture a tool returned, which sits under the assistant's call. */
   align?: 'start' | 'end';
+  /**
+   * `default`: the chat's 112 px cards in a row that wraps. `small`: 28 px squares, rounded, with no hover scale, on one line that
+   * never wraps, each a 44 px catch under a finger: the companion's strip at the top of her words in the station's portrait, which
+   * names what his newest line attached (MAN-569: the site that measured the need decides the prop).
+   */
+  size?: ChatImageSize;
 };
 
 /**
@@ -16,11 +27,13 @@ type ChatMessageImagesProps = {
  * directly; path-based attachments are fetched as blobs (a bare <img src>
  * cannot carry the auth header) — first from the global assets route
  * (`~/.cloudcli/assets`), then from the project files route as a fallback for
- * sessions recorded before attachments moved to the global store.
+ * sessions recorded before attachments moved to the global store. The project route is skipped for a
+ * path the file tree is certain to refuse (outside the project and the workspace root: a 403 and a console error).
  */
 function useChatImageSrc(image: ChatImage, projectId?: string | null): { src: string | null; failed: boolean } {
   const [src, setSrc] = useState<string | null>(image.data || null);
   const [failed, setFailed] = useState(false);
+  const { certain: refusedByFileTree } = useOutsideImage(image.path ?? null);
 
   useEffect(() => {
     if (image.data) {
@@ -42,7 +55,7 @@ function useChatImageSrc(image: ChatImage, projectId?: string | null): { src: st
 
     const candidateRequests: Array<() => Promise<Response>> = [
       () => api.assets.image(filename, { signal: controller.signal }),
-      ...(projectId
+      ...(projectId && !refusedByFileTree
         ? [() => api.readFileBlob(projectId, imagePath, { signal: controller.signal })]
         : []),
     ];
@@ -77,7 +90,7 @@ function useChatImageSrc(image: ChatImage, projectId?: string | null): { src: st
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [image.data, image.path, projectId]);
+  }, [image.data, image.path, projectId, refusedByFileTree]);
 
   return { src, failed };
 }
@@ -103,13 +116,20 @@ export function ImageLightbox({ src, alt, square = false, onClose }: { src: stri
   );
 }
 
-function ChatMessageImage({ image, projectId }: { image: ChatImage; projectId?: string | null }) {
+function ChatMessageImage({ image, projectId, size }: { image: ChatImage; projectId?: string | null; size: ChatImageSize }) {
   const { src, failed } = useChatImageSrc(image, projectId);
   const [expanded, setExpanded] = useState(false);
   const alt = image.name || 'Attached image';
+  const small = size === 'small';
 
   if (failed) {
-    return (
+    // Small, the box takes the name's width: a 28 px square has no room to say which picture did not come.
+    return small ? (
+      <div className="flex h-7 max-w-40 shrink-0 items-center gap-1 rounded-sm border border-border/50 bg-muted px-2 text-xs text-muted-foreground">
+        <ImageOffIcon className="size-3.5 shrink-0" aria-hidden />
+        <span className="truncate">{alt}</span>
+      </div>
+    ) : (
       <div className="flex h-28 w-28 items-center justify-center rounded-xl border border-border/50 bg-muted px-2 text-center text-[10px] text-muted-foreground">
         {alt}
       </div>
@@ -117,23 +137,37 @@ function ChatMessageImage({ image, projectId }: { image: ChatImage; projectId?: 
   }
 
   if (!src) {
-    return <div className="h-28 w-28 animate-pulse rounded-xl border border-border/50 bg-muted" />;
+    return <div className={small ? 'size-7 shrink-0 animate-pulse rounded-sm border border-border/50 bg-muted' : 'h-28 w-28 animate-pulse rounded-xl border border-border/50 bg-muted'} />;
   }
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setExpanded(true)}
-        aria-label={`Expand ${alt}`}
-        className="block overflow-hidden rounded-xl border border-border/50 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
-      >
-        <img
-          src={src}
-          alt={alt}
-          className="h-28 w-28 cursor-zoom-in object-cover transition-transform duration-200 hover:scale-105"
-        />
-      </button>
+      {small ? (
+        // The square keeps its 28 px to the eye; under a finger (a touch screen, or a window under 768 px) its catch grows to
+        // 44 px by a transparent ::before (INV-10275), which the row's 16 px gap keeps clear of its neighbours'. The zoom cursor
+        // is the button's, so the catch over the picture inherits it: the mouse is over the ::before, never the img.
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          aria-label={`Expand ${alt}`}
+          className="relative block shrink-0 cursor-zoom-in rounded-sm before:absolute before:inset-0 before:content-[''] focus:outline-none focus:ring-2 focus:ring-primary/60 finger:before:-inset-2"
+        >
+          <img src={src} alt={alt} className="block size-7 rounded-sm border border-border/50 object-cover" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          aria-label={`Expand ${alt}`}
+          className="block overflow-hidden rounded-xl border border-border/50 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
+        >
+          <img
+            src={src}
+            alt={alt}
+            className="h-28 w-28 cursor-zoom-in object-cover transition-transform duration-200 hover:scale-105"
+          />
+        </button>
+      )}
       {expanded && <ImageLightbox src={src} alt={alt} onClose={() => setExpanded(false)} />}
     </>
   );
@@ -145,17 +179,21 @@ function ChatMessageImage({ image, projectId }: { image: ChatImage; projectId?: 
  * expands to a fullscreen lightbox on click.
  *
  * Rendered by chat's MessageComponent for the images attached to a user turn, and by
- * ToolRenderer for the pictures a tool result carries.
+ * ToolRenderer for the pictures a tool result carries; exported through the chat barrel to the
+ * companion module's `CompanionAttachments`, which draws the pictures he attached to a typed line
+ * in her transcript (default) and in her portrait's strip (`small`).
  */
-export default function ChatMessageImages({ images, projectId, align = 'end' }: ChatMessageImagesProps) {
+export default function ChatMessageImages({ images, projectId, align = 'end', size = 'default' }: ChatMessageImagesProps) {
   if (!images || images.length === 0) {
     return null;
   }
 
+  // Small stays one line; its gap grows to 16 px under a finger, so two 44 px catches never overlap.
+  const row = size === 'small' ? 'flex gap-1.5 finger:gap-4' : 'flex flex-wrap gap-2';
   return (
-    <div className={`flex flex-wrap gap-2 ${align === 'end' ? 'justify-end' : 'justify-start'}`}>
+    <div className={`${row} ${align === 'end' ? 'justify-end' : 'justify-start'}`}>
       {images.map((image, index) => (
-        <ChatMessageImage key={`${image.path || image.name || 'image'}-${index}`} image={image} projectId={projectId} />
+        <ChatMessageImage key={`${image.path || image.name || 'image'}-${index}`} image={image} projectId={projectId} size={size} />
       ))}
     </div>
   );

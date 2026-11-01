@@ -38,13 +38,13 @@ export function ScheduleControl({ startAt, busy, onSchedule }: ScheduleControlPr
     <div role="group" aria-label={t('runner.schedule.label')} className="inline-flex items-center"
       data-dispatcher-schedule={startAt === null ? '' : String(startAt)}>
       {startAt === null ? (
-        <Button type="button" variant="secondary" size="sm" className="h-8" disabled={busy || offpeakAt === null}
+        <Button type="button" variant="secondary" size="sm" className="h-8 finger:h-11" disabled={busy || offpeakAt === null}
           title={t('dispatcher.resumeTitle')}
           onClick={() => onSchedule('offpeak')} data-dispatcher-schedule-set="">
           {t('runner.schedule.resumeAt', { time: offpeakAt === null ? '…' : scheduleClock(offpeakAt) })}
         </Button>
       ) : (
-        <Button type="button" variant="ghost" size="sm" className="h-8" disabled={busy} title={t('runner.schedule.cancelTitle')}
+        <Button type="button" variant="ghost" size="sm" className="h-8 finger:h-11" disabled={busy} title={t('runner.schedule.cancelTitle')}
           onClick={() => onSchedule('none')} data-dispatcher-schedule-cancel="">
           {t('runner.schedule.cancel')}
         </Button>

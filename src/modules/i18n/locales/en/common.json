@@ -3291,6 +3291,9 @@
       "emptyTitle": "Nothing said yet",
       "emptyMessage": "Type to {{name}} below. She keeps track of every chat you're running, drafts what to tell one, and sends only on your word."
     },
+    "attachments": {
+      "strip": "You attached"
+    },
     "walk": {
       "title": "Walkthrough",
       "of": "Item\u00a0{{at}}\u00a0of\u00a0{{total}}",
@@ -3333,6 +3336,7 @@
     },
     "action": {
       "waiting": "Waiting for your word",
+      "waitingShort": "Waiting",
       "verb": {
         "queue": "Queue <target/>",
         "hide": "Hide <target/>",
@@ -3382,6 +3386,8 @@
       "placeholder": "Message {{name}}…",
       "label": "Message {{name}}",
       "send": "Send",
+      "attach": "Attach a file",
+      "leftOut": "Not put back, {{max}} files are already waiting:",
       "refused": "Couldn't reach {{name}}. Your message is back in the box; send it again."
     },
     "talk": {
@@ -3409,7 +3415,7 @@
       "talk": "Talk to {{name}}",
       "keywords": "kaylee companion voice assistant talk draft brief",
       "station": "Open Kaylee Station",
-      "stationKeywords": "kaylee station watch floor dashboard monitor window"
+      "stationKeywords": "kaylee station watch floor dashboard monitor"
     },
     "noteKind": {
       "note": "Note",
@@ -3426,7 +3432,9 @@
     },
     "head": {
       "controls": "Her controls",
-      "menu": "Her controls and CloudCLI"
+      "menu": "Her controls and CloudCLI",
+      "showChat": "Show chat",
+      "showPortrait": "Show portrait"
     },
     "talk": {
       "orPress": "or press",
@@ -3483,28 +3491,6 @@
       "block": "One block of a page in DocSpace",
       "open": "Open in DocSpace"
     },
-    "fallback": {
-      "why": {
-        "chat": "The station has no view of a chat yet.",
-        "card": "The station has no view of this card yet.",
-        "ask": "The station has no view of a waiting ask yet.",
-        "followups": "The station has no view of follow-ups yet.",
-        "check": "The station has no view of a check yet.",
-        "note": "The station has no view of her cards yet.",
-        "walk": "The station has no view of her walkthrough yet.",
-        "page": "The station has no view of a page yet."
-      },
-      "open": {
-        "chat": "Open the chat in CloudCLI",
-        "card": "Open its card in the Runner",
-        "ask": "Open the chat it waits in",
-        "followups": "Open the chat in CloudCLI",
-        "check": "Open CloudCLI",
-        "note": "Open CloudCLI",
-        "walk": "Open CloudCLI",
-        "page": "Open CloudCLI"
-      }
-    },
     "rail": {
       "name": "Where things stand"
     },
@@ -3543,6 +3529,11 @@
     },
     "chat": {
       "moved": "last moved {{when}}",
+      "when": {
+        "today": "{{clock}}",
+        "yesterday": "yesterday {{clock}}",
+        "day": "{{date}} {{clock}}"
+      },
       "open": "Open the chat",
       "say": "Say “What is {{name}} doing?”"
     },
@@ -3595,8 +3586,7 @@
       "followups": "{{label}} has no open follow-ups now",
       "check": "{{label}} is no longer red",
       "note": "{{label}} was taken down",
-      "walk": "The walkthrough ended",
-      "page": "{{label}} is no longer in DocSpace"
+      "walk": "The walkthrough ended"
     },
     "needs": {
       "title": "What needs you",
@@ -3637,6 +3627,11 @@
         "open": "{{count}} open"
       },
       "where": "{{node}} · since {{time}}",
+      "when": {
+        "today": "{{clock}}",
+        "yesterday": "yesterday {{clock}}",
+        "day": "{{date}} {{clock}}"
+      },
       "onStage": "On the stage",
       "openChat": "Open the chat",
       "ask": {

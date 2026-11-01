@@ -8,8 +8,9 @@ import type { ReactNode } from 'react';
  * place, same order, same size.
  *
  * The verbs row wraps, so on a narrow card a verb drops under its neighbour rather than pushing it off the
- * card. EVERY BUTTON IN IT IS 32px TALL (`h-8`), set by each control this module puts here (`PlanControls`,
- * `DispatchArcControls`, `ScheduleControl`) rather than by a descendant rule on this row.
+ * card. EVERY BUTTON IN IT IS 32px TALL (`h-8`) AT A DESK AND 44px UNDER A FINGER (`finger:h-11`: a touch screen, or a window
+ * under 768 px), set by each control this module puts here (`PlanControls`, `DispatchArcControls`, `ScheduleControl`)
+ * rather than by a descendant rule on this row.
  *
  * IT DRAWS NOTHING when there is neither a verb nor a fold — a complete plan, whose next phase does not exist
  * for a word to reach and whose walk has no verb left — so a card never keeps an empty row.

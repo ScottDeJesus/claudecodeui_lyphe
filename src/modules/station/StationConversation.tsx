@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
 
-import { CompanionLog, useCompanion } from '@/modules/companion';
+import { CompanionFace, CompanionLog, useCompanion } from '@/modules/companion';
 import { useStation } from '@/modules/station/context/StationContext';
+import { useHerView } from '@/modules/station/hooks/useHerView';
+import { StationPortraitView } from '@/modules/station/StationPortrait';
 import type { CompanionNote, CompanionPicture } from '@/shared/companion-types';
 import type { CompanionSentenceRef, StationDensity, StationRegionProps } from '@/shared/types';
 import { Banner, Button, Spinner } from '@/shared/ui';
@@ -29,7 +31,8 @@ type StationConversationViewProps = {
 };
 
 /**
- * HER CONVERSATION, under her head in her column: her exchange with him as her panel draws it (`CompanionLog`, through the
+ * HER CONVERSATION, under her head in her column while her view is `chat` (the toggle in her head; in `portrait`, the default, her
+ * portrait stands in its place, `StationPortraitView`): her exchange with him as her panel draws it (`CompanionLog`, through the
  * companion's barrel), with her cards standing in it where she put them.
  *
  * - LOADING, before her picture's first read lands: her panel's waiting row, the kit's spinner over "Opening Kaylee's
@@ -90,16 +93,25 @@ export function StationConversationView({ picture, readFailure, onReread, name, 
 }
 
 /**
- * Her conversation on the page, the `conversation` slot's region (`stationRegions.ts`): it hands `StationConversationView` her
- * picture, the read's failure and its Try again, the sentence her voice is sounding, a card's press, and the log's scroller to
- * the station's scroll memory. It adds no state of its own.
+ * Her conversation on the page, the `conversation` slot's region (`stationRegions.ts`). By her view on this device (`useHerView`):
+ * `chat` hands `StationConversationView` her picture, the read's failure and its Try again, the sentence her voice is sounding, a
+ * card's press, and the log's scroller to the station's scroll memory; `portrait` (the default) hands `StationPortraitView` her
+ * picture, the sentence her voice is sounding and her face, bound to this page's provider as her head binds it in `chat`. Until
+ * her picture has landed, or when its read failed, `portrait` draws the conversation's own loading row and failed banner: with no
+ * picture there is no answer to put under her face. It adds no state of its own.
  */
 export function StationConversation({ density }: StationRegionProps) {
   const { t } = useTranslation();
   const { picture, readFailure, reread, voice } = useCompanion();
   // The stage a card's press puts it on, and the log's place: `scrollMemory('conversation')` keeps its identity across renders, so the scroller is bound once.
   const { setFocus, scrollMemory } = useStation();
+  const [herView] = useHerView();
   const name = picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
+
+  if (herView === 'portrait' && picture !== null) {
+    // She faces him: no look turns her toward a rail.
+    return <StationPortraitView density={density} picture={picture} name={name} speaking={voice.speaking} face={(px) => <CompanionFace size={px} />} />;
+  }
 
   return (
     <StationConversationView

@@ -76,7 +76,7 @@ export function SnapStrip({
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8 shrink-0"
+            className="h-8 w-8 shrink-0 finger:h-11 finger:w-11"
             aria-label={previousLabel}
             disabled={view.atStart}
             onClick={() => step(-1)}
@@ -90,7 +90,7 @@ export function SnapStrip({
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8 shrink-0"
+            className="h-8 w-8 shrink-0 finger:h-11 finger:w-11"
             aria-label={nextLabel}
             disabled={view.atEnd}
             onClick={() => step(1)}

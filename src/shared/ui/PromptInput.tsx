@@ -30,7 +30,7 @@ export type PromptInputProps = {
   status?: PromptInputStatus;
 } & React.FormHTMLAttributes<HTMLFormElement>;
 
-/** Composer form shell, used by ChatComposer. */
+/** Composer form shell, used by ChatComposer, the companion module's CompanionComposer and the kanban module's KanbanMetisConversation. */
 export const PromptInput = React.forwardRef<HTMLFormElement, PromptInputProps>(
   ({ className, status = 'ready', children, ...props }, ref) => {
     const contextValue = React.useMemo(() => ({ status }), [status]);
@@ -137,6 +137,37 @@ export const PromptInputTools = React.forwardRef<
 ));
 PromptInputTools.displayName = 'PromptInputTools';
 
+/* ─── A press that keeps the field's focus ───────────────────────── */
+
+/**
+ * The `onMouseDown` of every press the composer draws (the kit's buttons below): the press never takes the focus from the field.
+ * A tap on a touch screen ends in compatibility mouse events, and the `mousedown` is what moves the focus onto the pressed button.
+ * On a phone that is the keyboard going down with the field's blur, and the page's keyboard readers re-lay the composer out as it
+ * does (`useVisualViewportKeyboardOffset` ends its mark on a `focusout` into a button), so the tap's `click` can land where the
+ * button no longer stands: the first tap dismissed the keyboard and sent nothing. A default-prevented `mousedown` leaves the focus
+ * where it was, the keys stay up, nothing is re-laid and the `click` lands as pressed; typing goes on after the press. The caller's
+ * own `onMouseDown` runs first. A press from the keyboard (Enter or Space on a focused button) has no `mousedown` and is untouched.
+ */
+const keepFieldFocus = (own?: React.MouseEventHandler<HTMLButtonElement>): React.MouseEventHandler<HTMLButtonElement> => (event) => {
+  own?.(event);
+  event.preventDefault();
+};
+
+/**
+ * The `onPointerDown` of the same presses, for the one state where `keepFieldFocus` never runs: a DISABLED button is dispatched no
+ * `mousedown` (nor a `click`), so a tap on it still moved the focus onto nothing and dropped the keyboard: Send with nothing to
+ * send, or the second tap of a double tap, which lands on the Send the first tap has just disabled. A `pointerdown` still reaches a
+ * disabled button, and a default-prevented one leaves the focus where it was. Only while the button is disabled: an enabled press keeps
+ * `keepFieldFocus` alone, so its `:active` look and its compatibility events are as they were. The caller's own `onPointerDown` runs first.
+ */
+const keepFieldFocusWhileDisabled = (
+  disabled: boolean | undefined,
+  own?: React.PointerEventHandler<HTMLButtonElement>,
+): React.PointerEventHandler<HTMLButtonElement> => (event) => {
+  own?.(event);
+  if (disabled) event.preventDefault();
+};
+
 /* ─── PromptInputButton ──────────────────────────────────────────── */
 
 export type PromptInputButtonTooltip = {
@@ -147,19 +178,26 @@ export type PromptInputButtonTooltip = {
 
 export type PromptInputButtonProps = {
   tooltip?: PromptInputButtonTooltip;
+  /** The button's look: ghost, or tonal for a press that is lit (the companion's open mic). */
+  variant?: 'ghost' | 'tonal';
 } & React.ButtonHTMLAttributes<HTMLButtonElement>;
 
-/** Icon button in the composer footer, used by ChatComposer and VoiceInputButton. */
+/**
+ * Icon button in the composer, used by ChatComposer, VoiceInputButton, and the companion module's CompanionComposer (attach) and
+ * CompanionTalkButton (the talk button in the composer's cluster). It keeps the field's focus (`keepFieldFocus`), disabled or not.
+ */
 export const PromptInputButton = React.forwardRef<HTMLButtonElement, PromptInputButtonProps>(
-  ({ className, tooltip, children, ...props }, ref) => {
+  ({ className, tooltip, variant = 'ghost', children, onMouseDown, onPointerDown, ...props }, ref) => {
     const button = (
       <Button
         ref={ref}
         type="button"
-        variant="ghost"
+        variant={variant}
         size="icon"
         className={cn('h-8 w-8 [&_svg]:size-4', className)}
         {...props}
+        onMouseDown={keepFieldFocus(onMouseDown)}
+        onPointerDown={keepFieldFocusWhileDisabled(props.disabled, onPointerDown)}
       >
         {children}
       </Button>
@@ -194,9 +232,13 @@ PromptInputButton.displayName = 'PromptInputButton';
 
 export type PromptInputSubmitProps = React.ButtonHTMLAttributes<HTMLButtonElement>;
 
-/** Send/stop button of the composer, used by ChatComposer. */
+/**
+ * Send/stop button of the composer, used by ChatComposer, the companion module's CompanionComposer and the kanban module's
+ * KanbanMetisConversation. It keeps the field's focus (`keepFieldFocus`), disabled or not: one tap sends, and the field stays focused for
+ * the next words, and a tap on a Send with nothing to send (or the one the last tap just disabled) leaves the keyboard up.
+ */
 export const PromptInputSubmit = React.forwardRef<HTMLButtonElement, PromptInputSubmitProps>(
-  ({ className, children, ...props }, ref) => {
+  ({ className, children, onMouseDown, onPointerDown, ...props }, ref) => {
     // The status comes from the PromptInput root, which is the only place it is set.
     const { status } = usePromptInput();
     const isActive = status === 'submitted' || status === 'streaming';
@@ -209,6 +251,8 @@ export const PromptInputSubmit = React.forwardRef<HTMLButtonElement, PromptInput
         size="icon"
         className={cn('h-8 w-8 shrink-0 rounded-lg', className)}
         {...props}
+        onMouseDown={keepFieldFocus(onMouseDown)}
+        onPointerDown={keepFieldFocusWhileDisabled(props.disabled, onPointerDown)}
       >
         {children ?? (isActive ? (
           <SquareIcon className="h-3.5 w-3.5 fill-current" />

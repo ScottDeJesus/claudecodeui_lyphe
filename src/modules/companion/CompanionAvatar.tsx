@@ -13,8 +13,9 @@ type CompanionAvatarProps = {
   /** The face to draw: her `picture.face.id`. Null on a box with no face made yet, where the disc draws her initial instead. */
   faceId: string | null;
   /**
-   * The page's voice, read by the portrait's loop while she speaks (`level()` for how far her mouth opens, `progress()` for the vowel it
-   * shapes): functions, never props that change, so a level sixty times a second redraws nothing in React. Null where no voice sounds.
+   * The page's voice, read by the portrait's loop while she speaks (`mouth()` for the timed shapes her mouth takes where a piece holds the
+   * audio's place, `level()` for how far it opens and `progress()` for the vowel it shapes where none does): functions, never props that
+   * change, so a level sixty times a second redraws nothing in React, and a piece landing mid-sentence is read at the next frame. Null where no voice sounds.
    */
   voice: CompanionFaceVoice | null;
   /** The sentences she says, for her mood and her vowels; null where there are none (Settings' preview, an idle fixture). */
@@ -23,7 +24,11 @@ type CompanionAvatarProps = {
   look: CompanionFaceLook | null;
   /** Her name as he set it; the default stands in while a page has not read it. */
   name?: string;
-  /** The square she fills, in pixels, read only by her initial's `Avatar` (a box with no face yet). The portrait and the marks fill their square by CSS, so they follow the disc's own size frame by frame. */
+  /**
+   * The square she fills, in CSS pixels. Her initial's `Avatar` (a box with no face yet) takes it, and so does `useFaceAtlas`, which fetches the smallest
+   * tier of her face that is sharp at this size on the screen's pixel ratio. The portrait and the marks fill their square by CSS, so they follow the
+   * disc's own size frame by frame.
+   */
   size: number;
 };
 
@@ -63,7 +68,7 @@ export function CompanionAvatar({ presence, faceId, voice, sentences, look, name
   const { t } = useTranslation();
   const her = name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
   const { state, walk } = presence;
-  const atlas = useFaceAtlas(faceId);
+  const atlas = useFaceAtlas(faceId, size);
   const count = walk ? `${walk.at}/${walk.total}` : '';
   // The numbers shrink a little and their pill widens with the digits ("12/40"), so it stays inside the head's width. They
   // stop shrinking at 12 units (a walk of a thousand items), and the digits of a longer walk are squeezed to fit the pill.

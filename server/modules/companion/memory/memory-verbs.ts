@@ -15,7 +15,7 @@ import { findHisLine, firstQuote, memoryBody, MEMORY_BODY_MAX, quoteLine, quotes
 /**
  * HER THREE VERBS ON HER BANK, and the one clear: `recall`, `remember`, `forget` and `clearMemory`. Every read and every write goes
  * through her door (`bank-door.ts`), and every write runs inside `onBank` (`bank-chain.ts`), so one bank write runs at a time whichever
- * account asked; each that changed the bank, or may have (a write the door did not answer), then sends the hint `announceMemoryChanged` (`memory-announce.ts`), once, and a refusal that changed nothing sends none. The words of a memory are `memory-words.ts`'s: the SERVER writes a memory's body from his spoken log lines (ruling 4),
+ * account asked; each that changed the bank, or may have (a write the door did not answer), then sends the hint `announceMemoryChanged` (`memory-announce.ts`), once, and a refusal that changed nothing sends none. The words of a memory are `memory-words.ts`'s: the SERVER writes a memory's body from his log lines, spoken or typed (ruling 4),
  * and she writes only its title and one line of context. CloudCLI stores no memory (ruling 1): the only thing kept here is the forget
  * guard's log id, in `companion_state.memory_forget_line`.
  *
@@ -31,8 +31,8 @@ import { findHisLine, firstQuote, memoryBody, MEMORY_BODY_MAX, quoteLine, quotes
  * `hands/action-doors.ts` (`clearMemory`, on his word).
  */
 
-/** The whole of the log her store keeps for an account (`COMPANION_LOG_KEEP` in the repository), which is where a line of his is looked for. */
-const WHOLE_LOG = 400;
+/** The whole of the log her store keeps for an account (`COMPANION_LOG_KEEP` in the repository), which is where a line of his is looked for. Consumed here and by `hands/action-doors.ts` (the channel of the line that fired a clear). */
+export const WHOLE_LOG = 400;
 
 /** A token of the docstore's two tables, which is what `recall` reads whole. */
 const TOKEN = /^(INV|MAN)-\d+$/;
@@ -74,11 +74,14 @@ export function accountName(userId: number): string {
   return userDb.getUserById(userId)?.username ?? `account ${userId}`;
 }
 
-/** A memory as a recall line: `<title> · <token> · said <when> · “<first quote>”`, or its title and token alone when its body quotes no one. */
+/** How a recall tells when a quote came: a press he spoke was "said", a line he typed was "typed". */
+const saidOrTyped = (via: HisLine['via']): string => (via === 'typed' ? 'typed' : 'said');
+
+/** A memory as a recall line: `<title> · <token> · said <when> · “<first quote>”` (`typed <when>` for a typed line), or its title and token alone when its body quotes no one. */
 function recallLine(row: BankRow): string {
   const first = quotesOf(row.body)[0];
   if (first === undefined) return `${row.title} · ${row.token}`;
-  return `${row.title} · ${row.token} · said ${whenWords(first.at)} · “${firstQuote(row.body, QUOTE_CUT)}”`;
+  return `${row.title} · ${row.token} · ${saidOrTyped(first.via)} ${whenWords(first.at)} · “${firstQuote(row.body, QUOTE_CUT)}”`;
 }
 
 /** What a recall answers before `panel` is considered: a memory whole by its token, or the lines the closest memories make. Refusals are `isError` and nothing is put on the panel for them. */
@@ -150,7 +153,7 @@ async function correction(deps: CompanionToolDeps, input: RememberInput, correct
 /** The refusal of a new memory that is about the same thing as a held one: how it was said, and the two ways forward. */
 function sameSubjectSentence(held: BankRow): string {
   const first = quotesOf(held.body)[0];
-  const said = first === undefined ? '' : ` He said, ${whenWords(first.at)}: “${firstQuote(held.body, QUOTE_CUT)}”.`;
+  const said = first === undefined ? '' : ` He ${saidOrTyped(first.via)}, ${whenWords(first.at)}: “${firstQuote(held.body, QUOTE_CUT)}”.`;
   return `Not kept yet: ${held.token} (${held.title}) is about the same thing.${said} If this corrects it, remember again with corrects ${held.token}. If both stand, remember again with also.`;
 }
 
@@ -190,7 +193,7 @@ async function newMemory(deps: CompanionToolDeps, input: RememberInput, lines: H
   return written.ok ? textResult(`Kept as ${written.value.token}: ${input.title}.`) : writeFailed(written.sentence);
 }
 
-/** Every `said` as his spoken log line, in the order given and each once, or the sentence refusing the first that is not. */
+/** Every `said` as his log line, spoken or typed, in the order given and each once, or the sentence refusing the first that is not. */
 function hisLines(deps: CompanionToolDeps, said: string[]): { ok: true; lines: HisLine[] } | { ok: false; sentence: string } {
   const rows = deps.store.readLog(WHOLE_LOG);
   const lines: HisLine[] = [];
@@ -210,15 +213,15 @@ async function rememberInOrder(deps: CompanionToolDeps, input: RememberInput): P
   if (!his.ok) return deps.refuse(his.sentence);
 
   const body = memoryBody({ account: accountName(deps.userId), lines: his.lines, why: input.why, context: input.context ?? null });
-  // One oversize press cannot be shortened (a press is kept whole), so she is told to ask for it again on its own; several presses can drop some.
-  if (characterCount(body) > MEMORY_BODY_MAX) return deps.refuse(his.lines.length > 1 ? 'Too long to keep whole: carry only the presses that say it.' : 'That press is too long to keep whole, and a press is never cut. Ask him to say the point again on its own.');
+  // One oversize line cannot be shortened (a line of his is kept whole), so she is told to ask for it again on its own; several lines can drop some.
+  if (characterCount(body) > MEMORY_BODY_MAX) return deps.refuse(his.lines.length > 1 ? 'Too long to keep whole: carry only the lines that say it.' : 'That line is too long to keep whole, and a line is never cut. Ask him for the point again on its own.');
 
   return input.corrects === undefined ? newMemory(deps, input, his.lines, body) : correction(deps, input, input.corrects, body);
 }
 
 /**
- * `remember`: keeps one thing he said, in his own words. The body is written here from his SPOKEN log lines (a typed line is refused),
- * so a memory is never her paraphrase of him. A new memory is refused when a held one quotes the same words (read off the bank itself when
+ * `remember`: keeps one thing he said or typed, in his own words. The body is written here from his log lines, spoken or typed, each
+ * quoted with its channel, so a memory is never her paraphrase of him. A new memory is refused when a held one quotes the same words (read off the bank itself when
  * the search finds no row, `twinByReading`), and, unless she says
  * `also`, when a held one scores at or over `SAME_SUBJECT_LOGIT` against it: she then says it `corrects` that memory or stands `also`.
  * The two together are refused. The whole of it runs inside `onBank`. Consumed by `memory-tools.ts`.
@@ -270,7 +273,7 @@ async function forgetInOrder(deps: CompanionToolDeps, input: { memories: string[
 }
 
 /**
- * `forget`: stops keeping one to five memories on his word. `said` is his spoken line; it must be newer than the one the last forget
+ * `forget`: stops keeping one to five memories on his word. `said` is his line, spoken or typed; it must be newer than the one the last forget
  * used. Every token must be hers, and none is retired until all are read. The docstore's history keeps what was forgotten, with his
  * words as the reason. The whole of it runs inside `onBank`. Consumed by `memory-tools.ts`.
  */

@@ -1,5 +1,8 @@
+import type { CompanionAttachment } from '@/shared/companion-types.js';
 import { isList, isRecord, isText } from '@/shared/document-fields.js';
 import { isStoreStamp } from '@/shared/utils.js';
+
+import { isAttachmentList } from './attachments/attachment-shape.js';
 
 /**
  * His words that no turn of hers has answered yet, as the account's row keeps them (`companion_state.unanswered_json`).
@@ -19,15 +22,19 @@ import { isStoreStamp } from '@/shared/utils.js';
  * replaces this entry), his raw `body` (`''` with `via: 'spoken'` is a press that carried no words, or, with `heard: 'name'`,
  * a press that was only her name), how it came and the stamp `at` he said it. `cut` is the cut the message opened with (`<cut heard interrupted/>`, the sentences he heard and
  * the one he interrupted; absent when it opened with none): it is the one thing in the assembled message that is not a
- * snapshot, so a message said again after a handover opens with it too.
+ * snapshot, so a message said again after a handover opens with it too. `attachments` are the files he attached to a typed line, kept as RECORDS
+ * (path, his name, size, type and what she can do with each) and never as bytes: a picture he asked about is part of what he said, so a message
+ * said again carries it, but the pictures are read again from the upload store when it is said (base64 in a row rewritten many times a turn
+ * would put megabytes in it). Absent when the line carried none.
  */
-export type UnansweredMessage = { uuid: string; body: string; via: 'typed' | 'spoken'; at: string; heard?: 'name'; cut?: { heard: string; interrupted: string } };
+export type UnansweredMessage = { uuid: string; body: string; via: 'typed' | 'spoken'; at: string; heard?: 'name'; cut?: { heard: string; interrupted: string }; attachments?: CompanionAttachment[] };
 
 const isCut = (value: unknown): boolean => value === undefined || (isRecord(value) && isText(value.heard) && isText(value.interrupted));
 
 const isUnansweredMessage = (value: unknown): value is UnansweredMessage =>
   isRecord(value) && isText(value.uuid) && isText(value.body) && (value.via === 'typed' || value.via === 'spoken') && isStoreStamp(value.at)
-  && (value.heard === undefined || value.heard === 'name') && isCut(value.cut);
+  && (value.heard === undefined || value.heard === 'name') && isCut(value.cut)
+  && (value.attachments === undefined || isAttachmentList(value.attachments));
 
 /** The shape check `unanswered_json` is read through: a list of `UnansweredMessage`, oldest first. */
 export function isUnansweredList(value: unknown): value is UnansweredMessage[] {

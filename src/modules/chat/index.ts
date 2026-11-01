@@ -29,3 +29,13 @@ export { useEmbedWidgetState } from '@/modules/chat/embeds/embedSource';
 // as a question in the chat, and the companion module's `CompanionActionCard`, which draws the
 // prompt of an action waiting for his word (an Accept census, a round's questions) as the Roadmap does.
 export { QuestionText } from '@/modules/chat/tools/ContentRenderers/QuestionText';
+// The chips of the files waiting to be sent (with the warn line for the files an intake did not take), and the "Drop files here" overlay
+// drawn while files are dragged onto a box. Consumer: the companion module's `CompanionComposer`, her box, which takes files as the chat does
+// (`useAttachmentIntake`) and draws them the way the chat does, so the chat module stays the one home of how an attachment looks.
+export { ComposerAttachmentTray } from '@/modules/chat/composer/ComposerAttachmentTray';
+export { ComposerDropOverlay } from '@/modules/chat/composer/ComposerDropOverlay';
+// How an attachment looks on a turn: pictures as squares that enlarge, other files as cards that download. Consumer: the companion
+// module's `CompanionAttachments`, which draws the files he attached to a typed line above his words in her transcript (the chat's
+// own size) and in her portrait's strip (`size: 'small'`), so the chat module stays the one home of that look.
+export { default as ChatMessageImages } from '@/modules/chat/transcript/ChatMessageImages';
+export { default as ChatMessageFiles } from '@/modules/chat/transcript/ChatMessageFiles';

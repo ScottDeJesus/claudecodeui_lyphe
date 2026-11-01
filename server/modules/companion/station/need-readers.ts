@@ -11,7 +11,7 @@ import { checkName } from '../eyes/cerberus-lines.js';
 import { clipLine } from '../eyes/line-words.js';
 import type { CompanionHouse } from '../house.js';
 import { oldestPendingAsk, questionsOf, type OldestAsk } from '../tools/ask-decision.js';
-import { chatNameOf, chatRows, hiddenChatRows, pendingAsksOf, type ChatRow } from '../tools/house-reads.js';
+import { chatNameOf, chatRows, pendingAsksOf, type ChatRow } from '../tools/house-reads.js';
 
 /**
  * THE FOUR READERS of what needs him, one per family of `StationNeed`. Each reads the house through the door her own eyes and
@@ -21,7 +21,7 @@ import { chatNameOf, chatRows, hiddenChatRows, pendingAsksOf, type ChatRow } fro
  * costs its kind and never the rail.
  *
  *   - `planNeeds`: the dispatcher's open Accepts and questions rounds, in the lane's order, each once by its `asked` identity;
- *   - `chatAskNeeds`: each waiting chat's oldest ask, with how many wait behind it;
+ *   - `chatAskNeeds`: each waiting chat's oldest ask, among his chats, with how many wait behind it;
  *   - `followupNeeds`: the chats' open follow-ups, one item per chat, the chat with the newest one first;
  *   - `checkNeeds`: Cerberus' failing and refused checks, in the tab's own worst-first order.
  *
@@ -186,11 +186,13 @@ function waitingAsks(rows: ChatRow[]): StationNeed[] {
 }
 
 /**
- * Every waiting chat's oldest ask: his chats first, then the chats of hidden roots ("hidden is not gone": a probe's permission still
- * holds its chat, and no list of his chats shows it). Consumed by `station-needs.ts`.
+ * Every waiting chat's oldest ask, among his chats alone: the rows the station's left rail draws (`chatRows()`), so the rail and its count
+ * hold what he sees. A chat under a hidden root (the test root, `~/.claude/state`, `/tmp`, `/var/tmp`: scratch by definition, in no list of
+ * his) holds no item here; its ask is answered through `POST /api/companion/station/asks` (`answerStationAsk`), which settles any
+ * chat's ask by its request id. Consumed by `station-needs.ts`.
  */
 export function chatAskNeeds(): StationNeed[] {
-  return [...waitingAsks(chatRows()), ...waitingAsks(hiddenChatRows())];
+  return waitingAsks(chatRows());
 }
 
 // ---------------------------

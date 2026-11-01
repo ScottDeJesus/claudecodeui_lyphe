@@ -14,7 +14,6 @@ import { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPres
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
 import { openStation } from '@/shared/cloudcliDoors';
 import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
-import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import type { CompanionEars, CompanionPresence, CompanionVoice, TalkPress } from '@/shared/types';
 import { Banner, Button, Card, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -39,7 +38,8 @@ type CompanionPanelViewProps = {
   /** This page's ears: the header draws their switch, "Listen for her name on this device", and what they are doing. Absent, no row. */
   ears?: CompanionEars;
   onClose: () => void;
-  onSendText: (text: string) => Promise<void>;
+  /** Sends his typed words and the files he attached to them (either may be empty, never both); a refusal rejects and the composer puts both back. */
+  onSendText: (text: string, files: File[]) => Promise<void>;
   onModelChange: (model: CompanionModel) => Promise<void>;
   onLiveChange: (live: boolean) => Promise<void>;
   onInterrupt: () => Promise<void>;
@@ -87,7 +87,7 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  * Banner while her process has failed — the server's sentence, pinned where the eye lands, while the log keeps the
  * system line as history and the status line says the next message starts her again; the log, marking the sentence
  * being spoken (before the first read lands, a waiting row; once a read has failed, a warn Banner with the reason and a
- * Try again, since the picture is not coming by itself — the status line still says Loading, as the one state has no word for it); the dock — the walkthrough, her notes, the action waiting for his word, the draft; the composer, with the talk button before send.
+ * Try again, since the picture is not coming by itself — the status line still says Loading, as the one state has no word for it); the dock — the walkthrough, her notes, the action waiting for his word, the draft; the composer, with the paperclip and the talk button before send (his files go with his typed words).
  *
  * THE PANEL SHARES ITS HEIGHT, AND THE COMPOSER NEVER GIVES WAY. A phone's keyboard shrinks the shell to the strip above
  * it, a phone turned sideways is 375px tall, a long message grows the composer: whatever the room, nothing is cut at the
@@ -262,9 +262,8 @@ export function CompanionPanel() {
     talk, voice, ears,
   } = useCompanion();
   const presence = useCompanionPresence();
-  // The head's station button: the same door as the command palette's row, bound here to the router and to where the page stands.
+  // The head's station button: the same door as the command palette's row, bound here to the router.
   const navigate = useNavigate();
-  const { isMobile, isPWA } = useDeviceSettings();
   // The page's own set of chats with a turn running: Send steer shows while the draft's target is in it, because only then is there a turn to fold into.
   const busySessionIds = useBusySessionIdSet();
   // The action on the card he sees: the × withdraws that one, whatever has been prepared since the press.
@@ -293,7 +292,7 @@ export function CompanionPanel() {
       onDismissNote={dismissNote}
       // His × on the action card: the provider calls the server and clears this action from the picture, so the card goes at once.
       onWithdraw={pendingId === null ? undefined : () => cancelAction(pendingId)}
-      onOpenStation={() => openStation(navigate, { phone: isMobile, pwa: isPWA })}
+      onOpenStation={() => openStation(navigate)}
       talk={talk}
       voice={voice}
       ears={ears}

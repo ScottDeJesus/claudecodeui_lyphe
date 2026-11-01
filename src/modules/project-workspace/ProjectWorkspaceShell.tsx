@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import type { ReactNode } from 'react';
 
 import { AccountsProvider } from '@/modules/accounts';
 import { AppSwitcherProvider } from '@/modules/app-switcher';
@@ -9,13 +10,17 @@ import { PageAnchorsProvider } from '@/shared/context/PageAnchorsContext';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 import WorkspaceFrame from '@/modules/project-workspace/WorkspaceFrame';
 
-/** Rendered by ProjectWorkspaceRoute to lay out the workspace sidebar, main region and global overlays, inside the providers they share (the page's anchors, the chat's host, the application switcher, the account panel's state, Kaylee's picture). */
+/**
+ * Rendered by ProjectWorkspaceRoute to lay out the workspace sidebar, main region and global overlays, inside the providers they share (the page's anchors, the chat's host, the application switcher, the account panel's state, Kaylee's picture).
+ * `stationLayer` is the app's other whole page, drawn beside the frame inside the same providers: it reads the one chat host and the one Kaylee the workspace holds.
+ */
 function ProjectWorkspaceShell({
   isMobile,
   ws,
   sendMessage,
   navigate,
-}: ProjectWorkspaceShellProps) {
+  stationLayer,
+}: ProjectWorkspaceShellProps & { stationLayer: ReactNode }) {
   // Read from the chat context, not the sidebar's: the choices keep one identity until a project is
   // added, renamed or removed, so this shell is not woken by every session upsert.
   const { projectChoices } = useProjectChatState();
@@ -31,6 +36,7 @@ function ProjectWorkspaceShell({
             {/* Kaylee's one picture, above her door, her panel and the palette's row. She knows nothing of routes: the chat she opens is this module's to bring forward. */}
             <CompanionHost navigate={navigate}>
               <WorkspaceFrame isMobile={isMobile} ws={ws} sendMessage={sendMessage} navigate={navigate} />
+              {stationLayer}
             </CompanionHost>
           </AccountsProvider>
         </AppSwitcherProvider>

@@ -4,9 +4,9 @@ import multer from 'multer';
 
 import { asyncHandler, readAuthenticatedUserId, readPathParam } from '@/shared/utils.js';
 
-import { faceInvalid, faceNotFound } from './face-errors.js';
+import { faceInvalid } from './face-errors.js';
 import { PHOTO_MAX_BYTES, photoTooLargeSentence } from './face-upload.js';
-import { faceService, type FaceFile } from './face.service.js';
+import { faceService } from './face.service.js';
 
 /**
  * Her face's five routes, mounted by `createCompanionRoutes` at `/api/companion/face` behind `authenticateToken`. ONLY
@@ -16,7 +16,7 @@ import { faceService, type FaceFile } from './face.service.js';
  *                                hers, 202 `{ face }` while it is made (its progress comes as `companion_face` frames)
  *   DELETE /                     200 `{ face }`, the original
  *   GET    /:faceId/manifest     the face's `CompanionFaceManifest`
- *   GET    /:faceId/sheet/:n     one sheet, `image/webp`
+ *   GET    /:faceId/sheet/:file  one sheet, `image/webp`, by the file name the manifest gives it (every tier's sheets are named there)
  *   GET    /:faceId/contact      the contact sheet (every frame named), `image/webp`
  *
  * A file is served only for the original and the face the asking account names (404 `COMPANION_FACE_NOT_FOUND` for any other),
@@ -48,16 +48,9 @@ async function readPhoto(request: Request, response: Response): Promise<Buffer> 
   return request.file.buffer;
 }
 
-/** A sheet number from the path: a whole number of one to three digits, written the one way (no leading zero), else the file does not exist. */
-function readSheetNumber(request: Request): number {
-  const raw = readPathParam(request.params.n, 'n');
-  if (!/^(0|[1-9]\d{0,2})$/.test(raw)) throw faceNotFound();
-  return Number(raw);
-}
-
-/** Serves one face file with its cache header. `dotfiles: 'allow'` because the faces root lives under `~/.cloudcli`, which `sendFile` would otherwise refuse as a hidden path. */
-function sendFaceFile(request: Request, response: Response, file: FaceFile): void {
-  const location = faceService.fileFor(readAuthenticatedUserId(request), readPathParam(request.params.faceId, 'faceId'), file);
+/** Serves one face file, by its name in the face's folder (the service refuses a name that is not one of a face's files), with its cache header. `dotfiles: 'allow'` because the faces root lives under `~/.cloudcli`, which `sendFile` would otherwise refuse as a hidden path. */
+function sendFaceFile(request: Request, response: Response, fileName: string): void {
+  const location = faceService.fileFor(readAuthenticatedUserId(request), readPathParam(request.params.faceId, 'faceId'), fileName);
   response.sendFile(location, { dotfiles: 'allow', cacheControl: false, headers: { 'Cache-Control': FACE_FILE_CACHE_CONTROL } });
 }
 
@@ -83,17 +76,17 @@ export function createFaceRoutes(): Router {
 
   router.get(
     '/:faceId/manifest',
-    asyncHandler(async (request: Request, response: Response) => sendFaceFile(request, response, 'manifest')),
+    asyncHandler(async (request: Request, response: Response) => sendFaceFile(request, response, 'manifest.json')),
   );
 
   router.get(
-    '/:faceId/sheet/:n',
-    asyncHandler(async (request: Request, response: Response) => sendFaceFile(request, response, readSheetNumber(request))),
+    '/:faceId/sheet/:file',
+    asyncHandler(async (request: Request, response: Response) => sendFaceFile(request, response, readPathParam(request.params.file, 'file'))),
   );
 
   router.get(
     '/:faceId/contact',
-    asyncHandler(async (request: Request, response: Response) => sendFaceFile(request, response, 'contact')),
+    asyncHandler(async (request: Request, response: Response) => sendFaceFile(request, response, 'contact.webp')),
   );
 
   return router;

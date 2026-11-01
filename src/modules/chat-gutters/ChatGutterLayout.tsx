@@ -21,6 +21,7 @@ import { MemoryWidgetBody, useMemoryIntake } from '@/modules/memory-intake';
 import { NotesWidgetBody, useNotes } from '@/modules/notes';
 import { RoadmapWidgetBody, RoadmapWidgetFullscreenBody, useRoadmap } from '@/modules/roadmap';
 import { RunnerWidgetBody } from '@/modules/runner-tab';
+import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { GutterSide, GutterWidgetId, Tone } from '@/shared/types';
 import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
@@ -87,6 +88,7 @@ export function ChatGutterLayout({
   // The gutters always live in the opener, where this answers `window`; read through the seam anyway
   // so the Escape below asks the same window it listens on.
   const hostWindow = useHostWindow();
+  const isPageHeld = useIsPageHeld();
   const { placements, moveWidget, toggleWidget } = useGutterPlacements(sessionId);
   // The Runs widget lists the arcs as decks and the plans no arc holds as cards, so its badge
   // counts the plans alone: an arc's own plans are already counted, and the arc's deck is a
@@ -149,13 +151,14 @@ export function ChatGutterLayout({
   useEffect(() => {
     if (fullscreen === null) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || otherOverlayHoldsEscape(hostWindow.document)) return;
+      // The station on screen covers this page, and this listener takes the key from every other one: it must leave an Escape typed there alone.
+      if (event.key !== 'Escape' || isPageHeld() || otherOverlayHoldsEscape(hostWindow.document)) return;
       event.stopPropagation();
       setFullscreen(null);
     };
     hostWindow.addEventListener('keydown', onKeyDown, true);
     return () => hostWindow.removeEventListener('keydown', onKeyDown, true);
-  }, [fullscreen, hostWindow]);
+  }, [fullscreen, hostWindow, isPageHeld]);
 
   // A NEWLY NAMED address opens the Embed widget, once. The whole point of the embed fence is that
   // the model can put a page in front of the reader, and a widget that stayed collapsed would make it

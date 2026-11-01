@@ -161,9 +161,9 @@ export function CompanionActionCard({ pending, name, onWithdraw }: CompanionActi
                 busy={withdrawing}
                 aria-label={t('companion.action.withdraw', 'Withdraw')}
                 onClick={withdraw}
-                // 28px to look at, a 40px catch under a mouse and 44px under a finger (Verve's touch floor), as a note's ✕: below
-                // 768 px as well as under a coarse pointer (`max-md:` beside it, the station's touch law being keyed on width).
-                className="relative h-7 w-7 text-muted-foreground before:absolute before:-inset-1.5 before:content-[''] hover:text-foreground max-md:before:-inset-2 [@media(pointer:coarse)]:before:-inset-2"
+                // 28px to look at, a 40px catch under a mouse and 44px under a finger (a touch screen, or a window under 768 px:
+                // Verve's touch floor and the station's touch law), as a note's ✕.
+                className="relative h-7 w-7 text-muted-foreground before:absolute before:-inset-1.5 before:content-[''] hover:text-foreground finger:before:-inset-2"
               >
                 <X aria-hidden="true" />
               </Button>
@@ -187,7 +187,7 @@ export function CompanionActionCard({ pending, name, onWithdraw }: CompanionActi
 
       {round ? (
         <Collapsible open={questionsShown} onOpenChange={setQuestionsShown} data-companion-action-questions="" className="flex min-w-0 flex-col">
-          <CollapsibleTrigger className="flex items-center gap-1.5 self-start rounded-sm text-xs font-medium text-muted-foreground hover:text-foreground max-md:min-h-11 [@media(pointer:coarse)]:min-h-11">
+          <CollapsibleTrigger className="flex items-center gap-1.5 self-start rounded-sm text-xs font-medium text-muted-foreground hover:text-foreground finger:min-h-11">
             <FoldChevron collapsed={!questionsShown} />
             {t('companion.action.questions', 'The questions, with their options')}
           </CollapsibleTrigger>

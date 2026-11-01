@@ -5,7 +5,7 @@ import { AppError } from '@/shared/utils.js';
 
 /**
  * What a page may send her, and the one 400 every refusal is. The limits are the plan's interface 9 (`text`
- * 1-8000 for a typed message) and the draft's own (at most 20000, `DRAFT_TEXT_MAX`: `PUT /draft` refuses a blank one, while
+ * 1-8000 for a typed message, 0-8000 when the line carries files) and the draft's own (at most 20000, `DRAFT_TEXT_MAX`: `PUT /draft` refuses a blank one, while
  * `update_draft` takes an empty text as a clear), written once here so the routes and her tools cannot disagree about how
  * long a brief may be. A refusal is `COMPANION_INPUT_INVALID` with a sentence that
  * names the field and its limit, which is all the panel shows.
@@ -17,7 +17,7 @@ import { AppError } from '@/shared/utils.js';
  * its saves refuse with) and the draft tool (`tools/draft-tools.ts`: `DRAFT_TEXT_MAX`, `characterCount`).
  */
 
-/** The header every page sends: the id this page generated for itself, which names it on the floor. */
+/** The header every page sends: the id this page generated for itself, which names it on the floor. Consumed by `readClientId` and `requireClientId` below, and through them by every route of `companion.routes.ts` and `cards.routes.ts` that reads the page. */
 const COMPANION_CLIENT_HEADER = 'x-companion-client';
 
 /** The longest typed message, in characters. Consumed by `companion.routes.ts`, and by `companion-press.ts`, which holds a spoken line to the same limit. */
@@ -133,17 +133,50 @@ export function readBodyFlag(body: Record<string, unknown>, field: string): bool
 }
 
 /**
- * One text field of a body, trimmed, of 1 to `max` characters — or the 400 naming the field and its limit. Trimmed
- * because a message of nothing but whitespace is no message, and what is stored is what she is shown. Consumed by
- * `companion.routes.ts` (`text` of `/messages` and of `PUT /draft`).
+ * The most files one typed line may carry, and the longest `path` and `name` of one of them, in characters: the page's intake takes at most ten with one message
+ * (`useAttachmentIntake`), and a stored name is the store's own prefix plus a name cut to 255 by the upload route's file system. Consumed by `readBodyAttachments` below.
  */
-export function readBodyText(body: Record<string, unknown>, field: string, max: number): string {
-  const limit = `${field} must be 1-${max} characters`;
+const ATTACHMENTS_MAX = 10;
+const ATTACHMENT_PATH_MAX = 4096;
+const ATTACHMENT_NAME_MAX = 255;
+
+/**
+ * The files a typed line carries: absent is none, else a list of 0-10 records, each a `path` of 1-4096 characters and a `name` of 1-255 (his name for the file); any
+ * other field of a record is ignored, so a size or a type the page claims is never read. Anything else is the 400 `COMPANION_INPUT_INVALID` naming `attachments`. Only the SHAPE is
+ * checked here: whether a path is in the upload store and what the file is are the service's to read off the stored file (`attachments/typed-attachments.ts`).
+ * Consumed by `companion.routes.ts` (`attachments` of `/messages`).
+ */
+export function readBodyAttachments(body: Record<string, unknown>): Array<{ path: string; name: string }> {
+  const value = body.attachments;
+  if (value === undefined) return [];
+  const limit = `attachments must be a list of at most ${ATTACHMENTS_MAX} files, each with a path of 1-${ATTACHMENT_PATH_MAX} characters and a name of 1-${ATTACHMENT_NAME_MAX}`;
+  if (!Array.isArray(value)) throw inputInvalid(`${limit} (it is not a list).`, 'attachments');
+  if (value.length > ATTACHMENTS_MAX) throw inputInvalid(`${limit} (it has ${value.length}).`, 'attachments');
+  return value.map((record: unknown, index) => {
+    if (!isRecord(record) || !isText(record.path) || !isText(record.name)) throw inputInvalid(`${limit} (file ${index + 1} has no text path and name).`, 'attachments');
+    const pathLength = characterCount(record.path);
+    const nameLength = characterCount(record.name);
+    if (pathLength < 1 || pathLength > ATTACHMENT_PATH_MAX) throw inputInvalid(`${limit} (the path of file ${index + 1} has ${pathLength}).`, 'attachments');
+    if (nameLength < 1 || nameLength > ATTACHMENT_NAME_MAX) throw inputInvalid(`${limit} (the name of file ${index + 1} has ${nameLength}).`, 'attachments');
+    return { path: record.path, name: record.name };
+  });
+}
+
+/**
+ * One text field of a body, trimmed, of 1 to `max` characters — or the 400 naming the field and its limit. Trimmed
+ * because a message of nothing but whitespace is no message, and what is stored is what she is shown. `allowEmpty` lowers the
+ * floor to 0: `/messages` gives it when the line carries attachments, because a message of files alone is a message, as in a chat;
+ * the field must still be there as text. Consumed by `companion.routes.ts` (`text` of `/messages`, with `allowEmpty` when the line
+ * carries attachments, and of `PUT /draft`).
+ */
+export function readBodyText(body: Record<string, unknown>, field: string, max: number, options: { allowEmpty?: boolean } = {}): string {
+  const floor = options.allowEmpty === true ? 0 : 1;
+  const limit = `${field} must be ${floor}-${max} characters`;
   const value = body[field];
   if (!isText(value)) throw inputInvalid(`${limit} (it is not text).`, field);
   const text = value.trim();
   const length = characterCount(text);
-  if (length < 1 || length > max) throw inputInvalid(`${limit} (it has ${length}).`, field);
+  if (length < floor || length > max) throw inputInvalid(`${limit} (it has ${length}).`, field);
   return text;
 }
 

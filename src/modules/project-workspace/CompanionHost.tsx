@@ -1,10 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
 import { useBackToWorkspace, useCurrentApplication, useShowApplication } from '@/modules/app-switcher';
 import { useChatHost } from '@/modules/chat-host';
 import { CompanionProvider } from '@/modules/companion';
 import { useProjectEffectsState } from '@/modules/project-workspace/context/ProjectsStateContext';
+import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { CompanionOpenTarget } from '@/shared/companion-types';
 import { useRevealCard } from '@/shared/hooks/useRevealCard';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
@@ -17,6 +18,10 @@ const ARCHPULSE_APP_ID = 'archpulse';
  * and answers her orders to open a chat, a card, a page or a check on this page — the provider calls `onOpen(target, label)` only on the
  * page that holds the floor, so every branch below acts without asking whose turn it is. The workspace has no use for the label
  * (the spoken name the door resolved, which the station's stage names a thing by) and ignores it.
+ *
+ * THIS PROVIDER IS THE PAGE'S ONLY ONE, the station's too: the station is drawn inside it, beside the workspace's frame. So the first thing every open is
+ * asked is which page is on screen. While the station is, it takes the open and puts the thing on its stage (`openOnStage`, which the station registers);
+ * the workspace's own answers below are for the workspace being on screen.
  *
  * OPENING A CHAT HERE IS THREE THINGS, in this order. The Chat view comes forward (as a notification's landing does: the
  * route alone leaves a page on Files or Git looking at Files or Git). The route moves to `/session/<id>`. And when an
@@ -48,14 +53,25 @@ export default function CompanionHost({ navigate, children }: Pick<ProjectWorksp
   const backToWorkspace = useBackToWorkspace();
   const showApplication = useShowApplication();
   const revealCard = useRevealCard();
+  const { openOnStage, registerWorkspaceChatOpen } = useStationDoors();
+
+  // The workspace's one way to bring a chat forward, for her order to open it and for the station's "Open the chat" alike (`registerWorkspaceChatOpen`).
+  const openChatHere = useCallback(
+    (sessionId: string) => {
+      setActiveTab('chat');
+      navigate(`/session/${sessionId}`);
+      if (covered) floatChat();
+    },
+    [setActiveTab, navigate, covered, floatChat],
+  );
+  useEffect(() => registerWorkspaceChatOpen(openChatHere), [registerWorkspaceChatOpen, openChatHere]);
 
   const openOnThisPage = useCallback(
-    (target: CompanionOpenTarget, _label: string) => {
+    (target: CompanionOpenTarget, label: string) => {
+      if (openOnStage(target, label)) return;
       switch (target.kind) {
         case 'chat':
-          setActiveTab('chat');
-          navigate(`/session/${target.sessionId}`);
-          if (covered) floatChat();
+          openChatHere(target.sessionId);
           return;
         case 'card':
           if (covered) backToWorkspace();
@@ -71,7 +87,7 @@ export default function CompanionHost({ navigate, children }: Pick<ProjectWorksp
           return;
       }
     },
-    [setActiveTab, navigate, covered, floatChat, backToWorkspace, revealCard, showApplication],
+    [openOnStage, openChatHere, setActiveTab, covered, backToWorkspace, revealCard, showApplication],
   );
 
   return <CompanionProvider onOpen={openOnThisPage}>{children}</CompanionProvider>;

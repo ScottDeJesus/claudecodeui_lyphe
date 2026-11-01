@@ -114,11 +114,11 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
     verbs = (
       <>
         {startUnderPause && (
-          <Button size="sm" className="h-8" disabled={held} onClick={() => void resume()} data-dispatcher-start>
+          <Button size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => void resume()} data-dispatcher-start>
             {t('runner.start')}
           </Button>
         )}
-        <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void stop()} data-dispatcher-stop>
+        <Button variant="secondary" size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => void stop()} data-dispatcher-stop>
           {t('runner.stop')}
         </Button>
       </>
@@ -126,10 +126,10 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   } else if (plan.status === 'stalled') {
     verbs = (
       <>
-        <Button size="sm" className="h-8" disabled={held} onClick={() => void resume()} data-dispatcher-resume>
+        <Button size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => void resume()} data-dispatcher-resume>
           {t('runner.resume')}
         </Button>
-        <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void stop()} data-dispatcher-stop>
+        <Button variant="secondary" size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => void stop()} data-dispatcher-stop>
           {t('runner.stop')}
         </Button>
       </>
@@ -142,7 +142,7 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
     // and where that hour is, the card's own clock already says (`PlanFace.PlanClock`).
     verbs = (
       <>
-        <Button size="sm" className="h-8" disabled={held} onClick={() => void resume()}
+        <Button size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => void resume()}
           {...(stops ? { 'data-dispatcher-resume': '' } : { 'data-dispatcher-start': '' })}>{word}</Button>
         {(stops || armed !== null) && (
           <ScheduleControl busy={held} onSchedule={(when) => void schedule(when)} startAt={armed} />
@@ -151,13 +151,13 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
     );
   } else if (plan.status === 'hidden') {
     verbs = (
-      <Button size="sm" className="h-8" disabled={held} onClick={() => putAway.show([plan])} data-dispatcher-show>
+      <Button size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => putAway.show([plan])} data-dispatcher-show>
         {t('dispatcher.hidden.show')}
       </Button>
     );
   } else if (plan.status === 'parked') {
     verbs = (
-      <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void unpark()} data-dispatcher-unpark>
+      <Button variant="secondary" size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => void unpark()} data-dispatcher-unpark>
         {t('dispatcher.unpark')}
       </Button>
     );
@@ -176,7 +176,7 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
             onArm={() => void armAccept(plan.design_loaded_at ?? '')} onCancel={() => void disarmAccept()} />
         )}
         {parkable && (
-          <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void park()} data-dispatcher-park>
+          <Button variant="secondary" size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => void park()} data-dispatcher-park>
             {t('dispatcher.park')}
           </Button>
         )}
@@ -189,7 +189,7 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
     verbs = (
       <>
         {verbs}
-        <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void plannerResume()}
+        <Button variant="secondary" size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => void plannerResume()}
           data-dispatcher-planner-resume>
           {t('dispatcher.plannerResume')}
         </Button>

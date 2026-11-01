@@ -1,8 +1,13 @@
-// The mouth of her face, in pure code. Gemini's speech sends audio only, with no word or phoneme timings, so the mouth is
-// built from the two things the page does have: the voice's LEVEL says how far the mouth opens, and the sentence's TEXT, at
-// the share of it the audio has reached, says which vowel it shapes. `faceEngine.ts` plays the answers as frames.
+// The mouth of her face, in pure code. THE EXACT SHAPES LEAD AND THE LEVEL MOUTH FILLS IN. Gemini's speech sends audio only,
+// but the server finds the timed mouth shapes in it (Rhubarb Lip Sync, piece by piece as the audio arrives) and announces them,
+// so wherever an announced piece holds the audio's place her mouth is the baked mouth of that shape (`MOUTH_OF_SHAPE`, `shapeAt`).
+// Wherever none does (a sentence's start until its first piece lands: that piece's length, Rhubarb's run time and the audio's arrival, so
+// about one to two seconds and longer under load; the gap between two pieces; a piece Rhubarb could not answer; no install) the mouth is built from
+// the two things the page always has: the voice's LEVEL says how far the mouth opens, and the sentence's TEXT, at the share of
+// it the audio has reached, says which vowel it shapes. `chooseMouth` makes that choice for one step; `faceEngine.ts` plays it as frames.
 
-import type { CompanionSound } from '@/shared/companion-types';
+import type { FacePlaying } from '@/modules/companion/utils/faceMoodHold';
+import type { CompanionFaceMouth, CompanionMouthPiece, CompanionMouthShape, CompanionSound } from '@/shared/companion-types';
 
 /** How far her mouth is open: shut, half open (frame `1`) or full open (frame `2`). */
 type MouthOpenness = 'closed' | 'half' | 'full';
@@ -26,6 +31,30 @@ const HYSTERESIS = 0.01;
 const DWELL_MS = 50;
 /** Her speech, in characters of text a second: the estimate of a sentence's length until its body has ended and the player knows it. */
 const CHARACTERS_PER_SECOND = 15;
+/** How long the level mouth crossfades from one frame to the next, ms: long enough that a loudness on a threshold is a soft change, not a flicker. */
+export const MOUTH_FADE_MS = 60;
+/** How long an exact shape crossfades into the next, ms. Rhubarb's shortest cues run 40 to 70 ms, so a longer fade would never show a 40 ms shape whole; 40 ms still hides the swap of one photo frame for another. */
+const EXACT_MOUTH_FADE_MS = 40;
+
+/** Rhubarb's shapes as her baked mouths: the six basic shapes are six of her seven mouths, and rest is her closed mouth. `e2`, the wide grin, stays the level mouth's. */
+export const MOUTH_OF_SHAPE: Readonly<Record<CompanionMouthShape, CompanionFaceMouth>> = {
+  X: 'closed', A: 'closed', B: 'e1', C: 'a1', D: 'a2', E: 'o2', F: 'o1',
+};
+
+/**
+ * The shape her mouth takes `position` seconds into the sentence: the last cue at or before it, in the piece that holds it
+ * (`from` up to, not including, `to`). Null when no announced piece holds it.
+ */
+export function shapeAt(pieces: readonly CompanionMouthPiece[], position: number): CompanionMouthShape | null {
+  const piece = pieces.find((candidate) => position >= candidate.from && position < candidate.to);
+  if (piece === undefined) return null;
+  let shape: CompanionMouthShape | null = null;
+  for (const cue of piece.cues) {
+    if (cue.at > position) break;
+    shape = cue.shape;
+  }
+  return shape;
+}
 
 /**
  * How many characters of text each sound takes in the sentence's length. A giggle is not a character, but it takes time, so it
@@ -119,4 +148,35 @@ export function soundAt(
 ): { index: number; tag: string } | null {
   const { reached } = placeAt(text, sounds, elapsed, duration);
   return reached < 0 ? null : { index: reached, tag: sounds[reached].tag };
+}
+
+/** The level mouth as the engine carries it from step to step: the openness shown, and the vowel it shapes (kept for a step with no sentence). */
+export type VoiceMouth = { openness: MouthState; vowel: MouthVowel };
+
+/** The level mouth before she has spoken: shut, on "ah". */
+export const QUIET_VOICE: VoiceMouth = { openness: MOUTH_CLOSED, vowel: 'a' };
+
+/**
+ * What one step's mouth is: who `by` drove it, the baked mouth `key` to draw, the crossfade into it in ms, whether it is `closed`
+ * (a blink waits for that), and the level mouth to carry into the next step.
+ */
+export type MouthChoice = { by: 'exact' | 'voice'; key: CompanionFaceMouth; fadeMs: number; closed: boolean; voice: VoiceMouth };
+
+/**
+ * Used by `faceEngine.ts`: the mouth for one step while she speaks. Where an announced piece holds the audio's place, the mouth is
+ * the mood's baked mouth of that shape, crossfaded in 40 ms; elsewhere it is today's mouth from the level and the vowel, with its
+ * 60 ms crossfade, 50 ms dwell and hysteresis. The level mouth is read on every step either way, so it is current the moment it
+ * takes over.
+ */
+export function chooseMouth(level: number, playing: FacePlaying | null, voice: VoiceMouth, now: number): MouthChoice {
+  const openness = mouthOpenness(level, voice.openness, now);
+  const vowel = playing === null ? voice.vowel : vowelAt(playing.text, playing.sounds, playing.elapsed, playing.duration);
+  const shape = playing === null ? null : shapeAt(playing.mouth, playing.elapsed);
+  if (shape !== null) {
+    const key = MOUTH_OF_SHAPE[shape];
+    return { by: 'exact', key, fadeMs: EXACT_MOUTH_FADE_MS, closed: key === 'closed', voice: { openness, vowel } };
+  }
+  const closed = openness.openness === 'closed';
+  const key = closed ? 'closed' : (`${vowel}${openness.openness === 'half' ? 1 : 2}` as CompanionFaceMouth);
+  return { by: 'voice', key, fadeMs: MOUTH_FADE_MS, closed, voice: { openness, vowel } };
 }

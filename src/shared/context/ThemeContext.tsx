@@ -9,17 +9,10 @@ import {
 import { readSunPhase } from '@/shared/solarSchedule';
 
 type ThemeContextValue = {
-  /** The theme on screen: a held theme (`holdTheme`) while any hold stands, else the reader's own choice. */
+  /** The theme on screen: the reader's choice (the stored theme, the sun's answer or the system scheme), on every page of the app. */
   isDarkMode: boolean;
-  /** Flips the reader's OWN choice and stores it. A hold keeps the screen where it holds it; the choice is there when the hold is released. */
+  /** Flips the reader's choice and stores it. */
   toggleDarkMode: () => void;
-  /**
-   * Holds the screen in `theme` over the reader's choice until the returned release is called; the newest hold wins while
-   * several stand. Nothing a hold does is stored: his choice, the sun and the system scheme go on being read and written
-   * as they were, and the release puts the screen back to them. The release may be called more than once.
-   * Consumed by the Kaylee Station route, which holds dark while it is mounted.
-   */
-  holdTheme: (theme: 'dark' | 'light') => () => void;
   /** True while the theme is following the sun rather than a stored choice. */
   followsSun: boolean;
   setFollowsSun: (next: boolean) => void;
@@ -67,10 +60,9 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     () => readUserPreference<boolean>('themeFollowsSun', false),
   );
 
-  // The reader's OWN choice (stored theme, the sun's answer or the system scheme): what the switch flips and what
-  // `setFollowsSun` stores. Never the held theme, so a hold cannot be written over his preference; the colour on
-  // screen is `isDarkMode` below. Essential because the hold is applied over it and the release falls back to it.
-  const [ownDarkMode, setOwnDarkMode] = useState(() => {
+  // The colour on screen: the reader's choice (stored theme, the sun's answer or the system scheme), what the switch flips and
+  // what `setFollowsSun` stores. State, because every painting effect below keys on it and a change must re-render every consumer.
+  const [isDarkMode, setIsDarkMode] = useState(() => {
     // Ahead of the stored theme: when the reader has asked for the sun, the sun is the choice,
     // and the stored value is only a colour left over from before they asked.
     const sunDarkMode = readSunDarkMode();
@@ -89,14 +81,6 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     return false;
   });
 
-  // The themes held over his choice right now, oldest first: one entry per `holdTheme` not yet released. State, because a
-  // hold coming or going must re-render the provider so the colour on screen changes with it; the newest entry wins.
-  const [holds, setHolds] = useState<readonly { theme: 'dark' | 'light' }[]>([]);
-  // The colour on screen: the newest hold's theme while any stands, else his own choice. Every effect below that PAINTS
-  // keys on this; every path that WRITES his choice reads `ownDarkMode`.
-  const newestHold = holds[holds.length - 1];
-  const isDarkMode = newestHold === undefined ? ownDarkMode : newestHold.theme === 'dark';
-
   // The theme now lives in auth.db, so a change made on another device (or in
   // another tab) arrives through the preference store rather than a re-render.
   //
@@ -109,12 +93,12 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     setFollowsSunState(readUserPreference<boolean>('themeFollowsSun', false));
     const sunDarkMode = readSunDarkMode();
     if (sunDarkMode !== null) {
-      setOwnDarkMode(sunDarkMode);
+      setIsDarkMode(sunDarkMode);
       return;
     }
     const savedTheme = readUserPreference<string | null>('theme', null);
     if (savedTheme) {
-      setOwnDarkMode(savedTheme === 'dark');
+      setIsDarkMode(savedTheme === 'dark');
     }
   }), []);
 
@@ -195,7 +179,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       // A polar day or night measured nothing, so nothing is changed — the theme stays where the
       // reader last had it rather than being flipped by a time nobody computed.
       if (phase.nextChangeAt) {
-        setOwnDarkMode(!phase.isDaylight);
+        setIsDarkMode(!phase.isDaylight);
       }
 
       const msUntilChange = phase.nextChangeAt
@@ -220,7 +204,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       // Only update if user hasn't manually set a preference, and the sun is not in charge of the colour
       const savedTheme = readUserPreference<string | null>('theme', null);
       if (!savedTheme && readSunDarkMode() === null) {
-        setOwnDarkMode(e.matches);
+        setIsDarkMode(e.matches);
       }
     };
 
@@ -252,15 +236,15 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       document.body.classList.remove('vv-anim');
     }, 500);
 
-    // The colour is taken from the render's `ownDarkMode` (his choice, never a held colour), not from a state
+    // The colour is taken from the render's `isDarkMode`, not from a state
     // updater: an updater that writes a preference runs inside React's render when an update is already pending,
     // and the write then notifies other providers mid-render.
-    const next = !ownDarkMode;
+    const next = !isDarkMode;
 
     // Stored before the sun is released: releasing notifies the preference listener above, which from
     // then on applies the stored `theme`, so it has to be the colour just chosen and not the old one.
     writeUserPreference('theme', next ? 'dark' : 'light');
-    setOwnDarkMode(next);
+    setIsDarkMode(next);
 
     // Reaching for the switch IS the decision. Leaving the sun in charge would let it undo the
     // choice at the next crossing, which reads as the control being broken.
@@ -268,33 +252,24 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       writeUserPreference('themeFollowsSun', false);
       setFollowsSunState(false);
     }
-  }, [ownDarkMode]);
+  }, [isDarkMode]);
 
   // Letting the sun go from its own switch keeps the colour on screen: it becomes the stored choice.
   // The listener applies the stored `theme` once the sun is let go, so without this the page jumped
   // to whatever was stored days ago (the sun never writes `theme`).
   const setFollowsSun = useCallback((next: boolean) => {
     if (!next && readUserPreference<boolean>('themeFollowsSun', false)) {
-      writeUserPreference('theme', ownDarkMode ? 'dark' : 'light');
+      writeUserPreference('theme', isDarkMode ? 'dark' : 'light');
     }
     writeUserPreference('themeFollowsSun', next);
     setFollowsSunState(next);
-  }, [ownDarkMode]);
-
-  // A hold is an entry in `holds` and its release takes that entry out by identity, so two holds of the same theme
-  // release independently and a second call of one release finds nothing to remove. Nothing here touches a stored
-  // preference: holding and releasing are about the screen alone.
-  const holdTheme = useCallback((theme: 'dark' | 'light') => {
-    const hold = { theme };
-    setHolds((held) => [...held, hold]);
-    return () => setHolds((held) => (held.includes(hold) ? held.filter((entry) => entry !== hold) : held));
-  }, []);
+  }, [isDarkMode]);
 
   // A fresh object here would re-render every consumer in the app on any
   // render of this provider, theme change or not.
   const value = useMemo<ThemeContextValue>(
-    () => ({ isDarkMode, toggleDarkMode, holdTheme, followsSun, setFollowsSun }),
-    [isDarkMode, toggleDarkMode, holdTheme, followsSun, setFollowsSun],
+    () => ({ isDarkMode, toggleDarkMode, followsSun, setFollowsSun }),
+    [isDarkMode, toggleDarkMode, followsSun, setFollowsSun],
   );
 
   return (

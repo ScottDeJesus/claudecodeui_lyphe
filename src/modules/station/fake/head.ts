@@ -5,7 +5,7 @@ import { CompanionAvatar, CompanionControls } from '@/modules/companion';
 import { HER_PICTURES, KANBAN, picture, TREE_POLISH, UPLOADS } from '@/modules/station/fake/conversation';
 import { StationHeadView } from '@/modules/station/StationHead';
 import type { CompanionPicture } from '@/shared/companion-types';
-import type { CompanionPresence, CompanionPresenceState } from '@/shared/types';
+import type { CompanionPresence, CompanionPresenceState, StationHerView } from '@/shared/types';
 
 /*
  * HER HEAD'S FIXTURES, for `station-fake.ts`'s pictures only: `StationHeadView` drawn from her picture in each of the station's
@@ -19,6 +19,9 @@ import type { CompanionPresence, CompanionPresenceState } from '@/shared/types';
  *
  * - `home`: Idle; `waiting`: Speaking (her read-back, marked in the conversation); `walkthrough`: Walking Kanban lane review ·
  *   item 4 of 15, her turn running (Stop in the line); `empty`: Asleep · your next message wakes her.
+ *
+ * `portraitHead` is the same head in the portrait view (`herView: 'portrait'`: no face, the toggle reading "Show chat"), which
+ * `fake/portrait.ts` draws over a picture beside her portrait in the conversation's place. Every drawing here is in `chat`.
  *
  * `HEAD_STATES` are her fourteen presences, one drawing each by the presence's own word, drawn by the probe over `home` in the
  * slot's place: the page's own four (listening, transcribing, speaking, cut), her process's four (loading, failed with its
@@ -36,29 +39,37 @@ const VOICE_ON = { on: true, setOn: NO_PRESS };
 /** The sentence her harness says when her process could not start (`companion-fake.ts`'s, the panel's own failed state). */
 const FAILED_SENTENCE = 'Kaylee couldn\'t start: the Claude login on this box has expired. Sign in again from Settings > Account.';
 
-/** A presence: its word, and what it concerns. */
-const presenceOf = (state: CompanionPresenceState, about: Partial<Omit<CompanionPresence, 'state'>> = {}): CompanionPresence => (
+/** A presence: its word, and what it concerns. Also `fake/portrait.ts`'s. */
+export const presenceOf = (state: CompanionPresenceState, about: Partial<Omit<CompanionPresence, 'state'>> = {}): CompanionPresence => (
   { state, session: null, files: null, walk: null, ...about });
 
-/** Her head drawn from `her` (null: no picture yet) at `presence`. */
-function drawing(her: CompanionPicture | null, presence: CompanionPresence) {
+/** Her face at a square, drawn on `presence` from `her`'s face id (none on a fixture's picture: her initial). Also `fake/portrait.ts`'s. */
+export const avatarOf = (her: CompanionPicture | null, presence: CompanionPresence) => (px: number) => createElement(CompanionAvatar, {
+  presence, faceId: her?.face.id ?? null, voice: null, sentences: null, look: null, name: her?.settings.name ?? 'Kaylee', size: px,
+});
+
+/** Her head drawn from `her` (null: no picture yet) at `presence`, in her `herView` view. */
+function drawing(her: CompanionPicture | null, presence: CompanionPresence, herView: StationHerView = 'chat') {
   const name = her?.settings.name ?? 'Kaylee';
   return {
     view: StationHeadView,
     props: {
       name,
       presence,
-      face: (px: number) => createElement(CompanionAvatar, {
-        presence, faceId: her?.face.id ?? null, voice: null, sentences: null, look: null, name, size: px,
-      }),
+      face: avatarOf(her, presence),
       controls: (align: 'start' | 'center') => createElement(CompanionControls, {
-        name, picture: her, presence, voice: VOICE_ON, layout: 'line', align,
+        name, picture: her, voice: VOICE_ON, layout: 'line', align,
         onModelChange: NO_SAVE, onLiveChange: NO_SAVE, onInterrupt: NO_SAVE, onClear: NO_SAVE,
       }),
       failure: her?.process.state === 'failed' ? { sentence: her.process.error } : null,
+      herView,
+      onHerView: NO_PRESS,
     } satisfies Omit<ComponentProps<typeof StationHeadView>, 'tier' | 'density'>,
   };
 }
+
+/** Her head in the portrait view over `her` at `presence`: no face of its own, the toggle ready to show the chat. */
+export const portraitHead = (her: CompanionPicture | null, presence: CompanionPresence) => drawing(her, presence, 'portrait');
 
 /** Her head in each of the four pictures. */
 export const HEAD_FAKE = {

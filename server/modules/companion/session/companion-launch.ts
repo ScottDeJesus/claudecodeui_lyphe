@@ -35,6 +35,9 @@ import { fillSystemPrompt } from './companion-prompt.js';
  *     reads her turns as a program's, never as the operator's correction (INV-4352);
  *   - `includePartialMessages` feeds her text, delta by delta, to the sentence stream;
  *   - `maxTurns` is 30 PER TURN of hers (a turn is one answer to him, with every tool call inside it).
+ *   - `CLAUDE_CODE_AUTO_COMPACT_WINDOW` in her env is 500k tokens: the CLI compacts her conversation when it
+ *     reaches that, not at its default for a 1M model (about 967k). The CLI reads its env at launch, so a
+ *     change here applies from her next launch.
  * It is a Claude launch like any other, so it starts on the account the house chose, on the subscription.
  *
  * Consumers: `session/companion-session.ts` (every launch and relaunch), `session/companion-handover.ts` (where the thread of a
@@ -51,6 +54,10 @@ export const COMPANION_MCP_SERVER_NAME = 'companion';
 
 /** One of her turns may run at most this many model round-trips (tool calls included) before the CLI ends it. */
 const COMPANION_MAX_TURNS = 30;
+
+// How full her context may get before her CLI compacts it: 500k tokens, half her models' 1M window,
+// so the summary the CLI writes reads half a million tokens at most. The CLI's default for a 1M model is about 967k.
+const COMPANION_AUTO_COMPACT_WINDOW_TOKENS = 500_000;
 
 /**
  * `~/.claude/state/companion/<user id>`, made if absent: the folder her CLI is launched in. Nothing is
@@ -134,7 +141,7 @@ export async function companionQueryOptions(
     includePartialMessages: true,
     cwd,
     maxTurns: COMPANION_MAX_TURNS,
-    env: { ...userFacingEnv(), ...account.env },
+    env: { ...userFacingEnv(), ...account.env, CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(COMPANION_AUTO_COMPACT_WINDOW_TOKENS) },
     ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
     ...(providerSessionId ? { resume: providerSessionId } : {}),
   };

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useCompanion } from '@/modules/companion';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
-import { StageGone, StageReadFailed } from '@/modules/station/FocusFallback';
+import { StageGone, StageReadFailed } from '@/modules/station/stageStates';
 import { useKeepFocusWhenGone } from '@/modules/station/hooks/useKeepFocusWhenGone';
 import { refusalMessage } from '@/modules/station/stageRefusal';
 import { StageFoot, StageHeadActions } from '@/modules/station/stageSlots';

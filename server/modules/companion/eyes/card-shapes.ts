@@ -8,7 +8,7 @@ import type { CompanionNoteKind, CompanionNoteRef } from '@/shared/companion-typ
  *
  * THE TABLE (MAN-9151) is decided by the readers below and by nothing else:
  *   list, about nothing   list_roadmap, list_runs, list_alerts, read_schedules, read_kanban (every scope), read_heal summary and cycles,
- *                         read_cerberus, read_memory lists, recall, read_notes lists, search_docs
+ *                         read_cerberus, read_memory lists, recall, read_notes lists, search_docs, lookup_skills lists
  *   list, a project       read_git status
  *   diff, a project       read_git diff, and read_git of one file
  *   plan, a card          read_card design, and read_card of a phrase
@@ -17,7 +17,7 @@ import type { CompanionNoteKind, CompanionNoteRef } from '@/shared/companion-typ
  *   note, a card          read_run of a dispatcher run (the plan it belongs to)
  *   note, a chat          read_run of a run a chat launched by hand (that chat); a run with neither is a note about nothing
  *   page, a page          read_doc (a page, one of its blocks, a phrase, its outline)
- *   note, about nothing   read_heal of a kind, read_memory of one proposal, read_notes of one note
+ *   note, about nothing   read_heal of a kind, read_memory of one proposal, read_notes of one note, lookup_skills of one name
  * `show_note` is her own card: her `kind` (`note` or `list`), about nothing (`tools/draft-tools.ts`).
  *
  * Consumers: `eyes-answer.ts` (the default shape and the type `toPanel` and `answerRead` take), and every reader above:

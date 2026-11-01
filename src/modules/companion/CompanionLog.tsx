@@ -1,14 +1,16 @@
 import { ArrowDown, AudioLines, Bell, Keyboard, Mic, TriangleAlert } from 'lucide-react';
-import { Fragment, useCallback } from 'react';
+import { useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CompanionAttachments } from '@/modules/companion/CompanionAttachments';
 import { CompanionCardChip } from '@/modules/companion/CompanionCardChip';
-import { CompanionSentence } from '@/modules/companion/CompanionSentence';
+import { CompanionReply, SpeakingDots } from '@/modules/companion/CompanionReply';
 import { useFollowNewest } from '@/modules/companion/hooks/useFollowNewest';
 import type { CompanionLogEntry, CompanionNote } from '@/shared/companion-types';
 import type { CompanionSentenceRef } from '@/shared/types';
 import { Button, EmptyState, ScrollArea } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 type CompanionLogProps = {
   /** The picture's log, oldest first. */
@@ -33,20 +35,6 @@ type CompanionLogProps = {
    */
   scrollRef?: (node: HTMLElement | null) => void;
 };
-
-/**
- * The sentence being spoken, as read-aloud marks it: a highlighter's band in the info tone (the status line's Speaking),
- * its ink at a fifth, widened by a ring of the same band so the words keep their places (a ring takes no room; padding
- * would re-wrap the paragraph each time the mark moves), with a 2px bar of the tone's full ink in the ring's left edge,
- * and all of it cloned onto every line the sentence wraps over. The bar is what meets the house's 3:1 floor for a mark:
- * 5.3:1 against the canvas in light and 10.3:1 in dark, 4.3:1 and 6.8:1 against the band beside it, where the band alone
- * measures 1.32:1 and 1.51:1 (the tone's own soft ground, 1.07:1, vanished in light); the words on the band keep 12.6:1
- * and 11.0:1. The bar is a shadow, as the ring is, so it too takes no room; drawn under the ring's fifth of the same ink,
- * it reads as the full ink. An underline was tried and read as a link. Forced colours drop every ground and shadow, so
- * there the words are underlined instead.
- */
-const SPEAKING_MARK =
-  'rounded-sm bg-tone-ink/20 ring-2 ring-tone-ink/20 shadow-[-2px_0_0_0] shadow-tone-ink box-decoration-clone forced-colors:underline';
 
 /**
  * What the log draws, one block per row: his line; her turn, every sentence of one turn joined into one paragraph; an
@@ -101,23 +89,6 @@ function clockOf(iso: string): string {
   return Number.isNaN(at.getTime()) ? '' : at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
-/** The three dots of a turn still being said; the words are for a screen reader, the dots for the eye. */
-function SpeakingDots({ label }: { label: string }) {
-  return (
-    <span data-companion-speaking="" className="ml-1 inline-flex items-center gap-0.5 align-middle">
-      {[0, 1, 2].map((dot) => (
-        <span
-          key={dot}
-          aria-hidden="true"
-          className="size-1 rounded-full bg-muted-foreground motion-safe:animate-pulse"
-          style={{ animationDelay: `${dot * 160}ms` }}
-        />
-      ))}
-      <span className="sr-only">{label}</span>
-    </span>
-  );
-}
-
 /**
  * Her exchange with him, newest last. Drawn by this module's CompanionPanel, between the header and the dock, and by the
  * station module's conversation.
@@ -125,8 +96,10 @@ function SpeakingDots({ label }: { label: string }) {
  * HIS LINES stand on the right in the secondary ground, captioned "You · typed" or "You · spoken" with the glyph of the
  * way they came (a keyboard, a mic), as the chat draws his turn. A spoken line with no words (a press that carried none,
  * still a turn she answers) keeps that place and caption and reads "Nothing heard" in the muted ink on an outline, so it
- * is never taken for words he said. HER TURN is a paragraph on the left: the sentences of one turn joined, her mood
- * brackets already lifted by the server, each sound a small mark at its offset (CompanionSentence). While this page's
+ * is never taken for words he said. What he attached to a typed line stands under his caption, above his words, as the chat draws
+ * his turn (`CompanionAttachments`): pictures as squares that enlarge, other files as cards that download; a line of files with no
+ * words draws no bubble, since an empty one reads as a broken line. HER TURN is a paragraph on the left: the sentences of one turn
+ * joined, her mood brackets already lifted by the server, each sound a small mark at its offset (CompanionSentence). While this page's
  * player sounds one of her sentences (`speaking`), that sentence stands on a band of the info tone, as read-aloud marks
  * it, a bar of its ink at each line's start, and the band moves on with her voice; nothing else about the paragraph
  * changes, so its lines never re-wrap under him. AN ALERT is a row in the info tone with a bell, the house's news in its own words. A SYSTEM LINE is her harness
@@ -174,20 +147,13 @@ export function CompanionLog({ entries, name, turnId, visible, speaking = null, 
       return (
         <div key={block.key} data-companion-entry="kaylee" className="flex flex-col gap-1">
           <div className={CAPTION}>{name} · {clockOf(block.at)}</div>
-          <div className="break-words text-sm leading-relaxed text-foreground">
-            {block.sentences.map((sentence, index) => {
-              const spoken = speaking !== null && block.turnId === speaking.turnId && sentence.index === speaking.index;
-              const words = <CompanionSentence text={sentence.text} sounds={sentence.sounds} />;
-              return (
-                <Fragment key={sentence.id}>
-                  {index > 0 && ' '}
-                  {/* Only the sentence being spoken gets a wrapper: with none spoken, the paragraph is its bare words. */}
-                  {spoken ? <span data-companion-speaking-sentence="" data-tone="info" className={SPEAKING_MARK}>{words}</span> : words}
-                </Fragment>
-              );
-            })}
-            {block.turnId !== null && block.turnId === turnId && <SpeakingDots label={speakingWords} />}
-          </div>
+          <CompanionReply
+            sentences={block.sentences}
+            turnId={block.turnId}
+            answering={block.turnId !== null && block.turnId === turnId}
+            speaking={speaking}
+            name={name}
+          />
         </div>
       );
     }
@@ -197,6 +163,9 @@ export function CompanionLog({ entries, name, turnId, visible, speaking = null, 
       const Via = spoken ? Mic : Keyboard;
       // A press that carried no words is still his turn: the log says so, in words he could not have said.
       const nothingHeard = spoken && entry.text.trim().length === 0;
+      const attachments = entry.attachments ?? [];
+      // A typed line of files with no words draws no bubble: an empty bubble reads as a broken line.
+      const filesAlone = !spoken && entry.text.trim().length === 0 && attachments.length > 0;
       return (
         <div
           key={block.key}
@@ -214,12 +183,15 @@ export function CompanionLog({ entries, name, turnId, visible, speaking = null, 
             </span>
             · {clockOf(entry.at)}
           </div>
+          {/* What he attached, above his words, as his turn in a chat draws it: squares that enlarge, cards that download. */}
+          <CompanionAttachments attachments={attachments} size="message" />
           {nothingHeard ? (
             <div className="max-w-[85%] rounded-xl border border-dashed border-border px-3 py-2 text-sm leading-relaxed text-muted-foreground">
               {t('companion.log.nothingHeard', { defaultValue: 'Nothing heard' })}
             </div>
-          ) : (
-            <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-xl bg-secondary px-3 py-2 text-sm leading-relaxed text-foreground">
+          ) : filesAlone ? null : (
+            // Under what he attached, his words stand 8 px off it, as the chat's turn stands its bubble off its cards.
+            <div className={cn('max-w-[85%] whitespace-pre-wrap break-words rounded-xl bg-secondary px-3 py-2 text-sm leading-relaxed text-foreground', attachments.length > 0 && 'mt-1')}>
               {entry.text}
             </div>
           )}

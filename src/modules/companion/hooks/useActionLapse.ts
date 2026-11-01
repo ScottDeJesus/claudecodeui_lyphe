@@ -12,9 +12,10 @@ import { useEffect, useState } from 'react';
  *
  * `null` is no action at all: it sets no timer and never lapses. Used by this module's CompanionActionCard and
  * CompanionActionLine (the card in one line, on the station's phone), each of which draws nothing once it returns true: the two
- * lapse together; and, through the barrel, by the station's count of what needs him (`useNeedsCount`), which stays mounted across
- * actions and so counts a lapsed one out when its card goes (a past one reads live for the render that brings it, the timer
- * lapses it a tick later: only a keyed consumer is spared that).
+ * lapse together; and, through the barrel, by the station's `useLivePending`, which the count of what needs him reads (`useNeedsCount`,
+ * and the rail's head, `WhatNeedsYouView`). Those readers stay mounted across actions and so count a lapsed one out when its card goes;
+ * a past stamp reads live here for the render that brings it and the timer lapses it a tick later (only a keyed consumer is spared
+ * that), so `useLivePending` also reads the stamp against the clock itself.
  */
 export function useActionLapse(expiresAt: string | null): boolean {
   // The `expiresAt` that has passed. The stamp, not a flag, so the answer stays true to the action on screen: a card

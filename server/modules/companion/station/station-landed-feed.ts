@@ -10,7 +10,7 @@ import { dispatcherPictureOrNull, landedOf, LANDED_KIND_BY_CODE, landsThroughLan
 /**
  * A LANDING ARRIVES ON THE EVENT THAT KEEPS IT. The strip "since you last looked" reads the week once (`GET /station/landed`) and
  * then needs to hear what lands. This feed hears the notification history's own write (`onHistoryKept`): after a row is stored,
- * with its id, and with its wording already clear of every figure. A row whose code is one of the four landings
+ * with its id, and with its wording already clear of every figure. A row whose code is one of the five landings
  * (`LANDED_KIND_BY_CODE`) becomes ONE `station_landed { entry }` frame to that account's pages (`sendToUser`); every other row sends
  * nothing. Nothing polls, and no second reader of the runs says what finished: the page is told what the history holds.
  *
@@ -19,8 +19,9 @@ import { dispatcherPictureOrNull, landedOf, LANDED_KIND_BY_CODE, landsThroughLan
  * its id regardless, so a frame heard twice (a reconnect's re-read racing a frame) still draws once.
  *
  * THE ENTRY IS `landedOf(row, planChat)`, the one reading of a row as a landing, the same function the route's read goes through.
- * For a shipped feature or epic its chat is the dispatcher plan's, so `planChat` reads the lane's picture at that moment
- * (`house.dispatcher()`); a background landing names its own chat and a recovered check none, so those never wait on the lane. A lane
+ * For a shipped feature or epic its chat is the row's own, as the dispatcher's endings hand it; only a row kept without one asks the
+ * dispatcher plan's, so `planChat` reads the lane's picture at that moment (`house.dispatcher()`). A background landing names its own
+ * chat and a recovered check none, so those never wait on the lane either. A lane
  * that does not answer leaves the entry honestly naming no chat and the frame is still sent: the strip's entry is the news, its chat
  * a convenience. The frames of two landings close together may arrive out of order (one waited on the lane), so each carries its own
  * `id` and `at` for the page to place it by.
@@ -38,7 +39,7 @@ export function startStationLandedFeed(house: CompanionHouse): () => void {
 
   /** The account's pages hear one frame; a fault building it is logged by the caller with which row it was. */
   async function sendLanding(userId: number, row: NotificationHistoryRow): Promise<void> {
-    const picture = landsThroughLane(row.code) ? await dispatcherPictureOrNull(house) : null;
+    const picture = landsThroughLane(row) ? await dispatcherPictureOrNull(house) : null;
     if (stopped) return;
     const entry = landedOf(row, planChatOf(picture));
     if (entry === null) return;

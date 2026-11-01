@@ -24,6 +24,7 @@ import ToolGroupContainer from '@/modules/chat/transcript/ToolGroupContainer';
 import TypingIndicator from '@/modules/chat/transcript/TypingIndicator';
 import LoadAllMessagesOverlay from '@/modules/chat/transcript/LoadAllMessagesOverlay';
 import { type ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
+import { TranscriptPicturesContext, useTranscriptPictures } from '@/modules/chat/transcript/transcriptPictures';
 
 /**
  * How many of the newest rows mount with real content on the first commit,
@@ -211,6 +212,11 @@ function ChatMessagesPane({
     }
     return anchors;
   }, [chatMessages]);
+  // The pictures this chat's own `Read` calls returned, by path: what an image the replies name outside the project is drawn from.
+  const transcriptPictures = useTranscriptPictures(chatMessages, {
+    projectRoot: selectedProject?.fullPath ?? null,
+    complete: !hasMoreMessages || allMessagesLoaded,
+  });
   // With the work hidden, this is what tells the reader the turn is still going.
   const showTypingIndicator = isProcessing && !showWork;
 
@@ -283,8 +289,9 @@ function ChatMessagesPane({
   );
 
   return (
-    // Positioned wrapper so the loading wheel sits over the transcript, not inside its
-    // scroller, and stays centred while the hidden rows settle to the bottom underneath.
+    <TranscriptPicturesContext.Provider value={transcriptPictures}>
+    {/* Positioned wrapper so the loading wheel sits over the transcript, not inside its
+        scroller, and stays centred while the hidden rows settle to the bottom underneath. */}
     <div className="relative flex min-h-0 flex-1 flex-col">
     <div
       ref={scrollContainerRef}
@@ -508,6 +515,7 @@ function ChatMessagesPane({
       </div>
     )}
     </div>
+    </TranscriptPicturesContext.Provider>
   );
 }
 

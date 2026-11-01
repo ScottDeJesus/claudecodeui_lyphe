@@ -6,6 +6,7 @@ import { geminiRefusal } from './companion-input.js';
 import { readCompanionSettings } from './companion-settings.js';
 import { appendAudio, createSpeechEntry, finishEntry, followEntry, joinEntry, type SpeechEntry } from './companion-speech-cache.js';
 import { utteranceOf, type Utterance } from './companion-utterance.js';
+import { followMouth } from './mouth/mouth-follow.js';
 
 /**
  * Her voice for a page: the speech door's verbs, `speak` (`GET /speech/:turnId/:index`) and `cut` (`POST /cut`).
@@ -27,6 +28,14 @@ import { utteranceOf, type Utterance } from './companion-utterance.js';
  * THE CUT is the press of the talk button while she speaks. It stops every synthesis of the turn still in flight, stops her
  * running turn, and owes the cut: her next message opens with `<cut heard="…" interrupted="…"/>`, the display text of the
  * last sentence that played to its end and of the one playing at the press (`''` for a sentence the page names `null`).
+ *
+ * HER EXACT MOUTH IS MADE HERE, BESIDE THE AUDIO, never in front of it. `startSynthesis`'s `fill` pushes every chunk it puts in
+ * the cache to a follower (`mouth/mouth-follow.ts`), which cuts the sentence's audio into pieces at her pauses as it streams,
+ * runs Rhubarb on each, and calls back with the piece's timed shapes the moment its run ends: those are kept on the entry
+ * (`entry.mouth`) and told to every page as a `companion_mouth` frame. The page plays each chunk as it arrives and takes a
+ * shape over only where one has landed, so her voice waits for nothing; a missing Rhubarb leaves her mouth following her
+ * voice level, as before. A sentence served from the cache is not synthesized again, so its pieces are announced once more,
+ * from the entry, for a page that reloaded or took the floor mid-turn and missed the first sending.
  *
  * One log line per speech request: `[companion] speech <turn>/<index> client=<id> → <status> (<cache|gemini>)`, where the
  * parenthesis says whether the request found the sentence in the cache (or followed the call already running for it) or
@@ -66,13 +75,24 @@ function startSynthesis(account: CompanionAccount, { turnId, index }: SpeechRequ
 
   /** The audio of an opened call, read into the entry until it ends. A sentence that stopped before its end is not kept. */
   async function fill(entry: SpeechEntry, chunks: AsyncIterable<Uint8Array>): Promise<void> {
+    const mouth = followMouth({
+      label,
+      signal: entry.abort.signal,
+      announce: (piece) => {
+        entry.mouth.push(piece);
+        store.emit({ kind: 'companion_mouth', turnId, index, piece });
+      },
+    });
     let stoppedEarly = false;
     try {
       for await (const chunk of chunks) {
         // Leaving the loop closes the stream underneath: after a cut or a hang-up not one more piece is read.
         if (entry.abort.signal.aborted) break;
         // Copied: the voice module's pieces are views into buffers it still reads from.
-        appendAudio(entry, Buffer.from(chunk));
+        const audio = Buffer.from(chunk);
+        appendAudio(entry, audio);
+        // After the cache has it: the page's audio never waits for the mouth, which only reads this copy (it copies what it keeps).
+        mouth.push(audio);
         speechCache.trim();
       }
     } catch (error) {
@@ -80,8 +100,11 @@ function startSynthesis(account: CompanionAccount, { turnId, index }: SpeechRequ
       console.error(`[companion] speech ${label}: the audio stopped early: ${error instanceof Error ? error.message : String(error)}`);
     }
     // A cut or a hang-up ends the stream quietly, so the abort is read as well as the throw: half a sentence is never replayed.
-    if (stoppedEarly || entry.abort.signal.aborted) speechCache.remove(turnId, index, entry);
+    const wholeAudio = !stoppedEarly && !entry.abort.signal.aborted;
+    if (!wholeAudio) speechCache.remove(turnId, index, entry);
     finishEntry(entry);
+    // Last, so the page's audio is complete before the mouth cuts and analyses what is left.
+    mouth.end(wholeAudio);
   }
 
   /** The turn's one "I could not speak" line; a panel that cannot be written to must not turn a refusal into a defect. */
@@ -124,6 +147,7 @@ async function serve(account: CompanionAccount, client: string, request: SpeechR
   if (store.readState().floor !== client) throw notFloor();
 
   let entry = speechCache.find(request.turnId, request.index);
+  const foundInCache = entry !== undefined;
   if (entry === undefined) {
     const row = store.readSentence(request.turnId, request.index);
     if (row === null) throw noSentence();
@@ -143,6 +167,8 @@ async function serve(account: CompanionAccount, client: string, request: SpeechR
     leave();
     throw refusal;
   }
+  // Not synthesized again, so its pieces are told again: a page that reloaded or took the floor mid-turn missed the first sending.
+  if (foundInCache) for (const piece of [...entry.mouth]) store.emit({ kind: 'companion_mouth', turnId: request.turnId, index: request.index, piece });
   return { kind: 'audio', chunks: followEntry(entry, signal, leave) };
 }
 

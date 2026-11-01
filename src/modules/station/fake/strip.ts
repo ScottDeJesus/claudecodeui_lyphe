@@ -1,5 +1,7 @@
 import type { ComponentProps } from 'react';
 
+import { LANDED_UNREACHABLE } from '@/modules/station/context/StationLandedContext';
+import { railChat } from '@/modules/station/fake/sessions';
 import { SinceYouLastLookedView } from '@/modules/station/SinceYouLastLooked';
 import type { StationLanded } from '@/shared/station-types';
 
@@ -16,7 +18,8 @@ import type { StationLanded } from '@/shared/station-types';
  * ones the strip spells for that day.
  *
  * - `home`: five landings, two of them new: one by a chat, one shipped, one recovered (its line opens in place).
- * - `waiting`: three landings, one new.
+ * - `waiting`: three landings, one new. Its house is the picture's: the chats it names are rows of that picture's left rail
+ *   (`railChat`), and the feature it says finished is shipped on that picture's roadmap, the one the feature on the stage waits on.
  * - `walkthrough`: three landings, none new.
  * - `empty`: nothing this week.
  *
@@ -71,15 +74,19 @@ const HOME: StationLanded[] = [
   { id: 900101, at: dayAt(4, 11, 15), kind: 'epic', title: 'Epic finished · sidebar-rail', plan: 'sidebar-rail', sessionId: null, chat: null },
 ];
 
+/** The chats `waiting`'s landings name: rows of that picture's left rail, so the strip and the rail name one house. */
+const BACKUP_DRILL = railChat('waiting', 'Backup drill and XactAnalysis polls');
+const KAYLEE_STATION = railChat('waiting', 'Kaylee Station');
+
 /** `waiting`: one landing since his last look, a chat's backgrounded work. */
 const WAITING: StationLanded[] = [
   {
-    id: 900203, at: ago(6), kind: 'landed', title: 'Background agent finished · Backup drill and XactAnalysis polls', plan: null,
-    sessionId: '00000000-0000-4000-8000-000000900203', chat: 'Backup drill and XactAnalysis polls',
+    id: 900203, at: ago(6), kind: 'landed', title: `Background agent finished · ${BACKUP_DRILL.name}`, plan: null,
+    sessionId: BACKUP_DRILL.sessionId, chat: BACKUP_DRILL.name,
   },
   {
     id: 900202, at: ago(190), kind: 'shipped', title: 'Feature finished · kaylee-station--shell', plan: 'kaylee-station--shell',
-    sessionId: '00000000-0000-4000-8000-000000900202', chat: 'Kaylee Station',
+    sessionId: KAYLEE_STATION.sessionId, chat: KAYLEE_STATION.name,
   },
   {
     id: 900201, at: dayAt(1, 8, 5), kind: 'recovered', plan: null, sessionId: null, chat: null,
@@ -107,11 +114,11 @@ export const STRIP_FAKE = {
 
 /**
  * The strip's states no picture shows, each drawn by the shots probe over the `home` picture: the first read still out; a
- * read that failed, in the browser's own words for a request that never reached the server; and `home`'s week with no
+ * read that failed, in the provider's own sentence for a request that got no answer (`LANDED_UNREACHABLE`); and `home`'s week with no
  * last look on record (every landing new, no rule).
  */
 export const STRIP_STATES = {
   reading: drawing(null, ago(70)),
-  failed: drawing(null, ago(70), { failure: 'Failed to fetch' }),
+  failed: drawing(null, ago(70), { failure: LANDED_UNREACHABLE }),
   'first-look': drawing(HOME, null),
 };

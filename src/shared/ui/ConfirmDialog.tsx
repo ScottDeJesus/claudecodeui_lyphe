@@ -29,9 +29,12 @@ type ConfirmDialogProps = {
  *
  * Used by the file-editor module (closing an editor with unsaved changes), the file-manager module
  * (opening another file, or editing in another project, while a file has unsaved changes), the jev
- * module (clearing the replay cache), the dispatcher module (deleting a plan from the store) and the
+ * module (clearing the replay cache), the dispatcher module (deleting a plan from the store), the
  * companion module (clearing her conversation from her panel, clearing her memory in Settings,
- * clearing her draft, restoring her original register, restoring her original face).
+ * clearing her draft, restoring her original register, restoring her original face), the notes
+ * module (deleting a note), the roadmap module (deleting an item, promoting a feature), the settings
+ * module (restoring Google's sound tags, forgetting his Gemini key) and the sidebar module (deleting a
+ * folder).
  * Verve draws it (`Verve Design System.dc.html`, ConfirmDialog), which is why it lives here rather
  * than being composed at each site.
  *
@@ -40,8 +43,9 @@ type ConfirmDialogProps = {
  * `onOpenChange(false)`, which is routed to `onDismiss`. The title is VISIBLE — `DialogTitle` is
  * screen-reader-only by default — and names the dialog through `aria-labelledby`.
  *
- * Below `md` each answer is 44px tall (Verve's touch minimum) and the row wraps rather than
- * running off a phone screen when three long labels do not fit on one line.
+ * Under a finger (a touch screen, or a window under 768 px) each answer is 44px tall, Verve's touch
+ * minimum; the row wraps rather than running off a phone screen when three long labels do not fit on
+ * one line.
  */
 export function ConfirmDialog({ open, title, message, actions, onDismiss, wrapperClassName }: ConfirmDialogProps) {
   const titleId = useId();
@@ -61,7 +65,7 @@ export function ConfirmDialog({ open, title, message, actions, onDismiss, wrappe
               variant={action.variant}
               disabled={action.busy || action.disabled}
               aria-busy={action.busy || undefined}
-              className="max-md:h-11"
+              className="finger:h-11"
               onClick={action.onSelect}
             >
               {action.label}

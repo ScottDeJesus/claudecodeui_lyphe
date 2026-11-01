@@ -44,7 +44,7 @@ type LaneCardHeadProps = {
  * fold toggle's own rule (`CardFoldToggle`), so the three presses of the corner are one size at every
  * width and read as one group.
  */
-const CORNER_BUTTON = 'h-10 w-10 text-muted-foreground sm:h-7 sm:w-7';
+const CORNER_BUTTON = 'h-7 w-7 text-muted-foreground finger:h-11 finger:w-11';
 
 /**
  * What each kind's tag says besides its colour: the glyph that carries it in greyscale (design doctrine
@@ -107,7 +107,7 @@ export function CardDescription({ text, className }: { text: string; className?:
       type="button"
       aria-expanded={open}
       onClick={() => setOpen((wasOpen) => !wasOpen)}
-      className={cn('min-w-0 text-left text-xs leading-snug text-muted-foreground transition-colors hover:text-foreground', className)}
+      className={cn('min-w-0 text-left text-xs leading-snug text-muted-foreground transition-colors hover:text-foreground finger:min-h-11', className)}
     >
       <span data-card-description className={cn('break-words', open ? 'block' : 'line-clamp-1')}>{text}</span>
     </button>
@@ -196,7 +196,7 @@ export function LaneCardHead({ kind, title, badge, clock, progress, lead, spend,
       <div data-lane-head-row className="flex min-w-0 items-start gap-2">
         {/* The group's floor is the corner's height (`CORNER_BUTTON`), so a one-line title centres on
             the corner's presses rather than riding their top edge. */}
-        <div className="flex min-h-10 min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 sm:min-h-7">
+        <div className="flex min-h-7 min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 finger:min-h-11">
           <Heading className="min-w-fit flex-1 break-words text-sm font-medium leading-snug"><KindTag kind={kind} />{' '}{title}</Heading>
           {/* THE WORD AND THE COUNT ARE ONE UNBREAKABLE PAIR (`COMPLETE 14/14`): wrapped as two free
               items, the count fell onto a line of its own on half the heads at 320px and read as a

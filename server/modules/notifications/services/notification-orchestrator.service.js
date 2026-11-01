@@ -215,6 +215,20 @@ const notificationChannels = [
   ntfyChannel
 ];
 
+/**
+ * The kind of an event the house KEEPS AND NEVER PUSHES: the listener seam hears it (the notification history keeps it, her alert feed
+ * and the station's hint see it), and the call returns before the push preference, the dedupe and every channel. It is no member of
+ * `KIND_TO_PREF_KEY` on purpose: no switch of his decides it, so a `record` reaches no phone, desktop or ntfy topic whatever his
+ * preferences say. Its one producer is the dispatcher's endings (`dispatcher-endings.service.ts`): a feature of an epic finishing
+ * (`dispatcher.feature_finished`), which the epic's own finish tells him once, and which the station's strip "since you last looked"
+ * draws from the history all the same.
+ */
+const RECORD_KIND = 'record';
+
+/**
+ * Hands one event to the house: every listener first (before any push preference or dedupe), then, unless it is a `record`, the
+ * preference gate, the dedupe and each enabled channel.
+ */
 function notifyUserIfEnabled({ userId, event }) {
   if (!userId || !event) {
     return;
@@ -222,6 +236,9 @@ function notifyUserIfEnabled({ userId, event }) {
 
   const normalizedEvent = normalizeNotificationSession(event);
   announceToListeners(userId, normalizedEvent);
+  if (normalizedEvent.kind === RECORD_KIND) {
+    return;
+  }
   const preferences = notificationPreferencesDb.getPreferences(userId);
   if (!isNotificationEventEnabled(preferences, normalizedEvent)) {
     return;

@@ -16,14 +16,17 @@ import type { StationHerMark } from '@/shared/types';
  * and the roadmap `lyphecli` (`fake/roadmap.ts`). Ids are in a range no store has minted, so a press on one could find nothing.
  * Times are relative to when the fixture loads. Nothing in the app imports this file.
  *
- * ONE HOUSE PER PICTURE: a chat the right rail's slice names (`fake/needs.ts`) is among these, in the state its need implies —
- * `home`'s chat with open follow-ups, `walkthrough`'s chat waiting on a permission.
+ * ONE HOUSE PER PICTURE: a chat waits on a permission here only where the right rail (`fake/needs.ts`) holds that permission, and
+ * a chat the right rail's slice names is among these, in the state its need implies — `home`'s chat with open follow-ups,
+ * `walkthrough`'s chat waiting on a permission. The chats the strip's landings name (`fake/strip.ts`) are the rail's own rows,
+ * read from here by name.
  *
  * THE PICTURES: `home` three working, one idle and eleven asleep, the roadmap's three open epics, and the chat he pressed on the
- * stage (`HOME_CHAT_STAGE`), its line cut on the rail and whole there; `waiting` a chat waiting on a permission at the head and
- * two features at "waiting on you: Accept", one of them on the stage; `walkthrough` the deploy chat waiting on its permission at
- * the head, the fold open and her mark on the chat she walks; `empty` no chat and no roadmap. The rail's other states (a first
- * read still out, a first read failed, every chat asleep, her mark on the closed fold) are `SESSIONS_STATES`.
+ * stage (`HOME_CHAT_STAGE`), its line cut on the rail and whole there; `waiting` three working, two idle and the asleep, no chat
+ * waiting on a permission (the right rail holds none), and the roadmap with the feature on the stage and the epic `kaylee-desk`
+ * standing at "waiting on you: Accept", the two Accepts the right rail holds; `walkthrough` the deploy chat waiting on its
+ * permission at the head, the fold open and her mark on the chat she walks; `empty` no chat and no roadmap. The rail's other
+ * states (a first read still out, a first read failed, every chat asleep, her mark on the closed fold) are `SESSIONS_STATES`.
  */
 
 const NOW = Date.now();
@@ -69,22 +72,31 @@ const ASLEEP: StationSession[] = [
   resting(13, 'Mobile sidebar drag', 'lyphecli', 'asleep', 5 * 1440),
   resting(14, 'WorkCenter deadline extension', 'restorly', 'asleep', 6 * 1440),
 ];
-/** `waiting`'s head: the uploads chat stopped on a permission, its ask as her roster cuts it. */
-const UPLOADS_ASKING = chat(2, UPLOADS.name, UPLOADS.project, 'waiting', `wants permission: ${bash('rsync -av --delete dist/ deploy@restorly-box:/srv/restorly/uploads/')}`, 1);
+/**
+ * The two chats `waiting`'s strip names (`fake/strip.ts`): one whose background agent finished minutes ago, idle since, and the
+ * chat that asked for the feature the strip says finished three hours ago, asleep since. Their ids are the strip's own.
+ */
+const BACKUP_DRILL = resting(203, 'Backup drill and XactAnalysis polls', 'house', 'live', 6);
+const KAYLEE_STATION = resting(202, 'Kaylee Station', 'lyphecli', 'asleep', 190);
+/** `waiting`'s chats in her order: the asleep ones with the feature's chat among them, by how long each has rested. */
+const WAITING_SESSIONS = [TREE_POLISH, UPLOADS, DRYBOOK, BACKUP_DRILL, STATUS, KANBAN, ASLEEP[0], ASLEEP[1], KAYLEE_STATION, ...ASLEEP.slice(2)];
 /** `walkthrough`'s head: the chat whose permission the right rail holds in that picture, waiting on it. */
 const DEPLOY_ASKING = chat(DEPLOY_CHAT.sessionId, DEPLOY_CHAT.chat, 'lyphecli', 'waiting',
   `wants permission: ${bash('rsync -av --delete --exclude node_modules --exclude .vite dist/ eis1:/srv/cloudcli/releases/2026-10-30/')}`, 3);
 
 /** `home`'s focus: the chat he pressed on the rail. Put on the stage by `station-fake.ts`. */
 export const HOME_FOCUS: Extract<StationFocus, { kind: 'chat' }> = { kind: 'chat', sessionId: TREE_POLISH.sessionId, label: TREE_POLISH.name };
-/** `waiting`'s focus as the rail reads it: the feature whose Accept stands on the stage, one of the rail's two. */
+/** `waiting`'s focus as the rail reads it: the feature whose Accept stands on the stage, one of the right rail's two. */
 const WAITING_CARD: StationFocus = { kind: 'card', plan: WAITING_FEATURE.name, label: 'What needs you: the right rail and the waiting-on-you state' };
 /** Her mark in `walkthrough`: walking the Kanban review, her disc's initial and her words. */
 const HER_WALKING: StationHerMark = { sessionId: KANBAN.sessionId, initial: 'K', words: `Kaylee is walking ${KANBAN.name}` };
 
-/** The roadmap he selected, per picture: `lyphecli`, in `waiting` with two of the station's features owing their Accept. */
+/**
+ * The roadmap he selected, per picture: `lyphecli`, in `waiting` with the feature on the stage owing its Accept and the epic
+ * `kaylee-desk` (three features) owing the epic's: the two Accepts the right rail holds.
+ */
 const HOME_ROADMAP = lyphecliRoadmap();
-const WAITING_ROADMAP = lyphecliRoadmap({ 'kaylee-station--what-needs-you': 'accept', 'kaylee-station--cards': 'accept' });
+const WAITING_ROADMAP = lyphecliRoadmap({ 'kaylee-station--what-needs-you': 'accept' }, { desk: true });
 
 /** The rail's props in one picture: its sessions, its roadmap and its focus, with every press doing nothing and both folds shut. */
 type RailProps = Omit<ComponentProps<typeof WhereThingsStandView>, 'tier' | 'density'>;
@@ -99,7 +111,7 @@ const rail = (props: Pick<RailProps, 'sessions' | 'roadmap' | 'focus'> & Partial
 /** The `sessions` slot's drawing in each of the four pictures. */
 export const SESSIONS_FAKE = {
   home: rail({ sessions: [TREE_POLISH, UPLOADS, DRYBOOK, STATUS, KANBAN, ...ASLEEP], roadmap: HOME_ROADMAP, focus: HOME_FOCUS }),
-  waiting: rail({ sessions: [UPLOADS_ASKING, TREE_POLISH, DRYBOOK, STATUS, KANBAN, ...ASLEEP], roadmap: WAITING_ROADMAP, focus: WAITING_CARD }),
+  waiting: rail({ sessions: WAITING_SESSIONS, roadmap: WAITING_ROADMAP, focus: WAITING_CARD }),
   walkthrough: rail({ sessions: [DEPLOY_ASKING, KANBAN, ...ASLEEP], roadmap: HOME_ROADMAP, focus: null, her: HER_WALKING, asleepOpen: true }),
   empty: rail({ sessions: [], roadmap: null, focus: null }),
 };

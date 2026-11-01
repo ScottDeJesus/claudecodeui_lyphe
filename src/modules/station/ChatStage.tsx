@@ -1,20 +1,32 @@
+import type { TFunction } from 'i18next';
 import { ArrowUpRight } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
-import { useStation } from '@/modules/station/context/StationContext';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
-import { StageGone } from '@/modules/station/FocusFallback';
+import { useOpenChatInCloudcli } from '@/modules/station/hooks/useOpenChatInCloudcli';
+import { StageGone } from '@/modules/station/stageStates';
+import { stationStamp } from '@/modules/station/stationClock';
 import { SessionStateChip } from '@/modules/station/SessionRows';
-import { openInCloudcli } from '@/shared/cloudcliDoors';
-import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import type { StationFocus, StationSession } from '@/shared/station-types';
 import { Banner, Button, Card, Spinner } from '@/shared/ui';
-import { cn, formatRelativeTime } from '@/shared/utils';
+import { cn } from '@/shared/utils';
 
 /** A chat on the stage. */
 type ChatFocus = Extract<StationFocus, { kind: 'chat' }>;
+
+/**
+ * When the chat last moved, on his clock and the locale's (`stationStamp`): the clock alone today ("2:04 PM"), "yesterday 7:34 PM",
+ * else its day and clock ("Oct 26 2:04 PM"). A clock time stays true for as long as the stage stays open, with no tick to keep it
+ * so. Empty for a chat that carries no time.
+ */
+function movedWords(updatedAt: string | null, t: TFunction): string {
+  const stamp = updatedAt === null ? null : stationStamp(updatedAt);
+  if (stamp === null) return '';
+  if (stamp.day === 'today') return t('station.chat.when.today', { clock: stamp.clock, defaultValue: '{{clock}}' });
+  if (stamp.day === 'yesterday') return t('station.chat.when.yesterday', { clock: stamp.clock, defaultValue: 'yesterday {{clock}}' });
+  return t('station.chat.when.day', { date: stamp.date, clock: stamp.clock, defaultValue: '{{date}} {{clock}}' });
+}
 
 type ChatStageViewProps = {
   focus: ChatFocus;
@@ -30,8 +42,8 @@ type ChatStageViewProps = {
 
 /**
  * A CHAT ON THE STAGE, drawn whole from the very row the rail reads: the stage's head already names it (the session's glyph and
- * word over its name), so the body says the rest once. Its state, with the rail's own chip; its project and when it last moved;
- * the line she reads of it, WHOLE and wrapping (on the rail it is cut to one line: here a finger reads it); "Open the chat", the
+ * word over its name), so the body says the rest once. Its state, with the rail's own chip; its project and when it last moved (a
+ * clock time, in the page's one clock: `stationClock.ts`); the line she reads of it, WHOLE and wrapping (on the rail it is cut to one line: here a finger reads it); "Open the chat", the
  * chat in CloudCLI; and a quiet line with the words that ask her about it ("Say “What is <name> doing?”"). A chat waiting on him
  * says what it waits on in the warn ink, as its row does. The open is a 44 px catch under a finger below 768 px (the touch law).
  *
@@ -76,13 +88,13 @@ export function ChatStageView({ focus, session, onOpenChat, failure = null, onRe
     );
   }
 
-  const moved = session.updatedAt === null ? null : formatRelativeTime(session.updatedAt);
+  const moved = movedWords(session.updatedAt, t);
   return (
     <Card data-station-chat="session" data-station-chat-session={session.sessionId} className="flex min-w-0 flex-col gap-4 p-4 lg:p-5">
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
         <SessionStateChip state={session.state} />
         <span className="min-w-0 break-words">{session.project}</span>
-        {moved !== null && session.updatedAt !== null && (
+        {moved !== '' && session.updatedAt !== null && (
           <>
             <span aria-hidden="true">{'·'}</span>
             <time dateTime={session.updatedAt}>{t('station.chat.moved', { when: moved, defaultValue: 'last moved {{when}}' })}</time>
@@ -113,9 +125,7 @@ export function ChatStageView({ focus, session, onOpenChat, failure = null, onRe
  * in his sessions, the very rows the rail draws, and binds the open, and hands them to `ChatStageView`, which draws every state.
  */
 export function ChatStage({ focus }: { focus: ChatFocus }) {
-  const navigate = useNavigate();
-  const { phone } = useStation();
-  const { isPWA } = useDeviceSettings({ trackMobile: false });
+  const openChat = useOpenChatInCloudcli();
   const { sessions, failure, reread } = useStationSessions();
   // The answer his sessions held when this chat was staged (the stage's body is keyed by its focus, so this is taken once per chat).
   // State, because it must outlive the renders: an answer that was already out when the chat was staged cannot know a chat staged
@@ -133,8 +143,8 @@ export function ChatStage({ focus }: { focus: ChatFocus }) {
       session={session}
       failure={failure}
       onReread={reread}
-      // The chat in CloudCLI: the window named `cloudcli` on a desktop, this window on a phone or in the home-screen app (the door's own rule).
-      onOpenChat={() => openInCloudcli(`/session/${encodeURIComponent(focus.sessionId)}`, navigate, { phone, pwa: isPWA })}
+      // The chat in CloudCLI: the station gives way to the workspace, in this tab.
+      onOpenChat={() => openChat(focus.sessionId)}
     />
   );
 }

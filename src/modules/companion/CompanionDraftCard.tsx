@@ -1,8 +1,10 @@
 import { MessageSquarePlus, Send } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { useCardFloor } from '@/modules/companion/hooks/useCardFloor';
+import { useFieldRoom } from '@/modules/companion/hooks/useFieldRoom';
 import { useGrowingField } from '@/modules/companion/hooks/useGrowingField';
 import { errorMessage } from '@/shared/api';
 import type { CompanionDraft } from '@/shared/companion-types';
@@ -26,6 +28,12 @@ type CompanionDraftCardProps = {
   onClear: () => Promise<void>;
   /** The station's press on the target's name, which puts the session on its stage; absent, the name is text (her panel). */
   onTargetPress?: () => void;
+  /**
+   * The station's dock passes it, and only the dock: the card draws its HEAD LINE — the target with Steer's state, and the sends
+   * with Clear — as one row at its head (the sends wrapping under the target where the width is short), a refused send's sentence
+   * under it, and the field under all of it, giving way down to nothing. Absent (her panel), the card draws as it always has.
+   */
+  headLine?: boolean;
 };
 
 /** The house's eyebrow (MAN-742): it names the card, and states nothing on its own. */
@@ -40,13 +48,26 @@ const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
  * TOP: "DRAFT" and the target — "For Kanban lanes · claudecodeui_lyphe", or "New chat in claudecodeui_lyphe" — where the
  * chat's name keeps its room and the project gives way first; under it "Working now" while that chat runs a turn, and when
  * she last changed the draft. Given `onTargetPress` (the station), a chat's name is a link-styled press named "Show Kanban
- * lanes on the stage", a 44px catch below 768px and under a finger (`max-md:` beside `(pointer:coarse)`, the touch law, INV-10275); a new chat has no session to show, so its target stays words, as the
- * panel's always does. BODY: the words, in a field he can edit that grows with them into whatever room the dock
- * leaves — the notes give way first, down to their floor — and scrolls inside past that, never below its 88px floor, so a
- * brief built over a walkthrough is read as whole as the screen allows. Only the field gives way inside the card: the
+ * lanes on the stage", a 44px catch under a finger (a touch screen, or a window under 768px: the touch law, INV-10275); a new
+ * chat has no session to show, so its target stays words, as the panel's always does. BODY: the words, in a field he can edit
+ * that grows with them into whatever room the dock leaves — the notes give way first, down to their floor — and scrolls
+ * inside past that, never below its 88px floor, so a brief built over a walkthrough is read as whole as the screen allows.
+ * Only the field gives way inside the card: the
  * target, the notice and the sends always stand. FOOT: the sends and Clear. While the target is working, Send steer leads
- * (it folds the brief into the turn running now) and Send turn follows; otherwise Send turn stands alone. Clear asks
+ * (it folds the brief into the turn running now) and Send turn follows; otherwise Send turn stands alone. Where nothing
+ * hovers (a touch screen, `hover: none`) what Send steer does also stands in words under the sends, muted and led by its
+ * name ("Send steer · Folds it into the turn running now"); a pointer keeps its tooltip and is drawn no words. Clear asks
  * first: a brief built over a walkthrough is work.
+ *
+ * THE HEAD LINE (`headLine`, the station's dock alone): the same pieces in another order, so what his act needs stands first in
+ * a column that runs short. One row at the head holds "DRAFT", the target and "Working now", then the sends and Clear, which wrap
+ * under the target where the row is too short for both; Send steer's words and a refusal stand under that row, then her
+ * rewrite's notice, then the field, alone in a box that clips it, so it gives way down to nothing (below its first line it steps
+ * aside whole, `useFieldRoom`, never a sliver, and never while it holds the focus) and the floor the card measures is the head
+ * line alone. The project and when she changed the brief stand in the head line only in the room the chat's name leaves them,
+ * each whole or not at all, the stamp giving way first: the record yields before the brief, which is his act. A press on the
+ * head line's words opens the brief (the field
+ * takes the focus, and the dock gives it its room back), so a pointer reaches a field that has given way.
  *
  * HIS EDIT IS HELD HERE, so typing never waits on the server. It is saved when the field loses focus, and BEFORE A SEND,
  * so what is sent is exactly what he sees. While he has no edit the field shows her draft and follows her rewrites as
@@ -54,11 +75,13 @@ const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
  * with Use hers, never silently kept or dropped — and his own save coming back while he types on is his, never hers.
  * A refused send or save leaves everything on screen and says why.
  */
-export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit, onSend, onClear, onTargetPress }: CompanionDraftCardProps) {
+export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit, onSend, onClear, onTargetPress, headLine = false }: CompanionDraftCardProps) {
   const { t } = useTranslation();
   const pushToast = useToast();
   const fieldId = useId();
   const fieldRef = useRef<HTMLTextAreaElement>(null);
+  // The head line's box round the field, which clips it as it gives way to nothing: the floor counts it at nothing.
+  const fieldBoxRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   // His edit while it differs from the draft: unsaved, or saving. Null when the field simply shows her draft.
   const [edit, setEdit] = useState<string | null>(null);
@@ -92,12 +115,17 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
   // The field starts at its words' height and gives way to the dock's room (a flex basis, not a height), measured while drawn.
   useGrowingField(fieldRef, edit ?? draft.text, visible, 'flexBasis');
 
-  // The card's own floor (all of it but the field, plus the field's 88px), so the dock scrolls it whole, never folds it.
-  useCardFloor(cardRef, fieldRef, visible);
+  // The card's own floor (all of it but the field, plus the field's 88px; in the head line, the field's box at nothing), so the
+  // dock scrolls it whole, never folds it.
+  useCardFloor(cardRef, headLine ? fieldBoxRef : fieldRef, visible);
+  // In the head line, the field steps aside whole while it would show less than one line.
+  useFieldRoom(fieldBoxRef, fieldRef, headLine && visible);
 
   const shown = edit ?? draft.text;
   const theirsChanged = edit !== null && draft.text !== editBase && draft.text !== edit;
   const empty = shown.trim().length === 0;
+  // Only a working chat has a turn to steer: Send steer is offered, and leads, only then.
+  const steerOffered = targetWorking && draft.target.kind === 'session';
   const target = draft.target.kind === 'session'
     ? t('companion.draft.forChat', { chat: draft.target.session.name })
     : t('companion.draft.newChat', { project: draft.target.projectName });
@@ -172,7 +200,7 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
         disabled={empty || (sending !== null && sending !== mode)}
         onClick={() => send(mode)}
         data-companion-send={mode}
-        className="max-md:h-11 [@media(pointer:coarse)]:h-11"
+        className="finger:h-11"
       >
         {lead && <Send aria-hidden="true" />}
         {t(mode === 'steer' ? 'companion.draft.sendSteer' : 'companion.draft.sendTurn')}
@@ -181,56 +209,71 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
     return mode === 'steer' ? <Tooltip key={mode} content={t('companion.draft.steerHint')} position="top">{button}</Tooltip> : button;
   };
 
-  return (
-    <Card ref={cardRef} data-companion-draft={draft.target.kind} className="flex min-h-0 flex-col gap-2 border-input p-3">
-      <div className="flex shrink-0 flex-col gap-0.5">
-        <div className="flex min-w-0 items-baseline gap-2 text-sm">
-          <span className={cn(EYEBROW, 'shrink-0')}>{t('companion.draft.title')}</span>
-          {draft.target.kind === 'new' && <MessageSquarePlus aria-hidden="true" className="size-3.5 shrink-0 self-center text-muted-foreground" />}
-          {draft.target.kind === 'session' && onTargetPress !== undefined ? (
-            // "For" stays words and the chat's name is the press, so its name ("Show Kanban lanes on the stage") holds the
-            // words on screen, in the accent's readable ink (the fill's green is under 4.5:1 on light). This span does not
-            // clip: the catch (`::before`) reaches past the line, under a finger up into the card's padding and never down
-            // over the passive line under it; the name truncates inside.
-            <span data-companion-draft-target="" className="flex min-w-0 items-baseline gap-1 font-medium text-foreground">
-              <Trans
-                t={t}
-                i18nKey="companion.draft.forChatPress"
-                // The name rides as the slot's own child, so a name holding "<" reads as written.
-                components={{
-                  chat: (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      aria-label={t('companion.draft.showOnStage', { chat: draft.target.session.name })}
-                      onClick={onTargetPress}
-                      data-companion-draft-target-press=""
-                      className="relative h-auto min-w-0 justify-start px-0 py-0 text-sm font-medium text-accent-ink before:absolute before:-inset-x-1 before:-inset-y-1 before:content-[''] max-md:before:-top-7 max-md:before:bottom-0 [@media(pointer:coarse)]:before:-top-7 [@media(pointer:coarse)]:before:bottom-0"
-                    >
-                      <span className="min-w-0 truncate">{draft.target.session.name}</span>
-                    </Button>
-                  ),
-                }}
-              />
-            </span>
-          ) : (
-            <span data-companion-draft-target="" className="min-w-0 truncate font-medium text-foreground">{target}</span>
-          )}
-          {/* Shrinks four times as fast as the name: the chat he knows is named before the project it lives in. */}
-          {draft.target.kind === 'session' && <span className="min-w-0 shrink-[4] truncate text-xs text-muted-foreground">· {draft.target.session.project}</span>}
-        </div>
-        <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-          {draft.target.kind === 'session' && targetWorking && (
-            <span data-tone="info" className="flex shrink-0 items-center gap-1.5 font-medium text-tone-ink">
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-tone-dot motion-safe:animate-pulse" />
-              {t('companion.draft.working')}
-              <span aria-hidden="true" className="text-muted-foreground">·</span>
-            </span>
-          )}
-          <span className="truncate">{t('companion.draft.updated', { when: formatRelativeTime(draft.updatedAt) })}</span>
-        </p>
-      </div>
-
+  // When she last changed the draft: under the target in her panel, in the head line's trail in the dock.
+  const updated = t('companion.draft.updated', { when: formatRelativeTime(draft.updatedAt) });
+  // "DRAFT" and the target: the chat's name keeps its room and the project gives way first.
+  const targetWords = (
+    <>
+      <span className={cn(EYEBROW, 'shrink-0')}>{t('companion.draft.title')}</span>
+      {draft.target.kind === 'new' && <MessageSquarePlus aria-hidden="true" className="size-3.5 shrink-0 self-center text-muted-foreground" />}
+      {draft.target.kind === 'session' && onTargetPress !== undefined ? (
+        // "For" stays words and the chat's name is the press, so its name ("Show Kanban lanes on the stage") holds the
+        // words on screen, in the accent's readable ink (the fill's green is under 4.5:1 on light). This span does not
+        // clip: the catch (`::before`) reaches past the line, under a finger up into the card's padding and never down
+        // over the passive line under it; in the head line, whose row is the sends' 44 px, it reaches 12 px each way and
+        // stays inside the row. The name truncates inside.
+        <span data-companion-draft-target="" className="flex min-w-0 items-baseline gap-1 font-medium text-foreground">
+          <Trans
+            t={t}
+            i18nKey="companion.draft.forChatPress"
+            // The name rides as the slot's own child, so a name holding "<" reads as written.
+            components={{
+              chat: (
+                <Button
+                  variant="link"
+                  size="sm"
+                  aria-label={t('companion.draft.showOnStage', { chat: draft.target.session.name })}
+                  onClick={onTargetPress}
+                  data-companion-draft-target-press=""
+                  className={cn(
+                    "relative h-auto min-w-0 justify-start px-0 py-0 text-sm font-medium text-accent-ink before:absolute before:-inset-x-1 before:-inset-y-1 before:content-['']",
+                    headLine ? 'finger:before:-inset-y-3' : 'finger:before:-top-7 finger:before:bottom-0',
+                  )}
+                >
+                  <span className="min-w-0 truncate">{draft.target.session.name}</span>
+                </Button>
+              ),
+            }}
+          />
+        </span>
+      ) : (
+        <span data-companion-draft-target="" className="min-w-0 truncate font-medium text-foreground">{target}</span>
+      )}
+      {/* The chat he knows is named before the project it lives in: the project shrinks four times as fast as the name. In the
+          head line the project, then when she changed the brief, take only the room the name leaves, each whole or not at all:
+          their slot grows from nothing, and after a zero-width first item each wraps out of the slot's one clipped line where it
+          does not fit, the stamp first (no press inside, so no catch is clipped). */}
+      {headLine ? (
+        <span data-companion-draft-trail="" className="flex h-4 min-w-0 flex-[1_1_0] flex-wrap items-baseline gap-x-1 overflow-hidden text-xs text-muted-foreground">
+          <span aria-hidden="true">{'​'}</span>
+          {draft.target.kind === 'session' && <span className="whitespace-nowrap">· {draft.target.session.project}</span>}
+          <span className="whitespace-nowrap">· {updated}</span>
+        </span>
+      ) : draft.target.kind === 'session' && (
+        <span className="min-w-0 shrink-[4] truncate text-xs text-muted-foreground">· {draft.target.session.project}</span>
+      )}
+    </>
+  );
+  // Steer's state while the target works (a turn runs, so Send steer leads), and when she last changed the draft.
+  const working = steerOffered && (
+    <span data-tone="info" className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-tone-ink">
+      <span aria-hidden="true" className="size-1.5 rounded-full bg-tone-dot motion-safe:animate-pulse" />
+      {t('companion.draft.working')}
+    </span>
+  );
+  const stamp = <span className="min-w-0 truncate">{updated}</span>;
+  const field = (
+    <>
       <label htmlFor={fieldId} className="sr-only">{t('companion.draft.fieldLabel', { about })}</label>
       <TextArea
         ref={fieldRef}
@@ -239,52 +282,119 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
         value={shown}
         onChange={(event) => type(event.target.value)}
         onBlur={saveOnLeave}
-        className="overflow-y-auto"
+        // In the head line the kit's 88px floor is let go (its two classes, matched): the field gives way to nothing.
+        className={cn('overflow-y-auto', headLine && 'mt-2 [&.vv-textarea]:min-h-0')}
       />
+    </>
+  );
+  const notice = theirsChanged && (
+    <p data-tone="info" className="flex shrink-0 flex-wrap items-center gap-x-2 text-xs text-tone-ink">
+      {t('companion.draft.theirsChanged', { name })}
+      <Button variant="link" size="sm" className="h-auto px-0 py-0 text-xs" onClick={() => setEdit(null)}>
+        {t('companion.draft.useTheirs', { name })}
+      </Button>
+    </p>
+  );
+  const sends = (
+    <>
+      {/* Send turn and Send steer both send through `onSend`, which the panel's shell binds to the send verb. */}
+      {steerOffered ? [sendButton('steer', true), sendButton('turn', false)] : sendButton('turn', true)}
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={sending !== null}
+        // The panel holds two Clears: this one discards the brief, the header's wipes her conversation. `ml-auto`, not a
+        // spacer before it: when the row wraps on a narrow phone, Clear stands at the right end of its own line, apart
+        // from the sends, never under the lead one.
+        aria-label={t('companion.draft.clearLabel')}
+        onClick={() => setConfirmingClear(true)}
+        className="ml-auto text-muted-foreground hover:text-foreground finger:h-11"
+      >
+        {t('companion.draft.clear')}
+      </Button>
+    </>
+  );
+  const steerWords = steerOffered && (
+    // What Send steer does, in words where nothing hovers to open its tooltip (a touch screen): muted, under the sends, led
+    // by its name so it is never read as Send turn's. A pointer keeps the tooltip and draws no words.
+    <p data-companion-steer-words="" className="hidden shrink-0 text-xs leading-snug text-muted-foreground [@media(hover:none)]:block">
+      <span className="font-medium text-foreground">{t('companion.draft.sendSteer')}</span>
+      {' · '}
+      {t('companion.draft.steerHint')}
+    </p>
+  );
+  const refusalLine = refusal !== null && (
+    <p role="alert" data-tone="warn" className="flex shrink-0 items-start gap-1.5 text-xs leading-relaxed text-tone-ink">
+      <span aria-hidden="true">▲</span>
+      {refusal}
+    </p>
+  );
+  const clearQuestion = (
+    <ConfirmDialog
+      open={confirmingClear}
+      title={t('companion.draft.clearTitle')}
+      message={t('companion.draft.clearMessage', { about, name })}
+      actions={[
+        { label: t('companion.cancel'), variant: 'outline', onSelect: () => setConfirmingClear(false), disabled: clearing },
+        { label: t('companion.draft.clearConfirm'), variant: 'destructive', onSelect: clear, busy: clearing },
+      ]}
+      onDismiss={() => { if (!clearing) setConfirmingClear(false); }}
+    />
+  );
 
-      {theirsChanged && (
-        <p data-tone="info" className="flex shrink-0 flex-wrap items-center gap-x-2 text-xs text-tone-ink">
-          {t('companion.draft.theirsChanged', { name })}
-          <Button variant="link" size="sm" className="h-auto px-0 py-0 text-xs" onClick={() => setEdit(null)}>
-            {t('companion.draft.useTheirs', { name })}
-          </Button>
-        </p>
-      )}
+  // A press on the head line's words, never on one of its presses, opens the brief: the field takes the focus and the dock's
+  // slot gives it its 88px back, so a pointer reaches a field that had given way to nothing (the keyboard reaches it by Tab).
+  const openField = (event: MouseEvent<HTMLDivElement>) => {
+    if ((event.target as Element).closest('button') === null) fieldRef.current?.focus();
+  };
 
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {/* Send turn and Send steer both send through `onSend`, which the panel's shell binds to the send verb. */}
-        {targetWorking && draft.target.kind === 'session' ? [sendButton('steer', true), sendButton('turn', false)] : sendButton('turn', true)}
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={sending !== null}
-          // The panel holds two Clears: this one discards the brief, the header's wipes her conversation. `ml-auto`, not a
-          // spacer before it: when the row wraps on a narrow phone, Clear stands at the right end of its own line, apart
-          // from the sends, never under the lead one.
-          aria-label={t('companion.draft.clearLabel')}
-          onClick={() => setConfirmingClear(true)}
-          className="ml-auto text-muted-foreground hover:text-foreground max-md:h-11 [@media(pointer:coarse)]:h-11"
+  if (headLine) {
+    return (
+      <Card ref={cardRef} data-companion-draft={draft.target.kind} className="flex min-h-0 flex-col gap-2 border-input p-3">
+        {/* The head line's one row: the target and Steer's state, then the sends, which wrap under the target where the row is
+            too short for both, 14 px apart, so the target's 12 px catch under a finger stays clear of them. */}
+        <div data-companion-draft-head="" className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-3.5">
+          <div onClick={openField} className="flex min-w-0 flex-[1_1_12rem] cursor-text items-baseline gap-2 text-sm">
+            {targetWords}
+            {working}
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-2">{sends}</div>
+        </div>
+        {steerWords}
+        {refusalLine}
+        {notice}
+        {/* The field's box, the field alone in it: it clips the field as it gives way, down to nothing. Its 4 px each way hold the
+            field's focus ring, and its top takes back the card's gap (the field's own margin gives it), so at nothing the box adds
+            no gap to the head line. Below the field's first line it draws nothing a finger or an eye can take (`useFieldRoom`),
+            unless the field holds the focus: what he types is always drawn. */}
+        <div
+          ref={fieldBoxRef}
+          data-companion-draft-field=""
+          className="-mx-1 -mt-2 flex min-h-0 flex-col overflow-hidden px-1 pb-1 [&[data-field-room=none]:not(:focus-within)>*]:pointer-events-none [&[data-field-room=none]:not(:focus-within)>*]:opacity-0"
         >
-          {t('companion.draft.clear')}
-        </Button>
-      </div>
-      {refusal !== null && (
-        <p role="alert" data-tone="warn" className="flex shrink-0 items-start gap-1.5 text-xs leading-relaxed text-tone-ink">
-          <span aria-hidden="true">▲</span>
-          {refusal}
-        </p>
-      )}
+          {field}
+        </div>
+        {clearQuestion}
+      </Card>
+    );
+  }
 
-      <ConfirmDialog
-        open={confirmingClear}
-        title={t('companion.draft.clearTitle')}
-        message={t('companion.draft.clearMessage', { about, name })}
-        actions={[
-          { label: t('companion.cancel'), variant: 'outline', onSelect: () => setConfirmingClear(false), disabled: clearing },
-          { label: t('companion.draft.clearConfirm'), variant: 'destructive', onSelect: clear, busy: clearing },
-        ]}
-        onDismiss={() => { if (!clearing) setConfirmingClear(false); }}
-      />
+  return (
+    <Card ref={cardRef} data-companion-draft={draft.target.kind} className="flex min-h-0 flex-col gap-2 border-input p-3">
+      <div className="flex shrink-0 flex-col gap-0.5">
+        <div className="flex min-w-0 items-baseline gap-2 text-sm">{targetWords}</div>
+        <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          {working}
+          {working && <span aria-hidden="true">·</span>}
+          {stamp}
+        </p>
+      </div>
+      {field}
+      {notice}
+      <div className="flex shrink-0 flex-wrap items-center gap-2">{sends}</div>
+      {steerWords}
+      {refusalLine}
+      {clearQuestion}
     </Card>
   );
 }

@@ -8,6 +8,7 @@ import { CORNER_FAKE, CORNER_STATES } from '@/modules/station/fake/corner';
 import { DOCK_FAKE, DOCK_STATES } from '@/modules/station/fake/dock';
 import { HEAD_FAKE, HEAD_STATES } from '@/modules/station/fake/head';
 import { NEEDS_FAKE, NEEDS_STATES } from '@/modules/station/fake/needs';
+import { PORTRAIT_STATES } from '@/modules/station/fake/portrait';
 import { HOME_CHAT_STAGE, HOME_FOCUS, ROADMAP_PICTURES, SESSIONS_FAKE, SESSIONS_STATES } from '@/modules/station/fake/sessions';
 import { WAITING_FEATURE } from '@/modules/station/fake/stage';
 import { STRIP_FAKE, STRIP_STATES } from '@/modules/station/fake/strip';
@@ -41,7 +42,13 @@ import type { StationSlot } from '@/shared/types';
  * A REGION'S STATES THAT NO PICTURE SHOWS (a fold opened, a read still out, a read that failed) are `<SLOT>_STATES` in the
  * same file, drawings by name, and its one line in `REGION_STATES`: the probe draws each over the `home` picture with that
  * slot's drawing in its place, so a region's every state is photographed without a fifth picture.
+ *
+ * HER COLUMN IN THE PORTRAIT VIEW is two slots at once (her head without a face, her portrait where her conversation goes), so
+ * its states are not a region's: `PORTRAIT_STATES` (`fake/portrait.ts`) holds a drawing per slot under one name, and
+ * `lib/station-portrait.mjs` draws a name by putting both in their slots' places (`mountPicture`'s `states`).
  */
+export { PORTRAIT_STATES };
+
 
 /** The four named pictures. */
 type StationPicture = 'home' | 'waiting' | 'walkthrough' | 'empty';

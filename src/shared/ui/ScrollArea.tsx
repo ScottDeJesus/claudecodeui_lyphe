@@ -5,12 +5,13 @@ import { cn } from '@/shared/utils';
 type ScrollAreaProps = React.HTMLAttributes<HTMLDivElement> & {
   /**
    * The axis the pane scrolls along, which is also the one a finger pans. `vertical` (the default, every pane
-   * but two) scrolls down, and a sideways swipe on it pans nothing (`touch-action: pan-y`). `horizontal`
+   * but three) scrolls down, and a sideways swipe on it pans nothing (`touch-action: pan-y`). `horizontal`
    * scrolls sideways and never down: a finger pans it sideways (`pan-x`, which `pan-y` refuses outright, so a
    * sideways list in a vertical pane does not move under a finger), and a swipe that reaches its end stops
    * there (`overscroll-behavior-x: contain`) rather than handing the browser its back-and-forward swipe. Kaylee
-   * Station's two lines are the horizontal panes: "Since you last looked", the timeline across its bar, and her
-   * cards' shelf, the row over its stage.
+   * Station's three rows are the horizontal panes: "Since you last looked", the timeline across its bar; her
+   * cards' shelf, the row over its stage; and the companion's attachment strip (`CompanionAttachmentStrip`), what
+   * his newest line attached, over her words in the portrait.
    */
   orientation?: 'vertical' | 'horizontal';
 };
@@ -21,7 +22,7 @@ type ScrollAreaProps = React.HTMLAttributes<HTMLDivElement> & {
  * frame, the kanban lane and card drawer, and the Heal, Jev, Schedules, DeepSeek-spend, memory-intake,
  * Notes, agent-launch, Runner and Cerberus panels (the Cerberus tab's root scrolls its header, strip and
  * view as one), and by Kaylee Station: its stage's body, its compact sections' held places and, sideways, its strip's
- * timeline and her cards' shelf.
+ * timeline, her cards' shelf and the companion's attachment strip in her portrait.
  *
  * THE INNER SCROLLER IS `relative`, SO IT IS THE CONTAINING BLOCK OF EVERYTHING IT SCROLLS. A static
  * scroller handed every absolutely positioned descendant with no positioned ancestor nearer — an

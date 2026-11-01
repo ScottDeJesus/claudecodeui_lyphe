@@ -44,10 +44,10 @@ type LandedEntryProps = {
  * station's warm token, for the eye; the word "New", first in the press's name, for a screen reader. The timeline's
  * rule says it a third time, by where it stands.
  *
- * THE TOUCH LAW. The box is a 44 px catch below 768 px. The title it cuts is whole on the stage its press opens, or in
- * place; the `Tooltip` only repeats it for a pointer, and at once for a keyboard's focus. Where there is no hover
- * (`(hover: none)`: a phone) the bubble is never drawn: a tap raises the compatibility mouse events that would leave it standing
- * over the stage head or the line the press just opened.
+ * THE TOUCH LAW. The box is a 44 px catch under a finger (a touch screen, or a window under 768 px). The title it cuts is whole
+ * on the stage its press opens, or in place; the `Tooltip` only repeats it for a pointer, and at once for a keyboard's focus.
+ * Where there is no hover (`(hover: none)`: a phone) the bubble is never drawn, the kit's long press included: a finger reads the
+ * title whole where its press opens it, and a bubble would only stand over the stage head or the line just opened.
  *
  * A pure view that positions nothing: the strip sets its width. Drawn by `SinceYouLastLookedView` (this module): each
  * landing of the timeline, and the newest alone on the folded line.

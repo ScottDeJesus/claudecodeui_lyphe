@@ -8,7 +8,8 @@
 //
 // THE CLOCK. Chunks are placed on the audio clock, never on a timer: each starts where the one before it ends, counted in
 // whole samples from the moment the run began (a running sum of floats would drift). Only when nothing is playing, or the
-// stream has fallen behind what has already played, does a new run begin, a little ahead of `currentTime`.
+// stream has fallen behind what has already played, does a new run begin, a little ahead of `currentTime`. Each sentence keeps
+// where each of its runs began (and at which of its samples) so `progress()` can count the audio that sounded and leave the waits out.
 //
 // THE EVENTS. The audio clock reports them too. A silent one-sample marker is scheduled at each sentence's first chunk, and
 // its `ended` is the sentence's `start`; the `ended` of its last real buffer is the `end`. Both are queued by the audio thread
@@ -49,9 +50,11 @@ export type PcmPlayer = {
   /** The analyser's RMS over its last 43 ms, 0..1; 0 when nothing sounds, and 0 from the instant of `stop()` (the cut audio is hidden, not left to fade). */
   level(): number;
   /**
-   * The sentence sounding now (`playing()`'s): `elapsed` seconds since its first sample on the audio clock, 0 until that sample is reached,
-   * and its `duration` in seconds once its body has ended and every sample is scheduled, else null (still arriving). Null when no sentence
-   * sounds. Read on the audio clock, like `level()`, so the two agree on what is sounding. The face's vowel is the text at `elapsed / duration`.
+   * The sentence sounding now (`playing()`'s): `elapsed` seconds of its audio that have sounded, 0 until its first sample is reached, and its
+   * `duration` in seconds once its body has ended and every sample is scheduled, else null (still arriving). Null when no sentence sounds.
+   * Gaps are left out: while a stream that fell behind is awaited, `elapsed` holds at the last sample sounded and runs on from there when
+   * the sound resumes; whenever the audio never stalls it is the seconds since the first sample on the audio clock. Read on that clock, like
+   * `level()`, so the two agree on what is sounding. The face's vowel is the text at `elapsed / duration`; its exact mouth looks its shape up at `elapsed`.
    */
   progress(): CompanionSoundProgress | null;
   /** Reports each sentence's `start` (its first buffer begins sounding) and `end` (its last ends); returns the unsubscribe. */
@@ -59,6 +62,9 @@ export type PcmPlayer = {
   /** Creates or resumes the AudioContext; call it inside a gesture, without awaiting anything first. */
   unlock(): Promise<void>;
 };
+
+/** Where one run of a sentence's buffers began: `at` on the audio clock (context seconds) and `sample`, the sentence's own sample that sits there. */
+type SentenceRun = { at: number; sample: number };
 
 /** One enqueued sentence, from its body on the network to its last buffer in the speakers. */
 type Sentence = {
@@ -72,8 +78,12 @@ type Sentence = {
   /** How many real buffers have been scheduled for it, and how many of those have ended. */
   scheduled: number;
   ended: number;
-  /** Where its first sample sits on the audio clock (context seconds; null until a buffer is scheduled) and how many samples are scheduled: `progress()` reads both. */
-  firstSampleAt: number | null;
+  /**
+   * Each run of its buffers as it began on the audio clock, in order (empty until a buffer is scheduled): the first is where its first sample
+   * sits, and a stream that falls behind starts another mid-sentence, the wait before it being silence. With how many samples are scheduled,
+   * `progress()` reads these to say how much of the sentence has sounded.
+   */
+  runs: SentenceRun[];
   scheduledSamples: number;
   /** Set by the audio clock; `drain()` turns them into events, in order. */
   startReached: boolean;
@@ -116,6 +126,19 @@ function silence(node: AudioBufferSourceNode): void {
     console.warn('[pcmPlayer] a source refused to stop; disconnecting it instead', error);
   }
   node.disconnect();
+}
+
+/**
+ * Seconds of the sentence's audio that have sounded by audio-clock time `now`, gaps excluded: inside the latest run to have begun, its first
+ * sample plus the clock since; once that run's buffers are all played and the next run (the stream fell behind) has not begun, the last
+ * sample sounded. Counted in seconds from the run's own start so a sentence that never stalls reads exactly `now` minus its first sample's time.
+ */
+function soundedSeconds(sentence: Sentence, now: number): number {
+  let latest = sentence.runs.length - 1;
+  while (latest > 0 && sentence.runs[latest].at > now) latest -= 1;
+  const run = sentence.runs[latest];
+  const runEnd = latest + 1 < sentence.runs.length ? sentence.runs[latest + 1].sample : sentence.scheduledSamples;
+  return Math.min(Math.max(0, run.sample / PCM_SAMPLE_RATE + (now - run.at)), runEnd / PCM_SAMPLE_RATE);
 }
 
 /** Used by this module's CompanionProvider, which makes the page's one player (see `PcmPlayer`). */
@@ -223,14 +246,16 @@ export function createPcmPlayer(): PcmPlayer {
   function scheduleSamples(active: Graph, sentence: Sentence, samples: Float32Array<ArrayBuffer>): void {
     const { context } = active;
     const now = context.currentTime;
-    if (runStart + runSamples / PCM_SAMPLE_RATE < now + JOIN_GUARD_SECONDS) {
+    const beginsRun = runStart + runSamples / PCM_SAMPLE_RATE < now + JOIN_GUARD_SECONDS;
+    if (beginsRun) {
       // Nothing to join: begin a new run on the context's own sample grid.
       runStart = Math.ceil((now + RESTART_LEAD_SECONDS) * context.sampleRate) / context.sampleRate;
       runSamples = 0;
     }
     const startAt = runStart + runSamples / PCM_SAMPLE_RATE;
     runSamples += samples.length;
-    if (sentence.firstSampleAt === null) sentence.firstSampleAt = startAt;
+    // A run of the sentence's own begins with its first buffer (which may join the run an earlier sentence left) or with a new run mid-sentence.
+    if (beginsRun || sentence.runs.length === 0) sentence.runs.push({ at: startAt, sample: sentence.scheduledSamples });
     sentence.scheduledSamples += samples.length;
 
     const buffer = context.createBuffer(1, samples.length, PCM_SAMPLE_RATE);
@@ -316,7 +341,7 @@ export function createPcmPlayer(): PcmPlayer {
         return;
       }
       const sentence: Sentence = {
-        turnId, index, reader, waiting: [], streamDone: false, scheduled: 0, ended: 0, firstSampleAt: null, scheduledSamples: 0,
+        turnId, index, reader, waiting: [], streamDone: false, scheduled: 0, ended: 0, runs: [], scheduledSamples: 0,
         startReached: false, endReached: false, cancelled: false,
       };
       queue.push(sentence);
@@ -348,13 +373,13 @@ export function createPcmPlayer(): PcmPlayer {
     },
 
     progress() {
-      if (!graph || !current || current.firstSampleAt === null) return null;
+      if (!graph || !current || current.runs.length === 0) return null;
       // Its length is known when nothing more can arrive: the body is over and nothing waits behind an earlier sentence.
       const lengthKnown = current.streamDone && current.waiting.length === 0;
       return {
         turnId: current.turnId,
         index: current.index,
-        elapsed: Math.max(0, graph.context.currentTime - current.firstSampleAt),
+        elapsed: soundedSeconds(current, graph.context.currentTime),
         duration: lengthKnown ? current.scheduledSamples / PCM_SAMPLE_RATE : null,
       };
     },

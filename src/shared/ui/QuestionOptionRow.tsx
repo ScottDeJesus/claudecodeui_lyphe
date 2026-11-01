@@ -27,8 +27,8 @@ type QuestionOptionRowProps = {
  * reads in greyscale too. Used by chat's AskUserQuestionPanel as the control and by
  * AnsweredQuestion as the record of what was chosen, by the dispatcher module's RoundAnswer for
  * a round's options, and by the station module's ask stage for a chat's question, so the option looks
- * the same before and after and in every module's card. Below 768 px a row is a 44 px catch under a
- * finger, the house's touch floor.
+ * the same before and after and in every module's card. Under a finger (`finger:` — a touch screen, or a window
+ * under 768 px) a row is a 44 px catch, the house's touch floor; it grows with its words, so `min-h`, never `h`.
  */
 export const QuestionOptionRow: React.FC<QuestionOptionRowProps> = ({
   label,
@@ -70,7 +70,7 @@ export const QuestionOptionRow: React.FC<QuestionOptionRowProps> = ({
   );
 
   const frame = cn(
-    'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors duration-quick max-md:min-h-11',
+    'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors duration-quick finger:min-h-11',
     selected ? 'border-primary/60 bg-primary/10' : 'border-border bg-card',
     dashed && !selected && 'border-dashed',
   );

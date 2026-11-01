@@ -79,7 +79,7 @@ section: 01-websocket-transport/003 The pieces
 | `server/modules/auth/auth.middleware.ts` | `authenticateWebSocket` — first DB user in platform mode, JWT verification in OSS mode |
 | `server/modules/websocket/services/websocket-state.service.ts` | `connectedClients`, the set of open `/ws` sockets, and `WS_OPEN_STATE`; the socket-to-account map (`registerSocketUser`) behind `sendToUser` and `isUserConnected` |
 | `server/modules/websocket/services/chat-run-verbs.service.ts` | `abortChatRun`, `answerChatPermission` — the `chat.abort` and `chat.permission-response` actions as verbs the handlers and the companion module share |
-| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the seven inbound handlers, `protocol_error`, the attachment trust boundary, `runDetachedChatTurn`, and the one `session_host_liveness` snapshot a connecting socket is sent (MAN-8122) |
+| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the seven inbound handlers, `protocol_error`, the call to the attachment trust boundary (`filterAttachmentsToUploadStore`, MAN-9407), `runDetachedChatTurn`, and the one `session_host_liveness` snapshot a connecting socket is sent (MAN-8122) |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | `chatRunRegistry` — one run per session, `seq` stamping, the replay buffer, the exactly-one-`complete` contract |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter` — the object runtimes write into; swallows `session_created`, fans out to every attached socket |
 | `server/modules/websocket/services/session-upsert-broadcast.service.ts` | The only builder of `session_upserted`, the batched broadcast helper, and `onSessionUpserted(listener)`: a listener set called with the app session id of each event that goes out (consumed by the station hint, MAN-9257) |
@@ -92,7 +92,7 @@ section: 01-websocket-transport/003 The pieces
 | `src/shared/context/WebSocketContext.tsx` | The single browser-side socket: URL building, reconnect, the `subscribe` fan-out |
 | `src/modules/chat/hooks/useChatRealtimeHandlers.ts` | The one `kind` switch on the client, and `lastSeqRef` bookkeeping |
 | `src/modules/chat/ChatInterface.tsx`, `src/modules/chat/hooks/useChatSessionState.ts` | The two places that send `chat.subscribe` |
-| `src/modules/chat/hooks/useChatComposerState.ts` | Builds `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response` |
+| `src/modules/chat/hooks/useChatComposerState.ts` | Builds `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response`; takes its files through `useAttachmentIntake` and uploads them with `uploadAttachmentFiles` (`src/shared`, MAN-9406) |
 | `src/modules/chat/hooks/useSessionPresence.ts` | Builds `chat.presence` — the one place, called once from `ChatInterface.tsx`. Also exports `useIsLookingAtSession(isActive)`, the same pair (chat on screen, document visible) as a boolean (MAN-7575) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/websocket/desktop-notifications-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/projects-with-sessions-fetch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/taskmaster/taskmaster.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/plugin-websocket-proxy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/session-upsert-broadcast.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/shell-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-auth.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-server.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx
@@ -246,24 +246,31 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessio
 ## MAN-301 — The client is not trusted past the session id
 section: 01-websocket-transport/007 The chat protocol going up/008 The client is not trusted past the session id
 
-`resolveSendTarget` (`:170-200`) is the shared front half of `chat.send` and
+`resolveSendTarget` is the shared front half of `chat.send` and
 `chat.edit-send`. It reads the row from `sessionsDb` and takes provider, project path and
 provider-native id from there:
 
 > the session row and provider come from the database, never from the client.
-> — `chat-websocket.service.ts:167-168`
+> — `chat-websocket.service.ts`, above `resolveSendTarget`
 
 A send for a session with no row is refused with `SESSION_NOT_FOUND` and told to create it
-over REST first (`:184-189`) — that is the entry point in
+over REST first — that is the entry point in
 [conversation handoff](MANUAL.md).
 
-Attachments get the same treatment. `filterAttachmentsToUploadStore` (`:34-56`) resolves
-every path against the global upload store (`~/.cloudcli/assets`, where
-`POST /api/assets/images` writes) and keeps it only if it is a **direct child** of that
-directory: relative paths are anchored there, absolute paths must already be inside it, and
-traversal or subdirectories are dropped with a warning. Survivors are deduped by path and
-re-split into `attachments` / `images` / `files` before the runtime sees them (`:253-276`).
-The rejected shapes are covered by `tests/chat-attachment-filter.test.ts`.
+Attachments get the same treatment. `filterAttachmentsToUploadStore`
+(`server/shared/image-attachments.ts`, beside the trust boundary's second layer
+`isAllowedImageSourcePath`) resolves
+every path against the global upload store (`getGlobalImageAssetsDir()`: `CLOUDCLI_ASSETS_DIR`,
+else `~/.cloudcli/assets`, where `POST /api/assets/images` and `POST /api/assets/files` write) and keeps it only if it is a
+**direct child** of that directory: relative paths are anchored there, absolute paths must
+already be inside it, and traversal or subdirectories are dropped with a warning. Survivors are
+deduped by path and re-split into `attachments` / `images` / `files` before the runtime sees
+them (`chat-websocket.service.ts`, `chat.send`'s options). Her typed door
+(`POST /api/companion/messages`, `prepareTypedAttachments`: MAN-9411) runs the same
+filter on every record it is posted; it takes only `path` and `name` from the page and reads
+size and type off the stored file.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/image-attachments.ts
 
 ## MAN-305 — Protocol errors have their own kind
 section: 01-websocket-transport/007 The chat protocol going up/009 Protocol errors have their own kind
@@ -810,19 +817,21 @@ section: 01-websocket-transport/025 If you change this, check that
 | --- | --- |
 | The pathname routing block | Every path still gets the heartbeat first, and the unknown-path branch still closes rather than leaking a live socket |
 | `verifyWebSocketClient` | Both user shapes still work — `readRequestUserId` in the chat handler and `readRequestUserId` in the notifications handler read different fields |
-| `decorateAndRecordEvent` | The exactly-one-`complete` contract, `seq` monotonicity, and the buffer trim — `tests/chat-run-registry.test.ts` covers all three |
+| `decorateAndRecordEvent` | The exactly-one-`complete` contract, `seq` monotonicity, and the buffer trim |
 | `ChatSessionWriter.send` or `forward` | That no frame can escape without `sessionId` remapped and a `seq`, and that a closed socket is still dropped rather than throwing |
-| `attachConnection` | It must keep *adding*; the second-tab test is the regression guard |
+| `attachConnection` | It must keep *adding*: a second tab joins, never replaces |
 | `handleChatSubscribe` | Ack-before-replay ordering, the completed-run rule, and the client's `lastSeqRef` semantics in `useChatRealtimeHandlers.ts:104-109` |
 | The `protocol_error` codes | The client's `protocol_error` branch clears the spinner on the assumption that no `complete` follows — that must stay true of every new code |
-| `filterAttachmentsToUploadStore` | `tests/chat-attachment-filter.test.ts`, and that the re-split into `images` / `files` still happens *after* filtering |
+| `filterAttachmentsToUploadStore` | That the re-split into `images` / `files` still happens *after* filtering, that only direct children of the store pass, and that her typed door (`prepareTypedAttachments`, MAN-9411), its second caller, still gets the same rule |
 | Anything broadcasting to clients | Use `connectedClients`, never `wss.clients`, or the frames reach `/shell`, `/plugin-ws` and `/desktop-notifications` too |
 | The reconnect timing or the `ws` memo | Both `chat.subscribe` senders — `useChatSessionState.ts:664` and `ChatInterface.tsx:263` — and whether either now fires with a stale `lastSeq` |
-| `attachWebSocketHeartbeat` | `tests/websocket-heartbeat.service.test.ts`, and that the interval is still shorter than the shortest proxy idle timeout in front of the app |
+| `attachWebSocketHeartbeat` | That the interval is still shorter than the shortest proxy idle timeout in front of the app |
 
 Related: [the realtime stream](MANUAL.md) for what the frames become,
 [conversation handoff](MANUAL.md) for the ids they carry,
 [the index](MANUAL.md) for the rest of the set.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/image-attachments.ts
 
 ## MAN-322 — The realtime stream
 section: 02-realtime-stream/000
@@ -2785,7 +2794,7 @@ section: 05-scrolling/003 The pieces
 | `src/modules/chat/utils/searchTargetLocator.ts` | `findSearchTargetIndex` resolves a sidebar hit against loaded data; `resolveSearchWindowSize` sizes the render window. |
 | `src/modules/chat/utils/messageKeys.ts` | `getIntrinsicMessageKey` — stable render keys, so a prepend does not remount the rows below it. |
 | `src/index.css` | Mobile `touch-action`, document-level overscroll containment, `.search-highlight-flash`. **Neither the pane nor a row carries `contain`** — containment makes the element the containing block for a fullscreen card's `position: fixed` box, which is what a card asking for the screen sized itself to (MAN-388). |
-| `src/shared/hooks/useVisualViewportKeyboardOffset.ts` | Publishes `--keyboard-height` and the mark `data-keyboard` (`up` at 2 px or more, else `down`) so the shell shrinks above the iOS keyboard: once as the hook mounts (a keyboard that closed while neither route was mounted sent its `resize` to no one) and on every visual-viewport `resize`. Called by the workspace's route and by the station's route (the station's root rides it too); with `usePwaModeClass` and `pwa-status-clear` it is the phone's frame (MAN-9258). The mark has one reader, the station's phone arrangement: under `up` its strip line, pending line, talk error and bar step aside, the bar staying only while the microphone is open (MAN-9376). |
+| `src/shared/hooks/useVisualViewportKeyboardOffset.ts` | Publishes `--keyboard-height` and the mark `data-keyboard` (`up` at 2 px or more, else `down`) so the shell shrinks above the iOS keyboard: once as the hook mounts and on every visual-viewport `resize`. Called once, by the workspace's route (`ProjectWorkspaceRoute`), which stays mounted under Kaylee Station: the station's root rides it too (MAN-9426); with `usePwaModeClass` and `pwa-status-clear` it is the phone's frame (MAN-9258). The mark has one reader, the station's phone arrangement: under `up` its strip line, pending line, talk error and bar step aside, the bar staying only while the microphone is open (MAN-9376). |
 | `src/shared/ui/ScrollArea.tsx` | **Not used by chat.** Every caller is a pane outside the transcript; the component's own head comment names them, and `grep -rl "<ScrollArea" src` is the live list. The rule is the exclusion, not the roll call. Its INNER scroller is `relative`, the containing block of everything it scrolls: while it was static, every `sr-only` span in a Runner plan card escaped it to the `overflow-hidden` outer box and gave that box a scroll range (2820px over 621px at 320px), so a centring `scrollIntoView` (`block: 'center'`) on a control near the list's end scrolled the outer box and left the pane's foot drawn empty with `Show all` out of reach (2026-09-26). A focus does not reach that range: it scrolls the inner box to its end and stops. |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useHostMoveScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessagesPane.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LazyMessageRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LoadAllMessagesOverlay.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/messageKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/searchTargetLocator.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
@@ -4837,7 +4846,7 @@ through the app's own switch, no reload, diff against a fresh dark load). Any ot
 computed tokens gets the same guarantee only from an ordinary effect; one in its own layout effect,
 or at render time, would still read the old theme.
 
-`isDarkMode` is the colour ON SCREEN: a theme held with `holdTheme(theme)` while any hold stands (the station holds dark: MAN-9251), else his own choice. The layout effect above and `useWidgetHost`'s repost both key on it, so a hold or its release changes a widget's theme exactly as his switch does, and the hold stores nothing.
+`isDarkMode` is the colour ON SCREEN: the reader's own choice (the stored theme, the sun's answer or the system scheme), on every page of the app, Kaylee Station included. The layout effect above and `useWidgetHost`'s repost both key on it, so a widget follows every change of it live.
 
 The repost reads the opener's `<html>`, never the picture-in-picture window's copy of it. chat-host's mirror keeps that copy live through a `MutationObserver`, which runs AFTER the widget host's effect on a click-driven flip; a read there posted the new `dark` flag with the previous theme's tokens, one flip behind on every flip (measured 2026-09-29). The window's sheets are clones of the opener's, so once the mirror catches up it computes the same values.
 
@@ -5496,10 +5505,11 @@ section: 08-rendered-shapes/002 The pieces/002 `shapes/useFilePreview.ts`
 
 | File | Role |
 | --- | --- |
-| `shapes/useFilePreview.ts` | `useFilePreview` — a file chip's preview: reads a picture's or a PDF's bytes through the workspace's `readFileReference` palette op, shared within the reply, and keeps its fold in the shapes' own fold memory. Nothing while loading, when unreadable or mistyped, in an export, where chips are suppressed, in a reply still streaming, or for a PDF unless `navigator.pdfViewerEnabled` is true and the pointer is fine (a phone gets none). An SVG is shown from a `data:` URL, never a `blob:` one a new tab would run in this origin |
+| `shapes/useFilePreview.ts` | `useFilePreview` — a file chip's preview: reads a picture's or a PDF's bytes through the workspace's `readFileReference` palette op, shared within the reply, and keeps its fold in the shapes' own fold memory. Nothing while loading, when unreadable or mistyped, in an export, where chips are suppressed, in a reply still streaming, or for a PDF unless `navigator.pdfViewerEnabled` is true and the pointer is fine (a phone gets none). A picture outside the project is not read from where it is named: the bytes are the copy a `Read` in this chat returned (`transcript/transcriptPictures.ts`), and a path outside the project and the workspace root with no copy is not requested (`outsideImage`: once every page of the chat is loaded the chip draws a muted "Image outside the project: <path>" line; before that, and while the root is being read, it draws the bare chip). An SVG is shown from a `data:` URL, never a `blob:` one a new tab would run in this origin |
 | `shapes/previewScope.ts` | `PreviewScopeContext` — the row a preview belongs to: `MessageComponent` provides a tool row's `toolId`, or a finished reply's trimmed text hashed with its turn anchor — the last tool call before it in its turn, else the prompt, read by `ChatMessagesPane` from the full message order (never an id, which changes as a reply finalises, and never the rows on screen, which "Show work" changes), `false` while a reply streams, and `null` — this mount alone — where neither exists |
 | `shapes/FilePreview.tsx` | `FilePreviewFrame` — the preview under a chip: the picture (a click opens `ImageLightbox`, square as well) or the PDF in an `iframe` at most 32rem or 60vh tall, in a square-cornered hairline frame with nothing drawn over it, so a screenshot's corners and edges all show. The chip beside it carries the open-in-Files button. A preview that loads late grows its row like any other growth: `useFollowGlide`'s observer on the transcript's content box sees it and glides a chat left at its bottom down to the new foot (MAN-7574) |
-| `shapes/MarkdownImage.tsx` | `MarkdownImage`, the `img` override in both maps: a relative `src` with a picture's extension is drawn as that file's chip (labelled with the alt text), which previews it; any other `src` is react-markdown's own `<img>` with the props it was given |
+| `transcript/transcriptPictures.ts` | `TranscriptPicturesContext`, provided by `ChatMessagesPane` from the whole loaded transcript: every raster picture of a `Read` that did not error, by its exact `file_path`, oldest first (a live frame's data URL, or the stored asset a history load left), the project's folder, the server's workspace root (read once per page from `browse-filesystem`, whose `path` for no folder is the root; `undefined` while reading, `null` if unreadable, which decides nothing) and `complete` (no older page remains). `MessageTimeContext`, provided by `MessageComponent`, is the time of the message being drawn: a reply is drawn from the newest `Read` of its path at or before it, else the oldest after. `useOutsideImage(path)` answers, for an absolute path outside the project: `picture` (that copy), `local` (under the project or the root, or a copy: a file on this disk, served by the file tree), or `refused` (outside project and root with no copy, or the root not read yet: ask for nothing; `certain` once the root is known), and `captioned` (certain, and `complete`: only then is "no copy" a fact, since a `Read` on a page not loaded yet is not seen). The file tree serves a path under the project or the root and refuses every other (`validateWorkspacePath`), so the root, not a list of folders, is the rule; paths are compared with `.`, `..` and `//` folded. `readTranscriptPicture` decodes a data URL or reads the stored asset by name (a name the assets route did not have is remembered for the page), never the named path. Outside a chat the context is `null` and nothing changes. `ChatMessageImages` also skips its file-tree fallback for a certain refusal. Proven by `node .verify/chat-outside-images.mjs <label> <appUrl> [sessionId] [--measure]` on the "Station portrait mode" chat (`--measure` prints and exits 0, for a build before the change), with its reply stubbed in the browser for the unread paths, a workspace file outside the project (still read) and `/logo-64.png` (still native) |
+| `shapes/MarkdownImage.tsx` | `MarkdownImage`, the `img` override in both maps: a relative `src` with a picture's extension is drawn as that file's chip (labelled with the alt text), which previews it; a root-relative one (`/tmp/shot.png`) in a chat is that chip too when `useOutsideImage` says it is a path on this machine (local, or refused) and it has more than one segment; any other `src` (a one-segment `/favicon.ico` included) is react-markdown's own `<img>` with the props it was given |
 | `shapes/DataTable.tsx` | Every table that is not a matrix or a before/after pair: three-state sort, CSV copy, and a `Meter` bar down the one numeric column |
 | `shapes/DecisionMatrix.tsx` | `Option \| Pros \| Cons [\| Verdict]` as one `Card` per option, verdict as a `Badge` toned by its glyph |
 | `shapes/BeforeAfter.tsx` | `Before \| After` (optionally after a label column) as a pair of `Card`s per row |
@@ -5517,7 +5527,7 @@ section: 08-rendered-shapes/002 The pieces/002 `shapes/useFilePreview.ts`
 | `src/modules/markdown-preview/MermaidDiagram.tsx` | Draws a `mermaid` fence, shared with the PRD editor. Its failure line reads `common.shapes.diagramFailed`. A DRAWN diagram is a button that opens the kit's `Lightbox` — from the one component both the chat's fence and a markdown preview render; a diagram shown as its source never opens. The viewer, its id prefix and its strings are MAN-7426 |
 | `src/modules/command-palette/context/PaletteOpsContext.tsx` | `openFileReference(path, line?)` — the door a chip and a file link open through. The rest of the chain is [docs/MANUAL.md (file-manager)](../MANUAL.md) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/MarkdownImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/transcriptPictures.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-outside-images.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs
 
 ## MAN-5900 — The pieces — `server/modules/providers/list/claude/surface-signal.ts`
 section: 08-rendered-shapes/002 The pieces/003 `server/modules/providers/list/claude/surface-signal.ts`
@@ -5613,8 +5623,9 @@ What "matches" means, rung by rung:
   a read counting its declared size from its headers on. A file over 25 MB is refused on its
   `Content-Length` — which the content route sends, streaming exactly that many bytes — or, where a
   proxy stripped the header, part-way through its body. A markdown image, `![alt](src)`, with a RELATIVE `src` and a picture's extension is
-  drawn the same way; one with a scheme, `//`, or a leading `/` stays react-markdown's own `<img>` —
-  `/favicon.ico`, served by the app, is pinned in the baseline document. A heading and a plain table
+  drawn the same way; one with a scheme or `//` stays react-markdown's own `<img>`, and so does a leading `/` outside
+  a chat (the baseline's `/favicon.ico`) or of one segment (an app asset); in a chat, `/tmp/shot.png` is drawn from a
+  `Read`'s copy or, uncopied, not requested (MAN-5899). A heading and a plain table
   header suppress chips and pictures, streaming or settled. The prose scan refuses a run that is
   only the front of a longer name (`src/logo.png.bak`, `src/a.ts.map`).
 - **File references** have one grammar and two policies. `parseFileRef` with its defaults is the

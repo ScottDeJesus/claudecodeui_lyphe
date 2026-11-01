@@ -10,7 +10,11 @@ import type { CompanionPresence, CompanionPresenceState } from '@/shared/types';
  */
 const ACTIVE_MIN_PX = 48;
 
-/** The largest it grows to: what a 256 px frame of her portrait draws sharp at twice the pixel density. */
+/**
+ * The largest it grows to. At twice the pixel density 120 px is 240 device pixels, which the 256 px tier of her portrait still covers
+ * (`useFaceAtlas` picks the tier from this size and the ratio), so a 1x or 2x screen draws her grown disc from the small sheets; a 3x
+ * screen's 345 to 360 px takes the 448 px tier. A layout choice, not a sharpness limit.
+ */
 const ACTIVE_MAX_PX = 120;
 
 /** The share of the window's width her disc takes while she is active: 115 px at 1440, 82 at 1024, 48 on a phone. */

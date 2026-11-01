@@ -17,7 +17,7 @@ import { recipeId } from './face-recipe.js';
  *   <root>/comfyui/{input,output,temp}  ComfyUI's folders, the bake's own
  *   <root>/<photoId>/photo.png          the photo, orientation applied, alpha flattened, at most 2048 px
  *   <root>/<photoId>/frames/            the 512 px crop cache
- *   <root>/<photoId>/<recipeId>/        a face: manifest.json, sheet-N.webp, contact.webp
+ *   <root>/<photoId>/<recipeId>/        a face: manifest.json, sheet-<size>-<n>.webp (every tier), contact.webp
  *
  * A photo id is the first 12 hex of the sha256 of the uploaded bytes; the face id on every wire is `<photoId>-<recipeId>`.
  */
@@ -202,7 +202,8 @@ async function readSeedFile(): Promise<Buffer | null> {
   }
 }
 
-async function isPresent(file: string): Promise<boolean> {
+/** Whether `file` exists. Consumed by this file and by `face-bake.ts`, which asks it of the frame cache. */
+export async function isPresent(file: string): Promise<boolean> {
   try {
     await fs.access(file);
     return true;

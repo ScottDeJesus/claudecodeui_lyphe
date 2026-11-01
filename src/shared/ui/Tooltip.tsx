@@ -1,4 +1,4 @@
-import { type FocusEvent, type KeyboardEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type FocusEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
@@ -42,7 +42,14 @@ function getArrowClasses(position: TooltipPosition): string {
 }
 
 /**
- * Used by the project-workspace, sidebar and task-master modules and by the shared PromptInput primitive.
+ * The name or the note of a control, for a pointer that hovers. Used by the accounts, app-switcher, chat-host, companion,
+ * deepseek-spend, dispatcher, heal, jev, kanban, project-workspace, sidebar, station and task-master modules and by the shared
+ * KanbanCard and PromptInput primitives.
+ *
+ * A MOUSE OR A PEN opens it after `delay`, read off pointer events. A FINGER opens it by a long press alone: a tap also fires
+ * the browser's compatibility `mouseenter` after its `touchend`, which, read as a hover, opens the bubble 350 ms after every tap
+ * and leaves it standing until the next one (measured on a touch page whose mouse never moved), over words a touch screen
+ * already draws in its place (the station's touch law, INV-10275).
  *
  * `showOnFocus` is the project-workspace views rail's: its buttons are glyphs, so a reader who tabs along it needs the
  * name a pointer reader hovers for.
@@ -118,14 +125,17 @@ export function Tooltip({
     timeoutRef.current = { id: hostWindow.setTimeout(onFire, delay), armedOn: hostWindow };
   };
 
-  const handleMouseEnter = () => {
+  // A finger's enter and leave are its press, which the touch handlers below read as a long press or none.
+  const handlePointerEnter = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return;
     clearTooltipTimer();
     armShowTimer(() => {
       setIsVisible(true);
     });
   };
 
-  const handleMouseLeave = () => {
+  const handlePointerLeave = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return;
     clearTooltipTimer();
     setIsVisible(false);
   };
@@ -223,8 +233,8 @@ export function Tooltip({
     <div
       ref={containerRef}
       className="relative inline-block"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}

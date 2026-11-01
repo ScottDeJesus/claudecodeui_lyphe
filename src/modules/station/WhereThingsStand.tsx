@@ -1,4 +1,5 @@
 import type { TFunction } from 'i18next';
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCompanion } from '@/modules/companion';
@@ -45,20 +46,24 @@ type WhereThingsStandViewProps = {
 
 /**
  * WHERE THINGS STAND, the station's left rail (the `sessions` slot): his sessions over the roadmap he selected, in one scroller
- * of the rail's own, in a column and in compact's section alike. Every row is a press
+ * of the rail's own, in a column and in compact's section alike, under a head that names it. Every row is a press
  * that puts its thing on the stage, the thing on the stage is lit, and nothing is said only under a pointer: a line cut to one line
  * stands whole on the stage its row's press opens.
  *
  * Its sections draw every state of their own: `SessionRows` (reading, failed, no sessions, nothing running, the rows and the asleep
  * fold, her mark) and `RoadmapRows` (reading, no roadmap, nothing open, the open epics and their features, the complete fold).
  *
- * AT COMPACT DENSITY (the one-column arrangement's "Where things stand") each chat and each feature is one line, the epics and the
- * two folds as in full, the two sections closer together; the rail's one scroller fills the section it is given.
+ * THE HEAD (full density): "Where things stand" in the title face the right rail's "What needs you" wears (a bordered header over
+ * a serif heading, the same height, so the two rails' hairlines meet across the page), over the Sessions and Roadmap eyebrows; the
+ * scroller is the region the heading names (`aria-labelledby`).
  *
- * ONE SCROLLER, NOT TWO. The design gave the sessions and the roadmap a scroller each (`scrollMemory('sessions')` and
- * `scrollMemory('roadmap')`); the rail is drawn as one, remembered under `sessions` alone. Beside the corner the rail's column is
- * 380–780 px tall, and two scrollers would split that between a list of chats and twenty-odd features; one flow keeps both readable,
- * at the price that the chats scroll away under the roadmap. The `roadmap` region is left unregistered.
+ * AT COMPACT DENSITY (the one-column arrangement's "Where things stand") no head is drawn: the section switch names the rail, and the
+ * scroller carries the name as its `aria-label`. Each chat and each feature is one line, the epics and the two folds as in full,
+ * the two sections closer together; the rail's one scroller fills the section it is given.
+ *
+ * ONE SCROLLER, NOT TWO: the rail is one scroller, remembered under `sessions`, with the sessions over the roadmap. Beside the
+ * corner the rail's column is 380–780 px tall, and two scrollers would split that between a list of chats and twenty-odd
+ * features; one flow keeps both readable, at the price that the chats scroll away under the roadmap.
  *
  * A pure view: `WhereThingsStand` below binds it to the page, and `.verify/kaylee-station-shots.mjs` draws it on the fixtures'
  * pictures (`fake/sessions.ts`).
@@ -67,38 +72,51 @@ export function WhereThingsStandView({
   tier, density, sessions, failure, onReread, roadmap, focus, her, asleepOpen, onAsleepOpen, completeOpen, onCompleteOpen, onPress, scrollRef,
 }: WhereThingsStandViewProps) {
   const { t } = useTranslation();
+  const headId = useId();
+  const compact = density === 'compact';
+  const name = t('station.rail.name', { defaultValue: 'Where things stand' });
   return (
-    <ScrollArea
-      ref={scrollRef}
-      role="region"
-      aria-label={t('station.rail.name', { defaultValue: 'Where things stand' })}
-      data-station-rail=""
-      className="min-h-0 flex-1"
-    >
-      <div className={cn('flex min-w-0 flex-col px-2 py-3', density === 'compact' ? 'gap-4' : 'gap-6')}>
-        <SessionRows
-          tier={tier}
-          density={density}
-          sessions={sessions}
-          failure={failure}
-          onReread={onReread}
-          focus={focus}
-          her={her}
-          asleepOpen={asleepOpen}
-          onAsleepOpen={onAsleepOpen}
-          onPress={onPress}
-        />
-        <RoadmapRows
-          tier={tier}
-          density={density}
-          roadmap={roadmap}
-          focus={focus}
-          completeOpen={completeOpen}
-          onCompleteOpen={onCompleteOpen}
-          onPress={onPress}
-        />
-      </div>
-    </ScrollArea>
+    <>
+      {!compact && (
+        // The right rail's head, face for face (`WhatNeedsYouView`): the same box, the same breakpoint's padding and the same 26 px
+        // line, so the two rails' hairlines meet across the page.
+        <header className="shrink-0 border-b border-border px-3 py-3 min-[1360px]:px-4">
+          <h2 id={headId} className="flex min-h-[1.625rem] min-w-0 items-center font-serif text-lg font-normal leading-tight text-foreground">{name}</h2>
+        </header>
+      )}
+      <ScrollArea
+        ref={scrollRef}
+        role="region"
+        aria-label={compact ? name : undefined}
+        aria-labelledby={compact ? undefined : headId}
+        data-station-rail=""
+        className="min-h-0 flex-1"
+      >
+        <div className={cn('flex min-w-0 flex-col px-2 py-3', compact ? 'gap-4' : 'gap-6')}>
+          <SessionRows
+            tier={tier}
+            density={density}
+            sessions={sessions}
+            failure={failure}
+            onReread={onReread}
+            focus={focus}
+            her={her}
+            asleepOpen={asleepOpen}
+            onAsleepOpen={onAsleepOpen}
+            onPress={onPress}
+          />
+          <RoadmapRows
+            tier={tier}
+            density={density}
+            roadmap={roadmap}
+            focus={focus}
+            completeOpen={completeOpen}
+            onCompleteOpen={onCompleteOpen}
+            onPress={onPress}
+          />
+        </div>
+      </ScrollArea>
+    </>
   );
 }
 

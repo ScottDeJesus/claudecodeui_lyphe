@@ -1,6 +1,6 @@
 import type { Router } from 'express';
 
-import { appConfigDb, userDb } from '@/modules/database/index.js';
+import { appConfigDb, sessionsDb, userDb } from '@/modules/database/index.js';
 import { closeFollowupsForCompletions } from '@/modules/followups/index.js';
 import { createNotificationEvent, notifyUserIfEnabled } from '@/modules/notifications/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
@@ -72,18 +72,82 @@ const FIRST_READ_WAIT_MS = 5000;
 /** The `app_config` key holding the highest event id already announced — durable on purpose, see `dispatcher-endings.service.ts`. */
 const ANNOUNCED_THROUGH_KEY = 'dispatcher_announced_through';
 
+/** The `app_config` key holding the highest event id already KEPT as a record (`dispatcher.feature_finished`): a mark of its own beside the push one, for the reason `dispatcher-endings.service.ts` gives. */
+const RECORDED_THROUGH_KEY = 'dispatcher_recorded_through';
+
+/** One of those marks as the whole number stored, or `null` when none was ever stored. */
+function readStoredMark(key: string): number | null {
+  const raw = appConfigDb.get(key);
+  const mark = raw === null ? Number.NaN : Number(raw);
+  return Number.isFinite(mark) ? mark : null;
+}
+
 /**
  * The orchestrator is JavaScript, so TypeScript reads `dedupeKey = null` as a parameter that accepts
- * only `null`. This alias states the contract it actually implements.
+ * only `null`. This alias states the contract it actually implements. `kind` is the one typed union of the
+ * kinds an ending is handed as: `record` is kept and never pushed (a feature of an epic finishing), and
+ * `sessionId` is the chat that asked for the work, `null` for an ending that names none.
  */
 const buildEndingEvent = createNotificationEvent as (input: {
   provider: 'system';
-  kind: 'stop' | 'error';
+  kind: 'stop' | 'error' | 'record';
+  sessionId: string | null;
   code: DispatcherEnding['code'];
   meta: DispatcherEnding['meta'];
   severity: 'info' | 'warning';
   dedupeKey: string | null;
 }) => object;
+
+/**
+ * The kind an ending is handed to the orchestrator as. A feature of an epic finishing is a `record` — the history keeps it, the
+ * station's strip draws it, and no push preference or channel hears it — and a relaunch is the one warning (`error`). Every other
+ * code is a look (`stop`).
+ */
+function kindOfEnding(ending: DispatcherEnding): 'stop' | 'error' | 'record' {
+  if (ending.code === 'dispatcher.feature_finished') return 'record';
+  return ending.code === 'dispatcher.relaunched' ? 'error' : 'stop';
+}
+
+/**
+ * Tells every active user about one ending: one event per user, handed to the orchestrator, whose event switches and channels decide
+ * what reaches each of them. A plan belongs to no login, so every active user is told, and the dedupe key carries the user because
+ * the orchestrator's dedupe is process-wide: without it the second user's push reads as a repeat.
+ *
+ * Every code is a look except one warning: a plan or an epic that finished, or a plan that paused, is a state to read at leisure,
+ * while a phase taken up again is the walk changing its mind about something the operator may already have given up on. What an
+ * epic's features earn is decided before this point (`dispatcher-endings.service.ts`); this sends what it is handed. A landing
+ * (`dispatcher.finished`, `dispatcher.epic_finished`, `dispatcher.feature_finished`) carries the chat that asked for the work as the
+ * event's `sessionId`, so a tap on its push opens that chat — while the house still holds the chat: the plan's `session_app_id` is
+ * its `session` handed back unchanged when no chat matches, and a tap on a chat that is gone would open nothing where the root opens
+ * the app. A pause and a relaunch carry none and land on the root.
+ *
+ * One user's failure costs that user's push and nothing more, and is reported through `logError`: letting it throw would leave the
+ * ending due, and its retry would push again to every user already told.
+ *
+ * Consumed by `createDispatcherModule`'s endings notifier below, and by `.verify/kaylee-feature-landed-direct.mjs`, which runs the
+ * module's own function over a scratch copy of the database.
+ */
+export function announceDispatcherEnding(ending: DispatcherEnding, logError: (message: string) => void): void {
+  const chat = ending.sessionId !== null && sessionsDb.getSessionById(ending.sessionId) ? ending.sessionId : null;
+  for (const userId of userDb.getActiveUserIds()) {
+    try {
+      notifyUserIfEnabled({
+        userId,
+        event: buildEndingEvent({
+          provider: 'system',
+          kind: kindOfEnding(ending),
+          sessionId: chat,
+          code: ending.code,
+          meta: ending.meta,
+          severity: ending.code === 'dispatcher.relaunched' ? 'warning' : 'info',
+          dedupeKey: `dispatcher:${userId}:${ending.key}`,
+        }),
+      });
+    } catch (error) {
+      logError(`[Dispatcher] could not announce an ending to user ${userId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
 
 /**
  * What `createDispatcherModule` hands the server entrypoint: the router to mount, the poll's `start` (after `listen`)
@@ -136,41 +200,11 @@ export function createDispatcherModule(): DispatcherModule {
   };
 
   const endings = createDispatcherEndingsNotifier({
-    readMark: () => {
-      const raw = appConfigDb.get(ANNOUNCED_THROUGH_KEY);
-      const mark = raw === null ? Number.NaN : Number(raw);
-      return Number.isFinite(mark) ? mark : null;
-    },
+    readMark: () => readStoredMark(ANNOUNCED_THROUGH_KEY),
     writeMark: (eventId) => appConfigDb.set(ANNOUNCED_THROUGH_KEY, String(eventId)),
-    // A plan belongs to no login, so every active user is told and each user's own event switches
-    // and channels decide what reaches them. The dedupe key carries the user because the
-    // orchestrator's dedupe is process-wide: without it the second user's push reads as a repeat.
-    announce: (ending) => {
-      // Every code is a look except one warning: a plan or an epic that finished, or a plan that
-      // paused, is a state to read at leisure, while a phase taken up again is the walk changing its
-      // mind about something the operator may already have given up on. What an epic's features
-      // earn is decided before this point (`dispatcher-endings.service.ts`); this sends what it is handed.
-      const relaunched = ending.code === 'dispatcher.relaunched';
-      for (const userId of userDb.getActiveUserIds()) {
-        // One user's failure costs that user's push and nothing more. Letting it throw would leave
-        // the ending due, and its retry would push again to every user already told.
-        try {
-          notifyUserIfEnabled({
-            userId,
-            event: buildEndingEvent({
-              provider: 'system',
-              kind: relaunched ? 'error' : 'stop',
-              code: ending.code,
-              meta: ending.meta,
-              severity: relaunched ? 'warning' : 'info',
-              dedupeKey: `dispatcher:${userId}:${ending.key}`,
-            }),
-          });
-        } catch (error) {
-          logErrorOnce(`[Dispatcher] could not announce an ending to user ${userId}: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-    },
+    readRecordMark: () => readStoredMark(RECORDED_THROUGH_KEY),
+    writeRecordMark: (eventId) => appConfigDb.set(RECORDED_THROUGH_KEY, String(eventId)),
+    announce: (ending) => announceDispatcherEnding(ending, logErrorOnce),
   });
 
   const commands = { bin, timeoutMs: VERB_TIMEOUT_MS, env };

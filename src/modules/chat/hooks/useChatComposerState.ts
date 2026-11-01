@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
   ChangeEvent,
-  ClipboardEvent,
   Dispatch,
   FormEvent,
   KeyboardEvent,
@@ -9,15 +8,15 @@ import type {
   SetStateAction,
   TouchEvent,
 } from 'react';
-import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 
-import { api } from '@/shared/api';
+import { api, uploadAttachmentFiles } from '@/shared/api';
 import { PROVIDER_PERMISSION_PREFERENCE_KEYS } from '@/shared/constants';
 import { readUserPreference } from '@/shared/userSettings';
 import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
 import { useHostMove, useHostWindow } from '@/shared/context/HostWindowContext';
 import { applyPlainMode, usePlainModePreference } from '@/shared/hooks/usePlainModePreference';
+import { useAttachmentIntake } from '@/shared/hooks/useAttachmentIntake';
 import type { CommandModalPayload, CostCommandData, HelpCommandData, MarkSessionProcessing, ModelCommandData, QueuedDraft, SessionActivityMap, StatusCommandData,QueuedSendOptions,ChatAttachment,ChatMessage,PendingPermissionRequest,PermissionMode,SessionEstablishedContext,Project,ProjectSession,LLMProvider,SlashCommand,SentUserTurn } from '@/shared/types';
 import { grantClaudeToolPermission } from '@/modules/chat/utils/chatPermissions';
 import {
@@ -37,7 +36,7 @@ import { useInputHistory } from '@/modules/chat/hooks/useInputHistory';
 import { useSlashCommands } from '@/modules/chat/hooks/useSlashCommands';
 import { useRestartOnInstalledCli } from '@/modules/chat/hooks/useRestartOnInstalledCli';
 import { useScopedAttachments } from '@/modules/chat/hooks/useScopedAttachments';
-import { isEngineHandledCommand } from '@/shared/utils';
+import { isEngineHandledCommand, isImageAttachment } from '@/shared/utils';
 
 type UseChatComposerStateArgs = {
   selectedProject: Project | null;
@@ -100,39 +99,6 @@ type CommandExecutionResult = {
 const createFakeSubmitEvent = () => {
   return { preventDefault: () => undefined } as unknown as FormEvent<HTMLFormElement>;
 };
-
-const MAX_ATTACHMENT_COUNT = 10;
-const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
-
-const isImageAttachment = (attachment: ChatAttachment) => {
-  if (attachment.mimeType?.startsWith('image/')) return true;
-  return /\.(gif|jpe?g|png|svg|webp)$/i.test(attachment.path || attachment.name || '');
-};
-
-const uploadAttachmentFiles = async (files: File[]): Promise<unknown[]> => {
-  if (files.length === 0) {
-    return [];
-  }
-
-  const formData = new FormData();
-  files.forEach((file) => {
-    formData.append('files', file);
-  });
-
-  const response = await api.assets.uploadFiles(formData);
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error || 'Failed to upload files');
-  }
-
-  const result = await response.json();
-  if (!Array.isArray(result.attachments) || result.attachments.length !== files.length) {
-    throw new Error('File upload returned an incomplete result');
-  }
-  return result.attachments;
-};
-
 
 const restoreQueuedDraft = (sessionKey: string): QueuedDraft | null => {
   const saved = readQueuedMessage(sessionKey);
@@ -282,8 +248,7 @@ export function useChatComposerState({
   const draftScopeRef = useRef(draftScope);
   draftScopeRef.current = draftScope;
   // Attachments belong to the same scope as the text, so a photo stays with the chat it was added to.
-  const { attachedFiles, setAttachedFiles, clearAttachmentsFor, fileErrors, setFileErrors } =
-    useScopedAttachments(draftScope);
+  const { attachedFiles, setAttachedFiles, clearAttachmentsFor } = useScopedAttachments(draftScope);
   const setInput = useCallback<Dispatch<SetStateAction<string>>>((next) => {
     setInputState((previous) => ({
       scope: draftScopeRef.current,
@@ -585,68 +550,11 @@ export function useChatComposerState({
     lastAutosizedInputRef.current = target.value;
   }, []);
 
-  const handleAttachmentFiles = useCallback((files: File[]) => {
-    const validFiles = files.filter((file) => {
-      try {
-        if (!file || typeof file !== 'object') {
-          console.warn('Invalid file object:', file);
-          return false;
-        }
-
-        if (file.size > MAX_ATTACHMENT_SIZE) {
-          const fileName = file.name || 'Unknown file';
-          setFileErrors((previous) => {
-            const next = new Map(previous);
-            next.set(fileName, 'File too large (max 10MB)');
-            return next;
-          });
-          return false;
-        }
-
-        return true;
-      } catch (error) {
-        console.error('Error validating file:', error, file);
-        return false;
-      }
-    });
-
-    if (validFiles.length > 0) {
-      setAttachedFiles((previous) => [...previous, ...validFiles].slice(0, MAX_ATTACHMENT_COUNT));
-    }
-  }, []);
-
-  const handlePaste = useCallback(
-    (event: ClipboardEvent<HTMLTextAreaElement>) => {
-      const items = Array.from(event.clipboardData.items);
-
-      items.forEach((item) => {
-        if (!item.type.startsWith('image/')) {
-          return;
-        }
-        const file = item.getAsFile();
-        if (file) {
-          handleAttachmentFiles([file]);
-        }
-      });
-
-      if (items.length === 0 && event.clipboardData.files.length > 0) {
-        const files = Array.from(event.clipboardData.files);
-        const imageFiles = files.filter((file) => file.type.startsWith('image/'));
-        if (imageFiles.length > 0) {
-          handleAttachmentFiles(imageFiles);
-        }
-      }
-    },
-    [handleAttachmentFiles],
-  );
-
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    maxSize: MAX_ATTACHMENT_SIZE,
-    maxFiles: MAX_ATTACHMENT_COUNT,
-    onDrop: handleAttachmentFiles,
-    noClick: true,
-    noKeyboard: true,
-  });
+  // The paperclip's picker, a paste and a drop all land in the scope's attached files through the house's one intake.
+  // Its `refused` sentence names files of the chat it was said in, so a switch empties it, before the new chat paints (a send does, in handleSubmit).
+  const { handlePaste, getRootProps, getInputProps, isDragActive, openAttachmentPicker, refused, clearRefused } =
+    useAttachmentIntake(setAttachedFiles);
+  useLayoutEffect(clearRefused, [draftScope, clearRefused]);
 
   // Snapshot of everything `chat.send` needs beyond the text itself. Built at
   // send time for immediate sends and at queue time for queued ones, so a
@@ -827,6 +735,7 @@ export function useChatComposerState({
       ) {
         return;
       }
+      clearRefused();
 
       // A turn is already in flight: stash this message instead of sending it.
       // Upload attached files now so the queued record contains durable image
@@ -1088,6 +997,7 @@ export function useChatComposerState({
       attachedFiles,
       buildSendOptions,
       clearAttachmentsFor,
+      clearRefused,
       currentSessionId,
       editingAnchorId,
       executeCommand,
@@ -1568,11 +1478,11 @@ export function useChatComposerState({
     selectFile,
     attachedFiles,
     setAttachedFiles,
-    fileErrors,
+    refused,
     getRootProps,
     getInputProps,
     isDragActive,
-    openAttachmentPicker: open,
+    openAttachmentPicker,
     handleSubmit,
     queuedDraft,
     editQueuedDraft,

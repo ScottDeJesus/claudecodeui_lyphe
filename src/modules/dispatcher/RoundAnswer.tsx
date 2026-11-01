@@ -267,6 +267,7 @@ export function RoundAnswer({ ask, onAnswered }: { ask: RoundAsk; onAnswered: ()
                 onChange={(event) => typeOther(index, event.target.value)}
                 placeholder={t('dispatcher.ask.otherPlaceholder')}
                 aria-label={t('dispatcher.ask.otherPlaceholder')}
+                className="finger:h-11"
               />
             )}
           </SnapStripItem>
@@ -278,7 +279,7 @@ export function RoundAnswer({ ask, onAnswered }: { ask: RoundAsk; onAnswered: ()
           data-ask-send
           type="button"
           size="sm"
-          className="h-8"
+          className="h-8 finger:h-11"
           disabled={busy || !ready}
           onClick={pressSend}
         >

@@ -7,6 +7,7 @@ import { sendToUser } from '@/modules/websocket/index.js';
 import type { CompanionFace, CompanionFaceBake, CompanionFrame } from '@/shared/companion-types.js';
 
 import { comfyuiDir, isComfyUIInstalled } from './comfyui.js';
+import { frameCacheIsComplete } from './face-bake.js';
 import { faceNotFound, faceStopping } from './face-errors.js';
 import {
   faceDir, faceIdOf, isFaceId, newestPublishedFaceOf, photoIdOfFace, prune, readManifest, recipeIdOfFace, registerSeed,
@@ -29,7 +30,8 @@ import { acceptPhoto } from './face-upload.js';
  * between recipes; its id is null only while no original face exists at all.
  *
  * MODULE START (`start`) is the event the house recovers on: it registers the seed, queues the original's bake when its face
- * under the current recipe is not published and ComfyUI is installed, re-queues every account's pending bake, makes again the
+ * under the current recipe is not published and ComfyUI is installed or the photo's frame cache already holds every frame (a recipe
+ * change that only re-cuts, such as a new tier, renders nothing), re-queues every account's pending bake, makes again the
  * face of any account whose recipe is no longer current or whose files are gone, and prunes. A seed step that fails is logged
  * and does not stop the rest, except the prune: it waits for the original to be known. `stop` aborts the running bake, which
  * releases the lock, and leaves every pending id in the database for the next start.
@@ -42,8 +44,12 @@ import { acceptPhoto } from './face-upload.js';
 /** An uploaded photo as the route hands it over: the bytes of the one file, whose kind is read from the bytes themselves. */
 export type FaceUpload = { bytes: Buffer };
 
-/** Which of a face's files a page asks for: its manifest, its contact sheet (every frame named, for Settings' "See every frame"), or sheet number n. */
-export type FaceFile = 'manifest' | 'contact' | number;
+/**
+ * The names a page may ask of a face's folder: its manifest, its contact sheet (every frame named, for Settings' "See every frame")
+ * and its sheets, which the manifest names (`sheet-<size>-<n>.webp` of each tier, `sheet-<n>.webp` of a face made before tiers).
+ * Nothing else in the folder is the face's to serve, and no name can reach outside it.
+ */
+const FACE_FILE_NAME = /^(manifest\.json|contact\.webp|sheet-(\d{1,4}-)?\d{1,3}\.webp)$/;
 
 type FaceColumns = Pick<CompanionStateRow, 'face_id' | 'face_pending_id' | 'face_error'>;
 
@@ -193,8 +199,9 @@ function createFaceService() {
       announceAccountsOnOriginal();
 
       if (seedPhotoId !== null && !(await readManifest(faceIdOf(seedPhotoId)))) {
-        if (isComfyUIInstalled(comfyuiDir())) queue.wantOriginal(seedPhotoId);
-        else console.warn(`[Companion] the original face is not made under the current recipe, and ComfyUI is not installed at ${comfyuiDir()}; run scripts/install-comfyui.sh`);
+        // ComfyUI is needed only for a frame the cache lacks: a recipe change that only re-cuts is made from the cache on a box with none.
+        if (isComfyUIInstalled(comfyuiDir()) || (await frameCacheIsComplete(seedPhotoId))) queue.wantOriginal(seedPhotoId);
+        else console.warn(`[Companion] the original face is not made under the current recipe, its frame cache lacks frames, and ComfyUI is not installed at ${comfyuiDir()}; run scripts/install-comfyui.sh`);
       }
     } catch (error) {
       console.error('[Companion] the original face could not be set up; the accounts\' own faces are still resumed', error);
@@ -207,17 +214,15 @@ function createFaceService() {
     await exclusive(pruneNamed);
   }
 
-  /** The path of one of a face's files, for the account that may read it. Checked on the disk: a face whose manifest is there is whole. */
-  function fileFor(userId: number, faceId: string, file: FaceFile): string {
-    if (!isFaceId(faceId)) throw faceNotFound();
+  /** The path of one of a face's files (`FACE_FILE_NAME`), for the account that may read it. Checked on the disk: a face whose manifest is there is whole. */
+  function fileFor(userId: number, faceId: string, fileName: string): string {
+    if (!isFaceId(faceId) || !FACE_FILE_NAME.test(fileName)) throw faceNotFound();
     const named = validFaceId(companionDb.readState(userId)?.face_id);
     if (faceId !== originalFaceId && faceId !== named) throw faceNotFound();
 
-    const wanted = typeof file === 'number' ? `sheet-${file}.webp` : file === 'manifest' ? 'manifest.json' : 'contact.webp';
-    if (typeof file === 'number' && !(Number.isInteger(file) && file >= 0)) throw faceNotFound();
     const folder = faceDir(faceId);
-    if (!fs.existsSync(path.join(folder, 'manifest.json')) || !fs.existsSync(path.join(folder, wanted))) throw faceNotFound();
-    return path.join(folder, wanted);
+    if (!fs.existsSync(path.join(folder, 'manifest.json')) || !fs.existsSync(path.join(folder, fileName))) throw faceNotFound();
+    return path.join(folder, fileName);
   }
 
   return {
@@ -258,7 +263,7 @@ function createFaceService() {
       return faceOf(userId);
     },
 
-    /** The path of a face's manifest, contact sheet or sheet n; 404 `COMPANION_FACE_NOT_FOUND` for any face but the original and the one the account names. Consumed by `face.routes.ts`. */
+    /** The path of a face's manifest, contact sheet or sheet, by the name it has in the folder; 404 `COMPANION_FACE_NOT_FOUND` for any other name and for any face but the original and the one the account names. Consumed by `face.routes.ts`. */
     fileFor,
 
     /** Registers the seed, resumes the bakes and prunes, on the module's start. Failures are logged; the module still serves. */

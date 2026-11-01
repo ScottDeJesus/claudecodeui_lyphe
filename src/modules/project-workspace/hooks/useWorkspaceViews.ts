@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next';
 import { usePlugins } from '@/modules/plugins';
 import { useTasksSettings } from '@/modules/task-master';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
-import type { WorkspaceView } from '@/shared/types';
+import type { AppTab, WorkspaceView } from '@/shared/types';
 
 // One glyph per view, each naming the thing the view actually shows rather than an action, in the
 // rail's order: a speech bubble for the conversation; a file tree for the files; a branch for git;
@@ -36,7 +36,7 @@ import type { WorkspaceView } from '@/shared/types';
 // view carries `icon: null` and the rail draws a letter disc.
 
 /** What a built-in view is before the language and the gates have their say: its label is `tabs.<id>`. */
-type BuiltInView = Omit<WorkspaceView, 'label'>;
+type BuiltInView = Omit<WorkspaceView, 'label' | 'hiddenFromNav'>;
 
 // Chat leads the rail in a run of its own.
 const CHAT_VIEW: BuiltInView = { id: 'chat', group: 'chat', icon: MessageSquare, keywords: 'chat messages conversation' };
@@ -78,10 +78,15 @@ const FOOT_VIEWS: BuiltInView[] = [
 ];
 
 /**
- * Read by project-workspace's ProjectCommandPalette (its Navigate rows) and WorkspaceMain (the panes' gates and
- * snap-backs): the one list of the workspace's views, in rail order, with the preference gates that shaped it.
+ * Read by project-workspace's ProjectCommandPalette (its Navigate rows), WorkspaceMain (the panes' gates and
+ * snap-backs) and WorkspaceRail (the buttons, minus the views marked `hiddenFromNav`): the one list of the
+ * workspace's views, in rail order, with the preference gates that shaped it.
  * The list carries no count — badges are the rail's alone — so a reader of it does not re-render when a count
- * moves. `views` keeps one identity until a gate, the plugin list or the language really changes.
+ * moves. `views` keeps one identity until a gate, a nav choice, the plugin list or the language really changes.
+ *
+ * Two different kinds of "off the list" live here. A GATE (Shell, Tasks) takes the view out of `views` altogether:
+ * no button, no palette row, no pane. A NAV CHOICE (Files, Git, Browser) leaves the view in `views` and stamps it
+ * `hiddenFromNav`, which only the rail reads — so the palette still reaches it and its pane still draws.
  */
 export function useWorkspaceViews(): {
   views: WorkspaceView[];
@@ -90,7 +95,7 @@ export function useWorkspaceViews(): {
   preferencesSettled: boolean;
 } {
   const { t } = useTranslation();
-  const { hideShellTab, settled: preferencesSettled } = useUiPreferences();
+  const { hideShellTab, hideFilesTab, hideGitTab, hideBrowserTab, settled: preferencesSettled } = useUiPreferences();
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const { plugins } = usePlugins();
 
@@ -99,6 +104,10 @@ export function useWorkspaceViews(): {
 
   // `t` changes identity with the language, so it stands in for "the language" in the deps.
   const views = useMemo<WorkspaceView[]>(() => {
+    const hiddenFromNav = new Set<AppTab>();
+    if (hideFilesTab) hiddenFromNav.add('files');
+    if (hideGitTab) hiddenFromNav.add('git');
+    if (hideBrowserTab) hiddenFromNav.add('browser');
     const builtIn: BuiltInView[] = [
       CHAT_VIEW,
       ...OPEN_TOOL_VIEWS,
@@ -115,10 +124,15 @@ export function useWorkspaceViews(): {
         group: 'plugins',
         icon: null,
         keywords: `plugin ${plugin.name}`,
+        hiddenFromNav: false,
       }));
-    const named = (run: BuiltInView[]): WorkspaceView[] => run.map((view) => ({ ...view, label: t(`tabs.${view.id}`) }));
+    const named = (run: BuiltInView[]): WorkspaceView[] => run.map((view) => ({
+      ...view,
+      label: t(`tabs.${view.id}`),
+      hiddenFromNav: hiddenFromNav.has(view.id),
+    }));
     return [...named(builtIn), ...pluginViews, ...named(FOOT_VIEWS)];
-  }, [shouldShowShellTab, shouldShowTasksTab, plugins, t]);
+  }, [shouldShowShellTab, shouldShowTasksTab, hideFilesTab, hideGitTab, hideBrowserTab, plugins, t]);
 
   return { views, shouldShowShellTab, shouldShowTasksTab, preferencesSettled };
 }

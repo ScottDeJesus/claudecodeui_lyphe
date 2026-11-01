@@ -3,7 +3,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { TalkPressState } from '@/shared/types';
-import { Button, Spinner, Tooltip } from '@/shared/ui';
+import { Button, PromptInputButton, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type CompanionTalkButtonProps = {
@@ -59,8 +59,9 @@ const KEYCAP = 'rounded-md border border-b-2 border-border bg-muted px-1.5 font-
  * than stacking under it, as Settings' own talk row does), and is the button's description, so a reader hears it with its
  * name; the binding's words follow the button in reading order, and a phone, which hides them, is never told them.
  * BESIDE THE BUTTON where its box has the room (a query container of its own width: 20rem and more, the station's laptop
- * column), so the row is the button's 56 px; UNDER IT in a narrower box (the station's column at 1440 px is 420 px across,
- * and holds the button and the typing box in one row only with the line beneath).
+ * column, and the station's 360 px column, where the button stands across it), so the row is the button's 56 px; UNDER IT in a
+ * narrower box (a laptop column under 38rem gives the button a 12rem cell, holding the button and the typing box in one row only
+ * with the line beneath).
  */
 function LargeTalkButton({ state, error, onToggle, label, bindingLabel, compact = false }: Pick<CompanionTalkButtonProps, 'state' | 'error' | 'onToggle'> & { label: string; bindingLabel: string | null | undefined; compact?: boolean }) {
   const { t } = useTranslation();
@@ -230,25 +231,23 @@ export function CompanionTalkButton(props: CompanionTalkButtonProps) {
   return (
     // Under a finger, 8px more from send (12px between the faces), so the two 44px catches meet and do not overlap.
     <span data-companion-talk={state} className="relative inline-flex shrink-0 [@media(pointer:coarse)]:mr-2">
-      {/* The error stands right above this button, where the tooltip would open over its words: with one up, the name opens beside the button instead. */}
-      <Tooltip content={label} position={error === null ? 'top' : 'left'}>
-        <Button
-          type="button"
-          variant={listening ? 'tonal' : 'ghost'}
-          size="icon"
-          aria-label={label}
-          aria-describedby={error === null ? undefined : errorId}
-          data-tone={error === null ? undefined : 'warn'}
-          onClick={onToggle}
-          // Send's size and corner, so the two read as one pair; the transparent catch makes it 44px under a finger.
-          className={cn(
-            'relative h-8 w-8 rounded-lg before:absolute before:inset-0 before:content-[\'\'] [@media(pointer:coarse)]:before:-inset-1.5',
-            !listening && (error === null ? 'text-muted-foreground hover:text-foreground' : 'text-tone-ink hover:text-tone-ink'),
-          )}
-        >
-          <Mic aria-hidden="true" />
-        </Button>
-      </Tooltip>
+      {/* The composer's own press (PromptInputButton: it keeps the field's focus, so a tap on the mic leaves the keyboard up). The error
+          stands right above this button, where the tooltip would open over its words: with one up, the name opens beside the button instead. */}
+      <PromptInputButton
+        tooltip={{ content: label, side: error === null ? 'top' : 'left' }}
+        variant={listening ? 'tonal' : 'ghost'}
+        aria-label={label}
+        aria-describedby={error === null ? undefined : errorId}
+        data-tone={error === null ? undefined : 'warn'}
+        onClick={onToggle}
+        // Send's size and corner, so the two read as one pair; the transparent catch makes it 44px under a finger.
+        className={cn(
+          'relative rounded-lg before:absolute before:inset-0 before:content-[\'\'] [@media(pointer:coarse)]:before:-inset-1.5',
+          !listening && (error === null ? 'text-muted-foreground hover:text-foreground' : 'text-tone-ink hover:text-tone-ink'),
+        )}
+      >
+        <Mic aria-hidden="true" />
+      </PromptInputButton>
       {listening && (
         // The breathing ring: the mic is open. It stands over the button's edge and takes no press.
         <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg ring-2 ring-primary motion-safe:animate-pulse" />

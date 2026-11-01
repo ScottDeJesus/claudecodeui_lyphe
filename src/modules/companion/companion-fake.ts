@@ -1,13 +1,14 @@
 import type {
-  CompanionActionTarget, CompanionActivity, CompanionCarriedLine, CompanionDraft, CompanionFace, CompanionLogEntry, CompanionNote,
-  CompanionPendingAction, CompanionPicture, CompanionProcess, CompanionSessionRef, CompanionSettings, CompanionWalk,
+  CompanionActionTarget, CompanionActivity, CompanionAttachment, CompanionCarriedLine, CompanionDraft, CompanionFace, CompanionLogEntry,
+  CompanionNote, CompanionPendingAction, CompanionPicture, CompanionProcess, CompanionSessionRef, CompanionSettings, CompanionWalk,
 } from '@/shared/companion-types';
 
 /*
  * FAKE COMPANION PICTURES, for the scaffolds' fixtures only: every state of her panel and her Settings section, typed by
  * the wire's mirror, so each can be mounted and photographed before the module's routes exist. Nothing in the app
  * imports this file; `.verify/companion-panel-scaffold.mjs`, `.verify/kaylee-talk-scaffold.mjs` (its talk presses,
- * `heard`) and `.verify/kaylee-voice-scaffold.mjs` (her voice, `spoken`) do.
+ * `heard`), `.verify/kaylee-voice-scaffold.mjs` (her voice, `spoken`) and `.verify/kaylee-attachments-transcript.mjs` (the
+ * files he attached to a typed line, `attached`) do.
  *
  * The chats are named the way the operator names his (Kanban lanes, the migration chat) and the sentences are cut and
  * marked the way the server's `parseExpression` cuts and marks them: mood brackets lifted, a sound's `at` the length of
@@ -51,8 +52,9 @@ const MIGRATION: CompanionSessionRef = { sessionId: 'fx-migration', name: 'Migra
 
 let nextId = 1;
 type Sound = CompanionLogEntry['sounds'];
-const he = (secondsAgo: number, text: string, via: 'typed' | 'spoken' = 'typed'): CompanionLogEntry => (
-  { id: nextId++, at: ago(secondsAgo), role: 'operator', via, turnId: null, index: null, text, mood: null, sounds: [] });
+/** His line, typed or spoken; `attachments`, the files a typed line carried, absent as the wire leaves it on a line with none. */
+const he = (secondsAgo: number, text: string, via: 'typed' | 'spoken' = 'typed', attachments: CompanionAttachment[] = []): CompanionLogEntry => (
+  { id: nextId++, at: ago(secondsAgo), role: 'operator', via, turnId: null, index: null, text, mood: null, sounds: [], ...(attachments.length > 0 && { attachments }) });
 const she = (secondsAgo: number, turnId: string, index: number, text: string, sounds: Sound = [], mood: string | null = null): CompanionLogEntry => (
   { id: nextId++, at: ago(secondsAgo), role: 'kaylee', via: null, turnId, index, text, mood, sounds });
 const house = (secondsAgo: number, role: 'alert' | 'system', text: string): CompanionLogEntry => (
@@ -284,6 +286,24 @@ const CLEAR = prepared(41, {
   target: { kind: 'memory', spoken: 'your memory', count: 3 },
 });
 
+/**
+ * What he attached to one typed line, as the upload store holds it and `GET /api/companion` lists it: the stored name
+ * `<Date.now()>-<random>-<his name>` (server/modules/assets/assets.routes.ts), his name for it, its size and type read from the
+ * stored file, and what she can do with it: a picture shown to her, a note her reader opens.
+ */
+const ATTACHED_FILES: CompanionAttachment[] = [
+  { path: '/home/lyphe/.cloudcli/assets/1793030400000-482913377-blue.png', name: 'blue.png', size: 1754, mimeType: 'image/png', opens: 'shown' },
+  { path: '/home/lyphe/.cloudcli/assets/1793030400001-905114862-notes.md', name: 'notes.md', size: 42, mimeType: 'text/markdown', opens: 'text' },
+];
+
+/** His typed line carrying a picture and a note, and her answer, which saw the one and read the other. */
+const ATTACHED = [
+  ...HELLO,
+  he(40, 'What colour is this, and what is the code word in the note?', 'typed', ATTACHED_FILES),
+  she(32, 't-attached', 0, 'The picture is one solid blue, edge to edge.'),
+  she(31, 't-attached', 1, 'And the note says the code word for the launch is marigold.'),
+];
+
 const IDLE: CompanionActivity = { phase: 'idle', session: null, files: null, walk: null };
 const AWAKE: CompanionProcess = { state: 'awake', error: null };
 /** The face of an account for which none is made, the value the server's picture answers until its face service does: every fixture draws as it did before faces. */
@@ -331,6 +351,7 @@ export const FAKE_PANEL: Record<string, FakePanelState> = {
   closed: state({ log: HELLO }, false, false),
   heard: state({ log: HEARD }),
   spoken: state({ log: SPOKEN, focus: KANBAN }),
+  attached: state({ log: ATTACHED }),
   actionQueue: state({ log: [...HELLO, ...QUEUE_LOG], pending: QUEUE }),
   actionAnswer: state({ log: [...HELLO, ...ANSWER_LOG], pending: ANSWER }),
   actionRound: state({ log: [...HELLO, ...ROUND_LOG], pending: ROUND }),

@@ -112,7 +112,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 - `min-w-fit` (`min-width: fit-content`) IS THE FLOOR: the title is never narrower than its own longest word, so it reads on one line, or wraps BY WORD (a plan's `--` and `-` break it too) — never one character per line. Without it the title (`flex-1`, `min-w-0`) is the only item in the group that CAN give, because the word, the clock and the count must not — and it gives all the way down.
 - THE FLOOR HAS ONE BOUND, MEASURED: `fit-content` is `min(max-content, max(min-content, available))` — capped by the room the row can give — and `break-words` (`overflow-wrap: break-word`) does NOT lower a word's intrinsic min-content. A title that is ONE token with no space and no hyphen in it, wider than the row, therefore neither wraps nor shrinks: the name leaves the card (measured 2026-09-25 at 390px with a 74-character token — one 622px line in a 332px row, the title 278px past the deck's right edge, the page itself not scrolling because its ancestors clip it). No live name reaches it: the corpus's longest unbroken segment is 19 characters. The row's own `scrollWidth` against its `clientWidth` is the reading that catches it; `lines === 1` passes there.
 - `flex-wrap` IS THE OTHER HALF, and neither half works alone: a floor with no wrap pushes the word, the clock and the count past the card's edge instead of under the title; a wrap with no floor (`min-w-0`) lets the title shrink to nothing.
-- THE CORNER STANDS OUTSIDE THE WRAPPING GROUP, `shrink-0`, so its presses keep the row's top-right whatever the group does; the group's `min-h-10 sm:min-h-7` is the corner's height, so a one-line title centres on it.
+- THE CORNER STANDS OUTSIDE THE WRAPPING GROUP, `shrink-0`, so its presses keep the row's top-right whatever the group does; the group's `min-h-7 finger:min-h-11` is the corner's height, so a one-line title centres on it.
 - THE FLOOR IS CONTENT-DRIVEN, NEVER A BREAKPOINT: the same heads are drawn in the In flight face and in the chat gutter (~380px even at 1440), so `sm:` would put one home's card on the other home's branch.
 
 measured 2026-09-25. Operator, with a phone screenshot of the Runner widget: "This card is rendering funny on my phone" (`/tmp/chains/arc-header-phone.jpg`: `restorly.arc` one letter per line in a monospace column, `$0.32 DeepSeek · 2.6M in · 26k out` whole beside it, the status word and the fold chevron cut off past the card's edge).
@@ -162,20 +162,6 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord
 - Rule: a `.verify/` probe answers every host the page reaches that is not a read of this origin, before it counts console errors. A filter on the collected console lines is not the cure; the reading stays exact only when the request never leaves the page.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
-
-## INV-6571 — probe — . An epic whose status turns `complete` without a new completion is never announced — and the comment and doc say it is
-
-. An epic whose status turns `complete` without a new completion is never announced — and the comment and doc say it is
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 100 npx tsx --tsconfig server/tsconfig.json /home/lyphe/.claude/state/pipeline-reviews/epic-pushes/athena-probes/status-turns-late.mts; echo "[probe exit $?]"
-expect: `idea dropped, arc turns complete: epic <name> (newest completion #<id>) — epic_finished pushes: 1` (today: 0 — the control line above it, the arc complete from the start, says 1)
-```
-
-measured 2026-10-03 by chain chain-epic-pushes-20261003-171247-ef3d, finding M1, MEDIUM
-probe-key: f8a0597ce4b18b606a470ec712f117f91162a361
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-endings.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts
 
 ## INV-6572 — probe — . INV-5922 still says "a halt is one push per plan"
 

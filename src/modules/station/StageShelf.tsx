@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useCompanion } from '@/modules/companion';
 import { useStation } from '@/modules/station/context/StationContext';
+import { useSidewaysWheel } from '@/modules/station/hooks/useSidewaysWheel';
 import type { CompanionNote } from '@/shared/companion-types';
 import { COMPANION_NOTE_KIND_GLYPHS } from '@/shared/constants';
 import type { StationFocus } from '@/shared/station-types';
@@ -81,7 +82,8 @@ function ShelfChip({ note, current, onOpen }: { note: CompanionNote; current: bo
  * "+<n> more in the conversation" for the rest, which stand where she put them. A press on a chip puts its card on the stage.
  *
  * One row, never wrapped over the card: it scrolls sideways under a finger (the kit's horizontal `ScrollArea`, which stops a
- * swipe at its end rather than handing the browser its Back). Every chip is a 44 px catch below 768 px (the touch law).
+ * swipe at its end rather than handing the browser its Back) and under a mouse's plain wheel (`useSidewaysWheel`, as the strip's
+ * line turns). Every chip is a 44 px catch below 768 px (the touch law).
  * The chip of the card on the stage is brought into the row's view, sideways only, whenever another card takes the stage or
  * the row changes: it is what tells him which card stands there. With no cards the shelf draws nothing, and the stage stands
  * as it was.
@@ -93,6 +95,7 @@ export function StageShelfView({ notes, focus, onOpen }: StageShelfViewProps) {
   const labelId = useId();
   // The row's sideways scroller (the kit's `ScrollArea` hands its ref to it), which the lit chip is brought into view in.
   const rowRef = useRef<HTMLDivElement>(null);
+  const turnSideways = useSidewaysWheel(rowRef);
   const { pinned, newest, more } = shelfOf(notes);
   const onStage = focus?.kind === 'note' ? focus.id : null;
   // The chips in their order, so a card arriving or leaving that moves the lit chip brings it into view again too.
@@ -115,7 +118,7 @@ export function StageShelfView({ notes, focus, onOpen }: StageShelfViewProps) {
   const chip = (note: CompanionNote) => <ShelfChip key={note.id} note={note} current={note.id === onStage} onOpen={onOpen} />;
   return (
     <nav data-station-shelf="" aria-labelledby={labelId} className="shrink-0 border-b border-border [container-type:inline-size]">
-      <ScrollArea ref={rowRef} orientation="horizontal">
+      <ScrollArea ref={rowRef} orientation="horizontal" onWheel={turnSideways}>
         <div className="flex w-max items-center gap-2 px-3 py-2 lg:px-4">
           <span id={labelId} className="shrink-0 pr-1 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
             {t('station.cards.shelf.label', { defaultValue: 'Her cards' })}

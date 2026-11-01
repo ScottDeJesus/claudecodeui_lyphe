@@ -26,15 +26,16 @@ type EmptyStateProps = {
 /**
  * What a list, panel or pane shows when it is genuinely empty.
  *
- * Used by the file-manager module for an empty folder, the task-master module for an empty
- * board, the memory-intake module for a queue with nothing waiting, the cerberus module for a
- * History with nothing in it yet, and the station module's draft dock (at `sm`) while she holds
- * no draft — each means "there is nothing here yet", and a dashed frame around a serif line says
- * that without any of them inventing a way to.
+ * Used across the app: the affected-areas, app-switcher, carrier-bulletins, cerberus, chat, chat-host, companion,
+ * deepseek-spend, dispatcher, document-preview, file-manager, followups, git-panel, heal, jev, kanban, memory-intake, notes,
+ * roadmap, runner-tab, schedules, shell, sidebar, standalone-shell, station, task-master and universe modules and the shared
+ * KanbanLane — an empty folder, an empty board, a queue with nothing waiting, a History with nothing in it yet, and (at `sm`)
+ * the station's draft dock while she holds no draft. Each means "there is nothing here yet", and a dashed frame around a serif
+ * line says that without any of them inventing a way to.
  *
  * "Empty" is not "we don't know" and not "zero": this belongs where the app has looked and
  * found nothing. A pane that is still loading, or that failed to read, says its own thing.
- * Its action is a 44 px catch under a finger below 768 px, the house's touch floor.
+ * Its action is a 44 px catch under a finger (a touch screen, or a window under 768 px), the house's touch floor.
  */
 export function EmptyState({ title = 'Nothing here yet', message, icon: Icon, actionLabel, onAction, size = 'default' }: EmptyStateProps) {
   return (
@@ -47,7 +48,7 @@ export function EmptyState({ title = 'Nothing here yet', message, icon: Icon, ac
       <div className="vv-empty__title">{title}</div>
       {message && <p className="vv-empty__message">{message}</p>}
       {actionLabel && (
-        <Button variant="tonal" className="mt-2 max-md:h-11" onClick={onAction}>
+        <Button variant="tonal" className="mt-2 finger:h-11" onClick={onAction}>
           {actionLabel}
         </Button>
       )}

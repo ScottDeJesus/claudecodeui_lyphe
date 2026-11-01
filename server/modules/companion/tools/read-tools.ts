@@ -223,9 +223,11 @@ function listFollowups(deps: CompanionToolDeps, args: { session?: string }): Pro
  */
 function askDactyl(deps: CompanionToolDeps, args: { files: string[]; brief: string; context?: string }, signal: AbortSignal | undefined): Promise<ToolTextResult> {
   return guardedToolResult('ask_dactyl', 'start the readers', async () => {
-    const files = resolveDactylFiles(deps.userId, args.files);
+    // Read at this call, so a line that has left her log has already closed the door for its files.
+    const attached = deps.store.attachedFiles();
+    const files = resolveDactylFiles(deps.userId, args.files, attached);
     const wantedContext = args.context?.trim() ?? '';
-    const context = wantedContext === '' ? null : resolveDactylFiles(deps.userId, [wantedContext]);
+    const context = wantedContext === '' ? null : resolveDactylFiles(deps.userId, [wantedContext], attached);
     const refusals = [files, context].flatMap((judged) => (judged !== null && !judged.ok ? [judged.sentence] : []));
     if (!files.ok || (context !== null && !context.ok)) return deps.refuse(refusals.join(' '));
 

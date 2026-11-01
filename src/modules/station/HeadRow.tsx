@@ -3,15 +3,16 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionStatus } from '@/modules/companion';
+import { HerViewToggle } from '@/modules/station/HerViewToggle';
 import { STATION_SIDEWAYS_CATCH } from '@/shared/constants';
-import type { CompanionPresence, StationHeadRow } from '@/shared/types';
+import type { CompanionPresence, StationHeadRow, StationHerView } from '@/shared/types';
 import { AppLogo, Button, buttonVariants, Menu } from '@/shared/ui';
-import { cn } from '@/shared/utils';
+import { cn, isDrawn } from '@/shared/utils';
 
 type HeadRowProps = {
   /** What the phone's arrangement asks of her head: its sideways step, its `trail` and the way back. */
   row: StationHeadRow;
-  /** Her face's box, drawn by `StationHeadView` at the row's size (44 px, 32 on its side). */
+  /** Her face's box, drawn by `StationHeadView` at the row's size (44 px, 32 on its side); null in the portrait view, where the row draws none. */
   face: ReactNode;
   /** Her name as he set it; `nameId` is its heading's id, which names the whole head. */
   name: string;
@@ -24,13 +25,17 @@ type HeadRowProps = {
   panelWidth: number;
   /** A failed process's banner, under the row at its whole width; false while she runs. */
   banner: ReactNode;
+  /** How her column draws her, and the press that chooses the other: the toggle stands in her menu's panel. */
+  herView: StationHerView;
+  onHerView: (next: StationHerView) => void;
 };
 
 /**
  * HER HEAD AS THE PHONE'S TOP ROW, the bar and her head in one under the status bar: drawn by `StationHeadView` (this module)
  * whenever the phone's arrangement hands her head its `row`. Left to right:
  *
- * - her face, 44 px (32 px on its side, where the row is 40 px);
+ * - her face, 44 px (32 px on its side, where the row is 40 px); none in the portrait view, where her portrait stands in her
+ *   conversation's place and her name takes the row's start;
  * - her name and her state on one line: her name keeps its width up to 40% of the line, her state takes the rest and gives way by
  *   its own rule (a chat's name cut, "· item 4 of 15" kept; words with no subject wrap rather than lose their end). Her state is
  *   the companion's small line (`panel`, as her panel's narrow head draws it): at the station's 16 px it had 110 px beside her
@@ -39,13 +44,14 @@ type HeadRowProps = {
  *   (`flex: 1 1 auto`): what stands in the `trail` gives way before them.
  * - the arrangement's `trail`: the count of what needs him and, on its side, the strip's line;
  * - her ONE menu at the row's end, the glyph alone (a row this narrow has no room for its words; they are its name, "Her controls
- *   and CloudCLI"): its panel is her controls' line over "CloudCLI", the shell's way back, the bar's own press. The panel hangs
+ *   and CloudCLI"): its panel is her controls' line over the toggle between her views ("Show chat" or "Show portrait", its word
+ *   drawn: the row has no room for one) over "CloudCLI", the shell's way back, the bar's own press. The panel hangs
  *   under the row, so it never covers her face, and the kit's edge shift keeps it inside the window.
  *
  * Every press is a 44 px catch: upright by its size, on its side by a catch grown past the 40 px row (`STATION_SIDEWAYS_CATCH`).
  * A failed process's banner stands under the row at its whole width. `data-station-head="row"` reads the form.
  */
-export function HeadRow({ row, face, name, nameId, presence, controls, panelWidth, banner }: HeadRowProps) {
+export function HeadRow({ row, face, name, nameId, presence, controls, panelWidth, banner, herView, onHerView }: HeadRowProps) {
   const { t } = useTranslation();
   const menuLabel = t('station.head.menu', { defaultValue: 'Her controls and CloudCLI' });
 
@@ -59,7 +65,7 @@ export function HeadRow({ row, face, name, nameId, presence, controls, panelWidt
           each of those is a 44 px catch round a 20 px glyph, 12 px of air already. */}
       <div className={cn('flex min-w-0 items-center', row.sideways ? 'h-10' : 'h-14 py-1')}>
         {face}
-        <div className="ml-2 flex min-w-0 flex-[1_1_auto] items-baseline gap-x-2">
+        <div className={cn('flex min-w-0 flex-[1_1_auto] items-baseline gap-x-2', isDrawn(face) && 'ml-2')}>
           {/* Her name on her state's 20 px line, so two lines of her state are the row's 40 px on its side and never more. */}
           <h2 id={nameId} data-station-head-name="" className="max-w-[40%] shrink-0 truncate text-base font-semibold leading-5 text-foreground">
             {name}
@@ -75,6 +81,7 @@ export function HeadRow({ row, face, name, nameId, presence, controls, panelWidt
             panel={(
               <div className="flex min-w-0 flex-col gap-3">
                 {controls}
+                <HerViewToggle herView={herView} onChange={onHerView} className="h-11 w-full justify-start" />
                 <div className="border-t border-border pt-3">
                   <Button
                     variant="outline"

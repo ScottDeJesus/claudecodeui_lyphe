@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { createMouthPieces } from '@/modules/companion/utils/mouthPieces';
 import { createPcmPlayer } from '@/modules/companion/utils/pcmPlayer';
 import type { PcmPlayer } from '@/modules/companion/utils/pcmPlayer';
 import { createSpeechPull } from '@/modules/companion/utils/speechPull';
 import type { CompanionPicture } from '@/shared/companion-types';
-import type { CompanionSentenceRef, CompanionVoice } from '@/shared/types';
+import type { CompanionFaceVoice, CompanionSentenceRef, CompanionVoice } from '@/shared/types';
 
 /** The localStorage key of this device's voice switch: 'off' silences her here, anything else (or nothing) leaves her on. */
 const VOICE_SWITCH_KEY = 'companion-voice';
@@ -38,12 +39,18 @@ type CompanionVoiceHook = {
   cutOff: () => Promise<void> | null;
   /** The press that ends his recording: the pull is asked again from what she says next. */
   release: () => void;
-  /** Stops what sounds and asks for nothing more of the turn, with the floor kept (Stop, Clear). */
+  /** Stops what sounds and asks for nothing more of the turn, with the floor kept (Stop, Clear). It leaves the timed mouth shapes the page has heard: `forgetMouth` is Clear's. */
   silence: () => void;
   /** The player's `level()` — its RMS over the last 43 ms, 0..1, and 0 when nothing sounds — for her face's mouth. One function for the page's life. */
   level: () => number;
   /** The player's `progress()` — the sounding sentence's seconds elapsed and, once its body has ended, its length — for the vowel her mouth shapes. One function for the page's life. */
   progress: PcmPlayer['progress'];
+  /** The timed mouth shapes heard for a sentence (`createMouthPieces().of`), for her face's exact mouth: `[]` for a sentence none have arrived for. One function for the page's life. */
+  mouth: CompanionFaceVoice['mouth'];
+  /** Keeps one `companion_mouth` frame's piece for its sentence (the three most recent turns are kept). One function for the page's life. */
+  hearMouth: ReturnType<typeof createMouthPieces>['hear'];
+  /** Forgets every piece heard: her conversation is gone (Clear), and what she says next is a new one. One function for the page's life. */
+  forgetMouth: () => void;
 };
 
 /**
@@ -60,12 +67,18 @@ type CompanionVoiceHook = {
  * leaves the pull where it was. A page that stops holding the floor, or turns
  * its switch off, stops its player at once. Nothing polls: the pull moves on a frame, an answer, or the player's start.
  *
+ * THE MOUTH'S PIECES are kept here too, beside the player whose clock they are read against: the server announces the timed mouth shapes of
+ * each stretch of a sentence's audio (`companion_mouth`, via the provider), and her face looks the shape up at the audio's place on each
+ * animation frame (`mouth`). The store holds no React state, so a piece landing redraws nothing; a Stop leaves it, a Clear forgets it.
+ *
  * The status the panel reads is ONE state: `speaking` is the sentence the player is sounding, held from its start until the
  * next one starts and null only when the player falls silent; `cut` is true for 900 ms after a press cut her off.
  */
 export function useCompanionVoice({ picture, clientId }: { picture: CompanionPicture | null; clientId: string }): CompanionVoiceHook {
   // The page's one player, made once. It opens no audio context until a gesture unlocks it or a sentence arrives.
   const [player] = useState(createPcmPlayer);
+  // The timed mouth shapes heard for her last three turns, made once: a module-private store, not React state, because her face reads it sixty times a second and a piece landing must redraw nothing.
+  const [mouthPieces] = useState(createMouthPieces);
   // The sentence the player is sounding, for the log's mark and the status line's Speaking.
   const [speaking, setSpeaking] = useState<CompanionSentenceRef | null>(null);
   // The pull's engine, made once: it keeps its place across renders and across the picture being re-seeded.
@@ -132,5 +145,10 @@ export function useCompanionVoice({ picture, clientId }: { picture: CompanionPic
   const voice = useMemo<CompanionVoice>(() => ({ on, setOn, speaking, cut }), [on, setOn, speaking, cut]);
   // The player's `level` and `progress` close over the player's own graph and never read `this`, so they are handed out as they stand and keep one identity.
   const { level, progress } = player;
-  return useMemo(() => ({ voice, unlock, cutOff, release, silence, level, progress }), [voice, unlock, cutOff, release, silence, level, progress]);
+  // The store's three functions close over its own map and never read `this`, so they too are handed out as they stand and keep one identity.
+  const { of: mouth, hear: hearMouth, forget: forgetMouth } = mouthPieces;
+  return useMemo(
+    () => ({ voice, unlock, cutOff, release, silence, level, progress, mouth, hearMouth, forgetMouth }),
+    [voice, unlock, cutOff, release, silence, level, progress, mouth, hearMouth, forgetMouth],
+  );
 }

@@ -13,6 +13,7 @@ import ThinkingRow from '@/modules/chat/transcript/ThinkingRow';
 import ChatMessageImages from '@/modules/chat/transcript/ChatMessageImages';
 import { shapeKey } from '@/modules/chat/transcript/shapes/collapseState';
 import { PreviewScopeContext } from '@/modules/chat/transcript/shapes/previewScope';
+import { MessageTimeContext } from '@/modules/chat/transcript/transcriptPictures';
 import ChatMessageFiles from '@/modules/chat/transcript/ChatMessageFiles';
 import { Markdown, TRANSCRIPT_PROSE } from '@/modules/chat/transcript/Markdown';
 import StreamingMarkdown from '@/modules/chat/transcript/StreamingMarkdown';
@@ -168,6 +169,8 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
   }
   return (
     <PreviewScopeContext.Provider value={previewScope}>
+    {/* When this message was written: a picture it names outside the project is the one the newest `Read` at or before it returned. */}
+    <MessageTimeContext.Provider value={messageTime.isValid ? messageTime.date.getTime() : null}>
     <div
       ref={messageRef}
       data-message-timestamp={message.timestamp || undefined}
@@ -452,6 +455,7 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
         </div>
       )}
     </div>
+    </MessageTimeContext.Provider>
     </PreviewScopeContext.Provider>
   );
 });

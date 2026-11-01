@@ -359,7 +359,8 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
    *
    * A feature in no epic says each of these as it happens. A feature of an epic says only the first
    * of a wave of retries or of stops, and its copy names the epic and says the rest stay on the
-   * card (`epicWaveText`); its own finish is never said, because the epic's is.
+   * card (`epicWaveText`); its own finish is never pushed, because the epic's is, and is kept all the same as
+   * `dispatcher.feature_finished`, a `record`, for the station's strip.
    *
    * `dispatcher.paused` is the lane's stop-and-look: the dispatcher pauses a walk for its own
    * reasons (a spent ladder, a budget, the pause verb) and the phone is where the operator finds
@@ -377,6 +378,12 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
       ].filter((part): part is string => part !== null).join(' · '),
     };
   }],
+  // A feature of an epic finishing, kept and never pushed (kind `record`): the history's words for the strip, which draws the title —
+  // `Feature finished · <plan>` — and nothing else. The tasks done out of how many, and no spend: the strip never carries a figure.
+  ['dispatcher.feature_finished', ({ meta }) => ({
+    headline: 'Feature finished',
+    body: dispatcherPhaseText(meta),
+  })],
   // The title reads `Epic finished · <epic name>`: the ending's `sessionName` is the epic. Its spend is
   // the epic's own sum over all of its features, in the same words a feature's push uses.
   ['dispatcher.epic_finished', ({ meta }) => {

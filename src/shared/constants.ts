@@ -524,8 +524,7 @@ export const ROADMAP_DOT_PAINT: Record<RoadmapDotState, { fill: string; stroke: 
 /**
  * The query parameter a landing names a plan in (`?runner=<plan>`): the key one side writes and the other
  * reads. Used by the project-workspace module's `useRunnerLanding`, which reads it, and the shared
- * `useRevealCard`, which writes it from a surface that has no Roadmap tab above it, as does the station module's
- * `FocusFallback` (its way to a card in CloudCLI).
+ * `useRevealCard`, which writes it from a surface that has no Roadmap tab above it.
  */
 export const RUNNER_LANDING_PARAM = 'runner';
 
@@ -566,6 +565,17 @@ export const ZOOM_DOUBLE_TAP_RADIUS_PX = 32;
  * when they open.
  */
 export const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// ---------------------------
+
+//----------------- THE WINDOW'S POINTER ------------
+
+/**
+ * The media query that asks whether the window's main pointer is a finger. Read, with `matchMedia`, by the one phone predicate
+ * (`useStationWindow`'s `isPhoneWindow`, and a phone on its side) and by the keyboard's
+ * mark (`useVisualViewportKeyboardOffset`: a coarse pointer is what makes a shrunken layout viewport a keyboard).
+ */
+export const COARSE_POINTER_QUERY = '(pointer: coarse)';
 
 // ---------------------------
 
@@ -656,7 +666,7 @@ export const COMPANION_NOTE_KIND_GLYPHS: Record<CompanionNoteKind, { icon: Lucid
  * The glyph and the word of each kind of thing the station's stage can hold (`StationFocus.kind`): `icon` is the lucide mark and
  * `wordKey` the i18n key of its word (`station.focusKind.<kind>`: Session, Feature or epic, Waiting ask, Follow-ups, Check, Card,
  * Walkthrough, Page). A kind is always drawn with its word beside the mark, never the mark alone. Read by the station's stage
- * head, by its fallback for a view that has not landed, and by every region's press, which names its kind by them.
+ * head and by every region's press, which names its kind by them.
  */
 export const STATION_FOCUS_GLYPHS: Record<StationFocusKind, { icon: LucideIcon; wordKey: string }> = {
   chat: { icon: MessageSquare, wordKey: 'station.focusKind.chat' },
@@ -729,15 +739,23 @@ export const STATION_NEED_KINDS: Readonly<Record<StationNeedKind, { icon: Lucide
 
 // ---------------------------
 
-//----------------- THE STATION'S BOXES OUT OF REACH ------------
+//----------------- BOXES OUT OF REACH ------------
 
 /**
- * The props that take a box of Kaylee Station out of the tab order, the reading order and the press while it stands drawn under
- * something or behind it: `inert` (spelled as the string React 18 carries) and `aria-hidden`. Spread on the box: by compact's and
- * the phone's arrangements on the strip's line (and compact's switch) while the strip's week stands over them, and by the sections
- * on every section not shown.
+ * The props that take a box out of the tab order, the reading order and the press while it stands drawn under something or behind
+ * it: `inert` (spelled as the string React 18 carries) and `aria-hidden`. Spread on the box. Worn by Kaylee Station's compact and
+ * phone arrangements on the strip's line (and compact's switch) while the strip's week stands over them, by its sections on every
+ * section not shown, and by the two whole pages of the app (the workspace frame and the station's layer) on whichever of them is not
+ * the one on screen.
  */
-export const STATION_OUT_OF_REACH = { inert: '', 'aria-hidden': true } as unknown as HTMLAttributes<HTMLDivElement>;
+export const OUT_OF_REACH = { inert: '', 'aria-hidden': true } as unknown as HTMLAttributes<HTMLDivElement>;
+
+// ---------------------------
+
+//----------------- WHERE KAYLEE STATION STANDS ------------
+
+/** The router path Kaylee Station is shown at, under the basename. A page at it draws the station over the held workspace; deep-linking to it opens the station. */
+export const STATION_PATH = '/station';
 
 // ---------------------------
 
@@ -757,3 +775,13 @@ export const STATION_SIDEWAYS_CATCH = "relative h-10 before:absolute before:inse
  * and more. Worn by the strip's "<n> new" chip (`SinceYouLastLooked`) and its Try again (`StripLines`).
  */
 export const STATION_COUNT_FORM_CATCH = "relative before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']";
+
+// ---------------------------
+
+//----------------- ATTACHMENTS A MESSAGE CARRIES ------------
+
+/**
+ * The most files one message carries, in a chat and in a typed line to Kaylee: the intake (`useAttachmentIntake`) refuses the eleventh, the
+ * upload route holds the same ten, and the companion's composer caps a refused send's put-back at it.
+ */
+export const MAX_ATTACHMENT_COUNT = 10;

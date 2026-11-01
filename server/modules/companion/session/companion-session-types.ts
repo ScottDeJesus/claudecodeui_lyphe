@@ -1,6 +1,7 @@
 import type { SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 
-import type { CompanionModel, CompanionProcess } from '@/shared/companion-types.js';
+import type { CompanionAttachment, CompanionModel, CompanionProcess } from '@/shared/companion-types.js';
+import type { ClaudeImageBlock } from '@/shared/image-attachments.js';
 
 import type { UnansweredMessage } from '../companion-unanswered.js';
 
@@ -56,7 +57,11 @@ export type CompanionSessionDeps = MessageReaders &
  * `<operator via="spoken" heard="name">`, each still a turn she answers); `warm` starts the process of a closed one ahead of its first
  * message and pushes nothing (the CLI takes about a second to come up, which a caller that knows a push is
  * coming in seconds spends in parallel); `resendUnanswered` pushes again, each as a fresh message, the words of his that her last
- * process was given and never answered (the entrypoint calls it once the server is the sole one on the port); `oweCut` stores the cut the next message opens with (the last sentence he heard to its end, and the one playing at the press);
+ * process was given and never answered (the entrypoint calls it once the server is the sole one on the port), and answers a promise: a line
+ * that carried a picture has it read again from the upload store first, while that happens a new push waits behind the replay and goes after
+ * it, and the promise settles once the replay has pushed its messages (with no picture to read it has pushed them all before it answers);
+ * `pushOperator`'s `attached` is what a typed line carried: the records of his files (kept with his words) and the picture blocks read from
+ * them (held in memory only, beside the message), which a typed line with files and no words is allowed to have; `oweCut` stores the cut the next message opens with (the last sentence he heard to its end, and the one playing at the press);
  * `interrupt` stops her turn (`by` is who stopped it: the operator, by his Stop or the voice's cut, which is the default, or the
  * server, in a shutdown) and holds what is pushed until the stopped turn's result is in, so his next words cannot be folded into
  * the aborted request; `setModel` applies a model change to a
@@ -65,14 +70,14 @@ export type CompanionSessionDeps = MessageReaders &
  * shows and `turnId` the turn in flight (`null` when idle). Consumed by `companion.service.ts` and the voice.
  */
 export type CompanionSession = {
-  pushOperator(text: string, via: 'typed' | 'spoken'): void;
+  pushOperator(text: string, via: 'typed' | 'spoken', attached?: { attachments: CompanionAttachment[]; images: ClaudeImageBlock[] }): void;
   pushOperatorEmpty(): void;
   /** A name press with nothing after her name: `<operator via="spoken" heard="name">`, a turn she answers as someone called by name does. Kept with his unanswered words as `heard: 'name'`, so a replay sends it again as a call. Consumed by `companion-press.ts`. */
   pushOperatorCalled(): void;
   pushAlerts(blocks: string[]): void;
   pushFocusNews(envelope: string): void;
   warm(): void;
-  resendUnanswered(): void;
+  resendUnanswered(): Promise<void>;
   oweCut(heard: string | null, interrupted: string | null): void;
   interrupt(by?: StopSource): Promise<void>;
   setModel(model: CompanionModel): Promise<void>;

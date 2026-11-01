@@ -51,12 +51,17 @@ type FileChipProps = {
  * the chip, which stays there while the preview is folded and is never drawn over the preview. Until
  * the preview loads, and when it never does, the chip opens the file as every other chip does, so a
  * chip is never a button that does nothing.
+ *
+ * **A picture outside the project** (`/tmp/shot.png`) is previewed from the copy a `Read` in this chat
+ * returned, when there is one; when there is none and the file tree would refuse the path (it is outside the
+ * project and the workspace root), no read is made and, once every page of the chat is loaded, a muted line
+ * under the chip says the image is outside the project, with its path.
  */
 export function FileChip({ path, line, children, plain, alt }: FileChipProps) {
   const { t } = useTranslation('chat');
   const { openFileReference } = usePaletteOps();
   const suppressed = useContext(ChipsSuppressedContext);
-  const { preview, collapsed, toggle } = useFilePreview(path, previewKindOf(path) !== null && !suppressed);
+  const { preview, collapsed, toggle, outsideImage } = useFilePreview(path, previewKindOf(path) !== null && !suppressed);
   if (suppressed) return <>{plain ?? children}</>;
   const open = () => openFileReference(path, line ?? undefined);
   const openLabel = t('shapes.openFile', { path: line === null ? path : `${path}:${line}` });
@@ -81,7 +86,19 @@ export function FileChip({ path, line, children, plain, alt }: FileChipProps) {
       {children}
     </button>
   );
-  if (!preview) return chip;
+  if (!preview) {
+    return outsideImage ? (
+      <>
+        {chip}
+        {/* The picture lives outside the project, where the file tree refuses it, and no `Read` in this chat returned it:
+            the chip keeps the name and this says why there is no picture. Muted tokens, no colour of its own; `font-sans`
+            because the prose's display serif is cramped at this size and the path is the part that must stay readable. */}
+        <span data-outside-image="" className="mt-1 block font-sans text-xs text-muted-foreground [overflow-wrap:anywhere]">
+          {t('shapes.imageOutsideProject', { path })}
+        </span>
+      </>
+    ) : chip;
+  }
   return (
     <>
       {chip}

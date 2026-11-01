@@ -59,9 +59,9 @@ export function CompanionEarsSwitch({ ears, name }: CompanionEarsSwitchProps) {
   const unavailable = ears.state === 'unavailable';
 
   return (
-    // 44px tall under a finger (below 768 px, and on a touch screen of any width), Verve's touch floor, as the voice row's label is;
+    // 44px tall under a finger (a touch screen, or a window under 768 px), Verve's touch floor, as the voice row's label is;
     // there its own 6px above and below keep words of three lines and more as far from the row's edges as one or two lines stand.
-    <label data-companion-ears={ears.on ? ears.state : 'off'} className="flex w-full min-w-0 cursor-pointer items-center gap-2 max-md:min-h-11 max-md:py-1.5 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:py-1.5">
+    <label data-companion-ears={ears.on ? ears.state : 'off'} className="flex w-full min-w-0 cursor-pointer items-center gap-2 finger:min-h-11 finger:py-1.5">
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex min-w-0 items-center gap-2">
           <Glyph aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />

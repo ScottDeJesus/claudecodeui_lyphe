@@ -33,7 +33,7 @@ export function PaceOverride({ name, hold, overridden }: { name: string; hold: s
         <span data-plan-override="" className="min-w-0 break-words text-xs text-foreground">
           {t('dispatcher.override.on')}
         </span>
-        <Button type="button" variant="ghost" size="sm" className="h-8" disabled={pending} title={t('dispatcher.override.offTitle')}
+        <Button type="button" variant="ghost" size="sm" className="h-8 finger:h-11" disabled={pending} title={t('dispatcher.override.offTitle')}
           onClick={() => void overrideOff()} data-dispatcher-override-off>
           {t('dispatcher.override.off')}
         </Button>
@@ -42,7 +42,7 @@ export function PaceOverride({ name, hold, overridden }: { name: string; hold: s
   }
   return (
     <PaceHoldLine hold={hold}>
-      <Button type="button" variant="secondary" size="sm" className="h-8" disabled={pending} title={t('dispatcher.override.pressTitle')}
+      <Button type="button" variant="secondary" size="sm" className="h-8 finger:h-11" disabled={pending} title={t('dispatcher.override.pressTitle')}
         onClick={() => void override()} data-dispatcher-override>
         {t('dispatcher.override.press')}
       </Button>

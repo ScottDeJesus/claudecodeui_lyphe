@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
+import type { ClaudeImageBlock } from '@/shared/image-attachments.js';
+
 import type { UnansweredMessage } from '../companion-unanswered.js';
 
 /**
@@ -33,13 +35,16 @@ export type StopSource = 'operator' | 'server';
 /**
  * One message of ours, as assembled and pushed (`message`, whose id is `uuid`), with his raw `words` when it is his (so it can
  * be assembled again and kept: `body` `''` with `via` `'spoken'` is a press that carried no words, or only her name with `heard: 'name'`; `at` is when he said it) and
- * `stoppedBy` once the turn it was in was stopped (`null` before, and for a message pushed after the stop). Consumed by
- * `companion-session.ts`.
+ * `stoppedBy` once the turn it was in was stopped (`null` before, and for a message pushed after the stop). `images` are the pictures
+ * riding with `message`, as the image blocks it carries after its text: MEMORY ONLY, beside `words` and never in it, so the list written to
+ * disk (`{ uuid, ...sent.words }`) holds the attachment records and never a byte; a message said again keeps them (`restate`), and one said
+ * again after a restart reads them from the upload store afresh. Consumed by `companion-session.ts`.
  */
 export type Sent = {
   uuid: string;
   message: SDKUserMessage;
   words: Omit<UnansweredMessage, 'uuid'> | null;
+  images: ClaudeImageBlock[];
   stoppedBy: StopSource | null;
 };
 

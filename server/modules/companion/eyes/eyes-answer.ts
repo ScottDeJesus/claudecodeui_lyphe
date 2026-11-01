@@ -27,7 +27,7 @@ import { parseStamp, shortDate } from './panel-words.js';
  *
  * The words are his panels' (`panel-words.ts`) and his clock's (`whenWords`: the box's local clock, in English only).
  * Consumers: the eyes' reads, each in its own phase: `roadmap-reads.ts`, `run-reads.ts`, `doc-reads.ts`,
- * `alert-reads.ts`, `panel-reads.ts` and `house-reads.ts` of this folder.
+ * `alert-reads.ts`, `panel-reads.ts`, `house-reads.ts` and `skill-reads.ts` of this folder.
  */
 
 //----------------- THE CAPS ------------

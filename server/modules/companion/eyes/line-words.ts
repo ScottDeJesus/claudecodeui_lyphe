@@ -39,7 +39,7 @@ export function maskCredentials(text: string): string {
 /**
  * `text` as one line of at most `max` characters (as a person counts them): credential-looking values masked first
  * (`maskCredentials`), every run of whitespace folded to one space, the ends trimmed, and a line that was cut ending "…". `max` is
- * a whole number of 2 or more. Consumed by the heal, schedule, kanban and notes reads, for every stored text they put in a line.
+ * a whole number of 2 or more. Consumed by the heal, schedule, kanban, notes and skill reads, for every stored text they put in a line.
  */
 export function clipLine(text: string, max: number): string {
   const folded = maskCredentials(text).replace(/\s+/g, ' ').trim();
@@ -69,7 +69,7 @@ const LIST_LINES_BUDGET = INLINE_MAX_CHARACTERS - 250;
  * inline limit of 2,000 characters (`LIST_LINES_BUDGET`), one per line, then "And <k> more; give a phrase to narrow." for the rest.
  * A list stays whole this way rather than being handed to a dactyl, whose digest would drop the very fields a line carries.
  * `total` is how many items there are when the caller holds only the first page of them (a Kanban lane); it defaults to
- * `lines.length`. The first line is always shown. Consumed by every panel read of this family that answers a list.
+ * `lines.length`. The first line is always shown. Consumed by every panel read of this family that answers a list, and by `skill-reads.ts`.
  */
 export function fitLines(lines: string[], options: { total?: number; max?: number } = {}): string {
   const total = Math.max(options.total ?? lines.length, lines.length);

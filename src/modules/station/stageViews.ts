@@ -12,11 +12,11 @@ import type { StationFocus, StationFocusKind } from '@/shared/station-types';
 
 /**
  * THE REGISTRY OF THE STAGE'S VIEWS: for each kind of focus, the component that draws it large, handed `{ focus }` narrowed
- * to its kind. Every kind of focus has its line (`chat`, `card`, `page`, `ask`, `followups`, `check`, her `note` cards and her
- * `walk`); a kind added to `StationFocusKind` draws `FocusFallback` — its glyph and word, and a working way to the thing in
- * CloudCLI — until its line lands here, so a focus whose view has not landed is never a blank. Read by `StationStage`.
+ * to its kind. Total over `StationFocusKind` (`chat`, `card`, `page`, `ask`, `followups`, `check`, her `note` cards and her
+ * `walk`): every kind has its view, so a kind added to the type is a type error here until its view is written. Read by
+ * `StationStage`.
  */
-export const STAGE_VIEWS: { [Kind in StationFocusKind]?: ComponentType<{ focus: Extract<StationFocus, { kind: Kind }> }> } = {
+export const STAGE_VIEWS: { [Kind in StationFocusKind]: ComponentType<{ focus: Extract<StationFocus, { kind: Kind }> }> } = {
   chat: ChatStage,
   card: CardStage,
   page: PageStage,

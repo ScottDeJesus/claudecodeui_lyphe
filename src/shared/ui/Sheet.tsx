@@ -6,6 +6,9 @@ import { FOCUSABLE_SELECTOR } from '@/shared/constants';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { OWNS_ESCAPE, modalInFrontHoldsEscape } from '@/shared/ui/overlayEscape';
 
+/** `top`'s default: the scrim takes the whole viewport, so nothing outside the panel can take a press or a focus. */
+const FULL_VIEWPORT_TOP = '0px';
+
 type SheetProps = {
   open: boolean;
   onClose: () => void;
@@ -17,13 +20,22 @@ type SheetProps = {
   footer?: React.ReactNode;
   /** Any CSS width; the panel never outgrows the viewport at the default. */
   width?: string;
+  /** Any CSS length: the line the scrim and the panel stand below, from the viewport's top. Default `'0px'`, the whole viewport. A sheet that must clear something drawn at the page's top (a head, a face) passes that thing's foot; what stands above the line stays live, and Tab never walks from it into what the scrim covers. */
+  top?: string;
   children: React.ReactNode;
 };
 
 /**
  * Verve's `Sheet` (`_ds_bundle.js`, components/overlays/Sheet.jsx): a panel pinned to the right edge
  * over a scrim, for a detail that belongs beside the screen rather than over it. Used by the cerberus
- * module's CheckSheet.
+ * module's CheckSheet, which hands it the `width` and the `top` its caller asks for (the station's check
+ * stage keeps the sheet off her face with them).
+ *
+ * `top` is the line the scrim and the panel stand below: the root is `fixed` with its sides and foot at 0
+ * and its top there, and both are absolute inside it. A sheet that must clear something at the page's top
+ * passes that thing's foot; omitted, the sheet takes the whole viewport. What stands above that line is
+ * not covered, so it can hold the focus (a press on it) while the sheet is open; the Tab key then goes
+ * back into the panel and never on to the controls the scrim covers (see the keys, below).
  *
  * Portalled into the host window's body exactly as `Dialog` is, and rendered ONLY while open — which
  * is what lets the root carry `OWNS_ESCAPE` honestly (`overlayEscape.ts`): a `Dialog` opened before
@@ -38,11 +50,13 @@ type SheetProps = {
  * Paint is `.vv-sheet*` in verve/panels.css, motion included; there is no exit animation, as with
  * Dialog — the panel is unmounted the moment `open` goes false.
  */
-export function Sheet({ open, onClose, title, titleAccent, footer, width = 'min(600px, 100%)', children }: SheetProps) {
+export function Sheet({ open, onClose, title, titleAccent, footer, width = 'min(600px, 100%)', top = FULL_VIEWPORT_TOP, children }: SheetProps) {
   const { t } = useTranslation('common');
   const hostWindow = useHostWindow();
   const panelRef = React.useRef<HTMLDivElement | null>(null);
   const titleId = React.useId();
+  // True when the scrim leaves a band of the page uncovered above it (`top`): only then can focus stand outside the panel by a press.
+  const leavesBandLive = top !== FULL_VIEWPORT_TOP;
 
   React.useEffect(() => {
     if (!open) return undefined;
@@ -64,6 +78,15 @@ export function Sheet({ open, onClose, title, titleAccent, footer, width = 'min(
         if (focusable.length === 0) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
+        // A press on what stands above the scrim (her head's buttons) leaves the focus outside the panel, and the next Tab
+        // would walk on into the controls the scrim covers: they take Enter behind a sheet that says everything else is
+        // inert. Back into the panel instead, unless a menu or a dialog drawn in front of the sheet (its Mute dialog, a
+        // Select) holds the focus and the key.
+        if (leavesBandLive && !panelRef.current.contains(hostDocument.activeElement) && !modalInFrontHoldsEscape(panelRef.current, hostDocument)) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+          return;
+        }
         if (event.shiftKey && hostDocument.activeElement === first) {
           event.preventDefault();
           last.focus();
@@ -76,7 +99,7 @@ export function Sheet({ open, onClose, title, titleAccent, footer, width = 'min(
 
     hostWindow.addEventListener('keydown', handleKeyDown, true);
     return () => hostWindow.removeEventListener('keydown', handleKeyDown, true);
-  }, [open, onClose, hostWindow]);
+  }, [open, onClose, hostWindow, leavesBandLive]);
 
   // Focus goes into the panel on open and back to what held it on close. A frame of the window the
   // reader is looking at, as Dialog does it, so a sheet raised from a floating window is not left
@@ -100,7 +123,8 @@ export function Sheet({ open, onClose, title, titleAccent, footer, width = 'min(
   if (!open) return null;
 
   return createPortal(
-    <div className="vv-sheet fixed inset-0 z-50" {...OWNS_ESCAPE}>
+    // `top` stands the root below that line, with its sides and foot at 0: the scrim and the panel are absolute in it, so both follow.
+    <div className="vv-sheet fixed inset-0 z-50" style={{ top }} {...OWNS_ESCAPE}>
       <div className="vv-sheet__scrim absolute inset-0" onClick={onClose} aria-hidden />
       <div
         ref={panelRef}

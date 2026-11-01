@@ -22,7 +22,8 @@ import { isStoreStamp } from '@/shared/utils.js';
  *
  * Consumers: `server/modules/companion/companion-store.ts` — the lane's reader and writer, `readSentence` included —
  * `companion.service.ts`, which asks `userIdsFocusedOn` which accounts a finished run is news to, and
- * `server/modules/companion/memory/memory-verbs.ts`, which reads and writes `memory_forget_line` through `readState` and `writeState`.
+ * `server/modules/companion/memory/memory-verbs.ts`, which reads and writes `memory_forget_line` through `readState` and `writeState`;
+ * `readAttachedFiles` is read for her reader, through the store's `attachedFiles`.
  * Reach it through `@/modules/database/index.js`. Every statement runs on the caller's
  * connection; only `appendLog` and `clearAccount` open a transaction of their own, so each lands
  * whole or not at all.
@@ -89,6 +90,8 @@ export type CompanionLogRow = {
   mood: string | null;
   /** `CompanionSound[]` as JSON text, or NULL. */
   sounds_json: string | null;
+  /** `CompanionAttachment[]` as JSON text — the files he attached to a typed line — or NULL for none, which is every row before the column. */
+  attachments_json: string | null;
 };
 
 /** What `appendLog` takes: a row without its id and account. `at` defaults to now; the optional columns to NULL. */
@@ -101,6 +104,7 @@ export type CompanionLogInput = {
   turn_index?: number | null;
   mood?: string | null;
   sounds_json?: string | null;
+  attachments_json?: string | null;
 };
 
 /**
@@ -140,7 +144,7 @@ export type CompanionClearResult = {
 const STATE_PATCH_COLUMNS = ['provider_session_id', 'session_shape', 'handover', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor', 'memory_forget_line', 'face_id', 'face_pending_id', 'face_error'] as const;
 
 const STATE_COLUMNS = `user_id, ${STATE_PATCH_COLUMNS.join(', ')}, updated_at`;
-const LOG_COLUMNS = 'id, user_id, at, role, via, turn_id, turn_index, text, mood, sounds_json';
+const LOG_COLUMNS = 'id, user_id, at, role, via, turn_id, turn_index, text, mood, sounds_json, attachments_json';
 const NOTE_COLUMNS = 'id, user_id, at, title, text, kind, ref_json, pinned';
 
 export const companionDb = {
@@ -232,8 +236,8 @@ export const companionDb = {
   appendLog(userId: number, entry: CompanionLogInput): CompanionLogRow {
     const db = getConnection();
     const insert = db.prepare(
-      `INSERT INTO companion_log (user_id, at, role, via, turn_id, turn_index, text, mood, sounds_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO companion_log (user_id, at, role, via, turn_id, turn_index, text, mood, sounds_json, attachments_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING ${LOG_COLUMNS}`
     );
     const prune = db.prepare(
@@ -253,6 +257,7 @@ export const companionDb = {
         entry.text,
         entry.mood ?? null,
         entry.sounds_json ?? null,
+        entry.attachments_json ?? null,
       ) as CompanionLogRow | undefined;
       if (!row) throw new Error(`Could not append a companion log row for account ${userId}.`);
 
@@ -279,6 +284,20 @@ export const companionDb = {
          ) ORDER BY id`
       )
       .all(userId, bounded) as CompanionLogRow[];
+  },
+
+  /**
+   * The `attachments_json` of every row of the account's log that carries some, oldest first: the files he attached to the typed lines the
+   * log still holds. Whatever leaves the log (the keep window's prune, Clear) leaves this list with it. Read by `companion-store.ts`
+   * (`attachedFiles`), which hands the parsed records to her reader (`companion/tools/read-tools.ts`): the one door a dactyl has to a file of the
+   * upload store.
+   */
+  readAttachedFiles(userId: number): string[] {
+    const rows = getConnection()
+      .prepare('SELECT attachments_json FROM companion_log WHERE user_id = ? AND attachments_json IS NOT NULL ORDER BY id')
+      .all(userId) as Array<{ attachments_json: string }>;
+
+    return rows.map((row) => row.attachments_json);
   },
 
   /**

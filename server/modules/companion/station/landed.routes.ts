@@ -9,7 +9,7 @@ import type { CompanionService } from '../companion.service.js';
  * The station's landed route, mounted by `createCompanionRoutes` at `/api/companion/station` behind `authenticateToken`, so its
  * one door is `GET /api/companion/station/landed`. ONLY TRANSPORT: it reads who is asking, calls the companion service's `landed`
  * verb (which reads `stationLanded` with the house) and answers `{ landed }`: a `StationLanded[]` of the account's last seven days,
- * newest first, at most 60, `[]` when nothing landed. A read that throws (the history's database) is logged and answered 503
+ * newest first, at most 300 (every landing the history kept of the week), `[]` when nothing landed. A read that throws (the history's database) is logged and answered 503
  * `{ error }` with a sentence the strip can show, so a failed read is a state the page draws and never a stack it parses.
  *
  * The history is the account's own (what the house told THIS account), so the route names the account; it is no page's, so it

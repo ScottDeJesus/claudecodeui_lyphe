@@ -11,6 +11,7 @@ import { readVerveTokens } from '@/modules/widgets/readVerveTokens';
 import { WidgetErrorCard } from '@/modules/widgets/WidgetErrorCard';
 import { useWidgetBridge } from '@/modules/widgets/hooks/useWidgetBridge';
 import { useWidgetHost } from '@/modules/widgets/hooks/useWidgetHost';
+import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
 
@@ -149,6 +150,7 @@ export function WidgetFrame({
   // stand in a picture-in-picture window, where a key pressed reaches that window and never the opener:
   // the listener binds to it, asks its document who holds Escape, and binds again when the chat moves.
   const hostWindow = useHostWindow();
+  const isPageHeld = useIsPageHeld();
   // WHICH WINDOW THE FRAMES BELOW ARE KEYED ON. A frame carried into another window's document is
   // reloaded by the browser, and the host reads a second `load` on an element as the widget
   // navigating itself away — revoking it for good, so a widget moved into the floating window would
@@ -161,13 +163,14 @@ export function WidgetFrame({
   useEffect(() => {
     if (!fullscreen) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || otherOverlayHoldsEscape(hostWindow.document)) return;
+      // The station on screen covers this page, and this listener takes the key from every other one: it must leave an Escape typed there alone.
+      if (event.key !== 'Escape' || isPageHeld() || otherOverlayHoldsEscape(hostWindow.document)) return;
       event.stopPropagation();
       setFullscreen(false);
     };
     hostWindow.addEventListener('keydown', onKeyDown, true);
     return () => hostWindow.removeEventListener('keydown', onKeyDown, true);
-  }, [fullscreen, hostWindow]);
+  }, [fullscreen, hostWindow, isPageHeld]);
 
   if (!mounted || streaming) {
     return <pre className={FALLBACK_CLASSES}>{code.trim()}</pre>;

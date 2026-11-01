@@ -132,13 +132,16 @@ export type CompanionWalk = { session: CompanionSessionRef; items: string[]; at:
  */
 export type CompanionSound = { tag: string; at: number };
 
+/** A file he attached to a typed line, as the upload store holds it: `path`, a direct child of the store (the page fetches it by its last segment through /api/assets); `name`, his name for it; `size` in bytes and `mimeType` (from the stored name's extension; absent when none is known), both read from the stored file; `opens`, what she can do with it: `shown` to her as a picture, `text` her reader can open, or `unopened`. Carried on his log line and in his unanswered words. */
+export type CompanionAttachment = { path: string; name: string; size: number; mimeType?: string; opens: 'shown' | 'text' | 'unopened' };
+
 /**
  * One line of the conversation log. `role` is who said it: the `operator`, `kaylee`, an `alert`
  * the house raised or a `system` line the panel shows in its own tone (a failure of her account
  * is only ever a system line). `via` is how the operator's line arrived and is `null` for every other
  * role. `turnId` and `index` tie her sentences to the turn that said them and their order in it (both
  * `null` for a line that is not hers); `text` is what the panel draws; `mood` is her leading mood
- * word when the sentence had one; `sounds` are the marks inside `text`. `id` is the store's row id,
+ * word when the sentence had one; `sounds` are the marks inside `text`; `attachments` are the files he attached to a typed line. `id` is the store's row id,
  * growing with every line, and is the order the log is read in; `at` is ISO. Carried by `companion_log` and
  * `companion_sentence` and listed in the picture, newest last.
  */
@@ -152,6 +155,8 @@ export type CompanionLogEntry = {
   text: string;
   mood: string | null;
   sounds: CompanionSound[];
+  /** The files he attached to this typed line, in the order he attached them; absent on every other line, and on a line that carries none. */
+  attachments?: CompanionAttachment[];
 };
 
 /**
@@ -283,10 +288,20 @@ export type CompanionFaceMood = 'neutral' | 'delighted' | 'playful' | 'gentle' |
 
 /**
  * How open her mouth is, and on which vowel: `closed`, then `a` ("ah"), `e` ("ee") and `o` ("oo"), each half open (`1`) or
- * full (`2`). The key of `CompanionFaceManifest.moods[mood].mouths`; the page picks one from the loudness of her voice
- * and the vowel of the word being said.
+ * full (`2`). The key of `CompanionFaceManifest.moods[mood].mouths`; the page picks one from the timed shape of the sound
+ * (`CompanionMouthShape`) where an announced piece holds the audio's place, and elsewhere from the loudness of her voice and
+ * the vowel of the word being said.
  */
 export type CompanionFaceMouth = 'closed' | 'a1' | 'a2' | 'e1' | 'e2' | 'o1' | 'o2';
+
+/** One of Rhubarb Lip Sync's mouth shapes, as her server asks for them (`--extendedShapes X`): A lips pressed (m, b, p; Rhubarb's stand-in for f and v), B teeth just parted (most consonants, "ee"), C open ("eh", the a of bat; its stand-in for l), D wide open ("ah"), E slightly rounded ("off", "bird"), F puckered ("you", "show", "way"), X at rest. */
+export type CompanionMouthShape = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'X';
+
+/** A shape her mouth takes from `at` seconds into the sentence (its first sample is 0) until the next cue, or its piece's end. */
+export type CompanionMouthCue = { at: number; shape: CompanionMouthShape };
+
+/** The timed shapes of one stretch of a sentence's audio, `from` to `to` seconds of the sentence, its cues in order, the first at `from`. */
+export type CompanionMouthPiece = { from: number; to: number; cues: CompanionMouthCue[] };
 
 /**
  * Where her eyes look with her head still, in the eight directions of the screen. The key of `CompanionFaceManifest.gaze`;
@@ -308,9 +323,19 @@ export type CompanionFacePose = 'left_10' | 'left_20' | 'right_10' | 'right_20' 
 export type CompanionFaceClip = 'laugh' | 'giggle' | 'gasp' | 'sigh';
 
 /**
+ * One resolution of a face's atlas: every frame cut `frameSize` pixels square and packed onto `sheets`, 8 × 8 cells at most
+ * each, the cell at (`column`, `row`) of a `frames` entry starting `column × frameSize` across and `row × frameSize` down. A page
+ * asks the face's sheets by `file`, as `GET /api/companion/face/:faceId/sheet/:file`.
+ */
+export type CompanionFaceTier = { frameSize: number; sheets: Array<{ file: string; columns: number; rows: number }> };
+
+/**
  * Every frame of a face and where each sits: the file a bake writes (`manifest.json` in the face's folder) and a page plays.
- * The frames are cut `frameSize` pixels square and packed onto `sheets` (`sheet-0.webp` and on, at most 8 × 8 cells each);
- * `frames[n]` says which sheet, column and row frame `n` is on. Everything else is an index into `frames`: each mood has its
+ * The frames are cut `frameSize` pixels square and packed onto `sheets` (at most 8 × 8 cells each); `largerTiers` are the same
+ * frames again at larger sizes, smallest first, packed the same way, so `frames[n]` says which sheet, column and row frame `n`
+ * is on in EVERY tier. A page draws the smallest tier whose `frameSize` covers the pixels it is drawn at (`useFaceAtlas`), so a
+ * phone's small head never fetches the large sheets. A manifest with no `largerTiers` (a face made before they existed) has the one
+ * tier. Everything else is an index into `frames`: each mood has its
  * seven mouths and its half-closed and closed blink, `gaze` and `poses` are the neutral face looking or turned, `states`
  * are the looks of listening, failing and surprise, and each clip is its frames in order with the rate to play them at.
  * Directions are the screen's: `left` is toward the window's left edge. `faceId` is the face's own id, the one in
@@ -319,8 +344,9 @@ export type CompanionFaceClip = 'laugh' | 'giggle' | 'gasp' | 'sigh';
 export type CompanionFaceManifest = {
   version: 1;
   faceId: string;
-  frameSize: number;                                                    // pixels per side of one cell: 256
-  sheets: Array<{ file: string; columns: number; rows: number }>;       // `sheet-0.webp` …, 8 × 8 cells at most
+  frameSize: number;                                                    // pixels per side of one cell of the smallest tier: 256
+  sheets: CompanionFaceTier['sheets'];                                  // the smallest tier's sheets
+  largerTiers?: CompanionFaceTier[];                                    // the larger tiers, smallest first; absent on a face made with one
   frames: Array<{ sheet: number; column: number; row: number }>;
   moods: Record<CompanionFaceMood, { mouths: Record<CompanionFaceMouth, number>; blink: { half: number; closed: number } }>;
   gaze: Record<CompanionFaceGaze, number>;
@@ -387,7 +413,8 @@ export type CompanionPicture = {
  * or not the holder changed); `companion_cleared` says the account's log, unpinned notes and pending action were
  * cleared, with her conversation, and the panel empties but for the cards he pinned, which Clear keeps;
  * `companion_face` carries the account's face after an
- * upload, a restore, each frame a bake renders and the bake's end.
+ * upload, a restore, each frame a bake renders and the bake's end; `companion_mouth` carries the timed shapes of one piece
+ * of a sentence's audio (the `index`th sentence of turn `turnId`), for the face, never part of her picture.
  */
 export type CompanionFrame =
   | { kind: 'companion_log'; entry: CompanionLogEntry }
@@ -406,6 +433,7 @@ export type CompanionFrame =
   | { kind: 'companion_open'; target: CompanionOpenTarget; floor: string; label: string }
   | { kind: 'companion_floor'; floor: string }
   | { kind: 'companion_face'; face: CompanionFace }
+  | { kind: 'companion_mouth'; turnId: string; index: number; piece: CompanionMouthPiece }
   | { kind: 'companion_cleared' }
   | { kind: 'companion_memory' };
 

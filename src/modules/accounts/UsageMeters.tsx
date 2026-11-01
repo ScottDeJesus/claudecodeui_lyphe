@@ -140,6 +140,10 @@ function paceForWindow(key: string, pace: ClaudeUsagePace | null): { tickAt: num
  * projected-end mark on the 5-hour and weekly meters (`usage.pace`), and the pacer's own words as
  * one caption under the 5-hour meter. The figures arrive as percents from the usage route, which
  * converts them once, so the meter does no arithmetic. An absent pace draws none of it.
+ *
+ * AN ACCOUNT WITH NO 5-HOUR WINDOW ARRIVES WITHOUT ONE (`accountInUseUsage` drops it when the door's
+ * `no_five` says so), so its meter and the caption under it are simply not drawn — this file asks
+ * nothing about it and draws exactly the windows it is handed.
  */
 export function UsageMeters({ usage }: { usage: ClaudeUsage | null }) {
   // The pacer's projection as the usage route attached it, in percent; an unreachable answer has no

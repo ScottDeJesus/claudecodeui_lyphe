@@ -32,17 +32,10 @@ export function useScopedAttachments(scope: string | null): {
   attachedFiles: File[];
   setAttachedFiles: Dispatch<SetStateAction<File[]>>;
   clearAttachmentsFor: (scope: string | null) => void;
-  fileErrors: Map<string, string>;
-  setFileErrors: Dispatch<SetStateAction<Map<string, string>>>;
 } {
   const [state, setState] = useState<{ scope: string | null; files: File[] }>(() => ({
     scope,
     files: scope ? attachmentsByScope.get(scope) ?? NO_FILES : NO_FILES,
-  }));
-  // Size and read errors name files of the chat they were raised in, so they do not follow a switch.
-  const [errors, setErrors] = useState<{ scope: string | null; map: Map<string, string> }>(() => ({
-    scope,
-    map: new Map(),
   }));
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
@@ -74,24 +67,11 @@ export function useScopedAttachments(scope: string | null): {
     if (!target) return;
     attachmentsByScope.delete(target);
     setState((previous) => (previous.scope === target ? { scope: target, files: NO_FILES } : previous));
-    setErrors((previous) => (previous.scope === target ? { scope: target, map: new Map() } : previous));
-  }, []);
-
-  const setFileErrors = useCallback<Dispatch<SetStateAction<Map<string, string>>>>((next) => {
-    setErrors((previous) => {
-      const target = scopeRef.current;
-      const base = previous.scope === target ? previous.map : new Map<string, string>();
-      return { scope: target, map: typeof next === 'function' ? next(base) : next };
-    });
   }, []);
 
   return {
     attachedFiles: state.scope === scope ? state.files : scope ? attachmentsByScope.get(scope) ?? NO_FILES : NO_FILES,
     setAttachedFiles,
     clearAttachmentsFor,
-    fileErrors: errors.scope === scope ? errors.map : EMPTY_ERRORS,
-    setFileErrors,
   };
 }
-
-const EMPTY_ERRORS = new Map<string, string>();

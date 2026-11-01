@@ -4,6 +4,7 @@ import { useImageUrl } from '@/modules/affected-areas/hooks/useImageUrl';
 import { useQueue } from '@/modules/affected-areas/hooks/useQueue';
 import { MarkQueue } from '@/modules/affected-areas/MarkQueue';
 import type { Codebook, Queue, Region } from '@/shared/affected-areas-types';
+import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 
 type MarkScreenProps = {
@@ -38,6 +39,7 @@ const OWNS_THE_KEYBOARD = '[role="dialog"], [role="menu"], [role="listbox"]';
  */
 export function MarkScreen({ codebook, shown }: MarkScreenProps) {
   const hostWindow = useHostWindow();
+  const isPageHeld = useIsPageHeld();
   // ── The wires: the queue's mode and kind, its walk, the keys, and the presses that move it. Everything they hand
   //    `MarkQueue` is composition. ──
   // Which queue is walked: the operator chooses it, and the screen never changes it by itself. A new choice starts the
@@ -70,6 +72,8 @@ export function MarkScreen({ codebook, shown }: MarkScreenProps) {
   useEffect(() => {
     if (!shown) return undefined;
     const onKey = (event: KeyboardEvent) => {
+      // The station on screen covers this screen: its keys do not mark what nobody sees.
+      if (isPageHeld()) return;
       // A synthetic keydown (a browser's autofill sends them) can carry no key.
       const press = typeof event.key === 'string' ? PRESS_OF_KEY[event.key.toLowerCase()] : undefined;
       if (press === undefined || event.metaKey || event.ctrlKey || event.altKey || event.repeat || event.defaultPrevented) return;
@@ -85,7 +89,7 @@ export function MarkScreen({ codebook, shown }: MarkScreenProps) {
     };
     hostWindow.addEventListener('keydown', onKey);
     return () => hostWindow.removeEventListener('keydown', onKey);
-  }, [shown, hostWindow]);
+  }, [shown, hostWindow, isPageHeld]);
 
   return (
     <MarkQueue

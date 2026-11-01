@@ -28,8 +28,8 @@ export function CompanionVoiceSwitch({ on, onChange }: CompanionVoiceSwitchProps
   const Glyph = on ? Volume2 : VolumeX;
 
   return (
-    // 44px tall under a finger (below 768 px, and on a touch screen of any width), Verve's touch floor, as the Live switch's label is.
-    <label data-companion-voice={on ? 'on' : 'off'} className="flex w-full min-w-0 cursor-pointer items-center gap-2 max-md:min-h-11 [@media(pointer:coarse)]:min-h-11">
+    // 44px tall under a finger (a touch screen, or a window under 768 px), Verve's touch floor, as the Live switch's label is.
+    <label data-companion-voice={on ? 'on' : 'off'} className="flex w-full min-w-0 cursor-pointer items-center gap-2 finger:min-h-11">
       <Glyph aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
       <span aria-hidden="true" className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{label}</span>
       <Switch checked={on} label={label} onChange={onChange} />

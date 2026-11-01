@@ -35,9 +35,8 @@ type NoteCardProps = {
  * came to change), and Done hands it back to the Edit button it came from, so a keyboard reader is
  * never dropped on `<body>` by a button that left with the mode it ended.
  *
- * THE VERBS ARE A THUMB'S, NOT A MOUSE'S: 40px until `sm` and 32 after, the house's corner-button
- * floor (`LaneCardHead`'s CORNER_BUTTON, `CardFold`) — on a phone these two are the card's only
- * controls, and a thumb is not aiming at a 16px glyph.
+ * THE VERBS ARE A THUMB'S, NOT A MOUSE'S: 40px until `sm` and 32 after — on a phone these two are
+ * the card's only controls, and a thumb is not aiming at a 16px glyph.
  */
 export function NoteCard({ note, onDelete }: NoteCardProps) {
   const { t } = useTranslation();

@@ -187,6 +187,13 @@ export async function readApiJson<T>(response: Response): Promise<T> {
 }
 
 /**
+ * An Error whose message is a sentence the SERVER wrote for a refusal (a route's `error`), as opposed to one this page or the browser made
+ * up (a status line, a JSON parse failure, a timeout). A caller that shows the person the server's words and otherwise says its own line
+ * tells the two apart with `instanceof`. Thrown by `uploadAttachmentFiles` and by the companion provider's `ensureOk`.
+ */
+export class ServerSentenceError extends Error {}
+
+/**
  * The server's own sentence out of a refusal body, or `null` when the body carried none — or was
  * not JSON at all. Both envelope shapes `errorMessage` reads arrive here: a route's plain `error`
  * string, and the error middleware's `{ error: { code, message } }`. For the writers that answer
@@ -858,7 +865,10 @@ export const api = {
   companion: {
     // Her whole picture: the settings, the models, the process, the activity, the draft, the walk, the notes, the log.
     picture: () => get('/api/companion', companionOptions()),
-    sendText: (text: string) => post('/api/companion/messages', { text }, companionOptions()),
+    // His typed line. `attachments` are the records the upload store answered for his files (`uploadAttachmentFiles`), sent only when there
+    // are any: a line of words alone posts `{ text }`, as it always has. A line of files alone posts empty words.
+    sendText: (text: string, attachments: unknown[] = []) =>
+      post('/api/companion/messages', attachments.length > 0 ? { text, attachments } : { text }, companionOptions()),
     // The panel opened on this page: she acts on it from now on.
     floor: () => post('/api/companion/floor', undefined, companionOptions()),
     // A partial of her settings; `register: null` restores the original register. Answers the settings as they now read.
@@ -944,8 +954,8 @@ export const api = {
       restore: () => del('/api/companion/face'),
       // The face's `CompanionFaceManifest` (JSON): where every frame sits in the sheets.
       manifest: (faceId: string) => get(`/api/companion/face/${encodeURIComponent(faceId)}/manifest`),
-      // Sheet `n` of the face (`image/webp`, `manifest.sheets[n]`), for `createImageBitmap`.
-      sheet: (faceId: string, n: number) => get(`/api/companion/face/${encodeURIComponent(faceId)}/sheet/${n}`),
+      // One sheet of the face by the file name the manifest gives it (`image/webp`; `manifest.sheets[n].file`, or a larger tier's in `manifest.largerTiers`), for `createImageBitmap`.
+      sheet: (faceId: string, file: string) => get(`/api/companion/face/${encodeURIComponent(faceId)}/sheet/${encodeURIComponent(file)}`),
       // The contact sheet: every frame, named (`image/webp`). For him to read in Settings.
       contact: (faceId: string) => get(`/api/companion/face/${encodeURIComponent(faceId)}/contact`),
     },
@@ -954,7 +964,7 @@ export const api = {
     // The station's provider reads it at mount, on every `station_sessions_changed` hint and on reconnect.
     station: {
       sessions: () => get('/api/companion/station/sessions', companionOptions()),
-      // `landed` is what landed this week, the strip's line: 200 `{ landed: StationLanded[] }`, newest first, at most 60 of the account's
+      // `landed` is what landed this week, the strip's line: 200 `{ landed: StationLanded[] }`, newest first, at most 300 of the account's
       // last seven days (`[]` for none), or a 503 `{ error }` carrying the sentence when the history cannot be read. It is the account's, not
       // a page's, so it names no `x-companion-client`. The station's landed provider reads it at mount and on reconnect, and folds each
       // `station_landed` frame in between.
@@ -1556,6 +1566,43 @@ export const api = {
     usage: (range: DeepseekRange, feed: number) => get(`/api/deepseek/usage?range=${range}&feed=${feed}`),
   },
 };
+
+// ---------------------------
+
+//----------------- ATTACHMENT UPLOAD ------------
+
+/**
+ * Uploads the files a composer holds to the global upload store (`api.assets.uploadFiles`) and answers their stored
+ * descriptors, one per file in order. Throws the server's own sentence (a `ServerSentenceError`) when the upload is refused, a plain
+ * Error when the refusal carried none, and "File upload returned an incomplete result" when the answer is not a list with exactly one
+ * descriptor per file. Used by the chat
+ * module's `useChatComposerState`, which sends the descriptors with the message, and by the companion's provider once
+ * her typed send carries files.
+ */
+export async function uploadAttachmentFiles(files: File[]): Promise<unknown[]> {
+  if (files.length === 0) {
+    return [];
+  }
+
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append('files', file);
+  });
+
+  const response = await api.assets.uploadFiles(formData);
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    if (body?.error) throw new ServerSentenceError(body.error);
+    throw new Error('Failed to upload files');
+  }
+
+  const result = await response.json();
+  if (!Array.isArray(result.attachments) || result.attachments.length !== files.length) {
+    throw new Error('File upload returned an incomplete result');
+  }
+  return result.attachments;
+}
 
 // ---------------------------
 

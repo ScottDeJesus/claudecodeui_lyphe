@@ -3,13 +3,14 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { StationFocus, StationFocusKind } from '@/shared/station-types';
 
 /**
- * The handle of the control that fires what a kind of focus shows, inside the stage's body. A card is the dispatcher's own
- * `PlanCard`, so its own handles: LockAnswer's Queue for an Accept (`data-ask-queue`), RoundAnswer's first question for a round
- * (`data-ask-question`). The ask's, the follow-ups' and the check's stages mark theirs `data-station-fire`. A kind with no entry
- * (a chat, a page, her cards) has no firing control, and the keyboard stays where it was.
+ * The handle of what the keyboard lands on for a kind of focus, inside the stage's body. A card is the dispatcher's own
+ * `PlanCard`, so its own handles: LockAnswer's answers group for an Accept (`data-ask-answers`, Queue one Tab away: an Accept
+ * approves exactly what was shown, so it never lands on a press), RoundAnswer's first question for a round (`data-ask-question`).
+ * The ask's, the follow-ups' and the check's stages mark theirs `data-station-fire`. A kind with no entry (a chat, a page, her
+ * cards) has no landing, and the keyboard stays where it was.
  */
 const FIRE_HANDLES: Readonly<Partial<Record<StationFocusKind, string>>> = {
-  card: '[data-ask-queue], [data-ask-question]',
+  card: '[data-ask-answers], [data-ask-question]',
   ask: '[data-station-fire]',
   followups: '[data-station-fire]',
   check: '[data-station-fire]',
@@ -31,8 +32,8 @@ function focusTargetOf(handle: HTMLElement): HTMLElement | null {
 
 /**
  * HOLDS BACK THE KEY THAT PRESSED THE ACT. An Enter on the rail's act clicks it on its keydown, and the key is still down when the keyboard
- * lands on the control that fires (Queue is a button, and a button clicks on Enter): its auto-repeat would press Queue, approving a census he
- * has seen for less than one repeat interval. So every repeated keydown and keypress is swallowed in the capture phase until THAT key (`code`)
+ * lands: on a group it does nothing (an Accept's answers, a permission's), but a round's first option is a button and a button clicks on Enter,
+ * and "Open the chat" is one too, so the auto-repeat would press what he has seen for less than one repeat interval. So every repeated keydown and keypress is swallowed in the capture phase until THAT key (`code`)
  * comes up, or the window loses the keyboard: another key's release (Shift's, in a Shift+Enter) does not end it while Enter is still down.
  * A fresh keydown is a new press of his own and goes through. Returns the release.
  */
@@ -58,7 +59,7 @@ function holdBackHeldKey(code: string, onReleased: () => void): () => void {
 }
 
 /**
- * THE KEYBOARD'S LANDING after a rail item's act: `land(focus)` moves the keyboard to the control that fires the focus's stage,
+ * THE KEYBOARD'S LANDING after a rail item's act: `land(focus)` moves the keyboard to what answers the focus's stage (`FIRE_HANDLES`),
  * once the stage has drawn it. The act has just called `setFocus`, so the stage may not be there yet (a different thing is
  * drawn at the next commit) or may need a moment (a plan card). The landing is waiting on the DOM itself: a `MutationObserver` on the
  * page sees the control arrive and focuses it; no timer asks again. Only the stage's own body is searched, and only while its
@@ -66,7 +67,8 @@ function holdBackHeldKey(code: string, onReleased: () => void): () => void {
  *
  * It stops at the first of: the control found, the next landing (a newer press), the page's next press or key (he has moved
  * on and the keyboard is his; a held key's auto-repeat is not a new key), the deadline, and the rail leaving. It focuses and presses
- * nothing: a fresh Enter after it is his word, and on an Accept it is Queue's own button he then presses. The Enter that pressed the act
+ * nothing: a fresh Enter after it is his word, and an Accept's landing is its answers' group, so that Enter approves nothing and Queue is one Tab
+ * away (the lock law: an Accept approves exactly what was shown, never on a press he did not choose). The Enter that pressed the act
  * is held back until it comes up (`holdBackHeldKey`), so holding it down never presses what it was only asked to show.
  *
  * Used by `WhatNeedsYou`, once, for every act the rail offers.
@@ -128,8 +130,7 @@ export function useLandOnStageControl(): (focus: StationFocus) => void {
       document.removeEventListener('keydown', moved, true);
       stopRef.current = null;
     }
-    // The `disabled` attribute is watched too: Queue is disabled while its card is busy and enabled again without a node arriving.
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
+    observer.observe(document.body, { childList: true, subtree: true });
     document.addEventListener('pointerdown', moved, true);
     document.addEventListener('keydown', moved, true);
     stopRef.current = stop;

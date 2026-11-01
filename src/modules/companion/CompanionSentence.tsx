@@ -37,7 +37,7 @@ function SoundMark({ tag }: { tag: string }) {
  * landed." draws the mark hugging "nice". An offset past the end is drawn at the end, and two sounds at one offset stand
  * side by side, in the order she made them.
  *
- * Used by this module's CompanionLog, once per sentence of her turn's paragraph.
+ * Used by this module's CompanionReply, once per sentence of her turn's paragraph.
  */
 export function CompanionSentence({ text, sounds }: CompanionSentenceProps) {
   if (sounds.length === 0) return <>{text}</>;

@@ -15,6 +15,13 @@ import type { ClaudeAccountRow, ClaudeAccounts, ClaudeUsage, ClaudeUsagePace, Cl
  * THIS IS THE ONE PLACE THE DOOR'S FRACTIONS BECOME PERCENT. The door relays `reading.five`/`.week`
  * and its `pace` figures as fractions 0..1 (window POINTS, INV-4299 — never dollars); the meters take
  * percent and do no arithmetic, so the conversion happens here, once, and nowhere else.
+ *
+ * AN ACCOUNT WITH NO 5-HOUR WINDOW HAS NO 5-HOUR INDICATOR. Some plans dropped the limit, and the door
+ * says so with one boolean per account, `no_five` — derived by the pacer from the account's stored
+ * readings. That boolean is the only thing this app reads for it: a window missing from ONE usage reply
+ * also happens between 5-hour blocks on an account that has the limit, and that account keeps its
+ * "No reading yet" ring and its blank bar. `hasFiveHour` is the rule, `withoutFiveHour` applies it to
+ * the reading the meters draw, and the rings and the account rows ask `hasFiveHour` themselves.
  */
 
 /** Three minutes: the age past which a reading from the picture is drawn as old rather than current. */
@@ -84,6 +91,25 @@ export function accountInUse(picture: ClaudeAccounts | null | undefined): Claude
 }
 
 /**
+ * Whether an account has a 5-hour window. A picture that carries no `no_five` key — an older door — and an
+ * absent account both read as "has one", which is what the app drew before the door said otherwise.
+ * Used by this module's `accountInUseUsage` and by the accounts module's UsageRings and ClaudeAccountRowViews,
+ * so the default lives in one place.
+ */
+export function hasFiveHour(row: ClaudeAccountRow | null | undefined): boolean {
+  return row?.no_five !== true;
+}
+
+/**
+ * A reading without its 5-hour window: the window's meter and the pacer's marks on it go, the weekly's stay.
+ * An unreachable reading has no windows to drop and is passed through.
+ */
+function withoutFiveHour(usage: ClaudeUsage): ClaudeUsage {
+  if (!usage.reachable || !Array.isArray(usage.windows)) return usage;
+  return { ...usage, windows: usage.windows.filter((window) => window.key !== FIVE_HOUR.key) };
+}
+
+/**
  * The account in use's newest reading and pace, as the two-window `ClaudeUsage` the meters draw.
  *
  * `degraded: true` and `staleSince` — the reading's own filed-at stamp, epoch seconds — appear only
@@ -150,6 +176,8 @@ export function accountInUseUsage(
 ): ClaudeUsage | null {
   const row = accountInUse(picture);
   if (row === null) return usage;
-  if (usage !== null && usage.reachable && !usage.degraded && usage.account === row.digest) return usage;
-  return pictureReading(row, usage, nowMs);
+  const reading = usage !== null && usage.reachable && !usage.degraded && usage.account === row.digest
+    ? usage
+    : pictureReading(row, usage, nowMs);
+  return hasFiveHour(row) ? reading : withoutFiveHour(reading);
 }

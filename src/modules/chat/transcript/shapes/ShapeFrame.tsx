@@ -204,7 +204,9 @@ export function ShapeFrame({ kind, title, collapseKey, actions, children, classN
   // hierarchy on its weight and the header's wash instead. `truncate` is absent: a lead-in title is
   // the author's own line, it wraps under itself, and it is never cut.
   const titleClass = cn('min-w-0 flex-1 break-words font-semibold', accent ? 'text-foreground' : 'text-[color:var(--tone-ink)]');
-  const triggerClass = 'min-w-0 select-none text-left transition-colors hover:text-foreground';
+  // Under a finger (`finger:`: a touch screen, or a window under 768 px) the fold's press is a 44 px catch: `min-h-11`, and the header's own
+  // 8 px of padding above and below (`py-2`) taken back by the negative margin, so the header grows by 4 px and not by 20.
+  const triggerClass = 'min-w-0 select-none text-left transition-colors hover:text-foreground finger:-my-2 finger:min-h-11';
 
   return (
     <div
