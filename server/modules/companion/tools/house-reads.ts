@@ -169,7 +169,7 @@ export function resolveChat(ref: string): ChatResolution {
 /** A project a new chat can start in: its display name and its absolute path. Consumed by `session-tools.ts`'s `list_projects`. */
 export type HisProject = { name: string; path: string };
 
-/** The visible projects — registered, not archived, not in a hidden root — by display name. Consumed by `list_projects` and `resolveProject`. */
+/** The visible projects — registered, not archived, not in a hidden root — by display name. Consumed by `list_projects`, `resolveProject` and `eyes/skill-reads.ts` (whose project-level skills and agents these are). */
 export function listVisibleProjects(): HisProject[] {
   return projectsDb
     .getProjectPaths()

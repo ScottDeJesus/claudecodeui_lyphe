@@ -64,6 +64,10 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
   const { activeTab, setActiveTab, setSidebarOpen, sidebarSharedProps } = useProjectSidebarState();
   const { views } = useWorkspaceViews();
   const badges = useRailBadges();
+  // The rail — which is also the phone's drawer navigation, one tree — draws only the views the person has not hidden from
+  // the navigation. A hidden view is still in `views` (the palette reaches it, the pane draws), so this is the one place
+  // the choice takes effect, and every read below is of this list: no hidden view can reach a run, the foot or the reveal.
+  const navViews = useMemo(() => views.filter((view) => !view.hiddenFromNav), [views]);
 
   // The scroll region: the reveal finds the lit button in it, and the Chat watch below reads it as its root.
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -73,7 +77,7 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
   // region be when the button is already whole in it. A FRAME LATER, because a dialog closing on the same commit
   // (the palette's "Go to") returns focus to the rail button that held it, and focusing it scrolls the region back to
   // it: the reveal must come after that, not before.
-  const litPresent = views.some((view) => view.id === activeTab);
+  const litPresent = navViews.some((view) => view.id === activeTab);
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       scrollRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
@@ -111,8 +115,8 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
   );
 
   // A run with no view in it is dropped first, so a hairline never stands at an end or beside another.
-  const runs = SCROLL_GROUPS.map((group) => views.filter((view) => view.group === group)).filter((run) => run.length > 0);
-  const footViews = views.filter((view) => view.group === 'foot');
+  const runs = SCROLL_GROUPS.map((group) => navViews.filter((view) => view.group === group)).filter((run) => run.length > 0);
+  const footViews = navViews.filter((view) => view.group === 'foot');
 
   const viewButton = (view: WorkspaceView) => (
     <RailButton

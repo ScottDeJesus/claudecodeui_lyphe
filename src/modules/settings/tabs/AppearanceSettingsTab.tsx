@@ -27,7 +27,7 @@ export default function AppearanceSettingsTab({
   // The sun-follow switch reads the same theme context the Dark Mode switch beside it writes,
   // so the two can never disagree about who is in charge of the colour.
   const { followsSun, setFollowsSun } = useTheme();
-  const { hideShellTab, showRawParameters, showThinking, showWork, showCompactSummary, sendByCtrlEnter } = useUiPreferences();
+  const { hideShellTab, hideFilesTab, hideGitTab, hideBrowserTab, showRawParameters, showThinking, showWork, showCompactSummary, sendByCtrlEnter } = useUiPreferences();
   // The transcript's reading size, read and written through the one hook the chat pane reads —
   // so the stepper and the messages can never disagree about how big the text is.
   const chatFontSize = useChatFontSize();
@@ -172,6 +172,41 @@ export default function AppearanceSettingsTab({
 
       <SettingsSection title={t('appearance.workspaceTabs.title')}>
         <SettingsCard divided>
+          {/* Files, Git and Browser hide their LINK only (the rail and the phone's drawer); the Shell and Tasks
+              switches below remove the tab. Listed in the rail's own order. */}
+          <SettingRow
+            label={t('appearance.workspaceTabs.hideFiles.label')}
+            description={t('appearance.workspaceTabs.hideFiles.description')}
+          >
+            <SettingsToggle
+              checked={hideFilesTab}
+              onChange={(value) => setPreference('hideFilesTab', value)}
+              ariaLabel={t('appearance.workspaceTabs.hideFiles.label')}
+            />
+          </SettingRow>
+
+          <SettingRow
+            label={t('appearance.workspaceTabs.hideGit.label')}
+            description={t('appearance.workspaceTabs.hideGit.description')}
+          >
+            <SettingsToggle
+              checked={hideGitTab}
+              onChange={(value) => setPreference('hideGitTab', value)}
+              ariaLabel={t('appearance.workspaceTabs.hideGit.label')}
+            />
+          </SettingRow>
+
+          <SettingRow
+            label={t('appearance.workspaceTabs.hideBrowser.label')}
+            description={t('appearance.workspaceTabs.hideBrowser.description')}
+          >
+            <SettingsToggle
+              checked={hideBrowserTab}
+              onChange={(value) => setPreference('hideBrowserTab', value)}
+              ariaLabel={t('appearance.workspaceTabs.hideBrowser.label')}
+            />
+          </SettingRow>
+
           <SettingRow
             label={t('appearance.workspaceTabs.hideShell.label')}
             description={t('appearance.workspaceTabs.hideShell.description')}

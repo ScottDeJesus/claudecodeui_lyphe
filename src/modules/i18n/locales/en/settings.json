@@ -41,6 +41,18 @@
     "theme": "Theme",
     "workspaceTabs": {
       "title": "Tabs in the workspace",
+      "hideFiles": {
+        "label": "Hide Files",
+        "description": "Takes the Files link off the navigation. The view isn't gone — a file link in the chat opens it, and so does the command palette (Ctrl+K) on a keyboard. Turn this off to bring the link back."
+      },
+      "hideGit": {
+        "label": "Hide Git",
+        "description": "Takes the Git link off the navigation. The view isn't gone — the command palette (Ctrl+K) opens it on a keyboard. Turn this off to bring the link back."
+      },
+      "hideBrowser": {
+        "label": "Hide Browser",
+        "description": "Takes the Browser link off the navigation. The view isn't gone — the command palette (Ctrl+K) opens it on a keyboard. Turn this off to bring the link back."
+      },
       "hideShell": {
         "label": "Hide the Shell tab",
         "description": "Takes the terminal out of the workspace. A running session isn't stopped — it keeps going the same way it does while you're on another tab, and the server ends it half an hour after nothing is connected."

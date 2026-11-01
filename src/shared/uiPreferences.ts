@@ -32,6 +32,15 @@ export type UiPreferences = {
    * shell session is untouched, exactly as it is whenever another tab is active.
    */
   hideShellTab: boolean;
+  /**
+   * Keep the Files, Git and Browser views off the NAVIGATION — the desktop rail and the phone drawer — and
+   * nowhere else. Default OFF, so nobody's navigation changes until they ask. Unlike `hideShellTab`, hiding is
+   * only about the links: the view still opens from the command palette and from the app's own doors (a file
+   * link in the chat, a commit row in the palette), and its pane renders as ever.
+   */
+  hideFilesTab: boolean;
+  hideGitTab: boolean;
+  hideBrowserTab: boolean;
 };
 
 export type UiPreferenceKey = keyof UiPreferences;
@@ -49,6 +58,9 @@ const DEFAULTS: UiPreferences = {
   sidebarVisible: true,
   voiceEnabled: false,
   hideShellTab: true,
+  hideFilesTab: false,
+  hideGitTab: false,
+  hideBrowserTab: false,
 };
 
 const PREFERENCE_KEYS = Object.keys(DEFAULTS) as UiPreferenceKey[];

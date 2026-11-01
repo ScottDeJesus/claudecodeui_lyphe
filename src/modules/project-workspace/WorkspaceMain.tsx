@@ -24,6 +24,7 @@ import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import { absolutePathIn } from '@/shared/utils';
 import { useFileOpenResolver } from '@/modules/project-workspace/hooks/useFileOpenResolver';
+import { useHiddenNavFallback } from '@/modules/project-workspace/hooks/useHiddenNavFallback';
 import { useRunnerLanding } from '@/modules/project-workspace/hooks/useRunnerLanding';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
@@ -279,6 +280,10 @@ function WorkspaceMain({
       setActiveTab('chat');
     }
   }, [preferencesSettled, shouldShowShellTab, activeTab, setActiveTab]);
+
+  // Files, Git and Browser are different: hiding one removes only its link, so the pane stays and a view reached another
+  // way is left alone. This snaps back to chat only on the moment the person hides the view they are standing on.
+  useHiddenNavFallback({ activeTab, setActiveTab });
 
   // Stable so React.memo(ChatInterface) can bail out: an inline arrow here made every
   // WorkspaceMain render re-render the whole chat tree — and this component re-renders on

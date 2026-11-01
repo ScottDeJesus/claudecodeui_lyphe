@@ -23273,3 +23273,192 @@ measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa,
 probe-key: 961d86f3c6bb0bb72e0221a86b18e354a78142a1
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs
+
+## INV-10582 — probe — MEDIUM — a tap on a DISABLED Send still blurs the field and drops the keyboard; the new MAN-9090 row says a press "never takes the focus"
+
+MEDIUM — a tap on a DISABLED Send still blurs the field and drops the keyboard; the new MAN-9090 row says a press "never takes the focus"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const LIVE = 'http://127.0.0.1:5184';
+const { defaultBrowserType: _b, ...pixel } = pw.devices['Pixel 7'];
+const s = await openConsole({
+  dark: true, appUrl: LIVE, preferences: { ...HARNESS_PREFERENCES, theme: 'dark', themeFollowsSun: false },
+  viewport: { width: 412, height: 915 },
+  contextOptions: { userAgent: pixel.userAgent, deviceScaleFactor: pixel.deviceScaleFactor, isMobile: true, hasTouch: true },
+});
+const { page, browser } = s;
+const sends = [];
+await page.route(/\/api\//, async (route) => {           // nothing is written: every non-GET call is answered here
+  const r = route.request();
+  if (r.method() === 'GET') return route.continue();
+  if (new URL(r.url()).pathname === '/api/companion/messages') sends.push(JSON.parse(r.postData() ?? '{}').text ?? null);
+  return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+});
+await page.context().addInitScript(() => { try { localStorage.setItem('companion-voice', 'off'); } catch {} });
+await page.goto('http://127.0.0.1:5184/', { waitUntil: 'networkidle' });
+await new Promise((r) => setTimeout(r, 2500));
+const tap = async (loc) => { const b = await loc.boundingBox(); await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); await new Promise((r) => setTimeout(r, 400)); };
+const focus = () => page.evaluate(() => document.activeElement?.tagName.toLowerCase());
+await tap(page.locator('[data-companion-fab] button').first());
+const field = page.locator('[data-companion-composer-field]').first();
+await field.waitFor({ state: 'visible', timeout: 30000 });
+const send = field.locator('xpath=ancestor::form').locator('button[type="submit"]');
+await tap(field);
+const a = await focus();
+await tap(send);                       // the field is empty: Send is disabled
+console.log(`tap on the DISABLED Send, field focused: ${a} -> ${await focus()}`);
+await tap(field);
+await page.keyboard.type('athena probe words', { delay: 3 });
+await tap(send);                       // the first tap of a double tap: sends
+const b = await focus();
+await tap(send);                       // the second tap lands on a Send that has just been disabled
+console.log(`second tap of a double tap (text sent ${sends.length}x): ${b} -> ${await focus()}`);
+await browser.close();
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 200 node "$1/p.mjs" 2>&1 | grep -E 'DISABLED|double tap|rror' | head -6
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `tap on the DISABLED Send, field focused: textarea -> body` and `second tap of a double tap (text sent 1x): textarea -> body` while the defect stands; cured: both end `-> textarea`
+```
+
+measured 2026-10-31 by chain chain-composer-one-tap-send-20261031-140414-1caf, finding M1, MEDIUM
+probe-key: dd900f99c0e158dbf8d24d9ff702881eec3e475d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PromptInput.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-composer-one-tap.mjs
+
+## INV-10583 — probe — LOW — the rows an editor of these files meets steer the other way, and the kit file that holds the cure has no row
+
+LOW — the rows an editor of these files meets steer the other way, and the kit file that holds the cure has no row
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "MAN-9380 says the mic is 'A plain Button, no aria-pressed': $(docstore get MAN-9380 --text | grep -c 'A plain `Button`, no `aria-pressed`')"
+echo "MAN rows governing PromptInput.tsx that carry the one-tap rule (MAN-9090): $(docstore govern /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PromptInput.tsx --limit 50 --text | cut -d' ' -f1 | grep -c '^MAN-9090$')"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `…aria-pressed': 1` and `…(MAN-9090): 0` while it stands; cured: the first is 0 (the row names the kit's press) and the second is 1
+```
+
+measured 2026-10-31 by chain chain-composer-one-tap-send-20261031-140414-1caf, finding L1, LOW
+probe-key: 0993ebee3f18f17095cc2ba8ecc4baee2538aa8d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PromptInput.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-composer-one-tap.mjs
+
+## INV-10584 — probe — the caption says "Image outside the project" for a picture this chat holds, whenever the `Read` sits on an older page that has not loaded
+
+the caption says "Image outside the project" for a picture this chat holds, whenever the `Read` sits on an older page that has not loaded
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 100 node /home/lyphe/.claude/state/pipeline-reviews/chat-outside-images/athena-1-probes/probe.mjs paged 2>&1 | head -5
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: while the defect stands `… while the page holding that Read is not loaded: 2` then `… after the older pages loaded: 0`; cured when the first number is 0 (the picture, or no claim, until the Read's page is known)
+```
+
+measured 2026-10-31 by chain chain-chat-outside-images-20261031-140104-545b, finding M1, MEDIUM
+probe-key: 9e72f555bea6cf20514f96da38d101eb9a6e056c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/transcriptPictures.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-outside-images.mjs
+
+## INV-10585 — probe — "refused" is a copy of the server's forbidden list, not of the rule; `/var/tmp`, `/var/folders` and every other absolute path outside the home directory still draw the 403 and the console error
+
+"refused" is a copy of the server's forbidden list, not of the rule; `/var/tmp`, `/var/folders` and every other absolute path outside the home directory still draw the 403 and the console error
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 100 node /home/lyphe/.claude/state/pipeline-reviews/chat-outside-images/athena-1-probes/probe.mjs refused 2>&1 | head -5
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: while the defect stands four `403 files/content?path=…` answers and `console errors: 4`; cured: `none (no request made)` and `console errors: 0`
+```
+
+measured 2026-10-31 by chain chain-chat-outside-images-20261031-140104-545b, finding M2, MEDIUM
+probe-key: dd1b8be223c4b302c056150c0898173f68196d69
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/transcriptPictures.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-outside-images.mjs
+
+## INV-10586 — probe — a reply is drawn from the newest `Read` of the path in the whole transcript, including one that comes after the reply
+
+a reply is drawn from the newest `Read` of the path in the whole transcript, including one that comes after the reply
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 100 node /home/lyphe/.claude/state/pipeline-reviews/chat-outside-images/athena-1-probes/probe.mjs copy 2>&1 | head -5
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `reply written when only the 1450 px picture existed drew at 790 px …` while the later Read wins; 1450 once a reply is drawn from the Read before it
+```
+
+measured 2026-10-31 by chain chain-chat-outside-images-20261031-140104-545b, finding L3, LOW
+probe-key: e4d0aa9c956329b5441ec6fea117faee007537cc
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/transcriptPictures.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-outside-images.mjs
+
+## INV-10587 — probe — a markdown image of an absolute path outside the project that the file tree serves stays a broken `<img>`, though the same path as a chip draws
+
+a markdown image of an absolute path outside the project that the file tree serves stays a broken `<img>`, though the same path as a chip draws
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 100 node /home/lyphe/.claude/state/pipeline-reviews/chat-outside-images/athena-1-probes/probe.mjs markdown 2>&1 | head -5
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `markdown image of a workspace file: drawn width 0 … ; the same path as a code-span chip: preview width 1408` while the two renderers differ; cured when the first width is not 0
+```
+
+measured 2026-10-31 by chain chain-chat-outside-images-20261031-140104-545b, finding L4, LOW
+probe-key: 3c39b4c56815ab7f5e12078b70bbb4ce55d47646
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/transcriptPictures.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-outside-images.mjs
+
+## INV-10588 — probe — two small gaps in what the chip draws
+
+two small gaps in what the chip draws
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+for s in gone style; do timeout 100 node /home/lyphe/.claude/state/pipeline-reviews/chat-outside-images/athena-1-probes/probe.mjs $s 2>&1 | head -3; done
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `captions=0 previews=0 refused=404 … console_errors=2` and `caption font: "Instrument Serif" at 12px (the chip above it is ui-monospace; … "Schibsted Grotesk")` while both stand
+```
+
+measured 2026-10-31 by chain chain-chat-outside-images-20261031-140104-545b, finding L5, LOW
+probe-key: fa287a8f8089fbf529fa1d7f934d119cbbc9460a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/transcriptPictures.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-outside-images.mjs

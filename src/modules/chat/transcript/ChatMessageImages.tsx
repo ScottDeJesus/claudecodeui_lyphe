@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/shared/api';
 import type { ChatImage } from '@/shared/types';
 import { Lightbox } from '@/shared/ui';
+import { useOutsideImage } from '@/modules/chat/transcript/transcriptPictures';
 
 /** `default`, the chat's 112 px cards; `small`, 28 px squares on one line. */
 type ChatImageSize = 'default' | 'small';
@@ -26,11 +27,13 @@ type ChatMessageImagesProps = {
  * directly; path-based attachments are fetched as blobs (a bare <img src>
  * cannot carry the auth header) — first from the global assets route
  * (`~/.cloudcli/assets`), then from the project files route as a fallback for
- * sessions recorded before attachments moved to the global store.
+ * sessions recorded before attachments moved to the global store. The project route is skipped for a
+ * path the file tree is certain to refuse (outside the project and the workspace root: a 403 and a console error).
  */
 function useChatImageSrc(image: ChatImage, projectId?: string | null): { src: string | null; failed: boolean } {
   const [src, setSrc] = useState<string | null>(image.data || null);
   const [failed, setFailed] = useState(false);
+  const { certain: refusedByFileTree } = useOutsideImage(image.path ?? null);
 
   useEffect(() => {
     if (image.data) {
@@ -52,7 +55,7 @@ function useChatImageSrc(image: ChatImage, projectId?: string | null): { src: st
 
     const candidateRequests: Array<() => Promise<Response>> = [
       () => api.assets.image(filename, { signal: controller.signal }),
-      ...(projectId
+      ...(projectId && !refusedByFileTree
         ? [() => api.readFileBlob(projectId, imagePath, { signal: controller.signal })]
         : []),
     ];
@@ -87,7 +90,7 @@ function useChatImageSrc(image: ChatImage, projectId?: string | null): { src: st
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [image.data, image.path, projectId]);
+  }, [image.data, image.path, projectId, refusedByFileTree]);
 
   return { src, failed };
 }

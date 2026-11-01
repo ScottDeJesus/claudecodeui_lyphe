@@ -1950,7 +1950,9 @@ export type WorkspaceViewGroup = 'chat' | 'tools' | 'plans' | 'house' | 'plugins
  * header all read it, so a view is reached by the same name everywhere. `label` is the rail name (the
  * button's accessible name and the palette's `Go to <label>` row). `icon` is null for a plugin view, which the
  * rail draws as a letter disc. `keywords` are the palette's search words. A count never rides here — badges
- * belong to the rail alone, so a reader of this list does not re-render when a count moves.
+ * belong to the rail alone, so a reader of this list does not re-render when a count moves. `hiddenFromNav` is
+ * the person's choice to keep the view's link off the rail and the phone drawer: the view stays in this list,
+ * so the palette, the header's name for it and its pane all still know it; only the navigation skips it.
  */
 export type WorkspaceView = {
   id: AppTab;
@@ -1958,6 +1960,7 @@ export type WorkspaceView = {
   group: WorkspaceViewGroup;
   icon: ComponentType<{ className?: string; strokeWidth?: string | number }> | null;
   keywords: string;
+  hiddenFromNav: boolean;
 };
 
 /** One row of the command palette's Navigate group: `key` is its React key, `label` the name after "Go to", `keywords` the words the search also matches, and `run` the act the row performs when chosen. ProjectCommandPalette builds the list; CommandPalette only draws it. */

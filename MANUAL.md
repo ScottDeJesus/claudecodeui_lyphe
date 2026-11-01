@@ -4339,8 +4339,8 @@ The palette's `Navigate` group is the workspace's views list, one `Go to <label>
 
 | piece | where | fact |
 |---|---|---|
-| `useWorkspaceViews()` | `src/modules/project-workspace/hooks/useWorkspaceViews.ts` | returns `{ views: WorkspaceView[], shouldShowShellTab, shouldShowTasksTab, preferencesSettled }`. Readers: `ProjectCommandPalette` (the rows) and `WorkspaceMain` (the pane gates and the two snap-backs) |
-| `WorkspaceView` | `src/shared/types.ts` | `{ id: AppTab, label, group: WorkspaceViewGroup, icon: ComponentType \| null, keywords }`. `label` = `t('tabs.<id>')`; a count never rides here, so a reader does not re-render when a badge moves |
+| `useWorkspaceViews()` | `src/modules/project-workspace/hooks/useWorkspaceViews.ts` | returns `{ views: WorkspaceView[], shouldShowShellTab, shouldShowTasksTab, preferencesSettled }`. Readers: `ProjectCommandPalette` (the rows), `WorkspaceMain` (the pane gates and the two snap-backs) and `WorkspaceRail` (the buttons, minus the views stamped `hiddenFromNav`) |
+| `WorkspaceView` | `src/shared/types.ts` | `{ id: AppTab, label, group: WorkspaceViewGroup, icon: ComponentType \| null, keywords, hiddenFromNav }`. `label` = `t('tabs.<id>')`; a count never rides here, so a reader does not re-render when a badge moves. `hiddenFromNav` is true for `files`, `git` or `browser` when its preference (`hideFilesTab`, `hideGitTab`, `hideBrowserTab`, default `false`) is on: only `WorkspaceRail` reads it, so the palette still lists the view and its pane still draws |
 | `WorkspaceViewGroup` | `src/shared/types.ts` | `'chat' \| 'tools' \| 'plans' \| 'house' \| 'plugins' \| 'foot'` — the run a view belongs to |
 | `PaletteNavRow` | `src/shared/types.ts` | `{ key, label, keywords, run }` — `key` is the React key, `label` the name after "Go to" |
 | `navRows` | `ProjectCommandPalette.tsx` | `useMemo` over `[views, t, setActiveTab, openSettings]`: each view → `{ key: view.id, label, keywords, run: () => setActiveTab(view.id) }`, then the Settings row |
@@ -4359,8 +4359,10 @@ The palette's `Navigate` group is the workspace's views list, one `Go to <label>
 | after the list | the Settings row | none |
 
 - `browser` is ungated: with the feature off the pane draws "Browser is disabled" and a door into its Settings tab. `WorkspaceMain` has no snap-back for it.
+- Two kinds of "off": a GATE (`shell`, `tasks`) takes the view out of `views`, so no button, no palette row and no pane; a NAV CHOICE (`files`, `git`, `browser`) leaves it in `views` with `hiddenFromNav`, so only the rail's button (and the phone drawer's, the same tree) goes. Reach a nav-hidden view by `Go to <label>` or any in-app door. The palette opens only on Ctrl/Cmd+K, so a phone has no touch door to it: there, the way back to a hidden link is the Settings switch (the switches' descriptions say so).
 - `WorkspaceMain` keeps two snap-backs to `chat`, tasks and shell, each waiting on `preferencesSettled`. The `browser` and `runner` panes mount on `activeTab === '<id>'` alone.
-- `views` is memoised on `[shouldShowShellTab, shouldShowTasksTab, plugins, t]`; `t` stands in for the language.
+- `useHiddenNavFallback` (`hooks/useHiddenNavFallback.ts`, called by `WorkspaceMain`) moves to `chat` only when a Hide Files / Git / Browser switch turns ON while that view is in front — a settled false→true transition; the first settled read is only recorded, so a saved "hidden" never moves someone who opened the view on purpose after a reload.
+- `views` is memoised on `[shouldShowShellTab, shouldShowTasksTab, hideFilesTab, hideGitTab, hideBrowserTab, plugins, t]`; `t` stands in for the language.
 - Keywords live in the hook's constants (`CHAT_VIEW`, `OPEN_TOOL_VIEWS`, `SHELL_VIEW`, `TASKS_VIEW`, `PLAN_VIEWS`, `HOUSE_VIEWS`) beside each view's glyph.
 
 ## Not in the list
@@ -4392,7 +4394,7 @@ The palette's `Navigate` group is the workspace's views list, one `Go to <label>
 
 The script reads `hideShellTab ?? true` from the account, the app's own default.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceViews.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-navigate-views.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHiddenNavFallback.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceViews.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-navigate-views.mjs
 
 ## MAN-9002 — The workspace with no project selected — which panes draw, the choose-a-project body, the phone header's name, and probe-house-views-no-project.mjs
 
@@ -4466,7 +4468,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Wo
 | part | fact |
 |---|---|
 | disc cell | `size-11 md:size-10` (44px phone, 40px desktop) holding `<AppSwitcherDock />`: its 28px box is centred at (24, 28) on a desktop and the app switcher's FAB is drawn over it. While the disc is seated here it draws no dot (see MAN-486): the Chat glyph's badge says a reply landed |
-| scroll region | the runs of `SCROLL_GROUPS` in order: `chat`, `tools`, `plans`, `house`, `plugins`. A run with no view is dropped first; a `RailHairline` (`h-px w-6 bg-border`, `aria-hidden`, `my-1`) stands between two drawn runs |
+| scroll region | the runs of `SCROLL_GROUPS` in order: `chat`, `tools`, `plans`, `house`, `plugins`, of the views left once `WorkspaceRail` has dropped every one stamped `hiddenFromNav` (Settings → Appearance → Hide Files / Hide Git / Hide Browser; MAN-8999) — the same tree is the phone drawer's navigation, so one filter hides the link at both widths. A run with no view is dropped first; a `RailHairline` (`h-px w-6 bg-border`, `aria-hidden`, `my-1`) stands between two drawn runs |
 | foot | outside the scroll, `relative z-40`: the usage rings (`UsageRings` from the accounts barrel: the 5-hour over the week, each labelled with its countdown to reset, 28px rings in 32px cells, a status and no button; MAN-9033), the views whose `group` is `foot` (Inbox: MAN-9013), the Settings button (`t('rail.settings')`, running `sidebarSharedProps.onShowSettings()`), then the account cell |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRailBadges.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/RailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-mockup.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-read.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sheet.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-live.mjs
@@ -4517,7 +4519,7 @@ section: The views rail, composed — `WorkspaceRail`, `RailButton`, the focus t
 
 ## Readings
 
-`WorkspaceRail` reads `useProjectSidebarState()` (`activeTab`, `setActiveTab`, `setSidebarOpen`, `sidebarSharedProps.onShowSettings`), `useWorkspaceViews().views` and `useRailBadges()`. A view press is `setActiveTab(id)` and, on a phone (`isMobile`), `setSidebarOpen(false)` too: the drawer covers the view chosen.
+`WorkspaceRail` reads `useProjectSidebarState()` (`activeTab`, `setActiveTab`, `setSidebarOpen`, `sidebarSharedProps.onShowSettings`), `useWorkspaceViews().views` (kept as `navViews`, the views not stamped `hiddenFromNav`: every run, the foot and the reveal read that list) and `useRailBadges()`. A view press is `setActiveTab(id)` and, on a phone (`isMobile`), `setSidebarOpen(false)` too: the drawer covers the view chosen.
 
 ## Proof
 
@@ -5086,6 +5088,7 @@ The one place that says which session callback writes which row and sends which 
 | `list_alerts` | `eyes/alert-reads.ts` | none (she stays `thinking`) | none | MAN-9153 |
 | `read_kanban`, `read_heal`, `read_notes`, `read_schedules` | `eyes/panel-reads.ts` | none (she stays `thinking`) | none | MAN-9159, MAN-9160 |
 | `read_git`, `read_cerberus`, `read_memory`, `read_settings` | `eyes/house-reads.ts` | none (she stays `thinking`) | none | MAN-9158 |
+| `lookup_skills` | `eyes/skill-reads.ts` | none (she stays `thinking`) | none | MAN-9427 |
 | `prepare_action`, `take_action`, `cancel_action` | `hands/hands-tools.ts` | none (she stays `thinking`) | none | MAN-9174, MAN-9171, MAN-9172, MAN-9173, MAN-9194, MAN-9208 |
 | `open`, `close_followup` | `hands/direct-tools.ts` (handed over by `handsTools`) | none (she stays `thinking`) | none | MAN-9207 |
 | `recall`, `remember`, `forget` | `memory/memory-tools.ts` | none (she stays `thinking`) | none | MAN-9192, MAN-9193 |
@@ -5308,6 +5311,7 @@ section: src/modules/companion — Kaylee's panel, rail door and Settings sectio
 | The door lights with `RAIL_BUTTON_LIT` and rests with `RAIL_BUTTON_UNLIT` (`src/shared/constants.ts`). | one lit look with the views rail (MAN-9006) |
 | Settings text fields take `SETTINGS_FIELD_WIDTH` (`src/shared/constants.ts`). | one width across Settings (MAN-7425) |
 | `SettingsSection` and `SettingsCard` come from `@/shared/ui`, never the settings module. | settings → companion → settings loops and breaks HMR |
+| Every press in the composer (the paperclip, the talk button in its cluster, Send) is the kit's `PromptInputButton` / `PromptInputSubmit`, which default-prevent `mousedown` (`keepFieldFocus`, `src/shared/ui/PromptInput.tsx`): a press never takes the focus from the field. A DISABLED press is dispatched no `mousedown`, so the same parts default-prevent its `pointerdown` while `disabled` (`keepFieldFocusWhileDisabled`): a tap on an empty box's Send, or the second tap of a double tap, leaves the keys up too. A press that does neither (a plain `Button` in the box) breaks one tap on a phone. Proof: `.verify/kaylee-composer-one-tap.mjs` (Pixel 7 at 412×915, a touch keyboard simulated, the station's box, the bubble's and the main chat's composer; no disabled-press leg). | a tap's `mousedown` moved the focus onto the button: the keyboard went down, `useVisualViewportKeyboardOffset` ended its mark, the station's box re-laid out before the `click` and the click landed on a `div`, so the first tap sent nothing |
 | Text goes through `t('companion.*')` (`en/common.json`); the Settings section reads `voiceSettings.companion.*` (`en/settings.json`). | |
 
 ## Seams
@@ -5317,7 +5321,7 @@ section: src/modules/companion — Kaylee's panel, rail door and Settings sectio
 | The send's answer | `sendDraft(mode)` resolves with `'started'` or `'folded'`; the card needs no more (the draft clears and the chat opens by their own frames) and shows a refusal's sentence |
 | Talk button | `CompanionTalkButton` stands in `PromptInputTools` (`data-companion-talk-slot`) after the paperclip and before Send, drawn from the panel's `talk?: TalkPress`; without `talk` the cluster holds the paperclip alone (MAN-9093, MAN-9424) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PromptInput.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
 
 ## MAN-9091 — src/modules/companion — Kaylee's panel, rail door and Settings section: the — Proof — `.verify/companion-panel-scaffold.mjs`
 section: src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the stance, the status line, the rules and the fixture/007 Proof — `.verify/companion-panel-scaffold.mjs`
@@ -6494,8 +6498,8 @@ Default size:
 | rule | why |
 |---|---|
 | The sentence is never a bubble over the button | the composer box clips it; unclipped it covered Send steer / Send turn (photographed) |
-| A plain `Button`, no `aria-pressed` | its name changes with its state; a toggle's must not |
-| Keep `h-8 w-8 rounded-lg` and `before:-inset-1.5` under `(pointer:coarse)` | 32px to the eye, 44px catch (Verve touch floor), Send's size and corner |
+| The kit's `PromptInputButton` (variant `ghost`, `tonal` while listening), not a `Button` of its own, and no `aria-pressed` | the composer's presses keep the field's focus so a tap on the mic leaves the keyboard up (MAN-9090); its name changes with its state, and a toggle's must not |
+| Keep the kit's `h-8 w-8` (no size override), `rounded-lg` and `before:-inset-1.5` under `(pointer:coarse)` | 32px to the eye, 44px catch (Verve touch floor), Send's size and corner |
 | Keep `[@media(pointer:coarse)]:mr-2` | the 44px catches of talk and Send meet and do not overlap |
 | The rail door is not named "Talk to <name>" | that name is this button's; the door is named for what it shows (MAN-9089) |
 
@@ -7691,6 +7695,7 @@ The page's anchors: elements a floating guide can point at, registered under sta
 | row scrolled out of the sidebar's own scroller | still held |
 | chat floated into another window | the same node under another `ownerDocument`; its rect is in that window's coordinates |
 | off the Files view | `files-view` absent: the tree unmounts. The only key that is "drawn or absent" |
+| Settings → Hide Files on (`hideFilesTab`) | `rail:files` absent: `WorkspaceRail` draws no Files button (MAN-8999), so the reader falls to the next anchor |
 - The reader refuses a rect with no area, one outside its viewport, an element whose `ownerDocument` is not its own, and one something stands over; it falls to the next anchor. `sightOf` in `useAvatarTarget`: MAN-9132 §"In sight".
 
 ## Proof — `node .verify/page-anchors-live.mjs`
@@ -7795,7 +7800,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 
 ## MAN-9151 — server/modules/companion/eyes — eyes-answer.ts, card-shapes.ts and panel-words.ts: the seam every eyes read answers through, the kind of card it puts on his panel, and the table of the panels' English
 
-Every eyes read (`eyes/*-reads.ts`: roadmap, runs, docs, alerts, panels, house) answers through `eyes-answer.ts`, says the panels' words through `panel-words.ts` and names the card it puts on his panel through `card-shapes.ts`. The first two take strings, never records, so no renderer can dump usage or spend into an answer (ruling 1). Her context holds nothing of the house until she looks (ruling 2).
+Every eyes read (`eyes/*-reads.ts`: roadmap, runs, docs, alerts, panels, house, skills) answers through `eyes-answer.ts`, says the panels' words through `panel-words.ts` and names the card it puts on his panel through `card-shapes.ts`. The first two take strings, never records, so no renderer can dump usage or spend into an answer (ruling 1). Her context holds nothing of the house until she looks (ruling 2).
 
 ## `eyes-answer.ts`
 | Export | Does |
@@ -7839,7 +7844,7 @@ Every eyes read (`eyes/*-reads.ts`: roadmap, runs, docs, alerts, panels, house) 
 THE TABLE, decided by these readers and by nothing else (`show_note` is her own card: her `kind`, `ref: null`, MAN-9061):
 | reader, scope | kind | ref |
 |---|---|---|
-| `list_roadmap`, `list_runs`, `list_alerts`, `read_schedules`, `read_kanban` (every scope), `read_heal` `summary` and `cycles`, `read_cerberus`, `read_memory` (lists and a phrase), `recall`, `read_notes` lists, `search_docs` | `list` | none |
+| `list_roadmap`, `list_runs`, `list_alerts`, `read_schedules`, `read_kanban` (every scope), `read_heal` `summary` and `cycles`, `read_cerberus`, `read_memory` (lists and a phrase), `recall`, `read_notes` lists, `search_docs`, `lookup_skills` lists | `list` | none |
 | `read_git` `status` | `list` | project |
 | `read_git` `diff` and one file | `diff` | project |
 | `read_card` `design` and a phrase | `plan` | card |
@@ -7848,7 +7853,7 @@ THE TABLE, decided by these readers and by nothing else (`show_note` is her own 
 | `read_run` of a dispatcher run | `note` | card (its plan) |
 | `read_run` of a run a chat launched by hand | `note` | chat |
 | `read_doc` (a page, one block, a phrase, the outline) | `page` | page (`blockId` for a block) |
-| `read_heal` of a kind, `read_memory` of one proposal, `read_notes` of one note, a `read_run` with neither plan nor chat | `note` | none |
+| `read_heal` of a kind, `read_memory` of one proposal, `read_notes` of one note, `lookup_skills` of one name, a `read_run` with neither plan nor chat | `note` | none |
 - `recall` cards only a found answer; a refusal and "nothing kept" are never carded.
 
 ### `doorWords(by)`
@@ -15635,3 +15640,36 @@ The station wears the app's theme: nothing holds it over his choice, and a chang
 - A modal portalled to `body` by the station (a check's sheet, a roadmap dialog) stays open over the workspace if the browser's Back leaves `/station` while it is open (the app's own "CloudCLI" cannot be pressed under a modal).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/CompanionHost.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/lazyStationRoute.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/HeldPageContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx
+
+## MAN-9427 — server/modules/companion/eyes — skill-reads.ts: lookup_skills, her pointer lookup over the house's skills and agents
+
+`skillReads(deps)` (`eyes/skill-reads.ts`) returns the SDK `tool()` definition of `lookup_skills`, placed after `houseReads` in `buildCompanionTools` (`tools/companion-tools.ts`). It carries `readOnlyHint`, takes `panel`, runs inside `guardedToolResult`, and its description is `toolLine('lookup_skills')`: the ONE line her prompt holds about skills or agents. The operator's ruling (2026-10-31): nothing about skills or agents enters her context unless she calls it, and her prompt must not grow a list of skills; her subject map (THE HOUSE, WHEN HE POINTS AT IT) got no line for it either. No focus, no activity (she stays `thinking`). No dactyl ever reads for it. It never runs a skill and never launches an agent, and never answers a skill's body: pointers only.
+
+## What it reads, at call time, never cached
+| root | kind | where | Invoke line |
+|---|---|---|---|
+| `~/.claude/skills/<name>/SKILL.md` | skill | `user-level` | `typed as /<name>, or the Skill tool with skill "<name>"`; frontmatter `user-invocable: false` drops the first door, `disable-model-invocation: true` the second; both dropped says `no door` |
+| `~/.claude/agents/<name>.md` (the shims `generate_soul_agents.py` writes) | agent | `user-level` | `the Agent tool with subagent_type "<name>"`; a `Charter:` line names `~/.claude/charters/<stem>/SKILL.md` when that file exists |
+| `<project>/.claude/skills/<name>/SKILL.md` | skill | the project's display name | the two doors, then `in a session in <project>` |
+| `<project>/.agents/skills/<name>/SKILL.md` | skill | the project's display name | `read from its file by a session in <project>; not a slash command` (the cross-tool convention the CLI does not load; this repo's `backend-module-standards`) |
+| `<project>/.claude/agents/<name>.md` | agent | the project's display name | the Agent tool, `in a session in <project>` |
+
+The projects are `listVisibleProjects()` (`tools/house-reads.ts`): registered, not archived, not in a hidden root. A folder is read ONCE, as the first root that names it (`once`: `path.resolve` of each root dir in a `Set`): `/home/lyphe` is registered as the project "lyphe", so its `.claude/skills` and `.claude/agents` ARE the user-level roots, and before the guard every user-level entry was listed twice. Skills are read through `findProviderSkillMarkdownFiles` and `readProviderSkillMarkdownDefinitionFromContent` (`@/shared/utils.js`, the skills panel's own reader; `name` falls back to the folder name). Agents are the top-level `*.md` files of the folder (no dotfiles, no `agents/mcp` sub-folder), read through the same definition reader (`name` falls back to the file stem), with `model`, `effort` and `tools` from `parseFrontMatter` (`@/shared/frontmatter.js`, gray-matter; a list of strings is joined by ", "). A missing folder is empty; a file that cannot be read or parsed is left out, as the skills panel leaves it out.
+
+## Scopes
+| scope | answer | panel card |
+|---|---|---|
+| `all`, `list` | the whole index, `<name> · <kind> · <where>`, skills before agents, user-level before a project's, then by project and by name; `fitLines(lines, { max: lines.length })`: every line that fits 1,750 characters, then `And <k> more; give a phrase to narrow.` (46 lines, 1,464 characters live on 2026-10-31: 15 user-level skills, 2 of claudecodeui_lyphe, 3 of shadow-connector; 21 user-level agents, 5 of shadow-connector) | `list`, about nothing, title `Skills and agents` |
+| `skills`, `agents` | one kind of the index, the same lines; none at all says `The house has no <kind> on disk.` | `list`, `Skills` / `Agents` |
+| an exact name (case set aside; a leading `/` or `$` dropped) | every entry of that name, in full: the index line, `For: <description, clipLine 400>`, `File: <path>`, `Charter: <path> (the agent file is generated from it; the charter is the one to edit)` for a user-level agent whose charter exists, `Invoke: <as above>`, `Runs as: model …, effort …, tools …` for an agent whose frontmatter says any; several of one name (`thoth`: a user-level agent, shadow-connector's skill and its agent) are blocks separated by a blank line | `note`, about nothing, title `Skill or agent: <name>` |
+| anything else, a phrase | every word of it (case set aside) must stand in the entry's name, description or where; one line per fit, `<name> · <kind> · <description, clipLine 110> · <where>`; `fitLines` at `LIST_MAX` 20 | `list`, `Skills and agents: "<phrase>"` |
+| a phrase nothing fits | `deps.refuse`: `No skill or agent is named "<phrase>" or says all of those words; fewer words find more, and scope all lists every one.` | none (a refusal is never carded) |
+| nothing on disk at all | `The house has no skill or agent on disk: nothing under ~/.claude/skills, ~/.claude/agents, or a project's .claude or .agents folder.` | — |
+
+Every name, where, description, path, invocation and runs-as goes through `clipLine` (folded to one line, credentials masked), so no file forges a line of the answer (INV-9773's lesson). `panel: true` puts the WHOLE text on his panel through `toPanel` (title cut at 80, text at 4,000), never a fitted list. The description's text is the frontmatter `description` only; nothing below the frontmatter is read into any answer.
+
+## Showing
+- `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-skill-reads.mjs [scope …]`: the tool definition called directly over the real folders (the database opened `query_only`), default scopes `review`, `athena` and `all`, then `all` with `panel: true` into a stub store; prints each answer whole with its size and time (all three under 60 ms).
+- Live, 2026-10-31, `node .verify/companion-eyes-ask.mjs "Which of the house's agents handles security, and how would a session launch it?"` with her on haiku: she called `lookup_skills {"scope":"security"}` (one line, argus), then `lookup_skills {"scope":"argus"}` (the pointer), and said "Argus handles security and PII… A session launches it with the Agent tool, using subagent type "argus"." She reached the tool from its TOOLS line alone.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/skill-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-skill-reads.mjs

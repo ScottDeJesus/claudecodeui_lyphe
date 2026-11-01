@@ -5,6 +5,7 @@ import { shapeKey } from '@/modules/chat/transcript/shapes/collapseState';
 import { previewKindOf } from '@/modules/chat/transcript/shapes/detect';
 import type { PreviewKind } from '@/modules/chat/transcript/shapes/detect';
 import { PreviewScopeContext } from '@/modules/chat/transcript/shapes/previewScope';
+import { readTranscriptPicture, useOutsideImage } from '@/modules/chat/transcript/transcriptPictures';
 import { useShapeCollapse, useShapeInteractive } from '@/modules/chat/transcript/shapes/useShapeCollapse';
 
 export type FilePreviewState = {
@@ -13,6 +14,8 @@ export type FilePreviewState = {
   /** Folded by the reader through the chip. Expanded until they fold it, and always in an export. */
   collapsed: boolean;
   toggle: () => void;
+  /** A picture outside the project and the workspace that this chat holds no copy of, every page of it loaded: nothing was asked for, and the chip says why there is no picture. */
+  outsideImage: boolean;
 };
 
 /** A content type without its parameters: `image/svg+xml; charset=utf-8` is `image/svg+xml`. */
@@ -66,6 +69,12 @@ const sourceOf = (blob: Blob): Promise<string> =>
  * loads in an export (its static render runs no effect), in a reply still streaming, or for a PDF in
  * a browser that cannot show one.
  *
+ * **A picture outside the project is not read from where it is named.** The file tree refuses a path
+ * outside the project and the workspace root (`/tmp/shot.png` is a 403 and a console error), so the bytes
+ * come from the chat's own copy instead, when a `Read` in this transcript returned that picture
+ * (`useOutsideImage`); with no such copy a path outside both is never requested, and nothing is
+ * asked of a path while the workspace root is still being read.
+ *
  * It answers `null` until the bytes arrive and when they never do: the chip already names the file,
  * so a missing, unreadable, oversized or mistyped file costs the reader nothing but the preview, and
  * the chip goes on opening the file as it always did.
@@ -76,6 +85,7 @@ const sourceOf = (blob: Blob): Promise<string> =>
 export function useFilePreview(path: string, enabled: boolean): FilePreviewState {
   const { readFileReference } = usePaletteOps();
   const interactive = useShapeInteractive();
+  const outside = useOutsideImage(path);
   const mountScope = useId();
   const provided = useContext(PreviewScopeContext);
   // A row with a scope shares its reads and keeps its fold by it. One without shares nothing: its read
@@ -83,7 +93,7 @@ export function useFilePreview(path: string, enabled: boolean): FilePreviewState
   const scope = typeof provided === 'string' ? provided : null;
   const foldScope = scope ?? `mount:${mountScope}`;
   const kind = previewKindOf(path);
-  const active = enabled && interactive && provided !== false && kind !== null && (kind !== 'pdf' || canShowPdf());
+  const active = enabled && interactive && provided !== false && kind !== null && (kind !== 'pdf' || canShowPdf()) && !outside.refused;
   const { collapsed, toggle } = useShapeCollapse(shapeKey('file-preview', `${foldScope}\n${path}`));
   // Tagged with the path it was read for, so a reference that changes under a streaming reply never
   // shows the previous file's preview for the frames before the new one arrives.
@@ -93,7 +103,9 @@ export function useFilePreview(path: string, enabled: boolean): FilePreviewState
     if (!active || kind === null) return undefined;
     let cancelled = false;
     let objectUrl: string | null = null;
-    void readFileReference(path, scope)
+    // A transcript copy is only ever a raster picture, so it answers an image reference alone.
+    const read = outside.picture && kind === 'image' ? readTranscriptPicture(outside.picture) : readFileReference(path, scope);
+    void read
       .then(async (blob) => {
         if (cancelled || !blob || !ACCEPTS[kind](blob.type)) return;
         const url = await sourceOf(blob);
@@ -111,11 +123,12 @@ export function useFilePreview(path: string, enabled: boolean): FilePreviewState
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [active, kind, path, readFileReference, scope]);
+  }, [active, kind, outside.picture, path, readFileReference, scope]);
 
   return {
     preview: active && loaded?.path === path ? { kind: loaded.kind, url: loaded.url } : null,
     collapsed,
     toggle,
+    outsideImage: outside.captioned && kind === 'image',
   };
 }

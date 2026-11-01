@@ -12,6 +12,7 @@ import { houseReads } from '../eyes/house-reads.js';
 import { panelReads } from '../eyes/panel-reads.js';
 import { roadmapReads } from '../eyes/roadmap-reads.js';
 import { runReads } from '../eyes/run-reads.js';
+import { skillReads } from '../eyes/skill-reads.js';
 import { handsTools } from '../hands/hands-tools.js';
 import type { CompanionHouse } from '../house.js';
 import { memoryTools } from '../memory/memory-tools.js';
@@ -101,7 +102,8 @@ export type CompanionToolDeps = {
  * `rename_session`, `answer_session`), then the eyes (`eyes/*-reads.ts`): `roadmapReads(deps)` (`list_roadmap`, `read_card`),
  * `runReads(deps)` (`list_runs`, `read_run`), `docReads(deps)` (`search_docs`, `read_doc`),
  * `alertReads(deps)` (`list_alerts`), `panelReads(deps)` (`read_kanban`, `read_heal`, `read_notes`, `read_schedules`),
- * `houseReads(deps)` (`read_git`, `read_cerberus`, `read_memory`, `read_settings`), and last her hands (`hands/hands-tools.ts`):
+ * `houseReads(deps)` (`read_git`, `read_cerberus`, `read_memory`, `read_settings`), `skillReads(deps)` (`lookup_skills`, the house's skills and agents as
+ * pointers), and last her hands (`hands/hands-tools.ts`):
  * `handsTools(deps)` (`prepare_action`, `take_action`, `cancel_action`, `open`, `close_followup`), and last her own memory (`memory/memory-tools.ts`):
  * `memoryTools(deps)` (`recall`, `remember`, `forget`). Consumed by `companion-account.ts`, once per account.
  */
@@ -117,6 +119,7 @@ export function buildCompanionTools(deps: CompanionToolDeps): Array<SdkMcpToolDe
     ...alertReads(deps),
     ...panelReads(deps),
     ...houseReads(deps),
+    ...skillReads(deps),
     ...handsTools(deps),
     ...memoryTools(deps),
   ];

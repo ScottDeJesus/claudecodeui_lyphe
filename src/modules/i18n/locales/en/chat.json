@@ -387,6 +387,7 @@
     "exitFullscreen": "Exit fullscreen",
     "expandFile": "Show the preview of {{path}}",
     "collapseFile": "Hide the preview of {{path}}",
+    "imageOutsideProject": "Image outside the project: {{path}}",
     "titles": {
       "table": "Table",
       "options": "Options",
