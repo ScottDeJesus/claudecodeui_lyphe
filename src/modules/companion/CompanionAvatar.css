@@ -4,9 +4,11 @@
  * the same frame every token does. Both fill the square they are given, by CSS, so they follow the disc's own size frame by frame.
  *
  * THE PORTRAIT'S MOTION IS CSS, ON THE COMPOSITOR. The page redraws a canvas only when its frame changes (CompanionPortrait.tsx);
- * everything continuous is a transform here: a breath and a sway always, her lean (`--kaylee-tilt`, written per state and mood),
- * and the clips' motions (`data-motion`). The hair canvas takes every one of them 90 ms after the face canvas, on a softer ease,
- * and where the two differ the face layer's feathered mask blends them: her face leads and her hair follows.
+ * everything continuous is a transform here: a breath and a sway always (the breath is a rise of her head with her chest, a quicker
+ * breath in and a slower breath out, one rate in every state so a change of state never jumps its phase), her lean (`--kaylee-tilt`,
+ * written per state and mood), her head while she speaks (`--kaylee-bob` and `--kaylee-roll`, written by the portrait on each frame), and the
+ * clips' motions (`data-motion`). The hair canvas takes every one of them 90 ms after the face canvas, on a softer ease, and where the two differ
+ * the face layer's feathered mask blends them: her face leads and her hair follows.
  *
  * HOW A STATE IS BUILT. The marks' markup always holds every part; `[data-state]` turns on that state's accent (her ears pulsing,
  * three dots turning, a page, a pencil, the walk ring), which is the state's LOOK, a still frame. Everything that MOVES is added
@@ -63,8 +65,11 @@
   overflow: hidden;
 }
 
-/* Each canvas rides a layer drawn 6% larger than the disc and clipped to its circle, so a lean, a bounce or a breath never
-   shows the ground at the rim. The layer carries her lean and the clips' motions; the canvas inside carries the breath and the sway. */
+/* Each canvas rides a layer drawn 6% larger than the disc and clipped to its circle. A half-side of 53% holds the circle at any roll, so only
+   travel shows the ground at the rim: 3% of slack, which a canvas's scale grows (53% × scale − 50%, 3.32% at the breath's peak). The layer
+   carries her lean, her head's bob (at most 0.9% of it, 0.95% of the disc; with the breath's 0.64% that is 1.59%) and roll, and the clips' lifts
+   (1.5% of it, 1.59% of the disc; with the breath's 0.64% that is 2.23% of the 3.32%: the 1.09% left is for a painted edge, which lands up to
+   0.7 px off where layout puts it); the canvas inside carries the breath, a rise with her chest, and the sway. */
 .kaylee-portrait__layer {
   position: absolute;
   left: -3%;
@@ -72,7 +77,7 @@
   width: 106%;
   height: 106%;
   transform: rotate(var(--kaylee-tilt, 0deg));
-  will-change: transform;
+  will-change: transform, translate, rotate;
   /* The face leads; the hair follows by this much. */
   --kaylee-lag: 0ms;
 }
@@ -224,10 +229,18 @@
   .kaylee-portrait__layer--face { transition: transform 220ms var(--ease-enter); }
   .kaylee-portrait__layer--hair { transition: transform 320ms ease-in-out 90ms; }
 
+  /* Her head while she speaks: the portrait writes `--kaylee-bob` (% of the layer) and `--kaylee-roll` on each layer, the hair's 90 ms behind the face's.
+     The individual properties compose with the lean's `transform` untouched, so its easing never smears a beat, and a clip's keyframes on `translate`
+     take the bob's place while they run: a laugh is not doubled, and the bob returns after it. */
+  .kaylee-portrait__layer {
+    translate: 0 var(--kaylee-bob, 0%);
+    rotate: var(--kaylee-roll, 0deg);
+  }
+
   /* Every state: she breathes and she sways. */
   .kaylee-portrait__layer canvas {
     animation:
-      kaylee-breath 4.2s ease-in-out var(--kaylee-lag) infinite alternate,
+      kaylee-breath 4.6s ease-in-out var(--kaylee-lag) infinite,
       kaylee-sway 9s ease-in-out var(--kaylee-lag) infinite alternate;
   }
 
@@ -271,20 +284,24 @@
 }
 
 @keyframes kaylee-portrait-in { from { opacity: 0; } }
-@keyframes kaylee-breath { from { scale: 1; } to { scale: 1.015; } }
+/* The breath, thirteen a minute: in over the first 38%, out over the rest. The face rises 0.6% while it grows 0.3% each side: a lift, not a zoom. */
+@keyframes kaylee-breath {
+  0%, 100% { scale: 1; translate: 0 0; }
+  38% { scale: 1.006; translate: 0 -0.6%; }
+}
 @keyframes kaylee-sway { from { rotate: -0.8deg; } to { rotate: 0.8deg; } }
 /* The clips lift and drop the whole layer by a share of its own height. */
 @keyframes kaylee-laugh {
   0%, 33%, 67%, 100% { translate: 0 0; }
-  17%, 50%, 83% { translate: 0 -3%; }
+  17%, 50%, 83% { translate: 0 -1.5%; }
 }
 @keyframes kaylee-giggle {
   0%, 50%, 100% { translate: 0 0; }
-  25%, 75% { translate: 0 -2%; }
+  25%, 75% { translate: 0 -1.5%; }
 }
 @keyframes kaylee-gasp {
   0%, 100% { translate: 0 0; }
-  29% { translate: 0 -3%; }
+  29% { translate: 0 -1.5%; }
 }
 @keyframes kaylee-sigh {
   0%, 100% { translate: 0 0; }

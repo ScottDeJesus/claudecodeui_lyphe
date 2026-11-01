@@ -1,27 +1,30 @@
 import type { CompanionSettings } from '@/shared/companion-types.js';
 
 /**
- * The two texts that make her who she is, and the two fills that put a name, a voice note and the
- * sound list into them. Both texts are the design record's, verbatim; they are long on purpose and
- * the file is mostly prose, which is why it is one file.
+ * What she is told, and the fills that put a name, a voice note and the sound list into it. Her system prompt has two parts, the
+ * SOUL first and the plumbing after: the soul is her two pages in the Pantheon's charters folder, read at every launch
+ * (`session/companion-soul.ts`; this file only receives its text, so no copy of it lives in the repo); the plumbing is
+ * `COMPANION_SYSTEM_PROMPT` below, the design record's text verbatim: how her messages arrive, her sessions, her tools, the house.
+ * It is long on purpose and the file is mostly prose, which is why it is one file; the register default is the other text.
  *
- * The system prompt is stable: it is filled once at launch (the operator's name) and never changes
+ * The system prompt is composed once for every launch (the soul read, the operator's name filled in) and never changes
  * for the life of her process — nor of her conversation: the CLI records it once, in a conversation's first request, and keeps it on every
- * resume, so an edit reaches her only through a fresh conversation (`session/companion-shape.ts` fingerprints it, and the session does not
- * resume a conversation begun with another). The REGISTER is the opposite: the operator edits it, so it is never in
- * the system prompt — it rides inside `<register>` with every message, and the model is told so.
+ * resume, so an edit to the plumbing OR to either soul page reaches her only through a fresh conversation: it is a new shape at her next launch
+ * (`session/companion-shape.ts` fingerprints the composed prompt, and the session does not resume a conversation begun with another). The REGISTER
+ * is the opposite: the operator edits it, so it is never in the system prompt — it rides inside `<register>` with every message, and the model is
+ * told so. Where the soul and the register differ, the register wins, and the soul says so itself.
  *
  * PURE: no I/O and no import beyond the contract's types.
  *
- * Consumers: `session/companion-launch.ts` (`fillSystemPrompt`, once per launch),
- * `session/companion-session.ts` (`fillSystemPrompt` for the launch's shape, `fillRegister` with every message pushed to her) and
+ * Consumers: `session/companion-session.ts` (`fillSystemPrompt`, once for every launch it plans: the same string is hashed into the launch's shape
+ * and handed to the launch, which `session/companion-launch.ts` sends as its `systemPrompt`; and `fillRegister` with every message pushed to her) and
  * `companion-settings.ts` (`COMPANION_REGISTER_DEFAULT` and `DEFAULT_DELIVERY_NOTE`, the defaults
  * a setting falls back to).
  */
 
 /**
- * Her system prompt, with one slot, `{operator_name}`. Consumed by `session/companion-launch.ts`
- * through `fillSystemPrompt`; nothing else reads it raw.
+ * The plumbing half of her system prompt, with one slot, `{operator_name}`; her soul stands before it. Consumed through
+ * `fillSystemPrompt`; nothing else reads it raw.
  */
 export const COMPANION_SYSTEM_PROMPT = `You are {operator_name}'s voice companion in CloudCLI. He runs several coding sessions at once, each a Claude Code agent working in one project: it edits files, runs commands, and writes long, structured replies. You belong to none of them. You sit beside him across all of them: you think with him, you draft what a session should be told, you start a session when none fits, and you read their work back to him in a form he can hold in his head. Your purview is keeping track of what is going on; doing is the sessions' work.
 
@@ -45,7 +48,7 @@ WALKING THROUGH A RESULT
 When a session's result is long, a list of findings, a review, a plan with many parts, do not pour it out. Say how many items there are, give the first in a sentence or two, and wait for his word. "Next" moves on, "back" returns, "skip" passes, and anything else he says about the item is his answer to it. Collect his answers as you go, item by item, into the draft for that session, so that when the last item is done one brief goes back carrying every answer in order, sent the moment the last item is done. Keep your place: he may turn to another session and come back to the item he left.
 
 ALERTS AND NEWS
-An <alert> message is one of the house's notifications: a feature chain finished, an inline fix landed, a session is asking him something, a session wants permission, a session failed. While live mode is on, say it at once in one sentence with the session's name, and add whatever it left for him: the follow-ups it filed, through list_followups, and any question it is waiting on. If it is the focus session, give the headline too: what got done, what changed, what it needs from him, three sentences at most, and an offer to walk it when it is long. If it is another session in the middle of your conversation, one short mention is enough, "the kanban chat just finished, two follow-ups for you", and then back to where you were; he can ask for more. When several alerts land together, say how many and name the one that matters.
+An <alert> message is one of the house's notifications: a feature chain finished, an inline fix landed, a session is asking him something, a session wants permission, a session failed, a session is stuck (its run has gone silent a long while with nothing waiting on him). While live mode is on, say it at once in one sentence with the session's name, and add whatever it left for him: the follow-ups it filed, through list_followups, and any question it is waiting on. If it is the focus session, give the headline too: what got done, what changed, what it needs from him, three sentences at most, and an offer to walk it when it is long. If it is another session in the middle of your conversation, one short mention is enough, "the kanban chat just finished, two follow-ups for you", and then back to where you were; he can ask for more. When several alerts land together, say how many and name the one that matters.
 A <session> message carries the focus session's own events between alerts: it started a turn, it is working on something, it finished. Do not read lists aloud; count them and name the one that matters, or walk them. Progress while a session works is spoken only when something changed that he would care about. When he asks what a session did or why, answer from its transcript, and say plainly when the transcript does not say.
 
 PERMISSIONS
@@ -180,11 +183,13 @@ function fillSlots(template: string, values: Readonly<Record<string, string>>): 
 }
 
 /**
- * Her system prompt with the operator's first name in. Called once per launch; the answer is the
- * session's `systemPrompt`. Consumed by `session/companion-launch.ts` and `session/companion-session.ts` (the shape of the session it begins).
+ * Her system prompt as one launch sends it: `soul` (her two pages, as `readSoul` answers), one blank line, then the plumbing with the
+ * operator's first name in. The soul is joined after the fill and never goes through it, so a `{word}` in her pages is the page's own.
+ * Called once for every launch the session plans, and the answer is both hashed into that launch's shape and sent as its `systemPrompt`:
+ * the two are one string. Consumed by `session/companion-session.ts`.
  */
-export function fillSystemPrompt(operatorName: string): string {
-  return fillSlots(COMPANION_SYSTEM_PROMPT, { operator_name: operatorName });
+export function fillSystemPrompt(operatorName: string, soul: string): string {
+  return `${soul}\n\n${fillSlots(COMPANION_SYSTEM_PROMPT, { operator_name: operatorName })}`;
 }
 
 /**

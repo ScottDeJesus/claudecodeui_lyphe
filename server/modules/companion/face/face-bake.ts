@@ -7,7 +7,7 @@ import { contactSheet, cutFrame, layoutSheets, packSheets, padPhoto } from './fa
 import { faceDir, faceIdOf, facesRoot, isPresent, photoDir, readManifest, writeFileAtomically } from './face-files.js';
 import { takeBakeLock } from './face-lock.js';
 import { FaceBakeRefusal, sentences } from './face-refusal.js';
-import { buildManifest, FACE_FRAMING, frameCacheKey, recipeFrames, type RecipeFrame } from './face-recipe.js';
+import { buildManifest, frameCacheKey, recipeFrames, type FaceFraming, type RecipeFrame } from './face-recipe.js';
 
 // FaceBakeRefusal: its message is the sentence for his screen. Re-exported from its own file so `face-atlas.ts` can throw it without a cycle.
 export { FaceBakeRefusal };
@@ -17,6 +17,8 @@ const NO_FACE_LINE = 'Failed to detect face!!';
 
 type BakeInput = {
   photoId: string;
+  /** The look's framing: the face id, the crop cache, the pad, the cut at every tier and the crop_factor all come from it. */
+  framing: FaceFraming;
   /** Called once for each frame, in bake order, as it is rendered or found cached (`seconds` is 0 for a cached one). */
   onProgress(done: number, total: number, frame: string, seconds: number): void;
   /** Aborting stops ComfyUI and releases the lock, and the bake rejects with the signal's reason. */
@@ -40,18 +42,18 @@ async function readIfPresent(file: string): Promise<Buffer | null> {
 
 
 /** Where a frame's 512 px crop is cached: `frames/<its cache key>.png` in its photo's folder. */
-function cachedFramePath(photoId: string, frame: RecipeFrame): string {
-  return path.join(photoDir(photoId), 'frames', `${frameCacheKey(frame.sliders)}.png`);
+function cachedFramePath(photoId: string, frame: RecipeFrame, framing: FaceFraming): string {
+  return path.join(photoDir(photoId), 'frames', `${frameCacheKey(frame.sliders, framing)}.png`);
 }
 
 /**
- * Whether the frame cache holds the crop of every frame of the current recipe, so that a bake of `photoId` renders nothing and
- * never starts ComfyUI: a recipe change that only re-cuts (a tier, the framing's disc) is made from the cache alone. Consumed by
- * `face.service.ts`, which queues the original's bake on a box with no ComfyUI when this holds.
+ * Whether the frame cache holds the crop of every frame of the current recipe under `framing`, so that a bake of `photoId` renders
+ * nothing and never starts ComfyUI: a recipe change that only re-cuts (a tier, the framing's disc) is made from the cache alone.
+ * Consumed by `face.service.ts`, which queues the original's bake on a box with no ComfyUI when this holds.
  */
-export async function frameCacheIsComplete(photoId: string): Promise<boolean> {
+export async function frameCacheIsComplete(photoId: string, framing: FaceFraming): Promise<boolean> {
   for (const frame of recipeFrames()) {
-    if (!(await isPresent(cachedFramePath(photoId, frame)))) return false;
+    if (!(await isPresent(cachedFramePath(photoId, frame, framing)))) return false;
   }
   return true;
 }
@@ -59,7 +61,7 @@ export async function frameCacheIsComplete(photoId: string): Promise<boolean> {
 type StartedComfyUI = { comfy: ComfyUI; sourceName: string; sourcePath: string };
 
 /** ComfyUI started for this photo, with the padded source in its input folder, and the name `renderFrame` loads it by. */
-async function startForPhoto(photoId: string, signal: AbortSignal, onLine: (line: string) => void): Promise<StartedComfyUI> {
+async function startForPhoto(photoId: string, framing: FaceFraming, signal: AbortSignal, onLine: (line: string) => void): Promise<StartedComfyUI> {
   const root = facesRoot();
   const photo = await readIfPresent(path.join(photoDir(photoId), 'photo.png'));
   if (photo === null) throw new FaceBakeRefusal(sentences.photoMissing());
@@ -67,7 +69,7 @@ async function startForPhoto(photoId: string, signal: AbortSignal, onLine: (line
   try {
     const sourceName = `face-${photoId}.png`;
     const sourcePath = path.join(comfyWorkPaths(root).input, sourceName);
-    await fs.writeFile(sourcePath, await padPhoto(photo));
+    await fs.writeFile(sourcePath, await padPhoto(photo, framing));
     return { comfy, sourceName, sourcePath };
   } catch (error) {
     await comfy.stop();
@@ -76,16 +78,16 @@ async function startForPhoto(photoId: string, signal: AbortSignal, onLine: (line
 }
 
 /**
- * Every frame's cut square at every tier, `cuts[tier][frame]` in the order of `FACE_FRAMING.frameSizes` and of the bake: each from its
+ * Every frame's cut square at every tier, `cuts[tier][frame]` in the order of the framing's `frameSizes` and of the bake: each from its
  * 512 px crop in the `frames/` cache, or rendered by ComfyUI (started when the first frame is not cached, so a tune that changes only
  * the cut renders nothing and never starts it). The first render is when the node looks for the face; "Failed to detect face!!" on
  * its stdout ends the bake before that crop is cached.
  */
 async function cutEveryFrame(
-  photoId: string, frames: RecipeFrame[], onProgress: BakeInput['onProgress'], signal: AbortSignal,
+  photoId: string, framing: FaceFraming, frames: RecipeFrame[], onProgress: BakeInput['onProgress'], signal: AbortSignal,
 ): Promise<Buffer[][]> {
   await fs.mkdir(path.join(photoDir(photoId), 'frames'), { recursive: true });
-  const cuts: Buffer[][] = FACE_FRAMING.frameSizes.map(() => []);
+  const cuts: Buffer[][] = framing.frameSizes.map(() => []);
   let started: StartedComfyUI | null = null;
   let noFaceSeen = false;
   let lastLines: string[] = [];
@@ -93,24 +95,24 @@ async function cutEveryFrame(
   try {
     for (const [index, frame] of frames.entries()) {
       signal.throwIfAborted();
-      const cached = cachedFramePath(photoId, frame);
+      const cached = cachedFramePath(photoId, frame, framing);
       let preview = await readIfPresent(cached);
       let seconds = 0;
 
       if (preview === null) {
-        started ??= await startForPhoto(photoId, signal, (line) => {
+        started ??= await startForPhoto(photoId, framing, signal, (line) => {
           if (line.includes(NO_FACE_LINE)) noFaceSeen = true;
           lastLines = [...lastLines.slice(-29), line];
         });
         const renderStarted = performance.now();
-        preview = await started.comfy.renderFrame(started.sourceName, frame.sliders);
+        preview = await started.comfy.renderFrame(started.sourceName, frame.sliders, framing.cropFactor);
         if (noFaceSeen) throw new FaceBakeRefusal(sentences.noFace());
         // Whole or not at all, so an interrupted bake never leaves a half-written crop that the next one trusts.
         await writeFileAtomically(cached, preview);
         seconds = Math.max((performance.now() - renderStarted) / 1000, 0.001);
       }
 
-      const cutAtEachTier = await Promise.all(FACE_FRAMING.frameSizes.map((size) => cutFrame(preview, size)));
+      const cutAtEachTier = await Promise.all(framing.frameSizes.map((size) => cutFrame(preview, size, framing)));
       cutAtEachTier.forEach((cut, tier) => cuts[tier].push(cut));
       onProgress(index + 1, frames.length, frame.name, seconds);
     }
@@ -131,10 +133,10 @@ async function cutEveryFrame(
 }
 
 /** The face's files, `manifest.json` LAST and by rename: a face whose manifest exists is whole. The contact sheet is drawn from the smallest tier, which it shrinks to 128 px a cell. */
-async function publishFace(faceId: string, frames: RecipeFrame[], cuts: Buffer[][]): Promise<void> {
+async function publishFace(faceId: string, framing: FaceFraming, frames: RecipeFrame[], cuts: Buffer[][]): Promise<void> {
   const folder = faceDir(faceId);
   await fs.mkdir(folder, { recursive: true });
-  const sizes = FACE_FRAMING.frameSizes;
+  const sizes = framing.frameSizes;
   const layouts = sizes.map((size) => layoutSheets(frames.length, size));
   const [packed, contact] = await Promise.all([
     Promise.all(cuts.map((tierCuts, tier) => packSheets(tierCuts, sizes[tier]))),
@@ -147,7 +149,8 @@ async function publishFace(faceId: string, frames: RecipeFrame[], cuts: Buffer[]
 }
 
 /**
- * Makes (or resumes) the face of photo `photoId` under the current recipe; published when it resolves. Consumed by the CLI and `face.service.ts`.
+ * Makes (or resumes) the face of photo `photoId` under the current recipe and the look's `framing`; published when it resolves.
+ * Consumed by the CLI and `face-queue.ts`.
  *
  * The order: take the lock, kill a checked orphan, look again for a published face, then render what the frame cache lacks
  * (ComfyUI started for the first miss, stopped when the last frame is in), cut and pack, write the sheets and the contact
@@ -156,7 +159,8 @@ async function publishFace(faceId: string, frames: RecipeFrame[], cuts: Buffer[]
  */
 export async function bakeFace(input: BakeInput): Promise<{ faceId: string; seconds: number }> {
   const startedAt = performance.now();
-  const faceId = faceIdOf(input.photoId);
+  const { framing } = input;
+  const faceId = faceIdOf(input.photoId, framing);
   const frames = recipeFrames();
 
   const lock = await takeBakeLock(facesRoot(), input.whenBusy ?? 'wait', input.signal);
@@ -169,8 +173,8 @@ export async function bakeFace(input: BakeInput): Promise<{ faceId: string; seco
       return { faceId, seconds: secondsSince(startedAt) };
     }
 
-    const cuts = await cutEveryFrame(input.photoId, frames, input.onProgress, input.signal);
-    await publishFace(faceId, frames, cuts);
+    const cuts = await cutEveryFrame(input.photoId, framing, frames, input.onProgress, input.signal);
+    await publishFace(faceId, framing, frames, cuts);
     return { faceId, seconds: secondsSince(startedAt) };
   } finally {
     lock.release();

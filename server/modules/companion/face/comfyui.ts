@@ -8,7 +8,7 @@ import readline from 'node:readline';
 
 import { openFrameEvents } from './comfyui-socket.js';
 import { FaceBakeRefusal, sentences } from './face-refusal.js';
-import { FACE_FRAMING, type FaceSliders } from './face-recipe.js';
+import type { FaceSliders } from './face-recipe.js';
 
 /**
  * COMFYUI AS THE BAKE'S CHILD. One bake starts one ComfyUI on a free loopback port, with `--cpu`, at nice 15 so the box's
@@ -34,8 +34,8 @@ export class ComfyUIExit extends Error {
   }
 }
 
-/** One started ComfyUI. `renderFrame` answers the node's 512 px preview PNG for a source image and a slider set. */
-export type ComfyUI = { renderFrame(sourceName: string, sliders: FaceSliders): Promise<Buffer>; stop(): Promise<void> };
+/** One started ComfyUI. `renderFrame` answers the node's 512 px preview PNG for a source image, a slider set and the look's crop_factor (`FaceFraming.cropFactor`). */
+export type ComfyUI = { renderFrame(sourceName: string, sliders: FaceSliders, cropFactor: number): Promise<Buffer>; stop(): Promise<void> };
 
 /** ComfyUI is installed here by `scripts/install-comfyui.sh`, unless `COMPANION_COMFYUI_DIR` says otherwise. */
 const DEFAULT_COMFYUI_DIR = '/opt/comfyui';
@@ -45,7 +45,7 @@ export function comfyuiDir(): string {
   return process.env.COMPANION_COMFYUI_DIR || DEFAULT_COMFYUI_DIR;
 }
 
-/** Whether the installer's interpreter and ComfyUI's `main.py` are there under `dir`. Consumed by `startComfyUI` (which refuses without them) and by `face.service.ts` (which queues the original's bake only with them). */
+/** Whether the installer's interpreter and ComfyUI's `main.py` are there under `dir`. Consumed by `startComfyUI` (which refuses without them) and by `face.service.ts` (which queues a house look's bake only with them, or when its frame cache is whole). */
 export function isComfyUIInstalled(dir: string): boolean {
   return fs.existsSync(path.join(dir, 'venv', 'bin', 'python')) && fs.existsSync(path.join(dir, 'ComfyUI', 'main.py'));
 }
@@ -162,14 +162,14 @@ export async function startComfyUI(input: { dir: string; workDir: string; signal
   const base = `http://127.0.0.1:${port}`;
 
   return {
-    async renderFrame(sourceName, sliders) {
+    async renderFrame(sourceName, sliders, cropFactor) {
       const deadline = AbortSignal.any([signal, AbortSignal.timeout(FRAME_DEADLINE_MS)]);
       try {
         const prompt = {
           '1': { class_type: 'LoadImage', inputs: { image: sourceName } },
           '2': {
             class_type: 'ExpressionEditor',
-            inputs: { ...sliders, src_ratio: 1, sample_ratio: 1, sample_parts: 'OnlyExpression', crop_factor: FACE_FRAMING.cropFactor, src_image: ['1', 0] },
+            inputs: { ...sliders, src_ratio: 1, sample_ratio: 1, sample_parts: 'OnlyExpression', crop_factor: cropFactor, src_image: ['1', 0] },
           },
         };
         const queued = await fetch(`${base}/prompt`, {

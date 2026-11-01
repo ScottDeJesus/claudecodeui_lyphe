@@ -60,14 +60,16 @@ export type CompanionStateRow = {
    */
   memory_forget_line: number | null;
   /**
-   * The face her pages draw (`<photoId>-<recipeId>`, `server/modules/companion/face/`); NULL for the original. Survives Clear: Clear wipes her
-   * memory, not her look. Written only by the face service.
+   * The face made from his photo (`<photoId>-<recipeId>`, `server/modules/companion/face/`); NULL while he has none. It is one look among
+   * those he may wear, and the `avatar` column says whether he wears it. Survives Clear: Clear wipes her memory, not her look. Written only by the face service.
    */
   face_id: string | null;
   /** The face being made from his upload, which a restart resumes; NULL when none is being made. Survives Clear. Written only by the face service. */
   face_pending_id: string | null;
-  /** The sentence of the last bake that failed, shown in Settings until the next upload or restore; NULL for none. Survives Clear. Written only by the face service. */
+  /** The sentence of the last bake that failed, shown in Settings until the next upload or removal; NULL for none. Survives Clear. Written only by the face service. */
   face_error: string | null;
+  /** The look he picked (`face-avatars.ts`: a house avatar's key, or `own`, his photo); NULL until he picks, which reads as the house's first. Survives Clear: Clear wipes her memory, never how she looks. Written only by the face service. */
+  avatar: string | null;
   updated_at: string;
 };
 
@@ -130,8 +132,8 @@ export type CompanionHeardRow = {
   text: string;
 };
 
-/** One account's faces as the face service's start and prune read them: the face it draws and the one being made (each NULL for none). */
-export type CompanionFaceRow = Pick<CompanionStateRow, 'user_id' | 'face_id' | 'face_pending_id'>;
+/** One account's faces as the face service's start and prune read them: the face made from his photo, the one being made and the look he picked (each NULL for none). */
+export type CompanionFaceRow = Pick<CompanionStateRow, 'user_id' | 'face_id' | 'face_pending_id' | 'avatar'>;
 
 /** What `clearAccount` removed (`notesRemoved` counts the unpinned cards; the pinned stay) and whether a state row was there to reset. */
 export type CompanionClearResult = {
@@ -141,7 +143,7 @@ export type CompanionClearResult = {
 };
 
 /** Every state column the table holds besides the key: what a read returns and `writeState` may name. */
-const STATE_PATCH_COLUMNS = ['provider_session_id', 'session_shape', 'handover', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor', 'memory_forget_line', 'face_id', 'face_pending_id', 'face_error'] as const;
+const STATE_PATCH_COLUMNS = ['provider_session_id', 'session_shape', 'handover', 'focus_json', 'draft_json', 'walk_json', 'pending_json', 'unanswered_json', 'floor', 'memory_forget_line', 'face_id', 'face_pending_id', 'face_error', 'avatar'] as const;
 
 const STATE_COLUMNS = `user_id, ${STATE_PATCH_COLUMNS.join(', ')}, updated_at`;
 const LOG_COLUMNS = 'id, user_id, at, role, via, turn_id, turn_index, text, mood, sounds_json, attachments_json';
@@ -189,15 +191,15 @@ export const companionDb = {
   },
 
   /**
-   * EVERY account with its face and pending face (each NULL for none), ascending by account — an account that has never
-   * touched Kaylee has no state row and is listed on the original. The face service reads it at start, to resume the bakes and to
-   * bring a face whose recipe is no longer current up to date; after the original's face changes, to tell each account on the
-   * original; and for each prune, to know which faces are named.
+   * EVERY account with its face, pending face and pick (each NULL for none), ascending by account — an account that has never
+   * touched Kaylee has no state row and is listed on the house's first look. The face service reads it at start, to resume the bakes and to
+   * bring a face whose recipe is no longer current up to date; when a house look's bake moves or ends, to tell every account (every picker
+   * lists the house's looks); and for each prune, to know which faces are named.
    */
   listFaces(): CompanionFaceRow[] {
     return getConnection()
       .prepare(
-        `SELECT users.id AS user_id, companion_state.face_id AS face_id, companion_state.face_pending_id AS face_pending_id
+        `SELECT users.id AS user_id, companion_state.face_id AS face_id, companion_state.face_pending_id AS face_pending_id, companion_state.avatar AS avatar
          FROM users LEFT JOIN companion_state ON companion_state.user_id = users.id
          ORDER BY users.id`
       )

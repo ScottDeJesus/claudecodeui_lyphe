@@ -329,6 +329,9 @@ export type CompanionFaceClip = 'laugh' | 'giggle' | 'gasp' | 'sigh';
  */
 export type CompanionFaceTier = { frameSize: number; sheets: Array<{ file: string; columns: number; rows: number }> };
 
+/** A half-closed and a closed frame of one look; a blink shows half, closed, half. Every number is an index into `frames`. */
+export type CompanionFaceBlink = { half: number; closed: number };
+
 /**
  * Every frame of a face and where each sits: the file a bake writes (`manifest.json` in the face's folder) and a page plays.
  * The frames are cut `frameSize` pixels square and packed onto `sheets` (at most 8 × 8 cells each); `largerTiers` are the same
@@ -336,7 +339,8 @@ export type CompanionFaceTier = { frameSize: number; sheets: Array<{ file: strin
  * is on in EVERY tier. A page draws the smallest tier whose `frameSize` covers the pixels it is drawn at (`useFaceAtlas`), so a
  * phone's small head never fetches the large sheets. A manifest with no `largerTiers` (a face made before they existed) has the one
  * tier. Everything else is an index into `frames`: each mood has its
- * seven mouths and its half-closed and closed blink, `gaze` and `poses` are the neutral face looking or turned, `states`
+ * seven mouths and its half-closed and closed blink, `blinks` are the same blink for her listening face, each gaze and each
+ * turned pose, `brows` are each mood's closed face with her brows lifted, `gaze` and `poses` are the neutral face looking or turned, `states`
  * are the looks of listening, failing and surprise, and each clip is its frames in order with the rate to play them at.
  * Directions are the screen's: `left` is toward the window's left edge. `faceId` is the face's own id, the one in
  * `CompanionFace.id`, and `version` is the shape of this file.
@@ -348,27 +352,28 @@ export type CompanionFaceManifest = {
   sheets: CompanionFaceTier['sheets'];                                  // the smallest tier's sheets
   largerTiers?: CompanionFaceTier[];                                    // the larger tiers, smallest first; absent on a face made with one
   frames: Array<{ sheet: number; column: number; row: number }>;
-  moods: Record<CompanionFaceMood, { mouths: Record<CompanionFaceMouth, number>; blink: { half: number; closed: number } }>;
+  moods: Record<CompanionFaceMood, { mouths: Record<CompanionFaceMouth, number>; blink: CompanionFaceBlink }>;
   gaze: Record<CompanionFaceGaze, number>;
   poses: Record<CompanionFacePose, number>;
   states: { listening: number; failed: number; surprise: number };
   clips: Record<CompanionFaceClip, { fps: number; frames: number[] }>;
+  /** Blinks for the looks that are not a mood's own face: her listening face, each gaze and each turned pose. Absent on a face made before them, which blinks only in its moods. */
+  blinks?: { listening: CompanionFaceBlink; gaze: Record<CompanionFaceGaze, CompanionFaceBlink>; poses: Record<CompanionFacePose, CompanionFaceBlink> };
+  /** Each mood's closed face with her brows lifted, shown at the end of a question. Absent on a face made before them. */
+  brows?: Record<CompanionFaceMood, number>;
 };
 
 /**
  * Where the making of an uploaded photo's face stands: `queued` (another face is being made first), `baking` (`done` of
- * `total` frames are made) or `failed` (`error` is the sentence for his screen). Carried by `CompanionFace.bake`.
+ * `total` frames are made) or `failed` (`error` is the sentence for his screen). Carried by `CompanionFaceAvatar.bake`.
  */
 export type CompanionFaceBake = { state: 'queued' | 'baking'; done: number; total: number } | { state: 'failed'; error: string };
 
-/**
- * The face an account's pages draw. `id` is the face to fetch: the original's id while he has uploaded nothing, his upload's
- * once it is made, and `null` only while no face exists at all (a fresh box, before the seed photo's first bake), when the
- * page draws her initial. `original` says whether `id` is the original. `bake` is his upload's bake while it is queued,
- * running or failed, else `null`; her current face stays in `id` until the new one is ready. Carried by
- * `CompanionPicture.face` and announced by `companion_face`.
- */
-export type CompanionFace = { id: string | null; original: boolean; bake: CompanionFaceBake | null };
+/** One look she can wear: a portrait and the face the bake made of it (its moods, its mouths, its blinks, looks and clips), switched as one unit. `key` is a house avatar's own word (`original`, `office`) or `own`, his photo. `label` is the word the picker shows ("Dark hair", "Brown hair", "Your photo"). `faceId` is its face as made (under the current recipe, else the newest made while it is made again), null while it has none yet. `bake` is its making while queued, running or failed, else null. */
+export type CompanionFaceAvatar = { key: string; label: string; faceId: string | null; bake: CompanionFaceBake | null };
+
+/** The face an account's pages draw. `id` is the face to fetch: the picked avatar's, else the first look that has a face (the house default's whenever it has one), and null only while no face exists at all (a fresh box, where the page draws her initial). `avatar` is the key of the look `id` is the face of: the one he picked while it has a face, else the first that has one, which is the house's first, `original`, until he picks. `avatars` are the looks he may wear: the house's in their order, then his photo while he has one (made, being made or failed). Carried by `CompanionPicture.face` and announced by `companion_face`. */
+export type CompanionFace = { id: string | null; avatar: string; avatars: CompanionFaceAvatar[] };
 
 /**
  * The whole of her as a page reads it with `GET /api/companion`: the `settings`, the models the

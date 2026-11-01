@@ -943,8 +943,12 @@ export const api = {
         body.append('photo', file);
         return authenticatedFetch('/api/companion/face', { method: 'POST', body });
       },
-      // Back to the original: 200 `{ face }`. The face made from his photo is removed.
-      restore: () => del('/api/companion/face'),
+      // The look to wear, by its `key` (a house look's, or `own`, his photo): 200 `{ face }` once the server has stored it and announced it to
+      // every page of the account as a `companion_face` frame; 400 `COMPANION_FACE_INVALID` with "There is no look called <key>." or
+      // "That look isn't ready yet; it can be picked once it is made."; 503 `COMPANION_STOPPING`.
+      pick: (avatar: string) => put('/api/companion/face/avatar', { avatar }),
+      // Removes his photo and the face made from it, and drops a bake still being made: 200 `{ face }`. A look of the house he wears stays; a pick of his photo goes back to the house's first.
+      remove: () => del('/api/companion/face'),
       // The face's `CompanionFaceManifest` (JSON): where every frame sits in the sheets.
       manifest: (faceId: string) => get(`/api/companion/face/${encodeURIComponent(faceId)}/manifest`),
       // One sheet of the face by the file name the manifest gives it (`image/webp`; `manifest.sheets[n].file`, or a larger tier's in `manifest.largerTiers`), for `createImageBitmap`.

@@ -2,6 +2,7 @@ import express from 'express';
 import type { Request, Response, Router } from 'express';
 import multer from 'multer';
 
+import { isRecord } from '@/shared/document-fields.js';
 import { asyncHandler, readAuthenticatedUserId, readPathParam } from '@/shared/utils.js';
 
 import { faceInvalid } from './face-errors.js';
@@ -9,17 +10,20 @@ import { PHOTO_MAX_BYTES, photoTooLargeSentence } from './face-upload.js';
 import { faceService } from './face.service.js';
 
 /**
- * Her face's five routes, mounted by `createCompanionRoutes` at `/api/companion/face` behind `authenticateToken`. ONLY
+ * Her face's six routes, mounted by `createCompanionRoutes` at `/api/companion/face` behind `authenticateToken`. ONLY
  * TRANSPORT: each route reads who is asking, parses what came, calls one verb of the face service and answers.
  *
  *   POST   /                     multipart, one `photo` of at most 15 MB: 200 `{ face }` when that photo's face was already made and is now
- *                                hers, 202 `{ face }` while it is made (its progress comes as `companion_face` frames)
- *   DELETE /                     200 `{ face }`, the original
+ *                                hers, 202 `{ face }` while it is made (its progress comes as `companion_face` frames; when it is made she wears it)
+ *   PUT    /avatar               JSON `{ avatar: string }`, the key of the look to wear (a house look's, or `own`): 200 `{ face }` once it is stored
+ *                                and announced to every page of the account as a `companion_face` frame; 400 `COMPANION_FACE_INVALID` with
+ *                                "There is no look called <key>." or "That look isn't ready yet; it can be picked once it is made."
+ *   DELETE /                     200 `{ face }`, his photo removed with the face made from it (a look of the house he wore stays; his photo's pick goes back to the house's first)
  *   GET    /:faceId/manifest     the face's `CompanionFaceManifest`
  *   GET    /:faceId/sheet/:file  one sheet, `image/webp`, by the file name the manifest gives it (every tier's sheets are named there)
  *   GET    /:faceId/contact      the contact sheet (every frame named), `image/webp`
  *
- * A file is served only for the original and the face the asking account names (404 `COMPANION_FACE_NOT_FOUND` for any other),
+ * A file is served only for the house's looks (each one's drawn and current face) and the face the asking account made from its photo (404 `COMPANION_FACE_NOT_FOUND` for any other),
  * with `Cache-Control: private, max-age=31536000, immutable`: a face id names its bytes for ever. The refusals are the app's own
  * `AppError` envelope: 400 `COMPANION_FACE_INVALID` (its message is the sentence the card shows), 404, and 503 `COMPANION_STOPPING`.
  * Like her memory, the face is no page's, so these name no `x-companion-client`. Consumed by `companion.routes.ts`.
@@ -67,10 +71,19 @@ export function createFaceRoutes(): Router {
     }),
   );
 
+  router.put(
+    '/avatar',
+    asyncHandler(async (request: Request, response: Response) => {
+      const avatar: unknown = isRecord(request.body) ? request.body.avatar : undefined;
+      if (typeof avatar !== 'string' || avatar === '') throw faceInvalid('Send the look to wear as JSON: { "avatar": its key }.');
+      response.json({ face: faceService.pick(readAuthenticatedUserId(request), avatar) });
+    }),
+  );
+
   router.delete(
     '/',
     asyncHandler(async (request: Request, response: Response) => {
-      response.json({ face: faceService.restore(readAuthenticatedUserId(request)) });
+      response.json({ face: faceService.removeOwn(readAuthenticatedUserId(request)) });
     }),
   );
 

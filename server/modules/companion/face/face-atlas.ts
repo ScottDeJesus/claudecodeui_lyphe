@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import type { CompanionFaceManifest } from '@/shared/companion-types.js';
 
 import { FacePhotoInvalid, MIN_PHOTO_SIDE, sentences } from './face-refusal.js';
-import { FACE_FRAMING, type FaceFraming } from './face-recipe.js';
+import type { FaceFraming } from './face-recipe.js';
 
 /**
  * The picture work of the bake, all of it sharp: the photo made ready, the cut of each generator crop to the disc's
@@ -65,17 +65,17 @@ export async function normalizePhoto(bytes: Buffer): Promise<{ png: Buffer; phot
 }
 
 /**
- * The photo with a band on every side, `pad` times its size (width on the sides, height above and below). The node shifts a
+ * The photo with a band on every side, the framing's `pad` times its size (width on the sides, height above and below). The node shifts a
  * crop that runs off the image, which would move the face off the crop's centre; the band keeps every crop inside, and it
  * lies outside the disc. The sides are mirrored pixels. Above and below they are NOT: a vertical mirror holds the face
  * itself, upside down, at the very x of the real one, and the node takes the face box nearest the image's horizontal
  * centre — measured on the seed photo, it chose the reflection. A replicated edge row has no face in it. Consumed by
  * `face-bake.ts`, which hands the result to ComfyUI.
  */
-export async function padPhoto(png: Buffer, pad: number = FACE_FRAMING.pad): Promise<Buffer> {
+export async function padPhoto(png: Buffer, framing: FaceFraming): Promise<Buffer> {
   const { width, height } = await sharp(png).metadata();
-  const sideBand = Math.round((width ?? 0) * pad);
-  const verticalBand = Math.round((height ?? 0) * pad);
+  const sideBand = Math.round((width ?? 0) * framing.pad);
+  const verticalBand = Math.round((height ?? 0) * framing.pad);
   const sidesMirrored = await sharp(png).extend({ left: sideBand, right: sideBand, extendWith: 'mirror' }).png({ compressionLevel: 1 }).toBuffer();
   return sharp(sidesMirrored)
     .extend({ top: verticalBand, bottom: verticalBand, extendWith: 'copy' })
@@ -97,13 +97,13 @@ export function discSquare(framing: FaceFraming): { left: number; top: number; s
 }
 
 /**
- * One frame at one tier: the disc's square cut from the node's preview and, below the square's own side, resized to
+ * One frame at one tier of the look made with `framing`: the disc's square cut from the node's preview and, below the square's own side, resized to
  * `frameSize` (the square's own side is cut as it is, with no resampling: the preview holds no more detail than that), as a
  * lossless PNG for packing. A square that does not lie inside the preview, or a `frameSize` above the square's side (a tier
  * that would only stretch pixels), is a recipe value to correct, so it throws and names the numbers.
  * Consumed by `face-bake.ts`, once per frame and tier.
  */
-export async function cutFrame(preview: Buffer, frameSize: number, framing: FaceFraming = FACE_FRAMING): Promise<Buffer> {
+export async function cutFrame(preview: Buffer, frameSize: number, framing: FaceFraming): Promise<Buffer> {
   const { width, height } = await sharp(preview).metadata();
   if (width !== PREVIEW_SIDE || height !== PREVIEW_SIDE) {
     throw new Error(`the node's preview is ${width}x${height}, not ${PREVIEW_SIDE}x${PREVIEW_SIDE}`);

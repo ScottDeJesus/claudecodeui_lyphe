@@ -19,6 +19,7 @@ import { fillSystemPrompt } from './companion-prompt.js';
 import { createRefusal } from './companion-refusal.js';
 import type { CompanionSession, CompanionSessionDeps } from './companion-session-types.js';
 import { sessionShapeOf } from './companion-shape.js';
+import { readSoul } from './companion-soul.js';
 import { createTurnTracker } from './companion-turns.js';
 import { guarded } from './guarded-callback.js';
 
@@ -63,8 +64,8 @@ import { guarded } from './guarded-callback.js';
  * Consumers: `companion-account.ts` (one session per account, behind the routes and the feeds) and the voice.
  */
 
-/** What a launch begins with: the CLI conversation it continues (`null` for a fresh one), the `tools` it is handed and the `shape` of those tools and her prompt, which is stored with the session id its `init` reports. The shape is taken from the very tools the launch gets. */
-type LaunchPlan = { resume: string | null; tools: CompanionSessionDeps['tools']; shape: string };
+/** What a launch begins with: the CLI conversation it continues (`null` for a fresh one), the `tools` it is handed, the `systemPrompt` it is sent and the `shape` of those tools and that prompt, which is stored with the session id its `init` reports. The shape is taken from the very tools and the very prompt the launch gets. */
+type LaunchPlan = { resume: string | null; tools: CompanionSessionDeps['tools']; systemPrompt: string; shape: string };
 
 /** One launch and what the conversation has learned of it: the shape it was launched with, whether its first `init` has been seen (the process is up), whether the CLI refused its `resume`, and whether it holds a message yet (a `warm` launch does not). */
 type Launch = { cli: CompanionCli; shape: string; initSeen: boolean; resumeRefused: boolean; messaged: boolean };
@@ -286,6 +287,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
         resume: plan.resume,
         readSettings: deps.readSettings,
         tools: plan.tools,
+        systemPrompt: plan.systemPrompt,
         // A turn in flight is the only busy there is: she has no background task and no watcher.
         isBusy: () => turns.turnId !== null,
         // A launch that has been detached (closed, cleared, replaced) is drained unheard: its late words are nobody's turn.
@@ -334,10 +336,14 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     await detach(reason)?.cli.close();
   }
 
-  /** A launch made now that continues `resume`: her tools as they stand, and the shape of those and her system prompt as the launch will fill it with the operator's name. */
+  /**
+   * A launch made now that continues `resume`: her tools as they stand, her system prompt composed now (her soul pages read afresh, the operator's
+   * name filled in) and the shape of both. The launch is sent this very prompt, so what is hashed is what is sent; an edit to a soul page is a new shape here.
+   */
   function planWith(resume: string | null): LaunchPlan {
     const tools = deps.tools;
-    return { resume, tools, shape: sessionShapeOf(tools, fillSystemPrompt(deps.readSettings().operatorName)) };
+    const systemPrompt = fillSystemPrompt(deps.readSettings().operatorName, readSoul(userId));
+    return { resume, tools, systemPrompt, shape: sessionShapeOf(tools, systemPrompt) };
   }
 
   /**

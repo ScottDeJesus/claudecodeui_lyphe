@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type {
+  CompanionFaceBlink,
   CompanionFaceClip,
   CompanionFaceGaze,
   CompanionFaceManifest,
@@ -25,7 +26,9 @@ import type {
  *
  * Frame names are the one convention shared by the CLI's lines, the contact sheet, the page's replay and the page's stamp:
  * `mood.<mood>.<mouth>`, `blink.<mood>.half` and `.closed`, `gaze.<gaze>`, `pose.<pose>`, `state.listening`,
- * `state.failed`, `state.surprise` and `clip.<clip>.<n>`.
+ * `state.failed`, `state.surprise`, `clip.<clip>.<n>`, and after the clips the blinks of the looks that are not a mood's face:
+ * `blink.listening.<step>`, `blink.gaze.<gaze>.<step>` and `blink.pose.<pose>.<step>`, `<step>` being `half` or `closed`, and last
+ * `brow.<mood>`: each mood's closed face with her brows lifted, which the page shows at the end of a question.
  */
 
 /** The node's commit, which the recipe's id and every cached frame are keyed by: another commit may render another crop. Pinned by scripts/install-comfyui.sh. */
@@ -40,7 +43,7 @@ export type FaceSliders = {
 
 type SliderDelta = Partial<FaceSliders>;
 
-/** How the generator's crop becomes the disc's frame. Consumed by `face-atlas.ts` (the cut and the pad) and `comfyui.ts` (crop_factor). */
+/** How the generator's crop becomes the disc's frame. Consumed by `face-atlas.ts` (the cut and the pad), `face-bake.ts` (the cache and the tiers), `face-avatars.ts` and the CLI. */
 export type FaceFraming = {
   /** The node's crop_factor: the crop is this many face sides across, so the face's side is 512 / cropFactor preview pixels. */
   cropFactor: number;
@@ -59,7 +62,7 @@ export type FaceFraming = {
   pad: number;
 };
 
-/** The framing every face is made with. Consumed by `face-atlas.ts` (the cut and the pad) and `comfyui.ts` (crop_factor). */
+/** The house framing: Dark hair's, and the default of every account's own photo. Another look's framing (`face-avatars.ts`) is its own object of the same shape. Consumed by `face-avatars.ts`, `face-files.ts` and `face.service.ts`. */
 export const FACE_FRAMING: FaceFraming = { cropFactor: 2.0, discSide: 1.75, discRaise: 0.05, frameSizes: [256, 448], pad: 0.5 };
 
 /** The node's own range for each slider; each frame's sum is clamped to it. */
@@ -115,6 +118,9 @@ const STATES = {
   failed: { smile: -0.2, blink: -7, eyebrow: -1, pupil_y: -4 },
   surprise: { eyebrow: 12, blink: 5, aaa: 30, woo: 6 },
 } satisfies Record<string, SliderDelta>;
+
+/** Added to a mood's closed face for its `brow.<mood>` frame: her brows lifted and her eyes a little wider, the mouth left closed so the mood's smile stands. */
+const QUESTION_BROW: SliderDelta = { eyebrow: 6, blink: 2 };
 
 const LAUGH_BASE: SliderDelta = { smile: 1.1, eyebrow: 5, blink: -6 };
 const GIGGLE_BASE: SliderDelta = { smile: 0.9, eyebrow: 3, blink: -6 };
@@ -175,14 +181,22 @@ export function recipeFrames(): RecipeFrame[] {
   for (const mood of moodNames) {
     for (const mouth of mouthNames) add(`mood.${mood}.${mouth}`, [MOODS[mood], MOUTHS[mouth]]);
   }
-  for (const mood of moodNames) {
-    add(`blink.${mood}.half`, [MOODS[mood]], { blink: BLINKS.half });
-    add(`blink.${mood}.closed`, [MOODS[mood]], { blink: BLINKS.closed });
-  }
+  // A blink is its look's deltas with `blink` SET: half, then closed.
+  const addBlink = (name: string, delta: SliderDelta) => {
+    add(`${name}.half`, [delta], { blink: BLINKS.half });
+    add(`${name}.closed`, [delta], { blink: BLINKS.closed });
+  };
+  for (const mood of moodNames) addBlink(`blink.${mood}`, MOODS[mood]);
   for (const gaze of gazeNames) add(`gaze.${gaze}`, [GAZE[gaze]]);
   for (const pose of poseNames) add(`pose.${pose}`, [POSES[pose]]);
   for (const [state, delta] of Object.entries(STATES)) add(`state.${state}`, [delta]);
   for (const clip of clipNames) CLIPS[clip].frames.forEach((delta, n) => add(`clip.${clip}.${n}`, [delta]));
+  // The blinks of the looks that are not a mood's face, after the clips so every index before them stands.
+  addBlink('blink.listening', STATES.listening);
+  for (const gaze of gazeNames) addBlink(`blink.gaze.${gaze}`, GAZE[gaze]);
+  for (const pose of poseNames) addBlink(`blink.pose.${pose}`, POSES[pose]);
+  // Each mood's brows lifted, after the blinks for the same reason.
+  for (const mood of moodNames) add(`brow.${mood}`, [MOODS[mood], QUESTION_BROW]);
 
   listedFrames = frames;
   return frames;
@@ -199,22 +213,24 @@ function canonicalJson(value: unknown): string {
 }
 
 /**
- * The recipe's id: the first 8 hex of the sha256 of the recipe as canonical JSON, plus the node's commit. It hashes the
- * frames as composed (names and clamped sliders, in order) and the framing, so a change to any table, clamp or framing
- * value is a new id and so a new face. The second half of every face id (`<photoId>-<recipeId>`); consumed by `face-files.ts`.
+ * The recipe's id for a look made with `framing` (the house's by default): the first 8 hex of the sha256 of the recipe as
+ * canonical JSON, plus the node's commit. It hashes the frames as composed (names and clamped sliders, in order) and the
+ * framing, so a change to any table, clamp or that look's framing value is a new id and so a new face, while another look's
+ * face stands. The second half of every face id (`<photoId>-<recipeId>`); consumed by `face-files.ts`.
  */
-export function recipeId(): string {
-  const recipe = canonicalJson({ framing: FACE_FRAMING, frames: recipeFrames() });
+export function recipeId(framing: FaceFraming = FACE_FRAMING): string {
+  const recipe = canonicalJson({ framing, frames: recipeFrames() });
   return createHash('sha256').update(recipe + NODE_COMMIT).digest('hex').slice(0, 8);
 }
 
 /**
  * The key a frame's cached crop lives under: a hash of every input that shapes the generator's crop — the sliders,
  * crop_factor, the pad and the node's commit. The disc's side and raise are NOT in it: they only change the cut, so a
- * framing tune re-cuts cached crops and renders nothing. Consumed by `face-bake.ts`, the `frames/` cache.
+ * framing tune re-cuts cached crops and renders nothing. `framing` is the look's (the house's by default). Consumed by
+ * `face-bake.ts`, the `frames/` cache.
  */
-export function frameCacheKey(sliders: FaceSliders): string {
-  const shaping = canonicalJson({ sliders, cropFactor: FACE_FRAMING.cropFactor, pad: FACE_FRAMING.pad, node: NODE_COMMIT });
+export function frameCacheKey(sliders: FaceSliders, framing: FaceFraming = FACE_FRAMING): string {
+  const shaping = canonicalJson({ sliders, cropFactor: framing.cropFactor, pad: framing.pad, node: NODE_COMMIT });
   return createHash('sha256').update(shaping).digest('hex').slice(0, 16);
 }
 
@@ -238,8 +254,9 @@ export function buildManifest(faceId: string, tiers: CompanionFaceTier[], frames
     if (index === undefined) throw new Error(`the recipe names no frame "${name}"`);
     return index;
   };
-  const record = <K extends string>(keys: K[], name: (key: K) => string) =>
-    Object.fromEntries(keys.map((key) => [key, at(name(key))])) as Record<K, number>;
+  const table = <K extends string, V>(keys: K[], value: (key: K) => V) => Object.fromEntries(keys.map((key) => [key, value(key)])) as Record<K, V>;
+  const record = <K extends string>(keys: K[], name: (key: K) => string) => table(keys, (key) => at(name(key)));
+  const blinkOf = (name: string): CompanionFaceBlink => ({ half: at(`${name}.half`), closed: at(`${name}.closed`) });
 
   return {
     version: 1,
@@ -251,7 +268,7 @@ export function buildManifest(faceId: string, tiers: CompanionFaceTier[], frames
     moods: Object.fromEntries(
       moodNames.map((mood) => [mood, {
         mouths: record(mouthNames, (mouth) => `mood.${mood}.${mouth}`),
-        blink: { half: at(`blink.${mood}.half`), closed: at(`blink.${mood}.closed`) },
+        blink: blinkOf(`blink.${mood}`),
       }]),
     ) as CompanionFaceManifest['moods'],
     gaze: record(gazeNames, (gaze) => `gaze.${gaze}`),
@@ -260,5 +277,11 @@ export function buildManifest(faceId: string, tiers: CompanionFaceTier[], frames
     clips: Object.fromEntries(
       clipNames.map((clip) => [clip, { fps: CLIPS[clip].fps, frames: clipPlaylist(clip).map(at) }]),
     ) as CompanionFaceManifest['clips'],
+    blinks: {
+      listening: blinkOf('blink.listening'),
+      gaze: table(gazeNames, (gaze) => blinkOf(`blink.gaze.${gaze}`)),
+      poses: table(poseNames, (pose) => blinkOf(`blink.pose.${pose}`)),
+    },
+    brows: record(moodNames, (mood) => `brow.${mood}`),
   };
 }

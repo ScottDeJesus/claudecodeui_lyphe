@@ -21,8 +21,8 @@ type MouthState = { openness: MouthOpenness; since: number };
 /** A mouth shut for as long as anyone can remember: the first change is never held by its dwell. */
 export const MOUTH_CLOSED: MouthState = { openness: 'closed', since: Number.NEGATIVE_INFINITY };
 
-/** The level (the player's RMS, 0..1) at which a shut mouth opens to half. */
-const HALF_OPEN_AT = 0.035;
+/** The level (the player's RMS, 0..1) at which a shut mouth opens to half; `faceHead.ts` reads the same level as the floor of her voice's strength. */
+export const HALF_OPEN_AT = 0.035;
 /** The level at which a half-open mouth opens fully. */
 const FULL_OPEN_AT = 0.12;
 /** A mouth closes or narrows only once the level has fallen this far below the level that opened it, so a level resting on a threshold never flickers. */

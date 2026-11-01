@@ -138,7 +138,7 @@ export const picture = (change: Partial<CompanionPicture>): CompanionPicture => 
     { value: 'sonnet', label: 'Sonnet 5.5' }, { value: 'fable', label: 'Fable 5.1' }, { value: 'opus', label: 'Opus 5.5' }, { value: 'haiku', label: 'Haiku 5.5' },
   ],
   process: { state: 'awake', error: null }, activity: IDLE, turnId: null, focus: null, draft: null, pending: null, walk: null,
-  notes: [], log: [], floor: 'fixture-station', face: { id: null, original: true, bake: null }, ...change,
+  notes: [], log: [], floor: 'fixture-station', face: { id: null, avatar: 'original', avatars: [] }, ...change,
 });
 
 /** Her picture in each of the station's four: what her head, her conversation and her talk control are drawn from. */

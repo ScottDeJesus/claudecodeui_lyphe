@@ -49,10 +49,9 @@ section: README/001 The rules that keep it one source
    needed names of its own. `tone-soft`,
    `tone-ink` and `tone-dot` joined as names over the tone swap's own properties, not over a palette
    token: each is `color-mix` over `--tone-soft`, `--tone-ink` or `--tone-dot`, which the
-   `[data-tone]` rules of rule 4 hand to everything inside a container. `garnish` joined for
-   Kaylee Station's warm marks, its shapes (the "new" dot, the last look's dashed rule and the
-   edge of a new landing): `color-mix` over `--garnish`, the warm accent, never a wall. It is a
-   shape's colour and reads 3:1 on the light canvas; a warm WORD takes `warn-ink`. `bg-tone-dot` is the dot of
+   `[data-tone]` rules of rule 4 hand to everything inside a container. `garnish` joined for Kaylee
+   Station's title word (`text-garnish` on the italic "Station"): `color-mix` over `--garnish`, the
+   warm accent, never a wall. `bg-tone-dot` is the dot of
    whichever of the five tones the nearest `data-tone` chose, and resolves to nothing with none above
    it. `--tone-glyph` has no name: it holds a string, not a colour. A name whose
    `var()` points at no existing token is rule 2's second palette in a Tailwind spelling.
@@ -446,12 +445,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home
 
 ## MAN-8580 — `SegmentedControl` and `DataTable` — Verve's §11 switch and §5 sortable table: props, behaviour, paint (`verve/data.css`)
 
-`src/shared/ui/SegmentedControl.tsx` and `DataTable.tsx` are in the library because Verve draws them (§11 Plumbing "IconButton · SegmentedControl" and §5 "Data table · sortable"; MAN-571), with or without a second module. Callers (2026-10-17): `SegmentedControl` in the affected-areas module's `ToursSwitch`, `LayerSwitch` and `MarkQueue`, and in the station module's compact switch (`StationCompactView`, 2026-10-30); `DataTable` in its `ProvingTable` (the kinds) and `ProvingDetail` (a kind's sweep). The station's compact switch is `count`'s site ("Needs you 4") and `detail`'s ("Stage" and the label of what stands there). The `site` column names the screen each prop is for. Paint: `verve/data.css`, imported by the barrel after `media.css` and before `board.css` (MAN-740 rule 6). Both are exported from `@/shared/ui`; the type `DataTableColumn<Row>` is in `src/shared/types.ts`. The chat transcript's own `DataTable` (`src/modules/chat/transcript/shapes/DataTable.tsx`) renders react-markdown children with a CSV copy, a different job; it stays where it is.
+`src/shared/ui/SegmentedControl.tsx` and `DataTable.tsx` are in the library because Verve draws them (§11 Plumbing "IconButton · SegmentedControl" and §5 "Data table · sortable"; MAN-571), with or without a second module. Callers (2026-10-17): `SegmentedControl` in the affected-areas module's `ToursSwitch`, `LayerSwitch` and `MarkQueue`, in the station module's compact switch (`StationCompactView`, 2026-10-30) and in the companion module's face card (`CompanionFaceSettingsView`, 2026-11-01: the looks of hers that are made, named "Her face"; MAN-9220); `DataTable` in its `ProvingTable` (the kinds) and `ProvingDetail` (a kind's sweep). The station's compact switch is `count`'s site ("Needs you 4") and `detail`'s ("Stage" and the label of what stands there). The `site` column names the screen each prop is for. Paint: `verve/data.css`, imported by the barrel after `media.css` and before `board.css` (MAN-740 rule 6). Both are exported from `@/shared/ui`; the type `DataTableColumn<Row>` is in `src/shared/types.ts`. The chat transcript's own `DataTable` (`src/modules/chat/transcript/shapes/DataTable.tsx`) renders react-markdown children with a CSV copy, a different job; it stays where it is.
 
 ## `SegmentedControl`
 | prop | meaning | site |
 |---|---|---|
-| `options` | `{ value, label, count?, detail? }[]`, drawn in order; `count` is a number beside the word; `detail` is more words after the label in the muted ink, the one thing in the tray that gives way (the caller keeps the tray wide enough for every label whole) | Tours · Mark · Tables; the pano's layer switch; the Mark screen's queue mode; the station's compact switch (`count` on Needs you, `detail` on Stage) |
+| `options` | `{ value, label, count?, detail? }[]`, drawn in order; `count` is a number beside the word; `detail` is more words after the label in the muted ink, the one thing in the tray that gives way (the caller keeps the tray wide enough for every label whole) | Tours · Mark · Tables; the pano's layer switch; the Mark screen's queue mode; the station's compact switch (`count` on Needs you, `detail` on Stage); the face card's look switch |
 | `value` | the chosen option's `value`. A value no option carries leaves nothing chosen and gives the first option the Tab stop | each |
 | `onChange` | called with an option's `value` | each |
 | `label` | the group's accessible name | each |

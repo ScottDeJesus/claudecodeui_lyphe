@@ -41,7 +41,7 @@ import { startStationLandedFeed } from './station/station-landed-feed.js';
  * a message that arrives after it is refused with a 503 — beside the face service's `stop`, which aborts the running face
  * bake; the entrypoint's shutdown awaits both before it stops anything else.
  *
- * The face service starts here too (`faceService.start()`): it registers the seed photo, queues the original's bake when it
+ * The face service starts here too (`faceService.start()`): it registers the house's avatars, queues the bake of each whose face
  * is not made, resumes every account's pending bake and prunes (`face/face.service.ts`). Its work runs in the background and
  * a failure of it is logged; the module serves either way.
  */

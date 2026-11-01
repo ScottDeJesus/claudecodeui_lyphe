@@ -636,9 +636,9 @@ const addCompanionMemoryForgetLineColumn = (db: Database): void => {
 };
 
 /**
- * Adds the three columns of an account's face to `companion_state`: `face_id`, the face her pages draw (NULL for the original);
+ * Adds the three columns of an account's own photo to `companion_state`: `face_id`, the face made from his photo (NULL while he has none);
  * `face_pending_id`, the face being made from his upload, which a restart resumes; and `face_error`, the sentence of the last
- * bake that failed. All NULL for every row before these columns, which is the original face with nothing being made. Clear leaves
+ * bake that failed. All NULL for every row before these columns, which is no photo of his with nothing being made. Clear leaves
  * them (`clearAccount` names only the conversation's columns): Clear wipes her memory, not her look.
  */
 const addCompanionFaceColumns = (db: Database): void => {
@@ -647,6 +647,21 @@ const addCompanionFaceColumns = (db: Database): void => {
   addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'face_id', 'TEXT');
   addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'face_pending_id', 'TEXT');
   addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'face_error', 'TEXT');
+};
+
+/**
+ * Adds `companion_state.avatar`: the look he picked in Settings, a house avatar's key or `own` (his photo), NULL until he picks, which reads as the
+ * house's first look. It is one column and not a setting of hers because it decides which face the face service answers, and so it lives with the
+ * face's three columns; Clear leaves it too. Only when the column is just added, one UPDATE keeps what an account already wears: before
+ * the column, an account holding a face (`face_id`) wore it, so its pick is `own`; every other row stays NULL and stays on the house's first look.
+ * The literal is the face module's `OWN_AVATAR_KEY`, which a database migration may not import.
+ */
+const addCompanionAvatarColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'companion_state').map((column) => column.name);
+  if (columnNames.includes('avatar')) return;
+
+  addColumnToTableIfNotExists(db, 'companion_state', columnNames, 'avatar', 'TEXT');
+  db.prepare("UPDATE companion_state SET avatar = 'own' WHERE face_id IS NOT NULL").run();
 };
 
 /**
@@ -900,6 +915,7 @@ export const runMigrations = (db: Database) => {
     addCompanionPendingColumn(db);
     addCompanionMemoryForgetLineColumn(db);
     addCompanionFaceColumns(db);
+    addCompanionAvatarColumn(db);
     addCompanionUnansweredColumn(db);
     addCompanionSessionShapeColumn(db);
     addCompanionHandoverColumn(db);

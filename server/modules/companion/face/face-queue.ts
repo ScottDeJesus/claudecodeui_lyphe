@@ -1,29 +1,43 @@
+import type { CompanionFaceBake } from '@/shared/companion-types.js';
+
 import { bakeFace } from './face-bake.js';
+import { faceIdOf } from './face-files.js';
 import { FaceBakeRefusal, sentences } from './face-refusal.js';
-import { recipeFrames } from './face-recipe.js';
+import { FACE_FRAMING, recipeFrames, type FaceFraming } from './face-recipe.js';
 
 /**
  * THE IN-PROCESS BAKE QUEUE: the faces wanted, made one at a time in the order they were asked for, each under the box-wide
- * lock `bakeFace` takes (`face-lock.ts`). A job is one PHOTO: several accounts that upload the same photo share its bake, and
- * the original's own bake (`forOriginal`) is a job that no account asked for. The queue moves on events only: a job is
- * started when it is asked for (if none is running) and when the running one settles; nothing here looks at a clock.
+ * lock `bakeFace` takes (`face-lock.ts`). A job is one FACE: a photo under a framing. Several accounts that upload the same photo
+ * share its bake, and a house look's bake (`forHouse`) is a job that no account asked for. A photo that is both a house look's and
+ * an upload is two faces when the framings differ (his upload of the office picture is made under the house framing, Brown hair's
+ * under its own) and one when they do not. The queue moves on events only: a job is started when it is asked for (if none is
+ * running) and when the running one settles; nothing here looks at a clock.
  *
  * The queue knows nothing of accounts' rows or pages. What a bake's progress and its end MEAN for them is the service's, told
  * through the two hooks.
  */
 
-/** One photo's bake, queued or running. Consumed by `face.service.ts`, which reads its progress for the wire. */
+/** One face's bake, queued or running. Consumed by `face.service.ts` and `face-house.ts`, which read its progress for the wire. */
 export type BakeJob = {
+  /** The face made: `faceIdOf(photoId, framing)`. */
+  faceId: string;
   photoId: string;
-  /** The accounts waiting on this photo's face. */
+  /** The framing the face is made with: the house framing for an account's own photo, the look's for a house look. */
+  framing: FaceFraming;
+  /** The accounts waiting on this face (those whose photo it is). */
   accounts: Set<number>;
-  /** Whether this is also the original's bake, which stays wanted though no account is waiting. */
-  forOriginal: boolean;
+  /** Whether a house look wants this face, which stays wanted though no account is waiting. */
+  forHouse: boolean;
   state: 'queued' | 'baking';
   done: number;
   total: number;
   abort: AbortController;
 };
+
+/** A queued or running job's making as the wire says it: `baking` with its count, or `queued` with none made yet. Consumed by `face-house.ts` and `face.service.ts`, which put it on each look's `bake`. */
+export function bakeOfJob(job: BakeJob): CompanionFaceBake {
+  return job.state === 'baking' ? { state: 'baking', done: job.done, total: job.total } : { state: 'queued', done: 0, total: job.total };
+}
 
 /** How a job ended: `made` (the face is published), `refused` (the sentence for his screen) or `ended` (aborted: the server is stopping, or nobody wants the face any more). */
 export type BakeOutcome = { kind: 'made'; faceId: string } | { kind: 'refused'; sentence: string } | { kind: 'ended' };
@@ -41,9 +55,9 @@ export function createBakeQueue(hooks: BakeQueueHooks) {
   let stopped = false;
 
   /** A job that can still be joined: an aborted one is unwinding and will make nothing. */
-  const liveJobOf = (photoId: string): BakeJob | undefined => jobs.find((job) => job.photoId === photoId && !job.abort.signal.aborted);
+  const liveJobOf = (faceId: string): BakeJob | undefined => jobs.find((job) => job.faceId === faceId && !job.abort.signal.aborted);
 
-  const isWanted = (job: BakeJob): boolean => job.forOriginal || job.accounts.size > 0;
+  const isWanted = (job: BakeJob): boolean => job.forHouse || job.accounts.size > 0;
 
   function remove(job: BakeJob): void {
     const at = jobs.indexOf(job);
@@ -62,7 +76,7 @@ export function createBakeQueue(hooks: BakeQueueHooks) {
     try {
       hooks.onProgress(job);
     } catch (error) {
-      console.error('[Companion] a face bake\'s progress could not be announced', { photoId: job.photoId, error });
+      console.error('[Companion] a face bake\'s progress could not be announced', { faceId: job.faceId, error });
     }
   }
 
@@ -70,6 +84,7 @@ export function createBakeQueue(hooks: BakeQueueHooks) {
     try {
       const { faceId } = await bakeFace({
         photoId: job.photoId,
+        framing: job.framing,
         signal: job.abort.signal,
         onProgress(done, total) {
           job.done = done;
@@ -81,7 +96,7 @@ export function createBakeQueue(hooks: BakeQueueHooks) {
     } catch (error) {
       if (job.abort.signal.aborted) return { kind: 'ended' };
       if (error instanceof FaceBakeRefusal) return { kind: 'refused', sentence: error.message };
-      console.error('[Companion] a face bake failed', { photoId: job.photoId, done: job.done, total: job.total, error });
+      console.error('[Companion] a face bake failed', { faceId: job.faceId, done: job.done, total: job.total, error });
       return { kind: 'refused', sentence: sentences.stopped(job.done, job.total) };
     }
   }
@@ -94,7 +109,7 @@ export function createBakeQueue(hooks: BakeQueueHooks) {
     try {
       await hooks.onSettled(job, outcome);
     } catch (error) {
-      console.error('[Companion] the end of a face bake could not be recorded', { photoId: job.photoId, outcome: outcome.kind, error });
+      console.error('[Companion] the end of a face bake could not be recorded', { faceId: job.faceId, outcome: outcome.kind, error });
     }
   }
 
@@ -109,29 +124,32 @@ export function createBakeQueue(hooks: BakeQueueHooks) {
     });
   }
 
-  function join(photoId: string): BakeJob {
-    const existing = liveJobOf(photoId);
+  /** The live job making `photoId` under `framing`, or a new queued one. */
+  function join(photoId: string, framing: FaceFraming): BakeJob {
+    const faceId = faceIdOf(photoId, framing);
+    const existing = liveJobOf(faceId);
     if (existing) return existing;
     const job: BakeJob = {
-      photoId, accounts: new Set(), forOriginal: false, state: 'queued', done: 0, total: recipeFrames().length, abort: new AbortController(),
+      faceId, photoId, framing, accounts: new Set(), forHouse: false, state: 'queued', done: 0, total: recipeFrames().length, abort: new AbortController(),
     };
     jobs.push(job);
     return job;
   }
 
   return {
-    /** The original's face wanted: queued (or joined, if its photo is being made for an account) with no account behind it. */
-    wantOriginal(photoId: string): void {
+    /** A house look's face wanted: queued (or joined, if the same face is being made for an account) with no account behind it, and wanted until it is made. */
+    wantHouse(photoId: string, framing: FaceFraming): void {
       if (stopped) return;
-      join(photoId).forOriginal = true;
+      join(photoId, framing).forHouse = true;
       start();
     },
 
-    /** Makes `photoId`'s face what `userId` waits on: joins its job (or queues one) and leaves any other job the account was in, so a new upload replaces the pending one. */
+    /** Makes the face of his photo `photoId` (the house framing) what `userId` waits on: joins its job (or queues one) and leaves any other job the account was in, so a new upload replaces the pending one. */
     assign(userId: number, photoId: string): void {
       if (stopped) return;
-      join(photoId).accounts.add(userId);
-      for (const job of [...jobs]) if (job.photoId !== photoId) leave(job, userId);
+      const job = join(photoId, FACE_FRAMING);
+      job.accounts.add(userId);
+      for (const other of [...jobs]) if (other !== job) leave(other, userId);
       start();
     },
 
@@ -140,7 +158,7 @@ export function createBakeQueue(hooks: BakeQueueHooks) {
       for (const job of [...jobs]) leave(job, userId);
     },
 
-    /** The job making `photoId`, queued or baking, or undefined. */
+    /** The job making `faceId`, queued or baking, or undefined. */
     jobOf: liveJobOf,
 
     /** The photos the queue holds, so a prune keeps their folders (the photo and its frame cache). */
