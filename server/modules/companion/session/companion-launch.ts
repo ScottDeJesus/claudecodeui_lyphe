@@ -9,15 +9,13 @@ import { userFacingEnv } from '@/shared/child-env.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import type { CompanionSettings } from '@/shared/companion-types.js';
 
-import { fillSystemPrompt } from './companion-prompt.js';
-
 /**
  * How her one streaming-input `query()` is launched: the options, and the check that its tool list is
  * what was asked for. She is built exactly like the Cerberus diagnosis agent
  * (`cerberus/diagnosis/diagnosis-agent.ts`), which runs in production, so READ-ONLY-BY-CONSTRUCTION is
  * true of her for the same reasons, each one an option below:
- *   - `systemPrompt` is a plain string, her own — never the Claude Code preset — so no house rule,
- *     CLAUDE.md or skill is ever put in front of her;
+ *   - `systemPrompt` is a plain string, her own (her soul pages, then her plumbing, composed by the session's plan: `companion-prompt.ts`) —
+ *     never the Claude Code preset — so no house rule, CLAUDE.md or skill is ever put in front of her;
  *   - `settingSources: []` — nothing on disk widens what she may do;
  *   - `settings.autoMemoryEnabled: false` — the CLI keys a project's auto-memory (`MEMORY.md`, the
  *     operator's standing rules for coding agents) to the git root of the cwd, and hers sits inside
@@ -114,24 +112,25 @@ export function unexpectedTools(listed: readonly string[], tools: ReadonlyArray<
 }
 
 /**
- * The options of one launch of her conversation: `settings` give the model and the operator's name
- * (the system prompt's one slot), `tools` the definitions her MCP server carries (none is a valid
- * set — the probe runs without any), and `providerSessionId` the conversation to resume (`null` for a
- * fresh one: no `resume` key at all, never an empty one). Async because the account env is read from
- * the house's door at launch. Consumed by `session/companion-session.ts`.
+ * The options of one launch of her conversation: `settings` give the model, `tools` the definitions her MCP server
+ * carries (none is a valid set — the probe runs without any), `providerSessionId` the conversation to resume (`null` for a
+ * fresh one: no `resume` key at all, never an empty one) and `systemPrompt` the prompt exactly as the launch's plan hashed it
+ * (read nowhere here: a second read could differ from the one the shape was taken over). Async because the account env is read
+ * from the house's door at launch. Consumed by `session/companion-process.ts`, which runs the launch.
  */
 export async function companionQueryOptions(
   userId: number,
   settings: CompanionSettings,
   tools: Array<SdkMcpToolDefinition<any>>,
-  providerSessionId: string | null
+  providerSessionId: string | null,
+  systemPrompt: string
 ): Promise<Options> {
   const cwd = companionWorkingDirectory(userId);
   const executable = resolveClaudeCodeExecutablePath(process.env.CLAUDE_CLI_PATH);
   const account = await launchAccountEnv();
   return {
     model: settings.model,
-    systemPrompt: fillSystemPrompt(settings.operatorName),
+    systemPrompt,
     tools: [],
     mcpServers: { [COMPANION_MCP_SERVER_NAME]: createSdkMcpServer({ name: COMPANION_MCP_SERVER_NAME, tools }) },
     strictMcpConfig: true,

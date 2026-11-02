@@ -31,7 +31,7 @@ type ConfirmDialogProps = {
  * (opening another file, or editing in another project, while a file has unsaved changes), the jev
  * module (clearing the replay cache), the dispatcher module (deleting a plan from the store), the
  * companion module (clearing her conversation from her panel, clearing her memory in Settings,
- * clearing her draft, restoring her original register, restoring her original face), the notes
+ * clearing her draft, restoring her original register, removing his photo and the face made from it), the notes
  * module (deleting a note), the roadmap module (deleting an item, promoting a feature), the settings
  * module (restoring Google's sound tags, forgetting his Gemini key) and the sidebar module (deleting a
  * folder).

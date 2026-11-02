@@ -7,6 +7,8 @@ import { useUiPreferences, useSetUiPreference } from '@/shared/context/UiPrefere
 import { useVoiceConfig } from '@/modules/settings/hooks/useVoiceConfig';
 import { useVoiceSettings } from '@/modules/settings/hooks/useVoiceSettings';
 import { GeminiVoiceSection } from '@/modules/settings/tabs/voice-settings/sections/GeminiVoiceSection';
+import { TranscriptCleanupSection } from '@/modules/settings/tabs/voice-settings/sections/TranscriptCleanupSection';
+import { VocabularySection } from '@/modules/settings/tabs/voice-settings/sections/VocabularySection';
 import { VoiceProviderPicker } from '@/modules/settings/tabs/voice-settings/sections/VoiceProviderPicker';
 import { SettingRow, SettingsCard, SettingsSection } from '@/shared/ui';
 
@@ -26,8 +28,9 @@ function Field({ label, ...props }: { label: string } & InputHTMLAttributes<HTML
  * Rendered by Settings for the "voice" tab: voice on or off; with it on, the chat mic's provider (VoiceProviderPicker)
  * heading the voice-input section. That section is the OpenAI-compatible backend, which read-aloud uses whatever the
  * picker says, so all of it stands on Gemini too but the speech-to-text model, the one field that is the chat mic's alone.
- * Then, whether or not voice is on, Gemini (GeminiVoiceSection), because Kaylee hears and speaks through Gemini always,
- * and her own section.
+ * Then, whether or not voice is on, the transcript-cleanup switch (it governs the chat mic and Kaylee's presses alike), the
+ * vocabulary of house words (VocabularySection: misheard spellings corrected for both ears, and how Kaylee says each),
+ * Gemini (GeminiVoiceSection), because Kaylee hears and speaks through Gemini always, and her own section.
  */
 export default function VoiceSettingsTab() {
   const { t } = useTranslation('settings');
@@ -113,6 +116,16 @@ export default function VoiceSettingsTab() {
           </div>
         </SettingsSection>
       )}
+
+      {/* Whether or not voice is on, and whichever provider is picked: it cleans what the chat's mic and Kaylee's presses hear. */}
+      <TranscriptCleanupSection
+        checked={voiceSettings?.cleanTranscripts}
+        saving={saving}
+        onChange={(cleanTranscripts) => { void saveSettings({ cleanTranscripts }); }}
+      />
+
+      {/* Whether or not voice is on, whichever provider is picked: the words both ears correct and Kaylee's voice respells. It reads and saves for itself. */}
+      <VocabularySection />
 
       {/* Whether or not voice is on: Kaylee hears and speaks through Gemini whatever the picker says. */}
       <GeminiVoiceSection

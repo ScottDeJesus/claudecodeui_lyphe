@@ -1,7 +1,9 @@
 import { userPreferencesDb } from '@/modules/database/index.js';
 import { isRecord } from '@/shared/document-fields.js';
-import type { VoiceProvider, VoiceSettings } from '@/shared/types.js';
+import type { VocabularyEntry, VoiceProvider, VoiceSettings } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
+
+import { checkVocabulary } from './vocabulary-check.js';
 
 /** The `user_preferences` key the account's voice settings live under. */
 const PREFERENCE_KEY = 'voice';
@@ -33,6 +35,9 @@ const DEFAULT_GEMINI_SETTINGS = {
   voice: 'Kore',
 };
 
+/** Whether an account's transcripts have their disfluencies removed until it chooses: on. */
+const DEFAULT_CLEAN_TRANSCRIPTS = true;
+
 /** Both models ride the Gemini request, one in the URL's path, so their alphabet is the URL-safe one. */
 const MODEL_PATTERN = /^[A-Za-z0-9._-]{1,80}$/;
 const MODEL_LIMIT_SENTENCE = '1 to 80 characters of letters, digits, dots, underscores and hyphens';
@@ -51,10 +56,13 @@ const GEMINI_FIELDS = ['transcriptionModel', 'speechModel', 'voice', 'soundTags'
 /** What is stored: only the fields the account set, so a default the house later changes still reaches an account that never chose. */
 type StoredOverrides = {
   provider?: VoiceProvider;
+  cleanTranscripts?: boolean;
   transcriptionModel?: string;
   speechModel?: string;
   voice?: string;
   soundTags?: string[];
+  /** The account's house words (`vocabulary.ts` owns their meaning); an empty list is a choice, so `undefined` is the only "never saved". */
+  vocabulary?: VocabularyEntry[];
 };
 
 /** What a patch's `gemini` object carries after validation; `soundTags: null` is the restore of the default. */
@@ -103,6 +111,9 @@ function storedOverrides(userId: number): StoredOverrides {
 
   const overrides: StoredOverrides = {};
   if (isProvider(stored.provider)) overrides.provider = stored.provider;
+  if (typeof stored.cleanTranscripts === 'boolean') overrides.cleanTranscripts = stored.cleanTranscripts;
+  const checkedVocabulary = checkVocabulary(stored.vocabulary);
+  if ('entries' in checkedVocabulary) overrides.vocabulary = checkedVocabulary.entries;
   if (isRecord(stored.gemini)) {
     const { transcriptionModel, speechModel, voice, soundTags } = stored.gemini;
     if (isModel(transcriptionModel)) overrides.transcriptionModel = transcriptionModel;
@@ -117,6 +128,7 @@ function storedOverrides(userId: number): StoredOverrides {
 function withDefaults(overrides: StoredOverrides): VoiceSettings {
   return {
     provider: overrides.provider ?? 'openai',
+    cleanTranscripts: overrides.cleanTranscripts ?? DEFAULT_CLEAN_TRANSCRIPTS,
     gemini: {
       transcriptionModel: overrides.transcriptionModel ?? DEFAULT_GEMINI_SETTINGS.transcriptionModel,
       speechModel: overrides.speechModel ?? DEFAULT_GEMINI_SETTINGS.speechModel,
@@ -130,9 +142,10 @@ function withDefaults(overrides: StoredOverrides): VoiceSettings {
 /**
  * The account's voice settings, read fresh from the database on every call (never cached, so a saved change is
  * heard by the next press). A stored field that fails its limit reads as its default.
- * Consumed by `gemini-transcribe.ts` (the transcription model), `gemini-speech.ts` (the speech model and the voice),
- * `voice-provider.ts` (the provider) and the settings routes. Exported through the voice barrel for the companion,
- * which reads `gemini.soundTags` at the start of each turn (the parse) and at each push (the register).
+ * Consumed by `gemini-transcribe.ts` (the transcription model and `cleanTranscripts`), `gemini-speech.ts` (the speech model and
+ * the voice), `voice-provider.ts` (the provider and `cleanTranscripts`) and the settings routes. Exported through the voice
+ * barrel for the companion, which reads `gemini.soundTags` at the start of each turn (the parse) and at each push (the register),
+ * and every setting for `read_settings`.
  */
 export function readVoiceSettings(userId: number): VoiceSettings {
   return withDefaults(storedOverrides(userId));
@@ -143,6 +156,13 @@ function checkedProvider(patch: Record<string, unknown>): VoiceProvider | undefi
   if (!('provider' in patch)) return undefined;
   if (!isProvider(patch.provider)) throw settingsInvalid('provider must be "openai" or "gemini".', 'provider');
   return patch.provider;
+}
+
+/** The patch's `cleanTranscripts`, or the 400 that names it. `undefined` means the patch does not carry it. */
+function checkedCleanTranscripts(patch: Record<string, unknown>): boolean | undefined {
+  if (!('cleanTranscripts' in patch)) return undefined;
+  if (typeof patch.cleanTranscripts !== 'boolean') throw settingsInvalid('cleanTranscripts must be true or false.', 'cleanTranscripts');
+  return patch.cleanTranscripts;
 }
 
 /** The patch's `gemini` object with every field it carries checked, or the 400 that names the first field that fails. `undefined` means the patch does not carry `gemini`. */
@@ -190,6 +210,10 @@ function storedDocument(next: StoredOverrides): Record<string, unknown> {
   if (next.soundTags) gemini.soundTags = next.soundTags;
   return {
     ...(next.provider ? { provider: next.provider } : {}),
+    // `!== undefined`, not truthiness: a stored `false` is a choice the account made, and must not read back as the default.
+    ...(next.cleanTranscripts !== undefined ? { cleanTranscripts: next.cleanTranscripts } : {}),
+    // Same reason: a stored `[]` is an account that emptied its list, and must not read back as the seed.
+    ...(next.vocabulary !== undefined ? { vocabulary: next.vocabulary } : {}),
     ...(Object.keys(gemini).length > 0 ? { gemini } : {}),
   };
 }
@@ -198,23 +222,26 @@ function storedDocument(next: StoredOverrides): Record<string, unknown> {
  * Merges a partial patch into the account's voice settings, field by field (the nested `gemini` included), and
  * answers the settings as stored. An invalid field, or a field that is not a setting, throws AppError
  * `VOICE_SETTINGS_INVALID` (400) whose sentence names the field and its limit; nothing is written then.
- * `gemini.soundTags: null` drops the account's own list, so it reads as the shipped `DEFAULT_SOUND_TAGS` again.
+ * `gemini.soundTags: null` drops the account's own list, so it reads as the shipped `DEFAULT_SOUND_TAGS` again. `cleanTranscripts`
+ * is a boolean; `false` is stored and read back as `false`.
  * Consumed by the settings route (`PUT /api/voice/settings`).
  */
 export function saveVoiceSettings(userId: number, patch: unknown): VoiceSettings {
   if (!isRecord(patch)) throw settingsInvalid('The settings must be a JSON object.', 'settings');
 
   for (const field of Object.keys(patch)) {
-    if (field !== 'provider' && field !== 'gemini') {
-      throw settingsInvalid(`${field.slice(0, 40)} is not a voice setting; the fields are provider and gemini (${GEMINI_FIELDS.join(', ')}).`, field.slice(0, 40));
+    if (field !== 'provider' && field !== 'cleanTranscripts' && field !== 'gemini') {
+      throw settingsInvalid(`${field.slice(0, 40)} is not a voice setting; the fields are provider, cleanTranscripts and gemini (${GEMINI_FIELDS.join(', ')}).`, field.slice(0, 40));
     }
   }
   const provider = checkedProvider(patch);
+  const cleanTranscripts = checkedCleanTranscripts(patch);
   const gemini = checkedGemini(patch);
 
   // Read and write with no await between them, so two saves cannot both merge from the same stored value.
   const next: StoredOverrides = { ...storedOverrides(userId) };
   if (provider !== undefined) next.provider = provider;
+  if (cleanTranscripts !== undefined) next.cleanTranscripts = cleanTranscripts;
   if (gemini?.transcriptionModel !== undefined) next.transcriptionModel = gemini.transcriptionModel;
   if (gemini?.speechModel !== undefined) next.speechModel = gemini.speechModel;
   if (gemini?.voice !== undefined) next.voice = gemini.voice;
@@ -223,4 +250,23 @@ export function saveVoiceSettings(userId: number, patch: unknown): VoiceSettings
 
   userPreferencesDb.savePreferences(userId, { [PREFERENCE_KEY]: storedDocument(next) });
   return readVoiceSettings(userId);
+}
+
+/**
+ * The vocabulary the account saved, or `undefined` when it never has (the seed then stands). It lives in the same `voice`
+ * document as the other settings, so a write of either keeps the other. A stored list that fails `checkVocabulary` reads as
+ * never saved. Consumed by `vocabulary.ts` (`readVocabulary`).
+ */
+export function readStoredVocabulary(userId: number): VocabularyEntry[] | undefined {
+  return storedOverrides(userId).vocabulary;
+}
+
+/**
+ * Stores the account's whole vocabulary, already checked by the caller, beside its other voice settings, which are kept as
+ * they are. Read and write with no await between them, so a vocabulary save and a settings save cannot both merge from the
+ * same stored value. Consumed by `vocabulary.ts` (`saveVocabulary`).
+ */
+export function saveStoredVocabulary(userId: number, vocabulary: VocabularyEntry[]): void {
+  const next: StoredOverrides = { ...storedOverrides(userId), vocabulary };
+  userPreferencesDb.savePreferences(userId, { [PREFERENCE_KEY]: storedDocument(next) });
 }

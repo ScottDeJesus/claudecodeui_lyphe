@@ -29,7 +29,8 @@
  * the conversation that refusal dropped: written before the fresh start, carried once by the first message after it, then emptied when the launch that was handed that message reports `init`.
  * So is `companion_state.memory_forget_line` (`addCompanionMemoryForgetLineColumn`),
  * the id of the log line of his that the last forget of her memory used; Clear leaves it. So are `companion_state.face_id`, `face_pending_id` and
- * `face_error` (`addCompanionFaceColumns`), the face her pages draw, the one being made from his upload and the last bake's failure; Clear leaves them too. And `companion_actions.armed_from`
+ * `face_error` (`addCompanionFaceColumns`), the face made from his photo, the one being made from his upload and the last bake's failure, and
+ * `companion_state.avatar` (`addCompanionAvatarColumn`), the look he picked; Clear leaves them too. And `companion_actions.armed_from`
  * (`addCompanionActionArmedFromColumn`), and the three columns of a card's shape, `companion_notes.kind`, `ref_json` and `pinned`
  * (`addCompanionNoteShapeColumns`): what the card is, what it is about and whether he pinned it, defaulting to a note about nothing,
  * unpinned, which is every card held before them.

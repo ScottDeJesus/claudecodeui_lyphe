@@ -7,7 +7,7 @@ import { Children, type ReactNode } from 'react';
  *
  * Used by `RunnerCompactionRow` and `RunnerMainSessionDactylsRow` in the settings module and by
  * `AgentLaunchDactylField` in the agent-launch module, each for its Waiting line's reason, and by the companion module's
- * `CompanionFaceSettingsView` for a failed bake's and a refused photo's sentence (`scripts/install-comfyui.sh` held
+ * `CompanionFaceSettingsView` for a failed bake's, a refused photo's and a refused pick's sentence (`scripts/install-comfyui.sh` held
  * whole) — three modules, so it is the kit's.
  */
 export function WholeWords({ children }: { children?: ReactNode }) {

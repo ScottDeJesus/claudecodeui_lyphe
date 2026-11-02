@@ -6,6 +6,7 @@ import type { VoiceRequestOverrides, VoiceService, VoiceServiceResult } from '@/
 import { asyncHandler, readAuthenticatedUserId } from '@/shared/utils.js';
 
 import { clearGeminiKey, geminiKeyStatus, saveGeminiKey } from './gemini-key.js';
+import { readVocabulary, saveVocabulary } from './vocabulary.js';
 import type { createVoiceProvider } from './voice-provider.js';
 import { readVoiceSettings, saveVoiceSettings } from './voice-settings.js';
 
@@ -43,6 +44,27 @@ function sendFailure<TValue>(
   return true;
 }
 
+// The longest `text` `POST /clean` and `POST /speakable` take: the app's JSON limit is 50 MB, and the filler step of the cleanup is
+// quadratic in a run of fillers (a 96,000-character run of "uh, " held the event loop 3.3 s), all of it on the server's one loop.
+// 100,000 characters is some two hours of speech, far past any transcript or message; the page treats a refusal as "go on without
+// the engine" and keeps its raw text.
+const MAX_ENGINE_TEXT_CHARS = 100_000;
+
+// The `text` of a JSON body, or null after answering 400 `text required` (no string `text`) or 413 `text too long`. An empty string
+// is a text (a clip that heard nothing answers one, and cleaning it is a no-op).
+function readTextBody(request: express.Request, response: express.Response): string | null {
+  const text: unknown = request.body?.text;
+  if (typeof text !== 'string') {
+    response.status(400).json({ error: 'text required' });
+    return null;
+  }
+  if (text.length > MAX_ENGINE_TEXT_CHARS) {
+    response.status(413).json({ error: 'text too long' });
+    return null;
+  }
+  return text;
+}
+
 /**
  * Creates the transport-only router for the Voice composition root (`voice.module.ts`), which hands it the proxy
  * service, the provider decision and the upload parser. Other modules consume only the composed router exposed
@@ -67,6 +89,42 @@ export function createVoiceRouter(dependencies: VoiceRouterDependencies): expres
     const userId = readAuthenticatedUserId(request);
     const settings = saveVoiceSettings(userId, request.body);
     response.json({ settings, key: geminiKeyStatus(userId) });
+  }));
+
+  // The account's house words, one whole list: the misheard-word table both transcribers and Kaylee's speech read. The PUT
+  // replaces the list (a refused one is a 400 whose sentence names the entry or form) and answers it as stored; a standalone
+  // dictation app reads the same list with the GET.
+  router.get('/vocabulary', asyncHandler(async (request, response) => {
+    response.json({ vocabulary: readVocabulary(readAuthenticatedUserId(request)) });
+  }));
+
+  router.put('/vocabulary', asyncHandler(async (request, response) => {
+    response.json({ vocabulary: saveVocabulary(readAuthenticatedUserId(request), request.body?.vocabulary) });
+  }));
+
+  // The three halves of speech the browser may have run on its own OpenAI-compatible endpoint (a call this server never sees),
+  // answered by the one engine the server's own paths run, so a page, or a standalone dictation app, keeps no copy of the matching.
+  // None of them calls a backend. `GET /transcribe-hints` is Whisper's `prompt` for the account's vocabulary (`''` when the
+  // list is empty: send no prompt field). `POST /clean { text }` is a transcript as the server path returns it: fillers out
+  // when the account's `cleanTranscripts` is on, misheard house words corrected whatever that switch says. `POST /speakable
+  // { text }` is the text to hand a speech backend, each house word respelled as it is said. A body without a string `text` is a 400,
+  // one over `MAX_ENGINE_TEXT_CHARS` a 413.
+  router.get('/transcribe-hints', asyncHandler(async (request, response) => {
+    response.json(dependencies.voiceProvider.transcribeHintsForChat(readAuthenticatedUserId(request)));
+  }));
+
+  router.post('/clean', asyncHandler(async (request, response) => {
+    const userId = readAuthenticatedUserId(request);
+    const text = readTextBody(request, response);
+    if (text === null) return;
+    response.json({ text: dependencies.voiceProvider.cleanTranscriptForChat(userId, text) });
+  }));
+
+  router.post('/speakable', asyncHandler(async (request, response) => {
+    const userId = readAuthenticatedUserId(request);
+    const text = readTextBody(request, response);
+    if (text === null) return;
+    response.json({ text: dependencies.voiceProvider.speakableForChat(userId, text) });
   }));
 
   router.put('/gemini-key', asyncHandler(async (request, response) => {
@@ -123,10 +181,11 @@ export function createVoiceRouter(dependencies: VoiceRouterDependencies): expres
       return;
     }
 
-    const result = await dependencies.voiceService.synthesizeSpeech({
+    const result = await dependencies.voiceProvider.synthesizeForChat(
+      readAuthenticatedUserId(request),
       text,
-      overrides: parseVoiceOverrides(request),
-    });
+      parseVoiceOverrides(request),
+    );
     if (sendFailure(response, result)) {
       return;
     }

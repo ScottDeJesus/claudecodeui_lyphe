@@ -307,7 +307,7 @@ const ATTACHED = [
 const IDLE: CompanionActivity = { phase: 'idle', session: null, files: null, walk: null };
 const AWAKE: CompanionProcess = { state: 'awake', error: null };
 /** The face of an account for which none is made, the value the server's picture answers until its face service does: every fixture draws as it did before faces. */
-const NO_FACE: CompanionFace = { id: null, original: true, bake: null };
+const NO_FACE: CompanionFace = { id: null, avatar: 'original', avatars: [] };
 const FAILED_SENTENCE = "Kaylee couldn't start: the Claude login on this box has expired. Sign in again from Settings > Account.";
 
 /** A picture: the defaults of an awake, idle companion with an empty panel, and whatever a state changes. */

@@ -11,7 +11,7 @@ import { faceService } from './face/face.service.js';
  * The whole of her as a page reads it (`GET /api/companion`): settings, the picker's models, her process, her
  * activity, the turn in flight, the focus, the draft, the action waiting for his word, the walk, the notes, the
  * newest 200 log lines, the floor (the page that holds her voice) and her face (the one her pages draw,
- * `faceService.faceOf`: the account's own, else the original, with its bake if one is being made). Every later change
+ * `faceService.faceOf`: the look he wears, which is the house's first until he picks, and the looks he may wear: the house's, then his photo, each with its bake while it is being made). Every later change
  * reaches a page as a frame, and a page that missed some reads this again, so nothing here is derived from anything but
  * what a frame would also have told it. The pending action is the stored one WITHOUT its pin (`withoutPin`): what the prepare pinned is the server's alone and no picture carries it.
  *

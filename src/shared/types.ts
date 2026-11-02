@@ -996,11 +996,13 @@ export type VoiceProvider = 'openai' | 'gemini';
  * The account's voice settings as `GET /api/voice/settings` answers them: the chat mic's `provider` and the Gemini choices
  * (`gemini.transcriptionModel` and `gemini.speechModel`, 1-80 characters of letters, digits, `.`, `_` and `-`; `gemini.voice`,
  * 1-40 characters of letters, digits, `_` and `-`; `gemini.soundTags`, the one list of sounds Kaylee may make: 1-30 tags, each 1-24
- * lower-case letters with single spaces between words). Client mirror of the server's `VoiceSettings`. Read and saved by the
- * settings module's `useVoiceSettings`; a save sends a `VoiceSettingsPatch`.
+ * lower-case letters with single spaces between words), and `cleanTranscripts` (default true): whether a transcript has its um,
+ * uh and repeated words removed before it is used, for the chat mic and Kaylee's press alike. Client mirror of the server's
+ * `VoiceSettings`. Read and saved by the settings module's `useVoiceSettings`; a save sends a `VoiceSettingsPatch`.
  */
 export type VoiceSettings = {
   provider: VoiceProvider;
+  cleanTranscripts: boolean;
   gemini: { transcriptionModel: string; speechModel: string; voice: string; soundTags: string[] };
 };
 
@@ -1011,7 +1013,20 @@ export type VoiceSettings = {
  */
 export type VoiceSettingsPatch = {
   provider?: VoiceProvider;
+  cleanTranscripts?: boolean;
   gemini?: Partial<Omit<VoiceSettings['gemini'], 'soundTags'>> & { soundTags?: string[] | null };
+};
+
+/**
+ * One house word in the account's vocabulary, as `GET /api/voice/vocabulary` answers it: `spelling` is how the word is written,
+ * `pronunciation` how Kaylee should say it (equal to `spelling`, letters only, case-blind, means "as written"), and `misheard`
+ * the spellings a transcriber gives it by mistake, which the server replaces with `spelling` in every transcript. Client mirror
+ * of the server's `VocabularyEntry`. Read and saved, as a whole list, by the settings module's `useVocabulary`.
+ */
+export type VocabularyEntry = {
+  spelling: string;
+  pronunciation: string;
+  misheard: string[];
 };
 
 /**

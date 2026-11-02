@@ -2,6 +2,9 @@ import type { TranscribeAnswer, VoiceAudioUpload } from '@/shared/types.js';
 
 import { describeFetchFailure, googleMessage, isRetryableStatus, namesTheKey, parseJsonObject, redactKey } from './gemini-errors.js';
 import { resolveGeminiKey } from './gemini-key.js';
+import { cleanTranscript } from './transcript-cleanup.js';
+import { geminiVocabularyBlock } from './vocabulary-hints.js';
+import { readVocabulary } from './vocabulary.js';
 import { readVoiceSettings } from './voice-settings.js';
 
 const GEMINI_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -15,10 +18,23 @@ const RETRY_DELAY_MS = 2_000;
  */
 const NO_SPEECH_MARK = '[no speech]';
 
-const TRANSCRIPTION_INSTRUCTION = 'Transcribe the speech in this audio in the language it is spoken, as clean speech: leave out filler sounds (um, uh, er, ah, hmm, mm), stutters and false starts, write a word or short phrase said twice in a row once ("the, the lane" is "the lane", "and, and" is "and"), and keep every other word as it was spoken, in its order, with no paraphrase and no other correction. '
-  + 'Output only the words spoken, with no commentary, labels, timestamps or quotation marks. '
+/** What both forms of the instruction end on: the shape of the answer, the no-speech mark and the ban on invented words. */
+const INSTRUCTION_TAIL = 'Output only the words spoken, with no commentary, labels, timestamps or quotation marks. '
   + `If the audio holds no spoken words at all (silence, room noise, a click, breathing, music), output exactly ${NO_SPEECH_MARK} and nothing else. `
   + 'Never write words that were not spoken.';
+
+/**
+ * The instruction for a clip, in the form the account's `cleanTranscripts` setting picks. `clean` (the default) asks for clean
+ * speech: fillers, stutters, false starts and a word said twice left out. `verbatim` asks for every sound kept, exactly as said.
+ * Only the first sentence differs; `INSTRUCTION_TAIL` is the same in both. Either form is followed by the account's vocabulary
+ * block (`geminiVocabularyBlock`), so a house word is written as spelled whichever form is asked for.
+ */
+const TRANSCRIPTION_INSTRUCTION = {
+  clean: 'Transcribe the speech in this audio in the language it is spoken, as clean speech: leave out filler sounds (um, uh, er, ah, hmm, mm), stutters and false starts, write a word or short phrase said twice in a row once ("the, the lane" is "the lane", "and, and" is "and"), and keep every other word as it was spoken, in its order, with no paraphrase and no other correction. '
+    + INSTRUCTION_TAIL,
+  verbatim: 'Transcribe the speech in this audio in the language it is spoken, word for word, exactly as it was said: keep filler sounds (um, uh, er, ah, hmm, mm), stutters, false starts and repeated words, in their order, with no paraphrase and no correction. '
+    + INSTRUCTION_TAIL,
+} as const;
 
 /**
  * A whole answer that is one bracketed note — "[no speech]", "[silence]", "(inaudible)" — names what the clip held; it is not words
@@ -110,7 +126,11 @@ function answerFrom(attempt: Attempt, key: string): TranscribeAnswer {
 /**
  * Turns one clip into the words spoken, through Gemini, for one account: the account's key (else the house's) and
  * its transcription model, one `generateContent` call with `temperature: 0`. A clip with no words in it answers `ok` with
- * empty text (the model is told to say `[no speech]`, which is read as none). It never throws for an expected
+ * empty text (the model is told to say `[no speech]`, which is read as none). With the account's `cleanTranscripts` on, the model
+ * is told to leave out fillers and repeats and the text that comes back is cleaned once more (`transcript-cleanup.ts`, which also
+ * empties a lone "Um."), after the no-speech reading; off, the model is told to keep them and they are left in. The account's
+ * vocabulary works at both ends whichever way that switch is set: the model is told how the house words are spelled and sound,
+ * and the text that comes back has each misheard form replaced by its spelling. It never throws for an expected
  * failure; it answers `no_key` (no request made), `refused` (Google refused the key) or `failed` as a sentence
  * ready to show. NOT COUNTED against any Gemini budget (the operator's ruling): no admit before, no record after.
  * One log line per call, never the key.
@@ -119,7 +139,8 @@ function answerFrom(attempt: Attempt, key: string): TranscribeAnswer {
  */
 export async function transcribeWithGemini(userId: number, audio: VoiceAudioUpload): Promise<TranscribeAnswer> {
   const startedAt = Date.now();
-  const model = readVoiceSettings(userId).gemini.transcriptionModel;
+  const { gemini: { transcriptionModel: model }, cleanTranscripts } = readVoiceSettings(userId);
+  const vocabulary = readVocabulary(userId);
   const key = resolveGeminiKey(userId);
 
   let answer: TranscribeAnswer;
@@ -130,13 +151,15 @@ export async function transcribeWithGemini(userId: number, audio: VoiceAudioUplo
       contents: [{
         role: 'user',
         parts: [
-          { text: TRANSCRIPTION_INSTRUCTION },
+          { text: TRANSCRIPTION_INSTRUCTION[cleanTranscripts ? 'clean' : 'verbatim'] + geminiVocabularyBlock(vocabulary) },
           { inline_data: { mime_type: geminiMimeType(audio.mimeType), data: audio.bytes.toString('base64') } },
         ],
       }],
       generationConfig: { temperature: 0 },
     });
     answer = answerFrom(await postWithRetry(`${GEMINI_MODELS_URL}/${encodeURIComponent(model)}:generateContent`, key, body), key);
+    // After the no-speech reading (`readTranscript` has already turned `[no speech]` into ''), and the only place a Gemini transcript is cleaned and corrected: the chat mic's Gemini branch and Kaylee's press both come through here, and Kaylee's name cut (`companion-press.ts`) reads what this answers.
+    if (answer.ok) answer = { ok: true, text: cleanTranscript(answer.text, { removeFillers: cleanTranscripts, vocabulary }) };
   }
 
   const outcome = answer.ok ? 'ok' : answer.reason;

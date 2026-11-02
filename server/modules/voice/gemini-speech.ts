@@ -2,6 +2,8 @@ import type { SpeechAnswer, SpeechChunk } from '@/shared/types.js';
 
 import { describeFetchFailure, googleMessage, isRetryableStatus, namesTheKey, parseGoogleError, parseJsonObject, redactKey } from './gemini-errors.js';
 import { resolveGeminiKey } from './gemini-key.js';
+import { readVocabulary } from './vocabulary.js';
+import { respellForSpeech } from './vocabulary-match.js';
 import { readVoiceSettings } from './voice-settings.js';
 
 const INTERACTIONS_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
@@ -267,7 +269,8 @@ async function* nothing(): AsyncGenerator<SpeechChunk> {}
  * sentence ready to show), and an `ok: true` answer is already speaking. A failure after audio began makes the iterator
  * throw an Error whose message is the sentence. A 429 or 503 before the first byte is asked again once after a second.
  * NOT COUNTED against any Gemini budget (the operator's ruling, 2026-10-26, "Kaylee doesn't count for the budget"): no
- * admit before, no record after. One log line per call, never the key.
+ * admit before, no record after. One log line per call, never the key. The sentence is sent with the account's house words
+ * respelled to their pronunciation (`respellForSpeech`).
  * Consumed through the voice barrel by the companion's speech door (`companion-speech.ts`).
  */
 export async function synthesizeSentence(userId: number, input: { text: string; style: string; signal: AbortSignal }): Promise<SpeechAnswer> {
@@ -285,7 +288,10 @@ export async function synthesizeSentence(userId: number, input: { text: string; 
     return { ok: false, reason: 'no_key', sentence: 'No Gemini key: set one in Settings → Voice' };
   }
 
-  const opening = await openResponse(call, key, speechRequestBody(speechModel, voice, input.text, input.style));
+  // Gemini TTS has no pronunciation lexicon, so a house word is respelled the way it is said ("lypheCli" → "life C-L-I") in the
+  // text it is sent, and only there: the log line above and the words on the person's screen keep the spelling.
+  const spokenText = respellForSpeech(input.text, readVocabulary(userId));
+  const opening = await openResponse(call, key, speechRequestBody(speechModel, voice, spokenText, input.style));
   if (opening.kind === 'aborted') return { ok: true, chunks: nothing() };
   if (opening.kind === 'unreachable') {
     call.end('failed');

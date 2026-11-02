@@ -41,8 +41,9 @@ export async function answeredWithin<T>(work: Promise<T>, ms: number): Promise<T
 
 /**
  * What one launch is given. `initial` is queued before the CLI exists; `readSettings` is read once the
- * launch begins (the model and the operator's name), `tools` are the definitions her MCP server
- * carries and `resume` the CLI session to continue (`null` for a fresh conversation). `onMessage` hears
+ * launch begins (the model), `tools` are the definitions her MCP server carries, `systemPrompt` the
+ * prompt the session's plan was hashed over (her soul read once for the plan, never again here) and `resume`
+ * the CLI session to continue (`null` for a fresh conversation). `onMessage` hears
  * every message of the loop, `onEnded` the way a loop that ended BY ITSELF ended (`null` for a clean
  * end, else what it threw) and `onIdleClose` the idle closer's decision, which the owner carries out.
  * Consumed by `companion-session-types.ts`, whose `launch` dep is a function of it (a stand-in launcher replaces the real one).
@@ -53,6 +54,7 @@ export type CompanionCliLaunch = {
   resume: string | null;
   readSettings(): CompanionSettings;
   tools: Array<SdkMcpToolDefinition<any>>;
+  systemPrompt: string;
   isBusy(): boolean;
   onMessage(message: SDKMessage): void;
   onEnded(thrown: unknown): void;
@@ -102,7 +104,7 @@ export function launchCompanionCli(input: CompanionCliLaunch): CompanionCli {
     let thrown: unknown = null;
     try {
       const settings = input.readSettings();
-      const options = await companionQueryOptions(userId, settings, input.tools, input.resume);
+      const options = await companionQueryOptions(userId, settings, input.tools, input.resume, input.systemPrompt);
       // Ended while its options were being built: nothing was launched, so there is nothing to wind down.
       if (queue.ended) return;
       const started = query({ prompt: queue.stream, options });

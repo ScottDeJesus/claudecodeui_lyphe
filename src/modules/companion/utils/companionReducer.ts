@@ -89,13 +89,16 @@ const isBake = (value: unknown): boolean =>
   isRecord(value)
   && (((value.state === 'queued' || value.state === 'baking') && isNumber(value.done) && isNumber(value.total))
     || (value.state === 'failed' && isText(value.error)));
+/** The settings card draws each look of `avatars` by its `key`, `label` and `faceId`, and the making of it by its `bake`; an avatar without them is refused. */
+const isFaceAvatar = (value: unknown): boolean =>
+  isRecord(value) && isText(value.key) && isText(value.label) && orNull(isText)(value.faceId) && orNull(isBake)(value.bake);
 /**
- * The portrait draws from `id` (a face's id, `null` before any face exists) and the settings card from `original` and `bake`; a face without them is refused.
+ * The portrait draws from `id` (a face's id, `null` before any face exists) and the settings card from `avatar` (the key he picked) and `avatars` (the looks he may wear); a face without them is refused.
  * Consumed by this file's picture check and reducer, and by the Settings section's two hooks (useCompanionSettings, useCompanionFaceSettings), which
  * judge the face of a read, an answer and a frame by this one rule.
  */
 export const isFace = (value: unknown): value is CompanionFace =>
-  isRecord(value) && orNull(isText)(value.id) && typeof value.original === 'boolean' && orNull(isBake)(value.bake);
+  isRecord(value) && orNull(isText)(value.id) && isText(value.avatar) && Array.isArray(value.avatars) && value.avatars.every(isFaceAvatar);
 
 /**
  * Whether a picture read from the server has every part a page draws from. Consumed by this module's CompanionProvider, which

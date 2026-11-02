@@ -4812,7 +4812,7 @@ Kaylee's HTTP door. Transport only: a route reads who asks, checks the SHAPE of 
 - `house` is the `CompanionHouse` (MAN-9142): the readers only a module instance holds, which the entrypoint builds from the dispatcher, roadmap, dispatch-souls, Cerberus and heal instances.
 - It starts `startStationHint()` (`station/station-hint.ts`, MAN-9257) beside the alert, focus and deleted-chat feeds. The hint is not hers: it tells every open page that a chat changed (`station_sessions_changed`) from six announcements the house already makes (MAN-9257), and its frame goes to no one while no page is open.
 - It starts `startStationLandedFeed(house)` (`station/station-landed-feed.ts`, MAN-9269) beside the hint. It hears the notification history's `onHistoryKept` and sends each kept landing row (`LANDED_KIND_BY_CODE`) as one `station_landed { entry }` frame to that account's pages through `sendToUser`; every other row sends nothing.
-- Building the module launches no conversation: one starts on an account's first message. It calls `faceService.start()` (background; a failure is logged and the module serves), which registers the seed photo, resumes the accounts' pending bakes and may start ComfyUI to make the original's face (MAN-9237).
+- Building the module launches no conversation: one starts on an account's first message. It calls `faceService.start()` (background; a failure is logged and the module serves), which registers the house's avatars (MAN-9438), resumes the accounts' pending bakes and may start ComfyUI to make a house look's face (MAN-9237).
 - Mount: `/api/companion` behind `authenticateToken` (the account is `req.user`). Mounted in `server/index.ts` (`app.use('/api/companion', authenticateToken, companion.router)`), AFTER `createDispatchSoulsModule`, because the house is built from the instances above it. Nothing catches a request between her mount and theirs.
 - Shutdown: `shutdownRuntimeServices` in `server/index.ts` awaits `companion.stop()` first, raced against 3 s (`Promise.race` with `delay(3_000)`), before `cerberus.stop()` and the rest. why: a CLI that answers nothing is ended by its own 5 s grace, which keeps running, and the shutdown must not sit behind it inside the supervisor's window (INV-9807).
 
@@ -4844,7 +4844,7 @@ section: server/modules/companion — the door: routes, input limits, refusals, 
 
 - `POST /messages` reads `attachments` first, then `text` (empty only with files), awaits `sendText`, answers 202. A voice press carries no file. An account's typed lines are delivered in arrival order (MAN-9270).
 - The send itself is `companion-send.ts`, shared with `send_to_session` and `create_session`: checks, fold or turn, options, new chat, what clears — MAN-9072. The route adds the floor only (`sendDraft` takes it first).
-- Her face has five routes of its own, `POST` and `DELETE /face` and `GET /face/:faceId/manifest`, `/sheet/:n`, `/contact`, in `face/face.routes.ts` (`createFaceRoutes`), mounted by one line, `router.use('/face', createFaceRoutes())`: MAN-9236. Like `/memory`, no client id.
+- Her face has six routes of its own, `POST`, `PUT /face/avatar` and `DELETE /face` and `GET /face/:faceId/manifest`, `/sheet/:n`, `/contact`, in `face/face.routes.ts` (`createFaceRoutes`), mounted by one line, `router.use('/face', createFaceRoutes())`: MAN-9236. Like `/memory`, no client id.
 - Her ears' model files are `GET /ears/files/<repo>/<path>` in `ears/ears.routes.ts` (`createEarsRoutes`), mounted by one line at the foot beside `/face`, `router.use('/ears', createEarsRoutes())`. ONLY TRANSPORT: the rest of the path is looked up in the pinned manifest of `ears/ears-files.ts` (`earsFile`) by string equality, so only Moonshine base's and Silero VAD's pinned files can be named. A hit is `sendFile` (it answers the one-byte range the page's transformers.js asks first) with `Cache-Control: private, max-age=31536000, immutable` and `dotfiles: 'allow'` (the root is `COMPANION_EARS_DIR`, else `~/.cloudcli/companion-ears`); a name outside the manifest is 404 `COMPANION_EARS_NOT_FOUND`, a fetch from Hugging Face that was refused (unreachable with its cause named, silent for 60 s, a file that did not match its pinned SHA-256) or a file the disk would not keep or read is 502 `COMPANION_EARS_UNREACHABLE` carrying the sentence, and a range that starts past the end of a file is 416 with `Content-Range` naming its size. A file is fetched once, on first use, into a part of its own (`<file>.<uuid>.part`, so a second process fetching the same file never truncates it), and kept; nothing is downloaded until a page asks. No client id. Shown by `.verify/kaylee-ears-files.sh` under `.verify/kaylee-eyes-scratch.sh`.
 - The station's sessions list is `GET /station/sessions` in `station/sessions.routes.ts` (`createStationSessionsRoutes`), mounted by one line, `router.use('/station/sessions', createStationSessionsRoutes())`, before the other `/station` routers: MAN-9268. No client id, no account. 200 `{ sessions: StationSession[] }`; a read that throws is a 503 `{ error }`.
 - What needs him is `GET /station/needs` and one chat's ask is answered by `POST /station/asks`, both in `station/needs.routes.ts` (`createNeedsRoutes(service)`), mounted by one line, `router.use('/station', createNeedsRoutes(service))`, after the sessions router: MAN-9273. No client id. `GET /needs` answers `{ needs: StationNeed[], faults }` (`service.stationNeeds`; `faults` names the kinds whose reader threw, and a whole read that throws is a 503 `{ error }`). `POST /asks` takes the zod body `{ sessionId 1–200, requestId 1–200, answer 1–2000 (trimmed) }` and answers 200 `{ told }`, 400 `{ error }` (a body of another shape, naming the first field; or a word that is no answer to that ask, with the words that are), 409 `{ error: 'That ask was answered elsewhere.' }` (the `requestId` is no longer among the chat's pending asks), or 500 `{ error }` when the answer could not be sent and the ask still waits (`service.answerStationAsk`).
@@ -5190,7 +5190,7 @@ Three surfaces. Each is a VIEW that draws every state from props and a thin wrap
 |---|---|---|---|
 | her panel | `CompanionPanelView` (`CompanionPanel.tsx`) | `CompanionPanel`: reads `useCompanion()`; `targetWorking` = the draft's target chat is in the page's busy set (`useBusySessionIdSet`) | `WorkspaceFrame`, after the floating chat, ALWAYS rendered |
 | her door | `CompanionDoorView` (`CompanionDock.tsx`) | `CompanionDock`: draws it in her rail cell whenever her disc is out of its seat; the door's press is the disc's own (MAN-9125, MAN-9129) | `WorkspaceRail`'s foot, after `UsageRings`, above the Inbox |
-| her Settings section | `CompanionSettingsView` (`CompanionSettingsSection.tsx`) | `CompanionSettingsSection`: `useCompanionSettings` fetches `GET /api/companion` (her settings and `picture.face`), saves `PUT /api/companion/settings`; `useTalkBindingCapture` takes the next key or mouse button when Bind is pressed and saves it as `talkBinding` (MAN-9101); `CompanionFaceSettings` (her face card, MAN-9220, over `useCompanionFaceSettings`: the face from that same read, then the account's `companion_face` frames, his upload, his restore and the contact sheet) is the view's `face` slot, drawn directly after the talk button's card once the read has landed; `CompanionMemorySettings` (her memory card, MAN-9184) is the `memory` slot, drawn after the face card and above her four fields | `VoiceSettingsTab`, after its own sections, voice on or off |
+| her Settings section | `CompanionSettingsView` (`CompanionSettingsSection.tsx`) | `CompanionSettingsSection`: `useCompanionSettings` fetches `GET /api/companion` (her settings and `picture.face`), saves `PUT /api/companion/settings`; `useTalkBindingCapture` takes the next key or mouse button when Bind is pressed and saves it as `talkBinding` (MAN-9101); `CompanionFaceSettings` (her face card, MAN-9220, over `useCompanionFaceSettings`, MAN-9437: the face from that same read, then the account's `companion_face` frames, his pick of a look, his upload, the removal of his photo and the contact sheet) is the view's `face` slot, drawn directly after the talk button's card once the read has landed; `CompanionMemorySettings` (her memory card, MAN-9184) is the `memory` slot, drawn after the face card and above her four fields | `VoiceSettingsTab`, after its own sections, voice on or off |
 
 - Parts under the panel: `CompanionHeader` (the title row: her mark, her name, `CompanionStatus` (the status line: `CompanionStatus.tsx`, MAN-9089), the slot Stop is drawn into, given `onOpenStation` (`CompanionPanelView` takes it as an optional prop and hands it on; the fixture picture passes none and so draws none) the station button (`LayoutDashboard`, `aria-label` and tooltip "Open Kaylee Station" = `companion.panel.station`; the close's own ghost icon button with its transparent `::before` catch, 44 px under a finger, stepped 2 px aside under a finger so the two catches meet; `CompanionPanel`'s wrapper binds it to `openStation(navigate)` (the station comes forward over the workspace in this tab, on every device), so on a phone, where her panel is the full-screen sheet, the door is one press), close; the focus row; then `CompanionControls` (`CompanionControls.tsx`; its props are a union on `layout`: `rows`, the panel's, described here, and `line`, the station's head's, after it): Stop, drawn by portal into the title row's slot (`stopSlot`, a required prop, so Stop stands beside the way out), model `Select`, Live `Switch`, Clear (her conversation: MAN-9195) behind a `ConfirmDialog`, with every rule of MAN-9090; given `voice`, a row of its own under them, `CompanionVoiceSwitch`: "Voice on this device", the kit `Switch` closing the row under Clear, a `Volume2` / `VolumeX` glyph following it, the whole row its label; given `ears`, a row of its own under the voice row, `CompanionEarsSwitch` (MAN-9342); `layout: 'line'`, with `align?: 'start' | 'center'` and no `stopSlot`: every control in one `div[data-companion-controls=line]` that wraps rather than cut a word (`flex-wrap gap-x-3 gap-y-2`; `center` centres each line), in this order: Stop while her turn runs, the model `Select` in a fixed `w-36` box (the line does not move as the model's name changes), Live, then "Voice on this device" (given `voice`) and Clear as one unit, so Clear never stands alone on a line (given `ears`, the voice switch stands alone and "Listen for her name on this device" and Clear are the unit); each control keeps its words and its 44 px catch under a finger (`finger:`, INV-10275: Stop, the Select, the Live, voice and ears rows' labels, Clear; the composer's send takes it in its `::before`; the log's "Newest" is `finger:h-11`); where nothing hovers (`@media(hover:none)`) what Live does stands in words too: its tooltip's sentence (`companion.liveHint`) as one muted line, `[data-companion-live-words]`, outside the label so a tap on the words never flips the switch, right under the line that holds Live in `line` and under the controls row, inside its rules, in `rows`; a pointer keeps the tooltip and is drawn no words; the station's head draws `line`: MAN-9314), `CompanionLog` (her turn's paragraph is `CompanionReply`, `CompanionReply.tsx`, which the station's portrait draws too: MAN-9401; entries newest last; the files of his typed line under its caption, above his words (MAN-9420); alerts and system lines in their tone; given `speaking`, the one sentence whose `turnId` and `index` both equal `speaking`'s alone wrapped in `[data-companion-speaking-sentence][data-tone=info]`: a band `bg-tone-ink/20` widened by `ring-2 ring-tone-ink/20`, a 2px bar of the full ink in the ring's left edge (`shadow-[-2px_0_0_0] shadow-tone-ink`, the mark's 3:1: 5.3:1 light, 10.3:1 dark against the canvas, where the band alone is 1.32:1 / 1.51:1), `box-decoration-clone`, `forced-colors:underline`; ring and bar are shadows, so no word moves; given `cards` (`{ notes, onOpen }`: the station's conversation, her panel passes none) each card stands as a `CompanionCardChip` (MAN-9325) after the last block at or before the moment she put it up, and the log's content key counts the cards; given `scrollRef`, the log's one scroller is also handed to the caller, one callback binding the log's own ref first, which must keep its identity across renders; `useFollowNewest` keeps a place put back: a scroller standing more than 48 px above its end at its first pin starts not following, and "Newest" brings him down), `CompanionWalkStrip`, `CompanionNotes`, `CompanionDraftCard` (target, editable `TextArea`, Send turn, Send steer, Clear; two homes: her panel's dock, and the station's draft dock, MAN-9321; given `onTargetPress` (the station's) a session draft's chat name is a link-styled kit `Button` in `text-accent-ink`, `aria-label` `companion.draft.showOnStage` "Show <chat> on the stage", with "For" kept as text by `<Trans i18nKey="companion.draft.forChatPress">` "For <chat/>"; its catch is a `::before` 4 px past the name each way and, under a finger (`finger:`, INV-10275), 28 px up and none down, so the row stays as tall (in the dock's head line 12 px each way); Send turn, Send steer and Clear are `finger:h-11`; given `headLine`, the dock's alone, the card draws its head line: MAN-9393; a new chat's target stays words; her panel passes none and is unchanged), `CompanionComposer` (`PromptInput`, Enter sends; `touchField` stands its field at 44 px under a finger, the station's talk row, absent it keeps the panel's 40 px; `text` with `onText`, and `attachedFiles` with `onAttachedFiles`, each pair given together, hold his typed words and his attached files for a caller that keeps them, the station's talk row, whose provider holds them across an arrangement's tree, absent they are the composer's own, as her panel's are; `onSend(text, files)`; the tools cluster holds the paperclip first, then the talk button when `talk` is given: MAN-9424), `CompanionSentence` (her sounds drawn as marks at their offsets), `CompanionSettingsForm` (her name, his name, the register in a monospace `TextArea` with "Restore the original", the delivery note).
 
@@ -5301,7 +5301,7 @@ section: src/modules/companion — Kaylee's panel, rail door and Settings sectio
 | `onSendDraft(mode)` rejects with the server's sentence on refusal; the card shows it and keeps everything on screen. | no silent loss |
 | Send steer shows only while `targetWorking` and the draft targets a session; then it leads, Send turn follows. Otherwise Send turn alone. | a send to a working chat folds whatever button was pressed, so the two buttons differ in what they SAY |
 | The card has two homes, each the one editor of the one draft: her panel's dock and the station's `StationDock` (MAN-9321). Every rule here holds in both as written. Only two things differ: `targetWorking` is the page's busy set (`useBusySessionIdSet`) in the panel and the target's row in the station's sessions (`working` or `waiting`) in the dock; `onTargetPress` is the dock's alone, the target's name a "Show <chat> on the stage" press, absent in the panel and for a new chat's draft. | one draft, one set of rules; the card gains props only where a measured site needs them (MAN-569) |
-| The panel's Clear (aria-label "Clear <name>'s conversation": her conversation, unpinned cards, draft and walkthrough), Clear draft, Restore the original register, Settings' Clear her memory (what she keeps: MAN-9184) and Settings' Restore the original face (MAN-9220) each open a `ConfirmDialog` first. | each destroys work |
+| The panel's Clear (aria-label "Clear <name>'s conversation": her conversation, unpinned cards, draft and walkthrough), Clear draft, Restore the original register, Settings' Clear her memory (what she keeps: MAN-9184) and Settings' Remove your photo (MAN-9220) each open a `ConfirmDialog` first. | each destroys work |
 | Model and Live show his choice at once, restore the old value with a toast on a refused save. `CompanionControls` holds these two, Clear's question and Stop's refusal toast, so the panel's rows and the station head's line keep them alike (MAN-9062, MAN-9314). | a control that snaps back reads as refused |
 | Settings fields save one at a time on blur (inputs also on Enter), trimmed, only when changed and within `LIMITS` (MAN-9087). | "Saved as you change them" |
 | The Settings section raising a dialog passes `wrapperClassName="z-[10000]"` to `ConfirmDialog`. | Settings is a body portal at `z-[9999]`; the default `z-50` opens behind it |
@@ -5643,13 +5643,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/compani
 
 ## MAN-9077 — server/modules/companion/session — her launch: the options, the hidden working directory, persistence and resume, the idle close, setModel live
 
-One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(userId, settings, tools, providerSessionId)` (`session/companion-launch.ts`) builds its options; `launchCompanionCli(input)` (`session/companion-process.ts`) runs it. She is built like the Cerberus diagnosis agent (`cerberus/diagnosis/diagnosis-agent.ts`). What a CLI message means: the conversation row (`companion-events.ts`).
+One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(userId, settings, tools, providerSessionId, systemPrompt)` (`session/companion-launch.ts`) builds its options; `launchCompanionCli(input)` (`session/companion-process.ts`) runs it. She is built like the Cerberus diagnosis agent (`cerberus/diagnosis/diagnosis-agent.ts`). What a CLI message means: the conversation row (`companion-events.ts`).
 
 ## Options
 | option | value | why |
 |---|---|---|
 | `model` | `settings.model` (`sonnet` \| `opus` \| `haiku`) | read when the launch begins |
-| `systemPrompt` | `fillSystemPrompt(settings.operatorName)`, a plain string | never the Claude Code preset: no house rule, CLAUDE.md or skill reaches her |
+| `systemPrompt` | the prompt the session's plan composed and hashed, handed to the launch (`fillSystemPrompt(operatorName, readSoul(userId))`: her two soul pages, then the plumbing; MAN-9213), a plain string | never the Claude Code preset: no house rule, CLAUDE.md or skill reaches her |
 | `settingSources` | `[]` | nothing on disk widens what she may do |
 | `settings` | `{ autoMemoryEnabled: false }` | the CLI keys auto-memory (`MEMORY.md`, his standing rules) to the git root of the cwd; hers sits inside `~/.claude` |
 | `tools` | `[]` | no built-in tool: no shell, edit or web |
@@ -5863,7 +5863,8 @@ section: server/modules/companion/session — what she is pushed: the order of a
 
 | export | is |
 |---|---|
-| `COMPANION_SYSTEM_PROMPT` | one slot, `{operator_name}`; filled once per launch by `fillSystemPrompt`; stable for the life of the process |
+| `COMPANION_SYSTEM_PROMPT` | the plumbing half of her prompt, one slot, `{operator_name}`; stable for the life of the process |
+| `fillSystemPrompt(operatorName, soul)` | `soul`, one blank line, then the plumbing with `{operator_name}` filled; the soul is joined after the fill and never goes through it. Once per launch plan (`companion-session.ts`) |
 | `COMPANION_REGISTER_DEFAULT` | the register template; slots `{name}`, `{delivery_note}`, `{sound_tags}` |
 | `DEFAULT_DELIVERY_NOTE` | `bright, warm, quick, a smile in the voice` |
 | `fillRegister(settings, soundTags)` | fills `{name}` = `settings.name`, `{delivery_note}` = `settings.deliveryNote`, `{sound_tags}` = each tag as `<tag>`, space-separated |
@@ -5874,18 +5875,19 @@ section: server/modules/companion/session — what she is pushed: the order of a
 - The prompt teaches `<attachments>` in the sentence after the `<operator heard="name">` one (HOW YOU HEAR AND SPEAK): the list after his typed line names the files he attached; each picture is shown to her after the message's words, in that order; a text file (a note, code, a log, an SVG's source) `ask_dactyl` reads at the path the line gives; a PDF, an office document, an archive, audio, video, a picture of a kind she cannot see, or a text file past 320 KB she cannot open yet: she says so in a few words, by its name, rather than guess (envelope: MAN-9212; the rest: MAN-9410). Her `ask_dactyl` TOOLS line adds "A file he attached is read by the path its <attachments> line gives."
 - The prompt teaches `<handover>` in one sentence beside `<cut>`: it arrives once, first, when a fresh conversation begins; she takes it as what she remembers, answers what he says now and speaks from it without reciting it.
 - Fills run in ONE pass (`fillSlots`): a value that contains `{name}` is never filled again, `$` in a value is not a replacement pattern, a slot the template invents is left as written, a slot it lacks is not filled.
+- HER SOUL (`companion-soul.ts`, `readSoul(userId)`): `PERSONALITY.md` then `DIRECTIVE.md` from `~/.claude/charters/kaylee` (`COMPANION_SOUL_DIR` names another folder, read on each call), synchronously, afresh at every launch plan and never cached: each page's leading byte-order mark dropped, then its leading YAML frontmatter stripped (CRLF or LF; a `---` block counts when it is empty or its first line is a `key:`, so a markdown rule that opens a page is no block), then trimmed, the two joined by one blank line, nothing else rewritten. A page that opens with a `---` line that is no closed YAML block is left whole and the journal warns `[Companion] account <id>: her soul page <name> (<path>) opens with a `---` line that is no closed YAML block; the page is left whole in her prompt`. They stay where they are; the repo holds no copy. A page missing, unreadable or empty never stops her launch: one sentence in her voice (`Your page <name> at <path> could not be read at this launch: <reason>. Tell him once, then carry on from the register.`) stands in its place, and the journal warns `[Companion] account <id>: her soul page <name> (<path>) could not be read: <reason>; her prompt carries a note in its place`. The register still rides with every message and wins where it and the soul differ. The refusal's `currentShape` plans too (`withThread`, MAN-9209), so a wake holding a conversation reads the soul twice and a broken page warns twice. Proof: `.verify/kaylee-soul-load.mjs`.
 - The prompt's TOOLS section lists every tool she holds; the registry: MAN-9070.
 - `THE HOUSE, WHEN HE POINTS AT IT` (after WHAT YOU MUST NOT DO, before TOOLS): the rule (call the panel's tool before saying a word about it; every one takes `panel: true`), then one pointer line per panel naming its tool, in the TOOLS section's order. A new eyes tool adds its pointer line and its TOOLS line together: `toolLine` throws on a missing TOOLS line; a pointer line is read only by the probe of its own tool (`.verify/companion-doc-reads.mjs`: DocSpace's; `.verify/companion-run-reads.mjs`: the runs', and that it stands after the roadmap's and before DocSpace's).
 - `ON HIS WORD` (after THE HOUSE, before TOOLS): the hands' rule in her words. She does nothing in the house on her own judgment. `open` and `close_followup` are the harmless two and take no ceremony (MAN-9207): the moment he asks for a card, run, page, chat or Cerberus check to come up, in any phrasing, a question included ("can you pull up", "show me", "bring up", "open"), she calls `open`; to tick off a follow-up, `close_followup`. A polite question is an order. She says in one sentence what she opened or closed, and asks him a question only when she cannot tell which page or chat he means. The eleven others (queue, hide, show, rework, answer, recut, stop, resume, kick, resume_run and clear_memory, named in the paragraph) she puts on his panel with `prepare_action`, which tells her what to do next: she reads it back, the action and its name (for an Accept, the head of the prompt), and stops. She decides from the conversation whether he agreed, and no one else does: there are no set words, a line he typed counts as much as one he spoke, a yes, a go-ahead or an order in any phrasing can each be his yes, and a no, a question or a change of subject is not (operator, 2026-10-30). When he agreed she calls `take_action` with his line exactly as her log holds it, after her read-back and never before it, and never on her own words; if he declines, or she judges he does not want it, `cancel_action`. An action waits thirty minutes. When it lapsed, or the house refused it, she calls `prepare_action` again with the same action and target: that re-arms it and her read-back from before still stands, so when she has already judged that he agreed and nothing since changes that, she calls `take_action` at once and does not ask him again; otherwise she reads it back again (MAN-9208). Notes, answers and rulings travel in his own words; `cancel_action` when he changes his mind. The server confirms she read it back and records his line (MAN-9171, INV-10099). Its tools' lines are in TOOLS; `toolLine` throws on a missing one. The paragraph is plain text: it imports nothing from `hands/`. The TOOLS line of `open` names the five things it brings up: "open(target): bring a card, run, page, chat or Cerberus check up on the screen he is using, at once, the moment he asks, however he asks. target is its name, id or title; a check is its label or its path, <node>/<service>/<check>." (resolution and refusals: MAN-9172 §Targets).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-message.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-message.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-soul.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-soul-load.mjs
 
 ## MAN-9214 — server/modules/companion/session — what she is pushed: the order of a message — HER MEMORY in the prompt is three lines and a pointer, and nothing is pushed (ruling 3): the pointer
 section: server/modules/companion/session — what she is pushed: the order of a message and when each part is sent, the envelopes, the prompt and register fills/003 HER MEMORY in the prompt is three lines and a pointer, and nothing is pushed (ruling 3): the pointer
 
 - HER MEMORY in the prompt is three lines and a pointer, and nothing is pushed (ruling 3): the pointer is the LAST line of THE HOUSE, WHEN HE POINTS AT IT (`Your own memory, what he has told you to keep: recall, then remember or forget.`; it names no panel); TOOLS ends with `recall(about, panel)`, `remember(kind, title, said, why, context, corrects, also)` and `forget(memories, said)` after `open(target)` and `close_followup(followup)`, which follow `cancel_action()`. Each is the tool's description (`toolLine`, MAN-9192). `remember`'s line says `said` is each line of his that carries it, a press he spoke or a line he typed, whole, exactly as her log holds it, and that a sentence cut from a longer line is refused; `forget`'s line says the same of its one line (MAN-9183). `remember`'s line tells her to say aloud in half a sentence that she is keeping it when `why` is not `asked`, and never to keep a transcript, what a session said, or usage or spend (ruling 2). `forget`'s line closes: `Clearing your whole memory is his act alone: in Settings, or prepare_action clear_memory, read back to him.` `prepare_action`'s line lists `clear_memory` and says its target may be "your memory" (MAN-9194).
 - "Memory" is the bank's word alone in the prompt. The collaborator clause says she keeps hold of what he decided earlier in this conversation (`remember` is a tool's name), and the `<state>` message restates the focus "after this conversation was compacted".
-- The design record is the DocSpace page "Voice companion prompt" (block "System prompt"): the sections and tool lines above are its words, and a change to the prompt's words is made in both.
+- The DocSpace page "Voice companion prompt" (block "System prompt") is the design record's copy of the plumbing and predates later edits (its own warning says so): the live text is `COMPANION_SYSTEM_PROMPT`, and her soul half is the charters' two pages (MAN-9213), on no page.
 - The sound set is the account's `gemini.soundTags` (shipped default `DEFAULT_SOUND_TAGS`, voice module): one list for the fill and the filter (MAN-9081).
 
 ## Proof
@@ -5930,6 +5932,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 
 ## Proof
 - `.verify/companion-wire-contract.mjs`: `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-wire-contract.mjs` — parse (prints each parse and `utteranceOf` of its row), stream, fills and every envelope of `session/companion-envelopes.ts` on real strings (`calledEnvelope` prints `<operator via="spoken" heard="name"></operator>`); no server, no model call.
+  - Its section `=== the face manifest on the wire: the blinks and the brows ===` builds the recipe's own manifest (`buildManifest` over `recipeFrames()`, through JSON, MAN-9242) and prints `frames` 158, `blinks.listening` `{ half: 115, closed: 116 }`, the `blinks.gaze` and `blinks.poses` keys, `blinks.poses.left_20` `{ half: 135, closed: 136 }`, `brows.delighted` 150, then `true` for: every `blinks` entry two different frames of the manifest and none a mood's blink or mouth, a gaze, pose, state or clip frame; the nine `brows` all different and none an earlier frame or a `blinks` one.
+  - The same section runs the page's `isManifest` (cut from the text of `useFaceAtlas.ts`, MAN-9404): `true` for the manifest whole, with no `blinks` and with no `brows`; `false` for `blinks` or `brows` a number or null, and for a manifest with no neutral mood. 2026-11-01: exit 0.
 - `.verify/kaylee-sentence-replay.mjs`: `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-sentence-replay.mjs` — her recorded replies (`assistant` text blocks under `~/.claude/projects/-home-lyphe--claude-state-companion-*/`) through the cut at `f82d09c7` and the tree's; prints each text cut differently and whether the tree's cut is the same at delta sizes 1, 3, 7, 50 and whole; no server, no model call. 2026-10-28: 384 text blocks; 3 cut differently (`"Tea or coffee?"` once, `"…PONG."` twice), each now one sentence (1581 sentences → 1578), same words; 0 cut differently at any delta size.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-wire-contract.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-sentence-replay.mjs
@@ -5949,7 +5953,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 - `AUTOINCREMENT`, never reused: the panel holds a note id it may ask to dismiss and an entry id it has drawn; a number it remembers never names another row.
 - `relayed_sends` hangs on the CHAT because a relayed send is a fact of the chat's history. It survives Clear.
 - `memory_forget_line` survives Clear. why: log ids are AUTOINCREMENT and never reused, so a value from before a Clear stays a true lower bound and a line said after it has a greater id (MAN-9193).
-- `face_id`, `face_pending_id` and `face_error` (`TEXT`, NULL = the original with nothing being made) are the account's face, added by `addCompanionFaceColumns` in `migrations.ts`, not in `companion-schema.ts`. Written only by the face service. They survive Clear: Clear wipes her memory, not her look. What each holds and the files they name: MAN-9235.
+- `face_id`, `face_pending_id` and `face_error` (his photo's face, the face being made from it, the last bake's failure) and `avatar` (the look he picked: a house key or `own`; NULL until he picks, which reads as the house's first look) are the account's look (`TEXT`, NULL = no photo of his, nothing being made), added by `addCompanionFaceColumns` and `addCompanionAvatarColumn` in `migrations.ts`, not in `companion-schema.ts`. The avatar migration's one `UPDATE … SET avatar = 'own' WHERE face_id IS NOT NULL` runs only when it just added the column. Written only by the face service. They survive Clear: Clear wipes her memory, not her look. What each holds and the files they name: MAN-9235.
 - `companion_actions` is a fact about the HOUSE (what was done, on whose word, when). Clear never deletes from it; it ends any row with no outcome and no claim `cancelled` in its own transaction (a row a take has claimed is spared: the take ends it). An action ends once (`endAction` writes only a row with no outcome), and a lapse is found by the next prepare, take or cancel that meets it and ended `expired` — never by a timer.
 - Merge paths: the three paths in `sessions.db.ts` that delete a watcher's duplicate row (`assignProviderSessionId`, `repointSessionToProviderSession`, `createForkedSession`) move `followups` and do NOT move `relayed_sends`, and need not: the companion records a send only for a chat of her list (`session_id <> provider_session_id`), never for a watcher row. A writer that records sends for any other kind of row must extend those paths first (MAN-9003).
 
@@ -5961,9 +5965,9 @@ section: server/modules/companion — storage: the five tables, companionDb, rel
 | verb | does |
 |---|---|
 | `readState(userId)` | the row or `null` |
-| `writeState(userId, patch)` | upsert of the columns the patch names (`provider_session_id`, `session_shape`, `handover`, `focus_json`, `draft_json`, `walk_json`, `pending_json`, `unanswered_json`, `floor`, `memory_forget_line`, `face_id`, `face_pending_id`, `face_error`); a key left out or `undefined` is untouched, `null` sets NULL; stamps `updated_at`; answers the row |
+| `writeState(userId, patch)` | upsert of the columns the patch names (`provider_session_id`, `session_shape`, `handover`, `focus_json`, `draft_json`, `walk_json`, `pending_json`, `unanswered_json`, `floor`, `memory_forget_line`, `face_id`, `face_pending_id`, `face_error`, `avatar`); a key left out or `undefined` is untouched, `null` sets NULL; stamps `updated_at`; answers the row |
 | `userIdsFocusedOn(sessionId)` | accounts whose `focus_json.sessionId` is the chat, ascending; read from the rows, so an account untouched since boot is found; non-JSON `focus_json` names no one (guard is a `CASE`, not `AND`) |
-| `listFaces()` | EVERY account (`users` LEFT JOIN `companion_state`, ascending) as `{ user_id, face_id, face_pending_id }`: an account with no state row is on the original (both NULL). Read by the face service at start, after the original is made, and for each prune (MAN-9237) |
+| `listFaces()` | EVERY account (`users` LEFT JOIN `companion_state`, ascending) as `{ user_id, face_id, face_pending_id, avatar }`: an account with no state row has all three NULL and wears the house's first look. Read by the face service at start, to tell every account when a house look's bake moves or ends, and for each prune (MAN-9237) |
 | `userIdsWithUnanswered()` | accounts whose `unanswered_json` holds a non-empty list, ascending; what the server finds at boot to know whose Kaylee must be made so she says those messages again (MAN-9079) |
 | `appendLog(userId, entry)` | insert + delete everything beyond the newest `COMPANION_LOG_KEEP` = 400 of the account, one transaction; answers the row with its id. `entry.attachments_json` is the files of a typed line as JSON text, NULL for none |
 | `readLog(userId, limit)` | newest `limit` rows, oldest first; `limit` clamped to 0..400, non-finite = 400 |
@@ -6013,7 +6017,7 @@ The write comes first and the frame second, in the same tick; a failed write sen
 - The id is minted per tab by the page (`companionClientId()` in `src/shared/utils.ts`: 16 random bytes in hex, kept in `sessionStorage`) and rides every `api.companion.*` call as `x-companion-client`.
 
 ## Clear, in storage terms
-Rows deleted: the account's log, its UNPINNED notes (`pinned = 0`; a pinned card is his keep and stays), `provider_session_id` with `session_shape`, `handover`, focus, draft, pending action, unanswered words, walk. Rows kept: `floor`, `memory_forget_line`, `face_id`, `face_pending_id`, `face_error`, `relayed_sends`, `companion_actions` (a standing action's row is ended `cancelled`). Order of the steps: MAN-9271 §Clear.
+Rows deleted: the account's log, its UNPINNED notes (`pinned = 0`; a pinned card is his keep and stays), `provider_session_id` with `session_shape`, `handover`, focus, draft, pending action, unanswered words, walk. Rows kept: `floor`, `memory_forget_line`, `face_id`, `face_pending_id`, `face_error`, `avatar`, `relayed_sends`, `companion_actions` (a standing action's row is ended `cancelled`). Order of the steps: MAN-9271 §Clear.
 
 ## Proof
 `.verify/companion-storage.ts` (against a `.backup` copy of `auth.db`; refuses the live database): 405 appends leave 400 with the first five ids gone; a state round trip; a note added, listed, removed; `clearAccount` keeps the floor and `relayed_sends`; a relayed send; `latestPermissionMode`. `.verify/companion-store.mjs`: the store's frame per write (`setPending` among them: no pin on the wire), the record of actions (`endAction` once, `listActions` newest first, `heardSince`), Clear ending a standing action `cancelled` and keeping the record, one account's page and another's silent. `.verify/companion-pending.sh`: the same on a scratch server over a copied database, through `GET /api/companion`, `DELETE /api/companion/action` and `POST /api/companion/clear`.
@@ -6095,7 +6099,8 @@ section: src/modules/companion — the page's picture: CompanionProvider, the re
 | `press(blob, mimeType, durationMs, opened = 'button')` | `POST /api/companion/press`, multipart `audio` + `durationMs`, and `opened=name` only for a press her name opened; answers 202 `{ text }` or the 409/502 of a hearing that came to nothing, or a 400 naming `opened` (MAN-9101, MAN-9058 §Refusals). Returns the `Response`; `useTalkPress` is its one caller |
 | `earsFilesBase()` | `${window.location.origin}/api/companion/ears/files/`: where the ears' worker reads its models (MAN-9366). Fetches nothing; the worker asks, with the page's sign-in. `useEars` is its one caller |
 | `face.upload(file)` | `POST /api/companion/face`, multipart `photo` (JPEG, PNG or WebP, at most 15 MB); no deadline of its own. 200 `{ face }` when that photo's face was already made and is now hers, 202 `{ face }` while it is made (progress arrives as `companion_face` frames). Returns the `Response` |
-| `face.restore()` | `DELETE /api/companion/face`: back to the original, 200 `{ face }`; the face made from his photo is removed |
+| `face.pick(avatar)` | `PUT /api/companion/face/avatar`, JSON `{ avatar }`: the look to wear, a house look's key or `own`; 200 `{ face }` once it is stored and announced to the account's pages as a `companion_face` frame; 400 `COMPANION_FACE_INVALID` with "There is no look called <key>." or "That look isn't ready yet; it can be picked once it is made." (MAN-9236) |
+| `face.remove()` | `DELETE /api/companion/face`: his photo and the face made from it removed, a bake still being made dropped; 200 `{ face }`; a pick of a house look stays, a pick of his photo goes back to the house's first |
 | `face.manifest(faceId)` | `GET /api/companion/face/<faceId>/manifest`: the face's `CompanionFaceManifest` (JSON). `faceId` through `encodeURIComponent`. Called by `useFaceAtlas` (MAN-9223) |
 | `face.sheet(faceId, file)` | `GET /api/companion/face/<faceId>/sheet/<file>`: one sheet by the file name the manifest gives it (`image/webp`; `manifest.sheets[n].file`, or a larger tier's in `manifest.largerTiers`), for `createImageBitmap`. Called by `useFaceAtlas` |
 | `face.contact(faceId)` | `GET /api/companion/face/<faceId>/contact`: the contact sheet, every frame named (`image/webp`) |
@@ -6130,7 +6135,7 @@ section: src/modules/companion — the page's picture: CompanionProvider, the re
 | `companion_cleared` | empties `log`, `notes` (the pinned cards stay), `draft`, `pending`, `walk`, `focus`, `turnId`, sets activity `idle`; `settings`, `process`, `models`, `floor` and `face` stay (the provider then reads again). Clear wipes her memory, not her look |
 | unknown kind (`companion_mouth` is one: the shapes are for her face, never her picture), or a payload the panel cannot read | the SAME object back |
 - Folding a frame twice is harmless (ids and replacement), which is why a read and the socket need no ordering. `isCompanionPicture` requires `floor` to be text or `null`, `pending` to be `null` or an action with the fields above, and `face` to pass `isFace`.
-- `isFace(value)` (exported; the Settings section's two hooks judge a read's, an answer's and a frame's face by it): `id` text or null, `original` a boolean, `bake` null or a queued or baking bake with numeric `done` and `total`, or a failed bake with a text `error`. The portrait draws from `id`, the card from `original` and `bake`; a face without them is refused.
+- `isFace(value)` (exported; the Settings section's two hooks judge a read's, an answer's and a frame's face by it): `id` text or null, `avatar` text, `avatars` an array of avatars each with text `key` and `label`, `faceId` text or null, and `bake` null or a queued or baking bake with numeric `done` and `total`, or a failed bake with a text `error`. The portrait draws from `id`, the card from `avatar` and `avatars`; a face missing `avatar` or `avatars`, or one whose avatar fails these checks, is refused.
 
 ## Proof
 - `.verify/companion-lands.mjs` (live :5183 against :3011, Haiku): door, panel over an application, her conversation across a model switch, a second page of the account, the other account's page, Clear; records every `companion_*` frame to `<evidence>/frames.json`.
@@ -6197,9 +6202,11 @@ section: server/shared/companion-types.ts — the wire contract: the types, the 
 | `CompanionFacePose` | `left_10` \| `left_20` \| `right_10` \| `right_20` \| `up_5` \| `up_10` \| `down_5` \| `down_10`: where her head turns, eyes following; the number is degrees |
 | `CompanionFaceClip` | `laugh` \| `giggle` \| `gasp` \| `sigh`: a sound that plays as a run of frames; the key of `CompanionFaceManifest.clips` |
 | `CompanionFaceTier` | `{ frameSize: number, sheets: [{ file, columns, rows }] }`: one resolution of a face's atlas: every frame cut `frameSize` px square and packed onto `sheets`, 8 × 8 cells at most each, the cell at (`column`, `row`) starting `column × frameSize` across and `row × frameSize` down. A sheet is asked as `GET /api/companion/face/:faceId/sheet/:file` (MAN-9236) |
-| `CompanionFaceManifest` | `{ version: 1, faceId, frameSize: 256, sheets: CompanionFaceTier['sheets'], largerTiers?: CompanionFaceTier[], frames: [{ sheet, column, row }], moods: Record<Mood, { mouths: Record<Mouth, number>, blink: { half, closed } }>, gaze: Record<Gaze, number>, poses: Record<Pose, number>, states: { listening, failed, surprise }, clips: Record<Clip, { fps, frames: number[] }> }`. Every number is an index into `frames`. `frameSize` and `sheets` are the smallest tier's (256 px); `largerTiers` are the others, smallest first (`[{ frameSize: 448, sheets }]`), absent on a face made with one tier. `frames` places each frame the same way in every tier. A sheet's `file` is `sheet-<size>-<n>.webp`. A page draws the smallest tier that covers the pixels it is drawn at (`useFaceAtlas`: MAN-9404). The file `manifest.json` of a face's folder (MAN-9233, MAN-9235); `GET /api/companion/face/:faceId/manifest` (MAN-9236) |
-| `CompanionFaceBake` | `{ state: 'queued' \| 'baking', done, total }` \| `{ state: 'failed', error }`: the making of his uploaded photo's face; `error` is the sentence for his screen |
-| `CompanionFace` | `{ id: string \| null, original: boolean, bake: CompanionFaceBake \| null }`: `id` the face to fetch (the original's until his upload is made; `null` only while no face exists at all, when the page draws her initial), `original` whether `id` is the original, `bake` his upload's making, else `null`. Her current face stays in `id` until the new one is ready (MAN-9237) |
+| `CompanionFaceBlink` | `{ half: number, closed: number }`: the two frames of one blink, shown half, closed, half; each an index into `CompanionFaceManifest.frames` |
+| `CompanionFaceManifest` | `{ version: 1, faceId, frameSize: 256, sheets: CompanionFaceTier['sheets'], largerTiers?: CompanionFaceTier[], frames: [{ sheet, column, row }], moods: Record<Mood, { mouths: Record<Mouth, number>, blink: CompanionFaceBlink }>, gaze: Record<Gaze, number>, poses: Record<Pose, number>, states: { listening, failed, surprise }, clips: Record<Clip, { fps, frames: number[] }>, blinks?: { listening: CompanionFaceBlink, gaze: Record<Gaze, CompanionFaceBlink>, poses: Record<Pose, CompanionFaceBlink> }, brows?: Record<Mood, number> }`. Every number is an index into `frames`. `blinks` are the blinks of the looks that are not a mood's face: her listening face, each gaze, each turned pose; absent on a face made before them, which blinks only in its moods (`faceEngine.ts` plays it as it always did but for the fade rule: MAN-9432). `brows` is each mood's closed face with her brows lifted, `brow.<mood>`, which the page shows at the end of a question (MAN-9429); absent on a face made before them, which shows none. `frameSize` and `sheets` are the smallest tier's (256 px); `largerTiers` are the others, smallest first (`[{ frameSize: 448, sheets }]`), absent on a face made with one tier. `frames` places each frame the same way in every tier. A sheet's `file` is `sheet-<size>-<n>.webp`. A page draws the smallest tier that covers the pixels it is drawn at (`useFaceAtlas`: MAN-9404). The file `manifest.json` of a face's folder (MAN-9233, MAN-9235); `GET /api/companion/face/:faceId/manifest` (MAN-9236) |
+| `CompanionFaceBake` | `{ state: 'queued' \| 'baking', done, total }` \| `{ state: 'failed', error }`: the making of one avatar's face (`CompanionFaceAvatar.bake`); `error` is the sentence for his screen |
+| `CompanionFaceAvatar` | `{ key: string, label: string, faceId: string \| null, bake: CompanionFaceBake \| null }`: one look she can wear, a portrait and the face the bake made of it, switched as one unit. `key` is a house avatar's own word (`original`, `office`) or `own`, his photo; `label` the word the picker shows ("Dark hair", "Brown hair", "Your photo"); `faceId` its face as made (under the current recipe, else the newest made while it is made again), `null` while it has none yet; `bake` its making while queued, running or failed, else `null` |
+| `CompanionFace` | `{ id: string \| null, avatar: string, avatars: CompanionFaceAvatar[] }`: `id` the face to fetch (the picked avatar's, else the first look that has a face: the house default's whenever it has one; `null` only while no face exists at all, when the page draws her initial), `avatar` the key of the look `id` is the face of (the one he picked while it has a face, else the first that has one: the house's first, `original`, until he picks), `avatars` the looks he may wear: the house's in their order, then his photo while he has one (made, being made or failed). Her current face stays in `id` until a new one is ready (MAN-9237). Every surface that draws her reads only `id` |
 | `CompanionPicture` | `{ settings, models: [{ value, label }], process, activity, turnId, focus, draft, pending: CompanionPendingAction \| null, walk, notes, log, floor, face: CompanionFace }`; `GET /api/companion`; `log` = newest 200 (MAN-9070) |
 | `CompanionMemoryReading` | her memory as Settings reads it: `{ count: number \| null, pageId, reason: string \| null }`; `count` is how many memories her bank holds, `null` with `reason` saying why when the bank cannot be read; `pageId` is her DocSpace page, `page-kaylee-memory`. `GET /api/companion/memory` (MAN-9188); drawn by MAN-9184 |
 | `CompanionMemoryLine` | one memory of her bank as the station's memory view draws it: `{ token, title, kind, saidAt: string \| null, account: string \| null, quote: string \| null }`; `token` is the docstore row that holds it, `saidAt` is ISO, each `null` when the row records none |
@@ -6228,7 +6235,7 @@ section: server/shared/companion-types.ts — the wire contract: the types, the 
 | `companion_process` | `process` | the session's `onProcess` | each state change |
 | `companion_open` | `target: CompanionOpenTarget, floor, label` | `openOnFloor` (`tools/tool-deps.ts`) | a send or a new chat (`{ kind: 'chat', sessionId }`, `label` = the chat's name) or an `open` she was told to make (`label` = the `spoken` name the door resolved, `openOnFloor` in `hands/action-doors.ts`); none while no page holds the floor. The page whose client id equals `floor` acts on it with `onOpen(target, label)`; the workspace ignores the label, the station's stage names what she opened by it; every page notes a chat open (MAN-9083) |
 | `companion_floor` | `floor` (the client id now holding it) | `store.setFloor` | every write of the floor: a typed line, a press, Send, the panel opened. Sent even when the holder did not change. The page whose client id equals `floor` plays her voice; the others show the text only (MAN-9082, MAN-9113) |
-| `companion_face` | `face` | `faceService` (`face/face.service.ts`) | an upload is queued or switches at once; a bake starts, renders each frame and ends (made or refused); a restore; the original first made or found. Clear sends none: her face stays |
+| `companion_face` | `face` | `faceService` (`face/face.service.ts`) | an upload is queued or switches at once; a pick; a bake of his photo's face starts, renders each frame and ends (made or refused); a house look's bake does the same for EVERY account (every picker lists the house's looks); a removal of his photo; the house's looks found at start (every account). Clear sends none: her face stays |
 | `companion_mouth` | `turnId, index, piece: CompanionMouthPiece` | `store.emit` (the speech door's frame, `companion-speech.ts`: each piece as its Rhubarb run ends, and again for a sentence served from the cache; MAN-9110) | the timed shapes of one piece of a sentence's audio, the `index`th sentence of turn `turnId`, for her face. Never part of her picture: `reduceCompanion` returns the same object for it (MAN-9150) |
 | `companion_cleared` | none | `store.clearAccount` | Clear: the log, the unpinned notes, draft, pending action, walk and focus empty; the cards he pinned stay |
 - Writer of each row and frame per callback: MAN-9070. Row → frame per store verb: MAN-9082. What a page does with each: MAN-9083.
@@ -6237,9 +6244,9 @@ section: server/shared/companion-types.ts — the wire contract: the types, the 
 - Model labels (`CompanionPicture.models`): MAN-9070 §`companion-picture.ts`.
 
 ## Proof
-`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-wire-contract.mjs` runs the pure files. Its pending-action section prints the action through `isCompanionPicture` and `reduceCompanion`, and the pin's cut. Its face section prints `isCompanionPicture` on a picture with no face, a face with `id` null, the original, a baking and a failed upload, and on faces missing a field (refused), then `reduceCompanion` folding a bake's frames and keeping the face through `companion_cleared`, and handing a `companion_mouth` frame of a three-cue piece back as the very same picture. `.verify/companion-reducer.mjs` folds recorded frames of a real page over the pictures the server answered.
+`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-wire-contract.mjs` runs the pure files. Its pending-action section prints the action through `isCompanionPicture` and `reduceCompanion`, and the pin's cut. Its face section prints `isCompanionPicture` on a picture with no face, a face with `id` null and no avatars, Dark hair alone, his upload baking, failed and made and worn, and on faces missing a field or an avatar's field (refused), `isFace` refusing the shape before avatars (`original` and `bake` on the face) and taking `{ id, avatar, avatars }`, then `reduceCompanion` folding a bake's frames and keeping the face through `companion_cleared`, and handing a `companion_mouth` frame of a three-cue piece back as the very same picture. Its manifest section prints the recipe's `buildManifest` through JSON (the `blinks` table beside each mood's `blink`, none of its indices among the frames before the clips' end, and the nine `brows` indices 149 to 157, none of them any earlier frame) and runs the page's `isManifest`, taken from the text of `useFaceAtlas.ts`, on it: accepted with `blinks` and `brows`, with `brows` absent and with both keys absent, refused with `blinks` or `brows` a number or null and with no neutral mood. `.verify/companion-reducer.mjs` folds recorded frames of a real page over the pictures the server answered.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/companion-types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-wire-contract.mjs
 
 ## MAN-9087 — server/modules/companion — her settings: the stored overrides, the defaults, the limits and the operator's name
 
@@ -6375,8 +6382,8 @@ section: Probing Kaylee — the rules every probe of her keeps, the hidden-chat 
 | `kaylee-fab-motion.mjs`, `kaylee-fab-presence-frames.mjs`, `kaylee-fab-speaking.mjs` | her button on the live page: where it goes on a read (Haiku); the status line and the face in the same frame (Haiku, voice off); the mouth while she speaks (Gemini speech, one sentence: run on purpose) (MAN-9130) |
 | `kaylee-fab-growth.mjs` (`node --import tsx`) | her disc grows while she is active and shrinks 2.5 s after: its width, left edge and centre in every animation frame through one typed turn at 1440 × 900 and 390 × 844, a resize while active, a drag taken while grown; Haiku on account 1, the page's voice switch off (MAN-9240) |
 | `kaylee-face-replay.ts` (`TSX_TSCONFIG_PATH=tsconfig.json node --import tsx`) | the face engine on a recorded turn at 60 steps a second, printing the frame names over time; no server, no model call (MAN-9238) |
-| `companion-face-server.mjs [<photo>]` | her face on the dev API (:3011) as account 1: the original's manifest, two sockets counting a bake's `companion_face` frames, the second `GET`, the restore; one real bake of 115 frames (CPU, minutes), no model call (MAN-9236, MAN-9237) |
-| `kaylee-face-card.mjs`, `kaylee-face-card-walk.mjs` | her face card in Settings: every state on fixtures and the live section; then the live card pressed through, an upload to its meter to the new portrait, restore, a photo with no face; account 1, no model call (MAN-9221) |
+| `companion-face-server.mjs [<photo>]` | her face on the dev API (:3011) as account 1: each house look's manifest, the picks (`PUT /face/avatar`), two sockets counting a bake's `companion_face` frames, the second `GET`, the removal; one real bake of every frame the recipe names (CPU, minutes), no model call (MAN-9236, MAN-9237) |
+| `kaylee-face-card.mjs`, `kaylee-face-card-walk.mjs` | her face card in Settings: every state on fixtures and the live section; then the live card pressed through, the pick across four surfaces, an upload to its meter to the new portrait, remove, a photo with no face; account 1, no model call (MAN-9221, MAN-9445) |
 | `kaylee-bank-door.mjs <scratch\|live\|down\|wire>` | her side of the docstore door: the exact request and answer of every verb, and `onBank`; `scratch` writes only to a scratch door over a scratch database (MAN-9191) |
 | `kaylee-memory-words.mjs` (`node --import tsx`) | the words of a memory replayed over recorded rows and scores; no server, no model (MAN-9183) |
 | `kaylee-memory-verbs.mjs`, `kaylee-memory-clear-hands.mjs` | her three tools, the clear and the thirteenth action over a copy of `auth.db` and a stand-in door; client side only; no model, no Gemini (MAN-9192, MAN-9193, MAN-9194) |
@@ -6421,7 +6428,7 @@ Returns `{ state, toggle, stop }`; `state` = `'transcribing'` while a clip is ou
 | clip | result |
 | --- | --- |
 | `blob.size < 800` | `onError('Recording too short')`, no request |
-| upload | `transcribeVoice(blob, 'recording.<ext>', provider)` (`m4a` for mp4, `ogg` for ogg, else `webm`) in `src/shared/api.ts`, `provider` read from `currentVoiceProvider()` (the store `useVoiceProvider` keeps) when the clip is sent. `'openai'` (the default): a configured `baseUrl` → `POST <baseUrl>/audio/transcriptions` (`file`, `model` = `sttModel` or `whisper-1`); else the CloudCLI voice proxy (`audio` part, `x-voice-*` headers). `'gemini'`: always `POST /api/voice/transcribe` (`audio` part), no `x-voice-*` header, never the browser's endpoint |
+| upload | `transcribeVoice(blob, 'recording.<ext>', provider)` (`m4a` for mp4, `ogg` for ogg, else `webm`) in `src/shared/api.ts`, `provider` read from `currentVoiceProvider()` (the store `useVoiceProvider` keeps) when the clip is sent. `'openai'` (the default): a configured `baseUrl` → the browser-direct branch, `transcribeOnOwnEndpoint` in `src/shared/voiceDirect.ts`: `GET /api/voice/transcribe-hints` (the account's vocabulary, read per clip), then `POST <baseUrl>/audio/transcriptions` (`file`, `model` = `sttModel` or `whisper-1`, and `prompt` when the hints are non-empty), then `POST /api/voice/clean` on the answer's `text`, handed to the hook as a synthesized `Response` of the endpoint's own JSON; a hints or clean call that fails falls back to no prompt / the raw text with one `console.warn` (MAN-9452 §Browser-direct); else the CloudCLI voice proxy (`audio` part, `x-voice-*` headers), which applies the prompt and cleanup itself. `'gemini'`: always `POST /api/voice/transcribe` (`audio` part), no `x-voice-*` header, never the browser's endpoint |
 | non-ok response | `'gemini'` with a sentence in the body (`error`: the 409 no key or refused key, the 502 failure): `onError(<that sentence>)`. Otherwise `onError('Transcription failed: transcribe <status>')` |
 | empty text | `onError('No speech detected')` |
 | self-stopped clip | transcribed as a plain stop (`send` false) via `onEnded` |
@@ -6572,13 +6579,16 @@ Views drawn from props; the tab binds them. Server side: `server/modules/voice/`
 ## `VoiceSettingsTab` — section order
 1. Voice on/off.
 2. Voice on only: backend section (`voiceSettings.backendTitle`) — the OpenAI-compatible fields.
-3. `GeminiVoiceSection`, voice on or off.
-4. `CompanionSettingsSection`, voice on or off.
+3. `TranscriptCleanupSection`, voice on or off: the one switch for `cleanTranscripts`.
+4. `VocabularySection`, voice on or off: the account's house words as an editable table (MAN-9453 §Settings editor).
+5. `GeminiVoiceSection`, voice on or off.
+6. `CompanionSettingsSection`, voice on or off.
 - Rule: with Gemini picked, only the `voiceSettings.sttModel` field leaves; its row goes `sm:grid-cols-4` → `sm:grid-cols-3`. Base URL, API key, TTS model, voice, format, the note and the section's sentence stay. why: read-aloud uses that backend whatever the picker says; the picker governs the chat mic alone.
 - Kaylee hears through Gemini whatever the picker says.
 
 ## Mounted
 - The tab's head reads `useVoiceSettings()` (`src/modules/settings/hooks/useVoiceSettings.ts`): `{ settings, keyStatus, saving, error, providerRefusal, saveSettings, saveKey, clearKey, retry }`. `openaiPicked = (settings?.provider ?? 'openai') === 'openai'`.
+- `TranscriptCleanupSection` gets `checked={settings?.cleanTranscripts}`, `saving`, and `onChange` = `saveSettings({ cleanTranscripts })`. The hook reads `cleanTranscripts` as on unless the server says `false` (a server that predates the setting sends none), so the page never fails to read over it. A refused or failed save leaves the switch where it was and the sentence stands in the Gemini card's `error` line, the next block below.
 - `VoiceProviderPicker` is first in the backend section (voice on); `GeminiVoiceSection` sits before `CompanionSettingsSection`, voice on or off, with `onRetry={retry}`; its `keyStatus` prop is `GeminiKeyStatus | null` (`src/shared/types.ts`, beside `VoiceProvider` and `VoiceSettings`).
 - `VoiceSettingsTab` hands the Gemini section the stored speech rows: `speechModel`, `voice` and `soundTags` read from `settings.gemini` (undefined while the settings are unread, so no row stands over a value the page cannot see), and saves each through `saveSettings({ gemini: { transcriptionModel | speechModel | voice | soundTags } })` (`soundTags`: the whole list, or `null` for Restore). The server's rules for them: MAN-9102; the list's one home: INV-9938.
 - The picker's `onChange` saves only a provider other than the one picked (`pickedProvider`): the option already picked sends nothing. A refused provider save leaves the picker where it was and its sentence (`providerRefusal`, `[data-voice-provider-refused]`) stands under the picker; the Gemini card's `error` line, two sections below, carries the same sentence.
@@ -6587,6 +6597,13 @@ Views drawn from props; the tab binds them. Server side: `server/modules/voice/`
 - A save that carried `provider` and landed dispatches `VOICE_CONFIG_SYNC_EVENT`, after the server's answer. why: the chat's `useVoiceProvider` and `useVoiceAvailable` re-read on it, so an open composer follows the picker in the same tab.
 - The key is passed to `api.voice.saveGeminiKey(key)` (`PUT /api/voice/gemini-key`) and never held by the hook; the answer is `{ key: GeminiKeyStatus }`.
 - `api.voice.{ settings, saveSettings, saveGeminiKey, clearGeminiKey }` (`src/shared/api.ts`) are the only places these URLs are written. `settings` and `saveSettings` answer `{ settings, key }`; `saveSettings` takes a `Partial<VoiceSettings>`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVoiceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiNameField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiVoiceSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/SoundTagsField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/TranscriptCleanupSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VoiceProviderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/VoiceSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs
+
+## MAN-9447 — src/modules/settings/tabs — Settings > Voice: the chat mic's provider picker and — `TranscriptCleanupSection` — props `checked: boolean | undefined`, `saving`, `onChange(checked)`
+section: src/modules/settings/tabs — Settings > Voice: the chat mic's provider picker and the Gemini section/001 `TranscriptCleanupSection` — props `checked: boolean | undefined`, `saving`, `onChange(checked)`
+
+A kit `SettingsSection` (`voiceSettings.cleanTranscripts.title`, `Transcripts`) over a `SettingsCard` of one `SettingRow`: label `voiceSettings.cleanTranscripts.label` (`Clean up transcripts — remove um, uh, repeats`), a helper sentence (`…help`), and a `SettingsToggle` named by the label. The switch reads on while `checked` is undefined and is disabled then and while `saving`: no switch stands over a value the page cannot see, and two quick presses cannot land out of order. It governs the fillers of the chat mic (either provider) and of Kaylee's presses: MAN-9099 §Cleanup. Its helper says off keeps them as said and that the vocabulary below still corrects its words, which no switch turns off.
 
 ## `VoiceProviderPicker` — props `value: 'openai' \| 'gemini'`, `onChange`
 Kit `Field` (label `voiceSettings.provider.label` — `Speech to text`, helper `…provider.help`) around a `SegmentedControl` (radio group, arrows move the choice): `OpenAI-compatible` \| `Gemini`. The control sits in a block `div`, so the tray is as wide as its words.
@@ -6611,7 +6628,11 @@ Kit `Field` (label `voiceSettings.provider.label` — `Speech to text`, helper `
 - The three name rows are one component, `GeminiNameField` (`voice-settings/sections/GeminiNameField.tsx`; props `label`, `help`, `invalid`, `stored`, `placeholder`, `shape`, `hook`, `saving`, `onSave`): `[data-gemini-<hook>-field]`, saved on blur or Enter, only when changed and valid; follows the stored value while untouched; a name sent is not sent again until no save is out (Enter then blur sends once).
 - Model field: `[data-gemini-model-field]`, placeholder `gemini-3.8-flash`.
 
-## `SoundTagsField` — props `tags`, `saving`, `onChange(tags \| null)`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVoiceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiNameField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiVoiceSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/SoundTagsField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/TranscriptCleanupSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VoiceProviderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/VoiceSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs
+
+## MAN-9448 — src/modules/settings/tabs — Settings > Voice: the chat mic's provider picker and — `SoundTagsField` — props `tags`, `saving`, `onChange(tags \| null)`
+section: src/modules/settings/tabs — Settings > Voice: the chat mic's provider picker and the Gemini section/002 `SoundTagsField` — props `tags`, `saving`, `onChange(tags \| null)`
+
 - Root `[data-gemini-sound-tags]` = the count. The list in its order as kit `Chip`s (`action`), each a press that removes it, named `Remove <tag>`, ✕ glyph; `[data-gemini-sound-tag]` on the word. The last one left is a static chip (no ✕) with the line `At least one sound stays on the list.`
 - Under `(pointer: coarse)` each removable chip is `min-h-11` (44px) and the gap `gap-2`. why: a press removes at once, and a miss takes the neighbour.
 - Focus after a removal: once the list no longer holds the sound, the chip now at its index (the last chip if it was last), or the add field when only the static last chip is left; a refused removal leaves focus where it was; a focus moved elsewhere meanwhile is not taken. A `useEffect` on `tags` and `saving`; refs only.
@@ -6635,7 +6656,7 @@ Kit `Field` (label `voiceSettings.provider.label` — `Speech to text`, helper `
 ## Proof
 `.verify/kaylee-talk-scaffold.sh`: MAN-9095. `.verify/kaylee-talk-chat-mic.mjs [--stub]` runs the tab and the chat's mic on :5183 as account 1: the picker, the key set ("… ending KE12") and cleared, the model saved on blur (the PUT answered by the probe), the mic shown and hidden with the picker over the same open composer, and the clip sent to `/api/voice/transcribe` as `audio` with no `x-voice-*` header. `--stub` answers `/api/voice/transcribe` itself (no Gemini call) and adds the refusal sentence at both sizes and themes; without it, one live transcription of the fixture clip.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVoiceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiNameField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiVoiceSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/SoundTagsField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VoiceProviderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/VoiceSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVoiceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiNameField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiVoiceSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/SoundTagsField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/TranscriptCleanupSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VoiceProviderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/VoiceSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs
 
 ## MAN-9095 — src/modules/companion — Proof — .verify/kaylee-talk-scaffold.sh (the talk press, the binding row, the chat mic's picker and the Gemini section)
 
@@ -6672,7 +6693,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-scaffold.mjs
 
 ## MAN-9098 — server/modules/voice — the account's `voice` preference, its Gemini key, the settings routes and the transcribe provider branch
 
-`server/modules/voice/` serves two speech-to-text backends per account: the OpenAI-compatible proxy (`voice.service.ts`, the default) and Gemini (`gemini-*.ts`), and it speaks Kaylee's sentences through Gemini (`gemini-speech.ts`, MAN-9105). `voice.module.ts` builds `voiceRoutes`; `server/index.ts` mounts it at `/api/voice` behind `authenticateToken`. The Gemini call itself: MAN-9099. Rules: INV-9908.
+`server/modules/voice/` serves two speech-to-text backends per account: the OpenAI-compatible proxy (`voice.service.ts`, the default) and Gemini (`gemini-*.ts`), and it speaks Kaylee's sentences through Gemini (`gemini-speech.ts`, MAN-9105). `voice.module.ts` builds `voiceRoutes`; `server/index.ts` mounts it at `/api/voice` behind `authenticateToken`. The Gemini call itself: MAN-9099. Rules: INV-9908, INV-10622. The vocabulary of house words (its store, check and routes, the net, the hints, the respelling): MAN-9451, MAN-9452.
 
 ## Barrel — `index.ts`
 | export | consumer |
@@ -6680,12 +6701,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-scaffold.mjs
 | `voiceRoutes` | `server/index.ts` |
 | `transcribeSpeech` (= `transcribeWithGemini`) | `companion/companion-press.ts`: every press, whatever the chat's provider says |
 | `synthesizeSentence` | `companion/companion-speech.ts`: one call per sentence a floor page pulls (MAN-9105, MAN-9110) |
-| `readVoiceSettings` | `companion/companion-account.ts`: `readSoundTags`, the account's `gemini.soundTags` read at the start of each turn (the parse) and at each push (the register). Inside the module: `gemini-transcribe.ts`, `gemini-speech.ts`, `voice-provider.ts`, the settings routes |
+| `readVoiceSettings` | `companion/companion-account.ts`: `readSoundTags`, the account's `gemini.soundTags` read at the start of each turn (the parse) and at each push (the register); `companion/eyes/house-reads.ts`: `read_settings voice`, every setting said as a line (`settings-lines.ts`, which says `cleanTranscripts` as `Transcript cleanup: on|off`). Inside the module: `gemini-transcribe.ts`, `gemini-speech.ts`, `voice-provider.ts`, the settings routes |
 | `geminiKeyStatus` | `companion/eyes/house-reads.ts`: `read_settings` says whose Gemini key the voice uses ("a key of yours", "the house's key", "no key") from the status's `source` alone; the key and its `last4` are never read there. Inside the module: `gemini-key.ts`, the settings routes |
 | `DEFAULT_SOUND_TAGS` | `.verify/companion-wire-contract.mjs` (the parse proven against the shipped set). Its one home is `voice-settings.ts`; the companion's filter and her register read the account's list through `readVoiceSettings` (INV-9938) |
 | type `TranscribeAnswer` | `companion-press.ts`: tells a refusal from a failure |
 | type `SpeechAnswer` | `companion/companion-speech.ts`: tells a refusal (`no_key`, `refused`, `failed`) from a stream |
-- Types in `server/shared/types.ts`: `VoiceProvider`, `VoiceSettings`, `GeminiKeyStatus`, `TranscribeAnswer`, `SpeechChunk`, `SpeechAnswer`. The page mirrors the first three in `src/shared/types.ts`, with `VoiceSettingsPatch` (what `PUT /settings` takes; `soundTags: null` allowed).
+- Types in `server/shared/types.ts`: `VoiceProvider`, `VoiceSettings`, `GeminiKeyStatus`, `TranscribeAnswer`, `SpeechChunk`, `SpeechAnswer`, `VocabularyEntry`. The page mirrors the first three, and `VocabularyEntry`, in `src/shared/types.ts`, with `VoiceSettingsPatch` (what `PUT /settings` takes; `soundTags: null` allowed).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
 
@@ -6699,6 +6720,8 @@ section: server/modules/voice — the account's `voice` preference, its Gemini k
 | field | default | limit |
 |---|---|---|
 | `provider` | `openai` | `openai` or `gemini` |
+| `cleanTranscripts` | `true` | a boolean. `true` removes the um, uh, stutters and repeated words from a transcript before it is used (`transcript-cleanup.ts`, MAN-9099 §Cleanup) and asks Gemini for clean speech; `false` keeps the fillers, stutters and repeats as said and asks Gemini for a verbatim one; the vocabulary (next row) still corrects house words either way. It governs the chat mic (either provider) and Kaylee's presses alike |
+| `vocabulary` | the seed (MAN-9451 §Seed) until the account saves a list | a list of 0–100 `{ spelling, pronunciation, misheard }`; checked and answered by its own routes (`GET`/`PUT /vocabulary`, MAN-9103), never by `PUT /settings`. A stored `[]` is an account that emptied its list: it reads back `[]`, not the seed |
 | `gemini.transcriptionModel` | `gemini-3.8-flash` (the house's transcriber role) | 1–80 characters of `[A-Za-z0-9._-]` (`MODEL_PATTERN`). why: it becomes a path segment of the Gemini URL |
 | `gemini.speechModel` | `gemini-3.8-flash-tts`; `gemini-3.8-flash-lite-tts` is the cheap choice | the same `MODEL_PATTERN` |
 | `gemini.voice` | `Kore` | 1–40 characters of `[A-Za-z0-9_-]` |
@@ -6706,15 +6729,17 @@ section: server/modules/voice — the account's `voice` preference, its Gemini k
 
 - `gemini.soundTags` is the ONE allow-list of the sounds she may make: the register she is taught (`{sound_tags}`) and the filter that strips her sentences (`parseExpression`) both read it (MAN-9081). `DEFAULT_SOUND_TAGS` lives in `voice-settings.ts` and nowhere else; `readVoiceSettings` hands out a copy, never the shipped array.
 
-- `provider` picks the backend of the chat composer's mic only. The companion hears through Gemini whatever it says; read-aloud (`POST /tts`, `GET /health`) stays on the OpenAI-compatible backend.
+- `provider` picks the backend of the chat composer's mic only. The companion hears through Gemini whatever it says; read-aloud (`POST /tts`, `GET /health`) stays on the OpenAI-compatible backend, through the proxy or, when the browser holds a base URL, straight from the page, which then asks the server for the prompt, the cleanup and the respelling (MAN-9452 §Browser-direct).
+- `cleanTranscripts` is a top-level field, read for every provider. A stored `false` is kept by `storedDocument` (`!== undefined`, never truthiness) and reads back `false`; a stored value that is not a boolean reads as the default `true`. `vocabulary` is kept the same way (`!== undefined`): the WHOLE `voice` document is replaced on every write, so a field `storedDocument` does not carry is dropped by the next settings save (INV-10622).
 - `saveVoiceSettings(userId, patch)` merges a partial field by field (nested `gemini` included) and answers the settings as stored. Nothing is written when any field is refused. The read and the write have no `await` between them, so two saves cannot merge from the same stored value.
 
 Refusals — all 400 `VOICE_SETTINGS_INVALID`, `details.field` as listed:
 | patch | sentence | field |
 |---|---|---|
 | not an object | `The settings must be a JSON object.` | `settings` |
-| a key other than `provider`, `gemini` | `<key, 40 characters at most> is not a voice setting; the fields are provider and gemini (transcriptionModel, speechModel, voice, soundTags).` | the key |
+| a key other than `provider`, `cleanTranscripts`, `gemini` | `<key, 40 characters at most> is not a voice setting; the fields are provider, cleanTranscripts and gemini (transcriptionModel, speechModel, voice, soundTags).` | the key |
 | `provider` not a listed word | `provider must be "openai" or "gemini".` | `provider` |
+| `cleanTranscripts` not a boolean | `cleanTranscripts must be true or false.` | `cleanTranscripts` |
 | `gemini` not an object | `gemini must be an object holding transcriptionModel, speechModel, voice, soundTags.` | `gemini` |
 | `gemini.<other>` | `gemini.<other, 40 characters at most> is not a voice setting; the fields are gemini.transcriptionModel, gemini.speechModel, gemini.voice, gemini.soundTags.` | `gemini.<other>` |
 | a model past its limit | `gemini.transcriptionModel must be 1 to 80 characters of letters, digits, dots, underscores and hyphens.` (likewise `gemini.speechModel`) | `gemini.transcriptionModel` or `gemini.speechModel` |
@@ -6752,13 +6777,19 @@ section: server/modules/voice — the account's `voice` preference, its Gemini k
 |---|---|---|---|
 | GET | `/health` | none | the proxy's own `{ configured }`, the same for every account (read-aloud's speaker reads it) |
 | GET | `/settings` | none | 200 `{ settings: VoiceSettings, key: GeminiKeyStatus }` |
-| PUT | `/settings` | a partial `{ provider?, gemini?: { transcriptionModel?, speechModel?, voice?, soundTags? } }` | the same shape; 400 `VOICE_SETTINGS_INVALID` |
+| PUT | `/settings` | a partial `{ provider?, cleanTranscripts?, gemini?: { transcriptionModel?, speechModel?, voice?, soundTags? } }` | the same shape; 400 `VOICE_SETTINGS_INVALID` |
 | PUT | `/gemini-key` | `{ key }` | 200 `{ key: GeminiKeyStatus }`; 400 `VOICE_SETTINGS_INVALID` naming `key` |
 | DELETE | `/gemini-key` | none | 200 `{ key: GeminiKeyStatus }` |
+| GET | `/vocabulary` | none | 200 `{ vocabulary: VocabularyEntry[] }`, read fresh: the account's list, else the seed (MAN-9451) |
+| PUT | `/vocabulary` | `{ vocabulary }`, the WHOLE list (it replaces) | 200 `{ vocabulary }` as stored; 400 `VOICE_VOCABULARY_INVALID` (`details.field` `vocabulary`), the sentence naming the entry or form |
+| GET | `/transcribe-hints` | none | 200 `{ prompt }`: Whisper's `prompt` for the account's vocabulary, read fresh (`whisperVocabularyPrompt`); `''` for an empty list (send no prompt field) |
+| POST | `/clean` | `{ text }` | 200 `{ text }`: `cleanTranscript` with the account's `cleanTranscripts` switch and vocabulary, the very call `/transcribe` makes on the OpenAI branch; 400 `{ error: 'text required' }` for a body without a string `text` (an empty string is a text), 413 `{ error: 'text too long' }` over 100,000 characters (`MAX_ENGINE_TEXT_CHARS`: the cleanup's filler step is quadratic in a run of fillers and runs on the server's one event loop) |
+| POST | `/speakable` | `{ text }` | 200 `{ text }`: `respellForSpeech` with the account's vocabulary, the text `/tts` hands the backend; the same 400 and 413 |
 | POST | `/transcribe` | multipart `audio` (≤ 25 MB, memory) | 200 `{ text }`; see the next section |
-| POST | `/tts` | `{ text }` | the proxy's audio stream |
-- A `VOICE_SETTINGS_INVALID` answer is the app's envelope `{ success: false, error: { code, message, details } }` (MAN-9058 §Refusals); the page reads `message` through `refusalSentence`.
-- 2026-10-27, live :3011: `GET /settings` → `{"settings":{"provider":"openai","gemini":{"transcriptionModel":"gemini-3.8-flash","speechModel":"gemini-3.8-flash-tts","voice":"Kore","soundTags":[the ten]}},"key":{"source":"house","last4":null}}`, `grep -c AIza` on the body → 0; `PUT /settings {"bogus":1}` → 400 `bogus is not a voice setting; the fields are provider and gemini (transcriptionModel, speechModel, voice, soundTags).`
+| POST | `/tts` | `{ text }` | the proxy's audio stream, asked for the text with each house word respelled as it is said (`synthesizeForChat`, MAN-9452 §Speech) |
+- `/transcribe-hints`, `/clean` and `/speakable` call no backend and read no key: they are the server's speech engine for a caller that talks to its OWN OpenAI-compatible endpoint, a call this server never sees. Two callers: the page's browser-direct `transcribeVoice` and `synthesizeVoice` (`src/shared/api.ts` → `src/shared/voiceDirect.ts`, calling `api.voice.transcribeHints` / `clean` / `speakable`; MAN-9452 §Browser-direct) and the standalone dictation app. Each is a method of `createVoiceProvider` (`transcribeHintsForChat`, `cleanTranscriptForChat`, `speakableForChat`); the route only reads `text` and answers.
+- A `VOICE_SETTINGS_INVALID` or `VOICE_VOCABULARY_INVALID` answer is the app's envelope `{ success: false, error: { code, message, details } }` (MAN-9058 §Refusals); the page reads `message` through `refusalSentence`.
+- 2026-10-27, live :3011: `grep -c AIza` on a `GET /settings` body → 0: the answer carries the key's status (`source`, `last4`) and never a key.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
 
@@ -6768,8 +6799,8 @@ section: server/modules/voice — the account's `voice` preference, its Gemini k
 `createVoiceProvider(voiceService).transcribeForChat(userId, audio, overrides)`, called by the route with the upload (`mimeType` default `audio/webm`, `fileName` default `recording.webm`):
 | account's `provider` | does |
 |---|---|
-| `openai` (default) | `voiceService.transcribe({ audio, overrides })` exactly as before; reads the browser's `x-voice-*` headers |
-| `gemini` | `transcribeWithGemini(userId, audio)`; the `x-voice-*` headers are ignored |
+| `openai` (default) | `voiceService.transcribe({ audio, overrides, prompt })`, `prompt` being the account's spellings as Whisper's `prompt` form field (`whisperVocabularyPrompt`; no field at all when the vocabulary is empty); reads the browser's `x-voice-*` headers. A success's `text` is run through `cleanTranscript(text, { removeFillers: cleanTranscripts, vocabulary })` (Whisper has no instruction to give): fillers out when `cleanTranscripts` is on, misheard house words corrected whatever it says; a failure is passed on untouched |
+| `gemini` | `transcribeWithGemini(userId, audio)`; the `x-voice-*` headers are ignored. That door cleans and corrects its own text, once: the provider branch does not run it again |
 
 On `gemini`:
 | `TranscribeAnswer` | HTTP | body |
@@ -6779,6 +6810,7 @@ On `gemini`:
 | `failed` | 502 | `{ error: <sentence> }` |
 - Sentences: MAN-9099. The chat's `useVoiceInput` shows them as they came (MAN-9092).
 - An upload multer refuses is 400 `{ error: <its message> }`; no `audio` part is 400 `{ error: 'No audio uploaded' }`.
+- `synthesizeForChat(userId, text, overrides)` is `POST /tts`'s one call: `voiceService.synthesizeSpeech` with `respellForSpeech(text, vocabulary)` as its text, so the proxy's voice is told how each house word sounds (MAN-9452 §Speech). `transcribeHintsForChat`, `cleanTranscriptForChat` and `speakableForChat` serve the page's own direct calls to a base URL it holds (`transcribeVoice`, `synthesizeVoice` in `src/shared/api.ts`): `GET /transcribe-hints`, `POST /clean`, `POST /speakable`, no backend (MAN-9103 §Routes, MAN-9452 §Browser-direct).
 - `GET /health` takes no part in this decision: it answers the proxy's `configured` with Gemini picked too. The composer's mic follows `GET /settings` (MAN-9092 §`useVoiceProvider`).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
@@ -6795,7 +6827,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.
 ## Answer — `TranscribeAnswer`
 | answer | when | `sentence` |
 |---|---|---|
-| `{ ok: true, text }` | the model answered; `text` is trimmed; `''` when it reported no words or only a bracketed note (`[no speech]`). A silent clip is not certain to come back `''` (§Standing defect) | – |
+| `{ ok: true, text }` | the model answered; `text` is trimmed; `''` when it reported no words or only a bracketed note (`[no speech]`). `text` is then run through `cleanTranscript` (§Cleanup): with the account's `cleanTranscripts` on its fillers go (a lone `Um.` is `''` too), and always each misheard house word is replaced by its spelling (MAN-9452 §The net). A silent clip is not certain to come back `''` (§Standing defect) | – |
 | `{ ok: false, reason: 'no_key' }` | no key in reach (MAN-9098 §The key); NO request is made | `No Gemini key: set one in Settings → Voice` |
 | `{ ok: false, reason: 'refused' }` | HTTP 401 or 403, or a 400 whose error names the key (`API_KEY_INVALID` in the body, or `api key` in Google's message, case-insensitive) | `Gemini refused the key: <Google's message>` |
 | `{ ok: false, reason: 'failed' }` | any other status, a network error, a timeout, a reply with no text | `Gemini could not transcribe this: <why>` |
@@ -6815,8 +6847,36 @@ HTTP of each reason on the chat route: `no_key`, `refused` → 409; `failed` →
 ## The request
 - `POST https://generativelanguage.googleapis.com/v1beta/models/<model>:generateContent`; `<model>` = the account's `gemini.transcriptionModel` through `encodeURIComponent`.
 - Headers: `x-goog-api-key: <key>`, `Content-Type: application/json`.
-- Body: `{ contents: [{ role: 'user', parts: [{ text: TRANSCRIPTION_INSTRUCTION }, { inline_data: { mime_type, data: <the clip, base64> } }] }], generationConfig: { temperature: 0 } }`. The clip rides inline; no Files API.
-- `TRANSCRIPTION_INSTRUCTION`: transcribe as clean speech, in the language spoken, filler sounds, stutters, false starts and a word repeated while thinking left out, every other word as spoken; output only the words, no commentary, labels, timestamps or quotation marks; if the audio holds no spoken words at all (silence, room noise, a click, breathing, music) output exactly `[no speech]` and nothing else; never write words that were not spoken. why: asked to transcribe 2 s of digital silence under "output nothing", the model wrote a question nobody asked; the mark gives it a word to say. It does not make a silent clip come back `''` (§Standing defect).
+- Body: `{ contents: [{ role: 'user', parts: [{ text: TRANSCRIPTION_INSTRUCTION[clean|verbatim] + geminiVocabularyBlock(vocabulary) }, { inline_data: { mime_type, data: <the clip, base64> } }] }], generationConfig: { temperature: 0 } }`. The clip rides inline; no Files API. The form is picked by the account's `cleanTranscripts` (MAN-9102), read once per call with the model, and the account's vocabulary (`readVocabulary`) with them.
+- `TRANSCRIPTION_INSTRUCTION` has two forms that differ only in their first sentence; both end on the same tail.
+  - `clean` (`cleanTranscripts` on, the default): transcribe as clean speech, in the language spoken, filler sounds, stutters, false starts and a word or short phrase said twice in a row left out (written once), every other word as spoken, in its order, no paraphrase and no other correction.
+  - `verbatim` (`cleanTranscripts` off): transcribe word for word, exactly as said, in the language spoken; keep filler sounds, stutters, false starts and repeated words, in their order, no paraphrase and no correction.
+  - Tail, in both: output only the words, no commentary, labels, timestamps or quotation marks; if the audio holds no spoken words at all (silence, room noise, a click, breathing, music) output exactly `[no speech]` and nothing else; never write words that were not spoken. why: asked to transcribe 2 s of digital silence under "output nothing", the model wrote a question nobody asked; the mark gives it a word to say. It does not make a silent clip come back `''` (§Standing defect).
+  - Vocabulary block, in both forms, after the tail, when the account's vocabulary is not empty: ` These names may be spoken; write them exactly as spelled: <spelling>[ (sounds like "<pronunciation>")], …. ` (`geminiVocabularyBlock`, `vocabulary-hints.ts`; "sounds like" only when the pronunciation differs from the spelling: MAN-9452 §At the source). No block for an empty vocabulary.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts
+
+## MAN-9449 — server/modules/voice — `transcribeWithGemini`: the generateContent call, the — Cleanup — `transcript-cleanup.ts`, `cleanTranscript(text, { removeFillers, vocabulary }): string`
+section: server/modules/voice — `transcribeWithGemini`: the generateContent call, the three refusals, the key rules and what is never counted/001 Cleanup — `transcript-cleanup.ts`, `cleanTranscript(text, { removeFillers, vocabulary }): string`
+
+The ONE post-processor of both speech-to-text paths: `cleanTranscript(text, { removeFillers, vocabulary })`. Step one, when `removeFillers` (the account's `cleanTranscripts`, default on) is true, removes the disfluencies below. Step two, whatever the switch says, replaces each misheard form of the account's vocabulary with its spelling (`correctMisheardWords`, MAN-9452 §The net); an empty vocabulary makes it a no-op. The Gemini door runs it on its success text AFTER `readTranscript` has read the no-speech mark (so it is the only place a Gemini transcript is cleaned and corrected, for the chat mic's Gemini branch and Kaylee's press alike); `voice-provider.ts` runs it on the OpenAI branch's text (whisper-1 has no instruction to give; MAN-9104), and `POST /api/voice/clean { text }` runs the very same call (the account's `cleanTranscripts` and vocabulary, read fresh) for a client that heard the clip on its OWN endpoint: the page's browser-direct `transcribeVoice` and a standalone dictation app (MAN-9452 §Browser-direct). `removeFillers` false: the fillers stay and the Gemini instruction is the `verbatim` form; step two still runs.
+- Text with nothing to remove comes back byte for byte (a Whisper leading space stays). A result with no letter or digit in it is `''`, which the press door already settles as the empty press (`settling`: `''` → `{ logged: '', push: 'empty' }`, the same path as a press under 0.4 s).
+- Order: fragments, fillers, repeats with only spaces between the copies, repeats with a comma, ellipsis or dash between them, then `tidy` (only when something was removed): the sentence-start capital, double spaces, the second of two dashes that bounded a filler (`Okay—um—go` → `Okay—go`), a space after an opening quote, a space before punctuation, `", ."` → `"."`, a stray comma at either end, a stray full stop after a sentence-ending filler (`Okay. Um.` → `Okay.`), and a leading full stop or ellipsis the filler dragged along (`Hmm... okay.` → `Okay.`).
+| rule | does | leaves alone |
+|---|---|---|
+| fillers (`FILLER_SOUNDS`, `DRAWN_OUT_FILLER_SOUNDS`) | drops `um`, `uh`, `er`, `erm`, `ah`, `hmm`, `mm`, `mhm`, the drawn-out ones with their last letter repeated (`ummmm`, `Hmmmm`), with the commas against them: a comma before it stays when the clause it cut was complete (`Well, uh, I think` → `Well, I think`), goes with it after a word that leads into what follows (`FUNCTION_WORDS`: `to, uh, check` → `to check`). A filler that opened a sentence, or a quoted line (`He said, “Um, so…`), capitalises the next word (`Um, so` → `So`); a word with a capital inside it (`useEffect`, `iPhone`) keeps its case | `uh-huh`, `mm-hmm` (hyphen), an ALL-CAPS `ER` or `MM`, `5 mm` and `five mm`, a format string or a path (`HH:mm:ss`, `mm/dd/yyyy`, `er.ts`: a filler never touches a `:` `/` `@` or a `.` that joins it to a word), `err` |
+| set-off phrase (`SET_OFF_FILLER_PHRASES`: `you know`) | dropped only with a comma against it and a comma or a sentence edge on its other side | `Do you know where it is?`, `as you know, it works`, `You know?` |
+| repeats | one copy of a word or a phrase of up to 3 words said twice or more in a row, a run of any length in one pass (`the the the the` → `the`). Copies with only spaces between them are always a stutter: `I I want`. With a comma, ellipsis or dash between them (never `.` `?` `!`) they are a restart only when the copy ends on a word a clause strictly cannot end on (`NEVER_ENDS_A_CLAUSE`: articles, `to`, `of`, `and`, subject pronouns, modals, subject contractions): `The, the lane`, `I want to, I want to go`, `we should — we should`. `you`, `it` and `her` are not in that set | a repeat across a comma that ends on a noun, a verb, `you` or `it`, because the second copy starts a new clause (`Restart the server, the server crashed`, `I tried it, it failed`, `If it works, it works`, `Thank you, you did great`); a number, a lone letter other than `a` and `I`, words in `MAY_BE_SAID_TWICE` (`had had`, `that that`, `no, no, no`, `yeah, yeah`, spoken numbers) |
+| fragments | `w-what` → `what`, `th- the` → `the`, `I-I-I` → `I`; the fragment must start the word. A fragment of 1–2 letters counts with any dash; of 3–4 letters only as a hyphen with a space after it (`wha- what`); a whole-word repeat only for a function word | `see—seems`, `per-person`, `wha-what` (3 letters, no space: a missed stutter, never a lost word), `re-render`, `t-test`, `yo-yo`, `bye-bye`, `state-of-the-art` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts
+
+## MAN-9450 — server/modules/voice — `transcribeWithGemini`: the generateContent call, the — Latin script only (`\p{Script=Latin}`): Korean and Chinese are never touched. The lists are English
+section: server/modules/voice — `transcribeWithGemini`: the generateContent call, the three refusals, the key rules and what is never counted/002 Latin script only (`\p{Script=Latin}`): Korean and Chinese are never touched. The lists are English
+
+- Latin script only (`\p{Script=Latin}`): Korean and Chinese are never touched. The lists are English: a speaker of another language (Portuguese `um`, German or Dutch `er` are real words) turns the setting off. why: a false positive that drops a real word is worse than a missed filler.
+- The lists are the `const`s at the top of the file, unexported (no cross-file reader): edit them there. Not attempted: general false-start detection beyond the fragment and repeated-phrase cases; the `clean` instruction covers it.
+- Never logged: the transcript's words are not in the `[voice]` line.
 
 ## MIME mapping — `geminiMimeType`
 | recorder's type | sent as |
@@ -6850,7 +6910,7 @@ HTTP of each reason on the chat route: `no_key`, `refused` → 409; `failed` →
 ## Log
 - One line per call, never the key: `[voice] gemini transcribe <model> <clip bytes> B <ms> ms → ok|no_key|refused|failed`. The journal is shared: a probe names its call by the bytes it uploaded (the fixture posted by curl is 122924 B, MAN-9100).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts
 
 ## MAN-9100 — Probing Kaylee — the spoken probes: the fixture clip `kaylee-what-chats-are-working.wav`, its maker `.verify/kaylee-clip.mjs`, and which probe feeds it
 
@@ -6988,6 +7048,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useT
 ## The request
 - `POST https://generativelanguage.googleapis.com/v1beta/interactions`, headers `x-goog-api-key: <key>` (nowhere else) and `Content-Type: application/json`, body `{ model, input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style }] }] }], response_format: { type: 'audio', mime_type: 'audio/l16' }, generation_config: { speech_config: [{ voice }] }, stream: true }`. `model` = the account's `gemini.speechModel`, `voice` = its `gemini.voice`, both read fresh per call. A blank `style` sends no `annotations`.
 - Google answers server-sent events. Measured 2026-10-27 on `gemini-3.8-flash-lite-tts`: `interaction.created`, `interaction.status_update`, `step.start`, then `step.delta` ×37 (each `delta.type` `audio`, `delta.data` base64 PCM), `step.stop`, `interaction.completed`. The event's name is its `event:` line, else the data's own `event_type`/`type`. Only audio deltas are read; `interaction.completed` ends it; an `error` event fails it.
+- `text` goes out with the account's house words respelled to how they sound (`respellForSpeech(text, readVocabulary(userId))`): Gemini TTS has no lexicon and no SSML phoneme, so `lypheCli` is sent as `life C-L-I` and `Lyphe` as `life` (MAN-9452 §Speech). Only the request's text is respelled: the log line's `<characters>` and everything the page shows keep the spelling.
 - PCM is little-endian Int16, mono, 24 kHz. Every yielded piece is a WHOLE number of samples: an odd trailing byte is carried into the next piece (tested: deltas of 801, 600 and 599 bytes yield 800, 600, 600).
 
 ## Retry, bound, abort
@@ -7389,6 +7450,15 @@ Her portrait (`CompanionPortrait`: MAN-9223) with her marks drawn over it: one S
 3. Her initial, only while `faceId` is null.
 4. The marks: `<svg class="kaylee" data-state role="img">`.
 
+### Portrait motion in the stylesheet — inside `@media (prefers-reduced-motion: no-preference)`
+Rim arithmetic: MAN-9223 §"Layers". The head's variables: MAN-9434. Proof: MAN-9436.
+| rule | value |
+|---|---|
+| breath | `kaylee-breath` on each `.kaylee-portrait__layer canvas`: `4.6s ease-in-out var(--kaylee-lag) infinite`, never alternate, one rate in every state (13 a minute). Keyframes `0%, 100% { scale: 1; translate: 0 0 }`, `38% { scale: 1.006; translate: 0 -0.6% }`: a rise with her chest, not a zoom |
+| sway | `kaylee-sway` on the same canvas: 9 s, `rotate` ±0.8°, `alternate` |
+| layer | `translate: 0 var(--kaylee-bob, 0%)` and `rotate: var(--kaylee-roll, 0deg)` (the portrait writes both variables); `will-change: transform, translate, rotate`; her lean stays the layer's `transform: rotate(var(--kaylee-tilt, 0deg))` |
+| clips' lifts | `kaylee-laugh`, `kaylee-giggle`, `kaylee-gasp`: layer `translate` from the bob to −1.5% of its height; `kaylee-sigh`, `kaylee-nod`: from the bob to +2%. Every rest stop is `var(--kaylee-bob, 0%)` (0% with none), every lift stop absolute: the layer never steps at a clip's edge and a laugh is not doubled (MAN-9434) |
+
 ### Marks — `data-state` on the svg
 | state | mark on | portrait's face under reduced motion |
 |---|---|---|
@@ -7403,7 +7473,7 @@ Her portrait (`CompanionPortrait`: MAN-9223) with her marks drawn over it: one S
 | `walking` | `.kaylee__walk` | `mood.neutral.closed`; ring filled clockwise from the top to `walk.at / walk.total` |
 | `cut` | none | `state.surprise` (with motion one quick blink) |
 | `failed` | `.kaylee__walk` as a closed ring | `state.failed`, still: no breath, no sway |
-- Every other face rule (moods, hair, clips, a held look turning her head) is the engine's: MAN-9238 (states, crossfades, blink, glance, turn), MAN-9239 (mouth, sounds, mood words).
+- Every other face rule (moods, hair, clips, a held look turning her head) is the engine's: MAN-9238 (states, crossfades, glance, turn), MAN-9428 (blink, every state but `failed`), MAN-9430 (search, warm smile), MAN-9429 (brows), MAN-9239 (mouth, sounds, mood words).
 - Markup always holds every mark; `[data-state]` turns on its accent (one part). A look is a still frame; marks move only inside `@media (prefers-reduced-motion: no-preference)` at the foot of the stylesheet. why: reduced motion keeps each look and drops the movement with no rule of its own.
 - `waking` draws thinking's mark: the stylesheet's selectors are `:is([data-state='thinking'], [data-state='waking'])`.
 - `failed`: `.kaylee__track` stroke is `--kaylee-stopped` = `--warn-dot` (the status line's amber dot), width 4; `.kaylee__progress` and `.kaylee__count` are `display: none`. why a ring: it stands clear of the face and reads on the photograph in both themes.
@@ -7426,17 +7496,17 @@ Her portrait (`CompanionPortrait`: MAN-9223) with her marks drawn over it: one S
 | check | reads |
 |---|---|
 | name | one `role=img` per face, label = her state in words |
-| frame | reduced: exactly the table's frame; motion: a member of the set the engine may choose there |
+| frame | reduced: exactly the table's frame; motion: a member of the set the engine may choose there (thinking, waking: the search's four gazes and their blinks; idle: `mood.gentle.closed` and its blinks too) |
 | drawn | both canvases drawn at 106% of the disc, each exactly as many pixels as it is drawn at (CSS width × `devicePixelRatio`), and each within a mean difference of 0.5 (of 255, per colour) of the cell of the served 256 px sheet that `data-frame` names, scaled onto a canvas of that size the way the portrait scales it (the sheets are fetched in Node with the page's token and drawn on an `OffscreenCanvas` with high smoothing; a face mid-crossfade is not compared, and the line fails when more than 4 of the 36 are) |
 | lag | motion: hair layer `transition-delay` 0.09 s, face layer 0 s; both modes: only the face layer is masked |
 | lean | face and hair layers: listening −5°, thinking / waking / drafting +3°, the rest 0 (±0.6°) |
 | accent | each state has its own mark and no other |
 | ring | the 2-of-5 walk arc is `stroke-dasharray` `0.4 1`; numbers 0 at rest, 1 on hover |
 | motion | motion: every portrait but the failed one runs 2 canvas animations (breath, sway), failed 0; reduced: no face runs or names an animation |
-| once | the button and the 36 faces ask for the manifest and two sheets once each (3 requests) |
+| once | the button and the 36 faces ask for the manifest and each sheet of the smallest tier once each (three sheets for 158 frames: 4 requests) |
 | errors | nothing logged |
 - Shots: `.verify/shots/kaylee-avatar-{motion,reduced}-{light,dark}.png`.
-- 2026-10-31, after the 448 px tier and the pixel-sized canvases: ALL PASS, 36 of 36 faces compared, light and dark; `once`: 3 requests (the manifest and the 256 px tier's two sheets, `sheet-256-0.webp` and `sheet-256-1.webp`).
+- 2026-11-01, the 158-frame face: 38 PASS, 0 FAIL, light and dark; `once`: 4 requests (the manifest and the 256 px tier's `sheet-256-0.webp`, `-1` and `-2`).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
 
@@ -7997,7 +8067,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/do
 | `read_git { project, scope, panel? }` | `resolveProject(project)`, then the git panel's own `readGitStatus` / `readGitFileDiff` (git barrel) — `git-reads.ts` | `status`: `On <branch>: <n> modified, <n> added, <n> deleted, <n> untracked, <n> staged.` then `<state> <path>` per changed file (a staged one ends ` · staged`). `diff`: each changed file's diff, digested. Anything else: ONE changed file by its path, the end of it, or a piece of it (equal path, else folder-boundary tail, else substring; several fit → refused with each named) | 30 files. A folder that is no repository says so |
 | `read_cerberus { scope, panel? }` | `deps.house.cerberus()` — the tab's own overview (`cerberus-lines.ts`) | `overview`: `<checks> checks: <passing> passing, <needsYou> need you, <muted> muted, <nodes> nodes; last result <when>.`, then what needs him and any node not reporting. `needs`: all of it. A node id: its services (a passing check is counted, not listed) and every check that is not passing. A check `<node>/<service>/<check>`: status, value, last result, since, the mute, and its SERVICE's recent minutes (`cells`). Else a phrase over check paths, labels, service labels and values | overview 10 needs; a check's value cut at 600 characters, a list line at 70 (overview) or 160 |
 | `read_memory { scope, panel? }` | `listMemoryCandidates`, `getMemoryCandidate` (memory-intake barrel) — `memory-lines.ts` | `pending`: `<target> · <title> · from <chat> · proposal <id>`. `recent`: reviewed in 7 days, with the verdict (`<target> · <title> · approved yesterday 09:10 · proposal <id>`). A proposal id (`mc-136`, or `136`): it whole. Else a phrase over id, title, target and project | 15 lines. A proposal no chat recorded (spill sweeps) is "from an unrecorded chat" |
-| `read_settings { scope }` | `readCompanionSettings`, `modelOptions` (the picker's label), the voice barrel's `readVoiceSettings` and `geminiKeyStatus` — `settings-lines.ts` | `companion`: her name, his name, her model's label, Live, delivery note, talk button's label, register's length and whether it is the original. `voice`: the chat mic's provider, the transcription and speech models, her voice, her sounds, and whose Gemini key is in use: "a key of yours", "the house's key" or "no key" | none needed (under 1,000 characters). Any other scope: refused, saying `companion` or `voice` |
+| `read_settings { scope }` | `readCompanionSettings`, `modelOptions` (the picker's label), the voice barrel's `readVoiceSettings` and `geminiKeyStatus` — `settings-lines.ts` | `companion`: her name, his name, her model's label, Live, delivery note, talk button's label, register's length and whether it is the original. `voice`: the chat mic's provider, whether transcripts are cleaned of fillers and repeats (`Transcript cleanup: on|off`), the transcription and speech models, her voice, her sounds, and whose Gemini key is in use: "a key of yours", "the house's key" or "no key" | none needed (under 1,000 characters). Any other scope: refused, saying `companion` or `voice` |
 
 ## A secret's diff never reaches her
 Every changed file is held to the dactyl deny rule (`isDeniedPath` in `tools/dactyl-paths.ts`: the same `deniedBy` `judgeFile` applies, to the name as written AND to the real file, whether or not it exists; the attached-file door of MAN-9155 is `ask_dactyl`'s alone) BEFORE its diff is read — for `diff` and for a path scope alike. `git status` paths are relative to the REPOSITORY ROOT, so the rule is judged on the root (`getRepositoryRootPath`, exported from the git barrel for this) joined with git's path; a project that is a SUBFOLDER of its repository would otherwise judge a file above it on a path that does not exist, and the real-path half and the place half of the rule could not fire. A path scope is judged against the root and the project folder both. A denied file is NAMED ("withheld") and never read; a path scope on one is refused with a sentence that says so. This matters most for an untracked file, whose diff IS the whole file. Only files `git status` lists are ever read: a scope is matched against them and never opened as a path of its own. A diff with a NUL byte is "a binary file" and not shown. THE RESIDUAL: the name rule is a net, as `ask_dactyl`'s is. A credential-looking value inside a diff of an ORDINARY file (a named secret `token = …`, a `Bearer` value, a vendor key's own prefix such as `AIza…`) is replaced by `<masked>` before the diff is cut (`maskCredentials`, so a legitimate `token: string` line reads `<masked>` too); a secret in no recognisable shape, in an ordinary file, still reaches her. A file name is folded to one line wherever it is shown (`shownPath`), so a name holding a line break cannot forge a line. `read_settings` never reads `GeminiKeyStatus.last4`; the key's `source` is all that leaves `settings-lines.ts`.
@@ -9200,11 +9270,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/a
 why: the CLI records a conversation's tools and system prompt ONCE, in its first request, and keeps that record on every resume. A new tool NAME reaches a resumed session (the CLI re-lists the server's tools); a parameter added to an existing tool, or an edited prompt, does not. A change to either reaches her only through a fresh conversation.
 
 ## `sessionShapeOf(tools, systemPrompt)` (`session/companion-shape.ts`, pure)
-- Hex SHA-256 over `{ tools, systemPrompt }`: each tool's `name`, `description` and JSON schema, tools in name order, object keys sorted (arrays keep their order); `systemPrompt` is the FILLED prompt, `fillSystemPrompt(operatorName)`.
+- Hex SHA-256 over `{ tools, systemPrompt }`: each tool's `name`, `description` and JSON schema, tools in name order, object keys sorted (arrays keep their order); `systemPrompt` is the COMPOSED prompt, `fillSystemPrompt(operatorName, readSoul(userId))`: her two soul pages, then the plumbing (MAN-9213). The plan reads the soul once and hands that very string to the launch, so what is hashed is what is sent; an edit to either page is a new shape at her next launch.
 - Schema = `z.toJSONSchema(z.object(inputSchema), { unrepresentable: 'any', io: 'input' })`. `io: 'input'` is the side the bridge serves: a property wrapped in `.transform()` keeps its constraints, and `additionalProperties:false`, which output mode adds, is not hashed. A schema zod cannot represent is written `{}`: the fingerprint never fails a launch.
 | in the shape | out of the shape |
 |---|---|
-| tool name, description, input schema; the filled prompt (the operator's name included: editing that setting costs a fresh session) | the model (`setModel`, applied live); the register (rides with every message); tool annotations; handler code |
+| tool name, description, input schema; the composed prompt (the soul pages' text and the operator's name included: editing a page or that setting costs a fresh session) | the model (`setModel`, applied live); the register (rides with every message); tool annotations; handler code |
 
 ## The stored pair
 | where | what |
@@ -9304,94 +9374,85 @@ why: the text of the fresh-start handover is the house summarizer's account of t
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-oneshot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-handover.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover-real.mjs
 
-## MAN-9220 — src/modules/companion — her face card: CompanionFaceSettingsView, its states, the restore and remove question, the contact-sheet lightbox and the slot in her Settings section
+## MAN-9220 — src/modules/companion — her face card: CompanionFaceSettingsView, the looks she wears, the switch, the band, the remove question and the contact-sheet lightbox
 
-`CompanionFaceSettingsView` (`src/modules/companion/CompanionFaceSettings.tsx`) is Settings > Voice > Companion's "Her face" card: the face her pages draw, whose it is, and how he swaps it for one made from a photo of his. The page's wiring: `CompanionFaceSettings({ name, face })` over `useCompanionFaceSettings(face)`. The section that places it: MAN-9062 §Parts. Proof: the next row (`.verify/kaylee-face-card.mjs`, the card's states on fixtures) and `.verify/kaylee-face-card-walk.mjs` (the live card pressed through on :5183).
-
-## Wiring — the card is live
-- `CompanionSettingsView` takes `face?: ReactNode`, drawn in `<div className="mb-3">` directly after the talk button's card, above the `memory` slot. Order: talk, face, memory, fields.
-- `CompanionSettingsSection` passes `face={settings && face && <CompanionFaceSettings name={settings.name} face={face} />}`. `face` comes from `useCompanionSettings()`, which keeps `picture.face` out of the same `GET /api/companion` that brings `settings` (and out of its read again on `websocket_reconnected`) and answers it null until that read lands; the card mounts with its face known and makes no read of its own.
-- `hooks/useCompanionFaceSettings.ts` (`useCompanionFaceSettings(initial)`) is the card's behaviour: it starts from the section's face, replaces it with each `companion_face` frame of the account (`useWebSocket().subscribe`) and with a new `initial` (set while rendering, so a re-read is never drawn late). A frame carries no sequence: a frame heard while an upload or restore is out wins over that request's answer (`frameCountRef`), and `useCompanionSettings` hands on the newest frame's face instead of a read that was out while the frame came. A face of a read, an answer or a frame must pass the reducer's `isFace` (exported from `utils/companionReducer.ts`), else it is not drawn. Settings renders wherever the app does and the companion provider lives only in the project workspace, so it never reads the provider's picture. It returns `{ face, uploading, refusal, framesOpening, contactUrl, upload, restore, seeFrames, closeFrames }`:
-  - `upload(file)` → `api.companion.face.upload`; 200 `{ face }` switches her at once, 202 `{ face }` starts the meter (the frames then count it to the end). Any refusal's sentence (`refusalSentence`; a 400 `COMPANION_FACE_INVALID` is the usual) is `refusal`, a thrown request a fixed sentence (`voiceSettings.companion.face.uploadFailed`); `refusal` clears at the next upload and at a restore. `uploading` is true while it is out.
-  - `restore()` → `api.companion.face.restore`; its 200 `{ face }` is the original at once. A refusal is a warn toast (`restoreFailed`) carrying the server's sentence when it sent one, never the transport's words; the face as it was.
-  - `seeFrames()` → `api.companion.face.contact(face.id)` fetched through the authenticated client (an `<img src>` to the route would carry no token), shown from an object URL (`contactUrl`) that an effect revokes when it goes back to null (`closeFrames`) or the card unmounts. A failed fetch is a warn toast (`framesFailed`), the server's sentence under it when there is one. A 2xx answer to an upload or restore whose body is not a face (a proxy's page) is not a failure: the frames bring the face.
-  - Each control holds a ref guard, so two presses in one task send one request.
-- The portrait is `CompanionAvatar` (`presence` idle, `faceId={face.id}`, no voice, no sentences, no look, `size` 96): its atlas cache (`useFaceAtlas`) is shared with her button, so a switch of face reaches both.
-- Probes: `.verify/lib/face-card-live.mjs`, `.verify/lib/memory-card-live.mjs` and `.verify/lib/memory-card-kit.mjs`'s `readPlace` place the live section as `['talk','face','memory','fields','save']`. `face-card-kit.mjs`'s `mountCard` stands in the app's `ToastProvider` and a socket context that holds no socket, which the hook needs.
+`CompanionFaceSettingsView` (`src/modules/companion/CompanionFaceSettings.tsx`) is Settings > Voice > Companion's "Her face" card: the look she wears, the switch between the looks that are made, and the photo he makes a look from. The page's wiring: `CompanionFaceSettings({ name, face })` over `useCompanionFaceSettings(face)`. The section that places it: MAN-9062 §Parts. The slot, the container and the hook: MAN-9437. Proof: MAN-9221.
 
 ## `CompanionFaceSettingsView` — props
 | prop | shape | contract |
 |---|---|---|
-| `face` | `CompanionFace` (`src/shared/companion-types.ts`) | `id` the face drawn now (`null` = none made yet), `original` whose it is, `bake` the making of his upload |
+| `face` | `CompanionFace` (`src/shared/companion-types.ts`) | `id` the face drawn now (the pick's, else the first look's that has a face: the house default's whenever it has one; `null` = none made at all), `avatar` the key of the look `id` is the face of (the one he picked while it has a face, else the first that has one), `avatars` the looks, each `{ key, label, faceId, bake }`: the house's in the server's order, then `own` (his photo) while he has one. `faceId === null` = not made; `bake` = its making |
 | `portrait` | `ReactNode` | her idle portrait filling the 96px square (`size-24`); the square does not clip, `CompanionAvatar` owns its round mask |
 | `uploading` | `boolean` | Upload a photo busy: glyph `Loader2`, a second press refused, focus kept |
-| `refusal` | `string \| null` | a 400's sentence (the server's, MAN-9236 §Refusals), drawn in place of the helper |
+| `refusal` | `string \| null` | a refused upload's sentence (the server's, MAN-9236 §Refusals), drawn in place of the helper |
+| `pickRefusal` | `string \| null` | a refused pick's sentence (a 400: no look of that name, or one not made yet), drawn under the buttons above the helper |
 | `contactUrl` | `string \| null` | the contact sheet's object URL while the lightbox is open |
 | `framesOpening` | `boolean` | See every frame busy while its sheet is fetched, as Upload |
 | `onUpload(file)` | `File` | one JPEG, PNG or WebP |
-| `onRestore()` | `() => void` | called from the confirm alone |
+| `onPick(key)` | `(avatar: string) => void` | a look's `key` chosen on the switch |
+| `onRemove()` | `() => void` | called from the confirm alone |
 | `onSeeFrames()` / `onCloseFrames()` | `() => void` | the sheet is asked for / the lightbox closed (Escape, ✕, backdrop) |
 
-## States — root `[data-companion-face=none|original|yours]`, `[data-companion-face-bake=none|queued|baking|failed]`
-| state | line (`[data-companion-face-line]`, `role=status`) | controls |
-|---|---|---|
-| `none` (`face.id === null`) | "Her original face isn't made yet." | Upload a photo alone |
-| `original` | "The original face" | Upload, See every frame; plus Restore while `bake !== null` |
-| `yours` | "Your photo" | Upload, See every frame, Restore |
-- `restorable = !face.original || face.bake !== null`: Restore shows only while his photo is involved.
-- Band at the card's foot (`[data-companion-face-making]`, `border-t`): `baking` = `Meter` ("Making her new face", "{{done}} of {{total}} frames", "Her current face stays until it is ready."); `queued` = muted `Clock` line "Waiting for another face to finish."; `failed` = warn `Banner` carrying the server's sentence in `WholeWords` (a hyphen never breaks `scripts/install-comfyui.sh`). The portrait keeps her current face through all three.
-- Helper `[data-companion-face-help=help|refused]` under the controls, `aria-describedby` of Upload: "A JPEG, PNG or WebP where her face is clear, facing forward and not cut off." (no pixel figure; the server owns it); a refusal replaces it, `role=alert`, `data-tone=warn`, `▲` `aria-hidden`.
-- One `sr-only` `role=status` region (`[data-companion-face-announce]`) holds the making's words ("Making her new face", "Waiting for another face to finish.", the failure's sentence), never the frame count; the band is not live, so a card opened mid-bake announces nothing.
-- Layout by the card's own width (`[container-type:inline-size]`): from 30rem the portrait stands left of title, line and controls; narrower, portrait and words are row one, controls take the width under them. Every control is `[@media(pointer:coarse)]:min-h-11` (44px).
+## The look drawn — root `[data-companion-face=<key>|none]`
+- Worn look: the look whose `faceId === face.id`, the pick's before another that shares the face (his upload of a house photo); else the pick while `face.id === null`. Root `data-companion-face` is its `key` (`original`, `office`, `own`), `none` while `face.id === null`.
+- Line `[data-companion-face-line]` (`role=status`): the worn look's `label` ("Dark hair", "Brown hair", "Your photo"); `face.id === null`: "{{label}} isn't made yet." (`none`); no look listed: "Her face isn't made yet." (`noneAtAll`).
+- Portrait: the worn look's face alone. A pick is instant and reversible, so no other look's face is decoded.
+- Layout by the card's own width (`[container-type:inline-size]`): from 30rem the portrait stands left of title, line and controls; narrower, portrait and words are row one, controls take the width under them. Every button is `[@media(pointer:coarse)]:min-h-11` (44px).
+
+## The switch — `[data-companion-face-switch]`
+- The kit's `SegmentedControl` (MAN-8580) named "Her face": options are the looks with a `faceId`, in the server's order; `value` is `face.avatar`. Drawn while two or more looks are made (`LOOKS_TO_SWITCH`). A look not made is a band row, never an option.
+- `onChange` calls `onPick(key)` only when `key !== face.avatar`: the look she wears sends nothing.
+
+## Controls, helper, refusals
+- Upload a photo (hidden file input, one JPEG, PNG or WebP); See every frame while `face.id !== null`; Remove your photo (`[data-companion-face-remove]`, ghost) while an `own` look is among `avatars` (made, being made or failed).
+- Under the buttons: `pickRefusal` (`[data-companion-face-pick-refusal]`), then the helper `[data-companion-face-help=help|refused]`, `aria-describedby` of Upload: "A JPEG, PNG or WebP where her face is clear, facing forward and not cut off." (no pixel figure; the server owns it). `refusal` replaces the helper. Both refusals: `role=alert`, `data-tone=warn`, `▲` `aria-hidden`, `WholeWords`.
+
+## The band — `[data-companion-face-making]`, `border-t`
+One row per look with a `bake`, server order, `[data-companion-face-row=<key>][data-companion-face-bake=queued|baking|failed]`. A look made again is an option and a row.
+| `bake.state` | row |
+|---|---|
+| `baking` | `Meter`: "Making {{label}}", "{{done}} of {{total}} frames"; "Her current face stays until it is ready." only while `face.id !== null` and the look is `own` or the pick (`face.avatar`) |
+| `queued` | muted `Clock` line "{{label}} waits for another face to finish." |
+| `failed` | warn `Banner`: "{{label}} wasn't made." (medium weight) leading the server's sentence in `WholeWords` (a hyphen never breaks `scripts/install-comfyui.sh`) |
+- One `sr-only` `role=status` `aria-atomic=false` region (`[data-companion-face-announce]`) holds one `<p>` per row: the row's words, a failure with its sentence, never a frame count. A row is said when it arrives or its state changes; the band is not live, so a card opened mid-bake announces nothing. The line is polite too, so a pick's change of look is said.
+- A control that leaves while focused (Remove once his photo is gone, the switch once fewer than two looks are made) hands the focus that fell to the page to Upload a photo (`followed` ref: only a change moves focus).
 
 ## The question — `ConfirmDialog`, `wrapperClassName="z-[10000]"`
-| `face.original` | `face.id` | title | message | confirm (destructive) |
-|---|---|---|---|---|
-| false (his photo is hers) | any | "Restore her original face?" | "The face made from your photo is removed." (`restoreMessage`) | "Restore" |
-| true (his photo waits, is made or failed) | set | "Remove your photo?" | "No face is made from it, and her original face stays." (`dropMessage`) | "Remove your photo" |
-| true | `null` | "Remove your photo?" | "No face is made from it." (`dropMessageNone`) | "Remove your photo" |
-- Cancel (`outline`) first. Cancel, Escape and the backdrop put it away and send nothing; focus returns to Restore.
-- Restore's `aria-label` is "Restore the original face", telling it from the register's "Restore the original" further down the section.
-- A restore that went through takes Restore off the page; focus that fell with it goes to Upload a photo (`followedRestorable` ref: only a change moves focus). A question left open when nothing is restorable is reset while rendering.
-- The confirm sends `onRestore()` on press; the view has no `restoring` prop, so a failed restore is the hook's toast (the memory card's pattern, `useCompanionMemorySettings`).
+- Remove your photo opens it: title "Remove your photo?", message "The face made from it is removed." plus " She goes back to {{label}}." while `face.avatar === 'own'` (`label` = the first look that is not `own`). Actions: Cancel (`outline`) first, then "Remove your photo" (destructive) = `onRemove()`.
+- Cancel, Escape and the backdrop put it away and send nothing; focus returns to Remove. A question left open when no `own` look remains is reset while rendering.
+- The view has no `removing` prop; a failed remove is the hook's toast (the memory card's pattern, `useCompanionMemorySettings`).
 
 ## See every frame — `Lightbox`
 - Offered while `face.id !== null`. `contactUrl` renders the kit `Lightbox` (MAN-7426; top layer, above Settings) named "Every frame of her face" around an `<img data-companion-face-contact>`. Escape closes the lightbox alone; focus returns to See every frame.
 
 ## Strings
-- `voiceSettings.companion.face.*` (`en/settings.json`, `t()` with English `defaultValue`s): `title`, `original`, `yours`, `none`, `upload`, `help`, `frames`, `framesLabel`, `restore`, `restoreLabel`, `restoreTitle`, `restoreMessage`, `restoreConfirm`, `dropTitle`, `dropMessage`, `dropMessageNone`, `dropConfirm`, `cancel`, `making`, `progress`, `stays`, `queued`, and the hook's own `uploadFailed`, `restoreFailed`, `framesFailed`. English only so far.
-- `SettingsCard`, `SettingRow`, `Meter`, `Banner`, `ConfirmDialog`, `Lightbox`, `WholeWords` come from `@/shared/ui`.
+- `voiceSettings.companion.face.*` (`en/settings.json`, `t()` with English `defaultValue`s): `title`, `none`, `noneAtAll`, `upload`, `help`, `frames`, `framesLabel`, `remove`, `removeTitle`, `removeMessage`, `removeBack`, `removeConfirm`, `cancel`, `making`, `progress`, `stays`, `queued`, `failed`, and the hook's own `uploadFailed`, `pickFailed` ("That look couldn't be picked. Try again."), `removeFailed` ("Your photo wasn't removed"), `framesFailed`. `{{label}}` is a look's `label`. English only so far.
+- `SettingsCard`, `SettingRow`, `Meter`, `Banner`, `ConfirmDialog`, `Lightbox`, `SegmentedControl`, `WholeWords` come from `@/shared/ui`.
 
 ## Open (not decided here)
 - `ConfirmDialog` gives its message no `aria-describedby`; 16 sites in 15 files share it. A fix is a kit change needing its own showing.
-- The button reads "Restore the original" while she wears the original and his photo waits; design owner to decide.
+- A look that finishes making is not announced: its row leaves and the line does not change. Words for it are the operator's call (proposed "{{label}} is ready.").
+- The server's `stopped` sentence says to upload the photo again, wrong advice for a house look.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFaceSettings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionFaceSettings.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFaceSettings.tsx
 
 ## MAN-9221 — src/modules/companion — Proof — .verify/kaylee-face-card.mjs (her face card on fixtures, and the live section with the card)
 
-Proves the face card (MAN-9220) on fixtures, and the live section with the card the section mounts. The card pressed through on the live page (an upload, the meter, restore, a photo with no face): `.verify/kaylee-face-card-walk.mjs`.
+Proves the face card (MAN-9220) on fixtures, and the live section with the card the section mounts. The card pressed through on the live page (a pick across four surfaces, an upload, the meter, remove, a photo with no face): `.verify/kaylee-face-card-walk.mjs`, MAN-9445.
 
 ```bash
 node .verify/kaylee-face-card.mjs [--evidence <dir>] [--only fixtures|live]
 ```
-- Gitignored (`.verify/`): on disk only. About two minutes; client `:5183`; no Gemini call, no model turn. Exits 1 on any FAIL; zero console errors. Photographs `.verify/shots/kaylee-face-card/` + `shots.json`.
-- `lib/face-card-kit.mjs`: the app's `CompanionSettingsView` on `FAKE_SETTINGS` with `CompanionFaceSettingsView` in `face`, mounted in the live Settings > Voice modal (`mountReact.mjs`); `window.__faceCardKit.{ show, restore, mountCard, events }`; every press is recorded in `events`, none acted on. `lib/face-card-fixtures.mjs`: `sharp` crops of the photos in `~/.claude/state/images/kaylee/` plus a 115-frame contact sheet (crops of those photos, not baked frames). `lib/face-card-live.mjs`: the live Settings > Voice > Companion as it stands: the card after the talk button's card, above her memory card, saying the account's face (`place` `['talk','face','memory','fields','save']`). The refused fixture's sentence is the server's own `tooSmall` sentence for a 480 px photo (`face-refusal.ts`).
-- Fixtures at 1440×900 and 390×844, light and dark: states `original`, `yours`, `queued`, `baking` (37 of 115), `failed-{no-face,stopped,no-comfyui}`, `refused`, `uploading`, `frames-opening`, `none`; the three question forms (his photo is hers, `drop`, `drop-none`) with Cancel; the lightbox; Upload hands the chooser one file; Escape on the question; the confirm sends one restore; the card as the section mounts it holds only its face's line. Touch (`isMobile`): three controls at 44px.
-- 2026-10-30: 502 checks PASS, 0 FAIL, 68 photographs, exit 0, 2 min 32 s, no console error from the views, the finger pass or the live section.
+- Gitignored (`.verify/`): on disk only. About four minutes; client `:5183`; no Gemini call, no model turn. Exits 1 on any FAIL; zero console errors. Photographs `.verify/shots/kaylee-face-card/` + `shots.json`.
+- `lib/face-card-kit.mjs`: the app's `CompanionSettingsView` on `FAKE_SETTINGS` with `CompanionFaceSettingsView` in `face`, mounted in the live Settings > Voice modal (`mountReact.mjs`); `window.__faceCardKit.{ show, restore, mountCard, events }`; every press is recorded in `events` (`upload`, `pick`, `remove`, `seeFrames`, `closeFrames`), none acted on. `show({ face, portrait, uploading, framesOpening, refusal, pickRefusal, contact })`: the view is always handed `onPick`.
+- `lib/face-card-fixtures.mjs`: `sharp` crops of the photos in `~/.claude/state/images/kaylee/` (`original.png` Dark hair, `office.png` Brown hair, `yours.png`) plus a 115-frame contact sheet (crops of those photos, not baked frames); the faces in the wire's shape (`look(key, bake?, faceId?)`, `faceOf(avatar, avatars)`) and the `STATES` table. The refused upload's sentence is the server's own `tooSmall` sentence for a 480 px photo (`face-refusal.ts`); the refused pick's sentence `PICK_REFUSED` is the server's own "That look isn't ready yet; it can be picked once it is made." (`face.service.ts` `pick`).
+- `lib/face-card-live.mjs`: the live Settings > Voice > Companion as it stands: the card after the talk button's card, above her memory card (`place` `['talk','face','memory','fields','save']`), its line the `label` of the look `face.avatar` names among `face.avatars` of `GET /api/companion`, "{label} isn't made yet." while `face.id` is null, "Her face isn't made yet." with no looks.
+- Fixtures at 1440×900 and 390×844, light and dark: 18 `STATES`: `house-making`, `both-made`, `brown-picked`, `own-making`, `two-making`, `own-picked`, `failed-{no-face,stopped,no-comfyui}`, `house-failed`, `refused`, `pick-refused`, `uploading`, `frames-opening`, `shared-face`, `drawn-other`, `none`, `bare`. Each is read back: root state, title, line (announced), buttons, the switch (the made looks in the server's order, the pick chosen and holding the one Tab stop, named "Her face"; none while fewer than two are made), the 96px portrait, no overflow, helper or refusal, the pick's refusal, busy buttons, the band's rows (one per look with a making, in its words; "stays" only where it applies) and the polite region's words row by row, never a frame count, and the card's place.
+- Presses (recorded, none acted on): Remove asks with Your photo picked ("The face made from it is removed. She goes back to Dark hair.") and not, Cancel puts it away; the lightbox on the fixture sheet, Escape closes it alone and focus returns to See every frame; a press on a look sends `pick:<key>`, on the look she wears nothing, ArrowRight picks the neighbour and takes focus; Upload hands the chooser one file; Escape on the question; the confirm sends one `remove`; Remove or the switch leaving under focus puts focus on Upload a photo; the card as the section mounts it (the real `CompanionFaceSettings`, both looks made) draws its face from the first commit and its switch (`switches: 1`).
+- Touch (`isMobile`, 390): `own-picked` and `failed-no-face`: three buttons and the switch's options each at least 44px tall, inside the card.
+- 2026-11-01: 778 checks PASS, 0 FAIL, exit 0.
 
-## `node .verify/kaylee-face-card-walk.mjs [--photo <path>] [--evidence <dir>]` — the live card pressed through
-Settings > Voice > Companion on :5183 as account 1, ONE page with no reload from the first line to the last. No chat is sent, so no model answers; account 2 is never touched (`lib/face-card-walk-kit.mjs`).
-1. The card on the original: the line, Upload a photo and See every frame (no Restore), the portrait at 96 px made of the portrait's layers.
-2. An upload of a photo whose face is not made (default `~/.claude/state/images/kaylee/kaylee-test-mouth.jpg`): 202 with the original still hers and `bake` baking; the meter counts frames to the total (photographed at three points, the original hers while it counts); then "Your photo", and the page asks the new face's manifest and sheets, which is how the portrait changes.
-3. See every frame: the contact sheet in the lightbox from a `blob:` URL, revoked when Escape closes it.
-4. Restore: the confirm's words, then the original at once (measured from the press), and the server agrees.
-5. An upload of an image with no face in it (a screenshot of the app taken before Settings opened): the bake fails, the warn banner carries the no-face sentence, the original is still hers, Restore is offered as "Remove your photo".
-6. A last Restore: account 1 on the original with no bake, no error and no banner. The teardown does this on any failure.
-- Deadlines: 25 minutes for the bake of step 2, 6 minutes for the failing bake of step 5. A cold bake of 115 frames is minutes of CPU (MAN-9231).
-- A source edit under `src/` while it runs (another session's, through Vite) reloads the page and ends it with `the page lost its recorder: it reloaded`: run it on a quiet tree. 2026-10-30: steps 1 and 2 held up to 58 of 115 frames, then a reload ended the run.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-card-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-card-fixtures.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-card-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-card-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-card-walk-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-card-fixtures.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-card-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-card-live.mjs
 
 ## MAN-9223 — src/modules/companion CompanionPortrait — her photographed face as a player: the two canvases, the loop, the stamps, useFaceAtlas, useFaceSentences, useFaceLook, useReducedMotion
 
@@ -9407,6 +9468,7 @@ Her photographed face as a player: the bake made it once, as frames in an atlas;
 | `look` | `CompanionFaceLook \| null` | `{ dx, dy }`: the anchor's centre less hers, px. Her head turns toward it |
 
 - Her mouth: on each step the loop builds the engine's `playing` from `sentences.playing` with `mouth: voice.mouth(entry.turnId, entry.index)`. The engine draws the timed shape where an announced piece holds `progress().elapsed` and the level mouth elsewhere (MAN-9239); the root's `data-mouth` says which (MAN-9403). The pieces' store is no React state (MAN-9113): a piece landing mid-sentence takes over at the next animation frame and redraws nothing.
+- The stamps on the root and the layers: MAN-9403. The loop and when its next step runs (an animation frame while she speaks or her head settles, else `nextAt`'s timer): MAN-9404.
 
 The portrait through one live turn, and Settings' card beside it: MAN-9254.
 
@@ -9414,11 +9476,11 @@ The portrait through one live turn, and Settings' card beside it: MAN-9254.
 | part | rule |
 |---|---|
 | `.kaylee-portrait` | root, the disc's circle (`border-radius: 50%; overflow: hidden`); carries `data-state` |
-| `.kaylee-portrait__layer--hair`, `--face` | each 106% of the disc (`left`/`top` −3%), so a lean, bounce or breath never shows the ground at the rim; each holds one `<canvas>` whose backing store is the pixels it is drawn at: its layout width in CSS px times the window's `devicePixelRatio` (`useCanvasBackingSide`), never the atlas's cell size stretched by CSS. A frame is drawn onto it from the atlas's cell, scaled with `imageSmoothingQuality = 'high'` (set each time the loop starts: a size attribute resets the context). 2026-10-31, 1440 × 900: 340 px at ratio 1, 680 at 2; a 390 px phone at 3: 1023 |
+| `.kaylee-portrait__layer--hair`, `--face` | each 106% of the disc (`left`/`top` −3%), so a lean, bounce or breath keeps the ground off the rim (in layout, and in pixels with 1.09% to spare at the breath's top: a painted edge lands up to 0.7 px off its layout edge); each holds one `<canvas>` whose backing store is the pixels it is drawn at: its layout width in CSS px times the window's `devicePixelRatio` (`useCanvasBackingSide`), never the atlas's cell size stretched by CSS. A frame is drawn onto it from the atlas's cell, scaled with `imageSmoothingQuality = 'high'` (set each time the loop starts: a size attribute resets the context). 2026-10-31, 1440 × 900: 340 px at ratio 1, 680 at 2; a 390 px phone at 3: 1023 |
 | hair canvas | the whole frame |
 | face layer | same frame under `mask-image: radial-gradient(ellipse 46% 46% at 50% 61%, #000 70%, transparent 100%)`: opaque over her features, feathered over hair. Only this layer is masked. Where the two differ in motion the blend falls on hair, not cheek |
-- Layer: `rotate(var(--kaylee-tilt, 0deg))` and the clips' `animation`. Canvas: breath (`kaylee-breath`, 4.2 s, `scale` 1 → 1.015) and sway (`kaylee-sway`, 9 s, ±0.8°).
-- Hair follows the face by `--kaylee-lag: 90ms` (face layer 0): its lean transition is 320 ms `ease-in-out` after 90 ms against the face's 220 ms `--ease-enter`; its breath, sway and clip animation delay by the lag.
+- Layer: `rotate(var(--kaylee-tilt, 0deg))`, the clips' `animation`, and her head while she speaks: `translate: 0 var(--kaylee-bob, 0%)` and `rotate: var(--kaylee-roll, 0deg)` (MAN-9434). Canvas: breath (`kaylee-breath`, 4.6 s, one rate in every state: a rise of 0.6% with `scale` 1 → 1.006, in over the first 38% and out over the rest, never alternate) and sway (`kaylee-sway`, 9 s, ±0.8°). The layers stay 106% of the disc, so only travel shows the rim: a canvas covers the disc while its travel stays under 53% × scale − 50% (3.32% at the breath's peak), and the laugh's, giggle's and gasp's lift is 1.5% of the layer (1.59% of the disc, 2.23% with the breath's rise), and her head's bob is at most 0.9% of it (0.95% of the disc, 1.59% with the breath's rise); a clip's rest stops are the bob and its lift stops absolute, so the lift is never added to it. A painted edge lands up to 0.7 px off where layout puts it, so a lift must leave that much (measured painted, DPR 1, 55 sizes from 28 to 514 px): at 1.5% no size showed ground; a longer lift shows a 1 px nick of ground at the bottom of the circle at some sizes (2.0%: one, 2.5%: a dozen).
+- Hair follows the face by `--kaylee-lag: 90ms` (face layer 0): its lean transition is 320 ms `ease-in-out` after 90 ms against the face's 220 ms `--ease-enter`; its breath, sway and clip animation delay by the lag; its bob and roll are the face's value from the newest step at least that old, taken from a short history (`portraitHead.ts`, MAN-9434), and its clip's rest stops read that bob: the hair rests on its own head at a clip's edge, as the face does.
 - `failed`: `.kaylee-portrait[data-state='failed'] canvas { animation: none }`: no breath, no sway.
 - Every movement rule sits inside `@media (prefers-reduced-motion: no-preference)`. The lean stands under reduced motion; its easing does not. The portrait fades in (`kaylee-portrait-in`, `--dur-move`) only with motion.
 
@@ -9429,21 +9491,22 @@ section: src/modules/companion CompanionPortrait — her photographed face as a 
 
 | stamp | value |
 |---|---|
-| `data-frame` | base frame's name from `frameNames(manifest)`: `mood.<mood>.<mouth>`, `blink.<mood>.half\|closed`, `gaze.<gaze>`, `pose.<pose>`, `state.listening\|failed\|surprise`, `clip.<clip>.<n>` |
+| `data-frame` | base frame's name from `frameNames(manifest)`: `mood.<mood>.<mouth>`, `blink.<mood>.half\|closed`, `blink.listening.half\|closed`, `blink.gaze.<gaze>.half\|closed`, `blink.pose.<pose>.half\|closed`, `gaze.<gaze>`, `pose.<pose>`, `state.listening\|failed\|surprise`, `clip.<clip>.<n>`, `brow.<mood>` |
 | `data-frame-over` | the frame fading in during a crossfade; removed when none |
 | `data-mouth` | what drove her mouth while she speaks: `exact` (the timed shape of an announced piece) or `voice` (her level and the sentence's vowel); removed when she is not speaking, and under reduced motion. The two draw the same frame names, so `data-frame` cannot say which. Written only when it changes (`last.mouthBy`), as `data-frame` is |
 | `data-motion` | `laugh`, `giggle`, `gasp`, `sigh`, `nod`, `shake`, `breath`. `shake` (the tsk) names no keyframe: its frames alone move |
 | `--kaylee-tilt` | the lean, degrees: `listening` −5, `thinking` / `waking` / `drafting` +3, else the mood's (engine `STATE_TILT`) |
+| `--kaylee-bob`, `--kaylee-roll` | her head, on each LAYER div (the hair's value is the face's from `--kaylee-lag` ago): `<n>%` of the layer and `<n>deg`, to a thousandth, only when the string changes; both removed from both layers once the head is null and the hair's value has come to rest. Absent under reduced motion (MAN-9434) |
 - `data-motion` leaves the root `--kaylee-lag` after the engine drops it, so the hair finishes the motion it began late. The lag is read from the hair canvas's computed `--kaylee-lag` (CSS is its one source; keep it in ms). The same motion begun again inside the hold: the attribute is removed, `getBoundingClientRect()` forces a style flush, the attribute is set again. The pending hold survives loop restarts and is cleared on unmount.
 
 ## The loop
 - A `useLayoutEffect`, restarted when `atlas`, the backing `side`, `presence`, `voice`, `playing`, `newest`, `turnRunning`, `look.dx`, `look.dy` or `reducedMotion` change. A new `side` is React writing the canvases' size attributes, which clears them; the restart draws the frame again before paint. why layout: the first frame is on the canvases before first paint (`getContext('2d', { alpha: false })` starts black).
 - One engine per manifest (`createFaceEngine(manifest, seed)`); `seed` is random per portrait, so two portraits do not blink in step. Inputs changing never reset an engine mid-blink.
-- `step()` runs the engine, draws both canvases the same frame (base whole, `over` on top at `alpha`) only when `base`, `over`, `alpha`, the atlas or the backing side changed (memory kept across restarts), stamps, then schedules:
+- `step()` runs the engine, draws both canvases the same frame (base whole, `over` on top at `alpha`) only when `base`, `over`, `alpha`, the atlas or the backing side changed (memory kept across restarts), stamps, writes the head (`stampHead`, MAN-9434), then schedules:
 | when | next step |
 |---|---|
 | `document.hidden` | none; `visibilitychange` to shown steps at once and the engine catches up |
-| speaking and not reduced motion, or `draw.over !== null`, or `draw.motion !== null` | `requestAnimationFrame` |
+| speaking and not reduced motion, or `draw.over !== null`, or `draw.motion !== null`, or `draw.head !== null`, or `stampHead` answers true (the hair still trails the head) | `requestAnimationFrame` |
 | else `draw.nextAt !== null` | `setTimeout(step, max(0, ceil(nextAt − now)))`. why ceil: a fractional delay fires early and re-arms in a chain |
 | else | none |
 - Reduced motion: speaking holds the mood's half-open "ah"; no frame is asked for.
@@ -9458,9 +9521,9 @@ section: src/modules/companion CompanionPortrait — her photographed face as a 
 - The tier is chosen when the manifest arrives, from the size the page wants THEN (a ref written in an effect): the first render of a station view guesses 200 px before the layout reports the real square, and a choice made at the first render would fetch the small sheets for nothing.
 - Null for `faceId` null (a fresh box) and until the first atlas for an id has decoded. While a new id (or a new tier) decodes it keeps answering the atlas it had: a switch never blanks her.
 - Fetches `api.companion.face.manifest(id)` and `.sheet(id, file)` for each `file` the tier's `sheets` names (an `<img src>` to an authenticated route carries no token), decodes with `createImageBitmap`.
-- Module cache, one per page: `manifests` (by face id), `decoded` (by face id, then tier size) keeps `KEPT_FACES` = 2 faces (oldest dropped with its manifest, bitmaps not closed: a mounted portrait may hold them); `decoding` shares one request among concurrent askers of one face and tier. A page with the button and every other face of the same id at one size makes one manifest and one request per sheet (2026-10-29: 3 requests for the button and 36 fixture faces). A decoded 448 px tier is about 92 MB, the 256 px tier about 30 MB.
+- Module cache, one per page: `manifests` (by face id), `decoded` (by face id, then tier size) keeps `KEPT_FACES` = 2 faces (oldest dropped with its manifest, bitmaps not closed: a mounted portrait may hold them); `decoding` shares one request among concurrent askers of one face and tier. A page with the button and every other face of the same id at one size makes one manifest and one request per sheet (2026-10-29: 3 requests for the button and 36 fixture faces). A decoded 448 px tier is about 128 MB (three sheets: 3584 × 3584, 3584 × 3584, 3584 × 1792), the 256 px tier about 42 MB (2048 × 2048, 2048 × 2048, 2048 × 1024).
 - A non-ok answer or a manifest that fails `isManifest` rejects: `console.warn('[Companion] Her face <id> could not be loaded; the disc keeps her ground:', …)`, nothing cached, the next asker retries, nothing retries by itself.
-- `isManifest` checks `version === 1`, `frameSize` a number, `frames` and `sheets` arrays, `largerTiers` absent or an array of `{ frameSize: number, sheets: array }`, `moods` (with `moods.neutral`), `gaze`, `poses`, `states` and `clips` objects. why: a missing field read in render takes the whole app down. The numbers inside the tables are the server's and are not checked.
+- `isManifest` checks `version === 1`, `frameSize` a number, `frames` and `sheets` arrays, `largerTiers` absent or an array of `{ frameSize: number, sheets: array }`, `blinks` absent or an object holding `listening`, `gaze` and `poses` objects (a number, null, `{}` or an array is refused), `brows` absent or an object (a number or null is refused; `{}` and an array pass, and the engine draws no undefined frame from them), `moods` (with `moods.neutral`), `gaze`, `poses`, `states` and `clips` objects. why: a missing field read in render takes the whole app down. The numbers inside the tables are the server's and are not checked.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPortrait.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceAtlas.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFaceInputs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useReducedMotion.ts
 
@@ -9679,10 +9742,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationShell
 
 ## MAN-9231 — server/modules/companion/face — the bake: bakeFace, its order, the lock, the orphan check, the frame cache, the CLI, the refusal sentences, the pace
 
-`bakeFace` (`server/modules/companion/face/face-bake.ts`) makes, or resumes, the face of one stored photo under the current recipe. Recipe, framing, frame names: MAN-9233. ComfyUI as a child: MAN-9232. Where the files live: MAN-9235. The service that queues bakes: MAN-9237. The install: MAN-9234. Callers: `face-bake-cli.ts`, `face-queue.ts` (through `face.service.ts`).
+`bakeFace` (`server/modules/companion/face/face-bake.ts`) makes, or resumes, the face of one stored photo under the current recipe and one look's framing. Recipe, framing, frame names: MAN-9233. The looks and their framings: MAN-9438. ComfyUI as a child: MAN-9232. Where the files live: MAN-9235. The service that queues bakes: MAN-9237. The install: MAN-9234. Callers: `face-bake-cli.ts`, `face-queue.ts` (through `face.service.ts`).
 
-## `bakeFace({ photoId, onProgress(done, total, frame, seconds), signal, whenBusy? })` → `{ faceId, seconds }`
-- `faceId` = `<photoId>-<recipeId()>`. `seconds` = wall time of the call, one decimal.
+## `bakeFace({ photoId, framing, onProgress(done, total, frame, seconds), signal, whenBusy? })` → `{ faceId, seconds }`
+- `framing`: the look's `FaceFraming` (`FACE_FRAMING` for an account's photo and for Dark hair; a house look's own: MAN-9438). The face id, the crop cache, the pad, the cut at every tier and the crop_factor all come from it.
+- `faceId` = `faceIdOf(photoId, framing)` = `<photoId>-<recipeId(framing)>`. `seconds` = wall time of the call, one decimal.
 - `onProgress` fires once per frame, in recipe order; `seconds` is 0 for a cached or already-published frame.
 - `whenBusy`: `'wait'` (default; the API) or `'refuse'` (the CLI).
 - Rejects `FaceBakeRefusal` (its message is the sentence for his screen), or the signal's reason on abort. Any other error from the render loop is logged (`[Companion] the face maker stopped`, with ComfyUI's last 30 lines) and becomes the `stopped` refusal.
@@ -9691,8 +9755,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationShell
 1. `takeBakeLock(facesRoot(), whenBusy, signal)`.
 2. `reapOrphanComfyUI(facesRoot())`.
 3. `readManifest(faceId)`: published ⇒ `onProgress` for all frames with 0 s, return. why after the lock: the previous holder may have just made it.
-4. Per frame: read `frames/<frameCacheKey>.png`, else render it. ComfyUI is started for the first frame not cached, with the padded photo (`padPhoto`) written to `comfyui/input/face-<photoId>.png`. A re-cut of cached crops starts nothing, and a face whose every crop is cached is made on a box with no ComfyUI installed (`frameCacheIsComplete(photoId)` is what `face.service.ts` asks before it queues the original's bake there).
-5. Every frame is cut once per tier of `FACE_FRAMING.frameSizes` (`cutFrame`: the disc's square of the 512 px crop, resized to the tier's side; the tier at the square's own side, 448 px, is cut as it is, with no resampling).
+4. Per frame: read `frames/<frameCacheKey(sliders, framing)>.png`, else render it with `renderFrame(sourceName, sliders, framing.cropFactor)`. ComfyUI is started for the first frame not cached, with the padded photo (`padPhoto(photo, framing)`) written to `comfyui/input/face-<photoId>.png`. A re-cut of cached crops starts nothing, and a face whose every crop is cached is made on a box with no ComfyUI installed (`frameCacheIsComplete(photoId, framing)` is what `face.service.ts` asks before it queues a house look's bake there).
+5. Every frame is cut once per tier of `framing.frameSizes` (`cutFrame(preview, size, framing)`: the disc's square of the 512 px crop, resized to the tier's side; a tier at the square's own side is cut as it is, with no resampling). Dark hair's square is 448 px, so its 448 tier is not resampled; Brown hair's is 471 px, so both its tiers are.
 6. `finally` of the loop: `comfy.stop()`, then the padded source file is removed (about 15 MB per photo).
 7. `publishFace`: `packSheets` for every tier and `contactSheet` (drawn from the smallest tier) in parallel; `sheet-<size>-<n>.webp` of every tier and `contact.webp` written; `manifest.json` written LAST by rename (`writeFileAtomically`). A face whose manifest exists is whole.
 8. `lock.release()` in `finally`.
@@ -9701,9 +9765,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationShell
 
 ## The frame cache — `<root>/<photoId>/frames/<key>.png`
 - Each file is the node's 512 px preview PNG, written whole (`writeFileAtomically`).
-- `key` = first 16 hex of sha256 of canonical JSON `{ sliders, cropFactor, pad, node }` (`frameCacheKey`; `node` = the node's commit).
+- `key` = first 16 hex of sha256 of canonical JSON `{ sliders, cropFactor, pad, node }` (`frameCacheKey(sliders, framing)`; `cropFactor` and `pad` are the framing's; `node` = the node's commit). Two looks of one photo share a crop only when both are equal.
 - Not in the key: `discSide`, `discRaise`, `frameSizes`. Changing them re-cuts cached crops and renders nothing.
-- Nothing removes a key a tune left behind; the folder goes only with its photo (the prune). 2026-10-30: 119 files for 115 frames.
+- Nothing removes a key a tune left behind; the folder goes only with its photo (the prune). 2026-11-01: Dark hair's photo 162 files for 158 frames, Brown hair's 170.
 
 ## The lock — `face-lock.ts`, box-wide, one bake at a time
 - An abstract unix socket `\0companion-face-bake-<first 16 hex of sha256 of path.resolve(root)>`: one name per faces root. Whoever binds it holds the lock; the kernel frees the name when the holder's process ends, SIGKILL included. So it is never stale and there is no takeover.
@@ -9718,11 +9782,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationShell
 - Signals only a pid matching `/^[1-9][0-9]*$/` and above 1, whose `/proc/<pid>/cmdline` has an argument ending `/ComfyUI/main.py` and `--temp-directory <root>/comfyui/temp`. SIGKILL. Anything else is dropped unsignalled.
 
 ## `face-bake-cli.ts`
-`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx server/modules/companion/face/face-bake-cli.ts --photo <path> [--seed]`
+`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx server/modules/companion/face/face-bake-cli.ts --photo <path> [--house <key>]`
 - Imports `load-env.js` first: the same faces root as the API. Loads no database, touches no account.
-- Output, in order: `photo <photoId> <w>x<h>`; one line per frame `<done>/<total> <frame> <s.s> s` or `cached`; `face <faceId>`; `folder <dir>`; `contact <dir>/contact.webp`; `done <n> rendered, the rest cached, in <t> s total; <x> s per rendered frame` (`none rendered` when 0), with `; registered as the original` under `--seed`.
-- `--seed`: `refuseIfSeedTaken` before the first frame; `recordSeed` after the face is published.
-- Exit: 0 a published face; 1 a refusal (sentence on stderr) or any other error (stack); 2 a malformed call (`face-bake-cli: <why>` and the usage line).
+- Output, in order: `photo <photoId> <w>x<h>`; one line per frame `<done>/<total> <frame> <s.s> s` or `cached`; `face <faceId>`; `folder <dir>`; `contact <dir>/contact.webp`; `done <n> rendered, the rest cached, in <t> s total; <x> s per rendered frame` (`none rendered` when 0), with `; registered as house avatar <key>` under `--house`.
+- `--house <key>` (a `HOUSE_AVATARS` key: `original`, `office`): bakes with that look's framing, and `recordHouseAvatar` records the photo as that key in `avatars.json` after the face is published. Without it: the house framing (`FACE_FRAMING`), nothing recorded.
+- `refuseIfHouseKeyTaken` before the first frame: a key recorded under another photo is a refusal naming `avatars.json` and the key to remove from it (MAN-9438). The photo is stored first (`storePhoto`), so a refused photo's folder stays until the next prune.
+- Exit: 0 a published face; 1 a refusal (sentence on stderr) or any other error (stack); 2 a malformed call (`face-bake-cli: <why>` and the usage line): an unknown key (lists the house's keys), an unknown flag, a missing `--photo`.
 - SIGINT or SIGTERM aborts: ComfyUI is shut down, made crops are kept.
 
 ## Refusal sentences — `face-refusal.ts` `sentences`
@@ -9741,8 +9806,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationShell
 - 2026-10-30, 5 of 115 frames uncached, scratch root: `done 5 rendered … in 43.3 s total; 6.6 s per rendered frame` (9.9, 7.4, 5.2, 4.7, 5.7 s; ComfyUI's start about 10 s of the total).
 - 2026-10-30, a cold bake of a new photo through the server (`.verify/companion-face-server.mjs`, `kaylee-test-mouth.jpg`, other probes running on the box): `the bake ended in 927 s` for 115 frames, 8.1 s per frame.
 - 2026-10-29: 4.9 and 5.0 s per rendered frame on partial caches; a cold bake of 110 frames, 660 s.
-- All 115 cached, nothing to start: `done 0 rendered … in 2.6 s total`, exit 0.
-- Proof: run the CLI on `~/.claude/state/images/kaylee/kaylee-portrait-base.jpg` with `COMPANION_FACES_DIR` at a scratch folder holding a copy of the photo's `photo.png` and `frames/`; `jq '.frames | length'` of the new `manifest.json` prints 115.
+- 2026-10-31, all 149 cached, nothing to start (a scratch root holding copies of the photo and its 153 crops): 149 lines `cached`, 11.4 s total, exit 0.
+- 2026-10-31, the 34 blink frames (the 115 before them cached) through the server, box busy and the server restarted by its supervisor: crops written 23:05:35 to 23:18:35, median gap 11.8 s, longest 127 s.
+- 2026-11-01, the 9 brow frames (the 149 before them cached) through the server, the box idle and the server restarted by its supervisor on the recipe's save: crops written 00:02:30 to 00:03:22, the 8 gaps 5.3 to 8.7 s, median 6.4 s; the face published and the old one pruned at 00:03:28.
+- 2026-11-01, both faces made, the CLI on each real photo: `--house original` on `kaylee-portrait-base.jpg` (face `cc2f923d4798-e46ed153`, 0.70 s wall) and `--house office` on `kaylee-portrait-office.jpg` (face `4de51024aad7-9003160c`, 0.65 s wall): each 158 lines `cached`, `done 0 rendered … none rendered; registered as house avatar <key>`, exit 0. `--house nope` exit 2; the office photo with `--house original` exit 1 naming `avatars.json`.
+- Proof: run the CLI with `--house original` on `~/.claude/state/images/kaylee/kaylee-portrait-base.jpg` with `COMPANION_FACES_DIR` at a scratch folder holding a copy of the photo's `photo.png` and `frames/`; `jq '.frames | length'` of the new `manifest.json` prints 158.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/comfyui-orphan.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-bake-cli.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-bake.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-lock.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-refusal.ts
 
@@ -9750,9 +9818,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/co
 
 `startComfyUI` (`server/modules/companion/face/comfyui.ts`) runs ComfyUI as the bake's own child for the length of one bake; `comfyui-socket.ts` is its event socket. The bake that calls it: MAN-9231. The install it runs from: MAN-9234.
 
-## `startComfyUI({ dir, workDir, signal, onLine })` → `ComfyUI = { renderFrame(sourceName, sliders): Promise<Buffer>; stop(): Promise<void> }`
+## `startComfyUI({ dir, workDir, signal, onLine })` → `ComfyUI = { renderFrame(sourceName, sliders, cropFactor): Promise<Buffer>; stop(): Promise<void> }`
 - `dir` = `comfyuiDir()`: `COMPANION_COMFYUI_DIR`, else `/opt/comfyui`, read on each call. `workDir` = the faces root.
-- Not installed (`isComfyUIInstalled`: `<dir>/venv/bin/python` and `<dir>/ComfyUI/main.py` both exist) ⇒ `FaceBakeRefusal` `notInstalled(dir)`. `face.service.ts` queues the original's bake only when it is installed.
+- Not installed (`isComfyUIInstalled`: `<dir>/venv/bin/python` and `<dir>/ComfyUI/main.py` both exist) ⇒ `FaceBakeRefusal` `notInstalled(dir)`. `face.service.ts` queues a house look's bake only when it is installed or that look's frame cache is whole (`frameCacheIsComplete`, MAN-9231).
 - Spawns `<dir>/venv/bin/python <dir>/ComfyUI/main.py --cpu --listen 127.0.0.1 --port <free> --log-stdout --disable-auto-launch --input-directory <workDir>/comfyui/input --output-directory …/output --temp-directory …/temp`, `cwd` `<dir>/ComfyUI`, `PYTHONUNBUFFERED=1`. why unbuffered: the node's own prints (`Failed to detect face!!`) go through Python's stdout.
 - Port: one the OS handed out and released (`freeLoopbackPort`). A process that takes it first makes ComfyUI exit, which is the refusal.
 - `os.setPriority(child.pid, 15)` right after `spawn`; `<workDir>/comfyui.pid` holds the child's pid.
@@ -9760,8 +9828,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/co
 - An exit after ready fails every frame waiting, with `ComfyUIExit` (`while a frame was being made`).
 - `signal` abort at any moment of the start stops the child and rejects with the signal's reason, not `ComfyUIExit`.
 
-## `renderFrame(sourceName, sliders)` — one prompt
-- `POST /prompt` `{ prompt: { "1": LoadImage { image: sourceName }, "2": ExpressionEditor { …twelve sliders, src_ratio 1, sample_ratio 1, sample_parts 'OnlyExpression', crop_factor: FACE_FRAMING.cropFactor, src_image: ["1", 0] } }, client_id }`.
+## `renderFrame(sourceName, sliders, cropFactor)` — one prompt
+- `POST /prompt` `{ prompt: { "1": LoadImage { image: sourceName }, "2": ExpressionEditor { …twelve sliders, src_ratio 1, sample_ratio 1, sample_parts 'OnlyExpression', crop_factor: cropFactor (the look's `FaceFraming.cropFactor`, passed by `face-bake.ts`), src_image: ["1", 0] } }, client_id }`.
 - The frame ends on the socket's `executed` event of node `2` for that `prompt_id`, or `execution_error`. Never a poll of `/history` or the queue.
 - Then `GET /view?filename&type&subfolder` of the event's first image: the 512 px preview PNG.
 - Deadline: 10 minutes per frame (`AbortSignal.timeout`), merged with the bake's signal. Past it: `a frame was not done within 10 minutes`.
@@ -9779,11 +9847,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/co
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/comfyui-socket.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/comfyui.ts
 
-## MAN-9233 — server/modules/companion/face — the recipe: the framing, the 115 frames and their names, the clamp to the node's ranges, the ids, and how a recipe change reaches every face
+## MAN-9233 — server/modules/companion/face — the recipe: the framing, the 158 frames and their names, the clamp to the node's ranges, the ids, and how a recipe change reaches every face
 
-`server/modules/companion/face/face-recipe.ts` is the one home of every number that shapes a frame: the sliders of each frame, each clip's frames and pace, the framing. `face-atlas.ts` is the picture work (photo, pad, cut, sheets, contact sheet). Tuning her face is changing a value in the recipe and baking again. No frame is drawn, cut or retouched by hand, and no mask is added on the page to hide a framing fault. The bake: MAN-9231.
+`server/modules/companion/face/face-recipe.ts` is the one home of every number that shapes a frame: the sliders of each frame, each clip's frames and pace, the framing (a house look's own framing is its entry in `face-avatars.ts`: MAN-9438). `face-atlas.ts` is the picture work (photo, pad, cut, sheets, contact sheet). Tuning her face is changing a value in the recipe and baking again. No frame is drawn, cut or retouched by hand, and no mask is added on the page to hide a framing fault. The bake: MAN-9231.
 
-## Framing — `FACE_FRAMING`
+## Framing — `FaceFraming`; `FACE_FRAMING` is the house's
+- `FACE_FRAMING` is Dark hair's framing and the default of every account's own photo. Brown hair's is `OFFICE_FRAMING` (MAN-9438); `FACE_FRAMING` is never changed to tune another look. The table is `FACE_FRAMING`'s.
 | field | value | unit |
 |---|---|---|
 | `cropFactor` | 2.0 | the node's `crop_factor`: the crop is this many face sides across; the face is 512 / 2 = 256 px of the 512 px preview |
@@ -9791,16 +9860,16 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/co
 | `discRaise` | 0.05 | the square's centre above the face's centre, in face sides: room for hair |
 | `frameSizes` | [256, 448] | px per side of the cut frames of each tier of the atlas, smallest first. The largest is the disc's native square, `discSide × 512 / cropFactor` = 448 px, cut with no resampling; `cutFrame` throws, naming the numbers, for a tier above it (it would only stretch pixels). Hashed into the id: a tier added or dropped is a new face |
 | `pad` | 0.5 | the band added round the photo before the node sees it, in photo sizes |
-- `discSquare(FACE_FRAMING)` = `{ left: 32, top: 19, size: 448 }` in preview pixels, the same for every frame of a photo. `cutFrame` throws, naming the numbers, when the square leaves the 512 px preview.
-- `padPhoto`: sides are mirrored pixels; above and below are replicated edge rows. why: a vertical mirror holds the face upside down at the real face's x, and the node chose the reflection (measured on the seed photo).
-- Ruling 2: every frame is her head and face filling the disc, never shoulders or body. Read the contact sheet (`contact.webp`; the part outside the disc's circle is veiled) for a collar or shoulders inside the circle: such a frame is a framing value to change here.
+- `discSquare(framing)` in preview pixels, the same for every frame of a photo: `{ left: 32, top: 19, size: 448 }` for `FACE_FRAMING`, `{ left: 21, top: 0, size: 471 }` for `OFFICE_FRAMING`. `cutFrame(preview, size, framing)` throws, naming the numbers, when the square leaves the 512 px preview.
+- `padPhoto(png, framing)`: the band is `framing.pad`; sides are mirrored pixels, above and below are replicated edge rows. why: a vertical mirror holds the face upside down at the real face's x, and the node chose the reflection (measured on Dark hair's photo).
+- Ruling 2: every frame is her head and face filling the disc, never shoulders or body. Read the contact sheet (`contact.webp`; the part outside the disc's circle is veiled) for a collar or shoulders inside the circle: such a frame is a framing value to change (`FACE_FRAMING` here, a house look's entry in `face-avatars.ts`), never a mask on the page.
 
-The seed face this recipe made (115 frames), drawn through one live turn: MAN-9254.
+Dark hair's first 115 frames, drawn through one live turn: MAN-9254.
 
 ## Sliders
 - A frame is the twelve ExpressionEditor sliders (`FaceSliders`): `rotate_pitch`, `rotate_yaw`, `rotate_roll`, `blink`, `eyebrow`, `wink`, `pupil_x`, `pupil_y`, `aaa`, `eee`, `woo`, `smile`. A slider no table names is 0. `src_ratio` 1, `sample_ratio` 1, `sample_parts` `OnlyExpression` are `comfyui.ts`'s.
 - Signs, read off the contact sheet (directions are the screen's): `blink` negative closes; `pupil_x` positive looks left; `pupil_y` positive looks up; `rotate_yaw` negative turns left (the node negates yaw inside); `rotate_pitch` negative looks up, positive dips the head (the sigh).
-- Tables, all in the file: `MOODS` (added to every frame of the mood), `MOUTHS` (on top; `a`=ah, `e`=ee, `o`=oo, `1` half, `2` full), `BLINKS` (SET `blink` to −10 half, −20 closed, on the mood with a closed mouth), `GAZE`, `POSES`, `STATES`, `CLIPS`.
+- Tables, all in the file: `MOODS` (added to every frame of the mood), `MOUTHS` (on top; `a`=ah, `e`=ee, `o`=oo, `1` half, `2` full), `BLINKS` (SET `blink` to −10 half, −20 closed, on a look's own sliders: a mood with a closed mouth, her listening state, a gaze, a pose), `GAZE`, `POSES`, `STATES`, `CLIPS`, `QUESTION_BROW` (`{ eyebrow: 6, blink: 2 }`, added to a mood's closed face: her brows lifted and her eyes a little wider; the clamp holds every sum in range, delighted's eyebrow 4 + 6 = 10 and brisk's blink 2 + 2 = 4 being the highest).
 - THE CLAMP: a frame's slider is the sum of its deltas, clamped to the node's own range (`SLIDER_RANGES`, nodes.py:844-857), then rounded to 3 decimals. why: ComfyUI refuses a prompt holding a value past its max.
 
 | slider | range | slider | range |
@@ -9812,7 +9881,7 @@ The seed face this recipe made (115 frames), drawn through one live turn: MAN-92
 | `rotate_*` | −20…20 | | |
 - The one frame the clamp changes today: `mood.whispered.o2`, `woo` 3 + 14 = 17 → 15.
 
-## The 115 frames, in bake order (`recipeFrames()`)
+## The 158 frames, in bake order (`recipeFrames()`)
 | names | count | index |
 |---|---|---|
 | `mood.<mood>.<mouth>`: moods in order `neutral delighted playful gentle thoughtful brisk soft whispered mock_serious`, mouths `closed a1 a2 e1 e2 o1 o2`; `mood.neutral.closed` is frame 0 | 63 | 0–62 |
@@ -9821,16 +9890,21 @@ The seed face this recipe made (115 frames), drawn through one live turn: MAN-92
 | `pose.<left_10 left_20 right_10 right_20 up_5 up_10 down_5 down_10>` | 8 | 89–96 |
 | `state.listening`, `state.failed`, `state.surprise` | 3 | 97–99 |
 | `clip.laugh.0–5`, `clip.giggle.0–3`, `clip.gasp.0–1`, `clip.sigh.0–2` | 15 | 100–114 |
-- One naming convention for the CLI's lines, the contact sheet, the manifest and the page's `data-frame` stamp (`frameNames` in `utils/faceEngine.ts`, MAN-9238).
+| `blink.listening.half`, `blink.listening.closed` | 2 | 115–116 |
+| `blink.gaze.<gaze>.half`, `blink.gaze.<gaze>.closed`, gazes in the `gaze.*` order | 16 | 117–132 |
+| `blink.pose.<pose>.half`, `blink.pose.<pose>.closed`, poses in the `pose.*` order | 16 | 133–148 |
+| `brow.<mood>`: each mood's closed face with `QUESTION_BROW`, moods in the `mood.*` order | 9 | 149–157 |
+- The blinks of the looks that are not a mood's face, and then the brows, come after the clips, so every index before them stands: the first 115 frames are the same as before `blinks`. The page plays the blinks in `faceBlink.ts` (MAN-9428) and the brows in `faceBrows.ts` (MAN-9429): her brows lift at the end of a question.
+- One naming convention for the CLI's lines, the contact sheet, the manifest and the page's `data-frame` stamp (`frameNames` in `utils/faceNames.ts`, re-exported by `faceEngine.ts`: MAN-9429, MAN-9238).
 - Clips: `laugh` 12 fps, `giggle` 12, `gasp` 10, `sigh` 8. The gasp plays `clip.gasp.0`, `state.surprise`, `clip.gasp.1`; every other clip plays its own frames. The manifest's `clips.gasp.frames` is that three-entry list, and the page plays a clip's list as given.
-- Every one of the 115 slider sets is distinct (115 cache keys).
+- Every one of the 158 slider sets is distinct (158 cache keys). Read on the contact sheet (2026-11-01): each `brow.<mood>` lifts her brows and widens her eyes a little, her mouth closed and its mood's smile and gaze kept; `brow.mock_serious` (eyebrow −5 + 6 = 1) is the flattest lift, from its lowered brows to a level one.
 
 ## Ids and the manifest
-- `recipeId()` = first 8 hex of sha256 of canonical JSON (sorted keys) of `{ framing, frames }` (every frame's name and composed, clamped sliders, in order) plus `NODE_COMMIT` (`3bba732915e2`, the node's commit that `scripts/install-comfyui.sh` pins). 2026-10-31: `3fe09371`.
-- A face id is `<photoId>-<recipeId()>`. Any change to a table, the clamp, the framing or the node's commit is a new id, so a new face.
-- `frameCacheKey(sliders)` keys the 512 px crop cache; it leaves out `discSide`, `discRaise` and `frameSizes` (the bake row, §"The frame cache").
-- `buildManifest(faceId, tiers, frames)` writes `CompanionFaceManifest` (`version` 1): the smallest tier is its own `frameSize` 256 and `sheets`, the others its `largerTiers` (`[{ frameSize: 448, sheets }]`); `frames` is one table for every tier, since the placement is the same at every size. Every number is an index into `frames`, found by frame name, so manifest and recipe cannot drift. A manifest from before tiers has no `largerTiers` and is read as one tier.
-- `layoutSheets(n, frameSize)`: 8 × 8 cells per sheet at most, row by row, the same placement at every size; 115 frames = `sheet-<size>-0.webp` 8 × 8 and `sheet-<size>-1.webp` 8 × 7: 2048 × 2048 and 2048 × 1792 at 256 px, 3584 × 3584 and 3584 × 3136 at 448 px (both under the 4096 px a phone's GPU takes as one texture). `packSheets(frames, frameSize)`: WebP quality 82 on white. 2026-10-31: the face folder is 3.4 MB (256 px sheets 506 KB and 400 KB, 448 px sheets 1091 KB and 867 KB, contact sheet 609 KB).
+- `recipeId(framing = FACE_FRAMING)` = first 8 hex of sha256 of canonical JSON (sorted keys) of `{ framing, frames }` (every frame's name and composed, clamped sliders, in order) plus `NODE_COMMIT` (`3bba732915e2`, the node's commit that `scripts/install-comfyui.sh` pins). 2026-11-01: `e46ed153` (`recipeId()`, Dark hair), `9003160c` (Brown hair).
+- A face id is `<photoId>-<recipeId(framing)>` (`faceIdOf(photoId, framing = FACE_FRAMING)`, `face-files.ts`). A table, the clamp or the node's commit moves every face's id; a look's framing moves only that look's.
+- `frameCacheKey(sliders, framing = FACE_FRAMING)` keys the 512 px crop cache with the framing's `cropFactor` and `pad`; it leaves out `discSide`, `discRaise` and `frameSizes` (the bake row, §"The frame cache").
+- `buildManifest(faceId, tiers, frames)` writes `CompanionFaceManifest` (`version` 1): the smallest tier is its own `frameSize` 256 and `sheets`, the others its `largerTiers` (`[{ frameSize: 448, sheets }]`); `frames` is one table for every tier, since the placement is the same at every size. Every number is an index into `frames`, found by frame name, so manifest and recipe cannot drift. `blinks` is `{ listening, gaze, poses }`, each a `{ half, closed }` found the same way (`moods[mood].blink` too); `brows` is each mood's `brow.<mood>` index. A manifest from before tiers has no `largerTiers` and is read as one tier.
+- `layoutSheets(n, frameSize)`: 8 × 8 cells per sheet at most, row by row, the same placement at every size; 158 frames = `sheet-<size>-0.webp` and `-1.webp` 8 × 8 and `-2.webp` 8 × 4: 2048 × 2048, 2048 × 2048 and 2048 × 1024 at 256 px, 3584 × 3584, 3584 × 3584 and 3584 × 1792 at 448 px (all under the 4096 px a phone's GPU takes as one texture); decoded, about 42 MB at the 256 tier and 128 MB at the 448 (width × height × 4 bytes per sheet). `packSheets(frames, frameSize)`: WebP quality 82 on white. 2026-11-01: the face folder is 4.7 MB (256 px sheets 506, 503 and 228 KB, 448 px sheets 1091, 1085 and 497 KB, contact sheet 799 KB).
 - `contactSheet(frames, names)`: 128 px cells, ten to a row, the name in two lines under each, the corners outside the disc's circle veiled at 70% white; WebP quality 90. The Settings card shows it under "See every frame".
 
 ## Photo — `normalizePhoto(bytes)`
@@ -9838,8 +9912,8 @@ The seed face this recipe made (115 frames), drawn through one live turn: MAN-92
 - Short side under 512 px ⇒ `FacePhotoInvalid` `tooSmall`; bytes sharp cannot read or decode ⇒ `unreadable`.
 
 ## How a recipe change reaches every face
-1. The edit changes `recipeId()`.
-2. At the next module start `faceService.start()` (the service row: MAN-9237) finds the original's face under the new id missing and queues its bake (the old original keeps being drawn and is not pruned until the new one is published).
+1. The edit changes `recipeId(framing)`: every look's for a table, the clamp or the node's commit; only that look's for its framing.
+2. At the next module start `faceService.start()` (the service row: MAN-9237) finds each house look's face under the new id missing and queues its bake (a look keeps being drawn with its old face, which is not pruned until the new one is published).
 3. Every account whose own face carries an older recipe id, or whose files are gone, has `face_pending_id` set to the new id and is queued on its photo.
 4. The frame cache makes it cheap: only frames whose sliders, `cropFactor`, `pad` or node commit changed are rendered; a framing-only tune re-cuts and renders nothing.
 5. The old-recipe faces are pruned once nobody names them.
@@ -9906,148 +9980,148 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/fa
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/install-comfyui.sh
 
-## MAN-9235 — server/modules/companion/face — the faces root: its layout, the ids, seed.json, the three companion_state columns, what Clear leaves, and the prune's rules
+## MAN-9235 — server/modules/companion/face — the faces root: its layout, the ids, the four companion_state columns, what Clear leaves, and the prune's rules
 
-`server/modules/companion/face/face-files.ts` owns the faces root: every path under it, the ids that name them, the seed record and the prune. Content-addressed: the same photo bytes are the same folder, and a face id names its bytes for ever. Who makes a face: MAN-9231. Who serves it: MAN-9236. Who prunes and why: MAN-9237.
+`server/modules/companion/face/face-files.ts` owns the faces root's ids and the prune; `face-root.ts` (a leaf, so the prune can read `face-house-ids.ts` without a cycle) owns the root's path, the one path gate, the atomic write and the photo store, and `face-files.ts` re-exports them. Content-addressed: the same photo bytes are the same folder, and a face id names its bytes for ever. Who makes a face: MAN-9231. Who serves it: MAN-9236. Who prunes and why: MAN-9237. The house's photo ids (`avatars.json`): MAN-9438.
 
 ## Root
 - `facesRoot()` = `path.resolve(COMPANION_FACES_DIR || ~/.cloudcli/companion-faces)`, read on each call. why absolute: ComfyUI runs in its own folder, so a relative path would name one place to the bake and another to ComfyUI.
 - Layout:
 ```
-<root>/seed.json                     { "photoId": "<12 hex>" }, written once
+<root>/avatars.json                  { "<house key>": "<12 hex>" }, one entry per house look, written once per key
 <root>/bake.lock, comfyui.pid        the baker's pid, and ComfyUI's (the lock itself is a socket)
 <root>/comfyui/{input,output,temp}   ComfyUI's folders; the padded source lives in input only during a bake
 <root>/<photoId>/photo.png           the photo, orientation applied, alpha flattened, at most 2048 px
 <root>/<photoId>/frames/<key>.png    the 512 px crop cache
 <root>/<photoId>/<recipeId>/         a face: manifest.json, sheet-<size>-<n>.webp (every tier), contact.webp
 ```
-- 2026-10-30: `~/.cloudcli/companion-faces` holds `seed.json` (`cc2f923d4798`), that photo with its 119 cached crops, and its one face `3fe09371` (the recipe that adds the 448 px tier, made from the cached crops with no ComfyUI).
+- 2026-11-01: `~/.cloudcli/companion-faces` holds `avatars.json` (`original` → `cc2f923d4798`, `office` → `4de51024aad7`), those two photos with 162 and 170 cached crops, and one face each: `cc2f923d4798-e46ed153`, `4de51024aad7-9003160c`.
 
 ## Ids
 | id | form | made of |
 |---|---|---|
 | `photoId` | `/^[0-9a-f]{12}$/` | sha256 of the UPLOADED bytes |
-| `recipeId` | `/^[0-9a-f]{8}$/` | `recipeId()` (the recipe row: MAN-9233) |
-| face id | `isFaceId`: `/^[0-9a-f]{12}-[0-9a-f]{8}$/` | `<photoId>-<recipeId>`; `faceIdOf(photoId)` is the current recipe's |
+| `recipeId` | `/^[0-9a-f]{8}$/` | `recipeId(framing)` (the recipe row: MAN-9233); a look's framing is hashed in |
+| face id | `isFaceId`: `/^[0-9a-f]{12}-[0-9a-f]{8}$/` | `<photoId>-<recipeId>`; `faceIdOf(photoId, framing = FACE_FRAMING)` is the current recipe's under that framing |
 - `photoIdOfFace`, `recipeIdOfFace` split it. `photoDir(photoId)` and `faceDir(faceId)` throw on a string that fails its pattern; the one gate every path passes is `insideRoot`, which resolves the join and refuses anything not strictly inside the root.
 
 ## Files
-- `writeFileAtomically(file, bytes)`: a scratch `<file>.<uuid>.tmp`, then rename; a failed write removes the scratch. Used for the photo, every cached crop, the manifest and `seed.json`.
+- `writeFileAtomically(file, bytes)`: a scratch `<file>.<uuid>.tmp`, then rename; a failed write removes the scratch. Used for the photo, every cached crop, the manifest and `avatars.json`.
 - `storePhoto(bytes)`: `normalizePhoto` then `<photoId>/photo.png`; the same bytes again find the same folder, its crops and its faces.
 - `readManifest(faceId)`: the parsed manifest, null while not made (ENOENT) or when `version` is not 1.
-- `newestPublishedFaceOf(photoId)`: the face of that photo whose `manifest.json` is newest, under whatever recipe made it, else null. The original's pages keep drawing it while the current recipe's original is made.
+- `newestPublishedFaceOf(photoId, excluded?)`: the face of that photo whose `manifest.json` is newest, under whatever recipe made it, never one in `excluded`, else null. A house look's pages keep drawing it while the current recipe's face is made (what `excluded` holds: MAN-9438).
 
-## The seed — the original's photo
-- `seed.json` is written once (`recordSeed`, atomically); a second, different photo id is refused with "The original face is already registered as photo `<id>`. Remove `<root>/seed.json` first to register `<new>` instead." (`refuseIfSeedTaken`; the CLI asks it before the first frame).
-- `registerSeed()` → the original's photo id or null:
-  - `seed.json` names one ⇒ it, and when its `photo.png` is gone the seed file is stored again if it still holds that very photo (same id);
-  - else the file `COMPANION_FACE_SEED` names (default `~/.claude/state/images/kaylee/kaylee-portrait-base.jpg`) is stored, hashed and recorded;
-  - neither ⇒ null: a fresh box with no photo, and the page draws her initial.
-- The original is the seed photo under the current recipe. `face-bake-cli.ts --seed` registers one by hand.
-
-## The three `companion_state` columns — one account's face
+## The four `companion_state` columns — one account's look
 | column | holds | written by |
 |---|---|---|
-| `face_id` | the face her pages draw; NULL = the original | the face service, when a bake is made, an upload switches, a restore |
-| `face_pending_id` | the face being made from his upload; a restart resumes it | upload, restore, bake end |
-| `face_error` | the last bake's failure sentence, shown in Settings until the next upload or restore | bake refusal |
-- `addCompanionFaceColumns(db)` in `migrations.ts`, three `TEXT` columns, NULL for every row before them (= the original, nothing being made). `STATE_PATCH_COLUMNS` in `companion.db.ts` names them; `companionDb.listFaces()` reads every account (a `users` LEFT JOIN: an account that never touched Kaylee is on the original).
+| `face_id` | the face made from HIS photo; NULL = he has none | the face service: a bake of his photo made, an upload that switches, `removeOwn` |
+| `face_pending_id` | the face being made from his upload; a restart resumes it | upload, `removeOwn`, bake end |
+| `face_error` | the last bake's failure sentence, shown in Settings until the next upload or removal | bake refusal |
+| `avatar` | the look he PICKED: a house key or `own`; NULL until he picks, which reads as the house's first look | the face service: `pick` (a house key whose face is made, or `own` while his photo's face is made), a bake or upload that makes his photo's face (`own`), `removeOwn` (back to NULL when it was `own`) |
+- `addCompanionFaceColumns(db)` and `addCompanionAvatarColumn(db)` in `migrations.ts`, `TEXT` columns, NULL for every row before them. The avatar migration runs its one `UPDATE … SET avatar = 'own' WHERE face_id IS NOT NULL` only when it just added the column: an account that already wore its photo keeps wearing it. `STATE_PATCH_COLUMNS` in `companion.db.ts` names them; `companionDb.listFaces()` reads every account (a `users` LEFT JOIN: an account that never touched Kaylee has every column NULL and wears the house's first look).
 - CLEAR LEAVES THEM: `clearAccount` names only the conversation's columns. Clear wipes her memory, not her look. Clear also leaves the files.
 
 ## The prune — `prune(named: Set<string>)` → removed face ids
-- Removes every face folder whose id is not in `named`, then every photo folder left with no face, unless `named` holds its bare photo id or `seed.json` names it. The seed's photo and frame cache are always kept: after a recipe change the original's new face does not exist yet and the cache makes it cheap.
-- The only recursive deletion of the seam; the other removals are single files the seam made itself (ComfyUI's pid file, the lock's note, the padded source, an atomic write's scratch). It removes only a path joined from ids that came from the root's own listing and matched their exact patterns, resolved by `insideRoot` to lie strictly inside the root. A symlink is not a directory to `readdir`'s types, so none is followed.
+- Removes every face folder whose id is not in `named`, then every photo folder left with no face, unless `named` holds its bare photo id or `avatars.json` names it. A house look's photo and frame cache are always kept: after a recipe change its new face does not exist yet and the cache makes it cheap. An `avatars.json` that cannot be read throws before anything is removed.
+- The only recursive deletion of the seam; the other removals are single files, each removed by its name: the seam's own (ComfyUI's pid file, the lock's note, the padded source, an atomic write's scratch) and a one-photo store's `seed.json`, once `avatars.json` records its photo as `original` (MAN-9438). It removes only a path joined from ids that came from the root's own listing and matched their exact patterns, resolved by `insideRoot` to lie strictly inside the root. A symlink is not a directory to `readdir`'s types, so none is followed.
 - A folder that cannot be removed is logged (`[Companion] the unused face … could not be removed`) and left; the rest is still pruned.
-- What the service names: MAN-9237 §"The prune".
+- What the service names: MAN-9237 §"The prune — `pruneNamed`".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-files.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-files.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-root.ts
 
-## MAN-9236 — server/modules/companion/face — the face routes: POST and DELETE /face, the manifest, sheet and contact GETs, the cache header and the three refusals
+## MAN-9236 — server/modules/companion/face — the face routes: POST, PUT /avatar and DELETE /face, the manifest, sheet and contact GETs, the cache header and the three refusals
 
-Her face's five routes (`server/modules/companion/face/face.routes.ts`), `createFaceRoutes()`, mounted by `companion.routes.ts` as `router.use('/face', …)` after `/memory`, so under `/api/companion/face` behind `authenticateToken`. ONLY TRANSPORT: read who asks, parse, call one verb of `faceService` (MAN-9237), answer. They name no `x-companion-client`: the face is no page's. The page's calls: `api.companion.face.*` (`src/shared/api.ts`).
+Her face's six routes (`server/modules/companion/face/face.routes.ts`), `createFaceRoutes()`, mounted by `companion.routes.ts` as `router.use('/face', …)` after `/memory`, so under `/api/companion/face` behind `authenticateToken`. ONLY TRANSPORT: read who asks, parse, call one verb of `faceService` (MAN-9237), answer. They name no `x-companion-client`: the face is no page's. The page's calls: `api.companion.face.*` (`src/shared/api.ts`).
 
 ## Routes
 | verb | path | answer |
 |---|---|---|
-| `POST` | `/api/companion/face` (multipart, one `photo`, at most 15 MB) | 200 `{ face }` when that photo's face under the current recipe was already made and is now hers; 202 `{ face }` while it is made (progress arrives as `companion_face` frames) |
-| `DELETE` | `/api/companion/face` | 200 `{ face }`, the original; drops the account's pending bake |
+| `POST` | `/api/companion/face` (multipart, one `photo`, at most 15 MB) | 200 `{ face }` when that photo's face under the current recipe was already made: it is now his photo and the look he wears (`avatar: 'own'`); 202 `{ face }` while it is made (progress arrives as `companion_face` frames; the look he wears stays until it is made, then becomes `own`) |
+| `PUT` | `/api/companion/face/avatar` (JSON `{ avatar: string }`) | 200 `{ face }` after `faceService.pick`: the look is stored as the account's `avatar` and announced to every page of the account as a `companion_face` frame BEFORE the answer; the key is a house look's with a face, or `own` while his photo's face is made |
+| `DELETE` | `/api/companion/face` | 200 `{ face }` after `faceService.removeOwn`: his photo and its face removed, his pending bake dropped; a pick of `own` goes back to NULL (the house's first look), a pick of a house look stays |
 | `GET` | `/api/companion/face/:faceId/manifest` | the face's `CompanionFaceManifest` (`application/json`) |
 | `GET` | `/api/companion/face/:faceId/sheet/:file` | `image/webp`, the sheet the manifest names `file` (the sheets of every tier are named there) |
 | `GET` | `/api/companion/face/:faceId/contact` | `image/webp`, every frame named (Settings' "See every frame") |
 - A file answer carries `Cache-Control: private, max-age=31536000, immutable`: a face id names its bytes for ever. `sendFile` is called with `dotfiles: 'allow'` because the faces root lives under `~/.cloudcli`.
 - The route passes the name to `faceService.fileFor`, which serves only `/^(manifest\.json|contact\.webp|sheet-(\d{1,4}-)?\d{1,3}\.webp)$/` (`FACE_FILE_NAME`; the second form is the bake's `sheet-<size>-<n>.webp`, the optional size is absent from a face made before tiers: `sheet-0.webp`), else 404: no name reaches outside the face's folder.
-- A face is served only when it is the original's face or the face the asking account names (`face_id`); a face still being made is no one's. Anything else, an id that is not a face id, or a file not on disk: 404.
+- A face is served only when it is a house look's current or drawn face (every account reads those) or the face the asking account names (`face_id`); a face still being made is no one's. Anything else, an id that is not a face id, or a file not on disk: 404.
 
 ## Refusals — the app's `AppError` envelope `{ success: false, error: { code, message } }` (`face-errors.ts`)
 | status | `code` | when |
 |---|---|---|
-| 400 | `COMPANION_FACE_INVALID` | the message IS the sentence the card shows under its button |
+| 400 | `COMPANION_FACE_INVALID` | the message IS the sentence the card shows (an upload's under Upload a photo, a pick's under the buttons) |
 | 404 | `COMPANION_FACE_NOT_FOUND` | "That face is not available to this account." |
-| 503 | `COMPANION_STOPPING` | "The server is shutting down, so her face cannot be changed just now; try again once it is back." Upload and restore only |
+| 503 | `COMPANION_STOPPING` | "The server is shutting down, so her face cannot be changed just now; try again once it is back." Upload, `PUT /avatar` and `DELETE` only |
 - 400 sentences (`face-upload.ts`, `face-refusal.ts`): no part named `photo` or more than one part, or a text field ("Send one photo, as one multipart file in the field named photo." / "Choose a photo to upload: one JPEG, PNG or WebP file, in the field named photo."); an empty file ("That file is empty. Choose a JPEG, PNG or WebP photo."); over 15 MB ("That photo is larger than 15 MB. Choose a smaller one."); bytes sharp cannot read or decode (`unreadable`); a format that is not JPEG, PNG or WebP, read from the bytes and never from the file name or part type ("That file is a GIF picture, and her face is made from a JPEG, PNG or WebP photo. Choose one of those."); a short side under 512 px (`tooSmall`).
+- 400 sentences of `PUT /avatar` (`face.routes.ts`, `face-errors.ts`, `face.service.ts`): no string `avatar`, or an empty one ("Send the look to wear as JSON: { "avatar": its key }."); a key naming none of the account's looks, `own` included while he has no photo (`faceNoSuchLook`: "There is no look called <key>.", the key cut to its first 40 code points plus `…`, never through a surrogate pair); a look with no face yet ("That look isn't ready yet; it can be picked once it is made."). A refused pick stores and announces nothing.
 - multer: memory storage, `files: 1`, `fields: 0` (a body of fields is refused at the first one, not held), `fileSize` 15 MB + 1 byte. why +1: the parser cuts a part that REACHES its limit; `acceptPhoto` (inclusive, `PHOTO_MAX_BYTES` = 15 × 1024 × 1024) says whether a photo is too large, so exactly 15 MB is accepted.
-- A refusal of the bake itself (no face found, ComfyUI missing, the maker stopped) is not an HTTP answer: it is `face.bake` of `state: 'failed'` with the sentence, on the next frame and in the picture.
+- A refusal of the bake itself (no face found, ComfyUI missing, the maker stopped) is not an HTTP answer: it is the `own` avatar's `bake` of `state: 'failed'` with the sentence, on the next frame and in the picture.
 
 ## Proof — `node .verify/companion-face-server.mjs [<photo>]` on the dev API (:3011), signed in as the dev account (account 1)
-- `GET /api/companion` `.face` is the original's with `original: true`; its manifest route answers 115 frames and the cache header; another face's file is 404.
-- Two sockets of the account hear every `companion_face` frame; `POST` answers 200 or 202, the frames count to the bake's end, a second `GET` answers the new id; `DELETE` answers the original and both sockets hear it.
-- Account 2 is never touched.
+- Account 1 must start wearing the default (no pick, or `original`) with no photo and no failure; the probe waits for every house look to be made (deadline 90 minutes; a failed bake stops it at its sentence).
+- `GET /api/companion` `.face` is `{ id, avatar: 'original', avatars }`: Dark hair, then Brown hair, each with its face id and `bake: null`; each manifest route answers the cache header and exactly the frames its tables name (158: the highest index they hold, plus one); another face's file is 404.
+- Account 2 reads Brown hair's manifest (200: a house look is every account's); only that read, and its row is read before and after.
+- `PUT /avatar`: `nope`, `own` with no photo and `42` are each a 400 with its sentence and announce nothing; `office` answers 200 with Brown hair's face id, both sockets hear `companion_face` with `avatar: 'office'` and that id, the picture answers it, and account 2's row (its pick included) is unchanged.
+- Two sockets of the account hear every `companion_face` frame. `POST` answers 200 or 202; the frames count to the bake's end while `avatar` stays `office`; a `PUT … own` meanwhile is a 400 "isn't ready yet"; a second `GET` answers `avatar: 'own'` with the new id after the two house looks; account 2's read of that face is 404. `DELETE` answers Dark hair with no `own` look and both sockets hear it. The last call is `PUT … original` (200, both sockets hear it); the row ends `avatar: 'original'` with no photo, bake or failure. On any failure it sends `DELETE` for what it posted and `PUT … original`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-upload.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-face-server.mjs
 
-## MAN-9237 — server/modules/companion/face — the face service: faceOf, upload, restore, fileFor, the bake queue, the companion_face events, the start that resumes and the prune it asks for
+## MAN-9237 — server/modules/companion/face — the face service: faceOf, upload, pick, removeOwn, fileFor, who hears a bake, the start that resumes and the prune it asks for
 
-`faceService` (`server/modules/companion/face/face.service.ts`) answers each account's `CompanionFace`, takes an upload, restores the original, serves a face's files to the account that may read them, and makes faces on events. `face-queue.ts` is its in-process bake queue. The routes: MAN-9236. One bake: MAN-9231. The files and the three columns: MAN-9235. The frame it sends: `companion_face` in the wire contract (MAN-9086).
+`faceService` (`server/modules/companion/face/face.service.ts`) answers each account's `CompanionFace`, takes an upload, stores his pick, removes his photo, serves a face's files to the account that may read them, and makes faces on events. The routes: MAN-9236. The queue it runs: MAN-9439. The house's looks it holds: MAN-9438. One bake: MAN-9231. The files and the four columns: MAN-9235. The frame it sends: `companion_face` in the wire contract (MAN-9086).
 
 ## Verbs
 | verb | does |
 |---|---|
-| `faceOf(userId)` → `CompanionFace` | `id` = the account's `face_id` or, when NULL, the original's face; `original` = `face_id` is NULL or names the seed photo's face; `bake` = `baking { done, total }` while its pending photo's job runs, `queued { done: 0, total }` while pending and waiting, `failed { error }` from `face_error`, else null. A stored id that is not a face id is read as none |
-| `upload(userId, { bytes })` → `{ face, switched }` | in the `exclusive` section: `acceptPhoto` (the 400s), then the photo's face under the current recipe exists ⇒ `queue.release`, `face_id` set, pending and error NULL, announced, pruned: `switched: true`. Else `face_pending_id` set, `face_error` NULL, `queue.assign(userId, photoId)`, announced: `switched: false`, `id` stays the current face, `bake` is `baking` `0` of `total` when no other bake runs (it starts at once) and `queued` while another is made first. 503 `COMPANION_STOPPING` once stopped |
-| `restore(userId)` → `CompanionFace` | `queue.release`, the three columns NULL, announced, pruned later. 503 once stopped |
-| `fileFor(userId, faceId, fileName)` → path | `fileName` is one of the folder's files (`FACE_FILE_NAME`: `manifest.json`, `contact.webp`, a `sheet-<size>-<n>.webp`); 404 for any other name, for a `faceId` that is neither the original's nor the account's `face_id`, and when `manifest.json` or the file is missing on disk |
-| `start()` | background; a failure is logged and the module serves either way |
+| `faceOf(userId)` → `CompanionFace` | `avatars` = `house.avatars()` (every house look in order: `{ key, label, faceId: its drawn face or null, bake }`), then `{ key: 'own', label: 'Your photo', faceId: the account's `face_id` (null while none), bake }` while the account holds a `face_id`, a `face_pending_id` or a `face_error`. Own `bake`: the pending face's job as `bakeOfJob` (`baking { done, total }` or `queued { done: 0, total }`), a pending id with no job yet `queued` `0` of `recipeFrames().length`, else `failed { error }` from `face_error`, else null. The wearing look = the one whose key is the `avatar` column when it has a face, else the FIRST look that has a face. `avatar` = its key, `id` = its `faceId`: `id` is always the face of the look `avatar` names. No look has a face (a fresh box) ⇒ `id: null`, `avatar: 'original'`. A stored face id that is not a face id reads as none; a pick of `own` with no photo, or of an unknown key, reads as the first look with a face |
+| `upload(userId, { bytes })` → `{ face, switched }` | in the `exclusive` section: `acceptPhoto` (the 400s), then `faceIdOf(photoId)` published (`readManifest`) ⇒ `queue.release`, `face_id` set, pending and error NULL, `avatar` = `own`, announced, pruned later: `switched: true`. Else `face_pending_id` set, `face_error` NULL, `queue.assign(userId, photoId)`, announced: `switched: false`, the pick and `id` stay, the `own` look's `bake` reads `baking` `0` of `total` when no other bake runs and `queued` while another is made first. 503 `COMPANION_STOPPING` once stopped |
+| `pick(userId, key)` → `CompanionFace` | 503 `COMPANION_STOPPING` once stopped. The look = the `faceOf(userId).avatars` entry whose `key` is `key`: none (his photo's `own` included while he has none) ⇒ 400 `faceNoSuchLook(key)`; its `faceId` null ⇒ 400 "That look isn't ready yet; it can be picked once it is made."; else `companionDb.writeState(userId, { avatar: key })`, announced, answers `faceOf(userId)`. Synchronous and outside `exclusive`: the check and the write cannot be parted by an upload or a removal. The route: `PUT /face/avatar` |
+| `removeOwn(userId)` → `CompanionFace` | `queue.release`, `face_id`, `face_pending_id`, `face_error` NULL; `avatar` NULL only when it was `own` (a pick of a house look stays); announced, pruned later. 503 once stopped. The route: `DELETE /face` |
+| `fileFor(userId, faceId, fileName)` → path | `fileName` is one of the folder's files (`FACE_FILE_NAME`: `manifest.json`, `contact.webp`, a `sheet-<size>-<n>.webp`); 404 for any other name, for a `faceId` that is neither in `house.faces()` (each house look's current and drawn face: every account reads them) nor the account's own `face_id`, and when `manifest.json` or the file is missing on disk |
+| `start()` | background `begin()`: `setUpHouse`, `resumeAccounts`, the prune; a failure is logged and the module serves either way |
 | `stop()` | `stopped = true`, `queue.stop()`, awaits the exclusive tail |
 - The module: `createCompanionModule` calls `faceService.start()`, and its `stop()` runs `Promise.all([companionService.stopAll(), faceService.stop()])`. `buildPicture` adds `face: faceService.faceOf(userId)`.
+- `avatar` is written by `upload` (a photo already made), `pick`, `removeOwn` and a bake's end (below), and by nothing else. The page's call: `api.companion.face.pick(avatar)` (`src/shared/api.ts`, `PUT /api/companion/face/avatar`).
+
+## A bake's end — `settle(job, outcome)`
+| outcome | does |
+|---|---|
+| `ended` (nobody wants it, or the server stops) | not stopping ⇒ prune later; nothing else |
+| `refused` | logs; `house.failed(faceId, sentence)` (every house look whose current face it is shows `failed` in memory until made; a restart is a new try); each account still waiting: `face_pending_id` NULL, `face_error` = the sentence |
+| `made` | each account still waiting: `face_id` = the face, pending and error NULL, and `avatar` = `own` UNLESS the photo is the one its `face_id` already names (a re-make of the photo he wears under a new recipe leaves the pick; only a different photo's face becomes `own`); then `house.made(faceId)` for every bake that ends made, whoever asked (his upload of Dark hair's own photo is made under the same framing, so it is Dark hair's very face and mends its failure; Brown hair's face is another, `OFFICE_FRAMING` being unlike an upload's); prune later |
+- Still waiting = the accounts of the job whose `face_pending_id` names that photo's face.
 
 ## `companion_face` — `{ kind: 'companion_face', face }` by `sendToUser(userId, frame)` to every open page of the account
+`hearersOf(job, waiting)` = EVERY account (`companionDb.listFaces()`) when `job.forHouse` or `house.makes(job.faceId)` (a house look's current face: every picker lists the house's looks), else `waiting`.
 | event | who hears it |
 |---|---|
 | an upload is queued, or switches at once | the uploader |
-| a job starts baking (`queued` → `baking`) | every account waiting on that photo |
-| each frame rendered or found cached (`done` counts up to `total`, 115) | same |
-| a bake is made: `face_id` set, pending cleared | accounts still waiting on that photo; and, when the photo is the seed's, every account on the original (its id may have changed) |
-| a bake is refused: `face_pending_id` NULL, `face_error` = the sentence | accounts still waiting |
-| a restore | the account |
-| the original is first found at start (a page may have read the picture before) | every account on the original |
-- A frame carries no sequence. The page keeps the newest it heard (MAN-9220 §Wiring).
-- 2026-10-30, `.verify/companion-face-server.mjs`: an upload of a new photo answered 202 `baking 0/115`; each of two sockets heard 117 `companion_face` frames to the bake's end (the job starting, the upload's own announcement, 115 frames), then `no bake` with the new id; `DELETE` answered the original, both sockets heard it, and the prune removed the uploaded photo's folder from the root.
-
-## The queue — events only, nothing looks at a clock
-- One job per PHOTO: several accounts that upload the same photo share its bake. A job holds its `accounts` and `forOriginal`, `state` `queued` | `baking`, `done`, `total`, an `AbortController`.
-- Jobs run one at a time, oldest first: started when asked for (if none runs) and when the running one settles. The box-wide lock inside `bakeFace` keeps a CLI bake apart.
-- `assign(userId, photoId)` joins or makes the photo's job and takes the account out of every other job: a new upload replaces the pending one. `release(userId)`: a job nobody wants is dropped when queued, aborted ('nobody wants this face any more') when baking. The original's own job (`wantOriginal`) stays wanted with no account.
-- A job's end: `made` | `refused` (the bake's sentence; any other failure is logged and reads as `stopped`) | `ended` (aborted: nobody wants it, or the server stops).
-- `ended` and not stopping ⇒ prune later. Stopping leaves every pending id in the database for the next start.
+| `pick` | the account |
+| a job starts baking (`queued` → `baking`), each frame rendered or found cached (`done` counts to `total`, the recipe's frame count: 158) | `hearersOf(job, job.accounts)` |
+| a bake is made or refused | `hearersOf(job, still waiting)` |
+| `removeOwn` | the account |
+| the house is found at start (a page may have read the picture before) | every account |
+- A frame carries no sequence. The page keeps the newest it heard (MAN-9437 §Wiring).
 
 ## `start()` — the event the house recovers on
-1. `setUpOriginal`: `registerSeed()`; the original's face = the seed photo's face under the current recipe, else its newest published one, else null; announce the accounts on the original; when the current recipe's face is not published, `queue.wantOriginal` if ComfyUI is installed (`isComfyUIInstalled`) or the photo's frame cache holds every frame (`frameCacheIsComplete`, MAN-9231: a recipe change that only re-cuts, such as a new tier, renders nothing and needs no ComfyUI), else warn `run scripts/install-comfyui.sh`. A failure is logged and leaves the original unknown, and nothing is pruned.
-2. `resumeAccounts`: for every account (`companionDb.listFaces()`), the photo of its pending face, or of its own face when that was made under another recipe or its files are gone ⇒ `face_pending_id` = the current recipe's id, `face_error` NULL, queued. A pending id with nothing to resume is cleared. A face whose photo is gone from the root cannot be made again: the account reads `failed`, "That photo is not stored here. Upload it again." A failure in the seed step is logged and the resume still runs; the prune then removes nothing, because it waits for the original to be known.
+1. `setUpHouse`: `house.register()` (MAN-9438); announce every account; for each `house.unpublished()` look (its current face is not its drawn face), `queue.wantHouse(photoId, look.framing)` if ComfyUI is installed (`isComfyUIInstalled`) or the photo's frame cache holds every frame under that framing (`frameCacheIsComplete(photoId, framing)`, MAN-9231: a recipe change that only re-cuts renders nothing and needs no ComfyUI), else warn `run scripts/install-comfyui.sh`. A failure is logged and leaves the house unknown: nothing is pruned.
+2. `resumeAccounts`: for every account (`companionDb.listFaces()`), the photo of its pending face, or of its own face when that was made under another recipe or its files are gone ⇒ `face_pending_id` = `faceIdOf(photoId)`, `face_error` NULL, `queue.assign`. A pending id with nothing to resume is cleared. A photo gone from the root cannot be made again: the account reads `failed`, "That photo is not stored here. Upload it again." A failure in step 1 leaves step 2 running.
 3. The prune.
 
-## The prune
-- `named` = the seed's current face id, the original's face the page draws now, each account's `face_id`, each account's `face_pending_id` and its bare photo id, and the photo of every queued job. `prune(named)` (the faces-root row, MAN-9235) removes the rest.
-- Runs at start (not until the original is known), after a bake settles (made, or ended while running). A refusal does not prune: the photo and its frames stay, so the same photo uploaded again finishes where the bake stopped, after an upload that switched, after a restore.
+## The prune — `pruneNamed`
+- `named` = `house.faces()` (each look's current and drawn face), each account's `face_id`, `face_pending_id` and its bare photo id, and `queue.photoIds()`. `prune(named)` (MAN-9235) removes the rest, and keeps every photo `avatars.json` names.
+- Runs at start (not until `house.isKnown()`), after a bake settles `made`, after one `ended` while the server is not stopping, after an upload that switched, after `removeOwn`. A refusal does not prune: the photo and its frames stay, so the same photo uploaded again finishes where the bake stopped.
 - The prune and an upload's store take turns (`exclusive`): a prune never lands between a photo being stored and the account claiming it.
 
-## Proof
-`node .verify/companion-face-server.mjs` (the routes row, MAN-9236): the `companion_face` frames of an upload counted on two sockets to the bake's end.
+## Proof — `node .verify/companion-face-server.mjs [<photo>]` (the routes row, MAN-9236)
+- Account 1 must start wearing the default (no pick, or `original`) with no photo and no failure (the probe refuses otherwise); it waits for every house look to be made (a failed bake stops it at the sentence; deadline 90 minutes), counts `companion_face` frames on two sockets, and on any failure sends `DELETE /face` for what it posted.
+- 2026-11-01: `PASS` (exit 0): `PUT` of `nope`, `own` with no photo and `42` each 400; `PUT … office` 200 and both sockets heard `avatar: 'office'`; an upload 202 `baking 0/158`; `PUT … own` while it was being made 400 "isn't ready yet"; both sockets counted 160 baking frames, the bake took 1668 s; then `avatar: 'own'` with the new id, account 2's read of that face 404, `DELETE` 200 on `original`, `PUT … original` 200 last; account 2's row as it began.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-queue.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-face-server.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-face-server.mjs
 
 ## MAN-9238 — src/modules/companion — her face engine: createFaceEngine, FaceInput and FaceDraw, the states table, the crossfades, blink, glance, turn and tilt, reduced motion
 
-`createFaceEngine(manifest, seed)` (`src/modules/companion/utils/faceEngine.ts`) is pure code: it decides which frame of the manifest her face shows, what crossfades, which motion plays and how far she leans. It touches no browser, so `tsx` replays it on a recorded turn. The page that runs it: MAN-9223 (`CompanionPortrait`). The mouth, sounds, mood words and mood hold it calls: MAN-9239. The frames it indexes: MAN-9233.
+`createFaceEngine(manifest, seed)` (`src/modules/companion/utils/faceEngine.ts`) is pure code: it decides which frame of the manifest her face shows, what crossfades, which motion plays and how far she leans. It touches no browser, so `tsx` replays it on a recorded turn. The page that runs it: MAN-9223 (`CompanionPortrait`). The mouth, sounds, mood words and mood hold it calls: MAN-9239. The frames it indexes: MAN-9233. Her blink (`faceBlink.ts`): MAN-9428. Her brows at the end of a question (`faceBrows.ts`): MAN-9429. Her eyes' search and her warm spell (`faceEyes.ts`, `faceWarmth.ts`): MAN-9430. Her head while she speaks (`faceHead.ts`): MAN-9434.
 
 ## `engine.step(input: FaceInput): FaceDraw`
 | `FaceInput` | |
@@ -10060,47 +10134,75 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/fa
 | `turnRunning` | a turn is under way |
 | `look` | `{ dx, dy }` of the anchor from her, px; null when none holds |
 | `reducedMotion` | `prefers-reduced-motion: reduce` |
-- `FaceDraw { base, over, alpha, motion, tilt, nextAt, mouthBy }`: `base` whole with `over` on top at `alpha` (frame indices into `manifest.frames`; `over` null and `alpha` 0 when nothing fades); `motion` is `laugh | giggle | gasp | sigh | nod | shake | breath | null`; `tilt` degrees clockwise; `nextAt` the next ms the engine wants a call at when nothing else would change it, null for none.
+- `FaceDraw { base, over, alpha, motion, tilt, head, nextAt, mouthBy }`: `base` whole with `over` on top at `alpha` (frame indices into `manifest.frames`; `over` null and `alpha` 0 when nothing fades); `motion` is `laugh | giggle | gasp | sigh | nod | shake | breath | null`; `tilt` degrees clockwise; `head` is her head's `{ bob, roll }` while she speaks and settles, null at rest (MAN-9434; no frame changes with it); `nextAt` the next ms the engine wants a call at when nothing else would change it, null for none.
 - `mouthBy`: `'exact' | 'voice' | null`, what drove her mouth this step: `exact` a timed shape from an announced piece, `voice` the level and the vowel (both draw the same frame names). Null when she is not speaking, and under reduced motion. The page stamps it as `data-mouth` (MAN-9403).
 - The mouth is chosen by `chooseMouth` (`faceMouth.ts`, MAN-9239): the exact shape leads and the level mouth fills in. The engine takes its `key`, its crossfade and whether it is closed.
-- One engine plays one manifest; a new face is a new engine. `seed` makes blinks and glances repeatable (mulberry32). `frameNames(manifest)` gives every frame's bake name by index.
-- Time is deadlines, never a poll: a blink, a glance, the mood's hold, a crossfade's end, a clip's next frame and a turn's next level are each a `nextAt`.
+- One engine plays one manifest; a new face is a new engine. `seed` makes blinks, glances, the search and the warm spell repeatable (mulberry32). `frameNames(manifest)` (written in `faceNames.ts`, re-exported by the engine so no import changed) gives every frame's bake name by index.
+- Her blinks, search, warm smile and brows are keyed on the manifest: `blinks` present ⇒ she blinks in every state but `failed`, searches while she thinks and wakes, and smiles warmly at idle; `brows` present ⇒ her brows lift at a question's end. A face made before them plays as it always did but for the fade rule below: its mood and state fades start from her open eyes too (`legacy = manifest.blinks === undefined` in `faceEngine.ts`: MAN-9428).
+- A blink and a fade of a change of her face never overlap: a state's, a mood's, an ease's, the warm spell's and the brows' lift and ease back. The step that begins one cuts a blink in play and fades from the open-eyed frame under it (`blinker.openUnder`, read before anything cuts the blink: MAN-9428), and no blink starts on it. The rule, its fades and its deadlines: MAN-9432.
+- Time is deadlines, never a poll: a blink, a glance, a search step, a warm spell, the mood's hold, the brows' hold, a crossfade's end, a clip's next frame and a turn's next level are each a `nextAt`; while her head is not at rest the next frame is (`now + 1`).
 
-## States — what each draws
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceFader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceTurn.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
+
+## MAN-9431 — src/modules/companion — her face engine: createFaceEngine, FaceInput and — States — what each draws
+section: src/modules/companion — her face engine: createFaceEngine, FaceInput and FaceDraw, the states table, the crossfades, blink, glance, turn and tilt, reduced motion/001 States — what each draws
+
 | presence | frame | fade into it | tilt |
 |---|---|---|---|
-| `idle`, `asleep`, `loading`, `walking` | the mood's `closed` mouth (neutral once the hold ends), with blinks and glances | 140 ms steps | the mood's: playful −4, thoughtful +2, else 0 |
+| `idle`, `asleep`, `loading`, `walking` | the mood's `closed` mouth (neutral once the hold ends), with blinks and glances; in `idle` a warm smile comes and goes (MAN-9430) | 180 ms (a glance's or a turn's step: 140 ms) | the mood's: playful −4, thoughtful +2, else 0 |
 | `listening` | `states.listening`; a nod as it begins: `pose.down_5`, `pose.down_10`, `pose.down_5`, `states.listening` at 8 fps (`data-motion` `nod`, 600 ms) | 60 ms | −5 |
 | `transcribing` | `gaze.down` | 180 ms | 0 |
-| `thinking`, `waking` | `gaze.up_right` | 180 ms | +3 |
+| `thinking`, `waking` | her eyes search: she begins on `gaze.up_right`, then every 1.2–2.6 s another of `up_right`, `up`, `up_left`, `right`; a move may carry a blink (MAN-9430) | 180 ms | +3 |
 | `drafting` | `gaze.down_right` | 180 ms | +3 |
-| `reading_session` | eyes sweep `gaze.down_left` ⇄ `gaze.down_right`, a cycle every 4.4 s | 180 ms | 0 |
+| `reading_session` | eyes sweep `gaze.down_left` ⇄ `gaze.down_right`, a cycle every 4.4 s; a turn of it may carry a blink | 180 ms | 0 |
 | `reading_code` | the same sweep, a cycle every 2.6 s | 180 ms | 0 |
-| `speaking` | the sentence's mood, mouth the exact shape where an announced piece holds the audio's place (`moods[mood].mouths[MOUTH_OF_SHAPE[shape]]`), else on her voice (`moods[mood].mouths[<vowel><1\|2>]`, or `closed`); a sound's clip over it; a blink while the mouth is closed | 40 ms per exact mouth, 60 ms per level mouth | the mood's |
+| `speaking` | the sentence's mood, mouth the exact shape where an announced piece holds the audio's place (`moods[mood].mouths[MOUTH_OF_SHAPE[shape]]`), else on her voice (`moods[mood].mouths[<vowel><1\|2>]`, or `closed`); a sound's clip over it; a blink while the mouth is closed; her head bobs and rolls with her voice (MAN-9434) | 40 ms per exact mouth, 60 ms per level mouth | the mood's |
 | `cut` | `states.surprise`; one blink (neutral's) from 250 ms in | 180 ms | 0 |
 | `failed` | `states.failed`, still | 180 ms | 0 |
 - A look held turns her head in the states that are free to: `idle`, `asleep`, `loading`, `walking`, `thinking`, `waking`, `drafting`, `reading_session`, `reading_code`. The frame is then `pose.<dir>_<n>`, instead of the state's gaze. `listening`, `transcribing`, `speaking`, `cut` and `failed` keep their own faces.
 - The turn: yaw on the larger axis (`|dx| ≥ |dy|`), else pitch; a distance under 160 px is the small turn (`left_10`, `up_5`…), farther the large one (`_20`, `_10`); no distance, no turn. The head moves ONE level every 140 ms and reverses through the level below; a head turned the other way first comes back.
-- Under a held look no blink, glance or sweep runs.
+- Under a held look no glance, sweep or search runs; her blinks close the pose's eyes.
+- She blinks in every state but `failed`, over the look the states table names (MAN-9428); `cut` makes one blink from 250 ms in, on a step that begins no fade and with none running.
+- Her brows lift at the end of a question (MAN-9429): when the sentence that was sounding stops sounding and its text ends in a question mark, a face made with `brows` shows `brows[mood]` (that mood's closed face, her brows lifted), fading in over 140 ms, until her next sentence starts sounding or 1200 ms pass, then easing back over 300 ms. It lives through the step from `speaking` to rest and ends at any other state; it takes no blink and no glance; a head turned toward a held look replaces it. A page that plays no voice, and a face made before `brows`, shows none. The frame priority is clip, brows, blink, then the look's own frame.
 
-## Crossfades and time
-- A new state's face and a new mood's fade in over 180 ms; a mood easing back to neutral, 300 ms; a mouth change, 40 ms for an exact shape and 60 ms for the level mouth; a glance, a turn step, a gaze: 140 ms. A frame change inside a 180 or 300 ms fade joins it and ends with it, not cut to its own 40 or 60 ms.
-- A blink: 40 ms to half, 50 ms closed, 40 ms back, as hard swaps. One every 2.8–6.5 s; 15% are doubled (two with 90 ms open between). Only in the resting states and while speaking, never reduced, never in a fade, a clip, a turn or a look, and while speaking only with the mouth closed, whichever drove it (X and A are closed).
-- A glance: every 5–11 s, held 0.5–1.1 s, one of the eight `gaze.*`; resting states only, neutral mood only, never in a fade, a blink, a turn or a look.
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceFader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceTurn.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
+
+## MAN-9432 — src/modules/companion — her face engine: createFaceEngine, FaceInput and — Crossfades and time
+section: src/modules/companion — her face engine: createFaceEngine, FaceInput and FaceDraw, the states table, the crossfades, blink, glance, turn and tilt, reduced motion/002 Crossfades and time
+
+- A new state's face and a new mood's fade in over 180 ms; a mood easing back to neutral, and the warm spell in and out, 300 ms; a mouth change, 40 ms for an exact shape and 60 ms for the level mouth; a glance, a turn step, a gaze: 140 ms. A frame change inside a 180 or 300 ms fade joins it and ends with it, not cut to its own 40 or 60 ms.
+- A blink: hard swaps, 40 ms to half, 50 ms closed, 40 ms back; a gap after it drawn from the state's range; never reduced, never in a fade or a clip, and while speaking only with the mouth closed, whichever drove it (X and A are closed). A move of her eyes or head may carry one. Ranges, the carried blink, the face made before `blinks`: MAN-9428.
+- A blink and a fade of a change of her face never overlap. Those fades: a state's or a mood's 180 ms, an ease's 300 ms, the warm spell's 300 ms, the brows' lift's 140 ms and its ease back 300 ms.
+  - A step that begins one cuts a blink in play and shows the open-eyed frame of the look the blink was last drawn over at once (0 ms), then fades from it at the fade's own length. That frame is `blinker.openUnder(now, manifest)` (MAN-9428), read once at the step's start, before a state change, the lift or a mood change cuts the blink. The lift keeps its 140 ms whether or not a blink was cut under it.
+  - A state change, a mood change, a mood easing back, a clip and the lift each drop a blink in play.
+  - No blink starts on a step that begins a fade (`free` is false on a state's or a mood's change and on the step the brows' hold ends): a blink that fell due in the hold fires once the ease back is done (`fader.endsAt` is the deadline).
+  - A blink a move carries can still cut a glance's or a turn level's 140 ms step.
+  - A face made before `blinks` fades from her open eyes too. Reduced motion: no blink runs and no frame fades.
+- A glance: every 5–11 s, held 0.5–1.1 s, one of the eight `gaze.*`; resting states only, neutral mood only, never in a fade, a blink, a turn or a look. Its start and its end are moves a blink may carry.
+- The search (thinking, waking): her eyes move every 1200–2600 ms to another of four gazes, a gaze step of 140 ms, a move that may carry a blink; reduced motion or a held look leaves her on `gaze.up_right`. The warm spell (idle, neutral mood, no look, no glance in play): her face eases to `mood.gentle.closed` every 25–60 s, holds 3–6 s, eases back; no glance starts in it. Both are keyed on a face made with `blinks`; a face made before plays as it always did. Rules, ranges and proof: MAN-9430.
 - A blink or glance that falls due while the face has no such frames lapses and is renewed from when it was due, so the schedule is the same however often the page stepped.
 - Mood: set as a sentence STARTS sounding (voice page) or as the newest sentence of the running turn arrives (no voice); a sentence with no mood word is neutral. A new turn begins neutral unless a sentence of the last turn still sounds. After the turn ends and her voice stops it holds 2.5 s, then eases to neutral over 300 ms.
 
 ## Reduced motion
-- Keeps every look and drops the movement: no blink, glance, sweep or clip; no crossfade (frames swap whole); `data-motion` never set; a look shows its final turn at once; the tilt stands; speaking holds the mood's half-open `a1`, with `mouthBy` null.
+- Keeps every look and drops the movement: no blink, glance, sweep, search, warm spell, clip or head (`FaceDraw.head` null); no crossfade (frames swap whole), a question's lifted brows included, which still show; `data-motion` never set; a look shows its final turn at once; the tilt stands; speaking holds the mood's half-open `a1`, with `mouthBy` null.
 - Turning it on mid-fade ends the fade at once.
 
 The engine's frames on the live page through one turn with her real voice (a mood switching at its sentence, the giggle clip, the 2.5 s hold, neutral returning): MAN-9254.
 
-## Proof — `TSX_TSCONFIG_PATH=tsconfig.json node --import tsx .verify/kaylee-face-replay.ts`
-- Replays a recorded turn at 60 steps a second on a manifest built in the bake's order: thinking, three sentences of hers (moods delighted, playful with a `<giggle>`, gentle), idle; the voice level is the RMS of `.verify/fixtures/kaylee-what-chats-are-working.wav`. Then the same turn with reduced motion, a `reading_session` with a look of dx −300 held, every state in turn, every sound in one sentence.
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceFader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceTurn.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
+
+## MAN-9433 — src/modules/companion — her face engine: createFaceEngine, FaceInput and — Proof — `TSX_TSCONFIG_PATH=tsconfig.json node --import tsx .verify/kaylee-face-replay.ts`
+section: src/modules/companion — her face engine: createFaceEngine, FaceInput and FaceDraw, the states table, the crossfades, blink, glance, turn and tilt, reduced motion/003 Proof — `TSX_TSCONFIG_PATH=tsconfig.json node --import tsx .verify/kaylee-face-replay.ts`
+
+- Replays a recorded turn at 60 steps a second on a manifest built in the bake's order (`bakeManifest()` of `.verify/lib/face-replay-kit.ts`: the 115 frames of a face made before `blinks`): thinking, three sentences of hers (moods delighted, playful with a `<giggle>`, gentle), idle; the voice level is the RMS of `.verify/fixtures/kaylee-what-chats-are-working.wav`. Then the same turn with reduced motion, a `reading_session` with a look of dx −300 held, every state in turn, every sound in one sentence.
 - Then her saved sentence 1 (delighted, opening on a giggle; its text from `.verify/shots/kaylee-face-whole/audio/turn.json`) at its real length, its level the RMS of its own audio, with the pieces Rhubarb found in it (`.verify/fixtures/kaylee-mouth-sentence-1.json`, made by `.verify/kaylee-mouth-record.mjs`) announced 1.4 s in; once as it is and once with reduced motion.
+- Then the runs on the 149-frame face with `blinks`: `runBlinkRuns()` of `.verify/lib/face-replay-blinks.ts` (MAN-9428).
+- Then the runs of her eyes and her warm spell on the 149-frame face: `runEyesRuns()` of `.verify/lib/face-replay-eyes.ts` (MAN-9430).
+- Then the runs on the 158-frame face with `brows` (`bakeManifest(true, true)`): `runBrowRuns()` of `.verify/lib/face-replay-brows.ts` (MAN-9429).
+- Then her head's run: `runHead()` of `.verify/lib/face-replay-head.ts`, her saved sentences 0 and 1 with `FaceDraw.head` printed every 50 ms and checked (MAN-9435).
 - Prints one line per change: frame name, `over`, `motion`, `tilt`, `by` (`mouthBy`), `nextAt`. Checks that no draw changes before the `nextAt` it promised; on the saved sentence, that `mouthBy` is `voice` until 1.4 s and `exact` after, that every exact frame is `mood.delighted.<MOUTH_OF_SHAPE[shape]>` for its cue (or a blink, or the giggle's clip while it plays), that an exact fade lasts 40 ms, and that reduced motion holds `a1` with no `mouthBy`.
-- 2026-10-31: exit 0; all seven runs end `0 draws changed before the nextAt they were promised` (997, 997, 1386, 1872, 841, 710 and 710 steps). Saved sentence: 439 speaking steps, 0 off the `voice`-then-`exact` rule; `shapeAt` agrees with a walk of every cue on 439 of 439; exact steps 348 the cue's mouth, 8 a blink, 0 anything else; 72 exact fade steps read 40.0 ms. Reduced motion: 439 speaking steps, 0 not `a1` held, 0 with a `mouthBy`.
+- 2026-11-01: exit 0; all seven 115-frame runs end `0 draws changed before the nextAt they were promised` (997, 997, 1386, 1872, 841, 710 and 710 steps). Saved sentence: 439 speaking steps, 0 off the `voice`-then-`exact` rule; `shapeAt` agrees with a walk of every cue on 439 of 439; exact steps 348 the cue's mouth, 8 a blink, 0 anything else; 72 exact fade steps read 40.0 ms. Reduced motion: 439 speaking steps, 0 not `a1` held, 0 with a `mouthBy`.
+- 2026-11-01, the same run: the 149-frame runs (MAN-9428, MAN-9430) each end `0 draws changed before the nextAt they were promised`; the 158-frame brow runs (MAN-9429) end `0 checks FAILED`; her head's run ends `ALL PASS`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceFader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceTurn.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
 
@@ -10131,6 +10233,7 @@ Her mouth is the baked mouth of the TIMED SHAPE her server found in her own audi
 | under 0.035 | `closed` |
 | 0.035 up to 0.12 | `half` (frame `1`) |
 | 0.12 and over | `full` (frame `2`) |
+- The 0.035 is `HALF_OPEN_AT`, exported: `faceHead.ts` reads it as the floor of her voice's strength (MAN-9434).
 - Opens upward at the threshold, closes or narrows only 0.01 below it (0.025 and 0.11): a level resting on a threshold never flickers.
 - A mouth shown holds at least 50 ms before it changes. Returns `previous` itself when nothing changes. `MOUTH_CLOSED` has `since` −∞, so the first change is never held.
 - Frame = `moods[mood].mouths[<vowel><1|2>]`, or `closed`. This mouth fills in wherever the exact mouth has no shape.
@@ -10186,6 +10289,8 @@ Her mouth is the baked mouth of the TIMED SHAPE her server found in her own audi
 - A page that plays her voice takes the mood when a sentence STARTS sounding (a smaller `elapsed`, or different words, is a new sentence). A page with no voice takes it from `newestMood` as the sentence arrives. A sentence with no word is neutral, so it clears the last one's face.
 - A new turn begins neutral unless a sentence still sounds.
 - Holds 2.5 s after the turn has ended and her voice has stopped, then eases to neutral (`move: 'eased'`).
+- The brows' hold (`faceBrows.ts`, MAN-9429) is read beside it from the same `playing`: a question that has just stopped sounding lifts `brows[mood]` for the mood this hold still wears, for 1200 ms, which ends inside the 2.5 s; it never changes the mood, and the mood's own ease back to neutral is the one the lift's end uses (300 ms).
+- The warm spell (`faceWarmth.ts`, MAN-9430) needs the mood neutral: while the hold wears a mood, its 2.5 s after her voice stops included, no spell begins and its 25–60 s count has not started; the count starts at the first still step after the ease back. A spell wears `mood.gentle.closed`, a face the hold never sets, and the next sentence ends it.
 
 ## Proof
 Her real voice through the level mouth, the sounds and the mood hold on the live page, 2026-10-30 (mouth against the audio's loudness r 0.72 to 0.82 at a 150 ms lag; a giggle clip of four frames against a real giggle of 0.1 s to 0.85 s): MAN-9254.
@@ -10525,7 +10630,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-doors.mjs
 
 ## MAN-9254 — src/modules/companion — Proof — .verify/kaylee-face-whole.mjs: her face, whole and live (one typed turn, her disc, mood, mouth, giggle and shrink)
 
-Her face, whole and live: ONE typed turn on the dev account `verve` (account 1), :5183 at 1440×900, her model on Haiku, the page's voice switch on and this page holding the floor. `node --import tsx .verify/kaylee-face-whole.mjs`; PASS/FAIL per line, exit 1 on any FAIL. Gitignored (`.verify/`). Files: `.verify/kaylee-face-whole.mjs` (the steps and the checks), `.verify/lib/kaylee-face-whole-kit.mjs` (the speech store, a synthetic voice, the reading of frame names, the ffmpeg calls), `.verify/lib/kaylee-face-whole-capture.mjs` (the screen capture). The scene is `openLiveScene` (MAN-9130). What is proved: MAN-9125, MAN-9129, MAN-9240.
+Her face, whole and live: ONE typed turn on the dev account `verve` (account 1), :5183 at 1440×900, her model on Haiku, the page's voice switch on and this page holding the floor. `node --import tsx .verify/kaylee-face-whole.mjs`; PASS/FAIL per line, exit 1 on any FAIL. Gitignored (`.verify/`). Files: `.verify/kaylee-face-whole.mjs` (the steps and the checks), `.verify/lib/kaylee-face-whole-kit.mjs` (the speech store, a synthetic voice, the reading of frame names, the ffmpeg calls), `.verify/lib/kaylee-face-whole-capture.mjs` (the screen capture). The scene is `openLiveScene` (MAN-9130). What is proved: MAN-9125, MAN-9129, MAN-9240. The face it draws is the account's pick (`GET /api/companion` `.face`), whichever look that is; the probe never picks (MAN-9416).
 
 ## Modes
 | flag | her speech route | Gemini |
@@ -10541,7 +10646,7 @@ Her face, whole and live: ONE typed turn on the dev account `verve` (account 1),
 - Closing the set (`closeSet`) also points `/tmp/kaylee-face-whole.<CLAUDE_CODE_SESSION_ID>` at it and copies it to `.verify/shots/kaylee-face-whole/audio/`. The pointer is never written before the set is whole, so a run that dies early leaves the last set found; a session with no id writes no pointer (a bare shared name is never used).
 - `--replay` with no directory reads this session's pointer, then the kept copy, so any session finds the set; with neither it stops and says where it looked and that the no-flag run is the live one. The live set of 2026-10-30 is `/tmp/kaylee-face-whole-YW5MxQ`, kept at `.verify/shots/kaylee-face-whole/audio/` (2 sentences: 142,080 and 351,360 bytes).
 - `readSet` checks every sentence file against `turn.json`'s byte count (a cut or replaced file is refused, named) and the replay's gate pairs only a turn whose sentences (index, text, mood, sounds: the mood rides into the synthesis as its style) are the saved ones; another wording is a turn "not as asked" (204, sent again). A replay's PASS is therefore for the sentences the audio was made for.
-- Evidence in `.verify/shots/kaylee-face-whole/` (live), `…-replay/`, `…-rehearse/`: `timeline.txt` (the frame names beside each sentence), `recording.json` (every frame the recorder took), `audio-clock.json`, `disc.webm` (the page recording cut to the disc, 3×), `strip.png` (stills of it, each captioned with the disc width and frame names the recorder says she drew then), `card-original-idle.png`, `settings-voice-companion.png`, `full.webm`, `capture.json`.
+- Evidence in `.verify/shots/kaylee-face-whole/` (live), `…-replay/`, `…-rehearse/`: `timeline.txt` (the frame names beside each sentence), `recording.json` (every frame the recorder took), `audio-clock.json`, `disc.webm` (the page recording cut to the disc, 3×), `strip.png` (stills of it, each captioned with the disc width and frame names the recorder says she drew then), `card-picked-idle.png` (the card with the look she wears), `settings-voice-companion.png`, `full.webm`, `capture.json`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-face-whole-capture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-face-whole-kit.mjs
 
@@ -10564,8 +10669,9 @@ section: src/modules/companion — Proof — .verify/kaylee-face-whole.mjs: her 
 - The giggle: `clip.giggle.0`–`3` and `data-motion="giggle"` play within 400 ms of where `faceMouth.ts`'s `soundAt` puts the sound.
 - The hold: after her voice ends, the last sentence's mood stays; neutral begins fading in no sooner than 2.4 s after, and is the base within 3.2 s.
 - Her face asks the server for its manifest and its sheets and nothing else (`performance` resource list, the buffer widened by `keepEveryResource`).
-- Settings > Voice > Companion: "The original face", the portrait at 96 px idle, Upload a photo and See every frame, no Restore, no bake; no console error.
-- A magenta marker is shown in the page's corner at a known epoch moment at the start of each turn and taken down at its end, with 500 ms between; the recording is decoded in order (it has no index to seek by: a seek lands where it likes) and the LAST marker's onset ties the recording's clock to the page's. A marker put up in the same frame the last one came down is one run, not two.
+- The pick: `picture.face.avatar` names a look of `picture.face.avatars` that is made (`bake` null), and the face her pages draw (`face.id`) is that look's `faceId`. The probe reads the account's pick, whichever look it is, and never picks.
+- Settings > Voice > Companion: the card's `data-companion-face` is that look's key and its line the look's label; the portrait 96 px, idle; the buttons Upload a photo and See every frame, and Remove your photo while the `own` look is among `avatars`; no band row; no console error.
+- A magenta marker is shown in the page's corner at a known epoch moment at the start of each turn and taken down at its end, with 500 ms between; the recording is decoded in order (it has no index to seek by: a seek lands where it likes) and the LAST marker's onset ties the recording's clock to the page's. A marker put up in the same frame the last one came down is one run, not two. `lastMarkerOnset(video, length)` is exported; `lib/head-whole-capture.mjs` ties the head whole's recording with it (MAN-9443).
 - The recording is finished by closing the page (`scene.beforeClose`, MAN-9130), then `video.saveAs`.
 - ffmpeg is the newest `ffmpeg-<revision>` under `PLAYWRIGHT_BROWSERS_PATH` (else `~/.cache/ms-playwright`), asked for before the paid turn.
 - The cost line: the probe counts what its speech route answered, per request `via` `'server'` (it went to :3011, whose journal line `[companion] speech <turn>/<index> … (gemini)` is the Gemini call; her speech counts against no Gemini budget, so no plan ledger holds it) or `'files'`. A replay or rehearsal checks that none went to :3011.
@@ -10582,7 +10688,7 @@ section: src/modules/companion — Proof — .verify/kaylee-face-whole.mjs: her 
 - Sentence #0 "As a voice test only: the build is green." no mood, sounds +2987 to +5947 ms (2.96 s). Sentence #1 `[delighted] <giggle>@0` "That's the test line, not a status, since Cerberus still shows 22 checks failing." +5956 to +13276 ms (7.32 s).
 - Disc: 28.00 px in 91 frames; first active state (`thinking`) +136 ms after Enter; 115 px at +419 ms; 114.6 to 115.0 px over 591 frames; her voice ended +13252 ms; shrink began +2667 ms and was 28 px at +2883 ms after it.
 - #0: `mood.neutral` frames, 7 mouth shapes, r 0.82 at a lag of 150 ms. #1: delighted on screen +396 ms into the sentence (it opens with the giggle, whose clip plays first), 7 shapes, r 0.72 at 150 ms; `clip.giggle.0`–`3` first at +163 ms, `data-motion="giggle"` from +63 ms. Neutral began fading in 2600 ms after her voice ended and was the base at 2933 ms.
-- Her face asked for `manifest`, `sheet/0`, `sheet/1` of the original (`cc2f923d4798-fdd4ed41`).
+- Her face asked for `manifest`, `sheet/0`, `sheet/1` of Dark hair, the house's `original` (`cc2f923d4798-fdd4ed41`, its face as made then).
 - The saved audio: the giggle sounds from about 0.1 s to 0.85 s of sentence #1 (loudness bursts at 5 a second); the clip's four frames (12 fps) cover 0.16 s to 0.5 s of it, and the mood's face, its mouth following the loudness, carries the rest.
 - The mouth's openness, read from `data-frame`, trails the audio's loudness by about 150 ms (the level mouth's 60 ms crossfade, 50 ms dwell and the analyser's 43 ms window).
 - `--replay` ran the same turn with every speech request answered from files (none reached :3011): ALL PASS.
@@ -15302,10 +15408,12 @@ The proof of her exact mouth on the page: the app's own `CompanionAvatar` mounte
 
 ## Run — `node .verify/kaylee-mouth-page.mjs`
 - Needs the dev stack: client :5183, server :3011. Gitignored (`.verify/`). Prints `PASS|FAIL <leg> — <detail>` per leg, ends `ALL PASS` or `SOME FAILED`; exit 1 on any FAIL.
+- First line: `face <id> (<label of the look worn>); <n> recorded pieces, …`. `.verify/kaylee-avatars-whole.mjs` reads the id from it (MAN-9446).
+- Both sign-ins pass `project: false` (no project selected, no `simpleChatList: false` PATCH): the stage needs the app's modules and the account.
 - `KAYLEE_MOUTH_SAMPLES=<file>` writes every recorded frame as JSON.
 
 ## What it mounts
-- `CompanionAvatar` on her original face at 115 px (the disc's active size on a 1440 px window) and at 512 px (the station portrait's largest square), on ONE voice: her saved sentence 1 (`.verify/shots/kaylee-face-whole/audio/sentence-1.pcm`; text, mood and sounds from `turn.json`) played through the app's own `createPcmPlayer` (the page's audio clock). `level` is the player's, `mouth` the app's own `createMouthPieces().of`.
+- `CompanionAvatar` on the face her picture names (`GET /api/companion` `.face.id`: the look he picked, Dark hair's until he picks) at 115 px (the disc's active size on a 1440 px window) and at 512 px (the station portrait's largest square), on ONE voice: her saved sentence 1 (`.verify/shots/kaylee-face-whole/audio/sentence-1.pcm`; text, mood and sounds from `turn.json`) played through the app's own `createPcmPlayer` (the page's audio clock). `level` is the player's, `mouth` the app's own `createMouthPieces().of`.
 - The recorded pieces (`.verify/fixtures/kaylee-mouth-sentence-1.json`) reach the store through the app's own `isMouthFrame` and `hear` when the audio reaches 1.4 s.
 - Every animation frame's `data-frame`, `data-frame-over` and `data-mouth` on both portraits is recorded with the audio's place (`progress().elapsed`).
 - `.verify/lib/mouth-page-stage.mjs` is the browser's half: `mountStage(page, { hostId, faceId, sizes, spec })` loads `CompanionAvatar.tsx`, `pcmPlayer.ts` and `mouthPieces.ts` from the served app, mounts one portrait per size and installs `window.__play(turnId)`, which plays the sentence and answers every frame's stamps. The driver holds the judging.
@@ -15318,7 +15426,7 @@ The proof of her exact mouth on the page: the app's own `CompanionAvatar` mounte
 | the giggle, per size | clip frames only in the sentence's first 0.6 s: a piece landing mid-sentence does not replay it |
 | `data-mouth` writes, per size | 3 to 5 writes, each a change |
 | cues, per size | each cue's mood mouth (`MOUTH_OF_SHAPE`, written out in the probe and not read from the app) is on screen by the animation frame after the audio reaches it, and `data-frame` within 40 ms plus one frame; a cue inside a blink or the giggle's clip is measured from after it |
-| the two sizes | draw the same frame names at the same animation frames while `exact` (blink and giggle windows left out) |
+| the two sizes | draw the same frame names at the same animation frames while `exact`; left out: blink and giggle windows, and a frame that came over 35 ms (`STALL_MS`) after the one before (crossfade is 40 ms: a late frame sees one size's fade done and the other's next cue begun); fails unless the compared frames are at least 40% of the samples |
 | reduced motion, per size | `a1` held, no crossfade, no `data-mouth` |
 | the store | refuses a malformed frame, a piece heard again replaces itself, three turns are kept, Clear forgets |
 | errors | the page logs nothing |
@@ -15673,3 +15781,555 @@ Every name, where, description, path, invocation and runs-as goes through `clipL
 - Live, 2026-10-31, `node .verify/companion-eyes-ask.mjs "Which of the house's agents handles security, and how would a session launch it?"` with her on haiku: she called `lookup_skills {"scope":"security"}` (one line, argus), then `lookup_skills {"scope":"argus"}` (the pointer), and said "Argus handles security and PII… A session launches it with the Agent tool, using subagent type "argus"." She reached the tool from its TOOLS line alone.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/skill-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-skill-reads.mjs
+
+## MAN-9428 — src/modules/companion — her blink: faceBlink.ts, the frames a blink closes, the rhythm of each state, the blink a move carries, the replay's blink runs
+
+`src/modules/companion/utils/faceBlink.ts` is pure code (no browser, no timer): which frame a blink shows over the look she holds, when the next one is due, and the blink a move of her eyes or head carries. `faceEngine.ts` composes it and owns the clock (each deadline here is a `nextAt`). The rhythm table and the draws are `faceSchedule.ts`. The engine: MAN-9238. The 34 frames it plays: MAN-9233. The manifest's `blinks`: MAN-9242.
+
+## What a blink closes — `FaceLook`
+| look | `FaceLook` | half and closed | open |
+|---|---|---|---|
+| a mood's face | `{ kind: 'mood', mood }` | `moods[mood].blink` | `moods[mood].mouths.closed` |
+| her listening face | `{ kind: 'listening' }` | `blinks.listening` | `states.listening` |
+| a gaze: a glance, a state's eyes, the sweep, the search | `{ kind: 'gaze', gaze }` | `blinks.gaze[gaze]` | `gaze[gaze]` |
+| a turned head | `{ kind: 'pose', pose }` | `blinks.poses[pose]` | `poses[pose]` |
+- The engine's look, first match: `listening` presence ⇒ listening; a turn ⇒ the pose; a state that looks somewhere ⇒ its gaze; a glance landed ⇒ its gaze; else the mood (`cut`: neutral).
+- Exports: `FaceLook`; `blinkFramesOf(manifest, look)` (null when the face has none); `blinkNames(manifest)` (`[index, name]` pairs for `frameNames`); `stillFrameOf(manifest, look)`; `createBlinker(random)`.
+- Names: `blink.<mood>.<step>`, `blink.listening.<step>`, `blink.gaze.<gaze>.<step>`, `blink.pose.<pose>.<step>`; `<step>` is `half` or `closed`. The names say `pose`, the manifest key is `poses`.
+- A `blinks` that is a record but not whole: `blinkFramesOf` returns null and `blinkNames` names what the table holds, never a throw. The page's `isManifest` refuses it first (MAN-9404).
+
+## The blink
+- Steps, hard swaps into and out of it: half 40 ms, closed 50 ms, half 40 ms. A double is two with the look's open frame 90 ms between; 15% are doubles.
+- The gap after a blink is drawn when it starts, from its end, in the state's range (`BLINK_GAP_BY_STATE`, ms):
+
+| state | gap |
+|---|---|
+| `idle` `asleep` `loading` `walking` | 2800–6500 |
+| `speaking` | 2000–4500 |
+| `listening` | 2500–5500 |
+| `thinking` `waking` | 2200–5000 |
+| `transcribing` `drafting` `reading_session` `reading_code` | 4500–9000 |
+| `failed` | none: she does not blink |
+| `cut` | none: one plain blink (neutral's) from 250 ms in (`single`), on a step that begins no fade (no state or mood change, not the hold's end) and with none running |
+- A change of state draws the next gap from the new state's range, counted from the change (`enter`), and counts as the last blink's end for a blink that carries a move.
+- A scheduled blink starts when it is due and the step is `free`: it changed neither state nor mood, no clip plays, no crossfade runs, no question's brows are lifted (MAN-9429) and the step is not the one their hold ends on (the ease back begins there), motion is on, and while she speaks the mouth is closed (X and A are). A held look, a turn or a glance in play do not stop it.
+- A blink that falls due in a face that cannot blink lapses and is renewed from when it was due (`dueAt`, `renew`): the schedule is the same however often the page stepped.
+- `inBlink(now)` counts a blink whose last step ended since the last ask, so the step out of it is a hard swap.
+- `openUnder(now, manifest): number | null` answers the open-eyed frame (`stillFrameOf`) of the look the blink in play was last drawn over by `frame`, every step of it counted (the open one between a double's two blinks too), and counts a blink whose last step ended since the last ask (`inBlink`'s test). Null when none is in play or its first step has not been drawn. Asking retires nothing.
+  - `faceEngine.ts` reads it once at each step's start, before a state change, the lift or a mood change cuts the blink. A fade that begins on that step shows the frame at once and fades from it (MAN-9432: a blink and a fade never overlap).
+  - `frame` keeps the look it draws a blink frame over for it; `begin` and `single` forget it.
+- Reduced motion: none.
+
+## The blink a move carries — `carry(now)`
+- A move of her eyes or head (a sweep turn, a search step, a glance's start or end, a turn level) asks `carry(now)` and lands at the answer: now, or the start of the closed step of the blink it starts.
+- It starts one 40% of the time (`CARRY_SHARE`), never sooner after the last blink's end than the state's shortest gap (`carryApartMs`: the low end of the table above; a state with no range has no blink to carry). So a move decides WHEN inside the state's rhythm a blink lands and never how often she blinks: every gap before a blink, carried or scheduled, is inside the table's range, and she blinks seldom while she reads (the sweep's moves, one every 1.3 s, add no blink of their own).
+- A move that falls in a blink already in play lands under its closed lids. A step that runs so late that the whole closed step (90 ms into the blink) has passed finds the blink in its second half and draws that, so on a loaded page a blink may lose its closed step and a move may land in the second half.
+- A carried blink counts as the scheduled one: it draws the gap after it.
+- The engine asks `carry` only where a blink would cut no fade of a change of her face: `landing()` answers now, no blink carried, in a clip, in the brows' hold, on a step that moves the mood or ends the hold, and while a state's or a mood's fade (`bigFadeEndsAt`) runs, and on a face made before `blinks` and under reduced motion. A carried blink can cut only a glance's or a turn level's 140 ms step (MAN-9432).
+- The caller keeps no landing time: it asks `landing() <= now` each step until true (`eyes !== wanted && landing() <= now`).
+- 2026-11-01, 12 seeds × 600 s of the reading sweep: 712 of 5532 turns (13%) carried a blink with the closed step on the swap; 746 of the 1685 turns not within 4500 ms (`reading_code`'s shortest gap) after a blink (44%); a carried blink started 4500–8967 ms after the last.
+
+## A face made before `blinks`
+`legacy = manifest.blinks === undefined` in `faceEngine.ts`: one range, 2800–6500, for every state; a blink only in a resting state or while speaking, with no glance, turn or held look; no carried blink; seeded draws in the old order. The fade rule of MAN-9432 reaches it: a blink and a fade never overlap, so its mood and state fades start from her open eyes too.
+
+## Proof — `TSX_TSCONFIG_PATH=tsconfig.json node --import tsx .verify/kaylee-face-replay.ts`
+- `.verify/lib/face-replay-kit.ts`: what every replay shares. `bakeManifest(withBlinks?, withBrows?)` is the manifest in the bake's frame order: 115 frames, 149 with `withBlinks` (the blink frames after the clips, mood indices equal the recipe's), 158 with both (the `brow.<mood>` frames after the blinks). `run` steps the engine 60 times a second, prints a line per change of draw and checks that none changes before its promised `nextAt`.
+- `.verify/lib/face-replay-blinks.ts` also exports the readers of a run's frame names (`blinksOf`, `carriedBy`, `eyeOf`, `sweepTurns`, `inputOf`, `range`, `share`) to `.verify/lib/face-replay-eyes.ts` (MAN-9430).
+- `.verify/lib/face-replay-blinks.ts`, `runBlinkRuns()`, called by `kaylee-face-replay.ts`, on the 149-frame manifest: listening 20 s; `reading_code` 15 s with a look held and with none; idle 60 s (glances); 12 seeds × 600 s of sweeping; every state's rhythm, 300 s each (the gap before every blink, carried ones too, against the range; blinks a minute; frames against the look's family; the share of doubles; her reading states blinking the fewest and her speech more than rest and listening); reduced motion over four plays.
+- 2026-11-01: exit 0; every run ends `0 draws changed before the nextAt they were promised`.
+  - listening 20 s: 5 blinks, all `blink.listening.*`, gaps 2550–4600 ms inside 2500–5500.
+  - `reading_code`, look held: 4 blinks, 2 on `blink.pose.left_20`, every blink frame a frame of the look beside it.
+  - idle 60 s: 7 glances started, 4 under a blink's closed step; 6 ended, 4 under one.
+  - rhythm: every state's gaps, carried blinks too, inside its range, on its look's frames; doubles 120 of 770 (16%). Thinking and waking blink over the search's four gazes (`blink.gaze.up_right|up|up_left|right.*`), idle over its mood's, its glances' gazes and, in a warm spell, gentle's (MAN-9430).
+  - blinks a minute, seed 7 and up, 300 s: idle 12.2, asleep 14.0, loading 12.6, walking 12.6, listening 14.2, speaking 18.4, thinking 17.6 (29 carried), waking 17.2 (29 carried), transcribing 8.2, drafting 8.6, reading_session 9.0 (19 carried), reading_code 9.4 (30 carried): her reading states at most 9.4, every other state at least 12.2.
+  - reduced motion: 0 blink, sweep and glance frames in all four plays; a held look shows `pose.left_20`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBlink.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-blinks.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-kit.ts
+
+## MAN-9429 — src/modules/companion — her brows: faceBrows.ts, the rule at the end of a question, the hold, reduced motion, the replay's brow runs
+
+`src/modules/companion/utils/faceBrows.ts` is pure code (no browser, no timer): whether her brows are lifted now and when the hold ends. `faceEngine.ts` composes it beside the mood hold (MAN-9239), draws the frame and owns the clock: the hold's end is a `nextAt`. The 9 frames it plays, `brow.<mood>`: MAN-9233. The manifest's `brows`: MAN-9242. The engine: MAN-9238. `faceNames.ts` holds `frameNames` (the engine re-exports it, so no import changed), which names `brow.<mood>`.
+
+## The rule — `createBrowHold().read(now, playing, state)` → `{ lifted, nextAt }`
+- On a page that plays her voice: when the sentence that was sounding stops sounding (the player's progress no longer names it, so `FaceInput.playing` is null) and its text ends in a question mark (`QUESTION_END`, `/\?["'”’)\]\s]*$/`: a closing quote, bracket or space may follow it), her face shows `brows[mood]` (the mood the face wears at that step) with a 140 ms fade. The fade begins from her open eyes: a blink in play when the question stops is cut, and `blinker.openUnder` (MAN-9428) names the open-eyed frame under it, shown at once (0 ms) before the 140 ms fade starts (MAN-9432).
+- It holds until her next sentence starts sounding or 1200 ms pass, then eases back over 300 ms (the mood's own ease). The step the hold ends begins that ease and starts no blink. It lives through the step from speaking to rest (`speaking`, `idle`, `asleep`, `loading`, `walking`) and ends at any other state, into that state's own 180 ms fade.
+- A sentence that follows at once leaves no time for it: `playing` goes from one sentence to the next with no step between, so no lift begins. A page that plays no voice has no `playing`, so no moment a question ends, and shows none. A face without `brows` shows none: the engine does not ask the hold.
+- A held look that turns her head shows the turned pose instead (a brow frame faces front); the hold still ends at its deadline.
+- It takes no blink: while it holds, the blinker sees the face as not free, a blink in play is dropped, no move of her eyes or head carries one and no glance begins. A blink that fell due in the hold fires once the ease back is done (the fade's end is its deadline); a glance that fell due meanwhile is made after it. A clip in play (a sound at the question's end) is drawn over it.
+- Why a question: it is the one place in her speech where an expression reliably belongs and where her mouth is closed, so one closed-mouth frame per mood gives it. Brows on a stressed word would need brow frames for every mouth in every mood.
+
+## Reduced motion
+- A lifted brow is a look, so it still shows, swapped with no fade, held for the same 1200 ms.
+
+## Proof — `runBrowRuns()` of `.verify/lib/face-replay-brows.ts`, called from `kaylee-face-replay.ts`
+- On the 158-frame face (`bakeManifest(true, true)` of `.verify/lib/face-replay-kit.ts`), each run keeping its check that no draw changes before the `nextAt` it was promised: "Want me to send it?" ending into silence (`brow.delighted` 0 ms after the end, held 1200 ms, 0 blink frames in 90 draws from the lift to the ease's end, counted as a draw's target or its base (a blink in play when the sentence stops is cut and the lift fades in from her open eyes), the lift 140 ms and the ease back 300 ms read from alpha); the question in each of the nine moods (each its own `brow.<mood>`); the same text followed at once by another sentence (0 brow draws of 444); followed after half a second of silence by a short "Yes." (the lift 500 ms, ending at the next sentence, and 0 brow draws after the short sentence ended); a new state with no clip of its own, `thinking`, 400 ms after the end (the lift 400 ms, 0 brow draws from the state's first step on: listening's nod clip is drawn over the brows, so it could not show the hold had ended); reduced motion (`brow.delighted` at the end step, no draw with a fade); a page with no voice and a face with its `brows` taken out (none). `QUESTION_END` on eight real strings. 2026-11-01: 0 checks FAILED, 0 draws changed before their `nextAt`.
+- On the live page: `node .verify/kaylee-brows-page.mjs` mounts the app's own `CompanionAvatar` at 115 px and 512 px on the made face (`GET /api/companion` names it), on one voice playing her saved sentence 1 through the app's own PCM player with the log text ending in a question mark (`lib/mouth-page-stage.mjs`, recording 1.9 s past the audio's end). 2026-11-01, ALL PASS: at both sizes `brow.delighted` drawn toward 23 ms after the audio's end and never while she speaks, held 1205 ms, then `mood.delighted.closed`; the same sentence with a full stop draws no `brow.*` in 264 animation frames; under reduced motion the lift shows 23 ms after the end for 1182 ms with 0 animation frames of a fade; two stills of 512 px in `.verify/shots/kaylee-brows/`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBrows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceNames.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-brows-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-brows.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mouth-page-stage.mjs
+
+## MAN-9430 — src/modules/companion — her eyes' search and her warm spell: faceEyes.ts, faceWarmth.ts, the sweep, the idle smile, the replay's eyes runs
+
+`faceEyes.ts` and `faceWarmth.ts` (`src/modules/companion/utils/`) are pure code (no browser, no timer): where her eyes are while she looks somewhere with her head still (the reading sweep, thinking's search), and the warm spell at rest. `faceEngine.ts` composes them and owns the clock (each deadline here is a `nextAt`). The engine: MAN-9238. Her blink and the blink a move carries: MAN-9428. Every frame they draw is baked already (`gaze.*`, `mood.gentle.closed`, the blinks): MAN-9233.
+
+## Her eyes — `createStateEyes(random, searches = true).gaze(now, state, since, still)`
+`EYES_OF_STATE` and `SWEEP_CYCLE_MS` live here (they left the engine). Answers `{ gaze, nextAt }`, or null for a state with no look of its own.
+| state | her eyes | they move |
+|---|---|---|
+| `transcribing` | `gaze.down` | never |
+| `drafting` | `gaze.down_right` | never |
+| `reading_session`, `reading_code` | the sweep: `gaze.down_left`, `gaze.down_right`, a cycle every 4.4 s and 2.6 s, counted from `since` | each half cycle |
+| `thinking`, `waking` | the SEARCH: she begins on `gaze.up_right` (where thinking looked before), then every 1200–2600 ms moves to another of `up_right`, `up`, `up_left` and `right`, never the one she is on | at the end of each hold |
+- `since` is when the state began. `still` is `reduced || lookHeld` (the engine's): the state's one gaze (thinking and waking `up_right`), `nextAt` null; a held look's turn wins, as before, and the search begins again from `up_right` with a fresh hold once the look is gone.
+- `searches` is false for a face made before `blinks` (`legacy` in the engine): thinking and waking keep `up_right` and draw nothing from the random; the sweep is every face's.
+- A move that falls due while no one asked (a hidden page) is made at the next call, so the search is the same however often the page steps. Draws, in order: the next gaze (of the three others), then its hold.
+- The engine lands each move now, or at the closed step of a blink that carries it (`landing() <= now`, MAN-9428): 40% of the moves, never sooner than the state's shortest gap (MAN-9428) after the last blink's end.
+- Under reduced motion neither sweep nor search runs.
+
+## The warm spell — `createWarmth(random).read(now, eligible)`
+- In IDLE, with the mood neutral, no look held, no head turned, no glance in play, motion on, on a face made with `blinks`; the engine builds `eligible` from those and from this: a spell BEGINS only on a still face (a step that changed neither state nor mood, no blink, no crossfade), and once begun it holds through her blinks.
+- Her face while `warm` is the mood's face of `gentle`: `mood.gentle.closed` (a small smile and softer eyes added to the photo's own), blinking on `blink.gentle.*`. It eases in and out over 300 ms, as a mood eases back to neutral (`EASE_MS`), always from her open face, by the engine's rule for every fade (MAN-9432): a fade cuts a blink in play and begins from the open-eyed frame under it (`openUnder`, MAN-9428), never from the blink's half-lidded frame. A spell whose time is up in a blink waits for it to end (a double is 350 ms) and then eases back, so the smile never changes under half-open lids: `warm = spell.warm || (warmWas && blinker.inBlink(now))` in `faceEngine.ts`.
+- Every 25–60 s, counted from the first step the face is eligible and then from each spell's end; it holds 3–6 s, counted from the first gentle draw (the ease-in begins) to the first draw of the ease-out, so her face is fully gentle for 2.7–5.7 s, and a blink in play at its end holds it up to 360 ms more. `nextAt` is the spell's start while it waits and its end while it holds.
+- A change of state ends it: the engine makes a new `createWarmth` as each state begins, so the count starts again in the next idle. It also ends the moment the face stops being eligible (a look, a mood, reduced motion).
+- No glance starts in a spell, and one that falls due meanwhile lapses and is renewed from when it was due, as a blink or glance does in a face with no frames for it.
+- A spell that fell due waits up to 2 s for the face to be eligible (a glance holds up to 1.1 s, a held look or a mood's hold may end inside that), and starts when it is; a spell more than 2 s overdue lapses and is drawn again from when it was due, on whichever step finds it so late, eligible or not — a held look that outlasts the date, a page waking from sleep, reduced motion turned off — so none of those begins a smile at once. A spell begins only on a still face: no change of state or mood in the step, no blink, no crossfade, no lifted brow.
+- Asleep, loading, walking, speaking and every other state: none, and a face made before `blinks`: none, with no draw from the random.
+
+## Proof — `runEyesRuns()` of `.verify/lib/face-replay-eyes.ts`, called by `kaylee-face-replay.ts`, on the 149-frame face with `blinks`
+- 15 s of thinking and of waking; thinking with a look of dx −300 held; 12 seeds × 600 s of the search (walked at `createStateEyes`' own deadlines, and played by the engine); 120 s of idle (seed 6, which draws three spells; seed 7 draws one at 60 s), of walking, and of idle with a look held; a change of state 1.5 s into a spell; 12 seeds × 600 s of idle; reduced motion over thinking, waking and idle; the 115-frame face. Each keeps `run`'s check that no draw changes before the `nextAt` it was promised.
+- 2026-11-01, exit 0, every run `0 draws changed before the nextAt they were promised`:
+  - search: every gaze one of the four, from `up_right`, holds 1483–2583 ms in 15 s; over 12 seeds × 600 s walked: 3789 moves, 0 to the gaze she was on, 0 outside the four, 3789 holds, 0 outside 1200–2600 ms; played by the engine: 18% of 3788 moves carried a blink with its closed step on the swap, 48% of the 1585 not within 2200 ms (thinking's shortest gap) after a blink; a carried blink started 2200–5000 ms after the last; every blink frame in thinking on `blink.gaze.*`; the same inputs and seed draw the same frames.
+  - look held: 240 steps turned, all `pose.*` or a blink over one; after the look, `up_right` first.
+  - idle 120 s (seed 6): spells at 48.2, 84.2 and 116.4 s, 3.6–3.8 s long, 28.6–48.2 s apart (the first counted from the state's start), eased in and out in 300–317 ms (none begun on a blink's frame), 16 blink frames inside, all `blink.gentle.*`, 0 glance frames inside; walking: 0 gentle frames; a look held 10–70 s: 0 gentle frames while it held; a change of state 1.5 s into a spell: 0 gentle frames after.
+  - 12 seeds × 600 s of idle: 149 spells, 0 of the 148 ended ones outside 3–6 s (3017–6000 ms), gaps 25183–60117 ms (0 outside 25–60 s allowing 2 s for a glance in play and 360 ms of a blink's hold), every ease-in and ease-out 300–317 ms, 0 cut short by a blink and 0 begun on a blink's frame, 1212 blink frames inside, 0 not on `blink.gentle.*`, 0 glance frames. A verdict that counts something says NO when it counted nothing: a search that never moves or a spell that never begins fails the run.
+  - reduced motion: thinking and waking draw only `gaze.up_right`, idle only `mood.neutral.closed`: 0 blink, 0 gentle frames.
+  - the 115-frame face: thinking draws `gaze.up_right` only and idle never smiles; its seven runs and the head's run print what they printed before (diffed against the output kept before the change: nothing).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEyes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceWarmth.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-eyes.ts
+
+## MAN-9434 — src/modules/companion — her head while she speaks: createHeadMotion, FaceDraw.head, stampHead, --kaylee-bob and --kaylee-roll
+
+Her head moves in the picture's plane while she speaks: a bob (the layer's `translate` y) and a roll (its `rotate`). No frame changes: her speaking frames face forward, so a nod and a roll are the head movement she can make while she talks. Pure part: `utils/faceHead.ts` (`createHeadMotion(seed)`), stepped by the engine (MAN-9238) as `FaceDraw.head`. Page part: `utils/portraitHead.ts` (`createHeadMemory`, `stampHead`), called by `CompanionPortrait` (MAN-9223) on every step. Rules: INV-10600 (the portrait's: INV-10257). Proof: MAN-9435.
+
+## `FaceDraw.head: FaceHead | null` — `faceHead.ts`
+`FaceHead = { bob, roll }`: `bob` in % of the layer's own height (positive is down), `roll` in degrees (positive clockwise). Null at rest.
+| `HeadInput` | |
+|---|---|
+| `now` | the engine's clock, ms |
+| `speaking` | presence is `speaking` |
+| `level` | the player's `level()`, read on every step she speaks, with or without the exact mouth's pieces; a non-finite level reads as 0; a page that plays no voice draws no head |
+| `freshSentence` | a sentence began sounding this step |
+| `clipStarted` | a clip began this step (`!clipWasPlaying && clips.playing()`) |
+| `reducedMotion` | always null |
+- Its random draws (the side of the first roll, where the drift begins) come from its own `createRandom(seed ^ HEAD_SEED_SALT)`, so the blink and glance draws keep their order.
+- While `head` is not null the engine asks for the next frame (`wantAt(now + 1)`).
+
+## What moves her head, added together
+| part | rule |
+|---|---|
+| envelope | the level followed with an attack of 50 ms and a release of 220 ms (`ATTACK_MS`, `RELEASE_MS`); its slow average over 1200 ms (`SLOW_MS`). Strength = (envelope − `HALF_OPEN_AT`) / 0.2 (`STRENGTH_SPAN`), clamped 0..1; `HALF_OPEN_AT` = 0.035, exported by `faceMouth.ts` (MAN-9239) so the threshold has one home |
+| breath in | a sentence starts sounding: a lift of 0.6% (`BREATH_PCT`) that peaks 250 ms in (`BREATH_IN_MS`) and is settled 700 ms later (`BREATH_OUT_MS`). A sentence that starts with a clip draws none: the clip is its cue. While it lasts it takes the lift's place, never a sum: `rise = 0.6·b + 0.5·strength·(1−b)`. why: sentence 0's speech starts 200 ms in, and a sum clamps at −0.9% by 250 ms |
+| lift | her head rises with her voice: 0.5% × strength (`LIFT_PCT`) |
+| beat | where the envelope crosses upward over max(1.5 × its slow average, 0.08) (`BEAT_RATIO`, `BEAT_FLOOR`): a nod down 0.7% in 90 ms and back in 260 ms (`NOD_PCT`, `NOD_IN_MS`, `NOD_OUT_MS`), with a roll of 0.7° over 450 ms (`BEAT_ROLL_DEG`, `BEAT_ROLL_MS`) whose side alternates. A crossing, not every step above it. None within 320 ms of the last beat or of a sentence's start (`BEAT_GAP_MS`): the breath in or the clip owns that moment |
+| drift | a roll of 1.0° (`DRIFT_DEG`) on a sine of 3400 ms (`DRIFT_PERIOD_MS`). It starts at a zero of the sine when she wakes, so her roll leaves rest without a snap. A new sentence moves its phase by up to a quarter turn either way, spread over 1200 ms (`DRIFT_RETUNE_MS`). why: a phase set outright snaps the roll by up to 1° in a frame |
+- Bounds on the sum: ±0.9% bob, ±1.8° roll (`BOB_LIMIT_PCT`, `ROLL_LIMIT_DEG`). `bob = shown × (nod − rise)`: a rise is negative.
+- Settle: a weight runs 1 → 0 over 300 ms once she stops (`SETTLE_MS`), back up if she speaks again meanwhile, eased (`smooth`). Under `AT_REST_WEIGHT` (1e-6) the answer is null. why: stepping 300 ms of frames leaves float dust above 0 that held the head one step late.
+
+## `stampHead(memory, faceLayer, hairLayer, lagMs, head, now): boolean` — `portraitHead.ts`
+- Writes `--kaylee-bob` (`<n>%`) and `--kaylee-roll` (`<n>deg`), to a thousandth, as inline style on each layer div (`.kaylee-portrait__layer--face`, `--hair`), only when the string changes. `portraitHead.ts` touches the nodes it is handed and is no part of the engine.
+- Face layer: the engine's answer as it comes. Hair layer: the newest history sample at least `lagMs` old (`--kaylee-lag`, 90 ms), rest before that; so the hair follows by the one lag. Both layers' variables name the same number a lag apart.
+- History: `createHeadMemory()` in a ref (`headMemory`), never React state. Every step drops the samples older than the one the hair shows, so it holds the lag's worth of steps and one more. `TRAIL_LENGTH` = 64 is a safety bound, not its length: 64 entries span 90 ms up to about 700 Hz, and above that the hair shows the oldest entry.
+- `lagMs` is read once per loop (`hairLagMs(hairCanvas)`): a computed-style read after each frame's writes forces a restyle each frame.
+- Once `head` is null and the hair's sample is null, both variables are removed from both layers and the history emptied. Returns true while it wrote or the hair still trails; the loop asks for animation frames while `draw.head !== null` or it returns true.
+- After her voice stops: `head` is null 300 ms after her last speaking step; the variables are gone 90 ms after that. Measured 2026-10-31 at 22–28 ms frames: 393 ms after her state left speaking, 400 ms after the audio's end (replay: null from 287 ms after the end).
+
+## `CompanionAvatar.css` — inside `@media (prefers-reduced-motion: no-preference)`
+- `.kaylee-portrait__layer { translate: 0 var(--kaylee-bob, 0%); rotate: var(--kaylee-roll, 0deg); }` and `will-change: transform, translate, rotate`. The individual properties compose with the lean's `transform` untouched, so its easing never smears a beat.
+- A clip's keyframes on the layer's `translate` (`kaylee-laugh`, `-giggle`, `-gasp`, `-sigh`, `-nod`): every rest stop is `var(--kaylee-bob, 0%)` (the laugh's 0%, 33%, 67%, 100%; the giggle's 0%, 50%, 100%; the other three's 0% and 100%), every lift stop absolute (−1.5% laugh, giggle, gasp; +2% sigh, nod). An animation beats the declared value, so a laugh is not doubled.
+  - A clip begins and ends where her head is, each layer on its own bob (the hair's 90 ms behind, as its clip is): by its keyframes neither layer steps at a clip's edge: the face layer never does, the hair's does only where the portrait cuts its animation short (the bullet after the next). The lift is never added to the bob.
+  - A clip with `--kaylee-bob` unset (listening's nod) rests at 0%. Chromium re-reads a keyframe's `var()` while the animation runs.
+- Measured 2026-11-01 at 512 px, the layer's translate y minus the same sample's bob at a clip's edge frame, one run with the giggle at 0 and the laugh at 36: 0.000% at the laugh's first and last frame and the giggle's last. A giggle-only run read its last sampled frame 0.078% off the bob (0.4 px): the keyframes' own ease, one stalled frame before the rest.
+- A clip the engine drops mid-run (`clear()` of the clip player: a state change, or motion off) steps from its lift to the bob. Firefox is not installed here: `var()` in a moving keyframe is unmeasured there.
+- The hair's clip is cut short in about half the runs. `CompanionPortrait`'s `stamp` takes `data-motion` off the root `hairLagMs` (90 ms) after the engine's first draw with no motion, and the hair's animation (90 ms delay, then the clip's length) starts 15–32 ms after the attribute is written, so the attribute can leave before the animation ends. Measured 2026-11-01 on the live dev stack, eight readings (two sizes of four runs): it left 5.8 to 20.5 ms before the hair animation's end in five, and 12.9 to 28.1 ms after it in three. A cut leaves the ease's remainder, a step of the hair to its bob of 0.10 to 0.125% of the layer (0.5 to 0.7 px at 512 px, 0.1 to 0.15 px at 115 px). The face layer's animation ends about 360 ms after the write, before the attribute leaves, so it is never cut. Cure, in the portrait: take the attribute off when the hair's own animation ends (`animationend`), not on a timer counted from the engine's end.
+- Rim: the bob is at most 0.9% of the layer (0.95% of the disc; 1.59% with the breath's 0.64%) against 3.32% of slack (MAN-9223 §"Layers"). Added to a clip's lift it would leave 0.14% of the slack (1.09% after the clip and the breath, less the bob's 0.95%): 0.16 px at 115 px against a painted edge's 0.7 px, so a lift stop never adds the bob.
+- Reduced motion: the head is always null, no variable is written, and the layer's computed `translate` and `rotate` are `none`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPortrait.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceHead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/portraitHead.ts
+
+## MAN-9435 — src/modules/companion — her head: proof — .verify/lib/face-replay-head.ts (the replay) and .verify/kaylee-head-page.mjs (the page)
+
+The head's two probes (`.verify/` is gitignored: on disk only). What the head is: MAN-9434; its rules: INV-10600. No Gemini, no server, no Rhubarb answer.
+
+## The replay — `runHead()` of `.verify/lib/face-replay-head.ts`
+- Runs at the end of `TSX_TSCONFIG_PATH=tsconfig.json node --import tsx .verify/kaylee-face-replay.ts` (MAN-9433), one engine, seed 7, 60 steps a second: 1 s of thinking, saved sentence 0 (2.96 s, no mood, no sound; its level the RMS of `sentence-0.pcm` over the 1024 samples the player's analyser reads), saved sentence 1 straight after (`savedInputAt`: delighted, opening on her giggle, 7.32 s), 1 s of rest. Prints `bob` and `roll` every 50 ms with the beats marked; a beat is read off the head's own answer (a step of 0.1° or more that does not continue a rise of the same direction).
+| check | rule |
+|---|---|
+| breath in | peaks near −0.6% about 250 ms into sentence 0; sentence 1's giggle draws none (its first second never rises past the lift's 0.5%); the same sentence without its giggle, from rest, draws it |
+| beats | at the level's onsets (louder than its own second before, above 0.08); never closer than 320 ms; sides alternate |
+| bounds | 0.9% and 1.8° never passed; no step moves bob more than 0.4% or roll more than 0.3° |
+| rest | `head` null within 300 ms of the sentence's end and before she speaks; `nextAt` asks for the next frame while it is not null; null for every step under reduced motion |
+| repeat | two runs on one seed print the same lines; another seed does not |
+- 2026-10-31: 737 steps; 5 beats (1 in sentence 0, 4 in sentence 1), the closest two 367 ms apart; largest bob 0.600%, roll 1.000°; largest step 0.209% and 0.222°; null from 287 ms after the sentence's end; 633 steps with a head, 633 asking for the next frame; reduced motion 0 of 737 with a head; ALL PASS.
+- `nextAt` on speaking lines of the other runs changed when the head landed (it asks for the next frame): against HEAD's engine, only 466 `nextAt` fields differed, 0 promised-deadline violations; frames, tilts and blinks identical.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-head.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-recorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-settle.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-capture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-sampler.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-face-whole-capture.mjs
+
+## MAN-9441 — src/modules/companion — her head: proof — .verify/lib/face-replay-head.ts (the — The page — `node .verify/kaylee-head-page.mjs` (the dev client on :5183 and its server on :3011)
+section: src/modules/companion — her head: proof — .verify/lib/face-replay-head.ts (the replay) and .verify/kaylee-head-page.mjs (the page)/001 The page — `node .verify/kaylee-head-page.mjs` (the dev client on :5183 and its server on :3011)
+
+- The app's own `CompanionAvatar` at 115 px (the disc's active size on a 1440 px window) and 512 px (the station portrait's largest square), on the face her picture names (the look he picked), ONE voice playing saved sentence 1 through the app's own PCM player. The stage is the mouth page's (`lib/mouth-page-stage.mjs`, MAN-9418).
+- `lib/head-page-recorder.mjs` records on every animation frame, per size: both layers' `--kaylee-bob` and `--kaylee-roll`, `data-frame`, `data-frame-over`, `data-mouth`, `data-state`, `data-motion`; every write and removal of the two variables through `CSSStyleDeclaration`; every eighth frame the face layer's computed `translate` and `rotate`. `lib/head-page-settle.mjs` (`settleOf`) judges the settle rule on the portrait's own step clock, on EVERY step it took, written or not: the recorder logs each step as a tick (`{ at, id }`, `id` the animation-frame callback that ran it, one portrait's loop, mapped to a size by the layers its writes landed on). The step that makes the head null usually writes nothing (the face already at rest, the hair holding a value); a judge that read steps off the writes took a later step for it and failed, 2 runs in about 12 on 2026-11-01, then found no step 90 ms after and crashed. A step missing is now a FAIL that prints the steps' places.
+| check (per size) | rule |
+|---|---|
+| moves | both layers' variables change on the frame while she speaks, within 0.9% and 1.8° |
+| trail | the hair's values trail the face's by 90 ms, give or take a frame; every hair write is the face's value from the newest step at least 90 ms older |
+| binding | where no clip runs, the face layer's computed `translate` is the bob (a share of the layer's own height), its `rotate` the roll, and `will-change` is `transform, translate, rotate` |
+| clip | on every frame while her giggle runs (`data-motion`, which stays on for the hair's lag after the animation ends) the layer's computed `translate` y lies between the same sample's `--kaylee-bob` and −1.5%, 0.0005 of slack; at least 3 frames sampled and 2 lifted off the bob, the others (rest stops, frames past the animation's end) on it |
+| writes | every write changes what was there; nothing is written once the variables are gone |
+| settle | `head` null at the first step 300 ms after her last speaking step; variables gone from both layers at the first step 90 ms after that |
+| reduced | under `prefers-reduced-motion: reduce`: no variable written, none on a layer, computed `translate` and `rotate` none |
+- Also: the two sizes draw the same frame names (a frame beside a stall of over three median frames is left alone and counted: one size's step can land a cue's edge before the other's, 0.3 ms apart, and the next recorded frame is a stall later, so a cue shorter than the stall is never drawn at one size); the page logs nothing.
+- 2026-11-01, the clip line (`KAYLEE_HEAD_RECORDING=<file>`): ALL PASS; at 512 px 12 frames of the giggle sampled, 8 lifted off the bob (y −1.500% to −0.578%), 4 on it (the bob there 0%, 0%, −0.395%, −0.5%), 0 outside; 115 px the same way.
+- The variables come off 393–440 ms after the audio's end in calm runs (2026-10-31, 22–28 ms frames): the head's 300 ms settle, then the hair's 90 ms trail; 400–535 ms when a frame stalls inside the settle (the judge counts from the steps that happened).
+- At the box's ordinary load (8–19) the page's own frames run 17–28 ms apart with a longest of 113–221 ms, and the first version of the page's judge failed 2 runs in 7 on a correct portrait (the frame-names line met a cue the 115 px portrait's step skipped by 0.3 ms with the next frame 110 ms away). That is the judge's tolerance, tightened in the probe; the frame-names line as tightened has not been run since (the settle judge's tick fix has: exit 0, ALL PASS, 16 PASS lines, 14 of 14 loop runs); the `trail` line's lag fit is unchanged, and under a single stall of about 650 ms (load 16–18) it has read a fit of 111 ms against 165 expected with every hair write exactly on the rule.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-head.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-recorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-settle.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-capture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-sampler.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-face-whole-capture.mjs
+
+## MAN-9442 — src/modules/companion — her head: proof — .verify/lib/face-replay-head.ts (the — 2026-10-31, box at load 20–30: exit 0, ALL PASS, 357 frames 22.8 ms apart; trail best lag 105–106 ms
+section: src/modules/companion — her head: proof — .verify/lib/face-replay-head.ts (the replay) and .verify/kaylee-head-page.mjs (the page)/002 2026-10-31, box at load 20–30: exit 0, ALL PASS, 357 frames 22.8 ms apart; trail best lag 105–106 ms
+
+- 2026-10-31, box at load 20–30: exit 0, ALL PASS, 357 frames 22.8 ms apart; trail best lag 105–106 ms against 90 ms plus the half frame these frames leave (107), squared error 0.70–0.72 against 34–35 at no lag; 402 and 401 hair writes, 0 off the rule; settle 0.00 ms from the rule at both sizes; frame names 201 of 202 identical, 1 a frame apart at a cue's edge; reduced motion 418 speaking frames, 0 writes.
+- A full run can time out mounting the stage on a loaded box: the waits use `APP_BOOT_MS` (`lib/app-load.mjs`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-head.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-recorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-settle.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-capture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-sampler.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-face-whole-capture.mjs
+
+## MAN-9443 — src/modules/companion — her head: proof — .verify/lib/face-replay-head.ts (the — The whole — `node .verify/kaylee-head-whole.mjs` (the dev client on :5183 and its server on :3011, a
+section: src/modules/companion — her head: proof — .verify/lib/face-replay-head.ts (the replay) and .verify/kaylee-head-page.mjs (the page)/003 The whole — `node .verify/kaylee-head-whole.mjs` (the dev client on :5183 and its server on :3011, a
+
+## The whole — `node .verify/kaylee-head-whole.mjs` (the dev client on :5183 and its server on :3011, account `verve`; no Gemini, no model call)
+- Her made face as the app draws it (`GET /api/companion`'s face), the app's own `CompanionAvatar` at 115 and 512 px on the head page's stage (`lib/mouth-page-stage.mjs`), saved sentence 1 on the fake voice, then 10 s at rest. A second page of the signed-in session, on a context of its own with `recordVideo` at the page's size; a magenta marker put up at a known `performance.now()` ties the picture to the sampler (`lastMarkerOnset`, `lib/kaylee-face-whole-capture.mjs`). Playwright's recording is one picture pixel per CSS pixel at any `deviceScaleFactor` (a larger factor leaves a grey margin, measured 2026-11-01), so the 115 px disc is 115 px of picture and its capture is that enlarged six times to be seen.
+- Writes `.verify/shots/kaylee-head/`: `portrait-512.webm` (512 px), `disc-115.webm` (690 px), `strip.png` (ten moments of each: rest, the giggle's lift, rolled each way, head highest and lowest, voice ends, head settled, breath at its peak and low; each tile captioned with the frame, bob, roll and breath then, and two red ticks at one height in every tile to hold her against). The probes' own output is kept beside them: `head-probe.txt`, `breath-probe.txt`, `replay-head.txt`, and the run's own `whole.txt`.
+- `lib/head-whole-sampler.mjs` is the page side (per frame: state, frame, over, motion, both layers' variables, the face canvas's computed breath `translate`, the rim margin from each canvas's real quad, every `requestAnimationFrame` her portraits ask for, the live app's own disc included), `lib/head-whole-judge.mjs` the checks, `lib/head-whole-capture.mjs` the cropping and the strip. `KAYLEE_HEAD_WHOLE_RECORDING=<file>` dumps every sampled frame.
+| check | rule |
+|---|---|
+| animation | every `.kaylee-portrait__layer canvas` on the page (the live app's disc and both sizes): `kaylee-breath` at 4.6 s, infinite, not alternate |
+| head (per size) | while the voice sounds bob and roll take more than 50 values each, within 0.9% and 1.8°; no variable on either layer from 600 ms after the voice ends |
+| breath at rest (per size) | over the 10 s: rise −0.600% to 0; the rise passes its half height going in at 19% and out at 69% of the breath (±1.5%: a peak at 38%); 4600 ± 40 ms between breaths |
+| rim (per size) | on every frame the disc's circle lies inside both canvases' boxes, the box the real quad (layer and canvas `translate`, `rotate`, `scale`, `transform` composed about their middles), with 0.75 px to spare |
+| idle | in the rest every animation frame the three portraits ask for lies within 50 ms of a sampled frame of a blink, a crossfade or a glance of one of them (a frame is asked for in the step that draws the event, and the sampler reads that frame's state), in bursts of at most 800 ms (frames asked for 250 ms apart or less are one burst); the line prints the share of the rest the windows cover, which a stray frame is hidden in |
+| errors | no console error or page error of the run names `companion`, `portrait`, `canvas`, `mouth`, `head` or `kaylee` |
+| reduced | emulated: no canvas animates, no layer has a `translate` or `rotate`, every portrait still draws a frame |
+- 2026-11-01, face `cc2f923d4798-e46ed153`, 1440×900: exit 0, ALL PASS; 818 frames 23.5 ms apart (longest 84); the voice 7.31 s; 6 canvases on the page all on `kaylee-breath`; 234 frames of voice, 151 and 143 different bobs (−0.500% to 0.200%), 216 and 219 rolls (±1.5°); breath 19.1–19.3% in, 69.1–69.3% out, 4603 and 4593 ms between breaths; least rim 1.62 px at 115 px and 7.17 px at 512 px (both on the giggle's frames; the forced worst case is `kaylee-breath-page.mjs`'s); idle 42 frames in 3 bursts (longest 624 ms, about 1 s of loop in 10 s), judged at a 250 ms window (MAN-9444); reduced motion 0 animations.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-head.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-recorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-settle.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-capture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-sampler.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-face-whole-capture.mjs
+
+## MAN-9444 — src/modules/companion — her head: proof — .verify/lib/face-replay-head.ts (the — The idle line first failed twice for the probe's own reasons, not the portrait's: it laid one
+section: src/modules/companion — her head: proof — .verify/lib/face-replay-head.ts (the replay) and .verify/kaylee-head-page.mjs (the page)/004 The idle line first failed twice for the probe's own reasons, not the portrait's: it laid one
+
+- The idle line first failed twice for the probe's own reasons, not the portrait's: it laid one portrait's frames against another's blinks, and it left out the live app's own disc, which asks for frames as they do. Both are fixed in the judge, which now reads all three portraits. The 2026-11-01 run of MAN-9443 was judged against a 250 ms window, which explained about half of the rest; the window is now 50 ms and the line has not been run since.
+- What the captures cannot show: (1) the 115 px disc's breath: the recording is one picture pixel per CSS pixel and the breath is 0.73 px at the peak of a 122 px layer, so `disc-115.webm` moves about 0.65 px over the rest (`portrait-512.webm` 2.7 px); the enlargement adds no motion, and the breath is read off the stylesheet by the `breath at rest` line. (2) The breath drawn as a sentence begins: sentence 1 opens on her giggle and a sentence a clip opens draws none (the clip is its cue), so no capture has one; the replay's sentence 0 (no clip) shows it (`replay-head.txt`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-head.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-recorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-settle.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-capture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-sampler.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-face-whole-capture.mjs
+
+## MAN-9436 — src/modules/companion — her breath: proof — .verify/kaylee-breath-page.mjs
+
+The breath's probe (`.verify/` is gitignored: on disk only). What the breath is: MAN-9124 §"Portrait motion in the stylesheet"; the rim arithmetic: MAN-9223 §"Layers". No Gemini, no voice, no Rhubarb answer.
+
+## `node .verify/kaylee-breath-page.mjs` (the dev client on :5183 and its server on :3011)
+- The app's own `CompanionAvatar` at 115 px (the disc's active size on a 1440 px window) and 512 px (the station portrait's largest square), on the face her picture names (the look he picked), at rest, on the mouth page's stage (`lib/mouth-page-stage.mjs`, MAN-9418) with an empty sentence. PASS/FAIL per line, exit 1 on any FAIL.
+| check (per size, per layer) | rule |
+|---|---|
+| animation | computed `animation` names `kaylee-breath` at 4.6 s, `infinite`, not alternate, beside `kaylee-sway` 9 s `alternate`; the Web Animations API agrees: duration 4600, iterations Infinity, direction `normal`, delay 90 ms on the hair canvas and 0 on the face's, two animations |
+| keyframes | `getKeyframes`: offsets 0, 0.38, 1; `scale` 1, 1.006, 1; the rise (last word of `translate`) 0, −0.6%, 0, the middle one in percent. A breath that peaks elsewhere, or by another amount, fails |
+| rim | `data-motion` set to `laugh`; breath paused at 38%, laugh at 17%, sway at 50% (each shifted by its own delay): every edge of each canvas's `getBoundingClientRect` is outside the disc's by `SNAP_PX` = 0.75 px, and the sway reads 0deg. why 0.75: a painted edge lands up to 0.7 px off its layout edge |
+| control | the laugh's old lifts put back through the API: 3% shows the rim (the bottom edge inside the disc's), 2.5% is refused (bottom margin under 0.75 px) |
+| errors | nothing logged |
+- 2026-11-01: exit 0, ALL PASS (59 s); smallest rim margin 1.259 px at 115 px and 5.590 px at 512 px (1.09% of the disc both); the old 3% lift left −0.569 and −2.550 px, the old 2.5% lift 0.040 and 0.163 px.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-breath-page.mjs
+
+## MAN-9437 — src/modules/companion — her face card's wiring: the Settings slot, CompanionFaceSettings and useCompanionFaceSettings
+
+Her face card's page wiring: how the card reaches the Settings section, and what `useCompanionFaceSettings` does for it. The card itself — props, the look drawn, the switch, the band, the question: MAN-9220.
+
+## Wiring
+- `CompanionSettingsView` takes `face?: ReactNode`, drawn in `<div className="mb-3">` directly after the talk button's card, above the `memory` slot. Order: talk, face, memory, fields.
+- `CompanionSettingsSection` passes `face={settings && face && <CompanionFaceSettings name={settings.name} face={face} />}`. `face` comes from `useCompanionSettings()`, which keeps `picture.face` out of the same `GET /api/companion` that brings `settings` (and out of its read again on `websocket_reconnected`) and answers it null until that read lands; the card mounts with its face known and makes no read of its own.
+- `CompanionFaceSettings` hands the view the hook's `refusal`, `pickRefusal`, `onUpload` = `upload`, `onPick` = `pick` (`PUT /api/companion/face/avatar`), `onRemove` = `remove` (`DELETE /api/companion/face`), `onSeeFrames` and `onCloseFrames`; the live card draws its switch while two looks are made.
+- `hooks/useCompanionFaceSettings.ts` (`useCompanionFaceSettings(initial)`) is the card's behaviour: it starts from the section's face, replaces it with each `companion_face` frame of the account (`useWebSocket().subscribe`) and with a new `initial` (set while rendering, so a re-read is never drawn late). A frame carries no sequence: a frame heard while an upload, a pick or a removal is out wins over that request's answer (`frameCountRef`), and `useCompanionSettings` hands on the newest frame's face instead of a read that was out while the frame came. A face of a read, an answer or a frame must pass the reducer's `isFace` (exported from `utils/companionReducer.ts`), else it is not drawn. Settings renders wherever the app does and the companion provider lives only in the project workspace, so it never reads the provider's picture. It returns `{ face, uploading, refusal, pickRefusal, framesOpening, contactUrl, pick, upload, remove, seeFrames, closeFrames }`:
+  - `pick(avatar)` → `api.companion.face.pick`; the server stores and announces the pick before it answers, so the `companion_face` frame moves the card and every other page of the account, and the answer's face is taken only when no frame came while it was out. Until the answer is in, the returned `face.avatar` is the look just pressed (`asked`, so the switch shows it and a press on it is no new pick; the portrait and line follow `id`, which only the server moves); the later of two picks owns it. A refusal (400 `COMPANION_FACE_INVALID`: no look of that name, or one not made yet; any other refusal) is the server's sentence as `pickRefusal` under the buttons, a thrown request a fixed sentence (`voiceSettings.companion.face.pickFailed`); the switch goes back to the look she wears. `pickRefusal` clears at the next pick, an upload and a removal.
+  - `upload(file)` → `api.companion.face.upload`; 200 `{ face }` switches her at once, 202 `{ face }` starts the meter (the frames then count it to the end). Any refusal's sentence (`refusalSentence`; a 400 `COMPANION_FACE_INVALID` is the usual) is `refusal`, a thrown request a fixed sentence (`voiceSettings.companion.face.uploadFailed`); `refusal` clears at the next upload and at a removal; an upload clears `pickRefusal` too. `uploading` is true while it is out.
+  - `remove()` → `api.companion.face.remove`; its 200 `{ face }` is what she wears now (a pick of his photo goes back to the house's first look). It clears `refusal` and `pickRefusal`. A refusal is a warn toast (`removeFailed`, "Your photo wasn't removed") carrying the server's sentence when it sent one, never the transport's words; the face as it was.
+  - `seeFrames()` → `api.companion.face.contact(face.id)` fetched through the authenticated client (an `<img src>` to the route would carry no token), shown from an object URL (`contactUrl`) that an effect revokes when it goes back to null (`closeFrames`) or the card unmounts. A failed fetch is a warn toast (`framesFailed`), the server's sentence under it when there is one. A 2xx answer to an upload, a pick or a removal whose body is not a face (a proxy's page) is not a failure: the frames bring the face.
+  - Each control holds a ref guard, so two presses in one task send one request.
+- The portrait is `CompanionAvatar` (`presence` idle, `faceId={face.id}`, no voice, no sentences, no look, `size` 96): its atlas cache (`useFaceAtlas`) is shared with her button, so a switch of face reaches both.
+- Probes: `.verify/lib/face-card-live.mjs`, `.verify/lib/memory-card-live.mjs` and `.verify/lib/memory-card-kit.mjs`'s `readPlace` place the live section as `['talk','face','memory','fields','save']`. `face-card-kit.mjs`'s `mountCard` stands in the app's `ToastProvider` and a socket context that holds no socket, which the hook needs.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFaceSettings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionFaceSettings.ts
+
+## MAN-9438 — server/modules/companion/face — the house's looks: face-avatars.ts, face-house.ts, face-house-ids.ts, avatars.json, the drawn face and the failed bake
+
+An AVATAR is a portrait and the face the bake made of it (its moods, mouths, blinks, looks and clips), switched as one unit: `CompanionFaceAvatar { key, label, faceId, bake }` on the wire (MAN-9242). The house's avatars are the looks every account may wear besides its own photo (`own`: `OWN_AVATAR_KEY`). Listed in code (`face-avatars.ts`), held at run time by `face-house.ts` (`createHouse(jobOf, ownFaces)`, one per `faceService`: MAN-9237), their photo ids kept in `<root>/avatars.json` (`face-house-ids.ts`). A house look has no database row: all run-time state is memory, found again at each start.
+
+## `HOUSE_AVATARS` (`face-avatars.ts`)
+| key | label | seed env | default seed | framing |
+|---|---|---|---|---|
+| `original` | Dark hair | `COMPANION_FACE_SEED` | `~/.claude/state/images/kaylee/kaylee-portrait-base.jpg` | `FACE_FRAMING` |
+| `office` | Brown hair | `COMPANION_FACE_SEED_OFFICE` | `~/.claude/state/images/kaylee/kaylee-portrait-office.jpg` | `OFFICE_FRAMING`: `cropFactor` 1.5, `discSide` 1.38, `discRaise` 0.06, `frameSizes` [256, 448], `pad` 0.5 |
+- The first entry is every account's default (`DEFAULT_AVATAR_KEY`). `OWN_AVATAR_KEY` = `own`, `OWN_AVATAR_LABEL` = `Your photo`; no house key is `own`.
+- A key is never renamed once recorded: `avatars.json` holds each look's photo by its key. The framing is hashed into the recipe id (`recipeId(framing)`, MAN-9233): tuning one look's framing moves only that look's face; `FACE_FRAMING` is never changed by tuning another look.
+- `OFFICE_FRAMING` why: the office picture sits her face near the top, its crown at the picture's top edge (0.77 face sides above the face's centre), and its navy lapels begin 0.59 face sides below the centre, 0.33 aside. At the house disc (1.75 face sides) a lapel shows at the circle's lower right and the circle's top lies in the pad's band. So the disc is 1.38 face sides (her face and the hair framing it), `cropFactor` 1.5 reaches 0.75 above the centre (inside the picture's edge) and the disc is raised 0.06: `discSquare` = `{ left: 21, top: 0, size: 471 }`.
+- 2026-11-01: Brown hair's contact sheet (`4de51024aad7-9003160c`), all 158 frames read: no navy of the blazer, collar or shoulder inside the circle; hair frames her face to the rim.
+- Dark hair's sheet (`cc2f923d4798-e46ed153`) shows a small white collar V at the circle's foot (frame 0). `FACE_FRAMING` stays as it is (the arc's binding word: the face set of 2026-10-31); changing it moves every account's own photo's face id as well.
+- `seedFileOf(avatar)` = the env path, else the default, read on each call. `houseAvatar(key)`, `HOUSE_AVATARS` are read by `face-bake-cli.ts --house <key>` (makes the face under that look's framing; records the photo under the key once the face is made).
+
+## `avatars.json` (`face-house-ids.ts`)
+- `<root>/avatars.json`: `{ "<key>": "<12 hex photo id>" }`, written once per key (atomically), so a look holds after its seed file moves. A different photo for a recorded key is refused: "The house avatar "<key>" is already registered as photo <id>. Remove "<key>" from <root>/avatars.json first to register <new> instead." (`refuseIfHouseKeyTaken` is the CLI's, before the first frame).
+- `readHouseIds()`: `{}` when the file is missing; an entry whose value is no photo id is left out; a file that is not JSON or not an object throws, so the prune removes nothing on it.
+- `registerHouseAvatars()` → `Map<key, photoId | null>`: a recorded key keeps its photo and its `photo.png` is stored again from the seed file when that file still holds that very photo; an unrecorded key stores its seed file and records it; a key whose seed file is missing is null. One look that fails is logged and the others register. A `<root>/seed.json` left by the one-photo store is recorded as `original` and removed by its name (`adoptLegacySeed`); logged and left when `avatars.json` holds another photo for `original`.
+
+## `createHouse` — run-time state (`face-house.ts`)
+| name | holds |
+|---|---|
+| current face | `faceIdOf(photoId, look.framing)`: the photo under the look's framing and the current recipe, made or not; null while the look has no photo |
+| drawn face | its current face when published, else `newestPublishedFaceOf(photoId, excluded)` (MAN-9235), else null. `excluded` = every account's own `face_id` (made under the house framing) for a look framed unlike the house, so Brown hair never falls back to his house-framed upload of the same photo; a look framed like the house (Dark hair) may fall back to such a face |
+| failure | the sentence of a refused bake of the look's current face, until it is made |
+- `register()`: `registerHouseAvatars()`, then each look's drawn face. A look whose face cannot be read is logged and leaves `isKnown()` false (the prune waits).
+- `unpublished()`: looks with a photo whose drawn face is not their current face: `start` queues their bake.
+- `makes(faceId)`: some look's current face is `faceId` (a bake of it reaches every account).
+- `made(faceId)`: each look it is the current face of re-finds its drawn face and drops its failure. `failed(faceId, sentence)`: each such look shows the sentence.
+- `avatars()`: the house part of `CompanionFace.avatars`: each look in order with `faceId` = drawn face and `bake` = its current face's job as `bakeOfJob` (MAN-9439), else `failed { error }`, else null.
+- `faces()`: every look's current and drawn face: what every account may read and what the prune keeps.
+
+## Add a house look
+1. Its photo at the path its seed env names (`seedEnv`), or at its `defaultSeed`, under `~/.claude/state/images/kaylee/`.
+2. One entry in `HOUSE_AVATARS` (`face-avatars.ts`): a new `key` (never `own`, never renamed once recorded), `label` (the picker's word), `seedEnv`, `defaultSeed` and `framing` (a copy of `FACE_FRAMING`'s values until tuned).
+3. Tune the framing on its contact sheet: `face-bake-cli.ts --photo <seed file> --house <key>` (MAN-9231) makes the face; a tune that changes only `discSide`, `discRaise` or `frameSizes` re-cuts the cached crops and renders nothing. Open `contact.webp`: any navy of a collar or shoulder inside a circle, or hair not framing her face to the rim, is a framing value to change (ruling 2), never a mask on the page. Bake again until none shows.
+4. The next server start registers the photo (`registerHouseAvatars`: stored, recorded in `avatars.json`) and queues its bake (`wantHouse`); every account's picker lists the look being made (`companion_face` frames to every account) and offers it once made. A seed file that is not there is logged (`the house avatar "<key>" has no photo: its seed file <path> is not there, so it is not offered`); the look stays in `avatars` with `faceId` null and no `bake`, which the card does not draw.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-avatars.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-house-ids.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-house.ts
+
+## MAN-9439 — server/modules/companion/face — the bake queue: face-queue.ts, one job per face, wantHouse, assign, release, bakeOfJob
+
+`createBakeQueue(hooks)` (`server/modules/companion/face/face-queue.ts`) is the in-process queue behind `faceService` (MAN-9237). Events only: nothing looks at a clock. It knows nothing of accounts' rows or pages; what progress and an end mean for them is the service's, told through two hooks.
+
+## Job — `BakeJob`
+`{ faceId, photoId, framing, accounts, forHouse, state, done, total, abort }`
+| field | holds |
+|---|---|
+| `faceId` | `faceIdOf(photoId, framing)`: one job per FACE, a photo under a framing |
+| `framing` | `FACE_FRAMING` for an account's own photo, the look's for a house look |
+| `accounts` | accounts waiting on it (those whose photo it is) |
+| `forHouse` | a house look wants it; stays wanted with no account |
+| `state` | `queued` \| `baking`; `done`, `total` (the recipe's frame count: 158) |
+| `abort` | `AbortController` |
+- His upload of the office picture is one face under the house framing and Brown hair's another (two jobs); a photo under equal framings is one job.
+- `bakeOfJob(job)` → the wire's `bake`: `baking { done, total }` or `queued { done: 0, total }`.
+
+## Verbs
+| verb | does |
+|---|---|
+| `wantHouse(photoId, framing)` | joins or makes the face's job, sets `forHouse`, starts |
+| `assign(userId, photoId)` | joins or makes the job of `faceIdOf(photoId)` (house framing), adds the account, takes it out of every other job (a new upload replaces the pending one), starts |
+| `release(userId)` | the account leaves every job; a job nobody wants is dropped when queued, aborted ("nobody wants this face any more") when baking |
+| `jobOf(faceId)` | the live (not aborted) job making it, or undefined |
+| `photoIds()` | the photos of every job, for the prune |
+| `stop()` | aborts the running job, drops the queued, resolves when it unwound; nothing starts after |
+- Jobs run one at a time, oldest first: started when asked for (if none runs) and when the running one settles. The box-wide lock inside `bakeFace` keeps a CLI bake apart.
+- A job's end, passed to `onSettled(job, outcome)`: `made { faceId }` \| `refused { sentence }` (`FaceBakeRefusal`'s sentence; any other failure is logged and reads `sentences.stopped(done, total)`) \| `ended` (aborted). `onProgress(job)` after a state or frame-count change.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-queue.ts
+
+## MAN-9440 — src/modules/companion — her eyes and brows on the page: proof — .verify/kaylee-eyes-brows-page.mjs, its stage and its judges
+
+The whole of her eyes and brows on the live page, as one probe (`.verify/` is gitignored: on disk only). What she does: MAN-9428 (blink), MAN-9429 (brows), MAN-9430 (search, warm spell); the engine that plays it: MAN-9238; the rules: INV-10257. No Gemini, no model, no server work.
+
+## `node .verify/kaylee-eyes-brows-page.mjs` (the dev client on :5183 and its server on :3011)
+- It reads `GET /api/companion` for the face the account draws and `GET /api/companion/face/<id>/manifest`, and first checks that face has 158 frames, `blinks` (listening, 8 gazes, 8 poses) and 9 `brows`. The app's own `CompanionAvatar` (115 px, the disc's active size on a 1440 px window, and 512 px, the station portrait's largest square) is mounted by `lib/eyes-brows-stage.mjs` on fixture presences, one scene at a time, 20 s each, the two portraits of a scene side by side (each its own engine and seed): `idle`, `listening`, `thinking`, `reading_code`, `held` (reading_code with a look of dx −300 px set 1 s in) and `question`.
+- `question`: a fake voice on the page's own PCM player plays the saved `.verify/shots/kaylee-face-whole/audio/sentence-0.pcm` (2.96 s, 2 s in) under the log text "Want me to send it?" with no mood, so the brows are `brow.neutral`. The brows read the text's end and the moment the player says the sentence ended.
+- One scene at a time because a page draws two portraits at the frame rate; a dozen layered 512 px portraits starve software compositing to 16 frames a second. The measured session blocks Vite's hot updates (`hotUpdates: false`): another session's source edit must not reload the page under a recording.
+- The recorder (`lib/eyes-brows-stage.mjs`): every WRITE of `data-frame` and `data-frame-over` with its time (a MutationObserver on the body, read in the microtask after the portrait's own step), and every animation frame's `data-frame` summed by name. It prints each portrait's sums, then `lib/eyes-brows-full.mjs` and `lib/eyes-brows-reduced.mjs` judge the writes with `lib/eyes-brows-judge.mjs` (every number there is the design's, written out, never read from the app).
+- `KAYLEE_EYES_RECORD=<file>` also writes every portrait's recording as JSON, to read a line against.
+- It takes about 5½ minutes (321 s measured: twelve 20 s scenes, the page loads and the stills): run it with Bash's `timeout` of 600000 or in the background; a foreground call at the default two minutes loses the run and its output.
+
+| check (per size) | rule |
+|---|---|
+| idle | blinks on `blink.neutral.*` or over a glance, every gap before a blink inside 2800–6500 ms, no warm spell yet (the first is 25 s on) |
+| listening | blinks on `blink.listening.*` only, gaps inside 2500–5500 ms; no other face but her listening face and its nod (`pose.down_5`, `pose.down_10`) |
+| thinking | looks only up_right, up, up_left, right, beginning on up_right; each held 1200–2600 ms; none twice running; blinks on `blink.gaze.*`, gaps inside 2200–5000 ms; a carried move never lands on a half step before its blink's closed step |
+| reading_code | looks only down_left and down_right, beginning on down_left, 1300 ms each; blinks on `blink.gaze.*`, gaps inside 4500–9000 ms |
+| held look | pose.left_10 then pose.left_20 within 800 ms of the look; no gaze frame after the first pose; blinks on `blink.pose.left_*` |
+| question | `brow.neutral` within 140 ms of the audio's end, never while she speaks, held no more than 1200 ms, no blink drawn in the hold (a blink in flight at the end is cut and the lift fades in from her open eyes: MAN-9432; the line counts a blink frame on either canvas of any write from the lift to the release, as a write's target or its base) |
+| reduced motion | idle `mood.neutral.closed`, listening `state.listening`, thinking `gaze.up_right`, reading_code `gaze.down_right`, a held look `pose.left_20` at once, speaking `mood.neutral.a1`, the brows swapped in and out with no fade; no `blink.*` and no `clip.*` frame, no frame fading over another |
+- Tolerance (`lib/eyes-brows-judge.mjs`): a gap or a search hold passes 60 ms under its range (`EARLY_MS`) and 250 ms over (`LATE_MS`); a sweep hold passes within 190 ms of 1300; the question's lift and hold each add 60 ms (`SLACK_MS`).
+- A blink whose closed step a late timer skipped (the half step lasted 90 ms or more) is counted in the line and lawful; any other blink without a closed write fails.
+- The stills (`.verify/shots/kaylee-eyes-brows-page/`): the page's `setTimeout` and `requestAnimationFrame` are wrapped once and held the moment the wanted frame is written, so the avatar is photographed with her canvases showing exactly that frame at 512 px, then the clock runs on. Seven: `listening-blink-closed`, `listening-blink-half`, `gaze-blink-closed`, `gaze-blink-half`, `pose-blink-closed`, `pose-blink-half`, `brow`. Read 2026-11-01: listening's blink keeps her lifted brows with the ears' arcs; the gaze's half frame shows the look up and aside; the pose blink keeps the turn under the page's marks; the brow frame lifts her brows with the mouth closed.
+- 2026-11-01, face `4de51024aad7-9003160c` (the account's avatar at the time; `cc2f923d4798-e46ed153` ran before it), exit 0, ALL PASS: 6 scenes of 20 s, 780 to 1040 animation frames each in full motion and 1200 in reduced; listening 5 blinks at both sizes (gaps 2565–4518 ms), thinking 5 and 6 blinks, 12 looks each, holds 1194–2597 ms, reading_code 16 looks each (holds 1223–1387 ms, 3 blinks each), the held look pose.left_10 then pose.left_20 170 and 193 ms after the look, `brow.neutral` 18 ms after the audio's end and held 1186 and 1188 ms; reduced motion 14412 animation frames, 0 blink, 0 fade; the page logged nothing. This run predates the judges of listening strays, the search's first gaze and the question's hold writes.
+- The question scene sets presence to idle at the audio's end, so the page shows the idle path; presence staying `speaking`, a second sentence at once and the control with a full stop are the replay's (`face-replay-brows.ts`, MAN-9429).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-brows-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-full.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-reduced.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-stage.mjs
+
+## MAN-9445 — src/modules/companion — Proof — .verify/kaylee-face-card-walk.mjs (her face card pressed through on the live page: the pick across four surfaces, the upload, the removals)
+
+Presses her face card (MAN-9220) through on the live page, and reads which face each of four surfaces draws. The card on fixtures: MAN-9221.
+
+```bash
+node .verify/kaylee-face-card-walk.mjs [--photo <path>] [--evidence <dir>] [--picks]
+```
+- Gitignored (`.verify/`). Settings > Voice > Companion on :5183 as account 1: ONE page (A) with no reload from the first line to the last, plus two pages of the account that no press touches: the workspace `/` (B, its disc in view) and `/station` (C: its disc is hidden there, its portrait is drawn). No chat is sent, so no model answers; no Gemini call; account 2 is never touched. Exits 1 after printing every check.
+- `--picks`: steps 1 to 3 alone, about a minute, no bake. The whole walk bakes a photo in full (CPU, MAN-9231): 14 and 28 minutes measured 2026-11-01.
+- Account 1 starts wearing Dark hair with both looks made, no photo, no bake.
+
+## Which face a surface draws — `lib/face-card-walk-kit.mjs`
+- `portraitSignature(page, selector)`: the first `.kaylee-portrait` under the selector, its canvases laid over grey and brought down to a 16 × 16 luminance grid. `signatureDistance` = mean absolute luminance gap (0 to 255).
+- Surfaces: the card's portrait (96 px), the disc on A (26), B's disc (26), C's portrait (321). `makeSurfaces` answers `oneFace` (all within `ALIKE` of the card's), `allMoved` (each farther than `OTHER_FACE` from a reference), `allBack` (each within `SAME_FACE`). A surface that is null or flat fails every question.
+- Thresholds (measured 2026-11-01, Dark hair vs Brown hair): another face 46 to 54 (`OTHER_FACE` = 25); the same face on one surface 0 (`SAME_FACE` = 5); one face across the four surfaces 4 to 11.3 (`ALIKE` = 20).
+- Pages B and C learn a face by asking its manifest and sheets: the walk counts those asks per page. His photo is Dark hair's near twin, so for step 4 the asks are the proof, not a luminance gap.
+- Other exports: `faceOnServer`, `lookOf`, `installRecorder` / `recordedSteps` / `untilStep` (the card's states as drawn: `shown`, `bake`, `done`, `total`), `readCard`, `shootCard`, `leaveDarkHair`.
+
+## Steps
+1. Dark hair: the line, the switch (named "Her face": Dark hair, Brown hair; Dark hair chosen), the buttons (Upload a photo, See every frame; no Remove), the portrait at 96 px. The four surfaces draw one face.
+2. Brown hair pressed: `PUT /api/companion/face/avatar` with `{"avatar":"office"}` answers 200 with the office face. With no reload the card's line and portrait, the disc, B's disc and C's portrait draw it; B and C ask its manifest and sheets; the server holds the pick.
+3. Dark hair pressed: `{"avatar":"original"}`, 200; the four surfaces are back on the face they drew first (`allBack`), the server as it began.
+4. An upload of a photo whose face is not made (default `~/.claude/state/images/kaylee/kaylee-test-mouth.jpg`): 202, Dark hair still hers. The meter counts frames to the total, photographed at three points (`4-meter-<n>-of-3.png`), Dark hair still hers and the switch still two; then "Your photo", picked, the switch three; A, B and C ask the new face's manifest and sheets; the counts only ever rose.
+5. See every frame: the contact sheet in the lightbox from a `blob:` URL, revoked when Escape closes it, Settings staying.
+6. Remove your photo: the question's words ("She goes back to Dark hair."), then Dark hair under 2 s from the confirm: the card, the four surfaces and the server.
+7. An upload of an image with no face (a screenshot of the app taken before Settings opened): the bake fails, the warn banner carries the no-face sentence, Dark hair is still hers, Remove is offered, the server holds the same sentence.
+8. A last Remove: account 1 on Dark hair with no bake, no error and no banner.
+- Deadlines: 40 minutes for the bake of step 4 (`BAKE_DEADLINE_MS`), 8 minutes for the failing bake of step 7.
+- Teardown, on any failure and on SIGTERM / SIGINT: `leaveDarkHair` logs in on its own, sends `DELETE /face`, and `PUT /face/avatar` `original` when the pick is not `original`; API only, so it works with the browser gone.
+- A probe that registers its own stop-signal cleanup opens the browser with `launchOptions: { handleSIGINT: false }` (`openConsole`). why: Playwright's SIGINT handler exits in about 90 ms, before the cleanup's login and three calls (about 200 ms) finish.
+- Evidence `.verify/shots/kaylee-face-card-walk/`: `<n>-<name>.png` of the card, `<n>-<name>-disc.png` and `-station.png` for steps 1 to 4, `shots.json`.
+- A source edit under `src/` while it runs (another session's, through Vite) reloads the page and ends it with `the page lost its recorder: it reloaded`: run it on a quiet tree. 2026-10-30: a reload ended a run at 58 of 115 frames.
+- 2026-11-01: `--picks` passed steps 1 to 3 on two runs: the four surfaces moved 46 to 54 within about 1.5 s of the press, with no navigation on any page, and returned to 0.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-card-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-card-walk-kit.mjs
+
+## MAN-9446 — src/modules/companion — Proof — .verify/kaylee-avatars-whole.mjs (her looks whole on the live dev stack: the pick, one typed turn, the station, her exact mouth, the pick back)
+
+Runs her looks whole once on the live dev stack and prints, for each step, what the page and the server did. The card is MAN-9220, the walk that presses it through is MAN-9445, the service is MAN-9237, the house's looks are MAN-9438.
+
+```bash
+node --import tsx .verify/kaylee-avatars-whole.mjs
+```
+- Gitignored (`.verify/`). Account 1 (`verve`) on :5183 and :3011, her model Haiku (set through `openLiveScene`, put back by its `tearDown`), the page's voice switch OFF: no speech request is made and no Gemini is spent. The driver checks both: no speech request on the workspace page or the station, and this plan's own ledger files (the files of `/opt/shadow-connector/state/gemini_plan_spend` whose names hold `GEMINI_BUDGET_PLAN`; another plan's spend lands in a file of its own and is not read) the same size before and after; an environment with no `GEMINI_BUDGET_PLAN` has no file of its own, and the driver says so and judges the speech requests alone. Account 2 is never touched. Exits 1 after printing every check.
+- Two pages in one browser context: the workspace (a probe chat, `lib/kaylee-fab-live.mjs`, its disc in view) and `/station`, opened before the pick and never reloaded until step 3.
+- The pick is put back on what the run found (`putPickBack`, a login of its own, only the pick: his photo stays) when a step throws and on SIGINT or SIGTERM. When a step throws and when the run ends, `scene.tearDown` also puts back her model, the voice switch and the draft and deletes the probe chat; a stop by SIGINT or SIGTERM ends the mouth page and puts the pick back and leaves the probe chat and her model as the scene set them (Haiku), because Playwright's own handler closes the browser and exits first. Her conversation gains the typed line and her answer. The mouth page signs in with `project: false`: no `simpleChatList: false` PATCH; the one preference write left is the theme toggle `openConsole` makes when the page is not in its wanted theme.
+
+## Steps
+1. Settings > Voice > Companion, the card's switch pressed on "Brown hair": the `PUT /api/companion/face/avatar` answer (200, `avatar` `office`, `id` the office face's), the `companion_face` frame heard on both pages' sockets, and, with no reload, the card, the disc and the station's portrait all drawing another face than Dark hair (`portraitSignature` distance 46 to 54, `lib/face-card-walk-kit.mjs`). Both pages asked the office face's manifest and sheets and no other face.
+2. "In one short sentence, say hello." typed in her panel: her disc 28 px at rest, 115 px at most, back to 28; `data-state` runs (idle, thinking, idle, never `speaking`); every `data-frame` and `data-frame-over` name a named frame of the office face's manifest (`frameNames`); when her newest sentence wears a mood word its face is drawn (a page that plays no voice draws it), and when it wears none (Haiku's did not for this line on any run measured) the step prints that the mood face is not exercised on the page's own path and makes no check; every pixel reading of the disc during the turn nearer Brown hair than Dark hair; no face file asked during the turn.
+3. `/station`'s portrait: the office face's manifest and sheets asked, its pixels moved, and again after a reload of the station (its console judged before the reload and after, never across it: a reload aborts the page's own preference flush, logged as "Failed to fetch").
+4. `.verify/kaylee-mouth-page.mjs` run as a child process (awaited, never `spawnSync`: the pages are routed, and a blocked event loop times their calls out) on the face `GET /api/companion` names: its first line names the office id and "Brown hair", and its `exact` frames on the office face's own `mood.delighted.*` mouths at 115 px and 512 px, the cues and the two sizes beside each other, pass. Its comparison of the two sizes leaves out a frame that came over 35 ms after the one before (the crossfade is 40 ms, so a late frame can see one size's fade finished and the other's next cue begun; measured on a loaded box, 2 runs of 9).
+5. "Dark hair" pressed: 200, `original`, both sockets hear it, the three surfaces are back on their first Dark hair readings, and `GET /api/companion` reads `.face.avatar` `original`.
+6. Stills on Brown hair in `.verify/shots/kaylee-avatars-whole/`: the card, the disc at rest and at its active size, the station and its portrait.
+
+`lib/avatars-whole-kit.mjs`: `watchPage` (face files asked, speech requests, `companion_face` frames, console errors), `asksSince`, `pressLook`, `heardPick`, `sampleDisc`, `runsOfField`, `runMouthPage`, `stopMouthPage` (kills only the child `runMouthPage` spawned), `ledgerState`, `putPickBack`; the selectors `DISC`, `DISC_PORTRAIT`, `CARD_PORTRAIT`, `STATION_PORTRAIT`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatars-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-mouth-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatars-whole-kit.mjs
+
+## MAN-9451 — server/modules/voice — the vocabulary: the account's house words, their store, the seed and the check of a save
+
+The account's vocabulary: its house words, kept on the server as ONE list that three jobs read (how each is applied: MAN-9452; the Settings editor: MAN-9453). An entry is `{ spelling, pronunciation, misheard[] }` (`VocabularyEntry`, `server/shared/types.ts`, mirrored in `src/shared/types.ts`). (1) Both transcribers are told the spellings up front. (2) A net under both replaces each misheard form in a transcript with the spelling. (3) Kaylee's voice, and the chat's read-aloud, is sent the pronunciation in place of the spelling. Settings: MAN-9102. Routes: MAN-9103. Rule: INV-10622.
+
+| file | holds |
+|---|---|
+| `vocabulary.ts` | the seed, `readVocabulary(userId)`, `saveVocabulary(userId, value)` |
+| `vocabulary-check.ts` | `checkVocabulary`: the one check of a stored list and of a save, and the caps |
+| `vocabulary-match.ts` | `phraseKey`, `soundsAsWritten`, `correctMisheardWords` (the net), `respellForSpeech` (the speech), both on one `replacePhrases` |
+| `vocabulary-hints.ts` | `geminiVocabularyBlock`, `whisperVocabularyPrompt`: what each transcriber is told |
+| `server/shared/word-edges.ts` | the word-edge fragments, shared with `transcript-cleanup.ts` (fillers) |
+| `voice-settings.ts` | `readStoredVocabulary`, `saveStoredVocabulary`: the field in the account's `voice` document |
+
+## Store and read
+- Stored as `vocabulary` in the account's `voice` preference, beside the other settings (MAN-9102). `readVocabulary` reads it fresh on every call, never cached, so an entry saved now applies on the next press with no restart (read-aloud replays the audio the page already holds for a message it has read: MAN-9452 §Speech).
+- Never saved → the SEED. Saved → the saved list is the truth, an emptied one included: `[]` stays `[]`, and an empty vocabulary is how the whole feature is turned off for an account (no block, no prompt field, no replacement, no respelling). A stored list that fails `checkVocabulary` reads as never saved.
+- `readVocabulary` answers a copy; a caller that edits its list edits neither the seed nor the next read.
+
+## Seed
+Pronunciation equal to the spelling means "say it as written". The seed goes through `checkVocabulary` at first import (a fault in it throws loudly), so a form that repeats another in a different case is dropped once: `life cli` is `life CLI`.
+| spelling | pronunciation | misheard |
+|---|---|---|
+| Kaylee | Kaylee | Kailee, Kaylie, Kayley, Kaley, Kayleigh, Kaili |
+| lypheCli | life C-L-I | life CLI, life see ally, Life Klee, lifeCLI, Lyfe CLI, lyphe CLI, life C L I |
+| Restorly | Restore-lee | Restorely, Restore Lee, Restoreli, Restorley, Restorli |
+| Headscale | Headscale | head scale, Head-scale |
+| Cerberus | Cerberus | Cerebrus, Serberus, Cerberous, Sarberus |
+| dactyl | dack-tull | dactile, dactil, dactle, dack till, dactal |
+| Athena | Athena | Athina, Atheena |
+| Hermes | Hermes | Hermies, Hermease, Her mees |
+| Lyphe | life | Lyfe, Lyph, Lyphy, Lifey (never `life`: it is a real word) |
+- A plural needs no form of its own: the net keeps a plural `s` on whatever it replaces (`head scales` → `Headscales`), and a real `Headscales` is left as said. A stored list holds its own copy of the seed (an account that saved one keeps its forms), so a form removed here is removed from such a list by its own `PUT`.
+
+## Validation — `checkVocabulary`
+NORMALISED, never refused: every text trimmed with inner runs of white space collapsed; a blank pronunciation is the spelling; a blank misheard form is dropped; a form already listed (case-insensitively) is dropped; a form equal to its own entry's spelling (`phraseKey`) is dropped.
+REFUSED, all 400 `VOICE_VOCABULARY_INVALID` with `details.field` `vocabulary` (`saveVocabulary` throws it, nothing is written):
+| refused | sentence |
+|---|---|
+| not a list (a body without `vocabulary`) | `The vocabulary must be a list of entries, each with a spelling, a pronunciation and a list of misheard forms.` |
+| more than 100 entries | `The vocabulary holds at most 100 entries.` |
+| an entry that is not an object | `Entry <n> must be an object, …` |
+| a spelling that is missing, not text, without a letter or digit, or over 60 characters | `Entry <n>'s spelling needs at least one letter or digit.` (likewise `must be text`, `is longer than 60 characters`) |
+| a pronunciation over 80 characters, or not text | `“<spelling>”'s pronunciation …` |
+| misheard forms not a list of texts; a form without a letter or digit or over 60 characters; more than 40 forms | `A misheard form of “<spelling>” …`, `“<spelling>” lists more than 40 misheard forms.` |
+| a spelling twice (case-blind; a space and a hyphen are one) | `“<spelling>” is listed twice: each spelling is one entry.` |
+| a form two entries claim | `“<form>” is listed as misheard under both <A> and <B>: a misheard form belongs to one entry.` |
+| a form that is another entry's spelling | `“<form>” is an entry of its own, so it cannot also be a misheard form of <entry>.` |
+why the last two: the net could not know which word was meant, or would rewrite a right word.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-check.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
+
+## MAN-9452 — server/modules/voice — the vocabulary applied: the net under both transcribers, the source hints, the speech respelling, and what was measured
+
+How the account's vocabulary (MAN-9451) is applied: the net under both transcribers, what each transcriber is told up front, and the respelling of what Kaylee and the chat's read-aloud say. Rule: INV-10622.
+
+## The net — `correctMisheardWords`, inside `cleanTranscript` (MAN-9099 §Cleanup)
+- After filler removal, on BOTH transcribers, and whatever `cleanTranscripts` says: that switch governs the fillers only. Runs on the text the Gemini door and the OpenAI branch answer, so Kaylee's name cut (`companion-press.ts`) reads the corrected text.
+- One pass (`replacePhrases`), so a replacement is never itself replaced. Whole word or phrase, case-insensitive; the joiner inside a phrase is any run of spaces and hyphens (`life CLI`, `life-CLI`, `Head-scale`, `head scale` are one form); the longest form wins where two start at the same place (`Lyfe CLI` before `Lyfe`); the output is the entry's spelling exactly.
+- Edges (`STANDALONE_EDGE_*`, `server/shared/word-edges.ts`, the same rule as a filler): refuses a letter, digit, `_`, apostrophe or hyphen on either side, and a `:`, `/` or `@` or a `.` that joins a word (`@` keeps the local part of `kailee@home.com`, which a correction would turn into a different address). A possessive or plural tail (`'s`, `s'`, `'`, `s`) stays on the replacement: `Kailee's` → `Kaylee's`.
+- A word that is in no entry's list is never touched; the spelling itself is never a form of itself. Text with nothing to replace comes back byte for byte.
+
+## At the source — `vocabulary-hints.ts`
+- Gemini: `geminiVocabularyBlock` is appended to BOTH instruction forms (MAN-9099 §The request): ` These names may be spoken; write them exactly as spelled: lypheCli (sounds like "life C-L-I"), Kaylee, ….` `sounds like` only when `soundsAsWritten` is false (same letters and digits, any case or punctuation, is "as written"). Empty vocabulary: no block.
+- Whisper: `whisperVocabularyPrompt`, the spellings as `Kaylee, lypheCli, ….`, sent as the multipart field `prompt` of `/audio/transcriptions` (`voice.service.ts`; from the page's own direct call, `GET /transcribe-hints`: §Browser-direct), only when non-empty. Capped at 200 characters, entries dropped whole from the END, so even one token per character stays under Whisper's 224-token limit. whisper-1 and the gpt-4o transcribe models accept `prompt`.
+
+## Speech — `respellForSpeech`
+- Gemini TTS has no lexicon and no SSML phoneme, so the spoken text is respelled: each entry whose pronunciation differs from its spelling has its spelling replaced by its pronunciation (whole word, case-insensitive, the same edges and tails, longest spelling first so `lypheCli` goes before `Lyphe`). `Lyphe runs lypheCli and Restorly.` is sent as `life runs life C-L-I and Restore-lee.`
+- Only the synthesis request's text: `gemini-speech.ts` (`synthesizeSentence`, Kaylee: MAN-9105), `voice-provider.ts` (`synthesizeForChat`, the chat's read-aloud through the OpenAI-compatible proxy, `POST /tts`) and the page's own direct read-aloud (`POST /speakable`: §Browser-direct). Never the sentence the page shows, the log, or a stored row.
+- The chat's player (`voicePlayer.ts`) keeps the audio of the last 24 messages it spoke, keyed by the message's text and the browser's voice config and NEVER by the pronunciation (the server decides that per request, on the proxy path and the direct one alike). A message read before a vocabulary edit therefore replays its old audio until the page reloads; a message not yet read speaks the new pronunciation at once. Measured by Athena on the real player, 2026-11-01.
+
+## Browser-direct — the same engine over three routes
+The page may hold a base URL for its own OpenAI-compatible endpoint (`voiceConfig.baseUrl`, per browser). `transcribeVoice` and `synthesizeVoice` (`src/shared/api.ts`) then hand the call to `transcribeOnOwnEndpoint` / `synthesizeOnOwnEndpoint` (`src/shared/voiceDirect.ts`), which post straight to it, so the server never sees the call; the page asks the server's engine for the text halves and keeps no copy of the matching (`voice.routes.ts`, `voice-provider.ts`; routes: MAN-9103). `voiceDirect.ts` never imports `api.ts` (no import cycle): `api.voice` is passed in as the `engine`.
+| step | the page | the server |
+|---|---|---|
+| a clip | `GET /api/voice/transcribe-hints` PER CLIP (so a word saved in Settings applies on the next press, no reload), `{ prompt }` appended as the multipart `prompt` only when non-empty; then the clip to `<baseUrl>/audio/transcriptions` | `whisperVocabularyPrompt(readVocabulary)` |
+| its text | `POST /api/voice/clean { text }`; the reply is handed to the composer as a synthesized `Response` of the endpoint's own JSON with `text` replaced | `cleanTranscript` with the account's `cleanTranscripts` and vocabulary, as the proxy branch runs it |
+| read-aloud | `POST /api/voice/speakable { text }` (aborted with the play), the result as `input` of `<baseUrl>/audio/speech` | `respellForSpeech(readVocabulary)` |
+- A refusal from the endpoint, or an answer that is not `{ text }` with words in it, is handed back untouched; an empty text is not sent for cleanup.
+- Never blocks the mic or the voice: a hints, clean or speakable call that fails (unreachable, non-2xx, no field in the answer, no answer within 5 s: `VOICE_ENGINE_TIMEOUT_MS`) falls back to no prompt / the raw text / the unrespelled text, with one `console.warn` (`askVoiceEngine` in `voiceDirect.ts`, which joins the 5 s timeout and the play's own abort signal into the request's one signal by hand: `AbortSignal.any` is absent on iOS 15). A play the person aborted rethrows instead.
+- The proxy path and Gemini are not touched: they clean and respell on the server already.
+
+## Measured — 2026-11-01, live :3011, dev account `verve`
+- `GET /api/voice/vocabulary` answered the nine-entry seed. A `PUT` with `Zorblax ← zor blacks` added was answered and read back; `Zor-Blacks` under Kaylee too was 400 `“zor blacks” is listed as misheard under both Kaylee and Zorblax: …`; a blank spelling, a duplicate spelling and a form that is another spelling were each 400. `[]` was kept as `[]`. A `PUT /settings {cleanTranscripts:true}` kept the vocabulary.
+- A Gemini clip of "Please ask zor blacks to check the life CLI logs." through `POST /api/voice/transcribe`: vocabulary empty → `Please ask Zoroblax to check the lifeseal eye logs.`; with the entry saved moments before, no restart → `Please ask Zorblax to check the lypheCli logs.`
+- Whisper leg against a stand-in backend: fields `file`, `model`, `prompt` = `Kaylee, lypheCli, Restorly, Headscale, Cerberus, dactyl, Athena, Hermes, Lyphe, Zorblax.`; its reply ` Um, ask Kailee to check the life CLI logs on head scale.` came back `Ask Kaylee to check the lypheCli logs on Headscale.`
+- Speech: the request to Google carried `life runs life C-L-I and Restore-lee.` for `Lyphe runs lypheCli and Restorly.`
+- Not measured: Whisper's own acceptance of `prompt`. This box has no real OpenAI-compatible backend (`GET /api/voice/health` `configured: false`), so that is the vendor's documented behaviour; what was measured is that the page sends the field.
+
+## Measured — 2026-11-01, browser-direct, real app :5183 on live :3011, dev account `verve`
+- The three routes: `GET /transcribe-hints` → `{"prompt":"Kaylee, lypheCli, Restorly, Headscale, Cerberus, dactyl, Athena, Hermes, Lyphe."}`; `POST /clean` `Um, ask Kailee to check the the life CLI logs.` → `Ask Kaylee to check the lypheCli logs.`; `POST /speakable` `Lyphe runs lypheCli.` → `life runs life C-L-I.`; a body without `text` → 400 `text required`; no token → 401.
+- Seed: `The Headscales are down.` → unchanged (`verve`'s stored copy of the old seed read `The Headscale are down.` until its `Headscales` form was removed by its own `PUT`); `The head scales are down` → `The Headscales are down`.
+- A stand-in OpenAI-compatible backend under /tmp, `voiceConfig.baseUrl` set in the browser: the chat mic's 3.8 s clip reached it as `file`, `model` and `prompt` (the very string `GET /transcribe-hints` answers); it replied ` Um, ask Kailee to check the life CLI logs.` and the composer read `Ask Kaylee to check the lypheCli logs.` The page's calls: `GET /transcribe-hints`, `POST /clean`, never `POST /transcribe`.
+- Read-aloud on a message `Lyphe runs lypheCli and Restorly.`: the stand-in's `/audio/speech` body `input` was `life runs life C-L-I and Restore-lee.`, the message on screen still said `Lyphe`; the page called `POST /speakable` once, no `POST /tts`.
+- With the hints and clean routes aborted at the browser: the mic still filled the composer, with `Um, ask Kailee to check the life CLI logs.`, the clip went with no `prompt`, and the page logged two `console.warn` lines. With `/speakable` held open and never answered, read-aloud went on after the 5 s bound with `Lyphe runs lypheCli and Restorly.` as written and one `console.warn`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-hints.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-match.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/word-edges.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceInput.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/voicePlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/voiceDirect.ts
+
+## MAN-9453 — src/modules/settings/tabs — Settings > Voice > Vocabulary: the editable table of house words (VocabularySection, VocabularyEntryRow, useVocabulary)
+
+Settings > Voice > Vocabulary: the editor of the account's vocabulary (MAN-9451).
+
+- `VocabularySection` (`src/modules/settings/tabs/voice-settings/sections/`), between the cleanup switch and the Gemini section, voice on or off; it reads and saves for itself through `useVocabulary` (`src/modules/settings/hooks/useVocabulary.ts`: `GET`/`PUT /api/voice/vocabulary` via `api.voice.vocabulary` / `saveVocabulary`, the only places the URL is written). Composed of the kit's `SettingsSection`, `SettingsCard divided`, `Input`, `Chip`, `Button`, `ConfirmDialog` and nothing new.
+- One `VocabularyEntryRow` per entry: Spelling and Sounds like (`CommitField`: saved on leaving the field or Enter, never per keystroke, because a save replaces the whole list; Escape puts the server's value back; a blank Sounds like means as written), the misheard forms as chips that remove themselves, a field to add forms (Enter or Add; commas add several), and a delete button that asks first. `data-vocabulary-*` hooks: `-section`, `-entry`, `-field`, `-form`, `-form-field`, `-delete`, `-add-row`, `-draft` (the draft row), `-save-word` (its "Add word" button), `-refusal` (the refusal line, in the row the refused save was made from), `-save` (`saving` | `idle`, always mounted: it says only "Saving…").
+- "Add a word" opens a DRAFT row (`VocabularyEntryRow` with `draft`): nothing is sent until "Add word", which saves the list with the word AND the forms typed into its field and not yet added (a press on "Add word" under typed forms never saves the word alone). Nothing is optimistic; while a save is out every press waits (`busy`). Every text field is read-only while a save is out (an edit then would be built from the list as drawn, which is the one the save in flight is about to replace). A refusal leaves the table as it was, a field snaps back, and the server's own sentence stands IN THE ROW the refused save was made from (`editedRow`: its place in the list, or the draft), never under the table: the table is several windows tall, so a line under it was off screen for every row but the last.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularyEntryRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx

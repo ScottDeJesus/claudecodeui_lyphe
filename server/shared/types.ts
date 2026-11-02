@@ -2101,6 +2101,8 @@ export type VoiceService = {
   transcribe(input: {
     audio: VoiceAudioUpload;
     overrides: VoiceRequestOverrides;
+    /** The names the clip may hold, as Whisper's `prompt` field (it takes no instruction): sent only when non-empty. */
+    prompt?: string;
   }): Promise<VoiceServiceResult<{ text: string }>>;
   synthesizeSpeech(input: {
     text: string;
@@ -2130,15 +2132,37 @@ export type VoiceProvider = 'openai' | 'gemini';
  * tags, each 1-24 characters of lower-case letters with single spaces between words. The
  * register she is taught and the filter that strips her sentences both read it, so she is never
  * taught a sound the filter deletes; it defaults to the voice module's `DEFAULT_SOUND_TAGS` and
- * a save of `soundTags: null` restores that default. The value is read fresh on every call and
- * never cached, so a saved change is heard by the next press. Shared by `voice-settings.ts`
- * (reads and saves it), `gemini-transcribe.ts` and `gemini-speech.ts` (read the models and the
- * voice), the settings routes (answer it) and, through the voice barrel's `readVoiceSettings`,
- * the companion (reads the sound tags).
+ * a save of `soundTags: null` restores that default. `cleanTranscripts` (default `true`, a boolean
+ * either way) says whether a transcript has its disfluencies removed (um, uh, repeated words) before
+ * anyone reads it, whichever provider heard the clip: it governs the chat mic and Kaylee's press
+ * alike, and when `false` the Gemini instruction asks for a verbatim transcript. The value is read
+ * fresh on every call and never cached, so a saved change is heard by the next press. Shared by
+ * `voice-settings.ts` (reads and saves it), `gemini-transcribe.ts` (the model and the cleanup),
+ * `voice-provider.ts` (the cleanup of the OpenAI branch), `gemini-speech.ts` (the speech model and the
+ * voice), the settings routes (answer it) and, through the voice barrel's `readVoiceSettings`, the
+ * companion (reads the sound tags and says the cleanup setting in `read_settings`).
  */
 export type VoiceSettings = {
   provider: VoiceProvider;
+  cleanTranscripts: boolean;
   gemini: { transcriptionModel: string; speechModel: string; voice: string; soundTags: string[] };
+};
+
+/**
+ * One house word in an account's vocabulary: how it is SPELLED, how it SOUNDS, and the spellings a transcriber is known to
+ * give it instead. The account's `vocabulary` (`GET`/`PUT /api/voice/vocabulary`) is a list of these, and it serves three
+ * jobs from one list: the transcribers are told the spellings up front (Gemini's instruction, Whisper's prompt), the shared
+ * cleanup step replaces each `misheard` form with `spelling` (whole words, case-insensitive, `spelling` written exactly),
+ * and Kaylee's speech is sent `pronunciation` in place of `spelling`. `pronunciation` equal to `spelling` (letters only,
+ * case-blind) means "say it as written". Stored normalised: every text trimmed with inner spaces collapsed, `misheard`
+ * deduplicated case-insensitively and without a form equal to `spelling`, no form listed under two entries.
+ * Shared by `vocabulary.ts` (store, source hints), `vocabulary-check.ts` (validates it), `vocabulary-match.ts` (the
+ * replacements), `voice-settings.ts` (keeps it in the account's `voice` document) and `transcript-cleanup.ts`.
+ */
+export type VocabularyEntry = {
+  spelling: string;
+  pronunciation: string;
+  misheard: string[];
 };
 
 /**
