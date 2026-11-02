@@ -29,7 +29,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 const USAGE = [
   'usage: followups [list] [--all]',
-  '       followups add [--next "<one plain line>"]... [--gap "<one plain line>"]...',
+  '       followups add [--next "<one plain line, 240 characters at most>"]... [--gap "<one plain line, 240 characters at most>"]...',
   '       followups done <id> [<id>...]',
 ].join('\n');
 
