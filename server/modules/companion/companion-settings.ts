@@ -39,9 +39,9 @@ const LAST_RESORT_OPERATOR_NAME = 'Operator';
 
 /**
  * The models she can run on, in the order the picker lists them. Consumed by `companion-picture.ts`, which
- * labels each from the installed CLI's catalog, and by the model check below.
+ * labels the Claude ones from the installed CLI's catalog (DeepSeek is labelled there by name), and by the model check below.
  */
-export const COMPANION_MODELS: readonly CompanionModel[] = ['sonnet', 'fable', 'opus', 'haiku'];
+export const COMPANION_MODELS: readonly CompanionModel[] = ['sonnet', 'fable', 'opus', 'haiku', 'deepseek'];
 
 type TextField = 'name' | 'operatorName' | 'register' | 'deliveryNote' | 'talkBinding.label';
 type TextLimits = { min: number; max: number; singleLine: boolean };

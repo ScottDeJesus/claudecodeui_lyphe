@@ -4,10 +4,12 @@ import path from 'node:path';
 
 import { createSdkMcpServer, type Options, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 
+import { DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, readDeepseekApiKey } from '@/modules/deepseek/index.js';
 import { launchAccountEnv } from '@/modules/providers/index.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import type { CompanionSettings } from '@/shared/companion-types.js';
+import { companionProviderOf, type CompanionProvider } from '@/shared/companion-provider.js';
 
 /**
  * How her one streaming-input `query()` is launched: the options, and the check that its tool list is
@@ -26,7 +28,8 @@ import type { CompanionSettings } from '@/shared/companion-types.js';
  * She differs from the diagnosis agent in four ways, each one a reason she lives longer than a call:
  *   - she PERSISTS: `persistSession` stays on and the CLI session id the caller holds is passed as
  *     `resume`, so her conversation outlives the process (the idle closer ends it after two hours of silence) — but only while her
- *     tools and prompt are what that conversation began with: the CLI records both once and keeps them on a resume, so
+ *     tools, prompt and model provider are what that conversation began with: the CLI records the tools and prompt once and keeps
+ *     them on a resume, and an endpoint that did not open a conversation does not hold it, so
  *     `session/companion-session.ts` resumes a conversation only when its stored shape (`session/companion-shape.ts`) is the launch's own;
  *   - her `cwd` is `~/.claude/state/companion/<user id>`, a hidden project root
  *     (`shared/hidden-project-paths.ts`): her conversation never reaches a project list, and the heal
@@ -36,7 +39,10 @@ import type { CompanionSettings } from '@/shared/companion-types.js';
  *   - `CLAUDE_CODE_AUTO_COMPACT_WINDOW` in her env is 500k tokens: the CLI compacts her conversation when it
  *     reaches that, not at its default for a 1M model (about 967k). The CLI reads its env at launch, so a
  *     change here applies from her next launch.
- * It is a Claude launch like any other, so it starts on the account the house chose, on the subscription.
+ * Her model picks her ENDPOINT, and the launch carries everything that goes with it (`launchEnvironment` below). On a Claude model it is
+ * a Claude launch like any other: it starts on the account the house chose, on the subscription. On `deepseek` it is DeepSeek's
+ * Anthropic-compatible endpoint under the DeepSeek key, with the model name `deepseek-flash` verbatim and none of the Claude
+ * credentials in its env.
  *
  * Consumers: `session/companion-session.ts` (every launch and relaunch), `session/companion-handover.ts` (where the thread of a
  * conversation she drops is filed) and `tools/companion-tools.ts` (which re-exports `COMPANION_MCP_SERVER_NAME`, the one name her tools
@@ -111,12 +117,43 @@ export function unexpectedTools(listed: readonly string[], tools: ReadonlyArray<
   return listed.filter((name) => !own.has(name));
 }
 
+/** The names that say "run me on this endpoint": a launch carries exactly its own pair, never one it inherited. */
+const ENDPOINT_ENV_NAMES = ['ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN'] as const;
+
+/** The names a Claude launch rides on: the account's token and an API key. DeepSeek's endpoint must never be sent either of them. */
+const CLAUDE_CREDENTIAL_ENV_NAMES = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'] as const;
+
+/**
+ * The environment her CLI is launched with, by the provider her model is served from. The server's own env (`userFacingEnv`) is the
+ * start, and the endpoint pair is dropped from it FIRST, for every provider: the server can itself be running on DeepSeek (or be pointed
+ * at another endpoint), and a Claude launch that inherited the pair would be answered by that endpoint under a Claude model name while
+ * the CLI's tally still said Claude (measured 2026-09-15 on the house's plan-runner children; `deepseek.py`'s `ENDPOINT_ENV`).
+ *   - `claude`: the account the house chose rides in as its token (`launchAccountEnv`), and nothing else is added.
+ *   - `deepseek`: the Claude credentials are dropped (DeepSeek's endpoint under the operator's Claude token is a refused request, and
+ *     the token has no business there), and the endpoint plus the DeepSeek key are put in. A key that cannot be read THROWS rather
+ *     than falling back to Claude: the launch ends with her process's failure sentence, and nothing is sent to the subscription in its
+ *     place (the save of the model is refused while no key is held, so this is only a key removed afterwards).
+ */
+async function launchEnvironment(provider: CompanionProvider): Promise<NodeJS.ProcessEnv> {
+  const env = userFacingEnv();
+  for (const name of ENDPOINT_ENV_NAMES) delete env[name];
+
+  if (provider === 'claude') return { ...env, ...(await launchAccountEnv()).env };
+
+  const key = await readDeepseekApiKey();
+  if (!key) throw new Error('Her model is DeepSeek, but DEEPSEEK_API_KEY is not set, so her process cannot start on it.');
+  for (const name of CLAUDE_CREDENTIAL_ENV_NAMES) delete env[name];
+  return { ...env, ANTHROPIC_BASE_URL: DEEPSEEK_BASE_URL, ANTHROPIC_AUTH_TOKEN: key };
+}
+
 /**
  * The options of one launch of her conversation: `settings` give the model, `tools` the definitions her MCP server
  * carries (none is a valid set — the probe runs without any), `providerSessionId` the conversation to resume (`null` for a
  * fresh one: no `resume` key at all, never an empty one) and `systemPrompt` the prompt exactly as the launch's plan hashed it
- * (read nowhere here: a second read could differ from the one the shape was taken over). Async because the account env is read
- * from the house's door at launch. Consumed by `session/companion-process.ts`, which runs the launch.
+ * (read nowhere here: a second read could differ from the one the shape was taken over). Async because the account env (or the DeepSeek key)
+ * is read at launch. `settings.model` is the picker's word: a Claude alias goes to the CLI as it is, and `deepseek` goes as the vendor's
+ * own model name, `deepseek-flash`, verbatim — a Claude alias at DeepSeek's endpoint is mapped by the vendor to some other model. A launch that cannot
+ * be given its endpoint's credentials rejects. Consumed by `session/companion-process.ts`, which runs the launch.
  */
 export async function companionQueryOptions(
   userId: number,
@@ -127,9 +164,10 @@ export async function companionQueryOptions(
 ): Promise<Options> {
   const cwd = companionWorkingDirectory(userId);
   const executable = resolveClaudeCodeExecutablePath(process.env.CLAUDE_CLI_PATH);
-  const account = await launchAccountEnv();
+  const provider = companionProviderOf(settings.model);
+  const environment = await launchEnvironment(provider);
   return {
-    model: settings.model,
+    model: provider === 'deepseek' ? DEEPSEEK_MODEL : settings.model,
     systemPrompt,
     tools: [],
     mcpServers: { [COMPANION_MCP_SERVER_NAME]: createSdkMcpServer({ name: COMPANION_MCP_SERVER_NAME, tools }) },
@@ -140,7 +178,7 @@ export async function companionQueryOptions(
     includePartialMessages: true,
     cwd,
     maxTurns: COMPANION_MAX_TURNS,
-    env: { ...userFacingEnv(), ...account.env, CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(COMPANION_AUTO_COMPACT_WINDOW_TOKENS) },
+    env: { ...environment, CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(COMPANION_AUTO_COMPACT_WINDOW_TOKENS) },
     ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
     ...(providerSessionId ? { resume: providerSessionId } : {}),
   };

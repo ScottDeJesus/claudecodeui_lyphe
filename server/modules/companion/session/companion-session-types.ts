@@ -12,7 +12,7 @@ import type { CompanionCli, CompanionCliLaunch } from './companion-process.js';
 import type { TurnSink } from './companion-turns.js';
 
 /**
- * The CLI conversation an account holds: its `id`, and the `shape` (`companion-shape.ts`: her tools and prompt) it began with, which is
+ * The CLI conversation an account holds: its `id`, and the `shape` (`companion-shape.ts`: her tools, prompt and model provider) it began with, which is
  * `null` for a conversation begun before shapes were kept. Consumed by `companion-session.ts` (resumes only a conversation whose shape
  * is the launch's own) and by `companion-account.ts`, which reads and writes it through the store.
  */

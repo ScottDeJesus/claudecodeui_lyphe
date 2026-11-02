@@ -97,7 +97,7 @@ export function stateEnvelope(held: { focus: CompanionSessionRef | null; draft: 
 }
 
 /**
- * `<handover>`: a short account of the conversation she began her fresh start without (her tools or her prompt changed, so the old
+ * `<handover>`: a short account of the conversation she began her fresh start without (her tools, her prompt or her model provider changed, so the old
  * one was dropped), written by the summarizer from its thread. It is owed once, with the first message after the fresh start, after
  * `<state>`; she speaks from it and does not recite it. The text is a model's and quotes his and the chats' words, so it is escaped
  * (see the header). Consumed by the message assembler.

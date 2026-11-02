@@ -90,6 +90,7 @@
           "server/shared/document-fields.ts",
           "server/shared/cerberus-types.ts",
           "server/shared/companion-types.ts",
+          "server/shared/companion-provider.ts",
           "server/shared/station-types.ts",
           "server/shared/shadow-connector-lane.ts",
           "server/shared/shadow-connector-lane-router.ts",

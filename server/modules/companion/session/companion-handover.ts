@@ -4,7 +4,8 @@ import type { CompanionLogEntry } from '@/shared/companion-types.js';
 import { companionTranscriptPath } from './companion-launch.js';
 
 /**
- * The handover of a conversation she is made to drop. When her tools or her prompt changed (`companion-shape.ts`), her held CLI
+ * The handover of a conversation she is made to drop. When her tools, her prompt or the provider her model is served from changed
+ * (`companion-shape.ts`: a model change that crosses between Claude and DeepSeek is one), her held CLI
  * conversation is not resumed and she starts fresh; so that the fresh start is not a stranger, the summarizer reads the thread she
  * is leaving (her CLI transcript, `companionTranscriptPath`) and writes a few spoken lines of it, which her first message after the
  * start carries once as `<handover>` (`companion-envelopes.ts`, `companion-message.ts`). What the thread leaves out is hers by other

@@ -19,12 +19,16 @@
 // nothing.
 
 /**
- * The four Claude models Kaylee can run on, by the alias the CLI takes. Chosen from the panel's
- * picker (`CompanionPicture.models` lists them with their labels) and stored as
- * `CompanionSettings.model`; a change is applied live to her running process without losing her
- * conversation.
+ * The models Kaylee can run on: four Claude models by the alias the CLI takes, and `deepseek`, DeepSeek
+ * Flash on its own endpoint (the server launches her CLI against DeepSeek with the DeepSeek key, under
+ * the model name `deepseek-flash`; the value here is the picker's word, not what the CLI is told).
+ * Chosen from the panel's picker (`CompanionPicture.models` lists them with their labels) and stored as
+ * `CompanionSettings.model`. A change between two Claude models is applied live to her running process
+ * without losing her conversation; a change to or from `deepseek` crosses endpoints, which a live switch
+ * cannot do, so her process is closed, her next message launches it on the new model, and that launch
+ * starts a fresh conversation (a conversation is never resumed on the other endpoint).
  */
-export type CompanionModel = 'sonnet' | 'fable' | 'opus' | 'haiku';
+export type CompanionModel = 'sonnet' | 'fable' | 'opus' | 'haiku' | 'deepseek';
 
 /**
  * The key or mouse button that presses Kaylee's talk button, bound in Settings > Voice > Companion and

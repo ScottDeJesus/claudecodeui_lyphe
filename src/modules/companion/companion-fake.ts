@@ -27,6 +27,7 @@ const MODELS: CompanionPicture['models'] = [
   { value: 'fable', label: 'Fable 5.1' },
   { value: 'opus', label: 'Opus 5.5' },
   { value: 'haiku', label: 'Haiku 5.5' },
+  { value: 'deepseek', label: 'DeepSeek' },
 ];
 
 /** A register long enough to scroll its field, with the three slots the real one carries. */

@@ -1,5 +1,7 @@
 import { companionDb } from '@/modules/database/index.js';
+import { readDeepseekApiKey } from '@/modules/deepseek/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
+import { companionProviderOf } from '@/shared/companion-provider.js';
 import type { CompanionDraft, CompanionPicture, CompanionSessionRef, CompanionSettings } from '@/shared/companion-types.js';
 import type { StationAskAnswer, StationLanded, StationNeed } from '@/shared/station-types.js';
 import { AppError } from '@/shared/utils.js';
@@ -29,8 +31,9 @@ import { stationLanded } from './station/station-landed.js';
  * Every verb here backs one route (`companion.routes.ts`, `cards.routes.ts`) or one feed, and takes the account's id first, so a call
  * cannot reach another account's rows, pages or conversation. The routes only parse and answer; the verbs decide:
  *   - `sendText` takes the floor for the page that typed, logs his line (with the files he attached, read off the upload store) and pushes it to her;
- *   - `saveSettings` stores the patch, tells every page, and applies a model change to her running process
- *     with her conversation kept (`setModel`);
+ *   - `saveSettings` stores the patch, tells every page, and applies a model change to her running process: a switch between two Claude
+ *     models live, with her conversation kept (`setModel`), and a switch to or from DeepSeek by closing her process, because only a
+ *     new launch can change the endpoint (her next message launches it, on a fresh conversation); a save of DeepSeek is refused while no key is held;
  *   - `press` is a press of the talk button or of her name (`companion-press.ts`): a button press takes the floor for its page (a
  *     name press takes it only while no page holds it), the clip is heard, and
  *     his words (or the empty press) are logged and pushed in arrival order; a hearing that fails pushes nothing;
@@ -71,6 +74,10 @@ const FAILED_RUN_MARK_MS = 30_000;
 /** The 409 of an edit when no draft is held, with what to do about it. */
 const noDraft = (): AppError =>
   new AppError('There is no draft to edit; ask her to draft one first.', { code: 'COMPANION_NO_DRAFT', statusCode: 409 });
+
+/** The 400 of a save of the DeepSeek model while the house holds no DeepSeek key: her process would fail to launch on it. */
+const noDeepseekKey = (): AppError =>
+  inputInvalid('model cannot be deepseek: DEEPSEEK_API_KEY is not set on this server, so she could not start on it.', 'model');
 
 /** The 503 of a message that arrives once the server has begun to stop: her process would be launched with nothing left to end it. */
 const stopping = (): AppError =>
@@ -197,22 +204,33 @@ function createCompanionService() {
 
     /**
      * Stores `patch`, tells every page the settings as they now read, and applies a model change to her running
-     * process (her conversation is kept; a process that is asleep launches on the stored model). A model the CLI
-     * refuses to switch to is a system line on the panel, never a failed save: the setting IS saved and the
-     * next time she wakes she runs on it.
+     * process (a process that is asleep launches on the stored model). A switch between two Claude models is applied
+     * live and her conversation is kept; a model the CLI refuses to switch to is a system line on the panel, never a
+     * failed save: the setting IS saved and the next time she wakes she runs on it. A switch that CROSSES endpoints
+     * (to or from DeepSeek) is never sent to the CLI: `setModel` changes the model name and nothing else, so it would
+     * leave her on the old endpoint with the wrong model name. Her process is closed instead; her next message
+     * launches it on the new model and its endpoint, and since the conversation belongs to the endpoint that opened it,
+     * on a fresh one (`companion-shape.ts`). The key is checked BEFORE anything is read or stored, so the read of the
+     * old settings and their replacement stay one synchronous step, as the settings module promises.
      */
     async saveSettings(userId: number, patch: CompanionSettingsPatch): Promise<CompanionSettings> {
       const { store, session } = accountOf(userId);
+      if (patch?.model === 'deepseek' && !(await readDeepseekApiKey())) throw noDeepseekKey();
       const before = readCompanionSettings(userId);
       const settings = saveCompanionSettings(userId, patch);
       store.emit({ kind: 'companion_settings', settings });
-      if (settings.model !== before.model) {
-        try {
-          await session.setModel(settings.model);
-        } catch (error) {
-          console.error(`[Companion] account ${userId}: her running process would not switch to ${settings.model}`, error);
-          store.appendLog({ role: 'system', text: `She could not switch to ${settings.model} while awake; she will use it the next time she wakes.` });
-        }
+      if (settings.model === before.model) return settings;
+
+      if (companionProviderOf(settings.model) !== companionProviderOf(before.model)) {
+        console.log(`[Companion] account ${userId}: her model went ${before.model} → ${settings.model}, which changes her endpoint; closing her process so her next message launches on it`);
+        await session.close('her model changed endpoint');
+        return settings;
+      }
+      try {
+        await session.setModel(settings.model);
+      } catch (error) {
+        console.error(`[Companion] account ${userId}: her running process would not switch to ${settings.model}`, error);
+        store.appendLog({ role: 'system', text: `She could not switch to ${settings.model} while awake; she will use it the next time she wakes.` });
       }
       return settings;
     },

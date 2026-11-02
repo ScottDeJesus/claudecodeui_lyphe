@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
+import { companionProviderOf } from '@/shared/companion-provider.js';
 import type { CompanionAttachment, CompanionProcess } from '@/shared/companion-types.js';
 import { claudeImageBlocks, type ClaudeImageBlock } from '@/shared/image-attachments.js';
 
@@ -31,9 +32,10 @@ import { guarded } from './guarded-callback.js';
  * answer is `companion-ledger.ts`.
  *
  * ASLEEP until a push wakes it (`waking`, then `awake` at the launch's first `init`); her CLI session id is
- * stored at `init`, with the shape of her tools and prompt the launch had (`companion-shape.ts`), and every later launch passes the id as
+ * stored at `init`, with the shape of her tools, prompt and model provider the launch had (`companion-shape.ts`), and every later launch passes the id as
  * `resume` — when the stored shape is the launch's own. The CLI records a conversation's tools and prompt once and keeps them on every
- * resume, so a conversation begun with other ones would go on with them: a held id with another shape, or with none (it began before
+ * resume, so a conversation begun with other ones would go on with them, and a conversation belongs to the endpoint that opened it (a model
+ * change between Claude and DeepSeek is another shape): a held id with another shape, or with none (it began before
  * shapes were kept), is not resumed. It is forgotten, one system line says so, the state is owed to her, and she launches fresh (her
  * memory is the docstore's). When the thread of that conversation is on disk, a HANDOVER of it is written first (`companion-refusal.ts`,
  * `companion-handover.ts`: the summarizer, up to a bound) and her first message after the fresh start carries it once as `<handover>`;
@@ -342,14 +344,17 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
    */
   function planWith(resume: string | null): LaunchPlan {
     const tools = deps.tools;
-    const systemPrompt = fillSystemPrompt(deps.readSettings().operatorName, readSoul(userId));
-    return { resume, tools, systemPrompt, shape: sessionShapeOf(tools, systemPrompt) };
+    const settings = deps.readSettings();
+    const systemPrompt = fillSystemPrompt(settings.operatorName, readSoul(userId));
+    // The provider is read with the prompt, in the same synchronous run, so the shape is of the endpoint the launch is about to be made on.
+    return { resume, tools, systemPrompt, shape: sessionShapeOf(tools, systemPrompt, companionProviderOf(settings.model)) };
   }
 
   /**
    * What a new launch begins with. The held conversation is continued only when the shape stored with it is this launch's own AND its id is
    * a UUID: the CLI records a conversation's tools and prompt once and keeps them on every resume, so a conversation begun with other ones
-   * would go on with them (a parameter added to a tool, a sentence changed in her prompt: dark to her). A held conversation whose shape is
+   * would go on with them (a parameter added to a tool, a sentence changed in her prompt: dark to her), and the other provider never held it
+   * (a model change between Claude and DeepSeek). A held conversation whose shape is
    * not the launch's (changed, or never kept) is forgotten at once and said once on her panel, whatever its id looks like: a damaged id with
    * a stale shape is one refusal, one sentence. Her memory is the docstore's and is not touched. A wake that finds such a conversation with a
    * thread on disk never reaches here before the refusal is carried out WITH its handover (`gate.holding()` in `push`, `warm` and the

@@ -4923,7 +4923,7 @@ section: server/modules/companion — the service verbs, one account's wiring, t
 | `press(userId, client, { audio, durationMs, opened })` | a press of his talk button (`opened: 'button'`) or one her name opened (`'name'`), answering `{ text }` (what was logged; `''` for the empty press); built by `createPress` in `companion-press.ts`. See Press. 503 `COMPANION_STOPPING` once `stopAll` has run, before the press is heard and again before it is pushed. |
 | `speech(userId, client, { turnId, index }, signal)` | one of her sentences as streamed PCM for the page `client`, which must hold the floor; an `AppError` refusal comes before the first byte. `speak` of `createSpeech` (`companion-speech.ts`): MAN-9110 |
 | `cut(userId, { turnId, heard, interrupted })` | the talk press while she speaks: aborts the turn's syntheses, owes `<cut>`, interrupts her. MAN-9111 |
-| `saveSettings(userId, patch)` | stores, emits `companion_settings` to every page, and on a model change calls `session.setModel`. A switch the CLI refuses or does not answer within `CLI_GRACE_MS` (5 s) is a `system` log line; the save and the stored model stand, and her next wake runs on it. |
+| `saveSettings(userId, patch)` | stores, emits `companion_settings` to every page, and on a model change applies it: between two Claude models by `session.setModel`; to or from `deepseek` (a change of `companionProviderOf`) by `session.close('her model changed endpoint')` instead, because `setModel` changes the model name and never the endpoint — her next message launches on the new model and endpoint, on a fresh conversation (MAN-9209). A save of `deepseek` is refused with a 400 while no DeepSeek key is held. A switch the CLI refuses or does not answer within `CLI_GRACE_MS` (5 s) is a `system` log line; the save and the stored model stand, and her next wake runs on it. |
 | `editDraft(userId, text)` | replaces the held draft's words, keeps its target; 409 `COMPANION_NO_DRAFT` when none is held |
 | `clearDraft`, `dismissNote` | a note already gone is not an error |
 | `pinNote(userId, id, pinned)` | his Pin or Unpin (`PUT /notes/:id/pin`): `store.setNotePinned`; false for a card not on his panel (the route's 404), true for a card already in that state |
@@ -5053,7 +5053,7 @@ The one place that says which session callback writes which row and sends which 
 ## `companion-picture.ts` — `buildPicture(account)`
 - Shape: `{ settings, models, process, activity, turnId, focus, draft, pending, walk, notes, log, floor, face }`; `log` = newest 200 rows (store keeps 400). `pending` is the stored pending action WITHOUT its pin (`withoutPin`), or `null`. `face` = `faceService.faceOf(account.userId)` (MAN-9237): the face her pages draw and the making of his next, read in the same synchronous run.
 - The catalog is awaited FIRST, everything else read after it in one synchronous run: no frame lands between two fields.
-- Model labels: `COMPANION_MODELS` (`sonnet`, `fable`, `opus`, `haiku`) matched to `readClaudeModelsDefinition().OPTIONS` by family (`[1m]` suffix ignored); label = the option's `label` as given ("Sonnet 5.5"), else the capitalized family word. why: the catalog has already split the description at ` · `.
+- Model labels: `COMPANION_MODELS` (`sonnet`, `fable`, `opus`, `haiku`, `deepseek`) matched to `readClaudeModelsDefinition().OPTIONS` by family (`[1m]` suffix ignored); label = the option's `label` as given ("Sonnet 5.5"), else the capitalized family word. `deepseek` is no Claude family: its label is written in `companion-picture.ts` (`DeepSeek`) and never looked up. why: the catalog has already split the description at ` · `.
 - A catalog read that fails is logged (`[Companion] the CLI model catalog could not be read`) and the picker shows the family words.
 - `readClaudeModelsDefinition` is exported by `server/modules/providers/index.ts` for this reader.
 
@@ -5648,7 +5648,7 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 ## Options
 | option | value | why |
 |---|---|---|
-| `model` | `settings.model` (`sonnet` \| `opus` \| `haiku`) | read when the launch begins |
+| `model` | `settings.model` (a Claude alias, passed as it is), or `deepseek-flash` (`DEEPSEEK_MODEL`) verbatim when `settings.model` is `deepseek` | read when the launch begins; a Claude alias at DeepSeek's endpoint is mapped by the vendor to some other model |
 | `systemPrompt` | the prompt the session's plan composed and hashed, handed to the launch (`fillSystemPrompt(operatorName, readSoul(userId))`: her two soul pages, then the plumbing; MAN-9213), a plain string | never the Claude Code preset: no house rule, CLAUDE.md or skill reaches her |
 | `settingSources` | `[]` | nothing on disk widens what she may do |
 | `settings` | `{ autoMemoryEnabled: false }` | the CLI keys auto-memory (`MEMORY.md`, his standing rules) to the git root of the cwd; hers sits inside `~/.claude` |
@@ -5659,7 +5659,7 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 | `includePartialMessages` | `true` | text deltas feed the sentence stream |
 | `maxTurns` | 30 | per turn of hers: one answer to him, every tool call inside it |
 | `cwd` | `companionWorkingDirectory(userId)` | below |
-| `env` | `{ ...userFacingEnv(), ...(await launchAccountEnv()).env, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '500000' }` | the account the house chose, on the subscription; her CLI compacts her conversation when it reaches 500k tokens, not at its default for a 1M model (about 967k) |
+| `env` | `{ ...launchEnvironment(provider), CLAUDE_CODE_AUTO_COMPACT_WINDOW: '500000' }`; `launchEnvironment` starts from `userFacingEnv()` and deletes `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` for every provider, then for `claude` adds `(await launchAccountEnv()).env` (the account the house chose, on the subscription), and for `deepseek` deletes `CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY` and sets `ANTHROPIC_BASE_URL` = `DEEPSEEK_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` = the key from `readDeepseekApiKey()` (no key = the launch throws, filed as her process's failure: nothing is sent to Claude instead) | her CLI compacts her conversation when it reaches 500k tokens, not at its default for a 1M model (about 967k) |
 | `pathToClaudeCodeExecutable` | `resolveClaudeCodeExecutablePath(CLAUDE_CLI_PATH)`; key absent when it does not resolve | |
 | `resume` | the held CLI session id, only when the shape stored with it is the launch's own (MAN-9209); key ABSENT for a fresh launch, never empty | |
 
@@ -5694,7 +5694,8 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 | process up | `conversation.setModel(model)`, bounded by `CLI_GRACE_MS` = 5 s; no answer = throws `her CLI did not answer a switch to <model> within 5 s` |
 | launch under way (options being built) | remembered as `wantedModel`; applied once the query exists, if it differs from the launch's model; a failure is logged `the model change made while she woke was not applied` |
 | no process | nothing to apply: the next launch reads the stored model |
-- No relaunch, no lost conversation: the conversation continues on the new model. `companionService.saveSettings` calls it on a model change; a throw becomes the system line `She could not switch to <model> while awake; she will use it the next time she wakes.` and the save stands.
+- No relaunch, no lost conversation: the conversation continues on the new model. `companionService.saveSettings` calls it on a model change BETWEEN CLAUDE MODELS; a throw becomes the system line `She could not switch to <model> while awake; she will use it the next time she wakes.` and the save stands.
+- A change that crosses endpoints (`companionProviderOf` of the old and new model differ: to or from `deepseek`) never reaches `setModel`, which changes the model name and never the endpoint. `saveSettings` logs `[Companion] account <id>: her model went <old> → <new>, which changes her endpoint; closing her process so her next message launches on it` and closes her process (`closeProcess`: a turn in flight is stopped and his unanswered words are handed to the next process); the next message relaunches with the new model and env, and the provider in the shape (MAN-9209) makes it a fresh conversation.
 
 ## Ending a launch (`CompanionCli`)
 | verb | does |
@@ -6162,7 +6163,7 @@ section: server/shared/companion-types.ts — the wire contract: the types, the 
 
 | type | shape |
 |---|---|
-| `CompanionModel` | `'sonnet' \| 'fable' \| 'opus' \| 'haiku'` |
+| `CompanionModel` | `'sonnet' \| 'fable' \| 'opus' \| 'haiku' \| 'deepseek'` (`deepseek` = DeepSeek Flash on DeepSeek's endpoint; the CLI is told `deepseek-flash`, not this word) |
 | `CompanionSettings` | `name` (1–40, no line break, default `Kaylee`), `operatorName` (1–40), `register` (200–16000, slots `{name}` `{delivery_note}` `{sound_tags}`), `deliveryNote` (0–120, no line break), `model` (default `sonnet`), `live` (default `false`), `talkBinding` (`TalkBinding \| null`, default `null`; `PUT` with `null` unbinds). Storage and defaults: MAN-9087 |
 | `TalkBinding` | the key or mouse button that presses her talk button: `{ kind: 'key', code, ctrl, alt, shift, meta, label }` (`code` is a `KeyboardEvent.code`, 1–40 of `[A-Za-z0-9]`; a function key `F1`–`F24`, or Ctrl, Alt or Meta held with the key) or `{ kind: 'mouse', button: 1 \| 3 \| 4, label }` (middle, back, forward); `label` 1–40, no line break (`F8`, `Ctrl+Space`, `Mouse back`). Server limits: MAN-9087; the page's one rule that accepts, matches and labels a press: MAN-9062 |
 | `CompanionSessionRef` | `{ sessionId, name, project }` |
@@ -6269,7 +6270,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts
 | `live` | `false`: alerts and focus news reach her only while he has turned it on |
 | `talkBinding` | `null`: no key or mouse button presses her talk button |
 - `operatorName` default, first that passes its limit: the first word of `users.git_name` (up to the first whitespace; a name written as one run is cut at the first lower-to-upper boundary: `ScottDeJesus` → `Scott`), else the username with its first letter upper-cased, else `Operator`.
-- `COMPANION_MODELS` = `sonnet`, `fable`, `opus`, `haiku`: the picker's order.
+- `COMPANION_MODELS` = `sonnet`, `fable`, `opus`, `haiku`, `deepseek`: the picker's order.
 
 ## Limits (`TEXT_LIMITS`, counted in code points: an emoji is one)
 | field | min | max | one line |
@@ -6286,7 +6287,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts
 - `patch` is checked as untyped input (a route hands it a request body): not an object → 400.
 - A key that is not a setting is refused, not ignored: `<key, 40 characters at most> is not a setting; the settings are name, operatorName, register, deliveryNote, model, live, talkBinding.`
 - A field set to `undefined` is left as it was. `register: null` deletes the override: the default template returns; `talkBinding: null` deletes its override: nothing is bound.
-- Nothing is written unless EVERY field passes. The first failure throws `inputInvalid(sentence, field)` → 400 `COMPANION_INPUT_INVALID`, `details.field` = the field (MAN-9058 §Refusals). Sentences: `<field> must be <min>-<max> characters[ with no line break] (it is not text \| it has a line break \| it has <n>).`, `model must be one of sonnet, fable, opus, haiku.`, `live must be true or false.`, and for the talk binding (all with `details.field` = `talkBinding`): `talkBinding must be null or an object with a kind of key or mouse.`, `talkBinding.kind must be key or mouse.`, `talkBinding.label must be 1-40 characters with no line break (…)`, `talkBinding.button must be 1 (middle), 3 (back) or 4 (forward).`, `talkBinding.code must be 1-40 characters of letters and digits (it is a KeyboardEvent.code, as KeyK).`, `talkBinding.ctrl, alt, shift and meta must each be true or false.`, `talkBinding must be a function key (F1-F24) or hold Ctrl, Alt or Meta with the key: a key on its own fires while you type.`
+- Nothing is written unless EVERY field passes. The first failure throws `inputInvalid(sentence, field)` → 400 `COMPANION_INPUT_INVALID`, `details.field` = the field (MAN-9058 §Refusals). Sentences: `<field> must be <min>-<max> characters[ with no line break] (it is not text \| it has a line break \| it has <n>).`, `model must be one of sonnet, fable, opus, haiku, deepseek.`, `live must be true or false.`, `model cannot be deepseek: DEEPSEEK_API_KEY is not set on this server, so she could not start on it.` (400, `details.field` = `model`; raised by `companionService.saveSettings` before anything is read or stored, only for a save that carries `model: 'deepseek'` while `readDeepseekApiKey()` answers no key), and for the talk binding (all with `details.field` = `talkBinding`): `talkBinding must be null or an object with a kind of key or mouse.`, `talkBinding.kind must be key or mouse.`, `talkBinding.label must be 1-40 characters with no line break (…)`, `talkBinding.button must be 1 (middle), 3 (back) or 4 (forward).`, `talkBinding.code must be 1-40 characters of letters and digits (it is a KeyboardEvent.code, as KeyK).`, `talkBinding.ctrl, alt, shift and meta must each be true or false.`, `talkBinding must be a function key (F1-F24) or hold Ctrl, Alt or Meta with the key: a key on its own fires while you type.`
 - A register equal to `COMPANION_REGISTER_DEFAULT.trim()` is not stored as an override. why: a page that echoes the whole settings object back must not freeze today's default against every later edit of it.
 - No override left → the preference row is deleted.
 
@@ -9269,12 +9270,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/a
 
 why: the CLI records a conversation's tools and system prompt ONCE, in its first request, and keeps that record on every resume. A new tool NAME reaches a resumed session (the CLI re-lists the server's tools); a parameter added to an existing tool, or an edited prompt, does not. A change to either reaches her only through a fresh conversation.
 
-## `sessionShapeOf(tools, systemPrompt)` (`session/companion-shape.ts`, pure)
-- Hex SHA-256 over `{ tools, systemPrompt }`: each tool's `name`, `description` and JSON schema, tools in name order, object keys sorted (arrays keep their order); `systemPrompt` is the COMPOSED prompt, `fillSystemPrompt(operatorName, readSoul(userId))`: her two soul pages, then the plumbing (MAN-9213). The plan reads the soul once and hands that very string to the launch, so what is hashed is what is sent; an edit to either page is a new shape at her next launch.
+## `sessionShapeOf(tools, systemPrompt, provider)` (`session/companion-shape.ts`, pure)
+- Hex SHA-256 over `{ tools, systemPrompt }` for the `claude` provider, and over `{ tools, systemPrompt, provider: 'deepseek' }` for any other (`companionProviderOf(settings.model)`, `server/shared/companion-provider.ts`): the `claude` fingerprint is byte-identical to the one taken before the provider existed, so no held Claude conversation went stale the day DeepSeek arrived; each tool's `name`, `description` and JSON schema, tools in name order, object keys sorted (arrays keep their order); `systemPrompt` is the COMPOSED prompt, `fillSystemPrompt(operatorName, readSoul(userId))`: her two soul pages, then the plumbing (MAN-9213). The plan reads the soul once and hands that very string to the launch, so what is hashed is what is sent; an edit to either page is a new shape at her next launch.
 - Schema = `z.toJSONSchema(z.object(inputSchema), { unrepresentable: 'any', io: 'input' })`. `io: 'input'` is the side the bridge serves: a property wrapped in `.transform()` keeps its constraints, and `additionalProperties:false`, which output mode adds, is not hashed. A schema zod cannot represent is written `{}`: the fingerprint never fails a launch.
 | in the shape | out of the shape |
 |---|---|
-| tool name, description, input schema; the composed prompt (the soul pages' text and the operator's name included: editing a page or that setting costs a fresh session) | the model (`setModel`, applied live); the register (rides with every message); tool annotations; handler code |
+| tool name, description, input schema; the composed prompt (the soul pages' text and the operator's name included: editing a page or that setting costs a fresh session); the provider when it is not `claude` (a conversation belongs to the endpoint that opened it: crossing between Claude and DeepSeek costs a fresh session) | the model between two Claude models (`setModel`, applied live); the register (rides with every message); tool annotations; handler code |
 
 ## The stored pair
 | where | what |
@@ -9289,7 +9290,7 @@ Runs for every launch the session opens: a first message, a wake from `asleep`, 
 | held | does |
 |---|---|
 | nothing | fresh |
-| a shape other than the launch's own (changed, or `null`), no thread of it on disk | `refusal.bare`: journal `[Companion] account <id>: not resuming session <id>: no shape held (it began before shapes were kept)` or `…: shape changed (her tools or her prompt are not what it began with)`, then `; she starts fresh`; `writeProviderSession(null)` AT ONCE; system line `Her tools or her prompt changed, so she starts fresh; she keeps her memory.`; fresh. The id's form is not looked at: a damaged id with a stale shape is one refusal, one sentence |
+| a shape other than the launch's own (changed, or `null`), no thread of it on disk | `refusal.bare`: journal `[Companion] account <id>: not resuming session <id>: no shape held (it began before shapes were kept)` or `…: shape changed (her tools, her prompt or her endpoint are not what it began with)`, then `; she starts fresh`; `writeProviderSession(null)` AT ONCE; system line `Her tools, her prompt or her model provider changed, so she starts fresh; she keeps her memory.`; fresh. The id's form is not looked at: a damaged id with a stale shape is one refusal, one sentence |
 | a shape other than the launch's own, its thread on disk (`companionTranscriptPath`) | never reaches here: the wake waits while the summarizer writes a handover, the id is forgotten AFTER the text is stored, then the launch plans with nothing held and its first message carries `<handover>` (MAN-9210, MAN-9211) |
 | the launch's own shape, id a UUID (`resumableSessionId`) | `resume` = the id; no sentence |
 | the launch's own shape, id not a UUID | warn `[Companion] account <id>: the held session id is not a UUID; she starts fresh`; no panel sentence; fresh |
@@ -9303,7 +9304,7 @@ Runs for every launch the session opens: a first message, a wake from `asleep`, 
 - A probe of a changed tool schema or prompt asks her to name it after the server handover (`create_session`'s parameters): the first message after it is the refusal and the fresh start.
 - Measured 2026-10-29, live, account 1 on Haiku: the held id with no shape was refused once; after the fresh start she named `create_session`'s parameters `project, text, title, model`; a no-change server handover resumed the same id.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-shape.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session-shape.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-shape.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session-shape.mjs
 
 ## MAN-9210 — server/modules/companion/session — her fresh-start handover: when it is written, the wait behind it, the three outcomes
 
@@ -9330,9 +9331,9 @@ why: a refused resume (MAN-9209) drops her conversation; the fresh start would b
 ## Outcomes
 | outcome | stored | panel sentence | journal |
 |---|---|---|---|
-| written | text in `companion_state.handover` | `Her tools or her prompt changed, so she starts fresh with a handover of what you were discussing; she keeps her memory.` | `[Companion] account <id>: handover of session <id> written by <model>: <in> tokens in, <out> out, <n> characters`; one exchange: `…written from her newest exchange alone (…), no summarizer: <n> characters` |
-| failed: exit 1, 2 (more than one exchange), 3; no summary; unreadable answer; timeout; transcript gone; store threw | nothing | `Her tools or her prompt changed, so she starts fresh, and the handover of what you were discussing could not be written; she keeps her memory.` | `[Companion] account <id>: the handover of session <id> could not be written: <cause>` (not written when stopped on purpose) |
-| no thread on disk | nothing | `Her tools or her prompt changed, so she starts fresh; she keeps her memory.` | the refusal line (MAN-9209) |
+| written | text in `companion_state.handover` | `Her tools, her prompt or her model provider changed, so she starts fresh with a handover of what you were discussing; she keeps her memory.` | `[Companion] account <id>: handover of session <id> written by <model>: <in> tokens in, <out> out, <n> characters`; one exchange: `…written from her newest exchange alone (…), no summarizer: <n> characters` |
+| failed: exit 1, 2 (more than one exchange), 3; no summary; unreadable answer; timeout; transcript gone; store threw | nothing | `Her tools, her prompt or her model provider changed, so she starts fresh, and the handover of what you were discussing could not be written; she keeps her memory.` | `[Companion] account <id>: the handover of session <id> could not be written: <cause>` (not written when stopped on purpose) |
+| no thread on disk | nothing | `Her tools, her prompt or her model provider changed, so she starts fresh; she keeps her memory.` | the refusal line (MAN-9209) |
 
 The text and the summarizer call: MAN-9211.
 

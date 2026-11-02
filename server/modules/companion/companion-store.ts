@@ -56,7 +56,7 @@ import { isUnansweredList, type UnansweredMessage } from './companion-unanswered
  */
 export type CompanionStoredState = {
   providerSessionId: string | null;
-  /** The fingerprint of her tools and prompt when `providerSessionId` began (`session/companion-shape.ts`); `null` for none, and for a conversation begun before it was kept. */
+  /** The fingerprint of her tools, prompt and model provider when `providerSessionId` began (`session/companion-shape.ts`); `null` for none, and for a conversation begun before it was kept. */
   sessionShape: string | null;
   focus: CompanionSessionRef | null;
   draft: CompanionDraft | null;
@@ -114,7 +114,7 @@ export type CompanionEmittedFrame = Extract<
  */
 export type CompanionStore = {
   readState(): CompanionStoredState;
-  /** Her CLI conversation with the shape of her tools and prompt it began with, written together (`null`, `null` after Clear). No frame: a page has no use for it. */
+  /** Her CLI conversation with the shape of her tools, prompt and model provider it began with, written together (`null`, `null` after Clear). No frame: a page has no use for it. */
   setProviderSession(providerSessionId: string | null, sessionShape: string | null): void;
   /** The handover her last refused resume left for her first message after the fresh start (`session/companion-handover.ts`), or `null` for none. No frame. */
   readHandover(): string | null;

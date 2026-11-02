@@ -3,9 +3,10 @@ import { makeHandover, type LastWords } from './companion-handover.js';
 import type { CompanionSessionDeps, HeldSession } from './companion-session-types.js';
 
 /**
- * The refused resume: a held CLI conversation whose shape (`companion-shape.ts`: her tools and her prompt) is not the launch's own is
+ * The refused resume: a held CLI conversation whose shape (`companion-shape.ts`: her tools, her prompt and the endpoint her model is served from) is not the launch's own is
  * not continued. It is forgotten at once, the panel says so once, and she starts fresh; the CLI keeps a conversation's tools and prompt
- * as they were when it began, so a resume would hand her yesterday's. Two forms, by whether there is a thread to hand over:
+ * as they were when it began and the endpoint that did not open a conversation does not hold it, so a resume would hand her yesterday's or
+ * none at all. Two forms, by whether there is a thread to hand over:
  *   - BARE (`bare`): nothing of the conversation is on disk, so the id is forgotten and the line is said, synchronously, in the launch's own call.
  *   - WITH A HANDOVER (`withThread`, `withHandover`): her thread is on disk, so the summarizer writes a few lines of it first
  *     (`companion-handover.ts`, up to a bound), the text goes on her row, THEN the conversation is forgotten and the panel says so. In that
@@ -18,11 +19,11 @@ import type { CompanionSessionDeps, HeldSession } from './companion-session-type
  */
 
 /** What her panel says when a held conversation is not resumed because its shape is not today's and there is no thread of it to hand over. */
-const SHAPE_CHANGED_LINE = 'Her tools or her prompt changed, so she starts fresh; she keeps her memory.';
+const SHAPE_CHANGED_LINE = 'Her tools, her prompt or her model provider changed, so she starts fresh; she keeps her memory.';
 /** The same refusal when the summarizer wrote a handover of the thread for her first message. */
-const SHAPE_CHANGED_HANDOVER_LINE = 'Her tools or her prompt changed, so she starts fresh with a handover of what you were discussing; she keeps her memory.';
+const SHAPE_CHANGED_HANDOVER_LINE = 'Her tools, her prompt or her model provider changed, so she starts fresh with a handover of what you were discussing; she keeps her memory.';
 /** The same refusal when a handover was tried and could not be written: the cause is in the journal. */
-const HANDOVER_FAILED_LINE = 'Her tools or her prompt changed, so she starts fresh, and the handover of what you were discussing could not be written; she keeps her memory.';
+const HANDOVER_FAILED_LINE = 'Her tools, her prompt or her model provider changed, so she starts fresh, and the handover of what you were discussing could not be written; she keeps her memory.';
 
 /** What `createRefusal` answers; the session holds one. */
 type Refusal = {
@@ -46,7 +47,7 @@ export function createRefusal(
   /** The journal line of a held conversation that is not resumed because its shape is not the launch's own. */
   function journal(held: HeldSession): void {
     console.log(
-      `[Companion] account ${userId}: not resuming session ${held.id}: ${held.shape === null ? 'no shape held (it began before shapes were kept)' : 'shape changed (her tools or her prompt are not what it began with)'}; she starts fresh`
+      `[Companion] account ${userId}: not resuming session ${held.id}: ${held.shape === null ? 'no shape held (it began before shapes were kept)' : 'shape changed (her tools, her prompt or her endpoint are not what it began with)'}; she starts fresh`
     );
   }
 

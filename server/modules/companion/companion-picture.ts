@@ -20,7 +20,7 @@ import { faceService } from './face/face.service.js';
  * 5.6" the day the CLI moves, with no release here. The catalog's own `label` is already that name — it takes
  * the version out of the description's "Sonnet 5.5 · Efficient for routine tasks" when the CLI words the name
  * by family alone — so it is used as given; a family the catalog has no entry for (or an empty one) is the word
- * capitalized, which is a label that is never wrong.
+ * capitalized, which is a label that is never wrong. DeepSeek is no Claude family, so it is named here (`DeepSeek`) and never looked up.
  *
  * Consumer: `companion.service.ts` (`picture`).
  */
@@ -32,6 +32,9 @@ const PICTURE_LOG_ROWS = 200;
 const familyOf = (value: string): string => value.replace(/\[1m\]$/i, '').toLowerCase();
 
 const capitalized = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
+
+/** What the picker calls the DeepSeek model: it is not a Claude family, so the CLI's catalog has no name for it. */
+const DEEPSEEK_LABEL = 'DeepSeek';
 
 /**
  * The picker's models with their labels. A catalog that cannot be read is logged with what failed and
@@ -46,6 +49,7 @@ export async function modelOptions(): Promise<CompanionPicture['models']> {
     console.error('[Companion] the CLI model catalog could not be read; the picker shows the family names', error);
   }
   return COMPANION_MODELS.map((value: CompanionModel) => {
+    if (value === 'deepseek') return { value, label: DEEPSEEK_LABEL };
     const entry = definition?.OPTIONS.find((option) => familyOf(option.value) === value);
     return { value, label: entry?.label.trim() || capitalized(value) };
   });

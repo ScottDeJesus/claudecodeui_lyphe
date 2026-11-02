@@ -9,12 +9,19 @@ import { createDeepseekKeyReader } from './deepseek-key.js';
 // at `/api/deepseek` — the money left on the account this host's DeepSeek Flash builds spend.
 export { createDeepseekModule } from './deepseek.module.js';
 
+// DEEPSEEK_BASE_URL, DEEPSEEK_MODEL: used by `kanban-metis` (a Flash board's Metis) and `companion` (Kaylee on
+// DeepSeek) to point a child's CLI at DeepSeek's Anthropic-compatible endpoint under the model name it needs.
+export { DEEPSEEK_BASE_URL, DEEPSEEK_MODEL } from './deepseek-endpoint.js';
+
 /**
  * The DeepSeek key, as a reader the balance route and a spawning module share.
  *
- * Consumer: `server/modules/kanban-metis`, which hands the key to a board's Metis child as
- * `ANTHROPIC_AUTH_TOKEN` when that board's own switch is on. It is the ONE TypeScript-side reader
- * of `DEEPSEEK_API_KEY` — nothing in that module opens a `.env` or names the variable itself.
+ * Consumers: `server/modules/kanban-metis`, which hands the key to a board's Metis child as
+ * `ANTHROPIC_AUTH_TOKEN` when that board's own switch is on, and `server/modules/companion`, which does
+ * the same for Kaylee's CLI while her model is DeepSeek (and checks the key is held before a save of that
+ * model is accepted). It is the ONE TypeScript-side reader of `DEEPSEEK_API_KEY` — nothing in either
+ * module opens a `.env` or reads the variable itself (a sentence that tells the operator which key is
+ * missing names it, and that is all).
  * `~/.claude/hooks/plan_runner/deepseek.py` is the Python-side reader of the same name out of the
  * same file, and a second .env parser here would be a second answer to "which key does this host
  * hold".

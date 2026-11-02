@@ -37,7 +37,7 @@ export type CompanionStateRow = {
   user_id: number;
   /** Her CLI conversation; NULL until her first init and after Clear. */
   provider_session_id: string | null;
-  /** The fingerprint of her tools and prompt when that conversation began (`companion-shape.ts`); written and nulled with `provider_session_id`. NULL for a conversation begun before the column. */
+  /** The fingerprint of her tools, prompt and model provider when that conversation began (`companion-shape.ts`); written and nulled with `provider_session_id`. NULL for a conversation begun before the column. */
   session_shape: string | null;
   /** The handover of the conversation her last refused resume dropped (`companion/session/companion-handover.ts`); the first message after the fresh start carries it once, and the row is emptied when the launch that was handed that message reports `init`. NULL for none. */
   handover: string | null;

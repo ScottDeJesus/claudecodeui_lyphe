@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 
+import { DEEPSEEK_BASE_URL, DEEPSEEK_MODEL } from '@/modules/deepseek/index.js';
 import { writeFlagFile } from '@/modules/settings/index.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 import { resolveMcpCommand } from '@/shared/mcp-command.js';
@@ -23,17 +24,6 @@ import type { AgentLaunchResolved } from '@/shared/types.js';
 
 /** The board's own switch files: one per board, under this host's state directory. */
 const BOARD_FLAG_DIR = path.join(os.homedir(), '.claude', 'state', 'kanban-deepseek');
-
-/**
- * The DeepSeek endpoint and the model name a Flash child runs on.
- *
- * `~/.claude/hooks/plan_runner/deepseek.py` is the canonical home of both, and these are
- * its values transcribed rather than a second opinion: that file's `BASE_URL` and `MODEL` are
- * what every plan-runner on this box already routes on. A drift here would point a board's Metis
- * at an endpoint that no other child on the host uses, and nothing would say so.
- */
-export const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/anthropic';
-export const DEEPSEEK_MODEL = 'deepseek-flash';
 
 /** Where one board's switch file lives. Exported so the spawner and a probe name the same path. */
 export function boardFlagPath(boardId: string): string {
