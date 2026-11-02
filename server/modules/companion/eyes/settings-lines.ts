@@ -41,12 +41,13 @@ export function companionSettingsLines(settings: CompanionSettings, modelLabel: 
 }
 
 /**
- * `voice`: the chat mic's provider, the transcription and speech models, her voice, her sounds, and whose Gemini key is in use.
+ * `voice`: the chat mic's provider, whether transcripts are cleaned of fillers and repeats, the transcription and speech models, her voice, her sounds, and whose Gemini key is in use.
  * `source` is `GeminiKeyStatus['source']` and nothing else of the status.
  */
 export function voiceSettingsLines(voice: VoiceSettings, source: GeminiKeyStatus['source']): string[] {
   return [
     `Chat mic provider: ${PROVIDER_WORDS[voice.provider]}.`,
+    `Transcript cleanup: ${voice.cleanTranscripts ? 'on, so um, uh and repeated words are removed from what he says' : 'off, so his fillers, stutters and repeats are kept as said (the vocabulary still corrects his house words)'}.`,
     `Transcription model: ${voice.gemini.transcriptionModel}.`,
     `Speech model: ${voice.gemini.speechModel}.`,
     `Her voice: ${voice.gemini.voice}.`,

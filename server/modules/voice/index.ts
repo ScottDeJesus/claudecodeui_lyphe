@@ -7,7 +7,8 @@ export { transcribeWithGemini as transcribeSpeech } from './gemini-transcribe.js
 // to speak one of her sentences in the account's Gemini voice, streamed as PCM. Not counted against any Gemini budget.
 export { synthesizeSentence } from './gemini-speech.js';
 // readVoiceSettings: used by the companion module's wiring (`companion-account.ts`) to read the account's sound-tag list fresh, at the start
-// of each turn (the parse that strips her sentences) and at each push (the register that teaches her the sounds).
+// of each turn (the parse that strips her sentences) and at each push (the register that teaches her the sounds), and by its `read_settings`
+// eyes (`eyes/house-reads.ts`) to say every voice setting, `cleanTranscripts` included, as a line.
 export { readVoiceSettings } from './voice-settings.js';
 // geminiKeyStatus: used by the companion's `read_settings` (`eyes/house-reads.ts`) to say whose Gemini key the voice is using ("a key of yours", "the house's
 // key", "no key"). The companion reads the `source` alone: the key and its last characters never leave the voice module's settings routes.

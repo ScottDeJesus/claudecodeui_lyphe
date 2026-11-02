@@ -6428,7 +6428,7 @@ Returns `{ state, toggle, stop }`; `state` = `'transcribing'` while a clip is ou
 | clip | result |
 | --- | --- |
 | `blob.size < 800` | `onError('Recording too short')`, no request |
-| upload | `transcribeVoice(blob, 'recording.<ext>', provider)` (`m4a` for mp4, `ogg` for ogg, else `webm`) in `src/shared/api.ts`, `provider` read from `currentVoiceProvider()` (the store `useVoiceProvider` keeps) when the clip is sent. `'openai'` (the default): a configured `baseUrl` → `POST <baseUrl>/audio/transcriptions` (`file`, `model` = `sttModel` or `whisper-1`); else the CloudCLI voice proxy (`audio` part, `x-voice-*` headers). `'gemini'`: always `POST /api/voice/transcribe` (`audio` part), no `x-voice-*` header, never the browser's endpoint |
+| upload | `transcribeVoice(blob, 'recording.<ext>', provider)` (`m4a` for mp4, `ogg` for ogg, else `webm`) in `src/shared/api.ts`, `provider` read from `currentVoiceProvider()` (the store `useVoiceProvider` keeps) when the clip is sent. `'openai'` (the default): a configured `baseUrl` → the browser-direct branch, `transcribeOnOwnEndpoint` in `src/shared/voiceDirect.ts`: `GET /api/voice/transcribe-hints` (the account's vocabulary, read per clip), then `POST <baseUrl>/audio/transcriptions` (`file`, `model` = `sttModel` or `whisper-1`, and `prompt` when the hints are non-empty), then `POST /api/voice/clean` on the answer's `text`, handed to the hook as a synthesized `Response` of the endpoint's own JSON; a hints or clean call that fails falls back to no prompt / the raw text with one `console.warn` (MAN-9452 §Browser-direct); else the CloudCLI voice proxy (`audio` part, `x-voice-*` headers), which applies the prompt and cleanup itself. `'gemini'`: always `POST /api/voice/transcribe` (`audio` part), no `x-voice-*` header, never the browser's endpoint |
 | non-ok response | `'gemini'` with a sentence in the body (`error`: the 409 no key or refused key, the 502 failure): `onError(<that sentence>)`. Otherwise `onError('Transcription failed: transcribe <status>')` |
 | empty text | `onError('No speech detected')` |
 | self-stopped clip | transcribed as a plain stop (`send` false) via `onEnded` |
@@ -6579,13 +6579,16 @@ Views drawn from props; the tab binds them. Server side: `server/modules/voice/`
 ## `VoiceSettingsTab` — section order
 1. Voice on/off.
 2. Voice on only: backend section (`voiceSettings.backendTitle`) — the OpenAI-compatible fields.
-3. `GeminiVoiceSection`, voice on or off.
-4. `CompanionSettingsSection`, voice on or off.
+3. `TranscriptCleanupSection`, voice on or off: the one switch for `cleanTranscripts`.
+4. `VocabularySection`, voice on or off: the account's house words as an editable table (MAN-9453 §Settings editor).
+5. `GeminiVoiceSection`, voice on or off.
+6. `CompanionSettingsSection`, voice on or off.
 - Rule: with Gemini picked, only the `voiceSettings.sttModel` field leaves; its row goes `sm:grid-cols-4` → `sm:grid-cols-3`. Base URL, API key, TTS model, voice, format, the note and the section's sentence stay. why: read-aloud uses that backend whatever the picker says; the picker governs the chat mic alone.
 - Kaylee hears through Gemini whatever the picker says.
 
 ## Mounted
 - The tab's head reads `useVoiceSettings()` (`src/modules/settings/hooks/useVoiceSettings.ts`): `{ settings, keyStatus, saving, error, providerRefusal, saveSettings, saveKey, clearKey, retry }`. `openaiPicked = (settings?.provider ?? 'openai') === 'openai'`.
+- `TranscriptCleanupSection` gets `checked={settings?.cleanTranscripts}`, `saving`, and `onChange` = `saveSettings({ cleanTranscripts })`. The hook reads `cleanTranscripts` as on unless the server says `false` (a server that predates the setting sends none), so the page never fails to read over it. A refused or failed save leaves the switch where it was and the sentence stands in the Gemini card's `error` line, the next block below.
 - `VoiceProviderPicker` is first in the backend section (voice on); `GeminiVoiceSection` sits before `CompanionSettingsSection`, voice on or off, with `onRetry={retry}`; its `keyStatus` prop is `GeminiKeyStatus | null` (`src/shared/types.ts`, beside `VoiceProvider` and `VoiceSettings`).
 - `VoiceSettingsTab` hands the Gemini section the stored speech rows: `speechModel`, `voice` and `soundTags` read from `settings.gemini` (undefined while the settings are unread, so no row stands over a value the page cannot see), and saves each through `saveSettings({ gemini: { transcriptionModel | speechModel | voice | soundTags } })` (`soundTags`: the whole list, or `null` for Restore). The server's rules for them: MAN-9102; the list's one home: INV-9938.
 - The picker's `onChange` saves only a provider other than the one picked (`pickedProvider`): the option already picked sends nothing. A refused provider save leaves the picker where it was and its sentence (`providerRefusal`, `[data-voice-provider-refused]`) stands under the picker; the Gemini card's `error` line, two sections below, carries the same sentence.
@@ -6594,6 +6597,13 @@ Views drawn from props; the tab binds them. Server side: `server/modules/voice/`
 - A save that carried `provider` and landed dispatches `VOICE_CONFIG_SYNC_EVENT`, after the server's answer. why: the chat's `useVoiceProvider` and `useVoiceAvailable` re-read on it, so an open composer follows the picker in the same tab.
 - The key is passed to `api.voice.saveGeminiKey(key)` (`PUT /api/voice/gemini-key`) and never held by the hook; the answer is `{ key: GeminiKeyStatus }`.
 - `api.voice.{ settings, saveSettings, saveGeminiKey, clearGeminiKey }` (`src/shared/api.ts`) are the only places these URLs are written. `settings` and `saveSettings` answer `{ settings, key }`; `saveSettings` takes a `Partial<VoiceSettings>`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVoiceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiNameField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiVoiceSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/SoundTagsField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/TranscriptCleanupSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VoiceProviderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/VoiceSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs
+
+## MAN-9447 — src/modules/settings/tabs — Settings > Voice: the chat mic's provider picker and — `TranscriptCleanupSection` — props `checked: boolean | undefined`, `saving`, `onChange(checked)`
+section: src/modules/settings/tabs — Settings > Voice: the chat mic's provider picker and the Gemini section/001 `TranscriptCleanupSection` — props `checked: boolean | undefined`, `saving`, `onChange(checked)`
+
+A kit `SettingsSection` (`voiceSettings.cleanTranscripts.title`, `Transcripts`) over a `SettingsCard` of one `SettingRow`: label `voiceSettings.cleanTranscripts.label` (`Clean up transcripts — remove um, uh, repeats`), a helper sentence (`…help`), and a `SettingsToggle` named by the label. The switch reads on while `checked` is undefined and is disabled then and while `saving`: no switch stands over a value the page cannot see, and two quick presses cannot land out of order. It governs the fillers of the chat mic (either provider) and of Kaylee's presses: MAN-9099 §Cleanup. Its helper says off keeps them as said and that the vocabulary below still corrects its words, which no switch turns off.
 
 ## `VoiceProviderPicker` — props `value: 'openai' \| 'gemini'`, `onChange`
 Kit `Field` (label `voiceSettings.provider.label` — `Speech to text`, helper `…provider.help`) around a `SegmentedControl` (radio group, arrows move the choice): `OpenAI-compatible` \| `Gemini`. The control sits in a block `div`, so the tray is as wide as its words.
@@ -6618,7 +6628,11 @@ Kit `Field` (label `voiceSettings.provider.label` — `Speech to text`, helper `
 - The three name rows are one component, `GeminiNameField` (`voice-settings/sections/GeminiNameField.tsx`; props `label`, `help`, `invalid`, `stored`, `placeholder`, `shape`, `hook`, `saving`, `onSave`): `[data-gemini-<hook>-field]`, saved on blur or Enter, only when changed and valid; follows the stored value while untouched; a name sent is not sent again until no save is out (Enter then blur sends once).
 - Model field: `[data-gemini-model-field]`, placeholder `gemini-3.8-flash`.
 
-## `SoundTagsField` — props `tags`, `saving`, `onChange(tags \| null)`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVoiceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiNameField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiVoiceSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/SoundTagsField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/TranscriptCleanupSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VoiceProviderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/VoiceSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs
+
+## MAN-9448 — src/modules/settings/tabs — Settings > Voice: the chat mic's provider picker and — `SoundTagsField` — props `tags`, `saving`, `onChange(tags \| null)`
+section: src/modules/settings/tabs — Settings > Voice: the chat mic's provider picker and the Gemini section/002 `SoundTagsField` — props `tags`, `saving`, `onChange(tags \| null)`
+
 - Root `[data-gemini-sound-tags]` = the count. The list in its order as kit `Chip`s (`action`), each a press that removes it, named `Remove <tag>`, ✕ glyph; `[data-gemini-sound-tag]` on the word. The last one left is a static chip (no ✕) with the line `At least one sound stays on the list.`
 - Under `(pointer: coarse)` each removable chip is `min-h-11` (44px) and the gap `gap-2`. why: a press removes at once, and a miss takes the neighbour.
 - Focus after a removal: once the list no longer holds the sound, the chip now at its index (the last chip if it was last), or the add field when only the static last chip is left; a refused removal leaves focus where it was; a focus moved elsewhere meanwhile is not taken. A `useEffect` on `tags` and `saving`; refs only.
@@ -6642,7 +6656,7 @@ Kit `Field` (label `voiceSettings.provider.label` — `Speech to text`, helper `
 ## Proof
 `.verify/kaylee-talk-scaffold.sh`: MAN-9095. `.verify/kaylee-talk-chat-mic.mjs [--stub]` runs the tab and the chat's mic on :5183 as account 1: the picker, the key set ("… ending KE12") and cleared, the model saved on blur (the PUT answered by the probe), the mic shown and hidden with the picker over the same open composer, and the clip sent to `/api/voice/transcribe` as `audio` with no `x-voice-*` header. `--stub` answers `/api/voice/transcribe` itself (no Gemini call) and adds the refusal sentence at both sizes and themes; without it, one live transcription of the fixture clip.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVoiceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiNameField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiVoiceSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/SoundTagsField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VoiceProviderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/VoiceSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVoiceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiNameField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/GeminiVoiceSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/SoundTagsField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/TranscriptCleanupSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VoiceProviderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/VoiceSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs
 
 ## MAN-9095 — src/modules/companion — Proof — .verify/kaylee-talk-scaffold.sh (the talk press, the binding row, the chat mic's picker and the Gemini section)
 
@@ -6679,7 +6693,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-scaffold.mjs
 
 ## MAN-9098 — server/modules/voice — the account's `voice` preference, its Gemini key, the settings routes and the transcribe provider branch
 
-`server/modules/voice/` serves two speech-to-text backends per account: the OpenAI-compatible proxy (`voice.service.ts`, the default) and Gemini (`gemini-*.ts`), and it speaks Kaylee's sentences through Gemini (`gemini-speech.ts`, MAN-9105). `voice.module.ts` builds `voiceRoutes`; `server/index.ts` mounts it at `/api/voice` behind `authenticateToken`. The Gemini call itself: MAN-9099. Rules: INV-9908.
+`server/modules/voice/` serves two speech-to-text backends per account: the OpenAI-compatible proxy (`voice.service.ts`, the default) and Gemini (`gemini-*.ts`), and it speaks Kaylee's sentences through Gemini (`gemini-speech.ts`, MAN-9105). `voice.module.ts` builds `voiceRoutes`; `server/index.ts` mounts it at `/api/voice` behind `authenticateToken`. The Gemini call itself: MAN-9099. Rules: INV-9908, INV-10622. The vocabulary of house words (its store, check and routes, the net, the hints, the respelling): MAN-9451, MAN-9452.
 
 ## Barrel — `index.ts`
 | export | consumer |
@@ -6687,12 +6701,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-scaffold.mjs
 | `voiceRoutes` | `server/index.ts` |
 | `transcribeSpeech` (= `transcribeWithGemini`) | `companion/companion-press.ts`: every press, whatever the chat's provider says |
 | `synthesizeSentence` | `companion/companion-speech.ts`: one call per sentence a floor page pulls (MAN-9105, MAN-9110) |
-| `readVoiceSettings` | `companion/companion-account.ts`: `readSoundTags`, the account's `gemini.soundTags` read at the start of each turn (the parse) and at each push (the register). Inside the module: `gemini-transcribe.ts`, `gemini-speech.ts`, `voice-provider.ts`, the settings routes |
+| `readVoiceSettings` | `companion/companion-account.ts`: `readSoundTags`, the account's `gemini.soundTags` read at the start of each turn (the parse) and at each push (the register); `companion/eyes/house-reads.ts`: `read_settings voice`, every setting said as a line (`settings-lines.ts`, which says `cleanTranscripts` as `Transcript cleanup: on|off`). Inside the module: `gemini-transcribe.ts`, `gemini-speech.ts`, `voice-provider.ts`, the settings routes |
 | `geminiKeyStatus` | `companion/eyes/house-reads.ts`: `read_settings` says whose Gemini key the voice uses ("a key of yours", "the house's key", "no key") from the status's `source` alone; the key and its `last4` are never read there. Inside the module: `gemini-key.ts`, the settings routes |
 | `DEFAULT_SOUND_TAGS` | `.verify/companion-wire-contract.mjs` (the parse proven against the shipped set). Its one home is `voice-settings.ts`; the companion's filter and her register read the account's list through `readVoiceSettings` (INV-9938) |
 | type `TranscribeAnswer` | `companion-press.ts`: tells a refusal from a failure |
 | type `SpeechAnswer` | `companion/companion-speech.ts`: tells a refusal (`no_key`, `refused`, `failed`) from a stream |
-- Types in `server/shared/types.ts`: `VoiceProvider`, `VoiceSettings`, `GeminiKeyStatus`, `TranscribeAnswer`, `SpeechChunk`, `SpeechAnswer`. The page mirrors the first three in `src/shared/types.ts`, with `VoiceSettingsPatch` (what `PUT /settings` takes; `soundTags: null` allowed).
+- Types in `server/shared/types.ts`: `VoiceProvider`, `VoiceSettings`, `GeminiKeyStatus`, `TranscribeAnswer`, `SpeechChunk`, `SpeechAnswer`, `VocabularyEntry`. The page mirrors the first three, and `VocabularyEntry`, in `src/shared/types.ts`, with `VoiceSettingsPatch` (what `PUT /settings` takes; `soundTags: null` allowed).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
 
@@ -6706,6 +6720,8 @@ section: server/modules/voice — the account's `voice` preference, its Gemini k
 | field | default | limit |
 |---|---|---|
 | `provider` | `openai` | `openai` or `gemini` |
+| `cleanTranscripts` | `true` | a boolean. `true` removes the um, uh, stutters and repeated words from a transcript before it is used (`transcript-cleanup.ts`, MAN-9099 §Cleanup) and asks Gemini for clean speech; `false` keeps the fillers, stutters and repeats as said and asks Gemini for a verbatim one; the vocabulary (next row) still corrects house words either way. It governs the chat mic (either provider) and Kaylee's presses alike |
+| `vocabulary` | the seed (MAN-9451 §Seed) until the account saves a list | a list of 0–100 `{ spelling, pronunciation, misheard }`; checked and answered by its own routes (`GET`/`PUT /vocabulary`, MAN-9103), never by `PUT /settings`. A stored `[]` is an account that emptied its list: it reads back `[]`, not the seed |
 | `gemini.transcriptionModel` | `gemini-3.8-flash` (the house's transcriber role) | 1–80 characters of `[A-Za-z0-9._-]` (`MODEL_PATTERN`). why: it becomes a path segment of the Gemini URL |
 | `gemini.speechModel` | `gemini-3.8-flash-tts`; `gemini-3.8-flash-lite-tts` is the cheap choice | the same `MODEL_PATTERN` |
 | `gemini.voice` | `Kore` | 1–40 characters of `[A-Za-z0-9_-]` |
@@ -6713,15 +6729,17 @@ section: server/modules/voice — the account's `voice` preference, its Gemini k
 
 - `gemini.soundTags` is the ONE allow-list of the sounds she may make: the register she is taught (`{sound_tags}`) and the filter that strips her sentences (`parseExpression`) both read it (MAN-9081). `DEFAULT_SOUND_TAGS` lives in `voice-settings.ts` and nowhere else; `readVoiceSettings` hands out a copy, never the shipped array.
 
-- `provider` picks the backend of the chat composer's mic only. The companion hears through Gemini whatever it says; read-aloud (`POST /tts`, `GET /health`) stays on the OpenAI-compatible backend.
+- `provider` picks the backend of the chat composer's mic only. The companion hears through Gemini whatever it says; read-aloud (`POST /tts`, `GET /health`) stays on the OpenAI-compatible backend, through the proxy or, when the browser holds a base URL, straight from the page, which then asks the server for the prompt, the cleanup and the respelling (MAN-9452 §Browser-direct).
+- `cleanTranscripts` is a top-level field, read for every provider. A stored `false` is kept by `storedDocument` (`!== undefined`, never truthiness) and reads back `false`; a stored value that is not a boolean reads as the default `true`. `vocabulary` is kept the same way (`!== undefined`): the WHOLE `voice` document is replaced on every write, so a field `storedDocument` does not carry is dropped by the next settings save (INV-10622).
 - `saveVoiceSettings(userId, patch)` merges a partial field by field (nested `gemini` included) and answers the settings as stored. Nothing is written when any field is refused. The read and the write have no `await` between them, so two saves cannot merge from the same stored value.
 
 Refusals — all 400 `VOICE_SETTINGS_INVALID`, `details.field` as listed:
 | patch | sentence | field |
 |---|---|---|
 | not an object | `The settings must be a JSON object.` | `settings` |
-| a key other than `provider`, `gemini` | `<key, 40 characters at most> is not a voice setting; the fields are provider and gemini (transcriptionModel, speechModel, voice, soundTags).` | the key |
+| a key other than `provider`, `cleanTranscripts`, `gemini` | `<key, 40 characters at most> is not a voice setting; the fields are provider, cleanTranscripts and gemini (transcriptionModel, speechModel, voice, soundTags).` | the key |
 | `provider` not a listed word | `provider must be "openai" or "gemini".` | `provider` |
+| `cleanTranscripts` not a boolean | `cleanTranscripts must be true or false.` | `cleanTranscripts` |
 | `gemini` not an object | `gemini must be an object holding transcriptionModel, speechModel, voice, soundTags.` | `gemini` |
 | `gemini.<other>` | `gemini.<other, 40 characters at most> is not a voice setting; the fields are gemini.transcriptionModel, gemini.speechModel, gemini.voice, gemini.soundTags.` | `gemini.<other>` |
 | a model past its limit | `gemini.transcriptionModel must be 1 to 80 characters of letters, digits, dots, underscores and hyphens.` (likewise `gemini.speechModel`) | `gemini.transcriptionModel` or `gemini.speechModel` |
@@ -6759,13 +6777,19 @@ section: server/modules/voice — the account's `voice` preference, its Gemini k
 |---|---|---|---|
 | GET | `/health` | none | the proxy's own `{ configured }`, the same for every account (read-aloud's speaker reads it) |
 | GET | `/settings` | none | 200 `{ settings: VoiceSettings, key: GeminiKeyStatus }` |
-| PUT | `/settings` | a partial `{ provider?, gemini?: { transcriptionModel?, speechModel?, voice?, soundTags? } }` | the same shape; 400 `VOICE_SETTINGS_INVALID` |
+| PUT | `/settings` | a partial `{ provider?, cleanTranscripts?, gemini?: { transcriptionModel?, speechModel?, voice?, soundTags? } }` | the same shape; 400 `VOICE_SETTINGS_INVALID` |
 | PUT | `/gemini-key` | `{ key }` | 200 `{ key: GeminiKeyStatus }`; 400 `VOICE_SETTINGS_INVALID` naming `key` |
 | DELETE | `/gemini-key` | none | 200 `{ key: GeminiKeyStatus }` |
+| GET | `/vocabulary` | none | 200 `{ vocabulary: VocabularyEntry[] }`, read fresh: the account's list, else the seed (MAN-9451) |
+| PUT | `/vocabulary` | `{ vocabulary }`, the WHOLE list (it replaces) | 200 `{ vocabulary }` as stored; 400 `VOICE_VOCABULARY_INVALID` (`details.field` `vocabulary`), the sentence naming the entry or form |
+| GET | `/transcribe-hints` | none | 200 `{ prompt }`: Whisper's `prompt` for the account's vocabulary, read fresh (`whisperVocabularyPrompt`); `''` for an empty list (send no prompt field) |
+| POST | `/clean` | `{ text }` | 200 `{ text }`: `cleanTranscript` with the account's `cleanTranscripts` switch and vocabulary, the very call `/transcribe` makes on the OpenAI branch; 400 `{ error: 'text required' }` for a body without a string `text` (an empty string is a text), 413 `{ error: 'text too long' }` over 100,000 characters (`MAX_ENGINE_TEXT_CHARS`: the cleanup's filler step is quadratic in a run of fillers and runs on the server's one event loop) |
+| POST | `/speakable` | `{ text }` | 200 `{ text }`: `respellForSpeech` with the account's vocabulary, the text `/tts` hands the backend; the same 400 and 413 |
 | POST | `/transcribe` | multipart `audio` (≤ 25 MB, memory) | 200 `{ text }`; see the next section |
-| POST | `/tts` | `{ text }` | the proxy's audio stream |
-- A `VOICE_SETTINGS_INVALID` answer is the app's envelope `{ success: false, error: { code, message, details } }` (MAN-9058 §Refusals); the page reads `message` through `refusalSentence`.
-- 2026-10-27, live :3011: `GET /settings` → `{"settings":{"provider":"openai","gemini":{"transcriptionModel":"gemini-3.8-flash","speechModel":"gemini-3.8-flash-tts","voice":"Kore","soundTags":[the ten]}},"key":{"source":"house","last4":null}}`, `grep -c AIza` on the body → 0; `PUT /settings {"bogus":1}` → 400 `bogus is not a voice setting; the fields are provider and gemini (transcriptionModel, speechModel, voice, soundTags).`
+| POST | `/tts` | `{ text }` | the proxy's audio stream, asked for the text with each house word respelled as it is said (`synthesizeForChat`, MAN-9452 §Speech) |
+- `/transcribe-hints`, `/clean` and `/speakable` call no backend and read no key: they are the server's speech engine for a caller that talks to its OWN OpenAI-compatible endpoint, a call this server never sees. Two callers: the page's browser-direct `transcribeVoice` and `synthesizeVoice` (`src/shared/api.ts` → `src/shared/voiceDirect.ts`, calling `api.voice.transcribeHints` / `clean` / `speakable`; MAN-9452 §Browser-direct) and the standalone dictation app. Each is a method of `createVoiceProvider` (`transcribeHintsForChat`, `cleanTranscriptForChat`, `speakableForChat`); the route only reads `text` and answers.
+- A `VOICE_SETTINGS_INVALID` or `VOICE_VOCABULARY_INVALID` answer is the app's envelope `{ success: false, error: { code, message, details } }` (MAN-9058 §Refusals); the page reads `message` through `refusalSentence`.
+- 2026-10-27, live :3011: `grep -c AIza` on a `GET /settings` body → 0: the answer carries the key's status (`source`, `last4`) and never a key.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
 
@@ -6775,8 +6799,8 @@ section: server/modules/voice — the account's `voice` preference, its Gemini k
 `createVoiceProvider(voiceService).transcribeForChat(userId, audio, overrides)`, called by the route with the upload (`mimeType` default `audio/webm`, `fileName` default `recording.webm`):
 | account's `provider` | does |
 |---|---|
-| `openai` (default) | `voiceService.transcribe({ audio, overrides })` exactly as before; reads the browser's `x-voice-*` headers |
-| `gemini` | `transcribeWithGemini(userId, audio)`; the `x-voice-*` headers are ignored |
+| `openai` (default) | `voiceService.transcribe({ audio, overrides, prompt })`, `prompt` being the account's spellings as Whisper's `prompt` form field (`whisperVocabularyPrompt`; no field at all when the vocabulary is empty); reads the browser's `x-voice-*` headers. A success's `text` is run through `cleanTranscript(text, { removeFillers: cleanTranscripts, vocabulary })` (Whisper has no instruction to give): fillers out when `cleanTranscripts` is on, misheard house words corrected whatever it says; a failure is passed on untouched |
+| `gemini` | `transcribeWithGemini(userId, audio)`; the `x-voice-*` headers are ignored. That door cleans and corrects its own text, once: the provider branch does not run it again |
 
 On `gemini`:
 | `TranscribeAnswer` | HTTP | body |
@@ -6786,6 +6810,7 @@ On `gemini`:
 | `failed` | 502 | `{ error: <sentence> }` |
 - Sentences: MAN-9099. The chat's `useVoiceInput` shows them as they came (MAN-9092).
 - An upload multer refuses is 400 `{ error: <its message> }`; no `audio` part is 400 `{ error: 'No audio uploaded' }`.
+- `synthesizeForChat(userId, text, overrides)` is `POST /tts`'s one call: `voiceService.synthesizeSpeech` with `respellForSpeech(text, vocabulary)` as its text, so the proxy's voice is told how each house word sounds (MAN-9452 §Speech). `transcribeHintsForChat`, `cleanTranscriptForChat` and `speakableForChat` serve the page's own direct calls to a base URL it holds (`transcribeVoice`, `synthesizeVoice` in `src/shared/api.ts`): `GET /transcribe-hints`, `POST /clean`, `POST /speakable`, no backend (MAN-9103 §Routes, MAN-9452 §Browser-direct).
 - `GET /health` takes no part in this decision: it answers the proxy's `configured` with Gemini picked too. The composer's mic follows `GET /settings` (MAN-9092 §`useVoiceProvider`).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
@@ -6802,7 +6827,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.
 ## Answer — `TranscribeAnswer`
 | answer | when | `sentence` |
 |---|---|---|
-| `{ ok: true, text }` | the model answered; `text` is trimmed; `''` when it reported no words or only a bracketed note (`[no speech]`). A silent clip is not certain to come back `''` (§Standing defect) | – |
+| `{ ok: true, text }` | the model answered; `text` is trimmed; `''` when it reported no words or only a bracketed note (`[no speech]`). `text` is then run through `cleanTranscript` (§Cleanup): with the account's `cleanTranscripts` on its fillers go (a lone `Um.` is `''` too), and always each misheard house word is replaced by its spelling (MAN-9452 §The net). A silent clip is not certain to come back `''` (§Standing defect) | – |
 | `{ ok: false, reason: 'no_key' }` | no key in reach (MAN-9098 §The key); NO request is made | `No Gemini key: set one in Settings → Voice` |
 | `{ ok: false, reason: 'refused' }` | HTTP 401 or 403, or a 400 whose error names the key (`API_KEY_INVALID` in the body, or `api key` in Google's message, case-insensitive) | `Gemini refused the key: <Google's message>` |
 | `{ ok: false, reason: 'failed' }` | any other status, a network error, a timeout, a reply with no text | `Gemini could not transcribe this: <why>` |
@@ -6822,8 +6847,36 @@ HTTP of each reason on the chat route: `no_key`, `refused` → 409; `failed` →
 ## The request
 - `POST https://generativelanguage.googleapis.com/v1beta/models/<model>:generateContent`; `<model>` = the account's `gemini.transcriptionModel` through `encodeURIComponent`.
 - Headers: `x-goog-api-key: <key>`, `Content-Type: application/json`.
-- Body: `{ contents: [{ role: 'user', parts: [{ text: TRANSCRIPTION_INSTRUCTION }, { inline_data: { mime_type, data: <the clip, base64> } }] }], generationConfig: { temperature: 0 } }`. The clip rides inline; no Files API.
-- `TRANSCRIPTION_INSTRUCTION`: transcribe as clean speech, in the language spoken, filler sounds, stutters, false starts and a word repeated while thinking left out, every other word as spoken; output only the words, no commentary, labels, timestamps or quotation marks; if the audio holds no spoken words at all (silence, room noise, a click, breathing, music) output exactly `[no speech]` and nothing else; never write words that were not spoken. why: asked to transcribe 2 s of digital silence under "output nothing", the model wrote a question nobody asked; the mark gives it a word to say. It does not make a silent clip come back `''` (§Standing defect).
+- Body: `{ contents: [{ role: 'user', parts: [{ text: TRANSCRIPTION_INSTRUCTION[clean|verbatim] + geminiVocabularyBlock(vocabulary) }, { inline_data: { mime_type, data: <the clip, base64> } }] }], generationConfig: { temperature: 0 } }`. The clip rides inline; no Files API. The form is picked by the account's `cleanTranscripts` (MAN-9102), read once per call with the model, and the account's vocabulary (`readVocabulary`) with them.
+- `TRANSCRIPTION_INSTRUCTION` has two forms that differ only in their first sentence; both end on the same tail.
+  - `clean` (`cleanTranscripts` on, the default): transcribe as clean speech, in the language spoken, filler sounds, stutters, false starts and a word or short phrase said twice in a row left out (written once), every other word as spoken, in its order, no paraphrase and no other correction.
+  - `verbatim` (`cleanTranscripts` off): transcribe word for word, exactly as said, in the language spoken; keep filler sounds, stutters, false starts and repeated words, in their order, no paraphrase and no correction.
+  - Tail, in both: output only the words, no commentary, labels, timestamps or quotation marks; if the audio holds no spoken words at all (silence, room noise, a click, breathing, music) output exactly `[no speech]` and nothing else; never write words that were not spoken. why: asked to transcribe 2 s of digital silence under "output nothing", the model wrote a question nobody asked; the mark gives it a word to say. It does not make a silent clip come back `''` (§Standing defect).
+  - Vocabulary block, in both forms, after the tail, when the account's vocabulary is not empty: ` These names may be spoken; write them exactly as spelled: <spelling>[ (sounds like "<pronunciation>")], …. ` (`geminiVocabularyBlock`, `vocabulary-hints.ts`; "sounds like" only when the pronunciation differs from the spelling: MAN-9452 §At the source). No block for an empty vocabulary.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts
+
+## MAN-9449 — server/modules/voice — `transcribeWithGemini`: the generateContent call, the — Cleanup — `transcript-cleanup.ts`, `cleanTranscript(text, { removeFillers, vocabulary }): string`
+section: server/modules/voice — `transcribeWithGemini`: the generateContent call, the three refusals, the key rules and what is never counted/001 Cleanup — `transcript-cleanup.ts`, `cleanTranscript(text, { removeFillers, vocabulary }): string`
+
+The ONE post-processor of both speech-to-text paths: `cleanTranscript(text, { removeFillers, vocabulary })`. Step one, when `removeFillers` (the account's `cleanTranscripts`, default on) is true, removes the disfluencies below. Step two, whatever the switch says, replaces each misheard form of the account's vocabulary with its spelling (`correctMisheardWords`, MAN-9452 §The net); an empty vocabulary makes it a no-op. The Gemini door runs it on its success text AFTER `readTranscript` has read the no-speech mark (so it is the only place a Gemini transcript is cleaned and corrected, for the chat mic's Gemini branch and Kaylee's press alike); `voice-provider.ts` runs it on the OpenAI branch's text (whisper-1 has no instruction to give; MAN-9104), and `POST /api/voice/clean { text }` runs the very same call (the account's `cleanTranscripts` and vocabulary, read fresh) for a client that heard the clip on its OWN endpoint: the page's browser-direct `transcribeVoice` and a standalone dictation app (MAN-9452 §Browser-direct). `removeFillers` false: the fillers stay and the Gemini instruction is the `verbatim` form; step two still runs.
+- Text with nothing to remove comes back byte for byte (a Whisper leading space stays). A result with no letter or digit in it is `''`, which the press door already settles as the empty press (`settling`: `''` → `{ logged: '', push: 'empty' }`, the same path as a press under 0.4 s).
+- Order: fragments, fillers, repeats with only spaces between the copies, repeats with a comma, ellipsis or dash between them, then `tidy` (only when something was removed): the sentence-start capital, double spaces, the second of two dashes that bounded a filler (`Okay—um—go` → `Okay—go`), a space after an opening quote, a space before punctuation, `", ."` → `"."`, a stray comma at either end, a stray full stop after a sentence-ending filler (`Okay. Um.` → `Okay.`), and a leading full stop or ellipsis the filler dragged along (`Hmm... okay.` → `Okay.`).
+| rule | does | leaves alone |
+|---|---|---|
+| fillers (`FILLER_SOUNDS`, `DRAWN_OUT_FILLER_SOUNDS`) | drops `um`, `uh`, `er`, `erm`, `ah`, `hmm`, `mm`, `mhm`, the drawn-out ones with their last letter repeated (`ummmm`, `Hmmmm`), with the commas against them: a comma before it stays when the clause it cut was complete (`Well, uh, I think` → `Well, I think`), goes with it after a word that leads into what follows (`FUNCTION_WORDS`: `to, uh, check` → `to check`). A filler that opened a sentence, or a quoted line (`He said, “Um, so…`), capitalises the next word (`Um, so` → `So`); a word with a capital inside it (`useEffect`, `iPhone`) keeps its case | `uh-huh`, `mm-hmm` (hyphen), an ALL-CAPS `ER` or `MM`, `5 mm` and `five mm`, a format string or a path (`HH:mm:ss`, `mm/dd/yyyy`, `er.ts`: a filler never touches a `:` `/` `@` or a `.` that joins it to a word), `err` |
+| set-off phrase (`SET_OFF_FILLER_PHRASES`: `you know`) | dropped only with a comma against it and a comma or a sentence edge on its other side | `Do you know where it is?`, `as you know, it works`, `You know?` |
+| repeats | one copy of a word or a phrase of up to 3 words said twice or more in a row, a run of any length in one pass (`the the the the` → `the`). Copies with only spaces between them are always a stutter: `I I want`. With a comma, ellipsis or dash between them (never `.` `?` `!`) they are a restart only when the copy ends on a word a clause strictly cannot end on (`NEVER_ENDS_A_CLAUSE`: articles, `to`, `of`, `and`, subject pronouns, modals, subject contractions): `The, the lane`, `I want to, I want to go`, `we should — we should`. `you`, `it` and `her` are not in that set | a repeat across a comma that ends on a noun, a verb, `you` or `it`, because the second copy starts a new clause (`Restart the server, the server crashed`, `I tried it, it failed`, `If it works, it works`, `Thank you, you did great`); a number, a lone letter other than `a` and `I`, words in `MAY_BE_SAID_TWICE` (`had had`, `that that`, `no, no, no`, `yeah, yeah`, spoken numbers) |
+| fragments | `w-what` → `what`, `th- the` → `the`, `I-I-I` → `I`; the fragment must start the word. A fragment of 1–2 letters counts with any dash; of 3–4 letters only as a hyphen with a space after it (`wha- what`); a whole-word repeat only for a function word | `see—seems`, `per-person`, `wha-what` (3 letters, no space: a missed stutter, never a lost word), `re-render`, `t-test`, `yo-yo`, `bye-bye`, `state-of-the-art` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts
+
+## MAN-9450 — server/modules/voice — `transcribeWithGemini`: the generateContent call, the — Latin script only (`\p{Script=Latin}`): Korean and Chinese are never touched. The lists are English
+section: server/modules/voice — `transcribeWithGemini`: the generateContent call, the three refusals, the key rules and what is never counted/002 Latin script only (`\p{Script=Latin}`): Korean and Chinese are never touched. The lists are English
+
+- Latin script only (`\p{Script=Latin}`): Korean and Chinese are never touched. The lists are English: a speaker of another language (Portuguese `um`, German or Dutch `er` are real words) turns the setting off. why: a false positive that drops a real word is worse than a missed filler.
+- The lists are the `const`s at the top of the file, unexported (no cross-file reader): edit them there. Not attempted: general false-start detection beyond the fragment and repeated-phrase cases; the `clean` instruction covers it.
+- Never logged: the transcript's words are not in the `[voice]` line.
 
 ## MIME mapping — `geminiMimeType`
 | recorder's type | sent as |
@@ -6857,7 +6910,7 @@ HTTP of each reason on the chat route: `no_key`, `refused` → 409; `failed` →
 ## Log
 - One line per call, never the key: `[voice] gemini transcribe <model> <clip bytes> B <ms> ms → ok|no_key|refused|failed`. The journal is shared: a probe names its call by the bytes it uploaded (the fixture posted by curl is 122924 B, MAN-9100).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts
 
 ## MAN-9100 — Probing Kaylee — the spoken probes: the fixture clip `kaylee-what-chats-are-working.wav`, its maker `.verify/kaylee-clip.mjs`, and which probe feeds it
 
@@ -6995,6 +7048,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useT
 ## The request
 - `POST https://generativelanguage.googleapis.com/v1beta/interactions`, headers `x-goog-api-key: <key>` (nowhere else) and `Content-Type: application/json`, body `{ model, input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style }] }] }], response_format: { type: 'audio', mime_type: 'audio/l16' }, generation_config: { speech_config: [{ voice }] }, stream: true }`. `model` = the account's `gemini.speechModel`, `voice` = its `gemini.voice`, both read fresh per call. A blank `style` sends no `annotations`.
 - Google answers server-sent events. Measured 2026-10-27 on `gemini-3.8-flash-lite-tts`: `interaction.created`, `interaction.status_update`, `step.start`, then `step.delta` ×37 (each `delta.type` `audio`, `delta.data` base64 PCM), `step.stop`, `interaction.completed`. The event's name is its `event:` line, else the data's own `event_type`/`type`. Only audio deltas are read; `interaction.completed` ends it; an `error` event fails it.
+- `text` goes out with the account's house words respelled to how they sound (`respellForSpeech(text, readVocabulary(userId))`): Gemini TTS has no lexicon and no SSML phoneme, so `lypheCli` is sent as `life C-L-I` and `Lyphe` as `life` (MAN-9452 §Speech). Only the request's text is respelled: the log line's `<characters>` and everything the page shows keep the spelling.
 - PCM is little-endian Int16, mono, 24 kHz. Every yielded piece is a WHOLE number of samples: an odd trailing byte is carried into the next piece (tested: deltas of 801, 600 and 599 bytes yield 800, 600, 600).
 
 ## Retry, bound, abort
@@ -8013,7 +8067,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/do
 | `read_git { project, scope, panel? }` | `resolveProject(project)`, then the git panel's own `readGitStatus` / `readGitFileDiff` (git barrel) — `git-reads.ts` | `status`: `On <branch>: <n> modified, <n> added, <n> deleted, <n> untracked, <n> staged.` then `<state> <path>` per changed file (a staged one ends ` · staged`). `diff`: each changed file's diff, digested. Anything else: ONE changed file by its path, the end of it, or a piece of it (equal path, else folder-boundary tail, else substring; several fit → refused with each named) | 30 files. A folder that is no repository says so |
 | `read_cerberus { scope, panel? }` | `deps.house.cerberus()` — the tab's own overview (`cerberus-lines.ts`) | `overview`: `<checks> checks: <passing> passing, <needsYou> need you, <muted> muted, <nodes> nodes; last result <when>.`, then what needs him and any node not reporting. `needs`: all of it. A node id: its services (a passing check is counted, not listed) and every check that is not passing. A check `<node>/<service>/<check>`: status, value, last result, since, the mute, and its SERVICE's recent minutes (`cells`). Else a phrase over check paths, labels, service labels and values | overview 10 needs; a check's value cut at 600 characters, a list line at 70 (overview) or 160 |
 | `read_memory { scope, panel? }` | `listMemoryCandidates`, `getMemoryCandidate` (memory-intake barrel) — `memory-lines.ts` | `pending`: `<target> · <title> · from <chat> · proposal <id>`. `recent`: reviewed in 7 days, with the verdict (`<target> · <title> · approved yesterday 09:10 · proposal <id>`). A proposal id (`mc-136`, or `136`): it whole. Else a phrase over id, title, target and project | 15 lines. A proposal no chat recorded (spill sweeps) is "from an unrecorded chat" |
-| `read_settings { scope }` | `readCompanionSettings`, `modelOptions` (the picker's label), the voice barrel's `readVoiceSettings` and `geminiKeyStatus` — `settings-lines.ts` | `companion`: her name, his name, her model's label, Live, delivery note, talk button's label, register's length and whether it is the original. `voice`: the chat mic's provider, the transcription and speech models, her voice, her sounds, and whose Gemini key is in use: "a key of yours", "the house's key" or "no key" | none needed (under 1,000 characters). Any other scope: refused, saying `companion` or `voice` |
+| `read_settings { scope }` | `readCompanionSettings`, `modelOptions` (the picker's label), the voice barrel's `readVoiceSettings` and `geminiKeyStatus` — `settings-lines.ts` | `companion`: her name, his name, her model's label, Live, delivery note, talk button's label, register's length and whether it is the original. `voice`: the chat mic's provider, whether transcripts are cleaned of fillers and repeats (`Transcript cleanup: on|off`), the transcription and speech models, her voice, her sounds, and whose Gemini key is in use: "a key of yours", "the house's key" or "no key" | none needed (under 1,000 characters). Any other scope: refused, saying `companion` or `voice` |
 
 ## A secret's diff never reaches her
 Every changed file is held to the dactyl deny rule (`isDeniedPath` in `tools/dactyl-paths.ts`: the same `deniedBy` `judgeFile` applies, to the name as written AND to the real file, whether or not it exists; the attached-file door of MAN-9155 is `ask_dactyl`'s alone) BEFORE its diff is read — for `diff` and for a path scope alike. `git status` paths are relative to the REPOSITORY ROOT, so the rule is judged on the root (`getRepositoryRootPath`, exported from the git barrel for this) joined with git's path; a project that is a SUBFOLDER of its repository would otherwise judge a file above it on a path that does not exist, and the real-path half and the place half of the rule could not fire. A path scope is judged against the root and the project folder both. A denied file is NAMED ("withheld") and never read; a path scope on one is refused with a sentence that says so. This matters most for an untracked file, whose diff IS the whole file. Only files `git status` lists are ever read: a scope is matched against them and never opened as a path of its own. A diff with a NUL byte is "a binary file" and not shown. THE RESIDUAL: the name rule is a net, as `ask_dactyl`'s is. A credential-looking value inside a diff of an ORDINARY file (a named secret `token = …`, a `Bearer` value, a vendor key's own prefix such as `AIza…`) is replaced by `<masked>` before the diff is cut (`maskCredentials`, so a legitimate `token: string` line reads `<masked>` too); a secret in no recognisable shape, in an ordinary file, still reaches her. A file name is folded to one line wherever it is shown (`shownPath`), so a name holding a line break cannot forge a line. `read_settings` never reads `GeminiKeyStatus.last4`; the key's `source` is all that leaves `settings-lines.ts`.
@@ -16172,3 +16226,110 @@ node --import tsx .verify/kaylee-avatars-whole.mjs
 `lib/avatars-whole-kit.mjs`: `watchPage` (face files asked, speech requests, `companion_face` frames, console errors), `asksSince`, `pressLook`, `heardPick`, `sampleDisc`, `runsOfField`, `runMouthPage`, `stopMouthPage` (kills only the child `runMouthPage` spawned), `ledgerState`, `putPickBack`; the selectors `DISC`, `DISC_PORTRAIT`, `CARD_PORTRAIT`, `STATION_PORTRAIT`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatars-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-mouth-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatars-whole-kit.mjs
+
+## MAN-9451 — server/modules/voice — the vocabulary: the account's house words, their store, the seed and the check of a save
+
+The account's vocabulary: its house words, kept on the server as ONE list that three jobs read (how each is applied: MAN-9452; the Settings editor: MAN-9453). An entry is `{ spelling, pronunciation, misheard[] }` (`VocabularyEntry`, `server/shared/types.ts`, mirrored in `src/shared/types.ts`). (1) Both transcribers are told the spellings up front. (2) A net under both replaces each misheard form in a transcript with the spelling. (3) Kaylee's voice, and the chat's read-aloud, is sent the pronunciation in place of the spelling. Settings: MAN-9102. Routes: MAN-9103. Rule: INV-10622.
+
+| file | holds |
+|---|---|
+| `vocabulary.ts` | the seed, `readVocabulary(userId)`, `saveVocabulary(userId, value)` |
+| `vocabulary-check.ts` | `checkVocabulary`: the one check of a stored list and of a save, and the caps |
+| `vocabulary-match.ts` | `phraseKey`, `soundsAsWritten`, `correctMisheardWords` (the net), `respellForSpeech` (the speech), both on one `replacePhrases` |
+| `vocabulary-hints.ts` | `geminiVocabularyBlock`, `whisperVocabularyPrompt`: what each transcriber is told |
+| `server/shared/word-edges.ts` | the word-edge fragments, shared with `transcript-cleanup.ts` (fillers) |
+| `voice-settings.ts` | `readStoredVocabulary`, `saveStoredVocabulary`: the field in the account's `voice` document |
+
+## Store and read
+- Stored as `vocabulary` in the account's `voice` preference, beside the other settings (MAN-9102). `readVocabulary` reads it fresh on every call, never cached, so an entry saved now applies on the next press with no restart (read-aloud replays the audio the page already holds for a message it has read: MAN-9452 §Speech).
+- Never saved → the SEED. Saved → the saved list is the truth, an emptied one included: `[]` stays `[]`, and an empty vocabulary is how the whole feature is turned off for an account (no block, no prompt field, no replacement, no respelling). A stored list that fails `checkVocabulary` reads as never saved.
+- `readVocabulary` answers a copy; a caller that edits its list edits neither the seed nor the next read.
+
+## Seed
+Pronunciation equal to the spelling means "say it as written". The seed goes through `checkVocabulary` at first import (a fault in it throws loudly), so a form that repeats another in a different case is dropped once: `life cli` is `life CLI`.
+| spelling | pronunciation | misheard |
+|---|---|---|
+| Kaylee | Kaylee | Kailee, Kaylie, Kayley, Kaley, Kayleigh, Kaili |
+| lypheCli | life C-L-I | life CLI, life see ally, Life Klee, lifeCLI, Lyfe CLI, lyphe CLI, life C L I |
+| Restorly | Restore-lee | Restorely, Restore Lee, Restoreli, Restorley, Restorli |
+| Headscale | Headscale | head scale, Head-scale |
+| Cerberus | Cerberus | Cerebrus, Serberus, Cerberous, Sarberus |
+| dactyl | dack-tull | dactile, dactil, dactle, dack till, dactal |
+| Athena | Athena | Athina, Atheena |
+| Hermes | Hermes | Hermies, Hermease, Her mees |
+| Lyphe | life | Lyfe, Lyph, Lyphy, Lifey (never `life`: it is a real word) |
+- A plural needs no form of its own: the net keeps a plural `s` on whatever it replaces (`head scales` → `Headscales`), and a real `Headscales` is left as said. A stored list holds its own copy of the seed (an account that saved one keeps its forms), so a form removed here is removed from such a list by its own `PUT`.
+
+## Validation — `checkVocabulary`
+NORMALISED, never refused: every text trimmed with inner runs of white space collapsed; a blank pronunciation is the spelling; a blank misheard form is dropped; a form already listed (case-insensitively) is dropped; a form equal to its own entry's spelling (`phraseKey`) is dropped.
+REFUSED, all 400 `VOICE_VOCABULARY_INVALID` with `details.field` `vocabulary` (`saveVocabulary` throws it, nothing is written):
+| refused | sentence |
+|---|---|
+| not a list (a body without `vocabulary`) | `The vocabulary must be a list of entries, each with a spelling, a pronunciation and a list of misheard forms.` |
+| more than 100 entries | `The vocabulary holds at most 100 entries.` |
+| an entry that is not an object | `Entry <n> must be an object, …` |
+| a spelling that is missing, not text, without a letter or digit, or over 60 characters | `Entry <n>'s spelling needs at least one letter or digit.` (likewise `must be text`, `is longer than 60 characters`) |
+| a pronunciation over 80 characters, or not text | `“<spelling>”'s pronunciation …` |
+| misheard forms not a list of texts; a form without a letter or digit or over 60 characters; more than 40 forms | `A misheard form of “<spelling>” …`, `“<spelling>” lists more than 40 misheard forms.` |
+| a spelling twice (case-blind; a space and a hyphen are one) | `“<spelling>” is listed twice: each spelling is one entry.` |
+| a form two entries claim | `“<form>” is listed as misheard under both <A> and <B>: a misheard form belongs to one entry.` |
+| a form that is another entry's spelling | `“<form>” is an entry of its own, so it cannot also be a misheard form of <entry>.` |
+why the last two: the net could not know which word was meant, or would rewrite a right word.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-check.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts
+
+## MAN-9452 — server/modules/voice — the vocabulary applied: the net under both transcribers, the source hints, the speech respelling, and what was measured
+
+How the account's vocabulary (MAN-9451) is applied: the net under both transcribers, what each transcriber is told up front, and the respelling of what Kaylee and the chat's read-aloud say. Rule: INV-10622.
+
+## The net — `correctMisheardWords`, inside `cleanTranscript` (MAN-9099 §Cleanup)
+- After filler removal, on BOTH transcribers, and whatever `cleanTranscripts` says: that switch governs the fillers only. Runs on the text the Gemini door and the OpenAI branch answer, so Kaylee's name cut (`companion-press.ts`) reads the corrected text.
+- One pass (`replacePhrases`), so a replacement is never itself replaced. Whole word or phrase, case-insensitive; the joiner inside a phrase is any run of spaces and hyphens (`life CLI`, `life-CLI`, `Head-scale`, `head scale` are one form); the longest form wins where two start at the same place (`Lyfe CLI` before `Lyfe`); the output is the entry's spelling exactly.
+- Edges (`STANDALONE_EDGE_*`, `server/shared/word-edges.ts`, the same rule as a filler): refuses a letter, digit, `_`, apostrophe or hyphen on either side, and a `:`, `/` or `@` or a `.` that joins a word (`@` keeps the local part of `kailee@home.com`, which a correction would turn into a different address). A possessive or plural tail (`'s`, `s'`, `'`, `s`) stays on the replacement: `Kailee's` → `Kaylee's`.
+- A word that is in no entry's list is never touched; the spelling itself is never a form of itself. Text with nothing to replace comes back byte for byte.
+
+## At the source — `vocabulary-hints.ts`
+- Gemini: `geminiVocabularyBlock` is appended to BOTH instruction forms (MAN-9099 §The request): ` These names may be spoken; write them exactly as spelled: lypheCli (sounds like "life C-L-I"), Kaylee, ….` `sounds like` only when `soundsAsWritten` is false (same letters and digits, any case or punctuation, is "as written"). Empty vocabulary: no block.
+- Whisper: `whisperVocabularyPrompt`, the spellings as `Kaylee, lypheCli, ….`, sent as the multipart field `prompt` of `/audio/transcriptions` (`voice.service.ts`; from the page's own direct call, `GET /transcribe-hints`: §Browser-direct), only when non-empty. Capped at 200 characters, entries dropped whole from the END, so even one token per character stays under Whisper's 224-token limit. whisper-1 and the gpt-4o transcribe models accept `prompt`.
+
+## Speech — `respellForSpeech`
+- Gemini TTS has no lexicon and no SSML phoneme, so the spoken text is respelled: each entry whose pronunciation differs from its spelling has its spelling replaced by its pronunciation (whole word, case-insensitive, the same edges and tails, longest spelling first so `lypheCli` goes before `Lyphe`). `Lyphe runs lypheCli and Restorly.` is sent as `life runs life C-L-I and Restore-lee.`
+- Only the synthesis request's text: `gemini-speech.ts` (`synthesizeSentence`, Kaylee: MAN-9105), `voice-provider.ts` (`synthesizeForChat`, the chat's read-aloud through the OpenAI-compatible proxy, `POST /tts`) and the page's own direct read-aloud (`POST /speakable`: §Browser-direct). Never the sentence the page shows, the log, or a stored row.
+- The chat's player (`voicePlayer.ts`) keeps the audio of the last 24 messages it spoke, keyed by the message's text and the browser's voice config and NEVER by the pronunciation (the server decides that per request, on the proxy path and the direct one alike). A message read before a vocabulary edit therefore replays its old audio until the page reloads; a message not yet read speaks the new pronunciation at once. Measured by Athena on the real player, 2026-11-01.
+
+## Browser-direct — the same engine over three routes
+The page may hold a base URL for its own OpenAI-compatible endpoint (`voiceConfig.baseUrl`, per browser). `transcribeVoice` and `synthesizeVoice` (`src/shared/api.ts`) then hand the call to `transcribeOnOwnEndpoint` / `synthesizeOnOwnEndpoint` (`src/shared/voiceDirect.ts`), which post straight to it, so the server never sees the call; the page asks the server's engine for the text halves and keeps no copy of the matching (`voice.routes.ts`, `voice-provider.ts`; routes: MAN-9103). `voiceDirect.ts` never imports `api.ts` (no import cycle): `api.voice` is passed in as the `engine`.
+| step | the page | the server |
+|---|---|---|
+| a clip | `GET /api/voice/transcribe-hints` PER CLIP (so a word saved in Settings applies on the next press, no reload), `{ prompt }` appended as the multipart `prompt` only when non-empty; then the clip to `<baseUrl>/audio/transcriptions` | `whisperVocabularyPrompt(readVocabulary)` |
+| its text | `POST /api/voice/clean { text }`; the reply is handed to the composer as a synthesized `Response` of the endpoint's own JSON with `text` replaced | `cleanTranscript` with the account's `cleanTranscripts` and vocabulary, as the proxy branch runs it |
+| read-aloud | `POST /api/voice/speakable { text }` (aborted with the play), the result as `input` of `<baseUrl>/audio/speech` | `respellForSpeech(readVocabulary)` |
+- A refusal from the endpoint, or an answer that is not `{ text }` with words in it, is handed back untouched; an empty text is not sent for cleanup.
+- Never blocks the mic or the voice: a hints, clean or speakable call that fails (unreachable, non-2xx, no field in the answer, no answer within 5 s: `VOICE_ENGINE_TIMEOUT_MS`) falls back to no prompt / the raw text / the unrespelled text, with one `console.warn` (`askVoiceEngine` in `voiceDirect.ts`, which joins the 5 s timeout and the play's own abort signal into the request's one signal by hand: `AbortSignal.any` is absent on iOS 15). A play the person aborted rethrows instead.
+- The proxy path and Gemini are not touched: they clean and respell on the server already.
+
+## Measured — 2026-11-01, live :3011, dev account `verve`
+- `GET /api/voice/vocabulary` answered the nine-entry seed. A `PUT` with `Zorblax ← zor blacks` added was answered and read back; `Zor-Blacks` under Kaylee too was 400 `“zor blacks” is listed as misheard under both Kaylee and Zorblax: …`; a blank spelling, a duplicate spelling and a form that is another spelling were each 400. `[]` was kept as `[]`. A `PUT /settings {cleanTranscripts:true}` kept the vocabulary.
+- A Gemini clip of "Please ask zor blacks to check the life CLI logs." through `POST /api/voice/transcribe`: vocabulary empty → `Please ask Zoroblax to check the lifeseal eye logs.`; with the entry saved moments before, no restart → `Please ask Zorblax to check the lypheCli logs.`
+- Whisper leg against a stand-in backend: fields `file`, `model`, `prompt` = `Kaylee, lypheCli, Restorly, Headscale, Cerberus, dactyl, Athena, Hermes, Lyphe, Zorblax.`; its reply ` Um, ask Kailee to check the life CLI logs on head scale.` came back `Ask Kaylee to check the lypheCli logs on Headscale.`
+- Speech: the request to Google carried `life runs life C-L-I and Restore-lee.` for `Lyphe runs lypheCli and Restorly.`
+- Not measured: Whisper's own acceptance of `prompt`. This box has no real OpenAI-compatible backend (`GET /api/voice/health` `configured: false`), so that is the vendor's documented behaviour; what was measured is that the page sends the field.
+
+## Measured — 2026-11-01, browser-direct, real app :5183 on live :3011, dev account `verve`
+- The three routes: `GET /transcribe-hints` → `{"prompt":"Kaylee, lypheCli, Restorly, Headscale, Cerberus, dactyl, Athena, Hermes, Lyphe."}`; `POST /clean` `Um, ask Kailee to check the the life CLI logs.` → `Ask Kaylee to check the lypheCli logs.`; `POST /speakable` `Lyphe runs lypheCli.` → `life runs life C-L-I.`; a body without `text` → 400 `text required`; no token → 401.
+- Seed: `The Headscales are down.` → unchanged (`verve`'s stored copy of the old seed read `The Headscale are down.` until its `Headscales` form was removed by its own `PUT`); `The head scales are down` → `The Headscales are down`.
+- A stand-in OpenAI-compatible backend under /tmp, `voiceConfig.baseUrl` set in the browser: the chat mic's 3.8 s clip reached it as `file`, `model` and `prompt` (the very string `GET /transcribe-hints` answers); it replied ` Um, ask Kailee to check the life CLI logs.` and the composer read `Ask Kaylee to check the lypheCli logs.` The page's calls: `GET /transcribe-hints`, `POST /clean`, never `POST /transcribe`.
+- Read-aloud on a message `Lyphe runs lypheCli and Restorly.`: the stand-in's `/audio/speech` body `input` was `life runs life C-L-I and Restore-lee.`, the message on screen still said `Lyphe`; the page called `POST /speakable` once, no `POST /tts`.
+- With the hints and clean routes aborted at the browser: the mic still filled the composer, with `Um, ask Kailee to check the life CLI logs.`, the clip went with no `prompt`, and the page logged two `console.warn` lines. With `/speakable` held open and never answered, read-aloud went on after the 5 s bound with `Lyphe runs lypheCli and Restorly.` as written and one `console.warn`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-hints.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-match.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/word-edges.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceInput.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/voicePlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/voiceDirect.ts
+
+## MAN-9453 — src/modules/settings/tabs — Settings > Voice > Vocabulary: the editable table of house words (VocabularySection, VocabularyEntryRow, useVocabulary)
+
+Settings > Voice > Vocabulary: the editor of the account's vocabulary (MAN-9451).
+
+- `VocabularySection` (`src/modules/settings/tabs/voice-settings/sections/`), between the cleanup switch and the Gemini section, voice on or off; it reads and saves for itself through `useVocabulary` (`src/modules/settings/hooks/useVocabulary.ts`: `GET`/`PUT /api/voice/vocabulary` via `api.voice.vocabulary` / `saveVocabulary`, the only places the URL is written). Composed of the kit's `SettingsSection`, `SettingsCard divided`, `Input`, `Chip`, `Button`, `ConfirmDialog` and nothing new.
+- One `VocabularyEntryRow` per entry: Spelling and Sounds like (`CommitField`: saved on leaving the field or Enter, never per keystroke, because a save replaces the whole list; Escape puts the server's value back; a blank Sounds like means as written), the misheard forms as chips that remove themselves, a field to add forms (Enter or Add; commas add several), and a delete button that asks first. `data-vocabulary-*` hooks: `-section`, `-entry`, `-field`, `-form`, `-form-field`, `-delete`, `-add-row`, `-draft` (the draft row), `-save-word` (its "Add word" button), `-refusal` (the refusal line, in the row the refused save was made from), `-save` (`saving` | `idle`, always mounted: it says only "Saving…").
+- "Add a word" opens a DRAFT row (`VocabularyEntryRow` with `draft`): nothing is sent until "Add word", which saves the list with the word AND the forms typed into its field and not yet added (a press on "Add word" under typed forms never saves the word alone). Nothing is optimistic; while a save is out every press waits (`busy`). Every text field is read-only while a save is out (an edit then would be built from the list as drawn, which is the one the save in flight is about to replace). A refusal leaves the table as it was, a field snaps back, and the server's own sentence stands IN THE ROW the refused save was made from (`editedRow`: its place in the list, or the draft), never under the table: the table is several windows tall, so a line under it was off screen for every row but the last.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularyEntryRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx

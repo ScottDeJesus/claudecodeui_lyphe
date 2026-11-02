@@ -122,6 +122,33 @@
       "openai": "OpenAI-compatible",
       "gemini": "Gemini"
     },
+    "cleanTranscripts": {
+      "title": "Transcripts",
+      "label": "Clean up transcripts — remove um, uh, repeats",
+      "help": "Filler sounds, stutters and words said twice are taken out of what the chat's mic and Kaylee hear, so the text reads like what you meant to say. Off keeps them as said; the vocabulary below still corrects its words."
+    },
+    "vocabulary": {
+      "title": "Vocabulary",
+      "description": "Words of your own that a transcriber mishears. It writes them as spelled, any misheard form (whole words, any case) is corrected, and Kaylee says each one the way it sounds. Separate several misheard forms with commas.",
+      "loading": "Loading…",
+      "empty": "No words yet: nothing is corrected, and Kaylee says everything as written.",
+      "addRow": "Add a word",
+      "newWord": "new word",
+      "spelling": "Spelling",
+      "spellingPlaceholder": "lypheCli",
+      "pronunciation": "Sounds like",
+      "pronunciationPlaceholder": "life C-L-I",
+      "delete": "Delete {{word}}",
+      "misheard": "Misheard as",
+      "removeForm": "Remove {{form}}",
+      "formPlaceholder": "Add a misheard form, like life CLI",
+      "formField": "A misheard form of {{word}}",
+      "addForm": "Add",
+      "saveWord": "Add word",
+      "deleteTitle": "Delete {{word}}?",
+      "deleteMessage": "It goes from the vocabulary, with its misheard forms: they are no longer corrected, and Kaylee says it as it is written.",
+      "deleteConfirm": "Delete"
+    },
     "gemini": {
       "title": "Gemini",
       "description": "Kaylee hears and speaks through Gemini. The chat's mic uses it when picked above.",

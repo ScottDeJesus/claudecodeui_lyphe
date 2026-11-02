@@ -9,8 +9,10 @@ import { recordingFileName } from '@/shared/utils';
 /**
  * Push-to-talk dictation. Records the mic (useMicRecorder), transcribes it through the account's provider as useVoiceProvider
  * last read it, at the moment the clip is sent (the OpenAI-compatible backend, posted to the browser's own endpoint or the
- * Express proxy, or Gemini through the proxy on the server's key), and returns the transcript through onTranscript. A refusal
- * from Gemini (no key, a refused key) is handed to onError as the server's own sentence.
+ * Express proxy, or Gemini through the proxy on the server's key), and returns the transcript through onTranscript. Whichever
+ * way it went, the transcript is the account's cleaned one (fillers out, house words corrected): `transcribeVoice` gets that from
+ * the server's engine even when the clip never touched the server. A refusal from Gemini (no key, a refused key) is handed to
+ * onError as the server's own sentence.
  */
 export function useVoiceInput(
   onTranscript: (text: string, send?: boolean) => void,

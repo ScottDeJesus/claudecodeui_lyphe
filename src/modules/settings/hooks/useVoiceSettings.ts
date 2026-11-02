@@ -28,10 +28,12 @@ function asVoiceSettings(value: unknown): VoiceSettings | null {
   if (!isRecord(value) || !isRecord(value.gemini)) return null;
   const { provider } = value;
   const { transcriptionModel, speechModel, voice, soundTags } = value.gemini;
+  // A server that predates the setting does not send it: cleanup is on by default, so absent reads as on.
+  const cleanTranscripts = value.cleanTranscripts !== false;
   if (provider !== 'openai' && provider !== 'gemini') return null;
   if (typeof transcriptionModel !== 'string' || typeof speechModel !== 'string' || typeof voice !== 'string') return null;
   if (!Array.isArray(soundTags) || !soundTags.every((tag) => typeof tag === 'string')) return null;
-  return { provider, gemini: { transcriptionModel, speechModel, voice, soundTags } };
+  return { provider, cleanTranscripts, gemini: { transcriptionModel, speechModel, voice, soundTags } };
 }
 
 /**

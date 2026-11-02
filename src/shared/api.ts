@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult, VoiceProvider, VoiceSettingsPatch, WriteAttempt } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult, VocabularyEntry, VoiceProvider, VoiceSettingsPatch, WriteAttempt } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
@@ -13,6 +13,7 @@ import type { RoadmapWriteBody } from '@/shared/roadmap-types';
 import type { StationAskAnswer } from '@/shared/station-types';
 import { IS_PLATFORM, companionClientId, recordingFileName } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
+import { synthesizeOnOwnEndpoint, transcribeOnOwnEndpoint } from '@/shared/voiceDirect';
 
 // Headers are a plain record rather than the full `HeadersInit` union so the
 // defaults below can be merged with a caller's headers by spreading.
@@ -849,6 +850,18 @@ export const api = {
     saveSettings: (patch: VoiceSettingsPatch) => put('/api/voice/settings', patch),
     saveGeminiKey: (key: string) => put('/api/voice/gemini-key', { key }),
     clearGeminiKey: () => del('/api/voice/gemini-key'),
+    // The account's house words, as one whole list: `{ vocabulary: VocabularyEntry[] }` both ways. The save REPLACES the list and
+    // answers it as stored (trimmed, deduplicated); a refusal is a 400 `VOICE_VOCABULARY_INVALID` whose sentence names the entry or form.
+    vocabulary: () => get('/api/voice/vocabulary'),
+    saveVocabulary: (vocabulary: VocabularyEntry[]) => put('/api/voice/vocabulary', { vocabulary }),
+    // The server's speech engine for a caller that talks to its own OpenAI-compatible backend (this page's browser-direct
+    // voice calls, a standalone dictation app): the server never sees that traffic, so it answers the text halves alone.
+    // `transcribeHints` is `{ prompt }`, Whisper's `prompt` for the account's vocabulary (`''`: send none). `clean` takes a
+    // transcript and answers `{ text }` as the server's own path would (fillers out per the account's switch, misheard house
+    // words corrected). `speakable` answers `{ text }`, the text to hand a speech backend with house words respelled.
+    transcribeHints: (options: ApiRequestOptions = {}) => get('/api/voice/transcribe-hints', options),
+    clean: (text: string, options: ApiRequestOptions = {}) => post('/api/voice/clean', { text }, options),
+    speakable: (text: string, options: ApiRequestOptions = {}) => post('/api/voice/speakable', { text }, options),
   },
 
   // Kaylee, the voice companion. Every call names THIS page to her in `x-companion-client`: the page that last typed or
@@ -1606,14 +1619,6 @@ export async function uploadAttachmentFiles(files: File[]): Promise<unknown[]> {
 //----------------- VOICE TRANSCRIPTION AND SPEECH ------------
 
 /**
- * Builds a URL against the user's own OpenAI-compatible voice endpoint. Private to the
- * voice helpers below, which bypass the CloudCLI proxy when a base URL is configured.
- */
-function voiceDirectUrl(baseUrl: string, path: string): string {
-  return `${baseUrl.replace(/\/$/, '')}${path}`;
-}
-
-/**
  * Serializes the active voice configuration so callers can detect a settings change and
  * drop cached synthesized audio.
  */
@@ -1623,10 +1628,11 @@ export function voiceConfigSignature(): string {
 
 /**
  * Transcribes recorded audio. With the 'openai' provider (the default), it posts directly to the user's configured
- * OpenAI-compatible endpoint when one is set and otherwise goes through the CloudCLI voice proxy. With 'gemini' it
- * always goes through the proxy, which transcribes on the server's Gemini key: the browser's own endpoint is never
- * reached and none of its `x-voice-*` headers (its OpenAI-compatible key and model) ride along. Callers pass the
- * account's provider from the chat module's `useVoiceProvider`.
+ * OpenAI-compatible endpoint when one is set (the account's vocabulary prompt and cleanup applied through the server's
+ * engine: `transcribeOnOwnEndpoint`, `src/shared/voiceDirect.ts`) and otherwise goes through the CloudCLI voice proxy, which
+ * applies them itself. With 'gemini' it always goes through the proxy, which transcribes on the server's Gemini key: the
+ * browser's own endpoint is never reached and none of its `x-voice-*` headers (its OpenAI-compatible key and model) ride
+ * along. Callers pass the account's provider from the chat module's `useVoiceProvider`.
  */
 export function transcribeVoice(blob: Blob, filename: string, provider: VoiceProvider = 'openai'): Promise<Response> {
   const body = new FormData();
@@ -1638,13 +1644,7 @@ export function transcribeVoice(blob: Blob, filename: string, provider: VoicePro
 
   const config = readVoiceConfig();
   if (config.baseUrl.trim()) {
-    body.append('file', blob, filename);
-    body.append('model', config.sttModel || 'whisper-1');
-    return fetch(voiceDirectUrl(config.baseUrl.trim(), '/audio/transcriptions'), {
-      method: 'POST',
-      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
-      body,
-    });
+    return transcribeOnOwnEndpoint(blob, filename, config, api.voice);
   }
 
   body.append('audio', blob, filename);
@@ -1652,27 +1652,15 @@ export function transcribeVoice(blob: Blob, filename: string, provider: VoicePro
 }
 
 /**
- * Synthesizes speech for the given text, using the user's configured OpenAI-compatible
- * endpoint when one is set and otherwise the CloudCLI voice proxy.
+ * Synthesizes speech for the given text, using the user's configured OpenAI-compatible endpoint when one is set (the text
+ * respelled first by the server's engine: `synthesizeOnOwnEndpoint`, `src/shared/voiceDirect.ts`) and otherwise the CloudCLI
+ * voice proxy, which respells it itself.
  */
 export function synthesizeVoice(text: string, signal: AbortSignal): Promise<Response> {
   const config = readVoiceConfig();
 
   if (config.baseUrl.trim()) {
-    return fetch(voiceDirectUrl(config.baseUrl.trim(), '/audio/speech'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
-      },
-      body: JSON.stringify({
-        model: config.ttsModel || 'tts-1',
-        voice: config.ttsVoice || 'alloy',
-        input: text,
-        ...(config.ttsFormat.trim() ? { response_format: config.ttsFormat.trim() } : {}),
-      }),
-      signal,
-    });
+    return synthesizeOnOwnEndpoint(text, config, signal, api.voice);
   }
 
   return api.voice.tts(text, { headers: voiceConfigHeaders(), signal });

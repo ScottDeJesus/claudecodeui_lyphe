@@ -12,7 +12,9 @@ const IDLE: VoiceSnapshot = { state: 'idle', error: null };
 const CACHE_MAX = 24;
 const CLIENT_TIMEOUT_MS = 330000; // backstop; the server proxy already times out at 5 min
 
-// Stable id / cache key from the text and voice settings that affect its audio (djb2).
+// Stable id / cache key from the text and voice settings that affect its audio (djb2). The key leaves out how the account's
+// vocabulary says the words, which the server decides per request (`/speakable`, `/tts`): a message read before a vocabulary edit
+// replays its old audio until the page reloads, and every message not yet read speaks the new pronunciation at once.
 export function voiceId(content: string, signature = voiceConfigSignature()): string {
   const input = JSON.stringify([content, signature]);
   let h = 5381;

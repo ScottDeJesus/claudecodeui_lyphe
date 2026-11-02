@@ -97,7 +97,8 @@
           "server/shared/tool-text-result.ts",
           "server/shared/relayed-press-types.ts",
           "server/shared/relay-record.ts",
-          "server/shared/sayable-name.ts"
+          "server/shared/sayable-name.ts",
+          "server/shared/word-edges.ts"
         ],
         "mode": "file"
       },
@@ -123,6 +124,7 @@
           "src/shared/authToken.ts",
           "src/shared/authTrace.ts",
           "src/shared/voiceConfig.ts",
+          "src/shared/voiceDirect.ts",
           "src/shared/userSettings.ts",
           "src/shared/preferenceEntryPatch.ts",
           "src/shared/chatDrafts.ts",

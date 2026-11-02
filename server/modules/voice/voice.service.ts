@@ -101,10 +101,12 @@ function validateConfiguredBackend(config: ResolvedVoiceConfig): VoiceServiceRes
   return null;
 }
 
-function createTranscriptionFormData(audio: VoiceAudioUpload, sttModel: string): FormData {
+function createTranscriptionFormData(audio: VoiceAudioUpload, sttModel: string, prompt: string): FormData {
   const formData = new FormData();
   formData.append('file', new Blob([audio.bytes], { type: audio.mimeType }), audio.fileName);
   formData.append('model', sttModel);
+  // Whisper takes no instruction; its `prompt` is the one place to tell it how names are spelled. Never sent empty.
+  if (prompt) formData.append('prompt', prompt);
   return formData;
 }
 
@@ -131,7 +133,7 @@ export function createVoiceService(dependencies: VoiceServiceDependencies): Voic
           {
             method: 'POST',
             headers: authorizationHeader(config.apiKey),
-            body: createTranscriptionFormData(input.audio, config.sttModel),
+            body: createTranscriptionFormData(input.audio, config.sttModel, input.prompt ?? ''),
           },
         );
         const responseText = await response.text();
