@@ -66,8 +66,9 @@ export type CompanionCliLaunch = {
  * exist yet). `push` queues a message and restarts the idle clock; `interrupt` answers the uuids still
  * queued behind the stopped turn, or `unanswered` when the CLI did not answer within the grace;
  * `setModel` applies a model to the running CLI (and throws when the CLI does not answer within the grace), or
- * remembers it for the CLI that is not up yet; `close` ends the input and waits for the exit, killing the CLI
- * after the grace; `kill` ends it now. Consumed by
+ * remembers it for the CLI that is not up yet; `contextUsage` asks the running CLI for its own count of her context
+ * (no model call) and answers `null` while it is not up, past the grace or on a failure; `close` ends the input and
+ * waits for the exit, killing the CLI after the grace; `kill` ends it now. Consumed by
  * `companion-session.ts`, which holds one per launch.
  */
 export type CompanionCli = {
@@ -76,9 +77,43 @@ export type CompanionCli = {
   push(message: SDKUserMessage): void;
   interrupt(): Promise<{ stillQueued: string[] } | 'unanswered'>;
   setModel(model: CompanionModel): Promise<void>;
+  contextUsage(): Promise<CompanionContextReading | null>;
   close(): Promise<void>;
   kill(): void;
 };
+
+/**
+ * Her CLI's own count of her context, its window, the reserve under it and whether it would compact on its own; null while it
+ * is not up, past the grace, or on a failure. `total` is what the last response's usage and the CLI's local estimates make of her
+ * conversation, `window` the size the CLI measures it against, `reserve` the buffer it keeps back under the window (her window ends at
+ * `window - reserve` in its own reading; with its compaction off it does not refuse there) and `cliCompacts` whether the CLI summarises her conversation by itself before that.
+ * Consumed by `companion-closing.ts` (the reading at each turn's end and at a launch's first `init`) and by `companion-notice.ts`
+ * (the closing point derived from it), which phases `closing` and `notice` add.
+ */
+export type CompanionContextReading = { total: number; window: number; reserve: number; cliCompacts: boolean };
+
+/** A number the CLI answered: a finite, non-negative one. A missing or malformed number is no number — the reading it belongs to is dropped, never guessed. */
+function answeredCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+/**
+ * The reading out of the CLI's `getContextUsage` answer, or `null` when a number it is made of is missing: `reserve` is the sum of the
+ * categories of `kind: 'buffer'` (none at all is a reserve of 0), `window` must be a real window (never 0).
+ */
+function contextReadingOf(answer: unknown): CompanionContextReading | null {
+  if (!answer || typeof answer !== 'object') return null;
+  const { totalTokens, maxTokens, categories, isAutoCompactEnabled } = answer as Record<string, unknown>;
+  if (!answeredCount(totalTokens) || !answeredCount(maxTokens) || maxTokens === 0 || typeof isAutoCompactEnabled !== 'boolean' || !Array.isArray(categories)) return null;
+  let reserve = 0;
+  for (const category of categories) {
+    if (!category || typeof category !== 'object' || (category as { kind?: unknown }).kind !== 'buffer') continue;
+    const { tokens } = category as { tokens?: unknown };
+    if (!answeredCount(tokens)) return null;
+    reserve += tokens;
+  }
+  return { total: totalTokens, window: maxTokens, reserve, cliCompacts: isAutoCompactEnabled };
+}
 
 /** Consumed by `companion-session.ts`. Starts the launch at once (on the next microtask: the owner holds the handle before any callback can fire). */
 export function launchCompanionCli(input: CompanionCliLaunch): CompanionCli {
@@ -162,6 +197,25 @@ export function launchCompanionCli(input: CompanionCliLaunch): CompanionCli {
       if (!(await answeredWithin(switched, CLI_GRACE_MS))) {
         throw new Error(`her CLI did not answer a switch to ${model} within ${CLI_GRACE_MS / 1000} s`);
       }
+    },
+    async contextUsage() {
+      const asked = conversation;
+      if (asked === null) return null;
+      // Started inside this try so a throw on the way out (a CLI already gone) is a failed answer, never a rejection: a missing number costs one reading, never the turn it follows.
+      const reading = (async () => {
+        try {
+          const answer = await asked.getContextUsage({ detail: 'summary' });
+          const read = contextReadingOf(answer);
+          if (read === null) console.warn(`[Companion] account ${userId}: her CLI answered no usable context count`);
+          return read;
+        } catch (error) {
+          console.warn(`[Companion] account ${userId}: her context count failed (${error instanceof Error ? error.message : error})`);
+          return null;
+        }
+      })();
+      const answered = await answeredWithin(reading, CLI_GRACE_MS);
+      if (answered === undefined) console.warn(`[Companion] account ${userId}: her CLI did not count her context within ${CLI_GRACE_MS / 1000} s`);
+      return answered ?? null;
     },
     async close() {
       idle.cancel();

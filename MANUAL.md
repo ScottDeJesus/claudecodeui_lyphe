@@ -5048,6 +5048,8 @@ The one place that says which session callback writes which row and sends which 
 
 - `readView` = what is on his screen, a `ViewShown`: `viewShown` reads `viewTargetOf(userId, store.readState().floor)` (MAN-9057). No record is none; a record with no view is a page of the workspace, so its chat, through `resolveChat` (one it cannot resolve is none); a view is its kind, a `chat` view named through `resolveChat` (same rule), a `walk` view filled from `store.readState().walk` (none held is none), every other kind as the page stated it.
 - Activity is held here (`currentActivity()`); starts `IDLE_ACTIVITY`.
+- During her last turn (her own compaction, MAN-9455) the session calls none of `onSentence`, `onTurnStarted` and `onTurnEnded`: no frame, no log row, no speech-cache move; `onActivity` still passes, so she reads thinking.
+- The tool deps are made first and the session from her tools (`buildCompanionTools(toolDeps)`); the deps' `inLastTurn` reads the session lazily (`session?.inLastTurn ?? false`).
 - `CompanionAccount.speechCache` is made here, one per account (MAN-9111); the speech door reads the floor and the sentences through `store` (MAN-9110).
 
 ## `companion-picture.ts` — `buildPicture(account)`
@@ -5062,7 +5064,7 @@ The one place that says which session callback writes which row and sends which 
 |---|---|
 | `COMPANION_MCP_SERVER_NAME` | re-export of `session/companion-launch.ts`; the SDK names a tool `mcp__<name>__<tool>` |
 | `COMPANION_TOOL_NAMES` | the names of her tools, `toolNames()` of `session/companion-prompt.ts`: the lines of the prompt's TOOLS section that open `name(` |
-| `buildCompanionTools(deps)` | `[...sessionTools(), ...readTools(deps), ...draftTools(deps), ...actTools(deps)]`, then the eyes' (`eyes/*-reads.ts`): `roadmapReads`, `runReads`, `docReads`, `alertReads`, `panelReads`, `houseReads`, then the hands': `handsTools(deps)` (the three above and `directTools(deps)`: `open`, `close_followup`), and last her memory's: `memoryTools(deps)` (`memory/memory-tools.ts`) |
+| `buildCompanionTools(deps)` | `[...sessionTools(), ...readTools(deps), ...draftTools(deps), ...actTools(deps)]`, then the eyes' (`eyes/*-reads.ts`): `roadmapReads`, `runReads`, `docReads`, `alertReads`, `panelReads`, `houseReads`, then the hands': `handsTools(deps)` (the three above and `directTools(deps)`: `open`, `close_followup`), and last her memory's: `memoryTools(deps)` (`memory/memory-tools.ts`). Each definition is returned as `{ ...definition, handler }`: while `deps.inLastTurn()` is true the handler of every tool but `recall` and `remember` answers `deps.refuse("Not in this last turn: only recall and remember are open now. Keep what matters, then write your note.")` and runs nothing; otherwise it is the definition's own, except that `recall` is handed its input with `panel` read as false (its card would show his panel a turn he is never shown, and tell her only that it is there). Name, description and schema are never touched (the CLI keeps a conversation's tools as first recorded and `sessionShapeOf` fingerprints exactly them, so a tool dropped or reworded would start both accounts fresh) |
 | `CompanionToolDeps` | what every tool file is handed: the account, its store, the runtime gateway, the `house` (MAN-9142: the readers only a module instance holds) and the helpers below |
 | `ToolActivityPhase` | `CompanionPhase` minus `idle`, `thinking` (the turn's own) |
 
@@ -5096,13 +5098,14 @@ The one place that says which session callback writes which row and sends which 
 - THE DRAFT RULE: only the draft is ever sent. `send_to_session` and `create_session` carry the brief's `text`, and it must equal the draft's words; a mismatch is refused naming the draft's target and its first words, and nothing is sent. Both go through `deps.sendDraft` (MAN-9072); so does the panel's Send.
 - A tool never throws: a refusal is `deps.refuse(sentence)` (`isError` text saying what to do next), a handler that throws is logged and answered the same way.
 
-## `tools/tool-deps.ts` — `createToolDeps({ userId, store, runtime, house, activity })`
+## `tools/tool-deps.ts` — `createToolDeps({ userId, store, runtime, house, activity, inLastTurn? })`
 | Dep | Does |
 |---|---|
 | `setFocus(chat)` | writes and announces focus only when the chat moved or was renamed; no focus tool exists |
 | `withActivity(phase, chat, files, run)` | sets her activity for as long as `run` takes; a `walking` phase carries `{ at, total }` of the held walk |
 | `openOnFloor(target, label)` | emits `companion_open` `{ target, floor, label }` (`target` a `CompanionOpenTarget`, `label` the spoken name the door resolved); nothing while no page holds the floor |
 | `refuse(sentence)` | `isError` text saying what to do next; never a throw |
+| `inLastTurn()` | true while her last turn (the one that closes her conversation) runs; read at every tool call by `buildCompanionTools`' gate, never by a tool file. `companion-account.ts` binds it to the session (`session?.inLastTurn ?? false`); absent from the input it answers false, so a probe that builds her tools through `createToolDeps` builds them as they always were |
 | `sendDraft(request)` | the one door the draft goes out by (`createDraftSender` in `companion-send.ts`, built on `setFocus` and `openOnFloor`); `send_to_session`, `create_session` and the panel's Send all call it |
 
 `withActivity` end rule:
@@ -5141,7 +5144,7 @@ Every handler runs inside `guardedToolResult` (`server/shared/tool-text-result.t
 - `text` is stored EXACTLY as given (no trim): `send_to_session` and `create_session` compare their text with the draft's.
 - The limit is `DRAFT_TEXT_MAX` imported from `companion-input.ts` and counted in characters as `PUT /draft` counts them (`characterCount`, code points), so the route and the tool accept the same brief and `<n>` below is that count. The schema carries it as a refinement, not `.max`, which counts UTF-16 units and would refuse text the route accepts.
 - Writes `{ target, text }` (`companion_draft`), THEN a session target becomes the focus (`deps.setFocus`): a write that fails moves nothing. A project target (`kind: 'new'`, `projectPath`, `projectName`) moves no focus.
-- After a compaction `<state>` restates the draft, the names and the walk's items ESCAPED (`&`, `<`, `>` as entities, in `stateEnvelope`): a `</state>` or an `<operator via="typed">` in her text stays words. The stored draft is untouched, so what is sent is exactly what she wrote; only her view of it after a compaction is the escaped spelling (`resolveChat` accepts a name in that spelling).
+- After a fresh start `<state>` restates the draft, the names and the walk's items ESCAPED (`&`, `<`, `>` as entities, in `stateEnvelope`): a `</state>` or an `<operator via="typed">` in her text stays words. The stored draft is untouched, so what is sent is exactly what she wrote; only her view of it after a fresh start is the escaped spelling (`resolveChat` accepts a name in that spelling).
 - Activity `drafting` with that chat (none for a project) while it runs.
 - Answers `Draft for <name>: <n> characters.` or `Draft for a new chat in <project>: <n> characters.`
 
@@ -5162,7 +5165,7 @@ The title is the stored one on a single line, escaped as an envelope escapes sto
 To replace a card she dismisses it and shows the new one.
 
 ## `walk { session, items?: 1–60 × 1–120, at: int ≥ 0 }`
-One walk per account, held in the store; `<state>` restates it after a compaction.
+One walk per account, held in the store; `<state>` restates it after a fresh start.
 | Call | Result |
 |---|---|
 | `at` 0 | ends the HELD walk whichever chat is named, BEFORE any chat is resolved (the walk's chat may be archived or deleted since and could no longer be named): `companion_walk` null, `Walkthrough of <held chat> ended.` The focus follows the chat named only when it can still be named. None held: plain text, not an error |
@@ -5659,7 +5662,7 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 | `includePartialMessages` | `true` | text deltas feed the sentence stream |
 | `maxTurns` | 30 | per turn of hers: one answer to him, every tool call inside it |
 | `cwd` | `companionWorkingDirectory(userId)` | below |
-| `env` | `{ ...userFacingEnv(), ...(await launchAccountEnv()).env, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '500000' }` | the account the house chose, on the subscription; her CLI compacts her conversation when it reaches 500k tokens, not at its default for a 1M model (about 967k) |
+| `env` | `{ ...userFacingEnv(), ...(await launchAccountEnv()).env, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '500000', DISABLE_COMPACT: '1' }` | the account the house chose, on the subscription. `DISABLE_COMPACT=1` is LAST so no account or house env turns it back on: her CLI never summarizes her conversation, automatic or manual, and no `compact_boundary` reaches her. Her own closing is her compaction (MAN-9455). The 500k window (`COMPANION_WINDOW_TOKENS`) is what her CLI's reading measures her against and her closing counts back from; it is NOT a refusal point: with compaction off the CLI sends past it and refuses only at the model's own limit (measured 2026-11-01 on a 100,000 window: messages read at 99,982 and 100,122 tokens were both sent). The CLI reads its env at launch: a change applies from her next launch |
 | `pathToClaudeCodeExecutable` | `resolveClaudeCodeExecutablePath(CLAUDE_CLI_PATH)`; key absent when it does not resolve | |
 | `resume` | the held CLI session id, only when the shape stored with it is the launch's own (MAN-9209); key ABSENT for a fresh launch, never empty | |
 
@@ -5701,18 +5704,20 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 |---|---|
 | `push(message)` | queues the message, restarts the idle clock |
 | `interrupt()` | `conversation.interrupt()`, answer within 5 s → `{ stillQueued: string[] }`; silence or a failure → `'unanswered'` (the session then retires that launch and starts a replacement that resumes the held session id through `planLaunch` (MAN-9209), carrying what was given and what was held: a CLI that ignores a Stop would ignore the next message; MAN-9169) |
+| `contextUsage()` | `Promise<CompanionContextReading \| null>`, `CompanionContextReading = { total, window, reserve, cliCompacts }`: the CLI's own count of her context (`getContextUsage({ detail: 'summary' })`; no model call), within `CLI_GRACE_MS` = 5 s. `total` = `totalTokens`, `window` = `maxTokens`, `reserve` = sum of `tokens` over the `kind: 'buffer'` categories (0 when none), `cliCompacts` = `isAutoCompactEnabled`. `null` while no process is up, on a throw, on silence past the grace, or when a number is missing, non-finite or negative, `window` is 0 or `isAutoCompactEnabled` is not a boolean; each logs a `[Companion] account <id>: …` warning. `total` 0 is a reading (a fresh launch reads 25). Called by `companion-closing.ts` at a launch's first `init` and at each turn's end (MAN-9455) |
 | `close()` | cancels the clock, `queue.end()` (EOF = wind down), waits up to 5 s for the loop, then `conversation.close()` |
 | `kill()` | cancels the clock, ends the queue, `conversation.close()` now |
 - Once ended by us (`close`, `kill`, the idle closer) the launch reports NOTHING more: its messages are drained unheard and `onEnded` fires only for a loop that ended by itself. The queue never ends on its own: why, in the prompt-stream row.
 
 ## Proof
 `.verify/kaylee-session.mjs` (run under `tsx`, account 999, Haiku, stand-in callbacks): init check, hello, the conversation held across a message, `setModel` sonnet then haiku with no relaunch, resume after close, refused resume, Stop.
+`.verify/kaylee-context-reading.mjs [--own-disable]` (`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx`; account 1, Haiku, nothing sent, no model call): prints `contextUsage()`, the CLI's `DISABLE_COMPACT=` and `CLAUDE_CODE_AUTO_COMPACT_WINDOW=` environ lines, and `readLoopEvent` on the refusal and on an answered result. It deletes `DISABLE_COMPACT`/`DISABLE_AUTO_COMPACT` from its own env first; `--own-disable` sets `DISABLE_COMPACT=1`. Measured 2026-11-01: plain `{"total":25,"window":500000,"reserve":33000,"cliCompacts":true}`; `--own-disable` `{"total":25,"window":500000,"reserve":3000,"cliCompacts":false}`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-launch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-process.ts
 
 ## MAN-9079 — server/modules/companion/session — her conversation: the process states, the loop's events, which result ends a turn, the refused resume, Clear and Stop
 
-`createCompanionSession(deps)` (`session/companion-session.ts`) is one account's live conversation; `companion-account.ts` builds it (MAN-9070). The session reads nothing itself: `CompanionSessionDeps` (`companion-session-types.ts`) hands it the readers (`MessageReaders`), the sinks (`TurnSink`) and the held conversation (`HeldSession`: the CLI session id and the shape of her tools and prompt it began with). Launch: MAN-9077. Shape and the refusal before a launch: MAN-9209. The handover of a thread she is made to drop: MAN-9210, MAN-9211. Message order: MAN-9080. Sentence stream: MAN-9081.
+`createCompanionSession(deps)` (`session/companion-session.ts`) is one account's live conversation; `companion-account.ts` builds it (MAN-9070). The session reads nothing itself: `CompanionSessionDeps` (`companion-session-types.ts`) hands it the readers (`MessageReaders`), the sinks (`TurnSink`) and the held conversation (`HeldSession`: the CLI session id and the shape of her tools and prompt it began with). Launch: MAN-9077. Shape and the refusal before a launch: MAN-9209. The handover of a thread she is made to drop: MAN-9210, MAN-9211. Message order: MAN-9080. Sentence stream: MAN-9081. Her own compaction (her last turn, the hold, the fresh start): MAN-9455.
 
 ## `CompanionSession` surface
 | member | does |
@@ -5724,8 +5729,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 | `interrupt(by = 'operator')` | a stop of her turn: below. `by` is `'operator'` (his Stop `POST /interrupt`, the voice's cut) or `'server'` (`stopAll`) |
 | `setModel(model)` | `live?.cli.setModel`; MAN-9077 |
 | `clear()` | below |
-| `close(reason)` | `closeProcess`: stops a replay still reading pictures (`abandonReplay()`, MAN-9410) and a handover being written (`gate.abandon()`), detach, then `cli.close()` |
-| `process`, `turnId` | the condition the panel shows; the turn in flight or `null` |
+| `close(reason)` | `closeProcess`: stops a replay still reading pictures (`abandonReplay()`, MAN-9410) and a handover being written (`gate.abandon()`), detach, `closing.abandon()` (a closing under way, MAN-9455), then `cli.close()` |
+| `process`, `turnId` | the condition the panel shows; the turn in flight or `null` (`null` during her last turn too) |
+| `inLastTurn` | true while her last turn runs (the one that closes her conversation); a plain boolean getter, never a throw. `companion-account.ts` binds her tools' gate to it (`session?.inLastTurn ?? false`, MAN-9070); the closing answers it (MAN-9455) |
 
 ## Process states (`CompanionProcess`)
 | `state` | set when |
@@ -5748,11 +5754,13 @@ section: server/modules/companion/session — her conversation: the process stat
 | `system`/`init` | `init { sessionId, tools, model }` | tool check; store `{ session_id, the launch's shape }` when either differs from the held pair (MAN-9209); first of a launch = `awake`, and the row's `<handover>` text is emptied when this launch was handed it (`handoverReceived()`, MAN-9210) |
 | `stream_event` `content_block_delta` `text_delta`, `parent_tool_use_id` null | `text { delta }` | `turns.text` → sentence stream |
 | `stream_event` `content_block_stop` | `block_end` | flush the stream: a block ends with no whitespace after its last sentence |
-| `system`/`compact_boundary` | `compacted` | `assembler.oweState()` |
-| `result` | `result { answered, failure, resumeRefused }` | below |
-| anything else, thinking and tool-input deltas, a sub-agent's deltas | none | |
+| `result` | `result { answered, failure, resumeRefused, text, contextFull }` | below |
+| anything else: a `system` message but `init` (her CLI's compaction is off, so no `compact_boundary` reaches her), thinking and tool-input deltas, a sub-agent's deltas | none | |
 - `answered` = `user_message_uuids`, else `[user_message_uuid]`, else `[]`.
 - `failure`: `success` + `is_error` → `Her answer failed: <result>`; `error_max_turns` → `Her turn ran out of steps before she finished.`; any other subtype → `Her answer failed: <errors>`. A refused resume has `failure: null`.
+- `text`: `success` and not `is_error` → its `result` (the last assistant message's text: what she wrote before her tool calls is not in it); any other result → `null`.
+- `contextFull`: always a boolean; true for `success` + `is_error === true` whose `result` begins `Prompt is too long`. `failure` is still `Her answer failed: Prompt is too long.`. `text` is her note when the result is her last turn's; `contextFull` hands her conversation over instead of failing the turn (MAN-9455).
+- The refusal (measured 2026-11-01, Claude Code 2.1.316, Haiku, `DISABLE_COMPACT=1`, `CLAUDE_CODE_BLOCKING_LIMIT_OVERRIDE=5000`, a 9,000-word message): `success` + `is_error`, text `Prompt is too long`, cost 0, usage 0, the refused message's uuid in `user_message_uuids`. The refused message stays counted (27,176 tokens after it, reserve 3,000, `isAutoCompactEnabled: false`): every later message is refused too.
 - `failureSentence(lead, reason)`: whitespace collapsed; sentences of developer advice dropped (`Run --…`, `Please ensure…`, `Usage:…`, anything naming `options.<x>`; INV-7173); exactly one closing period.
 - Measured 2026-10-26 (live CLI, streaming input, Haiku): `init` arrives at the start of EVERY turn with the same `session_id`; `result` lists in `user_message_uuids` every message of ours the turn took, a mid-turn fold included.
 
@@ -5764,6 +5772,7 @@ section: server/modules/companion/session — her conversation: the process stat
 | a uuid of the turn in flight | ends it `answered` (`failure` null) or `failed` |
 | only uuids of a turn already stopped | `stale`: that turn's late answer; ends nothing |
 | no uuid | read as the turn in flight's (the CLI's startup failures) |
+- A result listing the notice of her last turn is the closing's alone: it ends no turn of the page's and never fails her (MAN-9455).
 - A message the ended turn did not consume starts the next turn at once, so the panel never shows her speaking outside a turn.
 - Each sentence carries `turnId` and `index` (from 0; counts only sentences `parseExpression` kept). A stopped or failed turn drops its buffered half-sentence.
 - At a turn's end: `onTurnEnded(turnId, outcome, error)`, then activity `idle` unless the callback pushed and began the next turn.
@@ -5778,6 +5787,7 @@ section: server/modules/companion/session — her conversation: the process stat
 - Kept = `companion_state.unanswered_json` (MAN-9082): `[{ uuid, body, via, at, heard?, cut?, attachments? }]`, his RAW text and how it came (`''` with `spoken` = an empty press, or, with `heard: 'name'`, a press that was only her name), never the assembled message (its roster snapshot goes stale; it is assembled again on delivery). `cut` is the `<cut heard interrupted/>` the message opened with (absent when it opened with none): the one part of an assembled message that is not a snapshot, so the message said again opens with it (unless a newer cut is owed). The in-process restate after a stop does not owe it again: the aborted request already carried it. `attachments` are the files a typed line carried, kept as RECORDS (`path`, `name`, `size`, `mimeType?`, `opens`) and never as bytes: the picture blocks ride in memory beside the message (`Sent.images`), a message said again within a process keeps them, and a replay after a restart reads them again from the upload store (MAN-9410). Absent when the line carried none; a typed line with files and no words is kept with `body` `''`. Written through `deps.writeUnanswered` after every change that alters the list, so a message is on disk before the CLI could lose it; read once through `deps.readUnanswered` when the session is made.
 - A message leaves the list when: a `result` with no failure for a turn that was not stopped consumes it (a success that lists no uuid consumes the messages of the turn in flight, `turns.inFlightUuids()`); `fail` drops it; Clear; his own cut or Stop takes the turn it was in (below). It does NOT leave when the process ends: `detach` (idle close, `close`, the server's stop) makes what is kept INHERITED.
 - A push that wakes her while a fresh-start handover is written is parked behind it; his words are kept first (`ledger.keep(words)`: an INHERITED entry the parked push replaces, so a server that ends meanwhile loses none; MAN-9210).
+- A push that arrives while her closing holds (her last turn, the wall's handover) is kept the same way and parked behind it. The wall's refusal takes out everything the launch was handed and never answered, and keeps his words of it without their `cut` (MAN-9455).
 - `resendUnanswered()` pushes each INHERITED entry as a fresh message (new uuid, same body, via and `at`, in order, assembled afresh with the roster and view like any wake). The new push REPLACES its entry, so a restart storm leaves one entry and gets one answer. Journal: `[Companion] account <id>: re-sending <K> message(s) her last process never answered`. A push that throws leaves its entry for the next boot. It answers a promise: an entry with a `shown` picture has it read first and new pushes park behind the replay meanwhile, so his words keep their order (hold, `unopened` downgrade of a picture it cannot read, Close and Clear mid-read: MAN-9410).
 - WHO CALLS IT. The entrypoint's `soleServerDuties()` (`server/index.ts`) → `companion.resendUnanswered()` → `companionService.resendUnanswered()` makes (if need be) the account of each `companionDb.userIdsWithUnanswered()` user and calls the session's, without waiting on the promise: a rejection and a throw are logged alike, per account (`[Companion] account <id>: her unanswered messages could not be sent again`). On a handover boot that is the supervisor's `takeover`, after the predecessor is gone: a predecessor still serving may be answering the same words, and two processes on one CLI conversation must not both say them (measured 2026-10-28: a re-send at module build ran a second before the predecessor was retired). So a session never re-sends by itself.
 
@@ -5786,6 +5796,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/compani
 ## MAN-9169 — server/modules/companion/session — her conversation: the process states, the — Stop (`interrupt(by)`)
 section: server/modules/companion/session — her conversation: the process states, the loop's events, which result ends a turn, the refused resume, Clear and Stop/003 Stop (`interrupt(by)`)
 
+0. During her last turn (`closing.inLastTurn`) `interrupt` returns at once: his Stop, his cut and a server stop leave it running, and it ends by its own bound (MAN-9455).
 1. `turns.stop()` ends the turn `stopped`; none in flight = nothing else happens.
 2. Every message the CLI was given is marked with `by` (`ledger.markStopped`): it is the turn being stopped. `by = 'operator'` takes them off the kept list at once (he did not want that answer); `'server'` leaves them kept — a server handover is no word of his.
 3. Launch still being built (`!cli.up`) → `closeProcess('stopped before her process was up')`.
@@ -5802,7 +5813,7 @@ section: server/modules/companion/session — her conversation: the process stat
 
 ## Clear (`clear`)
 1. `writeProviderSession(null)` (id and shape), `dropHandover()` (the stored handover), `abandonReplay()` (a boot replay still reading pictures says nothing afterwards, nothing parked behind it runs: MAN-9410), `gate.abandon()` (a handover being written is stopped, nothing parked runs) and `assembler.forget()` BEFORE anything is awaited.
-2. `detach('cleared')` takes the launch out of the conversation synchronously and sets `asleep`, then `ledger.forgetAll()` (nothing is kept; `companionDb.clearAccount` also NULLs `unanswered_json`). why: a push landing during the wind-down is a wake into a fresh conversation, never a resume of the one being cleared.
+2. `detach('cleared')` takes the launch out of the conversation synchronously and sets `asleep`, then `closing.abandon()` (a closing under way stops, nothing stored: MAN-9455), then `ledger.forgetAll()` (nothing is kept; `companionDb.clearAccount` also NULLs `unanswered_json`). why: a push landing during the wind-down is a wake into a fresh conversation, never a resume of the one being cleared.
 3. A turn in flight is interrupted now; `cli.close()` is awaited.
 4. A push that already woke a new launch is not overwritten.
 The rows go with it: MAN-9271 §Clear.
@@ -5823,7 +5834,7 @@ Every message to her is assembled at the moment it is pushed (`createMessageAsse
 ## Order of one message
 | # | part | sent when |
 |---|---|---|
-| 1 | `<state>` | owed once after `compact_boundary` and after every fresh start (a refused resume, a launch with nothing held, a changed shape: MAN-9209); lines `Focus: <name> · <project> · id <id>`, `Draft for <target>: <text>`, `Walkthrough of <name>: item k of n, "<title>"; items: 1. … 2. …` (`not begun` at 0), each only when held; nothing at all when none is held |
+| 1 | `<state>` | owed once after every fresh start (a refused resume, a launch with nothing held, a changed shape: MAN-9209); lines `Focus: <name> · <project> · id <id>`, `Draft for <target>: <text>`, `Walkthrough of <name>: item k of n, "<title>"; items: 1. … 2. …` (`not begun` at 0), each only when held; nothing at all when none is held |
 | 2 | `<handover>text</handover>` | once, after a fresh start that dropped a conversation (MAN-9210): the text stored on her row (`readHandover`), escaped. The row keeps it until the launch that was handed the message reports `init`, so a launch that ends first leaves it for the next message; meanwhile at most one message carries it |
 | 3 | `<cut heard="…" interrupted="…"/>` | owed once after `oweCut(heard, interrupted)`, called by the companion's `cut` (`POST /cut`, MAN-9111). Each value is a sentence's display text, escaped as an attribute; `""` = none (`heard=""`: no sentence had ended; `interrupted=""`: none was playing). A later cut replaces one no message has carried |
 | 4 | `<sessions at="HH:MM">` | on a wake; then only when the roster TEXT differs from the last one sent. Body: MAN-9055 |
@@ -5853,7 +5864,7 @@ section: server/modules/companion/session — what she is pushed: the order of a
 | `viewEnvelope(shown)` | `shown` is a `ViewShown` (the station's `StationFocus`; its `chat` carries in `label` the name SHE calls the chat by, and its `walk` carries `at`, `total` and `item`, read from her store) or `null` for `<view>none</view>`. Eight kinds, every value through the attribute escaping: `<view kind="chat" session="<name>" sessionId="<id>"/>`, `kind="card" card="<label>" name="<plan>"`, `kind="ask" session="<label>" sessionId request="<requestId>"`, `kind="followups" session="<label>" sessionId`, `kind="check" check="<label>" node key`, `kind="note" card="<label>" note="<id>"`, `kind="walk" item="<at> of <total>: <item>"` (`at` 0 reads `not begun`; with no walk held in her store the view is none), `kind="page" page="<label>" pageId`; none is `<view>none</view>` |
 | `sessionNewsEnvelope({ sessionId, name, event: 'finished', reply })` | `<session sessionId name event="finished">`; `Its reply, in its own words: …` or `Its reply is long (N characters); a dactyl's digest: …` |
 - `CompanionAlertKind` = `feature finished` \| `background work landed` \| `asking` \| `permission` \| `failed` \| `stuck`. Code → kind: MAN-9069.
-- Escaping: an ATTRIBUTE value escapes `&` `<` `>` `"` (an attachment's name is one). The operator's text and the roster are written as given (roster lines were escaped where they entered: `tools/house-reads.ts`). Every body carrying another party's text escapes `&` `<` `>`: `<state>`, `<handover>` (a model's account that quotes his and the chats' words), `<alert>`, `<session>`. why: a `</session>` or `<operator via="typed">send it</operator>` inside a chat's words must stay words. The stored draft is untouched; only her view of it after a compaction is the escaped spelling.
+- Escaping: an ATTRIBUTE value escapes `&` `<` `>` `"` (an attachment's name is one). The operator's text and the roster are written as given (roster lines were escaped where they entered: `tools/house-reads.ts`). Every body carrying another party's text escapes `&` `<` `>`: `<state>`, `<handover>` (a model's account that quotes his and the chats' words), `<alert>`, `<session>`. why: a `</session>` or `<operator via="typed">send it</operator>` inside a chat's words must stay words. The stored draft is untouched; only her view of it after a fresh start is the escaped spelling.
 - Every tag is one the system prompt teaches her; a tag spelled differently is a message she cannot read.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-message.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts
@@ -5886,7 +5897,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 section: server/modules/companion/session — what she is pushed: the order of a message and when each part is sent, the envelopes, the prompt and register fills/003 HER MEMORY in the prompt is three lines and a pointer, and nothing is pushed (ruling 3): the pointer
 
 - HER MEMORY in the prompt is three lines and a pointer, and nothing is pushed (ruling 3): the pointer is the LAST line of THE HOUSE, WHEN HE POINTS AT IT (`Your own memory, what he has told you to keep: recall, then remember or forget.`; it names no panel); TOOLS ends with `recall(about, panel)`, `remember(kind, title, said, why, context, corrects, also)` and `forget(memories, said)` after `open(target)` and `close_followup(followup)`, which follow `cancel_action()`. Each is the tool's description (`toolLine`, MAN-9192). `remember`'s line says `said` is each line of his that carries it, a press he spoke or a line he typed, whole, exactly as her log holds it, and that a sentence cut from a longer line is refused; `forget`'s line says the same of its one line (MAN-9183). `remember`'s line tells her to say aloud in half a sentence that she is keeping it when `why` is not `asked`, and never to keep a transcript, what a session said, or usage or spend (ruling 2). `forget`'s line closes: `Clearing your whole memory is his act alone: in Settings, or prepare_action clear_memory, read back to him.` `prepare_action`'s line lists `clear_memory` and says its target may be "your memory" (MAN-9194).
-- "Memory" is the bank's word alone in the prompt. The collaborator clause says she keeps hold of what he decided earlier in this conversation (`remember` is a tool's name), and the `<state>` message restates the focus "after this conversation was compacted".
+- "Memory" is the bank's word alone in the prompt. The collaborator clause says she keeps hold of what he decided earlier in this conversation (`remember` is a tool's name), and the `<state>` message restates the focus "after this conversation was compacted". Those are the prompt's words and stay as they are: the state is owed after every fresh start, her own compaction included (MAN-9080).
 - The DocSpace page "Voice companion prompt" (block "System prompt") is the design record's copy of the plumbing and predates later edits (its own warning says so): the live text is `COMPANION_SYSTEM_PROMPT`, and her soul half is the charters' two pages (MAN-9213), on no page.
 - The sound set is the account's `gemini.soundTags` (shipped default `DEFAULT_SOUND_TAGS`, voice module): one list for the fill and the filter (MAN-9081).
 
@@ -6341,6 +6352,7 @@ section: Probing Kaylee — the rules every probe of her keeps, the hidden-chat 
 |---|---|
 | `kaylee-session.mjs [--pure]` | her conversation: init check, the conversation held across a message, `setModel` live, resume, refused resume, Stop (MAN-9077, MAN-9079) |
 | `kaylee-session-shape.mjs` (`node --import tsx`, `TSX_TSCONFIG_PATH=server/tsconfig.json`) | the fingerprint of her tools and prompt and the refusal before a launch: her real tool list, a scratch database, a stand-in launcher; no model call (MAN-9209) |
+| `kaylee-closing-tools.mjs` (`TSX_TSCONFIG_PATH=server/tsconfig.json npx tsx`) | her last turn's gate: with `inLastTurn` true, every tool but `recall` and `remember` (36 of 38, `list_sessions` among them) answers the refusal and runs nothing (spy over store, runtime, house: no access), `recall` (also `{panel: true}`, read as a plain read) reads the live bank, `remember` is not refused; with it false `list_sessions` answers his roster; `sessionShapeOf` over the wrapped tools equals the group builders' own and the held `session_shape`; a `.backup` copy of `auth.db`, the live bank only read; no model call (MAN-9070) |
 | `kaylee-handover.mjs` (`node --import tsx`, `TSX_TSCONFIG_PATH=server/tsconfig.json`; about 100 s) | the fresh-start handover: the refusal with a thread on disk, the wait and the parked pushes, `<handover>` in her first message and when the row is emptied, each failure of the verb, Clear mid-write, the 90 s bound; real session machinery, stand-in launcher and stand-in verb over a scratch database; no model call (MAN-9210, MAN-9211) |
 | `kaylee-handover-real.mjs <session id> [log id]` (`node --import tsx`) | the real summarizer verb, ONE Haiku call, on one of account 1's real transcripts over a scratch copy of the database; no word typed to her (MAN-9211) |
 | `kaylee-handover-live.mjs turn1\|turn2` | two Haiku turns through the dev account's Kaylee on :3011 around a changed tool or prompt; her answer verbatim (MAN-9211) |
@@ -7203,12 +7215,12 @@ The door's audio is kept per account (`companion-speech-cache.ts`) and freed whe
 1. `speechCache.abortTurn(turnId)`: nothing more is spent on that turn.
 2. `session.oweCut(textOf(heard), textOf(interrupted))`. `textOf(i)` = the display text of the turn's log row `i` (`store.readSentence`), `null` for a `null` index or a row the log no longer holds.
 3. Log: `[companion] cut <turn> heard=<n|none> interrupted=<n|none>: <k> synthesis(es) stopped`.
-4. `await session.interrupt()`: stops her running turn; with none, nothing.
+4. `await session.interrupt()`: stops her running turn; with none, nothing. During her last turn (MAN-9455) it returns at once and stops nothing: the syntheses were aborted and the cut owed, and the last turn runs on.
 - why 2 before 4: the press's own message can arrive while she is stopping and must already carry the cut.
 - A turn the log no longer holds still stops her and owes a cut with both values empty.
 
 ## Owed, then carried
-- `CompanionSession.oweCut(heard: string | null, interrupted: string | null)` → the assembler stores `{ heard ?? '', interrupted ?? '' }`. A later cut replaces one no message has carried yet. Clear drops it.
+- `CompanionSession.oweCut(heard: string | null, interrupted: string | null)` → the assembler stores `{ heard ?? '', interrupted ?? '' }`. A later cut replaces one no message has carried yet. Clear drops it, and so does the end of her conversation at her own compaction (`assembler.forget()`): a cut pressed during her last turn is owed and never carried, because the fresh her never said that sentence.
 - The next message pushed to her (normally the press's own) carries `<cut heard="…" interrupted="…"/>` as its second part, after `<state>` (MAN-9080). Builder: `cutEnvelope(heard, interrupted)` (`companion-envelopes.ts`); each value is a display text escaped as an attribute (`&` `<` `>` `"`), `""` for none.
 - The system prompt teaches it: `heard` is the last sentence that played to its end (empty when none), `interrupted` the sentence he cut off, which he heard only in part; nothing after those was heard.
 
@@ -9316,6 +9328,7 @@ why: a refused resume (MAN-9209) drops her conversation; the fresh start would b
 | shape not the launch's own, no thread on disk | `refusal.bare`: journal, forget, the bare sentence (MAN-9209); no verb call |
 | shape the launch's own | no handover |
 - Asked by `gate.holding()` at every wake: `push`, `warm`, the replacement after an unanswered Stop. It starts the write when none is under way and `refusal.withThread()` answers a conversation.
+- `refusal.lastWords()` answers her newest exchange for a handover's `last` (the guarded reader of `companion_log`; `null` when none or unreadable). Her own compaction's fallback and the wall's handover read it through here too (`companion-closing.ts`, MAN-9211).
 - Order: `deps.writeHandover(text)` → `forget()` (id and shape) → `say(line)`. why: a crash between leaves the conversation held and the next boot writes the handover again; never a forgotten conversation whose handover is lost.
 - Whatever the summarizer does, the refusal is carried out. The store throwing is a failed handover.
 - Clear: `dropHandover()` and `gate.abandon()` (the verb is stopped, nothing is said, nothing parked runs); `companionDb.clearAccount` also NULLs the column (MAN-9146).
@@ -9340,7 +9353,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 
 ## MAN-9211 — server/modules/companion/session — her fresh-start handover: the summarizer call, `<handover>` in her first message, proof
 
-why: the text of the fresh-start handover is the house summarizer's account of the dropped thread, carried once by her first message. When it is written, the wait behind it and the outcomes: MAN-9210.
+why: the text of the fresh-start handover is the house summarizer's account of the dropped thread, carried once by her first message. When it is written, the wait behind it and the outcomes: MAN-9210. The same call is her own compaction's fallback and the wall's handover (below).
 
 ## The summarizer call (`makeHandover`, `companion-handover.ts`; `summarizeTranscript`, `modules/compaction/compaction-oneshot.ts`)
 | fact | value |
@@ -9349,12 +9362,18 @@ why: the text of the fresh-start handover is the house summarizer's account of t
 | reads | the answer's `summary`, never `seed` (the compaction's apparatus: the transcript path, every message he typed, the kept tail) |
 | env | `SUMMARIZE_TAIL_TOKENS=0` (`runSummarizeVerb`'s `env`, MAN-8049 §Seams). Without it the verb exits 2 `nothing to compact yet` for a thread inside its 20,000-token verbatim tail, which is nearly every thread of hers (measured 2026-10-29). With it the newest exchange is the tail, so it is NOT in the summary |
 | bound | `HANDOVER_WAIT_MS` = 90,000; at the limit, or when the signal aborts, the verb is stopped and the answer is a failure sentence. Measured 2026-10-29: 7 s on a 60k-token thread, 21–30 s on 18–22k-token threads |
-| cap | `HANDOVER_MAX_CHARS` = 2,000, cut at the last sentence end in the second half of the limit, else at a word with `…`; `### ` lines dropped (`tidyHandover`) |
+| cap | `HANDOVER_MAX_CHARS` = 2,000, cut at the last sentence end in the second half of the limit, else at a word with `…` (`cutAtSentence`, exported: `tidyHandover` and `companion-notice.ts`'s `tidyNote` call it; the word cut can return `limit + 1` characters); `### ` lines dropped (`tidyHandover`) |
 | not read | the Custom compaction switch and the readiness cache (MAN-8061): a not-ready verb answers exit 3 = a failure sentence |
 | cost | one summarizer call (the launch table's `[summarizer]` model, Haiku 5.5 by default) per fresh start per account |
 - Instructions (`handoverInstructions`), second person, plain spoken words, at most eight short lines, in this order, a line left out when empty: what you and he were discussing; which chat or session was in focus, and why; what he decided; what you offered or asked him that he has not answered. The verb's five-section shape is set aside. At most 8 KB (the verb's limit).
 - The newest exchange (`lastWordsOf(log)`, `deps.readLastWords`, the newest 80 lines of `companion_log`): her last turn's rows joined, and the `operator` or `alert` row she answered, a typed line that carried files quoted as `<words> (he attached <names, comma-separated>)` (`quotedWords`; files alone read `(he attached <names>)`, never an empty quote); each side cut at `LAST_WORDS_MAX_CHARS` = 500; appended to the instructions, with "an offer or a question in that answer is still open".
 - A thread that is one exchange: the verb exits 2 `nothing to compact yet` (`nothingBefore`); the handover is that exchange from her log (`newestExchangeAlone`), no model call. No exchange in her log = failed.
+
+## Her own compaction's fallback and the wall's handover (MAN-9455)
+- `companion-closing.ts` reaches `makeHandover` through its hook in `companion-session.ts`: `{ userId, sessionId, operatorName, name, last: refusal.lastWords(), signal }`; the text of a `written` outcome, else `null`. Nothing about the call changes: same verb, `SUMMARIZE_TAIL_TOKENS=0`, bound, cap and instructions.
+- Called when her last turn left no note (it failed, ran past `COMPANION_CLOSING_WAIT_MS`, wrote under `NOTE_MIN_CHARS`, or her note could not be stored) and when the CLI refused a message as "Prompt is too long" (no last turn then).
+- Her note, when she writes one, IS the handover and no summarizer runs: `tidyNote` (`companion-notice.ts`: at most `NOTE_MAX_CHARS` = 8,000, `cutAtSentence` at 7,999; this file's own cap stays 2,000), stored by the same `deps.writeHandover`, carried by the same `<handover>` envelope and emptied by the same `handoverReceived()`.
+- `abandon()` (Clear, a close) aborts the signal: the verb is stopped, nothing is stored.
 
 ## `<handover>` in her first message
 - Part 2 of the order (MAN-9080), escaped (`&`, `<`, `>`): a model's account quotes his and the chats' words. Prompt sentence: `<handover>` arrives once, first, when a fresh conversation begins; she takes it as what she remembers and does not recite it.
@@ -16333,3 +16352,255 @@ Settings > Voice > Vocabulary: the editor of the account's vocabulary (MAN-9451)
 - "Add a word" opens a DRAFT row (`VocabularyEntryRow` with `draft`): nothing is sent until "Add word", which saves the list with the word AND the forms typed into its field and not yet added (a press on "Add word" under typed forms never saves the word alone). Nothing is optimistic; while a save is out every press waits (`busy`). Every text field is read-only while a save is out (an edit then would be built from the list as drawn, which is the one the save in flight is about to replace). A refusal leaves the table as it was, a field snaps back, and the server's own sentence stands IN THE ROW the refused save was made from (`editedRow`: its place in the list, or the draft), never under the table: the table is several windows tall, so a line under it was off screen for every row but the last.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularyEntryRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx
+
+## MAN-9454 — server/modules/companion/session — her closing's numbers and words: the point, the wall, the notice, the note, the panel lines (`companion-notice.ts`)
+
+why: her CLI's own compaction is off, so near full she gets one last turn of her own; this file fixes where it begins and every word and number of it. Its body does no I/O but one env read. The machine: MAN-9455; what was measured: MAN-9456; the rules: INV-10640.
+
+## Constants and functions (`companion-notice.ts`)
+| name | value / behaviour |
+|---|---|
+| `CLOSING_ROOM_TOKENS` | 117,000: how far under her window's end (`wallOf`) she closes |
+| `LAST_TURN_BUDGET_TOKENS` | 30,000: what her measured last turn must stay under |
+| `NOTE_MAX_CHARS` / `NOTE_MIN_CHARS` | 8,000 / 80 |
+| `wallOf(reading)` | `reading.window - reading.reserve`: where her window ends in the CLI's own reading, 497,000 at her 500,000 window with compaction off. Not a refusal point: with compaction off the CLI sends past it (measured 2026-11-01 on a 100,000 window: messages read at 99,982 and 100,122 tokens were both sent) and refuses only at the model's own limit, so her closing is the only bound under her window |
+| `closingPoint(reading)` | `COMPANION_CLOSING_AT_TOKENS` when set, else `wallOf(reading) - CLOSING_ROOM_TOKENS`: 380,000 at her window, 350,000 on a CLI that still compacts (reserve 33,000) |
+| `noticeText({ operatorName, name })` | the notice, whole: `<compaction>` tag round the text; `operatorName` fills `{he}` through `escapeText` (`companion-envelopes.ts`), blank = `the operator`; `name` is taken for the call's shape and fills nothing |
+| `tidyNote(text)` | trim; under `NOTE_MIN_CHARS` or `null` → `null`; else `cutAtSentence(note, NOTE_MAX_CHARS - 1)` (`companion-handover.ts`). The `- 1` keeps the cap: the word cut adds `…` and can return `limit + 1`. Not idempotent at its edge |
+| `CLOSING_LINES` | the panel's six lines: `begins`, `noted`, `handedOver`, `neither`, `fullHandedOver`, `fullNeither` (the last two: the wall's "Prompt is too long"). The journal's lines are not here |
+- Type `CompanionContextReading` (`companion-process.ts`): `{ total, window, reserve, cliCompacts }`.
+
+## The notice, whole (`noticeText`; `{he}` is `operatorName` as set, escaped, blank = `the operator`)
+```
+<compaction>
+This conversation is nearly full, so it closes after this turn, and a fresh you begins in a new one. She will have your memory, the panel's state (the focus, the draft and its target, the walkthrough) and anything he says meanwhile, and of this conversation only the note you write now.
+
+First keep what should outlive it. Recall what your memory already holds, and remember, in his own words, the standing rulings and preferences he gave and the names he gave things. Your rule for what to keep: not small details or things that could be looked up as part of the project, but the assistant side of things, the overarching full-picture view, like the soft release of Restorly in January.
+
+Then write the note, as the last thing you write in this turn. Nothing in this turn is spoken or shown to him; the note goes to her alone, first thing. Your whole final message is the note, so begin it with the note itself, with nothing before it about what you kept. Write it to her as "you", in your own voice, one of you to the other, not a digest of the transcript:
+- what {he} decided in this conversation;
+- each session that matters: what it was doing, and what it still owes him;
+- which session is in focus, and why;
+- the draft and where it is going, and where the walkthrough stands;
+- what you promised to tell him or to do;
+- what was open between you: a question of his you had not answered, an offer of yours he had not taken up.
+Leave out what she will be told anyway: the roster of his sessions, the draft's words, what your memory holds. Plain sentences, no headings, at most about a thousand words.
+
+Only recall and remember are open in this turn.
+</compaction>
+```
+
+## The panel's lines (`CLOSING_LINES`, each one system line on her panel)
+| key | when | words |
+|---|---|---|
+| `begins` | her last turn begins (`begin`) | Her conversation is nearly full, so she is writing herself a note to start fresh from; she keeps her memory. |
+| `noted` | her note is stored and she starts fresh | She starts fresh from the note she wrote herself; she keeps her memory. |
+| `handedOver` | no note (the turn failed, ran out its bound, wrote under 80 characters, or the store of it failed): the house's handover is stored | She could not finish her note, so she starts fresh from a handover of what you were discussing; she keeps her memory. |
+| `neither` | no note and no handover | She could not finish her note and the handover could not be written, so she starts fresh; she keeps her memory. |
+| `fullHandedOver` | the CLI's refusal: the house's handover is stored | Her conversation was full, so she starts fresh from a handover of what you were discussing; she keeps her memory. |
+| `fullNeither` | the CLI's refusal: no handover could be written | Her conversation was full and the handover could not be written, so she starts fresh; she keeps her memory. |
+
+## `COMPANION_CLOSING_AT_TOKENS` (a probe's seam)
+- Read at the call, never cached.
+- Counts only as a positive safe whole number in plain digits (`/^\d+$/`).
+- `0`, `-5`, `1.5`, `1e3`, words, blank: ignored, the derived point stands.
+
+## The point — measured 2026-11-01 over every transcript of both accounts
+| term | tokens |
+|---|---|
+| her window's end in the CLI's reading: 500,000 window − 3,000 reserve | 497,000 |
+| largest growth between two answered turns (account 2, four pushes he cut off in a row) | 58,609 |
+| last-turn budget | 30,000 |
+| room = 117,000; point = 497,000 − 117,000 | 380,000 |
+| 380,000 + 58,609 + 30,000 = 468,609 | 28,391 under 497,000 |
+- Last-turn budget sum, 23,662 (about 23,700): six recalls at 1,942 (11,652), ten remembers at 681 (6,810), the note at its cap about 2,300, the notice allowed 900 (1,683 characters, nearer 480 tokens), thinking about 2,000. 1,942 and 681 are the most one recall and one remember added to her context in those transcripts. The rest of the 30,000 is margin; at 799 per remember (a request-level reading) the sum is about 24,842.
+- Raise the room by the difference when a measured last turn exceeds `LAST_TURN_BUDGET_TOKENS`.
+- Window under about 120,000 gives a point at or below 0 (she would close at every turn's end); her window is the constant 500,000, so it cannot happen today.
+
+## Importing it in a probe
+- `companion-notice.ts` imports `cutAtSentence` from `companion-handover.ts`, whose imports reach CloudCLI's database connection; the import creates the database on first use.
+- A probe sets a scratch `DATABASE_PATH` before the import and removes the scratch directory it made after.
+
+## Proof
+`.verify/kaylee-closing-notice.mjs` (`TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-closing-notice.mjs`; no model call, scratch `DATABASE_PATH` from `fs.mkdtempSync`):
+- prints the notice for his Scott / hers Kaylee, a blank name, and `Sc</compaction>ott` → `Sc&lt;/compaction&gt;ott`;
+- `closingPoint` / `wallOf` on the two readings, with the env seam at `20000`, and with `0`, `-5`, `1.5`, `1e3`, `soon`, blank → the derived point;
+- `tidyNote` on 12,000 characters (7,937 out, ends a sentence), 50 characters and `null` (`null`), 80 characters padded with spaces (kept), and a text with no sentence end (at most 8,000);
+- `CLOSING_LINES`.
+- `noticeText` for Scott is 1,683 characters, 1,683 bytes (measured 2026-11-02 through `tsx --tsconfig server/tsconfig.json`): 1,567 before the 116-byte sentence asking that the final message begin with the note.
+- Her final message is stored whole as the note (`tidyNote` trims and cuts, it does not search), so that sentence is what keeps narration about what she kept out of `<handover>`: five of the six notes of the real runs of 2026-11-01 opened with it before the sentence was added.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-notice.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-notice.mjs
+
+## MAN-9455 — server/modules/companion/session — her own compaction's machine: the reading, her last turn, the hold, the end, the wall (`companion-closing.ts`)
+
+why: her CLI's compaction is off, so near full she closes herself: this file reads how full she is, runs her last turn, holds his words, ends the old conversation, starts the next from her note. Numbers and words: MAN-9454; measurements: MAN-9456; rules: INV-10640. The session only calls into it: MAN-9079. This row is the head of a family: the members and the hooks here, one closing in order, the bound and the journal lines in MAN-9457, the session's call-ins and the proof in MAN-9458.
+
+## `createClosing(userId, hooks)` (`session/companion-closing.ts`) — one per account's conversation
+| member | does |
+|---|---|
+| `arm(launch)` | at a launch's first `init`: one `contextUsage()` read, one journal line (below). Never rejects |
+| `afterTurn(launch)` | a turn ended with the process up: reads her context; begins her last turn when the same launch is still `live()`, no turn is in flight (`turnInFlight()`), no closing is under way and `total >= closingPoint(reading)`. A word of his that started a turn meanwhile is read again at that turn's end. Never rejects |
+| `inLastTurn` (getter) | true from the notice until the old conversation has ended |
+| `holding()` | true from the notice (or the wall's refusal) until she has started fresh |
+| `park(action)` | runs `action` once she has started fresh, after every action parked before it; with no closing under way, at once |
+| `isLastTurnResult(answered)` | the result lists the notice's uuid while a last turn stands |
+| `lastTurnEnded(outcome)` | `{ answered: true, text }` or `{ answered: false, why: 'failed' \| 'timed out' }`; the first call per last turn counts, later ones (the aborted result after the bound) are ignored |
+| `full(launch)` | the wall's refusal: no-op while a closing stands; else the house's handover and the fresh start, no notice |
+| `abandon()` | Clear or a close: timer cleared, summarizer aborted, nothing stored, `parked` dropped (his words stay in the ledger); true when a closing was under way |
+
+## Hooks (`ClosingHooks`: closures the session builds)
+| hook | answers |
+|---|---|
+| `live()` | the current launch or `null`; launches are compared by identity |
+| `turnInFlight()` | `turns.turnId !== null \|\| stopping !== null`: a stop still being answered counts, a notice given then could be folded into the aborted request |
+| `sayNotice(text)` | gives the notice bare (ledger `give` + `dispatch`, no assembler: no roster, view, register, state or cut rides it); answers its uuid |
+| `endConversation(launch)` | detaches, `writeProviderSession(null)`, `assembler.forget()`, closes the CLI without awaiting it |
+| `writeHandover(text)` | stores the handover on her row (`deps.writeHandover`) |
+| `makeHandover(sessionId, signal)` | the house summarizer's text (`makeHandover`, MAN-9211, with `refusal.lastWords()`), `null` when it could not be written |
+| `conversationId()`, `say(line)`, `readSettings()` | the held CLI session id, the panel line, `operatorName` / `name` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-closing.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-attach-session.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-breakages.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session-shape.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-soul-load.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-kit.mjs
+
+## MAN-9457 — server/modules/companion/session — her own compaction's machine: the reading — One closing, in order
+section: server/modules/companion/session — her own compaction's machine: the reading, her last turn, the hold, the end, the wall (`companion-closing.ts`)/001 One closing, in order
+
+1. `begin`: `attempt` set first (every push waits, the tracker's turn start is kept off the page); journal; panel `CLOSING_LINES.begins`; `sayNotice(noticeText(...))`; bound timer (`unref`'d). A notice that throws ends the turn `failed`.
+2. The CLI runs her last turn: only `recall` and `remember` open (the tools' gate, MAN-9070).
+3. Her result → `lastTurnEnded`; the bound passing → `timeOut`: `cli.interrupt()` (issued first, only while `live()` is still that launch), turn ends `timed out`.
+4. `conclude`: `tidyNote(text)`; a read and, when there is no note, the house's handover run together. An abandoned closing returns here.
+5. `store(note ?? house)`; a note finished but not stored (the write threw) sends for the house's handover and stores that instead; `startFresh`: `endConversation`, then the panel line: `noted` (her note stored), `handedOver` (the house's), `neither` (nothing stored). A throw in either is a journal line, never a stop.
+6. Journal the ends line; `release()`: `attempt = null` first, then each parked action runs in order.
+- The wall: `full` → `concludeFull`: house handover, stored, `startFresh` with `fullHandedOver` / `fullNeither`, journal, `release()`.
+- Any fault of the closing's own work releases the hold (`spawn(..., holds)`): no push waits for ever. A fault is `console.error` `[Companion] account <id>: her closing failed (<label>)` or `her closing could not <what>`.
+
+## Bound `COMPANION_CLOSING_WAIT_MS` (a probe's seam)
+- Read at the call; default 180,000 ms.
+- Counts only as plain digits, positive and at most 2,147,483,647 (Node makes a longer timer delay 1 ms). Else the default: zero, blank, words, a number past the cap.
+
+## Journal lines (`[Companion] account <id>: …`)
+| when | line |
+|---|---|
+| armed, CLI compaction off | `armed: her CLI's own compaction is off, its window <window>; she closes herself at <point>` |
+| armed, CLI still compacts | `her CLI still compacts on its own at <window - reserve>; DISABLE_COMPACT did not reach it; she closes herself first, at <point>` |
+| armed, no reading | `her context could not be read at launch; each turn's end reads it again` |
+| `begin` | `conversation <id\|unknown> is at <total> tokens (she closes at <point>); her last turn begins` |
+| `conclude` | `her last turn ended <answered\|failed\|timed out> after <s> s at <total\|?> tokens (<cost\|?> of it); her note: <N characters\|none (<why>)>, the house wrote <N characters\|none>; she starts fresh` |
+| `concludeFull` | `conversation <id\|unknown> reached her CLI's limit (Prompt is too long); the house wrote <N characters\|none>; she starts fresh` |
+- `<why>`: `it ran past its bound of <s> s`, `the turn failed`, `it was under the least that counts as a note`, `she wrote nothing`, `it could not be stored`.
+- `<cost>` = total at the end − total at the notice. A failed read prints `?`.
+- Measured on the live dev API, account 1: her CLI's environ and the armed line of compaction off (MAN-9460 §J2).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-closing.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-attach-session.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-breakages.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session-shape.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-soul-load.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-kit.mjs
+
+## MAN-9458 — server/modules/companion/session — her own compaction's machine: the reading — What the session does around it (`companion-session.ts`)
+section: server/modules/companion/session — her own compaction's machine: the reading, her last turn, the hold, the end, the wall (`companion-closing.ts`)/002 What the session does around it (`companion-session.ts`)
+
+| place | does |
+|---|---|
+| `onInit`, first of a launch | `closing.arm(launch)` |
+| `onResult`, a result listing the notice | `ledger.take`, `turns.result(uuids, null)`, `lastTurnEnded`; never fails her, never a turn of the page's. A success listing no uuid is the turn in flight's (`turns.inFlightUuids()`) |
+| `onResult`, `event.contextFull` | `handOverRefused`: takes out everything the launch was handed and never answered (not only the refused uuids: a message folded in after it would sit inherited until the next boot); `closing.full`; each of his refused messages is kept on disk without its `cut` and parked FIRST, so the fresh launch's first message is his refused words with the handover |
+| `onResult`, a turn that ended with the process up | `closing.afterTurn(launch)` |
+| `deliver`, `holding()` | his words kept on disk (`keptWhileWaiting`), `park(deliver again)`; alerts and focus news go through the same door |
+| `warm` | no-op while `holding()` |
+| `fail`, `conclude` (launch ended) | during her last turn: `lastTurnEnded({ failed })` instead of failing her |
+| `interrupt` | returns at once during her last turn: his Stop, his cut and a server stop leave it running; it ends by its bound |
+| `closeProcess`, `clear` | `closing.abandon()` right after `detach` |
+| `unlessLastTurn` | `onSentence`, `onTurnStarted`, `onTurnEnded` are not called during her last turn; `onActivity` is |
+| `turnId` getter | `null` during her last turn |
+
+## Proof
+- The six probes' stand-in launchers answer `contextUsage: async () => ({ total: 20000, window: 500000, reserve: 3000, cliCompacts: false })`: below the point, so no closing begins. A stand-in without it makes every read warn `her context could not be read`.
+- `COMPANION_CLOSING_AT_TOKENS=1000` closes after every answer: a fresh conversation is already above it, so the fresh her's first answer begins another last turn and a probe reads a second note.
+- `.verify/kaylee-closing.mjs` (its harness: `.verify/lib/kaylee-closing-kit.mjs`) is the case-by-case proof, on the real session and the real tools over a stand-in launcher, a scratch database and a stand-in summarizer verb in a scratch HOME; `recall` and `remember` land on the stand-in docstore door. No model call. A below the point (none), and the reading that comes back after her launch was closed (none, no armed line); B the notice bare, the quiet turn, the tools' gate, the note as tidied, the fresh start's order, a result listing another message not ending her last turn and a success listing none being the notice's; C his words, an alert and a focus news wait; D his Stop and a cut; E no note (an error result, an error listing no message, her process ending, 50 characters, the bound at `COMPANION_CLOSING_WAIT_MS=2000`, a verb that fails) and a note that could not be stored (the house's handover next, else neither); F the wall's refusal, and a warm waiting behind its handover while her process is gone; G Clear, and Clear stopping the house's verb; H a close, then a second session closing at its next turn's end; I the armed line's four forms.
+- Measured 2026-11-01: 147 of 147 checks (A3 is a word of his starting a turn while the reading is still out; E6 is the notice itself refused as "Prompt is too long", which ends as a failed last turn and is handed over). `.verify/kaylee-closing-breakages.py` (its thirteen breakages are the ones the first 121 checks were measured against; the later cases are unmeasured against a breakage) runs the probe against a COPY of the server tree (`KAYLEE_CLOSING_MODULES` points the probe at it) with ONE call-in line or rule broken at a time, and it exits 1 on each of thirteen: a last-turn sentence passing, a last-turn turn frame passing, his Stop interrupting it, his words not held, the wall failed, the note stored untidied, every tool open, a close not abandoning, Clear not abandoning, the old conversation not forgotten, the owed cut kept, the point without the room, her last turn beginning over a turn in flight.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-closing.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-attach-session.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-breakages.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session-shape.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-soul-load.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-kit.mjs
+
+## MAN-9456 — server/modules/companion/session — her own compaction: what was measured (the CLI's thresholds, her turns, her tools' cost), the gate's proof, where each part lives
+
+why: her own compaction's numbers are read off these measurements (MAN-9454 §The point); the code's behaviour is MAN-9455. This row holds what was measured, the gate's proof and the parts' addresses; the whole's proofs are MAN-9459 (J1, on a real conversation) and MAN-9460 (J2, on the live processes, and the proofs standing).
+
+## Her compaction, by row
+| part | row |
+|---|---|
+| her CLI never summarizes her: `DISABLE_COMPACT=1`, the 500,000 window | MAN-9077 §Options |
+| the CLI's own count of her context, `contextUsage()` | MAN-9077 §Ending a launch (`CompanionCli`) |
+| the reading at a turn's end, her last turn, the hold, the end, the fresh start, the journal lines | MAN-9455, MAN-9457 |
+| the point, the notice, the note's bounds, the panel's lines | MAN-9454 |
+| the gate: only `recall` and `remember` run in her last turn | MAN-9070 §`tools/companion-tools.ts` |
+| the result's `text` and `contextFull`; the CLI's refusal | MAN-9167 |
+| the house's handover, her closing's fallback and the wall's | MAN-9211, MAN-9210 |
+| `<state>` and `<handover>` in the fresh her's first message | MAN-9080 |
+| his Stop and a cut in her last turn | MAN-9169, MAN-9111 |
+| the rules later edits keep | INV-10640 |
+
+## Her CLI's thresholds — measured 2026-11-01, Claude Code 2.1.316
+- Her models, `claude-haiku-5-5` (account 1) and `claude-fable-5-1` (account 2): window 1,000,000 each.
+| her env | compacts at | reserve | `cliCompacts` |
+|---|---|---|---|
+| nothing set (window read 1,000,000) | 967,000 | 33,000 | true |
+| `CLAUDE_CODE_AUTO_COMPACT_WINDOW=500000` (window read 500,000) | 467,000 | 33,000 | true |
+| `DISABLE_COMPACT=1`, `DISABLE_AUTO_COMPACT=1` or `autoCompactEnabled: false` | no threshold | 3,000 | false |
+- `DISABLE_COMPACT` also disables a manual `/compact`.
+- `wallOf` (`companion-notice.ts`) = window − reserve = 497,000 at her window with compaction off: where her window ends in the CLI's reading, not a refusal point (MAN-9454).
+- The refusal: measured on Haiku 4.5 with the CLI's test seam `CLAUDE_CODE_BLOCKING_LIMIT_OVERRIDE=5000`: 17,041 tokens counted at the refusal, 17,071 at the next message, also refused. The result's shape and the reading phase's own run of the same seam: MAN-9167.
+- Her own compaction by her CLI never ran on either account.
+
+## Her turns — measured 2026-11-01 over every transcript of both accounts
+| | account 1 (dev, Haiku) | account 2 (Scott's, Fable) |
+|---|---|---|
+| turns, transcripts | 1,088 in 196 | 350 in 13 |
+| growth per turn, median / p99 | 1,225 / 2,785 | 2,214 / 15,935 |
+| largest growth between two answered turns | 39,222 (a typed line with ten pictures) | 58,609 (four pushes he cut off in a row) |
+| largest single push | — | 22,586 (an alert carrying a whole Accept census) |
+| peak | 146,673 | 471,532 (29 October, before the window was lowered) |
+| held conversation | 42,067 | 75,232 |
+| a fresh conversation's first prompt, median / max | 16,379 / 32,398 | 21,551 / 27,686 |
+- At account 2's pace on 1 November a conversation lasts about six days.
+- 58,609 is the growth the room allows for (`CLOSING_ROOM_TOKENS` 117,000: MAN-9454 §The point).
+
+## Her tools' cost, and the summarizer
+- A `recall` adds a median 130 to 669 tokens, at most 1,942; a `remember` 124 to 331, at most 681. These bound her last turn's budget (30,000; MAN-9454).
+- The house summarizer has written handovers of her threads up to 120,052 tokens in (`makeHandover`, MAN-9211).
+
+## The gate — proof
+`TSX_TSCONFIG_PATH=server/tsconfig.json npx tsx .verify/kaylee-closing-tools.mjs` (her real tools, a COPY of the live auth database, the live bank read only; no model call). Measured 2026-11-01: 14 of 14.
+- With `inLastTurn` true: 36 of her 38 tools answer the refusal with no store, runtime or house access and no activity set; `recall` reads the live bank; `remember` is not refused by the gate.
+- With it false: `list_sessions` answers his roster.
+- `sessionShapeOf` over the wrapped tools equals the held shape of account 1 and of account 2 (`d3d643a9…`), flag true or false.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-closing.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-notice.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-live.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-real-kit.mjs
+
+## MAN-9459 — server/modules/companion/session — her own compaction: J1, one forced compaction on a real Haiku conversation (the whole's proof, scratch stack)
+section: server/modules/companion/session — her own compaction: what was measured (the CLI's thresholds, her turns, her tools' cost), the gate's proof, where each part lives/001 The whole — proof on a real conversation (J1) and on both live processes (J2)
+
+### J1 `.verify/kaylee-closing-real.mjs` (hands: `.verify/lib/kaylee-closing-real-kit.mjs`)
+`eval "$(bash .verify/kaylee-memory-bank-db.sh make)"`; `COMPANION_CLOSING_AT_TOKENS=1000 bash .verify/kaylee-memory-scratch.sh .verify/kaylee-closing-real.mjs`; `eval "$(bash .verify/kaylee-memory-bank-db.sh drop)"`. A scratch CloudCLI server over a copy of the auth database and a scratch docstore door: never his live bank (one list of it is read before and after) and never a conversation of Scott's. Real Haiku, no page; account 1 on Haiku with Live off, the copy's account 2 set to Haiku with Live off so no scratch alert wakes a Fable turn. Every wait is an event: the server log's appends and account 1's socket frames, under a deadline.
+- At the 1,000-token point the end of EVERY answer begins a last turn, a fresh conversation's first included: three closings in a run. He types the line holding a name, a ruling and a promise; DURING her last turn he types "And the bell stays quiet at night." (on the row's unanswered list at once, never in the old transcript, the fresh first message after `<handover>`); the note is read from `companion_state.handover` when the ends line is read; after the second closing "Where did we leave things?" goes to the conversation that starts from the SECOND note.
+- Checks (34, and one per row she wrote): the armed line; his second line typed with no ends line yet in the log; the notice whole and bare in the old transcript; only `recall` and `remember` answered in her last turn; each last turn answered and under `LAST_TURN_BUDGET_TOKENS`; no `companion_turn` or `companion_sentence` frame from a begins line to its ends line (a frame carries the count of log lines read when it arrived), and frames of other kinds did arrive inside the windows (the control); the fresh first message's order `<state>`, `<handover>` (the note, escaped), his line; the last answer names the bell, the portrait default or the Restorly reminder and repeats no run of eight words of either note; the rows she wrote carry actor `kaylee` in the scratch bank; the live list unmoved.
+- Measured 2026-11-01 22:55 and 22:57 PST, two runs, Haiku, a fresh conversation of about 30,000 tokens: her six last turns cost 447, 564, 383 and 995, 511, 283 tokens (budget 30,000, so `CLOSING_ROOM_TOKENS` stays 117,000), 6 to 8 s each, notes of 1,285 to 1,693 characters; in all six last turns she called `recall` and nothing else (every `remember` came in a normal turn, because his line had told her what to keep: J1 shows neither the notice's "remember" half nor a refused tool); no turn or sentence frame fell in any window; both first notes held the bell, the portrait default and the Restorly reminder, and the last answer named them. Her final text is her whole last message, and five of the six notes opened with a line of what she kept before the note; the notice sentence asking her to begin with the note itself was added after these runs, and J1 has not run with it.
+- The eight-word check did NOT hold in either run: the answer to "Where did we leave things?" restated a named open item in the note's words, "for the kanban chat telling it to ship" (the draft) and "send the portrait decision to the Station portrait mode chat" (an open offer). Her first answer from the first note repeated no run of eight.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-closing.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-notice.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-live.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-real-kit.mjs
+
+## MAN-9460 — server/modules/companion/session — her own compaction: J2, both live CLIs read (account 1 woken, account 2 only read), and the proofs standing
+section: server/modules/companion/session — her own compaction: what was measured (the CLI's thresholds, her turns, her tools' cost), the gate's proof, where each part lives/002 J2 `.verify/kaylee-closing-live.sh`
+
+On the live dev stack (`:3011`, `cloudcli-server-dev.service`); read only but for one typed Haiku line to the dev account's Kaylee; account 2 (Scott's) is never typed to. Per account, her CLI is the process whose `/proc/<pid>/cwd` is `~/.claude/state/companion/<id>` and whose parent chain reaches the pid listening on `127.0.0.1:3011`; printed: its pid and start time, the `DISABLE_COMPACT=1` and `CLAUDE_CODE_AUTO_COMPACT_WINDOW=500000` of its environ, and the armed line from `journalctl -u cloudcli-server-dev.service _PID=<serving pid>`.
+- Account 1: signs in as `DEV_USER` (`.verify/lib/console.mjs`), sets haiku for the line when her model does not read haiku, follows the journal from before the line, types "In one short sentence and without any tool, say hello." The typed line takes the floor; the page that held it is given it back, and the model is put back, on every exit path (a floor that was nobody's, or an earlier probe's `closing-live-<pid>`, stays with this probe's client until a page opens her panel or types). Account 2: the serving process's journal, else the journal's follow (`journalctl -f`, an event, under `timeout 7200`; the wait for the launch has a 3,600 s deadline) until its next launch: his word (never typed here) or the alert feed's warm, which returns unless his Live is on AND a page of his is connected (`feeds/alert-feed.ts`), so with no page open nothing launches her and the wait ends at its hour. A dev API restart closes her processes; the probe reads the serving pid again and follows for the next launch.
+- Measured 2026-11-01 23:01 PST (07:01Z, 2026-11-02), dev API pid 3304854, account 1: her CLI (pid 3549341, a child of it) holds both variables, the armed line reads as below, one normal answer, no closing line.
+- The armed line is `armed: her CLI's own compaction is off, its window 500000; she closes herself at 380000`: it says nothing of a refusal at 497,000, because with compaction off the CLI sends past its window (`companion-launch.ts`).
+
+## Proofs standing
+| proof | holds | row |
+|---|---|---|
+| `.verify/kaylee-closing.mjs` | the machine over a stand-in launcher: no model call | MAN-9458 §Proof |
+| `.verify/kaylee-closing-notice.mjs` | the notice, the point, the note, the panel lines | MAN-9454 §Proof |
+| `.verify/kaylee-context-reading.mjs` | her CLI's reading and the result's words | MAN-9077 §Proof |
+| `.verify/kaylee-closing-tools.mjs` | the gate and the shape | MAN-9456 §The gate |
+| `.verify/kaylee-closing-real.mjs` | one forced compaction on a real Haiku conversation on the scratch stack: her note, her last turn's tools and cost, the fresh her from it | MAN-9459 §J1 |
+| `.verify/kaylee-closing-live.sh` | the live CLIs, account 1 woken by one typed line and account 2 only read, never typed to: `DISABLE_COMPACT=1`, the 500,000 window, the armed line | here §J2 (the part above) |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-closing.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-notice.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-live.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-real-kit.mjs

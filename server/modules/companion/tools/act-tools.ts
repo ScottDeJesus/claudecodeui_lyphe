@@ -76,7 +76,7 @@ function stopSession(deps: CompanionToolDeps, args: { session: string }): Promis
 
 /**
  * What she holds of the chat besides her focus follows its new name: the draft's target and the walkthrough each carry the
- * chat as a ref with the name it had, and the panel's draft card and `<state>` after a compaction would go on naming a chat
+ * chat as a ref with the name it had, and the panel's draft card and `<state>` after a fresh start would go on naming a chat
  * that `resolveChat` no longer finds by that name.
  */
 function carryRename(deps: CompanionToolDeps, renamed: CompanionSessionRef): void {

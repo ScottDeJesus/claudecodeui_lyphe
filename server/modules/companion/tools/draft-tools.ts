@@ -32,8 +32,8 @@ import { resolveChat, resolveProject } from './house-reads.js';
  * names (the keys of the provider's alias table, never a list of its own). Left out, a new chat runs on the account's default
  * and an existing chat keeps its own; what the sender does with it is `companion-send.ts`'s.
  *
- * THE WALK'S CURSOR lives in the store, because her conversation's hold on it does not survive her own compaction or a turn
- * to another chat: `walk` carries the cursor, the store holds it, and `<state>` restates it after a compaction.
+ * THE WALK'S CURSOR lives in the store, because her conversation's hold on it does not survive a fresh start or a turn
+ * to another chat: `walk` carries the cursor, the store holds it, and `<state>` restates it after a fresh start.
  * One walk per account; a call that would MOVE it by naming another chat without `items` is refused rather
  * than guessed at, while `at` 0 ends the held walk whichever chat is named (its own chat may be gone). His own Back, Next and ×
  * move the same cursor through `companion-walk.ts`, which words the two refusals they share with this tool.

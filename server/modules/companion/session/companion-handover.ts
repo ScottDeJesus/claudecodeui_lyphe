@@ -38,9 +38,10 @@ type HandoverOutcome =
 
 /**
  * `text` cut to at most `limit` characters at the end of a sentence (the last one that ends in the second half of the limit), else at a
- * word with an ellipsis: never in the middle of a word.
+ * word with an ellipsis: never in the middle of a word. Consumed here (`tidyHandover`, the summarizer's handover) and by
+ * `companion-notice.ts` (`tidyNote`, her own closing note), which cut a text to a bound the same way.
  */
-function cutAtSentence(text: string, limit: number): string {
+export function cutAtSentence(text: string, limit: number): string {
   if (text.length <= limit) return text;
   const ends = [...text.slice(0, limit + 1).matchAll(/[.!?](?=\s)/g)];
   const last = ends.at(-1);

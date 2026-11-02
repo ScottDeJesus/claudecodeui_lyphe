@@ -8,10 +8,12 @@ import { claudeImageBlocks, type ClaudeImageBlock } from '@/shared/image-attachm
 import type { UnansweredMessage } from '../companion-unanswered.js';
 
 import { createReplayHold, messageContent } from './companion-content.js';
+import { createClosing } from './companion-closing.js';
 import { attachmentsEnvelope, calledEnvelope, emptyPressEnvelope, operatorEnvelope } from './companion-envelopes.js';
 import { failureSentence, readLoopEvent, type CompanionLoopEvent } from './companion-events.js';
 import { resumableSessionId, unexpectedTools } from './companion-launch.js';
 import { createHandoverGate } from './companion-handover-gate.js';
+import { makeHandover } from './companion-handover.js';
 import { createLedger, type Sent, type StopSource } from './companion-ledger.js';
 import { createMessageAssembler } from './companion-message.js';
 import { answeredWithin, CLI_GRACE_MS, launchCompanionCli, type CompanionCli } from './companion-process.js';
@@ -54,6 +56,10 @@ import { guarded } from './guarded-callback.js';
  * upload store before it pushes anything, and while it reads, a push that arrives is parked and goes after it (`companion-content.ts`), so his
  * words keep their order; with no picture to read the replay is as synchronous as ever.
  *
+ * HER OWN COMPACTION is `companion-closing.ts`: at a turn's end her CLI is asked how full she is; near full she gets one last turn (quiet to the page,
+ * not stopped by his Stop or a cut, only `recall` and `remember` open) to write herself a note, her conversation ends and the next begins from it. His
+ * words, the alerts and the focus news wait meanwhile (`closing.holding`). A turn the CLI refuses as past its limit is handed over the same way, never failed.
+ *
  * A STOP IS ANSWERED BEFORE ANYTHING ELSE IS SAID. From the moment `interrupt` starts until the stopped turn's
  * `result` is in, a push is held, not given to the CLI: a message that reaches the CLI while it unwinds an interrupt can be
  * folded into the request being aborted, and then nothing ever answers it. The held words are given, in order, once the result
@@ -92,11 +98,17 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   const onSystemLine = guarded('system line', userId, deps.onSystemLine);
   const writeProviderSession = guarded('session writer', userId, deps.writeProviderSession);
   const dropHandover = guarded('handover drop', userId, deps.dropHandover);
+  // Her last turn is quiet to the page: no sentence, no turn frame, no speech-cache move. Her activity still passes, so she reads thinking.
+  const unlessLastTurn =
+    <Args extends unknown[]>(callback: (...args: Args) => void) =>
+    (...args: Args): void => {
+      if (!closing.inLastTurn) callback(...args);
+    };
   const turns = createTurnTracker(
     {
-      onSentence: guarded('sentence', userId, deps.onSentence),
-      onTurnStarted: guarded('turn start', userId, deps.onTurnStarted),
-      onTurnEnded: guarded('turn end', userId, deps.onTurnEnded),
+      onSentence: unlessLastTurn(guarded('sentence', userId, deps.onSentence)),
+      onTurnStarted: unlessLastTurn(guarded('turn start', userId, deps.onTurnStarted)),
+      onTurnEnded: unlessLastTurn(guarded('turn end', userId, deps.onTurnEnded)),
       onActivity: guarded('activity', userId, deps.onActivity),
     },
     // The account's sound-tag list, read each time a turn begins: that turn's sentences are parsed by it.
@@ -144,6 +156,8 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
 
   /** A failure of her own: shown on the panel as one sentence, never spoken. The next push launches again. */
   function fail(launch: Launch, sentence: string): void {
+    // A fault of her last turn ends that turn (the closing hands her over), it is not a failure of hers.
+    if (closing.inLastTurn) return closing.lastTurnEnded({ answered: false, why: 'failed' });
     console.error(`[Companion] account ${userId}: ${sentence}`);
     retire(launch);
     // A message that makes her fail must not be sent again to fail again; one that carried the handover takes it with it, so the row keeps it for the next.
@@ -170,6 +184,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     console.log(
       `[Companion] account ${userId}: ${launch.cli.resume ? 'resumed' : 'started'} session ${event.sessionId} on ${event.model}; the CLI listed ${event.tools.length} tools, all hers${event.tools.length > 0 ? ` (${event.tools.join(', ')})` : ''}`
     );
+    closing.arm(launch);
   }
 
   /**
@@ -219,6 +234,17 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       launch.resumeRefused = true;
       return;
     }
+    // Her last turn's result is the closing's alone, whatever its outcome: it never fails her and is never a turn of the page's. A success that lists nothing is the
+    // turn in flight's, as below, so it is asked as that turn's messages: the notice is the only message of her last turn.
+    const lastTurnUuids = event.answered.length === 0 && event.failure === null ? turns.inFlightUuids() : event.answered;
+    if (closing.isLastTurnResult(lastTurnUuids)) {
+      ledger.take(lastTurnUuids);
+      turns.result(lastTurnUuids, null);
+      closing.lastTurnEnded(event.failure === null ? { answered: true, text: event.text } : { answered: false, why: 'failed' });
+      return;
+    }
+    // The CLI refused a message as past its limit: her conversation is handed over, never failed (every later message would be refused too).
+    if (event.contextFull) return handOverRefused(launch, event);
     const stopStands = stopping?.launch === launch;
     // A result that lists nothing is the turn in flight's (`companion-turns.ts`). When it succeeds it consumed what that turn took; left
     // listed nowhere, those messages would stay stored and be answered again at every boot.
@@ -231,7 +257,8 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     // server's (said again), and a message pushed after the stop that the CLI folded into the abort was never answered (said again).
     const aborted = listed.some((sent) => sent.stoppedBy !== null) || (stopStands && answered.length === 0);
     // A failed result ends the turn failed, and the process with it: the next push relaunches on a fresh account env.
-    if (turns.result(answered, aborted ? null : event.failure) === 'live' && !aborted && event.failure !== null) {
+    const ended = turns.result(answered, aborted ? null : event.failure);
+    if (ended === 'live' && !aborted && event.failure !== null) {
       fail(launch, event.failure);
       return;
     }
@@ -242,6 +269,25 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       turns.adopt(stranded);
     }
     finishStop(aborted ? listed.filter((sent) => sent.stoppedBy !== 'operator').map(restate) : []);
+    // A turn ended with her process still up: the reading that may begin her closing.
+    if (ended === 'live' && live === launch) closing.afterTurn(launch);
+  }
+
+  /**
+   * A turn answered "Prompt is too long": everything the launch was handed and never answered is taken out, his words of it are kept on disk (without the `<cut>`
+   * they carried: the fresh her never said that sentence) and parked FIRST, so the fresh launch's first message is his refused words with the handover.
+   */
+  function handOverRefused(launch: Launch, event: Extract<CompanionLoopEvent, { kind: 'result' }>): void {
+    const refused = ledger.take(ledger.carry().map((sent) => sent.uuid));
+    turns.result(event.answered.length > 0 ? event.answered : turns.inFlightUuids(), null);
+    closing.full(launch);
+    for (const sent of refused) {
+      if (sent.words === null) continue;
+      const words = { ...sent.words };
+      delete words.cut;
+      const kept = ledger.keep(words);
+      closing.park(() => deliver(wordsEnvelope(words), words, sent.images, kept));
+    }
   }
 
   function handle(launch: Launch, message: SDKMessage): void {
@@ -250,7 +296,6 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     if (event.kind === 'init') onInit(launch, event);
     else if (event.kind === 'text') turns.text(event.delta);
     else if (event.kind === 'block_end') turns.blockEnded();
-    else if (event.kind === 'compacted') assembler.oweState();
     else onResult(launch, event);
   }
 
@@ -262,6 +307,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
 
   /** The launch ended on its own: a refused resume is replaced by a fresh launch, anything else is a failure. */
   function conclude(launch: Launch, thrown: unknown): void {
+    if (closing.inLastTurn) return closing.lastTurnEnded({ answered: false, why: 'failed' });
     const reason = thrown === null ? null : thrown instanceof Error ? thrown.message : String(thrown);
     const resume = launch.cli.resume;
     if (resume !== null && (launch.resumeRefused || (reason !== null && /No conversation found/i.test(reason)))) {
@@ -333,7 +379,10 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     abandonReplay();
     // A handover still being written is stopped with the process: his parked words are in the ledger for the next one.
     if (gate.abandon() && live === null) setCondition({ state: 'asleep', error: null });
-    await detach(reason)?.cli.close();
+    const ending = detach(reason);
+    // Right after the detach, so the end of a last turn stays off the page; the conversation stays held and his kept words stay in the ledger.
+    closing.abandon();
+    await ending?.cli.close();
   }
 
   /**
@@ -379,6 +428,37 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     currentShape: () => planWith(null).shape,
     forget: () => writeProviderSession(null),
     say: onSystemLine,
+  });
+
+  /** Her own compaction (`companion-closing.ts`), made from what the session holds. */
+  const closing = createClosing(userId, {
+    live: () => live,
+    // A stop being answered is a turn still in the CLI: a notice given now could be folded into the request being aborted.
+    turnInFlight: () => turns.turnId !== null || stopping !== null,
+    sayNotice: (text) => {
+      const uuid = randomUUID();
+      const message: Sent['message'] = { type: 'user', message: { role: 'user', content: messageContent(text, []) }, parent_tool_use_id: null, uuid };
+      const sent: Sent = { uuid, message, words: null, images: [], stoppedBy: null };
+      ledger.give(sent);
+      dispatch(sent);
+      return uuid;
+    },
+    endConversation: (launch) => {
+      if (live === launch) detach('her conversation ended');
+      writeProviderSession(null);
+      assembler.forget();
+      // Not awaited: a message that lands while it winds down starts the fresh launch, as `detach` intends.
+      void launch.cli.close().catch((error: unknown) => console.error(`[Companion] account ${userId}: her old process did not close cleanly`, error));
+    },
+    writeHandover: deps.writeHandover,
+    makeHandover: async (sessionId, signal) => {
+      const { operatorName, name } = deps.readSettings();
+      const outcome = await makeHandover({ userId, sessionId, operatorName, name, last: refusal.lastWords(), signal });
+      return outcome.kind === 'written' ? outcome.text : null;
+    },
+    conversationId: () => deps.readProviderSession()?.id ?? null,
+    say: onSystemLine,
+    readSettings: deps.readSettings,
   });
 
   /** A wake waits behind the handover being written: `condition` says she is waking; when nothing is left parked and no launch came of it she is asleep again. */
@@ -481,6 +561,12 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
    * `images` are the pictures that ride after the text (read before, kept in memory with the message); `replacing` is the stored entry a re-sent message stands for.
    */
   function deliver(body: string, words: Sent['words'], images: ClaudeImageBlock[], replacing?: UnansweredMessage): void {
+    // Her last turn, or her wall's handover, is under way: this waits for the fresh her, his words on disk meanwhile, and the first of them plans the fresh launch.
+    if (closing.holding()) {
+      const kept = keptWhileWaiting(words, replacing);
+      closing.park(() => deliver(body, words, images, kept));
+      return;
+    }
     // A wake onto a conversation she is about to drop waits for its handover. His words are on disk meanwhile (kept as an inherited entry the replayed push replaces).
     if (live === null && gate.holding()) {
       const kept = keptWhileWaiting(words, replacing);
@@ -532,7 +618,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
 
   /** Starts her process if it is closed, with nothing in it: the idle closer is armed with the launch, so a message that never comes costs a process until the window ends. */
   function warm(): void {
-    if (live !== null) return;
+    if (live !== null || closing.holding()) return;
     if (gate.holding()) gate.park(warm);
     else live = open([], planLaunch());
   }
@@ -549,6 +635,8 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   }
 
   async function interrupt(by: StopSource = 'operator'): Promise<void> {
+    // His Stop, his cut and a server stop leave her last turn running: it is not his turn, and it ends by its own bound.
+    if (closing.inLastTurn) return;
     const target = live;
     if (!turns.stop() || target === null) return;
     // What the CLI has been given is the turn being stopped: his cut or Stop takes it off the kept list now, the server's leaves it for the next process.
@@ -617,6 +705,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       gate.abandon();
       assembler.forget();
       const ending = detach('cleared');
+      closing.abandon();
       ledger.forgetAll();
       // A turn in flight is stopped now, not at the end of the grace.
       if (ending?.cli.up) await ending.cli.interrupt();
@@ -628,8 +717,12 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     get process() {
       return condition;
     },
+    // Null during her last turn: the panel's Stop is keyed to this turn, and a page that loads then must not show one or follow it.
     get turnId() {
-      return turns.turnId;
+      return closing.inLastTurn ? null : turns.turnId;
+    },
+    get inLastTurn() {
+      return closing.inLastTurn;
     },
   };
 }

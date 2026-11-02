@@ -13406,56 +13406,6 @@ probe-key: 810bf5b540b5023bea153298ecf84e150d18c16d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/house-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/session-presence.service.ts
 
-## INV-9781 — probe — (LOW) — two exports in `companion-process.ts` carry no consumer comment, and one has no cross-file consumer
-
-(LOW) — two exports in `companion-process.ts` carry no consumer comment, and one has no cross-file consumer
-
-```probe
-set -u
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-F=server/modules/companion/session/companion-process.ts
-for t in CompanionCliLaunch CompanionCli; do
-  n=$(grep -B14 "^export type $t = {" "$F" | sed -n '/\/\*\*/,$p' | grep -ci 'consum')
-  echo "$t: doc lines naming a consumer = $n"
-done
-echo "files importing CompanionCliLaunch besides its own: $(grep -rl 'CompanionCliLaunch' server --include=*.ts | grep -vc "$F")"
-EOF
-bash "$D/p.sh"
-# expect: both `doc lines naming a consumer = 0` and `files importing CompanionCliLaunch besides its own: 0` (cured: `1` and `1` for the first two, or the export dropped)
-```
-
-measured 2026-10-26 by chain chain-kaylee--companion--session-20261026-170524-92a5, finding L5, LOW
-probe-key: 7ce33ba5cd479e5f731fbc64aaf76552e4b05a31
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-events.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-launch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-message.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session.mjs
-
-## INV-9786 — probe — LOW — three comments name a consumer that is not one (or none)
-
-LOW — three comments name a consumer that is not one (or none)
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-# Exports whose consumer line is missing or wrong (the module standard: every export names its consumers).
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-echo "importers of COMPANION_CLIENT_HEADER outside companion-input.ts: $(grep -rl 'COMPANION_CLIENT_HEADER' server src --include=*.ts --include=*.tsx | grep -vc 'companion-input.ts$')"
-echo "its doc comment names a consumer: $(grep -B3 'export const COMPANION_CLIENT_HEADER' server/modules/companion/companion-input.ts | grep -c 'Consumed\|Consumer')"
-echo "ToolActivityPhase doc comment names a consumer: $(grep -B3 'export type ToolActivityPhase' server/modules/companion/tools/companion-tools.ts | grep -c 'Consumed\|Consumer')"
-echo "companion.service.ts calls inputInvalid (as companion-input.ts says it does): $(grep -c 'inputInvalid(' server/modules/companion/companion.service.ts)"
-EOF
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D" ;; esac
-echo "[probe exit $?]"
-# expect: `importers of COMPANION_CLIENT_HEADER outside companion-input.ts: 0`, `its doc comment names a consumer: 0`, `ToolActivityPhase doc comment names a consumer: 0`, `companion.service.ts calls inputInvalid …: 0` while the defect stands; cured when each count is non-zero (or the lines are gone)
-```
-
-measured 2026-10-26 by chain chain-kaylee--companion--service-20261026-180357-0799, finding L5, LOW
-probe-key: cd422b9fc829da2208f00b4591160a637fecfc55
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-picture.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/tool-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
-
 ## INV-9788 — probe — MEDIUM — a walk whose chat was archived or deleted can never be ended
 
 MEDIUM — a walk whose chat was archived or deleted can never be ended
@@ -14983,128 +14933,8 @@ cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
 ```
 
 measured 2026-10-27 by chain chain-kaylee--companion--docs-20261027-083550-75ed, finding M1, MEDIUM
+read again 2026-11-01 by kaylee--before-compaction (phase docs): `companion-session.ts` is cured (prints INV-10640 MAN-9079 MAN-9209). `companion-tools.ts` prints INV-9855 INV-10640 INV-10055: the rules row INV-10640 reaches its editor and names MAN-9456, but no manual does, because the eyes phases' probe rows INV-10055 to INV-10068 also govern the file and rank ahead of MAN-9070. The row stands until those are cured.
 probe-key: eeefecd37d90c89e10c33069a5b30c950c6c0c31
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts
-
-## INV-9856 — probe — LOW — `MAN-9078`'s Proof command prints three lines, because the exported row matches its own grep
-
-LOW — `MAN-9078`'s Proof command prints three lines, because the exported row matches its own grep
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe
-grep -n "export function createPromptQueue\|export function createIdleCloser" -r server | grep -vc "^server/shared/prompt-stream.ts"
-EOF
-bash "$D/p.sh"
-cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: 0 (while the defect stands it prints 1, the row's own line in server/modules/providers/MANUAL.md)
-```
-
-measured 2026-10-27 by chain chain-kaylee--companion--docs-20261027-083550-75ed, finding L1, LOW
-probe-key: 7d5537afcd847398b09712ba7483d9a9678b2068
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts
-
-## INV-9857 — probe — LOW — `MAN-9078` ends on a correction note about rows that no longer say it; one other row still points at the old home
-
-LOW — `MAN-9078` ends on a correction note about rows that no longer say it; one other row still points at the old home
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe
-echo "note bullet in MAN-9078: $(docstore get MAN-9078 --text | grep -c 'Other rows say')"
-echo "MAN-326 idle-close pointer to chat-process.ts: $(grep -c 'running in it (.chat-process.ts.)' docs/architecture/MANUAL.md)"
-EOF
-bash "$D/p.sh"
-cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: both 0 (while the defect stands: 1 and 1)
-```
-
-measured 2026-10-27 by chain chain-kaylee--companion--docs-20261027-083550-75ed, finding L2, LOW
-probe-key: 61c71a49631ddb27c53f2ae180cccf688364b897
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts
-
-## INV-9858 — probe — LOW — `MAN-9087` carries two raw line-separator characters where it means to name them
-
-LOW — `MAN-9087` carries two raw line-separator characters where it means to name them
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-docstore get MAN-9087 --text | python3 -I -c "import sys;t=sys.stdin.read();print('U+2028/U+2029 in MAN-9087:', t.count(chr(0x2028)) + t.count(chr(0x2029)))"
-EOF
-bash "$D/p.sh"
-cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: 0 (while the defect stands it prints 2)
-```
-
-measured 2026-10-27 by chain chain-kaylee--companion--docs-20261027-083550-75ed, finding L3, LOW
-probe-key: 132900fb1d633a5cdf685fede03decda52cd46dc
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts
-
-## INV-9859 — probe — LOW — `MAN-9087`'s Callers section names the wrong files and omits the `live` readers
-
-LOW — `MAN-9087`'s Callers section names the wrong files and omits the `live` readers
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe
-echo "files calling readCompanionSettings: $(grep -rl readCompanionSettings server --include=*.ts | sed 's|.*/||; /^companion-settings.ts$/d' | sort | tr '\n' ' ')"
-echo "MAN-9087 names alert-feed.ts: $(docstore get MAN-9087 --text | grep -c 'alert-feed.ts')   companion-account.ts: $(docstore get MAN-9087 --text | grep -c 'companion-account.ts')"
-EOF
-bash "$D/p.sh"
-cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: the row names alert-feed.ts and companion-account.ts (each count at least 1); while the defect stands both are 0 and the first line lists alert-feed.ts companion-account.ts companion-picture.ts companion.service.ts
-```
-
-measured 2026-10-27 by chain chain-kaylee--companion--docs-20261027-083550-75ed, finding L4, LOW
-probe-key: e4d6336ea6e41a37267014fb83c87a117c4c985e
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts
-
-## INV-9860 — probe — LOW — the new `companion-tools.ts` comment says a missing prompt line "stops the server at the first build"
-
-LOW — the new `companion-tools.ts` comment says a missing prompt line "stops the server at the first build"
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe
-grep -rn "buildCompanionTools(" server --include=*.ts | grep -v "export function" | grep -v ':[0-9]*: *\*' | cut -c1-110
-echo "comment says the server stops: $(grep -c 'server at the first build' server/modules/companion/tools/companion-tools.ts)"
-EOF
-bash "$D/p.sh"
-cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: one call site (companion-account.ts, inside createCompanionAccount) and "comment says the server stops: 0" once the sentence names the account's first use (it prints 1 while the defect stands)
-```
-
-measured 2026-10-27 by chain chain-kaylee--companion--docs-20261027-083550-75ed, finding L5, LOW
-probe-key: 9035a771f2584bf092cb5bc03b67fc9d842f07ef
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts
-
-## INV-9861 — probe — LOW — two pinned probe rows govern paths that do not exist, and the report names only one
-
-LOW — two pinned probe rows govern paths that do not exist, and the report names only one
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-docstore check cloudcli:. --text | python3 -I -c "import sys,json;d=json.load(sys.stdin);print([(f['token'],f['path'][-40:]) for f in d['findings'] if f['class']=='governed-missing'])"
-EOF
-bash "$D/p.sh"
-cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: [] (while the defect stands it prints INV-9771 and INV-9836)
-```
-
-measured 2026-10-27 by chain chain-kaylee--companion--docs-20261027-083550-75ed, finding L6, LOW
-probe-key: 69a1307eb786331b5418cd50f3f26964b4747714
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts
 
@@ -17350,21 +17180,6 @@ probe-key: 4bcc593d3c83c4652f33c89ba58bf653ea48842a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
-## INV-10083 — probe — LOW — MAN-9077 still says the session CLOSES the process when the CLI ignores an interrupt (healed means deleted)
-
-LOW — MAN-9077 still says the session CLOSES the process when the CLI ignores an interrupt (healed means deleted)
-
-```probe
-docstore get MAN-9077 --text | grep -c 'the session then closes the process'
-echo "[probe exit $?]"
-# expect: 1 while it stands; 0 once the row says the launch is replaced and its unanswered/held words carried
-```
-
-measured 2026-10-28 by chain chain-kaylee-words-survive-interrupt-20261028-132949-58fd, finding L3, LOW
-probe-key: 084b6e199530a222bb15909a4bd503f1004e739d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-unanswered.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session.mjs
-
 ## INV-10085 — probe — His × (or Clear) during a take ends the row `cancelled` for an order the door ran
 
 His × (or Clear) during a take ends the row `cancelled` for an order the door ran
@@ -18430,21 +18245,6 @@ measured 2026-10-29 by chain chain-kaylee-hands-harmless-direct-20261029-132203-
 probe-key: cc11b17b6604c7370c4f4e8ffe1f7351ceeee597
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-prompts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-rearm.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-targets.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-word.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/direct-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/hands-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts
-
-## INV-10205 — probe — MEDIUM — a failed fresh launch loses the handover; the panel has already said she starts "with a handover"
-
-MEDIUM — a failed fresh launch loses the handover; the panel has already said she starts "with a handover"
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee-fresh-start-handover/athena-probes/lost-on-failed-launch.mjs 2>&1 | grep -E "^(a fresh start|first launch|after the launch|second launch)"
-echo "[probe exit $?]"
-# expect: `second launch exists: true | carries <handover>: false | carries <state>: true` while the defect stands; cured, `carries <handover>: true`
-```
-
-measured 2026-10-29 by chain chain-kaylee-fresh-start-handover-20261029-145748-9b96, finding M1, MEDIUM
-probe-key: 26baffeb91735525a1a8a4f7866f1aef03981e84
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-oneshot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-handover-gate.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-handover.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-refusal.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover.mjs
 
 ## INV-10206 — probe — LOW — `.verify/kaylee-handover.mjs` crashes under load at section F: it reads the stand-in's pid file before the stand-in writes it
 
@@ -19992,25 +19792,6 @@ probe-key: 3b166ffe7fd9e266e4ad296360d7deec9bb04238
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/card-shapes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/eyes-answer.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/eyes/panel-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-card-shapes.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-eyes-answer.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-words.mjs
 
-## INV-10344 — probe — (LOW) — "MAN-9059 §Clear" in MAN-9195 and MAN-9147 (and MAN-9169) lands on a stub
-
-(LOW) — "MAN-9059 §Clear" in MAN-9195 and MAN-9147 (and MAN-9169) lands on a stub
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-for t in MAN-9147 MAN-9169 MAN-9195; do echo "$t cites MAN-9059 §Clear: $(docstore get $t --text | grep -c 'MAN-9059 §Clear')"; done
-echo "'clear' lines in MAN-9059 itself: $(docstore get MAN-9059 --text | grep -c -i clear)"
-echo "'### Clear' headings in MAN-9271: $(docstore get MAN-9271 --text | grep -c '^### Clear')"
-EOF
-bash "$D/p.sh"; rm -f "$D/p.sh"; rmdir "$D"
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--cards--docs-20261030-084553-7a57, finding L4, LOW
-probe-key: f43dae0de82c11194ac880bc248a42a5086e0a79
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-picture.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-press.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-store.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/deleted-chat-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-events.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/guarded-callback.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/tool-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/companion-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/relayed-sends.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-deletion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-deletion-announce-direct.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-focus-deleted.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-pending.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-press-live.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-press-refused.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-press-refused.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-frame-tap.mjs
-
 ## INV-10345 — probe — (LOW) — MAN-9147 "Clear, in storage terms" leaves out a column Clear wipes
 
 (LOW) — MAN-9147 "Clear, in storage terms" leaves out a column Clear wipes
@@ -20028,31 +19809,6 @@ measured 2026-10-30 by chain chain-kaylee-station--cards--docs-20261030-084553-7
 probe-key: dd81d87a05bc3c8a3d04d517080c445f3680ccf5
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-pending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-store.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/companion-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/relayed-sends.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-pending.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-frame-tap.mjs
-
-## INV-10347 — probe — MAN-9213 ends in a double period
-
-MAN-9213 ends in a double period
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-export D
-cat > "$D/p.sh" <<'PEOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-echo "MAN-9186 'every rule of this row holds there': $(docstore get MAN-9186 --text | grep -c 'every rule of this row holds there')"
-echo "MAN-9186 dock-only rule still in the same bullet ('from the log (down to its 3.5rem floor)'): $(docstore get MAN-9186 --text | grep -c 'from the log (down to its 3.5rem floor)')"
-echo "MAN-9213 double period after '§Targets)': $(docstore get MAN-9213 --text | grep -c 'MAN-9172 §Targets)\.\.')"
-PEOF
-bash "$D/p.sh"
-cd /tmp
-case "$D" in /tmp/athena-probe.??????) rm -r "$D" ;; esac
-echo "[probe exit $?]"
-# expect: 1, 1, 1 while they stand; 0 on the first once the sentence names which rules hold on the rail, 0 on the third once the stray period is gone
-```
-
-measured 2026-10-30 by chain chain-kaylee-station--what-needs-you--docs-20261030-085942-ff2d, finding L2, LOW
-probe-key: bed2f3be98fd41239f56b482ba3df3776e0f96f9
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-message.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts
 
 ## INV-10348 — probe — the rows do not say that the ask route never looks at `cut`
 
@@ -24042,3 +23798,223 @@ The vocabulary (MAN-9451) is ONE list read fresh per call, applied at three plac
 | The page asks for the hints on EVERY clip and treats all three calls as optional: a failure, a refusal or no answer in 5 s is the raw text / no prompt / the unrespelled text and one `console.warn`, never an error to the person | a new entry applies on the next press with no reload, and the vocabulary only improves dictation: it never gets to stop it |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-match.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceInput.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/voicePlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/voiceDirect.ts
+
+## INV-10635 — probe — LOW — the proof never drives her last turn with a result that does not list the notice; X1 and X9 survive
+
+LOW — the proof never drives her last turn with a result that does not list the notice; X1 and X9 survive
+
+```probe
+D=/tmp/athena-probe-kaylee-closing; mkdir -p "$D"; cat > "$D/gap.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+python3 /home/lyphe/.claude/state/pipeline-reviews/kaylee--before-compaction--proof/athena-probes/mutants.py X1 X9 | grep -E "^(X1|X9) " || echo none
+EOF
+bash "$D/gap.sh"
+# expect: both lines end `exit 0; 0 failed  <<< PROBE DID NOT NOTICE` while the gap stands; `exit 1; N failed` once a case drives them
+```
+
+measured 2026-11-01 by chain chain-kaylee--before-compaction--proof-20261101-214356-a9fb, finding L1, LOW
+probe-key: 434f1b3beb0101af5b31d8da454aa6f42ac57791
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-kit.mjs
+
+## INV-10636 — probe — LOW — guards the proof has no case for: X5, X6, X14, X10, X12 survive
+
+LOW — guards the proof has no case for: X5, X6, X14, X10, X12 survive
+
+```probe
+D=/tmp/athena-probe-kaylee-closing; mkdir -p "$D"; cat > "$D/guards.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+python3 /home/lyphe/.claude/state/pipeline-reviews/kaylee--before-compaction--proof/athena-probes/mutants.py X5 X6 X10 X12 X14 | grep -E "^(X5|X6|X10|X12|X14) " || echo none
+EOF
+bash "$D/guards.sh"
+# expect: five lines, each `exit 0; 0 failed  <<< PROBE DID NOT NOTICE` while the guards have no case
+```
+
+measured 2026-11-01 by chain chain-kaylee--before-compaction--proof-20261101-214356-a9fb, finding L2, LOW
+probe-key: 4e9828e24c8ed334ff175778e0b6a5607aaa4158
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-kit.mjs
+
+## INV-10637 — probe — LOW — a failed setup leaves its scratch folder behind
+
+LOW — a failed setup leaves its scratch folder behind
+
+```probe
+D=/tmp/athena-probe-kaylee-closing; mkdir -p "$D"; cat > "$D/setupfail.sh" <<'EOF'
+S=$(mktemp -d /tmp/athena-probe-setupfail.XXXXXX) || exit 1
+case "$S" in /tmp/athena-probe-setupfail.*) ;; *) exit 1 ;; esac
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TMPDIR="$S" KAYLEE_CLOSING_MODULES=/nonexistent/modules TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx .verify/kaylee-closing.mjs >"$S.out" 2>&1
+echo "exit $? | scratch folders left behind: $(ls -d "$S"/kaylee-closing.* 2>/dev/null | wc -l)"
+cd /tmp && rm -rf "$S" "$S.out"
+EOF
+bash "$D/setupfail.sh"
+# expect: `exit 1 | scratch folders left behind: 1` while the leak stands, `… : 0` once the harness removes what it made on a failed setup
+```
+
+measured 2026-11-01 by chain chain-kaylee--before-compaction--proof-20261101-214356-a9fb, finding L3, LOW
+probe-key: 3f9d54bba2acaa8e4a9dcc4a400ca594b47bee9a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-kit.mjs
+
+## INV-10638 — probe — LOW — a refusal that repeats on a fresh launch's first message loops handovers, one summarizer call per round
+
+LOW — a refusal that repeats on a fresh launch's first message loops handovers, one summarizer call per round
+
+```probe
+D=/tmp/athena-probe-kaylee-closing; mkdir -p "$D"; cat > "$D/loop.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee--before-compaction--proof/athena-probes/exp.mjs 2 | grep "launches opened" || echo none
+EOF
+bash "$D/loop.sh"
+# expect: `launches opened: ~22-26 | verb calls: ~21-25 | failed process seen: false` while it loops; a handful of launches and a journal line saying why once bounded
+```
+
+measured 2026-11-01 by chain chain-kaylee--before-compaction--proof-20261101-214356-a9fb, finding L4, LOW
+probe-key: eed3a4018b520c1f617e41b26414095ef28f1064
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-kit.mjs
+
+## INV-10639 — probe — LOW — a store that fails at the closing says something false and skips the house's fallback
+
+LOW — a store that fails at the closing says something false and skips the house's fallback
+
+```probe
+D=/tmp/athena-probe-kaylee-closing; mkdir -p "$D"; cat > "$D/store.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee--before-compaction--proof/athena-probes/exp.mjs 3 | grep -E "ends:|panel:" || echo none
+EOF
+bash "$D/store.sh"
+# expect: `ends: … her note: none (it could not be stored), the house wrote none; she starts fresh` and the panel line "She could not finish her note and the handover could not be written" while the defect stands
+```
+
+measured 2026-11-01 by chain chain-kaylee--before-compaction--proof-20261101-214356-a9fb, finding L5, LOW
+probe-key: d63abbea47eba4d3e3356025e397c8b69c6102f9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-kit.mjs
+
+## INV-10640 — server/modules/companion/session — her own compaction: the rules later edits keep (the CLI never compacts her, her last turn is quiet, gated, never stopped, and always ends her conversation)
+
+Her own compaction: the machine MAN-9455, the numbers and words MAN-9454, what was measured and the gate's proof MAN-9456. His ruling of 2026-11-01: Kaylee writes her own summary, never the CLI's and never Haiku's.
+
+| rule | why |
+|---|---|
+| Her CLI never compacts her: `DISABLE_COMPACT=1` is the LAST key of her env (`companion-launch.ts`), her loop reads no `compact_boundary` (none can arrive), and nothing summarizes her conversation but her own closing | the CLI's summary is not hers; two compactions would race |
+| The closing reads her context only at the end of a turn that left her process up, and begins her last turn only when, once the reading is back, the same launch is live and no turn or stop is in flight (`turnInFlight()`) | she is never cut off mid-answer |
+| Nothing but the notice is pushed in her last turn: it goes through `sayNotice`, never the assembler, so no `<state>`, `<handover>`, `<cut>`, `<sessions>`, `<view>` or `<register>` rides it | it is the only message of that turn |
+| Only `recall` and `remember` run in it: the gate is in each tool's handler (`buildCompanionTools`), and every name, description and schema stays word for word | a changed tool list is a new shape; both accounts would start fresh |
+| It is never spoken, logged or announced as a turn: no `companion_turn` frame, sentence, log row or speech-cache move; `turnId` reads null and her activity thinking. His Stop, a cut and a server stop leave it running (`interrupt` returns); only `COMPANION_CLOSING_WAIT_MS` ends it | it is not his turn; a stop would lose the note |
+| His words, the alerts and the focus news that arrive during it wait for the fresh her: his words are kept on disk first, parked in order (`closing.park`), delivered after the fresh start; `warm` waits too | a message given to the closing conversation ends with it |
+| Her conversation always ends after it: her note, else the house's handover, else none is stored on her row BEFORE the conversation is forgotten, then it is forgotten and closed; a fault in the closing releases the hold | a hold that never ends stops every push |
+| The CLI's refusal ("Prompt is too long": `success` + `is_error`, `contextFull`) is handed over, never failed: no last turn, the house's handover, his refused words kept and delivered first to the fresh her | a refused message stays counted; a failure would loop |
+| Her prompt, her tool descriptions and her schemas are not changed by this machinery, and a normal turn gains nothing: no tool, no prompt line, no envelope | his ruling: report first when a normal turn would change |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-closing.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-events.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-launch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-notice.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts
+
+## INV-10641 — probe — J1's eight-word check fails on all three real runs, and as written it cannot pass for the question it is asked
+
+J1's eight-word check fails on all three real runs, and as written it cannot pass for the question it is asked
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cat > "$D/p.mjs" <<'JS'
+import { readTranscript, userTexts, textOf } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-real-kit.mjs';
+const unesc = (t) => t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+const words = (t) => t.toLowerCase().match(/[a-z0-9']+/g) ?? [];
+const longest = (a, b) => { const x = words(a), y = words(b); let best = 0, at = ''; for (let i = 0; i < x.length; i++) for (let j = 0; j < y.length; j++) { let k = 0; while (i + k < x.length && j + k < y.length && x[i + k] === y[j + k]) k++; if (k > best) { best = k; at = x.slice(i, i + k).join(' '); } } return { best, at }; };
+const info = (id) => { const e = readTranscript(id); const u = userTexts(e); const f = u.find((x) => x.text.includes('<operator')); const c = u.find((x) => x.text.includes('<compaction>')); const h = /<handover>\n([\s\S]*?)\n<\/handover>/.exec(f?.text ?? ''); const answer = f ? e.slice(f.index + 1, c?.index).filter((x) => x.type === 'assistant').map((x) => textOf(x.message?.content)).filter(Boolean).join(' ') : ''; return { note: h ? unesc(h[1]) : '', answer }; };
+const runs = { A: ['6410133d-86d0-4111-aa9a-3c3f801c0ad6', '209b6673-58bc-4a3d-9adb-867e5dc20fe3'], B: ['a8ac69b8-edd1-4622-8c7a-f60dcd3c927f', 'f29ceee1-7e37-4202-8204-1441c6fae875'], C: ['f502288b-164b-446a-b436-73c88e5e3001', 'f13b96ce-d052-4582-9f39-920bc472a116'] };
+for (const [name, [id2, id3]] of Object.entries(runs)) {
+  const c2 = info(id2), c3 = info(id3);
+  if (c3.answer === '') { console.log(`run ${name}: transcripts not on disk`); continue; }
+  const a = longest(c3.answer, c2.note), b = longest(c3.answer, c3.note);
+  console.log(`run ${name}: answer ${words(c3.answer).length} words; longest shared run with note 1 = ${a.best}, with note 2 = ${b.best} (the driver's check fails at 8 or more)`);
+}
+JS
+cd /home/lyphe/.claude/claudecodeui_lyphe && node "$D/p.mjs"
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -rf -- "$D" ;; esac
+# expect: run A 6 and 10, run B 10 and 10, run C 7 and 8 (each run has a number of 8 or more, so the driver's check FAILs); "transcripts not on disk" if they were pruned
+```
+
+measured 2026-11-02 by chain chain-kaylee--before-compaction--whole-20261101-224741-0888, finding H1, HIGH
+probe-key: 515577b1ba410ba9f55ffcdfef2469ca434eda0c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-live.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-real-kit.mjs
+
+## INV-10642 — probe — "verified on both accounts" is still unmet: account 2 has not launched, so it was never read
+
+"verified on both accounts" is still unmet: account 2 has not launched, so it was never read
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+SP=$(ss -H -ltnp 'sport = :3011' | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | head -1)
+echo "serving dev API pid ${SP:-none}, started $(ps -o lstart= -p "${SP:-0}" 2>/dev/null || echo unknown)"
+echo "account-2 journal lines of that pid: $(journalctl -u cloudcli-server-dev.service _PID="${SP:-0}" --no-pager 2>/dev/null | grep -c 'account 2:')"
+n=0; for e in /proc/[0-9]*; do [ "$(readlink $e/cwd 2>/dev/null)" = "$HOME/.claude/state/companion/2" ] && n=$((n+1)); done; echo "processes with cwd companion/2: $n"
+echo "the gate:"; grep -n -E "isUserConnected\(accountId\)|readCompanionSettings\(accountId\).live" server/modules/companion/feeds/alert-feed.ts | cut -c1-140
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -rf -- "$D" ;; esac
+# expect: while his page is closed: 0 account-2 journal lines, 0 processes with cwd companion/2, and the gate lines name `.live` and `isUserConnected`; a nonzero count means account 2 has launched and J2 can be run
+```
+
+measured 2026-11-02 by chain chain-kaylee--before-compaction--whole-20261101-224741-0888, finding H2, HIGH
+probe-key: 21f6b9965350f07ff7fa709f114e0a2a5ffc8baa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-live.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-real-kit.mjs
+
+## INV-10643 — probe — her stored note opens with narration that is not the note, in 5 of 6 notes
+
+her stored note opens with narration that is not the note, in 5 of 6 notes
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cat > "$D/p.mjs" <<'JS'
+import { readTranscript, userTexts } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-real-kit.mjs';
+const unesc = (t) => t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+const first = (id) => userTexts(readTranscript(id)).find((u) => u.text.includes('<operator'))?.text ?? '';
+for (const [label, id] of [['A1', '6410133d-86d0-4111-aa9a-3c3f801c0ad6'], ['A2', '209b6673-58bc-4a3d-9adb-867e5dc20fe3'], ['B1', 'a8ac69b8-edd1-4622-8c7a-f60dcd3c927f'], ['B2', 'f29ceee1-7e37-4202-8204-1441c6fae875'], ['C1', 'f502288b-164b-446a-b436-73c88e5e3001'], ['C2', 'f13b96ce-d052-4582-9f39-920bc472a116']]) {
+  const note = unesc((/<handover>\n([\s\S]*?)\n<\/handover>/.exec(first(id)) ?? [, ''])[1]);
+  console.log(`${label}: ${note === '' ? 'transcript not on disk' : JSON.stringify(note.slice(0, 95))}`);
+}
+JS
+cd /home/lyphe/.claude/claudecodeui_lyphe && node "$D/p.mjs"
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -rf -- "$D" ;; esac
+# expect: five of the six notes open with a sentence about what she kept in memory ("Nothing new needs keeping…", "Both of his rulings are already kept…"); only C1 opens with the note to a fresh her
+```
+
+measured 2026-11-02 by chain chain-kaylee--before-compaction--whole-20261101-224741-0888, finding M1, MEDIUM
+probe-key: 1ec2148630a215d84f4bb5199778a7000b828146
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-live.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-real-kit.mjs
+
+## INV-10644 — probe — MAN-9459's title says "(J2)" and holds only J1
+
+MAN-9459's title says "(J2)" and holds only J1
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+echo "MAN-9459 title ends: $(docstore get MAN-9459 --json 2>/dev/null | jq -r '.row.title' | sed 's/.* — //')"
+echo "J2 headings in MAN-9459's body: $(docstore get MAN-9459 --json 2>/dev/null | jq -r '.row.body' | grep -c '^### J2')"
+echo "J1 headings in MAN-9459's body: $(docstore get MAN-9459 --json 2>/dev/null | jq -r '.row.body' | grep -c '^### J1')"
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -rf -- "$D" ;; esac
+# expect: a title ending "(J1) and on both live processes (J2)" with 0 J2 headings and 1 J1 heading while this stands; a title naming J1 alone once cured
+```
+
+measured 2026-11-02 by chain chain-kaylee--before-compaction--whole-20261101-224741-0888, finding L1, LOW
+probe-key: c25480555e93d23bbe368e45839b587031e76a34
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-live.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-real-kit.mjs

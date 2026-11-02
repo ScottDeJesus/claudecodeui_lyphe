@@ -23,7 +23,7 @@ import type { CompanionSettings } from '@/shared/companion-types.js';
  *   - `tools: []` — no built-in tool exists: no shell, no file edit, no web. Her tools are the one
  *     in-process MCP server, and `allowedTools` names exactly those, so a tool is never one prompt away;
  *   - `strictMcpConfig` — the operator's own MCP servers (`~/.claude.json`) are not loaded into her.
- * She differs from the diagnosis agent in four ways, each one a reason she lives longer than a call:
+ * She differs from the diagnosis agent in five ways, each one a reason she lives longer than a call:
  *   - she PERSISTS: `persistSession` stays on and the CLI session id the caller holds is passed as
  *     `resume`, so her conversation outlives the process (the idle closer ends it after two hours of silence) — but only while her
  *     tools and prompt are what that conversation began with: the CLI records both once and keeps them on a resume, so
@@ -33,9 +33,13 @@ import type { CompanionSettings } from '@/shared/companion-types.js';
  *     reads her turns as a program's, never as the operator's correction (INV-4352);
  *   - `includePartialMessages` feeds her text, delta by delta, to the sentence stream;
  *   - `maxTurns` is 30 PER TURN of hers (a turn is one answer to him, with every tool call inside it).
- *   - `CLAUDE_CODE_AUTO_COMPACT_WINDOW` in her env is 500k tokens: the CLI compacts her conversation when it
- *     reaches that, not at its default for a 1M model (about 967k). The CLI reads its env at launch, so a
- *     change here applies from her next launch.
+ *   - her CLI NEVER COMPACTS HER: `DISABLE_COMPACT=1` in her env switches off its summary, automatic and manual alike (so no `compact_boundary` can
+ *     reach her), and `CLAUDE_CODE_AUTO_COMPACT_WINDOW` makes her window 500k tokens: the size her CLI's own reading measures her against
+ *     (`session/companion-process.ts`), which her closing counts back from. It is NOT a refusal point: with compaction off the CLI sends a message that
+ *     passes it (measured 2026-11-01 on a 100,000 window: messages read at 99,982 and at 100,122 tokens were both sent) and refuses only at the model's own
+ *     limit (read from the CLI's code, not measured at her size). So her own closing (`session/companion-closing.ts`: a last turn to write herself a
+ *     note, then a fresh conversation) is the only bound under her window, and the refusal that does come is handed over, never failed (`session/companion-events.ts`).
+ *     The CLI reads its env at launch, so a change here applies from her next launch.
  * It is a Claude launch like any other, so it starts on the account the house chose, on the subscription.
  *
  * Consumers: `session/companion-session.ts` (every launch and relaunch), `session/companion-handover.ts` (where the thread of a
@@ -53,9 +57,11 @@ export const COMPANION_MCP_SERVER_NAME = 'companion';
 /** One of her turns may run at most this many model round-trips (tool calls included) before the CLI ends it. */
 const COMPANION_MAX_TURNS = 30;
 
-// How full her context may get before her CLI compacts it: 500k tokens, half her models' 1M window,
-// so the summary the CLI writes reads half a million tokens at most. The CLI's default for a 1M model is about 967k.
-const COMPANION_AUTO_COMPACT_WINDOW_TOKENS = 500_000;
+/**
+ * Her window: 500k tokens, half her models' 1M. With the CLI's compaction off (`DISABLE_COMPACT`, below) the CLI does not refuse at it — it sends past it —
+ * so it is the size her CLI's reading measures her against and her closing counts back from; her own closing is what keeps her under it.
+ */
+const COMPANION_WINDOW_TOKENS = 500_000;
 
 /**
  * `~/.claude/state/companion/<user id>`, made if absent: the folder her CLI is launched in. Nothing is
@@ -140,7 +146,8 @@ export async function companionQueryOptions(
     includePartialMessages: true,
     cwd,
     maxTurns: COMPANION_MAX_TURNS,
-    env: { ...userFacingEnv(), ...account.env, CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(COMPANION_AUTO_COMPACT_WINDOW_TOKENS) },
+    // Last, so neither the house's environment nor the account's can switch her CLI's compaction back on.
+    env: { ...userFacingEnv(), ...account.env, CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(COMPANION_WINDOW_TOKENS), DISABLE_COMPACT: '1' },
     ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
     ...(providerSessionId ? { resume: providerSessionId } : {}),
   };
