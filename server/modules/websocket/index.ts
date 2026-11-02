@@ -20,6 +20,9 @@ export { broadcastSessionUpserted, broadcastSessionUpsertedBatch } from './servi
 // onSessionUpserted: used by the companion module's station hint, which hears every session the broadcaster announces
 // (a rename, a new chat, a re-index) and tells the station a chat changed.
 export { onSessionUpserted } from './services/session-upsert-broadcast.service.js';
+// broadcastSessionArchiveChanged: used by the providers module — the close and the reopen of a chat, and the sleep-time
+// auto-close — so every open sidebar loses or regains the chat at once (an archived row sends no `session_upserted`).
+export { broadcastSessionArchiveChanged } from './services/session-archive-broadcast.service.js';
 // runDetachedChatTurn: used by the scheduled-messages module to run a turn
 // from a timer, with no socket to stream to or report errors on.
 export { runDetachedChatTurn } from './services/chat-websocket.service.js';

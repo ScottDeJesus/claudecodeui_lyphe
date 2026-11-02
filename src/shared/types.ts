@@ -2263,12 +2263,13 @@ export type ArchivedSessionListItem = {
 
 /**
  * The subset of archived-session fields needed to render a recent-conversations row and reopen the session it points at.
- * `icon` is the chat's chosen icon name, or null for the default; `unread` means its last run finished while it was not on screen and it has not been on screen since.
+ * `icon` is the chat's chosen icon name, or null for the default; `unread` means its last run finished while it was not on screen and it has not been on screen since;
+ * `pinned` means he pinned the chat: the list draws it first, marks it, and the sleep-time auto-close leaves it open.
  */
 export type RecentConversationListItem = Pick<
   ArchivedSessionListItem,
   'sessionId' | 'provider' | 'projectId' | 'projectDisplayName' | 'sessionTitle' | 'lastActivity'
-> & { icon: string | null; unread: boolean };
+> & { icon: string | null; unread: boolean; pinned: boolean };
 
 /** The four marks a simple-list chat can draw, by name. */
 export type SimpleChatMark = 'awaitingInput' | 'unread' | 'running' | 'subagents';

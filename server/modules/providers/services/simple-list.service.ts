@@ -41,6 +41,32 @@ type SimpleListLayoutFolder = Extract<SimpleListLayoutItem, { kind: 'folder' }>;
  */
 const EVERY_TAGGED_CHAT = -1;
 
+/**
+ * The ladder's order with pinned rows lifted to the front, inside each container: a loose chat is
+ * pinned when it is, a folder when any chat in it is, and a folder's own chats sort pinned-first
+ * inside it. Both partitions are stable, so the manual ladder order survives inside the pinned group
+ * and inside the unpinned one.
+ *
+ * A folder with a pinned chat travels with it because the alternative hides the pin: the pinned
+ * chat would sit in a folder drawn below every unpinned loose chat. Lifting the folder keeps "pinned
+ * things come first" true at the top level without pulling a chat out of the folder he put it in.
+ * Consumed by `readFeed` below, the one place the feed's layout is drawn.
+ */
+function pinnedFirstLayout(topLevel: SimpleListLayoutItem[], chatById: Map<string, RecentChat>): SimpleListLayoutItem[] {
+  const isPinned = (sessionId: string): boolean => chatById.get(sessionId)?.pinned === true;
+
+  for (const item of topLevel) {
+    if (item.kind === 'folder') {
+      item.sessionIds = [...item.sessionIds.filter(isPinned), ...item.sessionIds.filter((id) => !isPinned(id))];
+    }
+  }
+
+  const holdsPin = (item: SimpleListLayoutItem): boolean =>
+    item.kind === 'chat' ? isPinned(item.sessionId) : item.sessionIds.some(isPinned);
+
+  return [...topLevel.filter(holdsPin), ...topLevel.filter((item) => !holdsPin(item))];
+}
+
 /** The folder a request names is gone: the 404 a folder write answers with. A move's `unknown-folder` is only ever said with a non-null id. */
 function folderNotFound(folderId: string | null): AppError {
   return new AppError(`Simple-list folder "${folderId}" was not found.`, {
@@ -159,8 +185,9 @@ export const simpleListService = {
       topLevel.push({ kind: 'chat', sessionId: entry.id });
     }
 
-    const layout = topLevel.slice(offset, offset + limit);
-    const total = topLevel.length;
+    const pinnedFirst = pinnedFirstLayout(topLevel, chatById);
+    const layout = pinnedFirst.slice(offset, offset + limit);
+    const total = pinnedFirst.length;
 
     // What the picker lists, in the order the list draws it, so the two can never disagree.
     const conversations: RecentChat[] = [];

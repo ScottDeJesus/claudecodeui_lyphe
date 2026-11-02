@@ -173,8 +173,8 @@ export default function SidebarModals({
                     </p>
                     <p className="mt-3 text-xs text-muted-foreground">
                       {pendingDeletion.isArchived
-                        ? t('deleteConfirmation.archivedSessionNotice', 'This session is already archived. You can keep it hidden or delete it permanently.')
-                        : t('deleteConfirmation.archiveSessionNotice', 'Archive keeps the session out of the active list while preserving its history.')}
+                        ? t('deleteConfirmation.closedSessionNotice', 'This session is already closed. You can keep it hidden or delete it permanently.')
+                        : t('deleteConfirmation.closeSessionNotice', 'Close keeps the session out of the active list while preserving its history.')}
                     </p>
                   </div>
                 </div>
@@ -187,7 +187,7 @@ export default function SidebarModals({
                     onClick={() => onConfirmDeleteSession(false)}
                   >
                     <EyeOff className="mr-2 h-4 w-4" />
-                    {t('deleteConfirmation.archiveSession', 'Archive session')}
+                    {t('deleteConfirmation.closeSession', 'Close session')}
                   </Button>
                 )}
                 <Button

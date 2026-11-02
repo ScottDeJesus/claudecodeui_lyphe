@@ -16614,3 +16614,20 @@ On the live dev stack (`:3011`, `cloudcli-server-dev.service`); read only but fo
 | `.verify/kaylee-closing-live.sh` | the live CLIs, account 1 woken by one typed line and account 2 only read, never typed to: `DISABLE_COMPACT=1`, the 500,000 window, the armed line | here §J2 (the part above) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-closing.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-notice.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-live.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-real-kit.mjs
+
+## MAN-9470 — Custom command arguments — POST /api/commands/execute, rawArgs, $ARGUMENTS, $N
+
+How a typed `/cmd text…` reaches a custom command's `$ARGUMENTS` and `$1`, `$2`, …
+
+| Part | Rule |
+| --- | --- |
+| Client (`executeCommand`, `useChatComposerState.ts`) | The name must open the input and end at whitespace or the end (`^<name>(?=\s\|$)`); everything after it, line breaks included (`[\s\S]`), trimmed at both ends, is `rawArgs`. `args` is `rawArgs` split on `/\s+/`. Both go in the `POST /api/commands/execute` body. `/cmd` then a line break runs `/cmd`. |
+| Route body (`commands.routes.ts`) | `rawArgs`: string, else `""`. `args`: the array sent, else `rawArgs` trimmed and split on `/\s+/`. |
+| `substituteCommandArguments(template, argumentsText, args)` | One pass, replacer function. `$ARGUMENTS` ← `rawArgs` verbatim (line breaks and spacing kept, as in the Claude Code CLI). `$N` (`N` ≥ 1, word boundary) ← `args[N-1]`; no such token → `$N` left as written. `why:` a replacer inserts the text literally: `$&` and `$$` in the user's text are not patterns, and a `$1` inside it is not substituted again. |
+| Re-submit | The expanded body is sent as the message with `skipCommandInterception: true`, so a body that starts with its own command name does not call `/api/commands/execute` again. |
+| Stale tab | A bundle that sends `args` without `rawArgs` gets an empty `$ARGUMENTS` until it reloads. |
+| Not here | Engine commands and skills never reach this route (MAN-8069). |
+
+- 2026-11-02, dev server: POST with only `rawArgs: "first line costs $& and $$5\nsecond line says $1 literally"` returned both lines unchanged; a `rawArgs`-only client got `one=[alpha] two=[$&] three=[beta]` from a command using `$1 $2 $3`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/commands/commands.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts

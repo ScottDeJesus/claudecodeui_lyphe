@@ -23950,3 +23950,18 @@ measured 2026-11-02 by chain chain-kaylee--before-compaction--whole-20261101-224
 probe-key: c25480555e93d23bbe368e45839b587031e76a34
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-live.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-real-kit.mjs
+
+## INV-10650 — probe — LOW — the install sweep is documented as a sleep that closes chats; measured, it never reaches the listener as one
+
+LOW — the install sweep is documented as a sleep that closes chats; measured, it never reaches the listener as one
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && echo "claims: service comment=$(grep -c "install sweep's retirement of an idle host" server/modules/providers/services/session-auto-close.service.ts) MANUAL=$(grep -c "retirement by the install sweep" server/modules/providers/MANUAL.md) MAN-9467=$(docstore get MAN-9467 --text | grep -c 'retirement by the install sweep')"; grep -n "facade.settleExit(null, 'SIGHUP')" server/modules/providers/list/claude/session-host/spawner.ts | head -1; bash /home/lyphe/.claude/state/pipeline-reviews/chat-pins-autoclose/athena-probes/retire-sweep.sh
+echo "[probe exit $?]"
+# expect: `claims: … =1 … =1 … =1`, the spawner line, and `<chat> lost its host without winding down (code none, signal SIGHUP); not a sleep, left open` (one Haiku turn in the /tmp probe project; the scratch chat is deleted after). Cured: the claims read 0 and 0 and 0 (the SIGHUP line is the behaviour and stays).
+```
+
+measured 2026-11-02 by chain chain-chat-pins-autoclose-20261102-092138-6ff0, finding L1, LOW
+probe-key: 0d82fec22300a955d9a05fef4b503385e4904176
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-auto-close.service.ts

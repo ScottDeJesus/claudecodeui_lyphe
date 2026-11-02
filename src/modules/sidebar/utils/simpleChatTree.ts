@@ -13,7 +13,7 @@ import type {
  *
  * Two hooks of this module are its consumers. `hooks/useSimpleChatList.ts` (the feed) holds the tree
  * and makes every change to it here: a page becomes `treeFromFeed`, a later page `appendPage`, a
- * rename `patchChat`, a fold `patchFolder`, an archive `removeChat`, a carried row `moveItem`.
+ * rename `patchChat`, a fold `patchFolder`, a close `removeChat`, a carried row `moveItem`.
  * `hooks/useSimpleChatDrag.ts` (the carry) turns the row under the pointer into a position through
  * `positionForDrop`.
  *
@@ -86,7 +86,7 @@ export function appendPage(previous: SimpleListItem[], page: SimpleListItem[]): 
 export function patchChat(
   items: SimpleListItem[],
   sessionId: string,
-  patch: Partial<Pick<RecentConversationListItem, 'sessionTitle' | 'icon'>>,
+  patch: Partial<Pick<RecentConversationListItem, 'sessionTitle' | 'icon' | 'pinned'>>,
 ): SimpleListItem[] {
   return items.map((item): SimpleListItem => {
     if (item.kind === 'chat') {

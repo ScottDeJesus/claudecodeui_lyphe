@@ -49,9 +49,9 @@ const RELOAD_DEBOUNCE_MS = 500;
 
 /**
  * Every mounted instance of the feed, told of a row taken out of it. The sidebar's list and the floating
- * picker each hold their own rows, and an archive or a delete sends no `session_upserted` (the only other
- * thing that refreshes them): a removal made through one instance would otherwise stay listed in the other
- * until an unrelated upsert arrived.
+ * picker each hold their own rows, and a close or a delete sends no `session_upserted` (a closed row never
+ * announces itself): a removal made through one instance would otherwise stay listed in the other until
+ * the server's own `session_archive_changed` re-read lands.
  */
 const removalListeners = new Set<(sessionId: string) => void>();
 
@@ -93,7 +93,7 @@ export function useSimpleChatList(selectedSessionId: string | null, enabled = tr
   loadMore: () => Promise<void>;
   patchLocal: (
     sessionId: string,
-    patch: Partial<Pick<RecentConversationListItem, 'sessionTitle' | 'icon'>>,
+    patch: Partial<Pick<RecentConversationListItem, 'sessionTitle' | 'icon' | 'pinned'>>,
   ) => void;
   patchFolderLocal: (folderId: string, patch: Partial<Pick<SimpleListFolder, 'name' | 'collapsed'>>) => void;
   removeLocal: (sessionId: string) => void;
@@ -176,14 +176,19 @@ export function useSimpleChatList(selectedSessionId: string | null, enabled = tr
     void fetchPage(0, PAGE_SIZE, false);
   }, [enabled, fetchPage]);
 
-  // A row in this feed may have just been created, retitled or bumped to the top; a folder may have
-  // been made, renamed, folded, moved or deleted, or a chat moved between places or folders. Either
-  // frame says the server's list may no longer be the one on screen, so the page is re-read.
+  // A row in this feed may have just been created, retitled, pinned or bumped to the top; a folder may
+  // have been made, renamed, folded, moved or deleted, a chat moved between places or folders, or a chat
+  // closed or reopened (by this tab, another, the sleep-time auto-close or Kaylee). Any of the three frames
+  // says the server's list may no longer be the one on screen, so the page is re-read.
   useEffect(() => {
     if (!enabled) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const unsubscribe = subscribe((event) => {
-      if (event?.kind !== 'session_upserted' && event?.kind !== 'simple_list_changed') return;
+      if (
+        event?.kind !== 'session_upserted'
+        && event?.kind !== 'simple_list_changed'
+        && event?.kind !== 'session_archive_changed'
+      ) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
@@ -208,14 +213,14 @@ export function useSimpleChatList(selectedSessionId: string | null, enabled = tr
     void reload();
   }, [enabled, selectedSessionId, rows, reload]);
 
-  // The optimistic write behind a rename and an icon pick: the chat shows the change at once and
+  // The optimistic write behind a rename, an icon pick and a pin: the chat shows the change at once and
   // the server's own `session_upserted` refetch confirms it a moment later. `patchChat` merges
   // rather than replaces, keeping every field the patch does not name — a replaced row would drop
   // the project label and the activity stamp the row still renders — and it finds the chat wherever
   // it sits, at the top level or in a folder. `unread` is deliberately outside the patch type: it is
   // the server's answer to a completed run, never a client's guess.
   const patchLocal = useCallback(
-    (sessionId: string, patch: Partial<Pick<RecentConversationListItem, 'sessionTitle' | 'icon'>>) => {
+    (sessionId: string, patch: Partial<Pick<RecentConversationListItem, 'sessionTitle' | 'icon' | 'pinned'>>) => {
       setItems((previous) => patchChat(previous, sessionId, patch));
     },
     [],

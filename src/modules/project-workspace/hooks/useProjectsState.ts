@@ -239,11 +239,22 @@ const getSessionAliasIds = (event: SessionUpsertedEvent): Set<string> => {
 };
 
 /**
+ * The sessions with the pinned ones first, each group in the order it already had. The server pages a
+ * project's sessions pinned-first, so this only has to keep a live change — a pin, an unpin, a new chat
+ * prepended above a pinned one — in the same order a reload would draw.
+ */
+const pinnedFirst = (sessions: ProjectSession[]): ProjectSession[] => [
+  ...sessions.filter((session) => session.pinned === true),
+  ...sessions.filter((session) => session.pinned !== true),
+];
+
+/**
  * Upserts one session into a project's normalized session list.
  *
  * Existing rows are updated in place (summary/lastActivity changes from the
  * watcher); new rows are prepended since the watcher only fires for sessions
- * with fresh activity. `sessionMeta.total` grows only on insert.
+ * with fresh activity, and pinned rows stay ahead of both. `sessionMeta.total`
+ * grows only on insert.
  */
 const upsertSessionIntoProject = (project: Project, event: SessionUpsertedEvent): Project => {
   const sessions = project.sessions ?? [];
@@ -294,7 +305,7 @@ const upsertSessionIntoProject = (project: Project, event: SessionUpsertedEvent)
     inserted = true;
   }
 
-  const next: Project = { ...project, sessions: nextSessions };
+  const next: Project = { ...project, sessions: pinnedFirst(nextSessions) };
   if (inserted) {
     const total = Number(project.sessionMeta?.total ?? 0) + 1;
     next.sessionMeta = {
@@ -752,6 +763,23 @@ export function useProjectsState({
         && event.kind !== 'websocket_reconnected'
       ) {
         markSessionAttention(eventSessionId);
+      }
+
+      // A chat was closed (by this tab, another, the sleep-time auto-close or Kaylee): it leaves every
+      // project's list. The open chat is left where it is — closing a row never navigates a page away
+      // from the conversation it is showing. A reopen arrives as the `session_upserted` below.
+      if (event.kind === 'session_archive_changed') {
+        const closedIds = event.isArchived === true && Array.isArray(event.sessionIds)
+          ? event.sessionIds.filter((id): id is string => typeof id === 'string')
+          : [];
+        if (closedIds.length > 0) {
+          setProjects((previousProjects) =>
+            previousProjects.map((project) =>
+              closedIds.reduce((current, closedId) => removeSessionFromProject(current, closedId), project),
+            ),
+          );
+        }
+        return;
       }
 
       if (event.kind !== 'session_upserted') {

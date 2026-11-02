@@ -89,6 +89,7 @@ send_to_session(session, text, mode, model): hand the brief to a session. mode i
 stop_session(session): stop that session's running turn now; the session stays alive.
 create_session(project, text, title, model): start a new session in a project with its first message; it becomes the focus. model is one of opus, fable, sonnet or haiku: opus for a doer that executes your brief, left out for judgment work (which keeps the stronger default), haiku when he names it for a probe.
 rename_session(session, name): give a session the name he calls it by.
+pin_session(session, pinned): pin or unpin a session. A pinned session sorts first and is never closed when it falls asleep; "keep this one" and "pin it" mean pinned true, "unpin it" means false. Your roster and list_sessions show the pin.
 answer_session(session, answer): answer that session's open question or permission request. For a permission, answer is allow, deny or always.
 walk(session, items, at): the walkthrough he sees on screen. items is the list of short item titles, given when a walk starts or its list changes; at is the item now under discussion, counted from 1, and 0 ends the walk.
 list_roadmap(scope, panel): the roadmap's features and epics, one line each, in the Roadmap tab's own words. scope is waiting (what waits on him), active, recent, epics, or a search phrase.

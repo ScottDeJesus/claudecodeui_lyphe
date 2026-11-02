@@ -109,7 +109,7 @@ const LAST_TURN_REFUSAL = 'Not in this last turn: only recall and remember are o
  * `COMPANION_TOOL_NAMES`): `sessionTools()` (`list_sessions`, `list_projects`), which
  * names no chat and so needs no deps, `readTools(deps)` (`read_session`, `list_followups`, `ask_dactyl`), `draftTools(deps)`
  * (`show_note`, `dismiss_note`, `update_draft`, `walk`, `send_to_session`, `create_session`), `actTools(deps)` (`stop_session`,
- * `rename_session`, `answer_session`), then the eyes (`eyes/*-reads.ts`): `roadmapReads(deps)` (`list_roadmap`, `read_card`),
+ * `rename_session`, `pin_session`, `answer_session`), then the eyes (`eyes/*-reads.ts`): `roadmapReads(deps)` (`list_roadmap`, `read_card`),
  * `runReads(deps)` (`list_runs`, `read_run`), `docReads(deps)` (`search_docs`, `read_doc`),
  * `alertReads(deps)` (`list_alerts`), `panelReads(deps)` (`read_kanban`, `read_heal`, `read_notes`, `read_schedules`),
  * `houseReads(deps)` (`read_git`, `read_cerberus`, `read_memory`, `read_settings`), `skillReads(deps)` (`lookup_skills`, the house's skills and agents as

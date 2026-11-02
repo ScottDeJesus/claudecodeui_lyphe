@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit2, EyeOff, FolderInput, Loader2, MoreHorizontal, Smile, Trash2 } from 'lucide-react';
+import { DoorClosed, Edit2, FolderInput, Loader2, MoreHorizontal, Pin, PinOff, Smile, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { ActionMenu, Tooltip } from '@/shared/ui';
@@ -35,7 +35,10 @@ type SidebarSimpleListRowProps = {
   // One step in, under the folder this chat sits in: indented, and marked `data-nested`.
   isNested: boolean;
   onSelect: () => void;
-  onArchive: () => void;
+  // Close: the chat leaves the list but nothing is deleted; Closed lists it and Reopen brings it back.
+  onClose: () => void;
+  // Pin when the chat is not pinned, Unpin when it is.
+  onTogglePin: () => void;
   onDelete: () => void;
   onRename: (title: string) => void;
   onChooseIcon: () => void;
@@ -50,7 +53,7 @@ type SidebarSimpleListRowProps = {
   t: TFunction;
 };
 
-/** One row of SidebarSimpleList: its icon, title, project, a running spinner or unread dot, and Rename/Change icon/Archive/Delete behind one ActionMenu. */
+/** One row of SidebarSimpleList: its icon, title, project, a running spinner or unread dot, a pin mark when pinned, and Rename/Change icon/Pin/Close/Delete behind one ActionMenu. */
 export default function SidebarSimpleListRow({
   row,
   isSelected,
@@ -62,7 +65,8 @@ export default function SidebarSimpleListRow({
   projectNameHint,
   isNested,
   onSelect,
-  onArchive,
+  onClose,
+  onTogglePin,
   onDelete,
   onRename,
   onChooseIcon,
@@ -111,6 +115,8 @@ export default function SidebarSimpleListRow({
       data-dragging={isDragging ? 'true' : 'false'}
       // Present only on a chat with no live session host, so `[data-asleep]` finds exactly those.
       data-asleep={isAsleep ? 'true' : undefined}
+      // Present only on a pinned chat, so `[data-pinned]` finds exactly those.
+      data-pinned={row.pinned ? 'true' : undefined}
       data-drop-edge={dropEdge ?? undefined}
       // Present only on a row that sits inside a folder, so `[data-nested]` finds exactly those.
       data-nested={isNested ? 'true' : undefined}
@@ -246,6 +252,21 @@ export default function SidebarSimpleListRow({
         />
       )}
 
+      {/* A pinned chat's mark: it stays where the list draws pinned chats, and `data-pinned` finds exactly those rows. */}
+      {row.pinned && !isEditing && (
+        <Tooltip content={t('simpleList.pinned')} position="top">
+          <span
+            data-testid="simple-chat-pinned"
+            data-no-drag
+            role="img"
+            aria-label={t('simpleList.pinned')}
+            className="flex h-5 w-4 flex-shrink-0 items-center justify-center text-muted-foreground"
+          >
+            <Pin className="h-3 w-3" aria-hidden="true" />
+          </span>
+        </Tooltip>
+      )}
+
       {!isEditing && (
         <div data-testid="simple-chat-menu">
           <ActionMenu
@@ -269,8 +290,14 @@ export default function SidebarSimpleListRow({
                 icon: Smile,
                 onSelect: onChooseIcon,
               },
-              // Only when the list holds a folder to move into: the entry sits between Change icon
-              // and Archive, and the divider below stays with Archive.
+              {
+                key: 'simple-chat-pin',
+                label: row.pinned ? t('simpleList.unpin') : t('simpleList.pin'),
+                icon: row.pinned ? PinOff : Pin,
+                onSelect: onTogglePin,
+              },
+              // Only when the list holds a folder to move into: the entry sits between Pin
+              // and Close, and the divider below stays with Close.
               ...(onMoveToFolder === null
                 ? []
                 : [{
@@ -280,14 +307,14 @@ export default function SidebarSimpleListRow({
                   onSelect: onMoveToFolder,
                 }]),
               // Two entries where there was one "Remove", because they are two different
-              // outcomes: archive keeps the transcript and can be undone from the archive
-              // list, delete takes it off disk. Only the second is painted as danger.
+              // outcomes: close keeps the transcript and can be undone from the Closed
+              // list (Reopen), delete takes it off disk. Only the second is painted as danger.
               {
-                key: 'simple-chat-archive',
-                label: t('simpleList.archive', { defaultValue: 'Archive' }),
-                icon: EyeOff,
+                key: 'simple-chat-close',
+                label: t('simpleList.close', { defaultValue: 'Close' }),
+                icon: DoorClosed,
                 showDividerBefore: true,
-                onSelect: onArchive,
+                onSelect: onClose,
               },
               {
                 key: 'simple-chat-delete',

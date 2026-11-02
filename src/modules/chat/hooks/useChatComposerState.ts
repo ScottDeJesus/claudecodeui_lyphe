@@ -91,10 +91,16 @@ type CommandExecutionResult = {
   hasFileIncludes?: boolean;
 };
 
-
-
-
-
+type SubmitOptions = {
+  /**
+   * Send the text as a chat message even when it starts with "/" (or is
+   * "help"). Set only for the re-submit of a custom command's expanded body:
+   * like the Claude Code CLI, that body is never read as a command again, so a
+   * body that opens with its own or another command's name cannot loop or
+   * run that command instead of being sent.
+   */
+  skipCommandInterception?: boolean;
+};
 
 const createFakeSubmitEvent = () => {
   return { preventDefault: () => undefined } as unknown as FormEvent<HTMLFormElement>;
@@ -233,6 +239,7 @@ export function useChatComposerState({
     ((
       event: FormEvent<HTMLFormElement> | MouseEvent | TouchEvent | KeyboardEvent<HTMLTextAreaElement>,
       queuedSubmission?: QueuedDraft,
+      submitOptions?: SubmitOptions,
     ) => Promise<void>) | null
   >(null);
   const inputValueRef = useRef(input);
@@ -376,9 +383,10 @@ export function useChatComposerState({
     inputValueRef.current = commandContent;
 
     // Defer submit to next tick so the command text is reflected in UI before dispatching.
+    // The expanded body is the message itself: it skips slash-command interception.
     hostWindow.setTimeout(() => {
       if (handleSubmitRef.current) {
-        handleSubmitRef.current(createFakeSubmitEvent());
+        handleSubmitRef.current(createFakeSubmitEvent(), undefined, { skipCommandInterception: true });
       }
     }, 0);
   }, [addMessage, hostWindow]);
@@ -391,9 +399,17 @@ export function useChatComposerState({
 
       try {
         const effectiveInput = rawInput ?? input;
-        const commandMatch = effectiveInput.match(new RegExp(`${escapeRegExp(command.name)}\\s*(.*)`));
-        const args =
-          commandMatch && commandMatch[1] ? commandMatch[1].trim().split(/\s+/) : [];
+        // Everything typed after the command name is its argument text, line
+        // breaks included (`[\s\S]`, unlike `.`), trimmed as the Claude Code CLI
+        // does. `$ARGUMENTS` gets it verbatim; `$1`, `$2`, … get its tokens.
+        // The name must open the input and end at whitespace or the end: a pick
+        // from the slash menu passes the whole composer, where the name may
+        // appear later or inside a longer word ("see /echo2 …" has no arguments).
+        const commandMatch = effectiveInput
+          .trimStart()
+          .match(new RegExp(`^${escapeRegExp(command.name)}(?=\\s|$)([\\s\\S]*)`));
+        const rawArgs = commandMatch ? commandMatch[1].trim() : '';
+        const args = rawArgs ? rawArgs.split(/\s+/) : [];
 
         // The `/api/commands/execute` context sends `projectId` now instead of
         // a folder-derived project name; the path is still included verbatim.
@@ -410,6 +426,7 @@ export function useChatComposerState({
           commandName: command.name,
           commandPath: command.path,
           args,
+          rawArgs,
           context,
         });
 
@@ -718,6 +735,7 @@ export function useChatComposerState({
     async (
       event: FormEvent<HTMLFormElement> | MouseEvent | TouchEvent | KeyboardEvent<HTMLTextAreaElement>,
       queuedSubmission?: QueuedDraft,
+      submitOptions?: SubmitOptions,
     ) => {
       event.preventDefault();
       // The chat this send was pressed in; an upload awaited below can outlast a switch to another.
@@ -813,11 +831,13 @@ export function useChatComposerState({
       // Also accept exact "help" as a convenience alias for users who expect CLI-style help.
       const commandInput = currentInput.trimEnd();
       const isHelpAlias = commandInput.trim().toLowerCase() === 'help';
-      if (commandInput.startsWith('/') || isHelpAlias) {
-        const firstSpace = commandInput.indexOf(' ');
+      if (!submitOptions?.skipCommandInterception && (commandInput.startsWith('/') || isHelpAlias)) {
+        // The name ends at the first whitespace of any kind, so "/cmd" followed
+        // by a line break still runs /cmd (the Claude Code CLI splits the same way).
+        const firstWhitespace = commandInput.search(/\s/);
         const commandName = isHelpAlias
           ? '/help'
-          : firstSpace > 0 ? commandInput.slice(0, firstSpace) : commandInput;
+          : firstWhitespace > 0 ? commandInput.slice(0, firstWhitespace) : commandInput;
         const matchedCommand =
           slashCommands.find((cmd: SlashCommand) => cmd.name === commandName) ||
           (commandName === '/help'

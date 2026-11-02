@@ -35,7 +35,16 @@ import type { Facade } from './facade.js';
 /** The hosts this process holds, per chat (app session id). A chat is live while its set is non-empty. */
 const hostsByChat = new Map<string, Set<string>>();
 
-type HostLivenessListener = (sessionIds: string[]) => void;
+/**
+ * How a host ended, as its CLI reported it on the exit frame: the exit `code` and the `signal`, each null when the other
+ * is the answer. A CLI wound down by the end of its stdin (the idle closer, a retirement, `close()`) exits `code` 0 with no
+ * signal; a Stop, a `kill-session`, the tmux server going down and a socket lost with no exit frame all end with a signal
+ * (or no code). Nothing here judges which is a sleep — a listener reads the facts (`session-auto-close.service.ts`).
+ */
+export type HostEnd = { code: number | null; signal: NodeJS.Signals | null };
+
+/** What a liveness listener is told: the chats, which way it went (`live` or `asleep`), and — for `asleep` only — how the last host ended. */
+type HostLivenessListener = (sessionIds: string[], change: 'live' | 'asleep', end: HostEnd | null) => void;
 
 /** Called with the chats of every `live` or `asleep` change that is broadcast; never for the snapshot. */
 const livenessListeners = new Set<HostLivenessListener>();
@@ -45,7 +54,7 @@ const livenessListeners = new Set<HostLivenessListener>();
  * out, and not the snapshot a connecting socket is sent; returns the unsubscribe. A listener that throws is logged and
  * the rest still hear it.
  *
- * consumer: the companion module's station hint, through the providers barrel
+ * consumer: the companion module's station hint, and the providers module's sleep-time auto-close, through the providers barrel
  */
 export function onHostLivenessChanged(listener: HostLivenessListener): () => void {
   livenessListeners.add(listener);
@@ -54,11 +63,11 @@ export function onHostLivenessChanged(listener: HostLivenessListener): () => voi
   };
 }
 
-/** Puts one frame on every open gateway socket; a socket that throws costs only itself its frame. */
-function broadcastLiveness(event: SessionHostLivenessEvent): void {
+/** Puts one frame on every open gateway socket; a socket that throws costs only itself its frame. `end` is how the last host ended, for an `asleep` push. */
+function broadcastLiveness(event: SessionHostLivenessEvent & { change: 'live' | 'asleep' }, end: HostEnd | null = null): void {
   for (const listener of livenessListeners) {
     try {
-      listener([...event.sessionIds]);
+      listener([...event.sessionIds], event.change, end);
     } catch (error) {
       console.error(
         `[keepalive] a host-liveness listener failed: ${error instanceof Error ? error.message : String(error)}`
@@ -89,13 +98,13 @@ function hostBound(appSessionId: string, hostId: string): void {
   broadcastLiveness({ kind: 'session_host_liveness', change: 'live', sessionIds: [appSessionId], at: Date.now() });
 }
 
-function hostEnded(appSessionId: string, hostId: string): void {
+function hostEnded(appSessionId: string, hostId: string, end: HostEnd): void {
   const held = hostsByChat.get(appSessionId);
   if (!held || !held.delete(hostId) || held.size > 0) return;
   hostsByChat.delete(appSessionId);
   // D-10: a facade that settles while the API exits was detached, not ended; the successor snapshots.
   if (!isApiExiting()) {
-    broadcastLiveness({ kind: 'session_host_liveness', change: 'asleep', sessionIds: [appSessionId], at: Date.now() });
+    broadcastLiveness({ kind: 'session_host_liveness', change: 'asleep', sessionIds: [appSessionId], at: Date.now() }, end);
   }
 }
 
@@ -110,7 +119,7 @@ function hostEnded(appSessionId: string, hostId: string): void {
 export function trackHostLiveness(facade: Facade, appSessionId: string, hostId: string): void {
   if (facade.settled) return;
   hostBound(appSessionId, hostId);
-  facade.once('exit', () => hostEnded(appSessionId, hostId));
+  facade.once('exit', (code, signal) => hostEnded(appSessionId, hostId, { code, signal }));
 }
 
 /**

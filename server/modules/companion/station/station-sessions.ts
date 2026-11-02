@@ -4,7 +4,7 @@ import { activityLine, chatRows } from '../tools/house-reads.js';
 
 /**
  * His chats as the station's left rail draws them: the very rows her roster is made of, so what he sees is what she sees. The
- * chats are `chatRows()`'s (his app chats, not archived, not in a hidden root), in its order (waiting, then working, then live,
+ * chats are `chatRows()`'s (his app chats, not archived, not in a hidden root), in its order (pinned chats first; inside each group waiting, then working, then live,
  * then asleep, most recent first inside each state), and each carries `activityLine()`'s one line. The station adds no reading
  * of its own: a chat is never read here any other way, and a name, project or line is served as the house reads it, unescaped
  * (the roster's entity escaping guards a tag she reads, which a JSON field is not).
@@ -22,5 +22,6 @@ export function stationSessions(): StationSession[] {
     state,
     activity: activityLine(chat.sessionId, state),
     updatedAt: chat.updatedAt > 0 ? new Date(chat.updatedAt).toISOString() : null,
+    pinned: chat.pinned,
   }));
 }

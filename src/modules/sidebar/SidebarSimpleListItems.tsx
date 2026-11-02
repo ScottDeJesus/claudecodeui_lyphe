@@ -47,8 +47,10 @@ type SidebarSimpleListItemsProps = {
   dragProps: SimpleListDragProps;
   /** A chat row was pressed: open that chat. */
   onSelectChat: (chat: RecentConversationListItem) => void;
-  /** A chat row's Archive: put the chat away, keeping its transcript. */
-  onArchiveChat: (chat: RecentConversationListItem) => void;
+  /** A chat row's Close: put the chat away, keeping its transcript (the Closed filter lists it; Reopen brings it back). */
+  onCloseChat: (chat: RecentConversationListItem) => void;
+  /** A chat row's Pin or Unpin: a pinned chat is drawn first and is never closed when it falls asleep. */
+  onTogglePinChat: (chat: RecentConversationListItem) => void;
   /** A chat row's Delete: take the chat off disk. */
   onDeleteChat: (chat: RecentConversationListItem) => void;
   /** A chat row's "Change icon": open the icon picker on that chat. */
@@ -162,7 +164,8 @@ export default function SidebarSimpleListItems({
   dropTarget,
   dragProps,
   onSelectChat,
-  onArchiveChat,
+  onCloseChat,
+  onTogglePinChat,
   onDeleteChat,
   onChooseIcon,
   onRenameChat,
@@ -189,8 +192,10 @@ export default function SidebarSimpleListItems({
       isRemoveFailed={failedSessionId === chat.sessionId}
       // FILL: onSelectChat
       onSelect={() => onSelectChat(chat)}
-      // FILL: onArchiveChat
-      onArchive={() => onArchiveChat(chat)}
+      // FILL: onCloseChat
+      onClose={() => onCloseChat(chat)}
+      // FILL: onTogglePinChat
+      onTogglePin={() => onTogglePinChat(chat)}
       // FILL: onDeleteChat
       onDelete={() => onDeleteChat(chat)}
       // FILL: onRenameChat

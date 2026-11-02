@@ -14,6 +14,8 @@ type SessionSummary = {
   summary: string;
   messageCount: number;
   lastActivity: string;
+  /** He pinned the chat: the tree draws it first in its project and marks it. */
+  pinned: boolean;
 };
 
 type SessionRepositoryRow = {
@@ -22,6 +24,7 @@ type SessionRepositoryRow = {
   custom_name?: string | null;
   updated_at?: string | null;
   created_at?: string | null;
+  pinned?: number;
 };
 
 type ProjectListItemBase = {
@@ -133,6 +136,7 @@ function mapSessionRowToSummary(row: SessionRepositoryRow): SessionSummary {
     summary: row.custom_name || '',
     messageCount: 0,
     lastActivity: row.updated_at ?? row.created_at ?? new Date().toISOString(),
+    pinned: row.pinned === 1,
   };
 }
 

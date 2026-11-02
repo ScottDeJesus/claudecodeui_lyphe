@@ -43,6 +43,10 @@ export { diagnoseProjectFolder } from './list/claude/claude-project-folder.js';
 // edited message's resume point, which only the providers module can read.
 export { sessionsService } from './services/sessions.service.js';
 
+// sessionUserStateService: used by the companion module's `pin_session`, which pins a chat through the very write the sidebar's
+// Pin item makes (`PUT /sessions/:sessionId/pinned`), so a pin from her and one from his hand leave the same mark.
+export { sessionUserStateService } from './services/session-user-state.service.js';
+
 export { initializeSessionsWatcher } from './services/sessions-watcher.service.js';
 export { closeSessionsWatcher } from './services/sessions-watcher.service.js';
 
@@ -72,6 +76,10 @@ export { sessionHostLivenessSnapshot } from './list/claude/session-host/index.js
 // onHostLivenessChanged: used by the companion module's station hint, which hears a chat gain or lose its last live host
 // (the `live` and `asleep` pushes, never the snapshot) and tells the station a chat changed.
 export { onHostLivenessChanged } from './list/claude/session-host/index.js';
+
+// startSessionAutoClose: used by server/index.ts, which arms it once the boot's re-adoption has handed every surviving host back —
+// from then on a chat that falls asleep unpinned, not working and not waiting on him is closed.
+export { startSessionAutoClose } from './services/session-auto-close.service.js';
 
 // readClaudeTranscriptBySessionId: used by the dispatch-souls module to read a launched soul's own
 // Claude transcript from the session id its launch recorded. A soul has no app session row, so its

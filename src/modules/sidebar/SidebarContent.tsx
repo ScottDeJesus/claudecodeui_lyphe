@@ -2,7 +2,7 @@ import { type ReactNode } from 'react';
 import { Activity, Archive, Folder, MessageSquare, RotateCcw, Search, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
-import { Badge, LLMProviderLogo, ScrollArea } from '@/shared/ui';
+import { Badge, Chip, LLMProviderLogo, ScrollArea } from '@/shared/ui';
 import { getAllSessions } from '@/shared/sessionRecency';
 import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationSearchResults, Project, RecentConversationListItem, ReleaseInfo, SearchProgress, SidebarProjectListProps, SidebarSearchMode } from '@/shared/types';
 import { formatCompactAge } from '@/modules/sidebar/utils/sidebarProjectFormatting';
@@ -223,8 +223,23 @@ export default function SidebarContent({
         t={t}
       />
 
+      {/* The simple list has no search box and no mode chips (the header leaves them out), so the one other list
+          it needs has a pair of its own: its chats, and the Closed chats — the ones a close or the sleep-time
+          auto-close put away, each with a Reopen. Both read the same `searchMode` the chips of the project
+          tree do, so the Closed view below is the one view for both lists. */}
+      {simpleList !== null && (
+        <div className="flex flex-shrink-0 flex-wrap gap-1.5 px-3 pb-2" role="group" aria-label={t('simpleList.listFilter')}>
+          <Chip size="sm" selected={searchMode !== 'archived'} onClick={() => onSearchModeChange('projects')}>
+            {t('simpleList.chatsFilter')}
+          </Chip>
+          <Chip size="sm" selected={searchMode === 'archived'} onClick={() => onSearchModeChange('archived')}>
+            {t('search.modeClosed')}
+          </Chip>
+        </div>
+      )}
+
       <ScrollArea className="flex-1 overflow-y-auto overscroll-contain md:px-1.5 md:py-2">
-        {simpleList !== null ? (
+        {simpleList !== null && searchMode !== 'archived' ? (
           simpleList
         ) : showConversationSearch ? (
           isSearching && !conversationResults ? (
@@ -446,10 +461,10 @@ export default function SidebarContent({
                 </div>
                 <div>
                   <h3 className="text-xs font-medium text-foreground">
-                    {t('archived.loadingTitle', 'Loading archive...')}
+                    {t('archived.loadingTitle', 'Loading closed chats...')}
                   </h3>
                   <p className="text-[11px] text-muted-foreground">
-                    {t('archived.loadingDescription', 'Fetching hidden workspaces and sessions you can restore later.')}
+                    {t('archived.loadingDescription', 'Fetching closed chats and archived workspaces you can bring back.')}
                   </p>
                 </div>
               </div>
@@ -473,13 +488,13 @@ export default function SidebarContent({
                 </div>
                 <h3 className="text-sm font-medium text-foreground">
                   {archivedSessionsCount > 0
-                    ? t('archived.noMatchingSessions', 'No matching archived items')
-                    : t('archived.emptyTitle', 'No archived items')}
+                    ? t('archived.noMatchingSessions', 'No matching closed items')
+                    : t('archived.emptyTitle', 'Nothing closed')}
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
                   {archivedSessionsCount > 0
                     ? t('archived.tryDifferentSearch', 'Try a different search term.')
-                    : t('archived.emptyDescription', 'Archived workspaces and sessions will appear here when you hide them from the active list.')}
+                    : t('archived.emptyDescription', 'Closed chats and archived workspaces will appear here when you hide them from the active list.')}
                 </p>
               </div>
             </div>
@@ -492,10 +507,10 @@ export default function SidebarContent({
                   </span>
                   <div>
                     <h2 className="text-xs font-medium leading-none text-foreground">
-                      {t('archived.title', 'Archive')}
+                      {t('archived.title', 'Closed')}
                     </h2>
                     <p className="mt-1 text-[10px] leading-none text-muted-foreground">
-                      {t('archived.restoreHint', 'Restore items whenever you need them')}
+                      {t('archived.restoreHint', 'Reopen items whenever you need them')}
                     </p>
                   </div>
                 </div>
@@ -672,8 +687,8 @@ export default function SidebarContent({
                           <button
                             className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                             onClick={() => onRestoreArchivedSession(session.sessionId)}
-                            title={t('archived.restore', 'Restore session')}
-                            aria-label={`${t('archived.restore', 'Restore session')}: ${session.sessionTitle}`}
+                            title={t('archived.reopen', 'Reopen')}
+                            aria-label={`${t('archived.reopen', 'Reopen')}: ${session.sessionTitle}`}
                           >
                             <RotateCcw className="h-3.5 w-3.5" />
                           </button>

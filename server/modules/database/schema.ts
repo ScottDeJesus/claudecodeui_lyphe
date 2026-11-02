@@ -164,6 +164,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     -- The tool sets this chat has switched on, a JSON array of set names. NULL
     -- means it never switched one; [] means it switched one on and off again.
     toolsets TEXT,
+    -- 1 while the chat is pinned: it sorts first in every list and the sleep-time auto-close never
+    -- closes it. A person's choice (the sidebar's Pin, Kaylee's pin_session), never a derived fact.
+    pinned INTEGER NOT NULL DEFAULT 0,
     isArchived BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

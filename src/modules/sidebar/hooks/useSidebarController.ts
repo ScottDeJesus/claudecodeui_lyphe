@@ -3,6 +3,7 @@ import type { TFunction } from 'i18next';
 
 import { api } from '@/shared/api';
 import { getAllSessions } from '@/shared/sessionRecency';
+import { useWebSocket } from '@/shared/context/WebSocketContext';
 import { subscribeToUserPreferences } from '@/shared/userSettings';
 import { usePaletteOps } from '@/modules/command-palette';
 import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationProjectResult, ConversationSearchResults, LLMProvider, Project, ProjectSession, ProjectSortOrder, RecentConversationListItem, RunningSessionListItem, SearchProgress, ActiveSidebarRename, PendingSidebarDeletion, SessionTitleSearchResult, SessionWithProvider, SidebarSearchMode } from '@/shared/types';
@@ -343,6 +344,19 @@ export function useSidebarController({
     // and background synchronizer updates are reflected without a full reload.
     void fetchArchivedSessions();
   }, [fetchArchivedSessions, searchMode]);
+
+  // While the Closed list is the one on screen, a chat closed or reopened elsewhere (another tab, the
+  // sleep-time auto-close, Kaylee) lands in it at once instead of on the next time the tab is opened.
+  const { subscribe: subscribeToServerEvents } = useWebSocket();
+  useEffect(() => {
+    if (searchMode !== 'archived') {
+      return undefined;
+    }
+
+    return subscribeToServerEvents((event) => {
+      if (event?.kind === 'session_archive_changed') void fetchArchivedSessions();
+    });
+  }, [fetchArchivedSessions, searchMode, subscribeToServerEvents]);
 
   useEffect(() => {
     reconcileProjectStarOverrides(projects);
@@ -965,7 +979,7 @@ export function useSidebarController({
           status: response.status,
           error: errorText,
         });
-        alert(t('messages.restoreSessionFailed', 'Failed to restore session. Please try again.'));
+        alert(t('messages.reopenSessionFailed', 'Failed to reopen session. Please try again.'));
         return;
       }
 
@@ -975,7 +989,7 @@ export function useSidebarController({
       ]);
     } catch (error) {
       console.error('[Sidebar] Error restoring session:', error);
-      alert(t('messages.restoreSessionError', 'Error restoring session. Please try again.'));
+      alert(t('messages.reopenSessionError', 'Error reopening session. Please try again.'));
     }
   }, [fetchArchivedSessions, onRefresh, t]);
 

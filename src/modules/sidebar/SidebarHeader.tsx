@@ -77,7 +77,7 @@ function SearchModeChips({
         {runningLabel}
       </Chip>
       <Chip size="sm" selected={searchMode === 'archived'} onClick={() => onSearchModeChange('archived')}>
-        {t('search.modeArchived')}
+        {t('search.modeClosed')}
       </Chip>
     </div>
   );
@@ -109,7 +109,7 @@ export default function SidebarHeader({
   const searchPlaceholder = searchMode === 'conversations'
     ? t('search.conversationsPlaceholder')
     : searchMode === 'archived'
-      ? t('search.archivedPlaceholder')
+      ? t('search.closedPlaceholder')
       : searchMode === 'running'
         ? t('search.runningPlaceholder')
         : t('projects.searchPlaceholder');

@@ -176,7 +176,7 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
   async function sendToChat(chat: CompanionSessionRef, draft: CompanionDraft, words: string, mode: 'turn' | 'steer', model: ClaudeModelAlias | undefined): Promise<DraftSendOutcome> {
     const row = sessionsDb.getSessionById(chat.sessionId);
     if (!row || row.isArchived) {
-      return refused(`"${chat.name}" is no longer a chat he has (it was archived or deleted), so nothing was sent. Tell him, and ask which chat the brief is for.`);
+      return refused(`"${chat.name}" is no longer a chat he has (it was closed or deleted), so nothing was sent. Tell him, and ask which chat the brief is for.`);
     }
     const provider = row.provider as LLMProvider;
     const name = row.custom_name?.trim() || chat.name;

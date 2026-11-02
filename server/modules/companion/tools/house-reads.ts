@@ -35,14 +35,17 @@ export type { ChatState } from './chat-activity.js';
 
 //----------------- HIS CHATS ------------
 
-/** One of his chats: its name (`custom_name`), its project's display name and path, and its last update in epoch ms (0 when unreadable). Consumed by `session-tools.ts`. */
-export type HisChat = { sessionId: string; name: string; project: string; projectPath: string; updatedAt: number };
+/** One of his chats: its name (`custom_name`), its project's display name and path, its last update in epoch ms (0 when unreadable), and whether he pinned it. Consumed by `session-tools.ts`. */
+export type HisChat = { sessionId: string; name: string; project: string; projectPath: string; updatedAt: number; pinned: boolean };
 
 /** A chat with its state at the moment of the read. Consumed by `session-tools.ts`'s `list_sessions`. */
 export type ChatRow = { chat: HisChat; state: ChatState };
 
 /** The name a chat shows when it has none, as the sidebar does. Consumed by `chatNameOf` here and by `eyes/alert-reads.ts`, which tells a chat's own name from this fallback. */
 export const UNTITLED_CHAT = 'Untitled Session';
+
+/** ` · pinned` for a chat he pinned, nothing for the rest: the mark a roster line and a `list_sessions` line carry after the project. Consumed by `session-tools.ts` and the roster below. */
+export const pinMark = (chat: HisChat): string => (chat.pinned ? ' · pinned' : '');
 
 const refOf = (chat: HisChat): CompanionSessionRef => ({ sessionId: chat.sessionId, name: chat.name, project: chat.project });
 
@@ -58,7 +61,7 @@ function storedTimeMs(value: string | null | undefined): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-type ChatSqlRow = { session_id: string; custom_name: string | null; project_path: string | null; custom_project_name: string | null; updated_at: string | null };
+type ChatSqlRow = { session_id: string; custom_name: string | null; project_path: string | null; custom_project_name: string | null; updated_at: string | null; pinned: number };
 
 /**
  * The non-archived app chats of projects in a visible root (`'visible'`, his chats) or in a hidden one
@@ -70,7 +73,7 @@ function chatsInRoots(scope: 'visible' | 'hidden'): HisChat[] {
   const rows = getConnection()
     .prepare(
       `SELECT sessions.session_id, sessions.custom_name, sessions.project_path, projects.custom_project_name,
-              COALESCE(sessions.updated_at, sessions.created_at) AS updated_at
+              sessions.pinned, COALESCE(sessions.updated_at, sessions.created_at) AS updated_at
        FROM sessions
        LEFT JOIN projects ON projects.project_path = sessions.project_path
        WHERE sessions.isArchived = 0
@@ -86,6 +89,7 @@ function chatsInRoots(scope: 'visible' | 'hidden'): HisChat[] {
     project: projectDisplayName(row.project_path ?? '', row.custom_project_name),
     projectPath: row.project_path ?? '',
     updatedAt: storedTimeMs(row.updated_at),
+    pinned: row.pinned === 1,
   }));
 }
 
@@ -104,8 +108,8 @@ export function chatNameOf(sessionId: string): string {
 }
 
 /**
- * Every chat of his with its state, ONE liveness read for all: waiting first, then working, then live, then
- * asleep, each most recent first. Consumed by `session-tools.ts`'s `list_sessions`, the roster below, `station/station-sessions.ts`
+ * Every chat of his with its state, ONE liveness read for all: the pinned chats first, and inside each group waiting first,
+ * then working, then live, then asleep, each most recent first. Consumed by `session-tools.ts`'s `list_sessions`, the roster below, `station/station-sessions.ts`
  * (the rows of the station's left rail, in this order) and `station/need-readers.ts` (the waiting asks, the rail's "What needs you":
  * what the left rail draws and nothing a hidden root holds).
  */
@@ -113,7 +117,9 @@ export function chatRows(): ChatRow[] {
   const chats = listHisChats();
   const states = chatStates(chats.map((chat) => chat.sessionId));
   const rank: Record<ChatState, number> = { waiting: 0, working: 1, live: 2, asleep: 3 };
-  return chats.map((chat, index) => ({ chat, state: states[index] })).sort((a, b) => rank[a.state] - rank[b.state]); // stable: recency survives inside a state
+  return chats
+    .map((chat, index) => ({ chat, state: states[index] }))
+    .sort((a, b) => Number(b.chat.pinned) - Number(a.chat.pinned) || rank[a.state] - rank[b.state]); // stable: recency survives inside a pin and a state
 }
 
 //----------------- RESOLVING A NAME ------------
@@ -215,8 +221,9 @@ const ROSTER_ASLEEP_NAMES = 12;
 
 /**
  * The body of `<sessions>`, computed at the moment a message is pushed to her: one line per working, waiting or
- * live chat ("Bugfixes · claudecodeui_lyphe · working: Bash npm run build · id …", twenty at most, waiting
- * first), then "Asleep, still sendable: " with the twelve most recent asleep names. A count says so when
+ * live chat ("Bugfixes · claudecodeui_lyphe · pinned · working: Bash npm run build · id …", twenty at most, the pinned
+ * chats first and waiting first inside each group; a chat he did not pin carries no `pinned` word), then "Asleep, still
+ * sendable: " with the twelve most recent asleep names, `(pinned)` after the ones he pinned. A count says so when
  * either list was cut, so she never takes a partial list for the whole. Every name, project and activity line is
  * escaped (`inRosterBody`). The read runs on the push path, so a failing read (an approvals gateway, the database)
  * is logged and answers one sentence instead of throwing into the message he typed.
@@ -236,12 +243,12 @@ function buildRoster(): string {
   const active = rows.filter((row) => row.state !== 'asleep');
   const asleep = rows.filter((row) => row.state === 'asleep');
   const lines = active.slice(0, ROSTER_ACTIVE_MAX).map(
-    ({ chat, state }) => `${inRosterBody(`${chat.name} · ${chat.project} · ${state}: ${activityLine(chat.sessionId, state)}`)} · id ${chat.sessionId}`
+    ({ chat, state }) => `${inRosterBody(`${chat.name} · ${chat.project}${pinMark(chat)} · ${state}: ${activityLine(chat.sessionId, state)}`)} · id ${chat.sessionId}`
   );
   if (lines.length === 0) lines.push('None of his chats is working, waiting or live.');
   if (active.length > ROSTER_ACTIVE_MAX) lines.push(`…and ${active.length - ROSTER_ACTIVE_MAX} more active; list_sessions with scope active names them.`);
   if (asleep.length > 0) {
-    const names = asleep.slice(0, ROSTER_ASLEEP_NAMES).map((row) => inRosterBody(row.chat.name)).join(', ');
+    const names = asleep.slice(0, ROSTER_ASLEEP_NAMES).map((row) => inRosterBody(`${row.chat.name}${row.chat.pinned ? ' (pinned)' : ''}`)).join(', ');
     lines.push(`Asleep, still sendable: ${names}${asleep.length > ROSTER_ASLEEP_NAMES ? `, and ${asleep.length - ROSTER_ASLEEP_NAMES} more` : ''}`);
   }
   return lines.join('\n');

@@ -2451,7 +2451,7 @@ slices with that same helper. Either way the caller cannot tell which path serve
 | Eligible providers | Claude and Codex only — they parse `session.jsonl_path` itself. Cursor (`store.db`) and OpenCode (shared SQLite) pass `transcriptPath: null` and bypass the cache, because the JSONL's stat says nothing about their history. |
 | Budget | `MAX_CACHED_TRANSCRIPT_FILE_BYTES = 256 MB` of source-file bytes and `MAX_CACHE_ENTRIES = 8`, LRU by re-insertion. The newest entry is never evicted. |
 | Concurrency | `pendingLoads` — concurrent requests for one session share a single parse. |
-| Invalidation | None, by design. Anything that changes history (a turn, an edit, a rewind, a fork) touches the file, so the next `stat` misses. |
+| Invalidation | `invalidate(sessionId)` drops one entry. One caller: `claude-runtime.provider.js`, when a turn's `result` first states the session's context window or changes it (MAN-9468). `why:` the file cannot say the cached `tokenUsage.total` was measured against the fallback window. Anything else that changes history (a turn, an edit, a rewind, a fork) touches the file, so the next `stat` misses. |
 
 `sessions.service.test.ts` → *"history pages are sliced from the cached full transcript and see
 appended rows"* is the test that pins this: page, append a row, re-read, and the newest page
@@ -2663,9 +2663,11 @@ section: 04-message-store-and-lazy-loading/016 Gotchas and why the code looks li
 - **Hidden tabs never fetch.** `canRequest` returns false, the coordinator marks the session
   dirty, and activation flushes exactly one request (`6e8d4087`). An initial page load
   supersedes a pending refresh for an unhydrated slot via `discardPending`.
-- **The history cache has no invalidation API on purpose.** Every mutation path already
-  touches the transcript file, so the `stat` comparison covers all of them; an explicit hook
-  would be one more thing to forget to call.
+- **The history cache has one invalidation call, for the context window.** Every mutation path
+  already touches the transcript file, so the `stat` comparison covers all of them. The one fact
+  the file cannot carry is the window the SDK reported (`tokenUsage.total`):
+  `claude-runtime.provider.js` calls `sessionHistoryCache.invalidate` when a turn's `result`
+  first states it or changes it (MAN-9468). Any other hook would be one more thing to forget to call.
 - **The store keys sessions directly, with no alias table.** The app session id is allocated by
   `POST /api/providers/sessions` before the first send — see
   [conversation handoff](MANUAL.md) — so nothing downstream re-keys a slot.

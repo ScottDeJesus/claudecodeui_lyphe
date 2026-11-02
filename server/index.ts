@@ -19,6 +19,7 @@ import {
     providerRuntimeService,
     readoptKeepaliveSessions,
     releaseKeepaliveOwnership,
+    startSessionAutoClose,
     whenNodeSessionsReadopted,
 } from '@/modules/providers/index.js';
 import { createWebSocketServer, startRunStallWatchdog } from '@/modules/websocket/index.js';
@@ -693,6 +694,9 @@ async function soleServerDuties() {
         console.log(`[keepalive] re-adopted ${keepalive.readopted} host(s), swept ${keepalive.swept} dead host file(s)`);
     } catch (error) { console.error('[keepalive] re-adopt failed (continuing):', getErrorMessage(error)); }
     markRunsReadopted();
+    // A chat that falls asleep unpinned is closed from here on. Armed after the re-adoption above and never
+    // before it: a host the boot retires or re-binds is a reconcile, and the listener hears sleeps only.
+    startSessionAutoClose();
     // Sends anything that came due while the server was not running, then keeps polling.
     initializeScheduledMessageDispatcher(chatRuntime);
     // Start server-side plugin processes for enabled plugins

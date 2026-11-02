@@ -3,7 +3,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 
 import { projectsDb, sessionCompactionsDb, sessionsDb } from '@/modules/database/index.js';
-import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
+import { broadcastSessionArchiveChanged, broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
 import { markRelayedSends } from '@/modules/providers/services/session-relayed-sends.js';
@@ -47,6 +47,8 @@ type RecentSessionListItem = Pick<
   icon: string | null;
   /** Its last run finished while the chat was not on screen, and it has not been on screen since. */
   unread: boolean;
+  /** He pinned the chat: it is drawn first and the sleep-time auto-close leaves it open. */
+  pinned: boolean;
 };
 
 type RecentSessionsPage = {
@@ -269,6 +271,7 @@ export const sessionsService = {
         lastActivity: session.updated_at ?? session.created_at ?? null,
         icon: session.icon ?? null,
         unread: Boolean(session.unread),
+        pinned: Boolean(session.pinned),
       };
     });
 
@@ -719,7 +722,8 @@ export const sessionsService = {
    * Archives or permanently deletes one persisted session row by id.
    *
    * Soft-delete mirrors the project behavior by toggling `isArchived` so the
-   * row disappears from active lists but remains restorable. Force-delete
+   * row disappears from active lists but remains restorable. It is the chat
+   * list's "Close", and every open sidebar hears it (`session_archive_changed`). Force-delete
    * optionally removes the transcript file before deleting the database row.
    */
   async deleteOrArchiveSessionById(
@@ -739,6 +743,7 @@ export const sessionsService = {
 
     if (!options.force) {
       sessionsDb.updateSessionIsArchived(sessionId, true);
+      broadcastSessionArchiveChanged([sessionId], true);
       return {
         sessionId,
         action: 'archived',
@@ -779,7 +784,9 @@ export const sessionsService = {
   },
 
   /**
-   * Restores one archived session back into the active sidebar lists.
+   * Restores one archived session back into the active sidebar lists — the chat list's "Reopen".
+   * Both frames go out: `session_archive_changed` re-reads the simple list, and `session_upserted`
+   * (sent once the row is no longer archived) puts the chat back in every open project tree.
    */
   restoreSessionById(sessionId: string): { sessionId: string; isArchived: false } {
     const session = sessionsDb.getSessionById(sessionId);
@@ -791,6 +798,13 @@ export const sessionsService = {
     }
 
     sessionsDb.updateSessionIsArchived(sessionId, false);
+    broadcastSessionArchiveChanged([sessionId], false);
+    void broadcastSessionUpserted(sessionId).catch((error) => {
+      console.error('[Sessions] a reopened chat could not be announced to the project trees', {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
     return { sessionId, isArchived: false };
   },
 
