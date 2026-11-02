@@ -24,6 +24,8 @@ import type { CompanionCli, CompanionContextReading } from './companion-process.
  * journal say so, and the waiting words are delivered. The handover is stored before the conversation is forgotten, as the refusal does
  * (`companion-refusal.ts`): a crash between the two leaves it held, and the next session reads it again and closes it. THE WALL: a turn answered
  * "Prompt is too long" means the CLI's own limit was reached and a last turn would be refused too: `full` writes the house's handover and ends it at once.
+ * Unless the refused message was all that conversation held (a fresh launch's first): then the message is too long, not the conversation, and a handover
+ * would reach the next launch with the same words, refused again, one summarizer call per round; `full` ends it with no handover and the words are not kept.
  *
  * `arm` and `afterTurn` are reached by a normal turn and never throw or reject: a fault of the closing is a journal line. Nothing polls.
  */
@@ -247,12 +249,16 @@ export function createClosing(userId: number, hooks: ClosingHooks) {
     );
   }
 
-  /** The wall's refusal handled: the house's handover, the conversation ended, then what waited. */
-  async function concludeFull(mine: Attempt): Promise<void> {
-    const kept = store(await houseHandover(mine));
+  /** The wall's refusal handled: the house's handover, the conversation ended, then what waited. `tooLongAlone`: the refused message was all the conversation held, so it is the message that is too long; no handover is written and it is not sent again. */
+  async function concludeFull(mine: Attempt, tooLongAlone: boolean): Promise<void> {
+    const kept = tooLongAlone ? null : store(await houseHandover(mine));
     if (attempt !== mine) return;
-    startFresh(mine, kept === null ? CLOSING_LINES.fullNeither : CLOSING_LINES.fullHandedOver);
-    journal(`conversation ${mine.conversation ?? 'unknown'} reached her CLI's limit (Prompt is too long); the house wrote ${sizeOf(kept)}; she starts fresh`);
+    startFresh(mine, tooLongAlone ? CLOSING_LINES.fullAlone : kept === null ? CLOSING_LINES.fullNeither : CLOSING_LINES.fullHandedOver);
+    journal(
+      tooLongAlone
+        ? `conversation ${mine.conversation ?? 'unknown'} refused its first message (Prompt is too long) with nothing else in it, so that message is too long by itself; no handover was written and it was not sent again; she starts fresh`
+        : `conversation ${mine.conversation ?? 'unknown'} reached her CLI's limit (Prompt is too long); the house wrote ${sizeOf(kept)}; she starts fresh`
+    );
     release();
   }
 
@@ -286,12 +292,12 @@ export function createClosing(userId: number, hooks: ClosingHooks) {
     lastTurnEnded(outcome: LastTurnEnd): void {
       if (attempt?.lastTurn === true) endLastTurn(attempt, outcome);
     },
-    /** A turn answered "Prompt is too long": the house's handover, the fresh start; his words of that turn are carried by the caller's parks. */
-    full(launch: ClosingLaunch): void {
+    /** A turn answered "Prompt is too long": the house's handover, the fresh start; his words of that turn are carried by the caller's parks. `tooLongAlone` (the launch held nothing but the refused message): no handover, the fresh start alone. */
+    full(launch: ClosingLaunch, tooLongAlone: boolean): void {
       if (attempt !== null) return;
       const mine = newAttempt(launch, false, 0);
       attempt = mine;
-      spawn("the wall's refusal", () => concludeFull(mine), mine);
+      spawn("the wall's refusal", () => concludeFull(mine, tooLongAlone), mine);
     },
     /** Clear or a close: the closing stops, nothing is stored, nothing parked runs; his parked words stay in the ledger. True when one was under way. */
     abandon(): boolean {

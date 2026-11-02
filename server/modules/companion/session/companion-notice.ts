@@ -121,9 +121,9 @@ export function tidyNote(text: string | null): string | null {
 }
 
 /**
- * The panel's six lines of her closing, word for word, one per way it can go: it begins; it ends on her note; on the house's handover
- * (she could not finish her note); on neither; and the two ways the wall's own refusal ("Prompt is too long") ends, on the house's
- * handover or on neither. The journal's lines are built from the numbers of the moment and are `companion-closing.ts`'s own. Consumed by
+ * The panel's seven lines of her closing, word for word, one per way it can go: it begins; it ends on her note; on the house's handover
+ * (she could not finish her note); on neither; and the three ways the wall's own refusal ("Prompt is too long") ends, on the house's
+ * handover, on neither, or on a first message too long by itself (`fullAlone`: nothing was written and the message was not sent). The journal's lines are built from the numbers of the moment and are `companion-closing.ts`'s own. Consumed by
  * `companion-closing.ts`, which gives each to the panel through its `say`.
  */
 export const CLOSING_LINES = {
@@ -133,4 +133,5 @@ export const CLOSING_LINES = {
   neither: 'She could not finish her note and the handover could not be written, so she starts fresh; she keeps her memory.',
   fullHandedOver: 'Her conversation was full, so she starts fresh from a handover of what you were discussing; she keeps her memory.',
   fullNeither: 'Her conversation was full and the handover could not be written, so she starts fresh; she keeps her memory.',
+  fullAlone: 'That message was too long for her to read, so it was not sent; she starts fresh; she keeps her memory.',
 } as const satisfies Record<string, string>;

@@ -12,7 +12,18 @@ const MAX_ATTACHMENT_SIZE = MAX_ATTACHMENT_MEGABYTES * 1024 * 1024;
 /** One intake's files, sorted by what became of them. `tooBig` and `tooMany` are the ones left out, before any room is counted. */
 type Offer = { accepted: File[]; tooBig: File[]; tooMany: File[] };
 
-const nameOf = (file: File) => file.name || 'Unknown file';
+/**
+ * A file that arrives with no name (a paste can hand one over) is given one, the way a browser names its own pasted picture: `image.png`. The
+ * name is what the chip draws, what the refusal sentence lists and what the upload sends; a multipart part with an empty filename is read by the
+ * server as a form field, not a file, so a nameless file would draw an empty chip and every send would answer "No files provided". The copy shares
+ * the original's bytes.
+ */
+const withName = (file: File): File => {
+  if (file.name) return file;
+  const kind = file.type.startsWith('image/') ? 'image' : 'file';
+  const extension = file.type.split('/')[1]?.split(/[+;]/)[0] || 'bin';
+  return new File([file], `${kind}.${extension}`, { type: file.type, lastModified: file.lastModified });
+};
 
 // A file's name is never handed to i18next as a value: it replaces the first textual `{{x}}` it finds, so a file named
 // `{{megabytes}}.bin` would be rewritten and the template's own placeholder left raw. The template is given a slot instead,
@@ -47,7 +58,7 @@ export function useAttachmentIntake(setAttachedFiles: Dispatch<SetStateAction<Fi
   const clearRefused = useCallback(() => setRefused(null), []);
 
   const nameList = useCallback((files: File[]) => {
-    const names = files.map(nameOf);
+    const names = files.map((file) => file.name);
     return names.length === 2
       ? fillSlots(t('input.refused.pair', { first: slot(0), second: slot(1), defaultValue: '{{first}} and {{second}}' }), names)
       : names.join(', ');
@@ -81,8 +92,10 @@ export function useAttachmentIntake(setAttachedFiles: Dispatch<SetStateAction<Fi
     return sentences.length > 0 ? sentences.join(' ') : null;
   }, [nameList, t]);
 
-  const takeOffer = useCallback((offer: Offer) => {
-    if (offer.accepted.length + offer.tooBig.length + offer.tooMany.length === 0) return;
+  const takeOffer = useCallback((unnamed: Offer) => {
+    if (unnamed.accepted.length + unnamed.tooBig.length + unnamed.tooMany.length === 0) return;
+    // Every intake, whatever its source, is named here, once: the files that wait, the files refused and the sentence that lists them all read one name.
+    const offer: Offer = { accepted: unnamed.accepted.map(withName), tooBig: unnamed.tooBig.map(withName), tooMany: unnamed.tooMany.map(withName) };
 
     // How many files already wait is known only to the updater, which sees the list as it is when the add is applied (a
     // removal made a moment ago included); this hook is handed the setter alone. The updater hands the files that did not

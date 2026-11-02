@@ -5995,6 +5995,12 @@ Every statement names its account in `WHERE`/`VALUES`: an id of another account 
 - `record(sessionId, via, text, messageUuid = null)`: stores `text.trim()`, `sent_at` = now (ISO, ms), `message_uuid`; answers the row. `via` is the companion's send mode (`turn` \| `steer`). `message_uuid` is the transcript uuid of the user row the send became: a Claude turn's, NULL for a steer, a turn into another provider's chat and every row recorded before the column (MAN-9084). Nothing updates or deletes a row.
 - `listForSession(sessionId)`: oldest first.
 - Reader: the history mark (MAN-9084). Writer: `companion-send.ts` (MAN-9072).
+- Reader outside the repo: `scripts/heal_friction_who.py` (step 3b, INV-10014) runs `SELECT message_uuid FROM relayed_sends WHERE message_uuid IS NOT NULL` to name a transcript row Kaylee's brief, not the operator's turn.
+
+| change | effect on the reading |
+|---|---|
+| a turn goes out without its `message_uuid` recorded | her briefs file as `operator-correction` rows again, silently |
+| the column renamed or the table moved | registry unreadable: every chat turn answers `UNKNOWN`, his own included, and `census["holds"]` holds the tail until the table is readable |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-store.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/companion-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion-actions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/relayed-sends.db.ts
 
@@ -15060,6 +15066,7 @@ How a composer takes, shows and uploads files. The callers: the chat's `useChatC
   - "Not attached: 11 files at once; at most 10 go with one message.";
   - "Not attached: c.png; 10 files are already waiting.";
   - an intake that hit more than one kind says each, in that order, in one line.
+- Every intake is named once, at `takeOffer`, before anything reads a name: a file that arrives with an empty `name` (a paste can hand one over) is replaced by a same-bytes copy named `image.<subtype>` for a picture, `file.<subtype>` for anything else (`bin` with no subtype), so the chip, the refusal sentence and the upload all read one name. An empty filename in a multipart body is read by the server as a form field, not a file: a nameless file would draw an empty chip and every send would answer "No files provided". `withName` is the one place a name is invented; there is no other fallback.
 - A file's name is never an i18next value (i18next rewrites the first `{{x}}` it finds, so a file named `{{megabytes}}.bin` would come out as `10.bin`): the template gets a slot, and the name is filled in afterwards in one pass.
 
 ## uploadAttachmentFiles
@@ -15098,7 +15105,7 @@ How a composer takes, shows and uploads files. The callers: the chat's `useChatC
 ## Probe — `.verify/chat-attachment-refusal.mjs`
 
 - Run: `node .verify/chat-attachment-refusal.mjs [--evidence <dir>]`. Needs the live dev app on `:5183` and the dev API on `:3011`; sends nothing.
-- Drives the live chat composer on a scratch chat (made over the API, no turn sent, deleted after; a second to switch to), the fixtures written into the run's own `mkdtemp`: `big.bin` (12 MB of zeros) given to the hidden input, two files over 10 MB, eleven files by the input and again dropped (the overlay up first), nine files then two more, `big.bin` with ten waiting (both kinds in one line), a chip removed then one file given, a pasted 12 MB PNG, a switch to the other chat and back. Each step's warn line and chips are read; the box is photographed.
+- Drives the live chat composer on a scratch chat (made over the API, no turn sent, deleted after; a second to switch to), the fixtures written into the run's own `mkdtemp`: `big.bin` (12 MB of zeros) given to the hidden input, two files over 10 MB, eleven files by the input and again dropped (the overlay up first), nine files then two more, `big.bin` with ten waiting (both kinds in one line), a chip removed then one file given, a pasted 12 MB PNG, a switch to the other chat and back, then a pasted picture with an empty name (refused by the name `image.png` with ten waiting; a chip `image.png` with a chip removed). Each step's warn line and chips are read; the box is photographed.
 - Requires the line to be `role="alert"`, `data-tone="warn"`, led by ▲. The only console errors it allows are the app's own 404 on `/api/providers/sessions/<id>/token-usage` for a chat nothing was sent in.
 - Photographs and `shots.json`: `.verify/shots/chat-attachment-refusal/`.
 
@@ -16367,7 +16374,7 @@ why: her CLI's own compaction is off, so near full she gets one last turn of her
 | `closingPoint(reading)` | `COMPANION_CLOSING_AT_TOKENS` when set, else `wallOf(reading) - CLOSING_ROOM_TOKENS`: 380,000 at her window, 350,000 on a CLI that still compacts (reserve 33,000) |
 | `noticeText({ operatorName, name })` | the notice, whole: `<compaction>` tag round the text; `operatorName` fills `{he}` through `escapeText` (`companion-envelopes.ts`), blank = `the operator`; `name` is taken for the call's shape and fills nothing |
 | `tidyNote(text)` | trim; under `NOTE_MIN_CHARS` or `null` → `null`; else `cutAtSentence(note, NOTE_MAX_CHARS - 1)` (`companion-handover.ts`). The `- 1` keeps the cap: the word cut adds `…` and can return `limit + 1`. Not idempotent at its edge |
-| `CLOSING_LINES` | the panel's six lines: `begins`, `noted`, `handedOver`, `neither`, `fullHandedOver`, `fullNeither` (the last two: the wall's "Prompt is too long"). The journal's lines are not here |
+| `CLOSING_LINES` | the panel's seven lines: `begins`, `noted`, `handedOver`, `neither`, `fullHandedOver`, `fullNeither`, `fullAlone` (the last three: the wall's "Prompt is too long"). The journal's lines are not here |
 - Type `CompanionContextReading` (`companion-process.ts`): `{ total, window, reserve, cliCompacts }`.
 
 ## The notice, whole (`noticeText`; `{he}` is `operatorName` as set, escaped, blank = `the operator`)
@@ -16399,6 +16406,7 @@ Only recall and remember are open in this turn.
 | `neither` | no note and no handover | She could not finish her note and the handover could not be written, so she starts fresh; she keeps her memory. |
 | `fullHandedOver` | the CLI's refusal: the house's handover is stored | Her conversation was full, so she starts fresh from a handover of what you were discussing; she keeps her memory. |
 | `fullNeither` | the CLI's refusal: no handover could be written | Her conversation was full and the handover could not be written, so she starts fresh; she keeps her memory. |
+| `fullAlone` | the CLI's refusal of a fresh launch's first message (the message is too long by itself; no handover was written and it was not sent) | That message was too long for her to read, so it was not sent; she starts fresh; she keeps her memory. |
 
 ## `COMPANION_CLOSING_AT_TOKENS` (a probe's seam)
 - Read at the call, never cached.
@@ -16446,7 +16454,7 @@ why: her CLI's compaction is off, so near full she closes herself: this file rea
 | `park(action)` | runs `action` once she has started fresh, after every action parked before it; with no closing under way, at once |
 | `isLastTurnResult(answered)` | the result lists the notice's uuid while a last turn stands |
 | `lastTurnEnded(outcome)` | `{ answered: true, text }` or `{ answered: false, why: 'failed' \| 'timed out' }`; the first call per last turn counts, later ones (the aborted result after the bound) are ignored |
-| `full(launch)` | the wall's refusal: no-op while a closing stands; else the house's handover and the fresh start, no notice |
+| `full(launch, tooLongAlone)` | the wall's refusal: no-op while a closing stands; else the house's handover and the fresh start, no notice. `tooLongAlone` (the launch is fresh and had taken no message, so the refused message was all its conversation held): no handover is written, no verb is asked, the fresh start alone |
 | `abandon()` | Clear or a close: timer cleared, summarizer aborted, nothing stored, `parked` dropped (his words stay in the ledger); true when a closing was under way |
 
 ## Hooks (`ClosingHooks`: closures the session builds)
@@ -16471,7 +16479,7 @@ section: server/modules/companion/session — her own compaction's machine: the 
 4. `conclude`: `tidyNote(text)`; a read and, when there is no note, the house's handover run together. An abandoned closing returns here.
 5. `store(note ?? house)`; a note finished but not stored (the write threw) sends for the house's handover and stores that instead; `startFresh`: `endConversation`, then the panel line: `noted` (her note stored), `handedOver` (the house's), `neither` (nothing stored). A throw in either is a journal line, never a stop.
 6. Journal the ends line; `release()`: `attempt = null` first, then each parked action runs in order.
-- The wall: `full` → `concludeFull`: house handover, stored, `startFresh` with `fullHandedOver` / `fullNeither`, journal, `release()`.
+- The wall: `full` → `concludeFull`: house handover, stored, `startFresh` with `fullHandedOver` / `fullNeither`, journal, `release()`. With `tooLongAlone` the house's handover is skipped: `startFresh` with `fullAlone`, the journal line below, `release()`.
 - Any fault of the closing's own work releases the hold (`spawn(..., holds)`): no push waits for ever. A fault is `console.error` `[Companion] account <id>: her closing failed (<label>)` or `her closing could not <what>`.
 
 ## Bound `COMPANION_CLOSING_WAIT_MS` (a probe's seam)
@@ -16487,6 +16495,7 @@ section: server/modules/companion/session — her own compaction's machine: the 
 | `begin` | `conversation <id\|unknown> is at <total> tokens (she closes at <point>); her last turn begins` |
 | `conclude` | `her last turn ended <answered\|failed\|timed out> after <s> s at <total\|?> tokens (<cost\|?> of it); her note: <N characters\|none (<why>)>, the house wrote <N characters\|none>; she starts fresh` |
 | `concludeFull` | `conversation <id\|unknown> reached her CLI's limit (Prompt is too long); the house wrote <N characters\|none>; she starts fresh` |
+| `concludeFull`, `tooLongAlone` | `conversation <id\|unknown> refused its first message (Prompt is too long) with nothing else in it, so that message is too long by itself; no handover was written and it was not sent again; she starts fresh` |
 - `<why>`: `it ran past its bound of <s> s`, `the turn failed`, `it was under the least that counts as a note`, `she wrote nothing`, `it could not be stored`.
 - `<cost>` = total at the end − total at the notice. A failed read prints `?`.
 - Measured on the live dev API, account 1: her CLI's environ and the armed line of compaction off (MAN-9460 §J2).
@@ -16500,7 +16509,7 @@ section: server/modules/companion/session — her own compaction's machine: the 
 |---|---|
 | `onInit`, first of a launch | `closing.arm(launch)` |
 | `onResult`, a result listing the notice | `ledger.take`, `turns.result(uuids, null)`, `lastTurnEnded`; never fails her, never a turn of the page's. A success listing no uuid is the turn in flight's (`turns.inFlightUuids()`) |
-| `onResult`, `event.contextFull` | `handOverRefused`: takes out everything the launch was handed and never answered (not only the refused uuids: a message folded in after it would sit inherited until the next boot); `closing.full`; each of his refused messages is kept on disk without its `cut` and parked FIRST, so the fresh launch's first message is his refused words with the handover |
+| `onResult`, `event.contextFull` | `handOverRefused`: takes out everything the launch was handed and never answered (not only the refused uuids: a message folded in after it would sit inherited until the next boot); `closing.full`; each of his refused messages is kept on disk without its `cut` and parked FIRST, so the fresh launch's first message is his refused words with the handover. `tooLongAlone` = `launch.cli.resume === null && !launch.answered` (a fresh conversation that has taken nothing: `Launch.answered` is set by any result that is not this refusal): `closing.full(launch, true)` and none of his words kept or parked, so no handover loops them |
 | `onResult`, a turn that ended with the process up | `closing.afterTurn(launch)` |
 | `deliver`, `holding()` | his words kept on disk (`keptWhileWaiting`), `park(deliver again)`; alerts and focus news go through the same door |
 | `warm` | no-op while `holding()` |
@@ -16513,8 +16522,8 @@ section: server/modules/companion/session — her own compaction's machine: the 
 ## Proof
 - The six probes' stand-in launchers answer `contextUsage: async () => ({ total: 20000, window: 500000, reserve: 3000, cliCompacts: false })`: below the point, so no closing begins. A stand-in without it makes every read warn `her context could not be read`.
 - `COMPANION_CLOSING_AT_TOKENS=1000` closes after every answer: a fresh conversation is already above it, so the fresh her's first answer begins another last turn and a probe reads a second note.
-- `.verify/kaylee-closing.mjs` (its harness: `.verify/lib/kaylee-closing-kit.mjs`) is the case-by-case proof, on the real session and the real tools over a stand-in launcher, a scratch database and a stand-in summarizer verb in a scratch HOME; `recall` and `remember` land on the stand-in docstore door. No model call. A below the point (none), and the reading that comes back after her launch was closed (none, no armed line); B the notice bare, the quiet turn, the tools' gate, the note as tidied, the fresh start's order, a result listing another message not ending her last turn and a success listing none being the notice's; C his words, an alert and a focus news wait; D his Stop and a cut; E no note (an error result, an error listing no message, her process ending, 50 characters, the bound at `COMPANION_CLOSING_WAIT_MS=2000`, a verb that fails) and a note that could not be stored (the house's handover next, else neither); F the wall's refusal, and a warm waiting behind its handover while her process is gone; G Clear, and Clear stopping the house's verb; H a close, then a second session closing at its next turn's end; I the armed line's four forms.
-- Measured 2026-11-01: 147 of 147 checks (A3 is a word of his starting a turn while the reading is still out; E6 is the notice itself refused as "Prompt is too long", which ends as a failed last turn and is handed over). `.verify/kaylee-closing-breakages.py` (its thirteen breakages are the ones the first 121 checks were measured against; the later cases are unmeasured against a breakage) runs the probe against a COPY of the server tree (`KAYLEE_CLOSING_MODULES` points the probe at it) with ONE call-in line or rule broken at a time, and it exits 1 on each of thirteen: a last-turn sentence passing, a last-turn turn frame passing, his Stop interrupting it, his words not held, the wall failed, the note stored untidied, every tool open, a close not abandoning, Clear not abandoning, the old conversation not forgotten, the owed cut kept, the point without the room, her last turn beginning over a turn in flight.
+- `.verify/kaylee-closing.mjs` (its harness: `.verify/lib/kaylee-closing-kit.mjs`) is the case-by-case proof, on the real session and the real tools over a stand-in launcher, a scratch database and a stand-in summarizer verb in a scratch HOME; `recall` and `remember` land on the stand-in docstore door. No model call. A below the point (none), and the reading that comes back after her launch was closed (none, no armed line); B the notice bare, the quiet turn, the tools' gate, the note as tidied, the fresh start's order, a result listing another message not ending her last turn and a success listing none being the notice's; C his words, an alert and a focus news wait; D his Stop and a cut; E no note (an error result, an error listing no message, her process ending, 50 characters, the bound at `COMPANION_CLOSING_WAIT_MS=2000`, a verb that fails) and a note that could not be stored (the house's handover next, else neither); F the wall's refusal after a turn was answered, and a warm waiting behind its handover while her process is gone; (F4) a resumed launch's first message refused is handed over; (F5) a fresh launch's first message refused writes no handover, asks no verb, keeps none of its words, opens no launch and says why, twice in a row; G Clear, and Clear stopping the house's verb; H a close, then a second session closing at its next turn's end; I the armed line's four forms.
+- Measured 2026-11-02: 156 of 156 checks. Measured 2026-11-01: 147 of 147 checks (A3 is a word of his starting a turn while the reading is still out; E6 is the notice itself refused as "Prompt is too long", which ends as a failed last turn and is handed over). `.verify/kaylee-closing-breakages.py` (its fourteen breakages: the first thirteen are the ones the first 121 checks were measured against, the fourteenth is a fresh launch's first refusal handed over again (F5 fails on it); the later cases are unmeasured against a breakage) runs the probe against a COPY of the server tree (`KAYLEE_CLOSING_MODULES` points the probe at it) with ONE call-in line or rule broken at a time, and it exits 1 on each of thirteen: a last-turn sentence passing, a last-turn turn frame passing, his Stop interrupting it, his words not held, the wall failed, the note stored untidied, every tool open, a close not abandoning, Clear not abandoning, the old conversation not forgotten, the owed cut kept, the point without the room, her last turn beginning over a turn in flight.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-closing.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-attach-session.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-unanswered.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing-breakages.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-handover-real.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-session-shape.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-soul-load.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-kit.mjs
 

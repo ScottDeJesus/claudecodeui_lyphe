@@ -19592,11 +19592,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/compani
 D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
 cat > "$D/p.mjs" <<'EOF'
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 const R = '/home/lyphe/.claude/claudecodeui_lyphe';
-process.env.DATABASE_PATH = join(mkdtempSync('/tmp/athena-probe-db-'), 'auth.db');
+process.env.DATABASE_PATH = join(process.argv[2], 'auth.db');
 execFileSync('sqlite3', ['-readonly', join(homedir(), '.cloudcli', 'auth.db'), `VACUUM INTO '${process.env.DATABASE_PATH}'`]);
 const { startStandInDoor } = await import(`${R}/.verify/lib/kaylee-bank-standin.mjs`);
 const door = await startStandInDoor(); process.env.DOCSTORE_URL = door.url;
@@ -19609,7 +19608,7 @@ console.log('clear of an EMPTY bank:', JSON.stringify(r), '| companion_memory fr
 await door.close(); process.exit(0);
 EOF
 cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$1/p.mjs" 2>&1 | grep -v -E '^Database|ExperimentalWarning'
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$1/p.mjs" "$1" 2>&1 | grep -v -E '^Database|ExperimentalWarning'
 EOF
 bash "$D/p.sh" "$D"
 cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
@@ -21990,10 +21989,9 @@ LOW — a typed line over 2,000 characters reaches her as a raw validation error
 ```probe
 D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
 cat > "$D/p.mjs" <<'EOF'
-import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 const R = '/home/lyphe/.claude/claudecodeui_lyphe';
-process.env.DATABASE_PATH = join(mkdtempSync('/tmp/athena-probe-db-'), 'auth.db');
+process.env.DATABASE_PATH = join(process.argv[2], 'auth.db');
 const { memoryTools } = await import(`${R}/server/modules/companion/memory/memory-tools.ts`);
 const { createSdkMcpServer } = await import(`${R}/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs`);
 const { Client } = await import(`${R}/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js`);
@@ -22011,7 +22009,7 @@ console.log(`typed line of ${said.length} chars → isError=${out.isError === tr
 process.exit(0);
 EOF
 cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$1/p.mjs" 2>&1 | grep -v -E '^Database|ExperimentalWarning|^Migrated|^  from|^  to|^}'
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$1/p.mjs" "$1" 2>&1 | grep -v -E '^Database|ExperimentalWarning|^Migrated|^  from|^  to|^}'
 EOF
 bash "$D/p.sh" "$D"
 cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
@@ -22709,54 +22707,6 @@ measured 2026-10-31 by chain chain-no-five-hour-accounts-20261031-094802-a789, f
 probe-key: 7b688298316e8cb594d7ad033a5efb2407f37b97
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/no-five-routes.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/fiveless.py, /home/lyphe/.claude/hooks/plan_runner/pacer/project.py, /home/lyphe/.claude/hooks/plan_runner/pacer/readings.py
-
-## INV-10572 — probe — LOW — a pasted file with no name draws an empty chip and every send says "No files provided"
-
-LOW — a pasted file with no name draws an empty chip and every send says "No files provided"
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-set -u
-D=$(cd "$(dirname "$0")" && pwd)
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-cat > "$D/drv.mjs" <<'JS'
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { BOX, makeKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/attach-whole-kit.mjs';
-const scratch = dirname(process.env.CLOUDCLI_ASSETS_DIR);
-const png = join(scratch, 'one.png');
-writeFileSync(png, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'));
-mkdirSync(join(scratch, 'shots'), { recursive: true });
-const kit = makeKit({ app: process.env.PROBE_APP, evidence: join(scratch, 'shots'), say: () => {} });
-try {
-  const page = await kit.open({ width: 1440, height: 900 });
-  await kit.openPanel(page);
-  await kit.pasteFile(page, [png, '', 'image/png']);
-  await page.waitForTimeout(300);
-  const before = await kit.readBox(page);
-  await page.locator(`${BOX} [data-companion-composer-field]`).fill('a nameless picture');
-  await page.locator(`${BOX} button[type="submit"]`).click();
-  await page.waitForTimeout(2000);
-  const after = await kit.readBox(page);
-  const below = await page.evaluate((box) => document.querySelector(`${box} > p[role="alert"]`)?.textContent ?? null, BOX);
-  console.log(`nameless paste: chips ${JSON.stringify(before.names)}; after send: chips ${JSON.stringify(after.names)}, line under the box ${JSON.stringify(below)}`);
-} catch (error) { console.log(`probe could not run: ${error.message}`); }
-for (const session of kit.sessions) await session.browser.close().catch(() => {});
-JS
-A=$(mktemp -d /tmp/heph-attach-whole.XXXXXX) || exit 1
-CLOUDCLI_ASSETS_DIR="$A/assets" KAYLEE_EYES_PLANS="" SUNSET_SLOT=5 bash .verify/kaylee-eyes-scratch.sh node "$D/drv.mjs" 2>&1 | grep -E "^(nameless|probe could not)"
-case "$A" in /tmp/heph-attach-whole.??????) rm -rf -- "$A";; esac
-EOF
-bash "$D/p.sh"
-cd / && case "$D" in /tmp/athena-probe.??????) rm -rf -- "$D";; esac
-# expect: `nameless paste: chips [""]; after send: chips [""], line under the box "▲No files provided"` while the defect stands; cured, the chip carries a name or the send says which file cannot go
-```
-
-measured 2026-10-31 by chain chain-kaylee--attachments--whole-20261031-104402-d32d, finding L1, LOW
-probe-key: 024f61e959aafa3c332f0ae4f99deb4ae73aafdc
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-attachments-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-attachments-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/attach-whole-kit.mjs
 
 ## INV-10573 — probe — LOW — the driver cannot tell her pictures arrived out of order
 
@@ -23857,24 +23807,6 @@ probe-key: 3f9d54bba2acaa8e4a9dcc4a400ca594b47bee9a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-kit.mjs
 
-## INV-10638 — probe — LOW — a refusal that repeats on a fresh launch's first message loops handovers, one summarizer call per round
-
-LOW — a refusal that repeats on a fresh launch's first message loops handovers, one summarizer call per round
-
-```probe
-D=/tmp/athena-probe-kaylee-closing; mkdir -p "$D"; cat > "$D/loop.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/kaylee--before-compaction--proof/athena-probes/exp.mjs 2 | grep "launches opened" || echo none
-EOF
-bash "$D/loop.sh"
-# expect: `launches opened: ~22-26 | verb calls: ~21-25 | failed process seen: false` while it loops; a handful of launches and a journal line saying why once bounded
-```
-
-measured 2026-11-01 by chain chain-kaylee--before-compaction--proof-20261101-214356-a9fb, finding L4, LOW
-probe-key: eed3a4018b520c1f617e41b26414095ef28f1064
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-closing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-closing-kit.mjs
-
 ## INV-10639 — probe — LOW — a store that fails at the closing says something false and skips the house's fallback
 
 LOW — a store that fails at the closing says something false and skips the house's fallback
@@ -23906,7 +23838,7 @@ Her own compaction: the machine MAN-9455, the numbers and words MAN-9454, what w
 | It is never spoken, logged or announced as a turn: no `companion_turn` frame, sentence, log row or speech-cache move; `turnId` reads null and her activity thinking. His Stop, a cut and a server stop leave it running (`interrupt` returns); only `COMPANION_CLOSING_WAIT_MS` ends it | it is not his turn; a stop would lose the note |
 | His words, the alerts and the focus news that arrive during it wait for the fresh her: his words are kept on disk first, parked in order (`closing.park`), delivered after the fresh start; `warm` waits too | a message given to the closing conversation ends with it |
 | Her conversation always ends after it: her note, else the house's handover, else none is stored on her row BEFORE the conversation is forgotten, then it is forgotten and closed; a fault in the closing releases the hold | a hold that never ends stops every push |
-| The CLI's refusal ("Prompt is too long": `success` + `is_error`, `contextFull`) is handed over, never failed: no last turn, the house's handover, his refused words kept and delivered first to the fresh her | a refused message stays counted; a failure would loop |
+| The CLI's refusal ("Prompt is too long": `success` + `is_error`, `contextFull`) is handed over, never failed: no last turn, the house's handover, his refused words kept and delivered first to the fresh her. The one exception is a launch that is fresh (`cli.resume === null`) and has taken no message yet (`Launch.answered`): its conversation holds only the refused message, so the message is too long, not the conversation. `closing.full(launch, true)` ends it with no handover and no summarizer call, keeps and parks none of its words, journals why and says `fullAlone` on the panel; a handover would reach the next launch with the same words, refused again, one call per round | a refused message stays counted; a failure would loop; a handover of a conversation that holds nothing loops too (measured 2026-11-02: 32 launches and 32 verb calls in 3 s) |
 | Her prompt, her tool descriptions and her schemas are not changed by this machinery, and a normal turn gains nothing: no tool, no prompt line, no envelope | his ruling: report first when a normal turn would change |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-closing.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-events.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-launch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-notice.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-session.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts

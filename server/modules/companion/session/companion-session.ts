@@ -73,8 +73,8 @@ import { guarded } from './guarded-callback.js';
 /** What a launch begins with: the CLI conversation it continues (`null` for a fresh one), the `tools` it is handed, the `systemPrompt` it is sent and the `shape` of those tools and that prompt, which is stored with the session id its `init` reports. The shape is taken from the very tools and the very prompt the launch gets. */
 type LaunchPlan = { resume: string | null; tools: CompanionSessionDeps['tools']; systemPrompt: string; shape: string };
 
-/** One launch and what the conversation has learned of it: the shape it was launched with, whether its first `init` has been seen (the process is up), whether the CLI refused its `resume`, and whether it holds a message yet (a `warm` launch does not). */
-type Launch = { cli: CompanionCli; shape: string; initSeen: boolean; resumeRefused: boolean; messaged: boolean };
+/** One launch and what the conversation has learned of it: the shape it was launched with, whether its first `init` has been seen (the process is up), whether the CLI refused its `resume`, whether it holds a message yet (a `warm` launch does not) and whether the CLI has taken a message of it without refusing it as too long (`answered`). */
+type Launch = { cli: CompanionCli; shape: string; initSeen: boolean; resumeRefused: boolean; messaged: boolean; answered: boolean };
 
 /** A stop whose turn has not yet reported its result: the launch concerned, a promise that settles when the wait is over and the way to settle it. */
 type Stop = { launch: Launch; over: Promise<void>; end(): void };
@@ -243,8 +243,11 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       closing.lastTurnEnded(event.failure === null ? { answered: true, text: event.text } : { answered: false, why: 'failed' });
       return;
     }
-    // The CLI refused a message as past its limit: her conversation is handed over, never failed (every later message would be refused too).
-    if (event.contextFull) return handOverRefused(launch, event);
+    // The CLI refused a message as past its limit: her conversation is handed over, never failed (every later message would be refused too). A fresh
+    // conversation that has taken nothing yet holds only the refused message, so the message is the too-long thing, not the conversation: a handover
+    // would reach the next launch with the same words and be refused again, one summarizer call per round.
+    if (event.contextFull) return handOverRefused(launch, event, launch.cli.resume === null && !launch.answered);
+    launch.answered = true;
     const stopStands = stopping?.launch === launch;
     // A result that lists nothing is the turn in flight's (`companion-turns.ts`). When it succeeds it consumed what that turn took; left
     // listed nowhere, those messages would stay stored and be answered again at every boot.
@@ -276,12 +279,14 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   /**
    * A turn answered "Prompt is too long": everything the launch was handed and never answered is taken out, his words of it are kept on disk (without the `<cut>`
    * they carried: the fresh her never said that sentence) and parked FIRST, so the fresh launch's first message is his refused words with the handover.
+   * `tooLongAlone`: the launch held nothing but the refused message, so those words are not kept or parked: no launch could take them, and they would be
+   * refused again by every one that carried them (`closing.full` ends it without a handover).
    */
-  function handOverRefused(launch: Launch, event: Extract<CompanionLoopEvent, { kind: 'result' }>): void {
+  function handOverRefused(launch: Launch, event: Extract<CompanionLoopEvent, { kind: 'result' }>, tooLongAlone: boolean): void {
     const refused = ledger.take(ledger.carry().map((sent) => sent.uuid));
     turns.result(event.answered.length > 0 ? event.answered : turns.inFlightUuids(), null);
-    closing.full(launch);
-    for (const sent of refused) {
+    closing.full(launch, tooLongAlone);
+    for (const sent of tooLongAlone ? [] : refused) {
       if (sent.words === null) continue;
       const words = { ...sent.words };
       delete words.cut;
@@ -348,6 +353,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       initSeen: false,
       resumeRefused: false,
       messaged: initial.length > 0,
+      answered: false,
     };
     setCondition({ state: 'waking', error: null });
     return launch;
