@@ -1024,37 +1024,6 @@ Every opener of a push's `data.path` opens it only when it is a rooted, same-ori
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/electron/main.js, /home/lyphe/.claude/claudecodeui_lyphe/public/sw.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-landing.service.ts
 
-## INV-6090 — probe — a title of two ZERO WIDTH SPACEs is accepted: a card that draws as nothing
-
-a title of two ZERO WIDTH SPACEs is accepted: a card that draws as nothing
-
-```probe
-T=$(curl -s -X POST http://127.0.0.1:3011/api/auth/login -H 'content-type: application/json' -d '{"username":"verve","password":"verve-dev-2026"}' | jq -r .token)
-BODY=$(python3 -c "import json;print(json.dumps({'title':chr(0x200b)*2,'description':''}))")   # a title of two U+200B ZERO WIDTH SPACEs
-curl -s -w ' <- %{http_code}\n' -X POST -H "Authorization: Bearer $T" -H 'content-type: application/json' -d "$BODY" http://127.0.0.1:3011/api/notes
-# with the id the answer carries: curl -s -o /dev/null -w '%{http_code}\n' -X DELETE -H "Authorization: Bearer $T" http://127.0.0.1:3011/api/notes/<id>
-expect: `201 {"success":true,"data":{"id":"…","title":"<two U+200B>","description":"","createdAt":"…","updatedAt":"…"}} <- 201` — a card whose title is two invisible characters; the cleanup DELETE answers 200 and leaves no row behind.
-```
-
-measured 2026-09-30 by chain chain-simple-notes--whole-20260930-134952-8535, finding L1, LOW
-probe-key: ac54f2f112f88267d461c10e585dd21b1fe97d12
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/p9-page-a-step2-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/p9-page-b-step3-light.png
-
-## INV-6091 — probe — a draft typed during its own add's flight is discarded when the write lands
-
-a draft typed during its own add's flight is discarded when the write lands
-
-```probe
-node /tmp/athena-p9-ui-b.mjs
-expect: the line `[!!] S39 a draft typed during its own add: typed during the flight "typed while the save was in flight" → after the write landed ""` — the field is emptied although the person typed after the press. The script deletes every note it made and ends with the account holding 0 cards.
-```
-
-measured 2026-09-30 by chain chain-simple-notes--whole-20260930-134952-8535, finding L2, LOW
-probe-key: 8cf24c6327736f004c14f6df80e827895b99764a
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/p9-page-a-step2-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/p9-page-b-step3-light.png
-
 ## INV-6094 — probe — the A7/A8 repair is justified, but it steps aside from the suite's only feed-unread gate, and that gate cannot pass
 
 the A7/A8 repair is justified, but it steps aside from the suite's only feed-unread gate, and that gate cannot pass
@@ -18532,8 +18501,9 @@ Detail: MAN-9223 (portrait), MAN-9238 (engine), MAN-9434 (her head; its rules IN
 | `voice` is three stable functions read by identity (`level`, `progress`, `mouth`); a prop that changes sixty times a second is never added | the provider keeps one identity for the page's life |
 | The reduced-motion query is read by `useReducedMotion` alone; the stylesheet's media blocks ask the same setting | the engine and the CSS must agree |
 | Every movement is in `@media (prefers-reduced-motion: no-preference)`; reduced motion keeps each look and drops the movement: the engine starts no blink, glance, sweep, search or warm spell, and a question's lifted brows still show, swapped with no fade | no look depends on an animation having run |
+| A blink and a fade of a change of her face never overlap: the fade cuts a blink in play and begins from the open-eyed frame under it (`blinker.openUnder`, read at the step's start), and no blink starts on a step that begins a fade (MAN-9432) | a fade over a lid draws her eyes half shut for its whole length, and a blink on a fade's first step cuts the fade to 40 ms |
 | The hair lag is `--kaylee-lag` in the stylesheet, read from the hair canvas's computed style by the portrait; `data-motion` leaves the root that long after the engine drops it, and the head's variables leave both layers only once the hair's value has come to rest | the hair finishes the motion it began late |
-| A manifest that fails `isManifest` is refused with a warning and the disc keeps her ground (`blinks` and `brows` are checked only when present: a face made before them plays as it always did); with no face (`faceId` null) she draws her initial | a missing field read in render takes the whole app down |
+| A manifest that fails `isManifest` is refused with a warning and the disc keeps her ground (`blinks` and `brows` are checked only when present: a face made before them still plays); with no face (`faceId` null) she draws her initial | a missing field read in render takes the whole app down |
 | Her disc's size is one number, `useCompanionSize`; its four constants live in that file and nowhere else; the disc grows through the kit's own `--vv-fab-size`; the stored rest is the 28 px disc's top-left | the one owner of a constant |
 | The window's width is read on `resize` only while she is active; the shrink is a 2.5 s deadline | events, not a watchdog |
 | There is no second face: with no atlas the disc shows its own ground, and her initial (`Avatar`) while `faceId` is null. A face is drawn from the manifest's frames and from nothing else | one face, one source |
@@ -21213,7 +21183,7 @@ case "$D" in /tmp/athena-eng-run.??????) rm -rf -- "$D" ;; esac
 measured 2026-10-30 by chain chain-kaylee--wake-word--engine-20261030-161212-350d, finding M1, MEDIUM
 probe-key: 5fde975c4404c9b49cbadb80d74c16ba2e31f172
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/vite-ears-build.config.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs
 
 ## INV-10435 — probe — A failed model load poisons the worker: the next `arm()` fails at once with the old sentence and fetches nothing, though the worker's comment says it retries
 
@@ -21256,7 +21226,7 @@ case "$D" in /tmp/athena-eng-run.??????) rm -rf -- "$D" ;; esac
 measured 2026-10-30 by chain chain-kaylee--wake-word--engine-20261030-161212-350d, finding M2, MEDIUM
 probe-key: 66d36bf4be810a8bbe1a2464a410ddb90fe599a0
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/vite-ears-build.config.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs
 
 ## INV-10436 — probe — A worker whose script failed to load is kept: the engine's next `arm()` hangs for ever
 
@@ -21294,7 +21264,7 @@ case "$D" in /tmp/athena-eng-run.??????) rm -rf -- "$D" ;; esac
 measured 2026-10-30 by chain chain-kaylee--wake-word--engine-20261030-161212-350d, finding M3, MEDIUM
 probe-key: 979bd3d697edec774f58973325893a499def0029
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/vite-ears-build.config.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs
 
 ## INV-10437 — probe — `tell()` is dropped when no session exists, so her voice (or the button) told before an arm never reaches the machine, and the rule "a segment that starts while she sounds never opens a press" breaks
 
@@ -21339,7 +21309,7 @@ case "$D" in /tmp/athena-eng-run.??????) rm -rf -- "$D" ;; esac
 measured 2026-10-30 by chain chain-kaylee--wake-word--engine-20261030-161212-350d, finding M4, MEDIUM
 probe-key: 5352f86289162735aba465135ea2fe74bf57f5fe
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/vite-ears-build.config.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs
 
 ## INV-10438 — probe — `detach()` then `end()` in the next statement loses the open press's clip, and neither comment says so
 
@@ -21384,7 +21354,7 @@ case "$D" in /tmp/athena-eng-run.??????) rm -rf -- "$D" ;; esac
 measured 2026-10-30 by chain chain-kaylee--wake-word--engine-20261030-161212-350d, finding L1, LOW
 probe-key: 5bdfa7002193be3e3798ed70aecd29a40d51247c
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/vite-ears-build.config.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs
 
 ## INV-10439 — probe — `onnxruntime-web` is imported by the worker but not declared in `package.json`
 
@@ -21406,7 +21376,7 @@ case "$D" in /tmp/athena-eng-run.??????) rm -rf -- "$D" ;; esac
 measured 2026-10-30 by chain chain-kaylee--wake-word--engine-20261030-161212-350d, finding L2, LOW
 probe-key: 9beee1ab423cb05b1f5142d29cc957937e0e1b13
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/vite-ears-build.config.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs
 
 ## INV-10440 — probe — A close phrase is dropped when newer speech began before Moonshine answered for the segment that held it
 
@@ -21441,7 +21411,7 @@ case "$D" in /tmp/athena-eng-run.??????) rm -rf -- "$D" ;; esac
 measured 2026-10-30 by chain chain-kaylee--wake-word--engine-20261030-161212-350d, finding L3, LOW
 probe-key: 0aa9bfa3b67a41e2cfb196cfa524b0bd5a3b4f11
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/vite-ears-build.config.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsAudio.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsCapture.worklet.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsMachine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsProtocol.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/earsWorker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ears-replay.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-ears-engine.mjs
 
 ## INV-10455 — probe — a name press closed `gone` because the floor moved retakes the floor for the page that lost it
 
@@ -22255,7 +22225,7 @@ echo "[probe exit $?]"
 measured 2026-10-31 by chain chain-kaylee-memory-typed-lines-20261031-060528-f21d, finding L1, LOW
 probe-key: 0e8e383bd4c792e05bf5cf42b03bd091c4329fd9
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-typed.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-typed-clear-probe.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-typed.mjs
 
 ## INV-10527 — probe — LOW — a typed line over 2,000 characters reaches her as a raw validation error, and her words never name the cap
 
@@ -22296,7 +22266,7 @@ echo "[probe exit $?]"
 measured 2026-10-31 by chain chain-kaylee-memory-typed-lines-20261031-060528-f21d, finding L2, LOW
 probe-key: 944e6fd1e198bead1d12f8c940e3566eb6e9a1f4
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-typed.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-typed-clear-probe.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/hands/action-doors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/bank-lines.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-verbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/memory/memory-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-memory-typed.mjs
 
 ## INV-10528 — probe seed — a station probe that reads her conversation or her head's face disc seeds CHAT_VIEW_RECORD
 
@@ -22572,34 +22542,6 @@ probe-key: 791851f120b5ee9ea483f337fb2e4aa20d387c48
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/mouth-cues.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/mouth-follow.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/mouth-pieces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/rhubarb.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-mouth-replay.ts
 
-## INV-10555 — probe — LOW — the page probe cannot tell a replayed giggle from a blink, so "a piece landing mid-sentence is the same sentence" is unguarded at the page
-
-LOW — the page probe cannot tell a replayed giggle from a blink, so "a piece landing mid-sentence is the same sentence" is unguarded at the page
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -nE "check\(.*(giggle|replay)" .verify/kaylee-mouth-page.mjs || echo none
-# expect: none
-```
-
-measured 2026-10-31 by chain chain-kaylee--exact-mouth--page-20261031-074621-7966, finding L1, LOW
-probe-key: d4f8c05f217cb638a3d36de09b89b15f605943d6
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/mouthPieces.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-mouth-page.mjs
-
-## INV-10556 — probe — LOW — the probe never judges the cue that is in force when the pieces land
-
-LOW — the probe never judges the cue that is in force when the pieces land
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "cue.at > marks.heard.elapsed" .verify/kaylee-mouth-page.mjs || echo none
-# expect: a match at line 121 while the in-force cue is skipped; none once the first judged cue is the one holding the place at arrival
-```
-
-measured 2026-10-31 by chain chain-kaylee--exact-mouth--page-20261031-074621-7966, finding L2, LOW
-probe-key: f8ef17ecf641ddd6b1bdec6d0d575affcfc1700d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/mouthPieces.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-mouth-page.mjs
-
 ## INV-10557 — server/modules/companion/mouth — her exact mouth: the rules later edits keep
 
 Server: MAN-9413 (pieces, follower), MAN-9412 (Rhubarb), MAN-9414 (proof). Page: MAN-9239 (the mouth), MAN-9238 (the engine), MAN-9113 (the pieces' store, with INV-9940).
@@ -22619,29 +22561,6 @@ Server: MAN-9413 (pieces, follower), MAN-9412 (Rhubarb), MAN-9414 (proof). Page:
 | `PIECE_RULES`, `RHUBARB_ARGUMENTS` and `MAX_RUNS` are named constants in their files | each is measured (MAN-9413, MAN-9412); one place changes it |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/install-rhubarb.sh, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/mouth-cues.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/mouth-follow.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/mouth-pieces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/mouth/rhubarb.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceMouth.ts
-
-## INV-10558 — probe — MEDIUM — the page's proof has no row at all: `.verify/kaylee-mouth-page.mjs` and `.verify/lib/mouth-page-stage.mjs`
-
-MEDIUM — the page's proof has no row at all: `.verify/kaylee-mouth-page.mjs` and `.verify/lib/mouth-page-stage.mjs`
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-R=/home/lyphe/.claude/claudecodeui_lyphe
-for f in .verify/kaylee-mouth-page.mjs .verify/lib/mouth-page-stage.mjs; do
-  n=$(~/.claude/scripts/docstore govern "$R/$f" --limit 80 --text | grep -c '^MAN-' || true)
-  printf '%s: manual rows served %s\n' "$f" "$n"
-done
-EOF
-bash "$D/p.sh"
-cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: `manual rows served 0` for both while the proof has no row; 1 or more for both once a manual row governs it and its stage
-```
-
-measured 2026-10-31 by chain chain-kaylee--exact-mouth--docs-20261031-090444-dab5, finding M1, MEDIUM
-probe-key: f6822bb835e6dc9ace1125e7a8d7cd9f9e17900a
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-mouth-page.mjs
 
 ## INV-10559 — probe — `src/modules/companion/CompanionAttachmentStrip.tsx:117` — when no sentence follows his line, the pin covers what her portrait shows: her turn that broke, or her answer after Stop
 
@@ -23637,94 +23556,6 @@ probe-key: b1b4efb3130646ca23092ff85f3c20c13e0a79ba
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-breath-page.mjs
 
-## INV-10597 — probe — LOW — a seed file that cannot be read (not missing, not a bad picture) for one look throws every look's id away
-
-LOW — a seed file that cannot be read (not missing, not a bad picture) for one look throws every look's id away
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'JS'
-import fs from 'node:fs';
-import path from 'node:path';
-const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face';
-const houses = await import(`${R}/face-house-ids.ts`);
-const root = path.join(process.argv[2], 'root'); fs.mkdirSync(root);
-process.env.COMPANION_FACES_DIR = root;
-process.env.COMPANION_FACE_SEED = '/home/lyphe/.claude/state/images/kaylee/kaylee-portrait-base.jpg';
-process.env.COMPANION_FACE_SEED_OFFICE = '/tmp'; // a directory: the read fails with EISDIR, not ENOENT
-let out;
-try { out = JSON.stringify(Object.fromEntries(await houses.registerHouseAvatars())); } catch (e) { out = `THREW ${e.code ?? e.name}`; }
-console.log(`office seed = a directory -> ${out} | avatars.json ${fs.readFileSync(path.join(root, 'avatars.json'), 'utf8').replace(/\s+/g, '')}`);
-JS
-cat > "$D/p.sh" <<'SH'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$1/p.mjs" "$1" 2>&1 | grep -v -e Fontconfig -e '^    at '
-SH
-bash "$D/p.sh" "$D"
-cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: today "office seed = a directory -> THREW EISDIR | avatars.json {"original":"cc2f923d4798"}"; cured: it answers {"original":"cc2f923d4798","office":null} and still prints that avatars.json
-```
-
-measured 2026-11-01 by chain chain-animate-kaylee--avatars--house-20261031-225330-229c, finding L1, LOW
-probe-key: 216e256d2d61638600466399738047a59b08bfd3
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-avatars.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-house-ids.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-root.ts
-
-## INV-10598 — probe — LOW — a record that is valid JSON of the wrong shape reads as "no house photos", and the prune then removes the house photo and its crops
-
-LOW — a record that is valid JSON of the wrong shape reads as "no house photos", and the prune then removes the house photo and its crops
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'JS'
-import fs from 'node:fs';
-import path from 'node:path';
-const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face';
-const houses = await import(`${R}/face-house-ids.ts`);
-const files = await import(`${R}/face-files.ts`);
-const root = path.join(process.argv[2], 'root'); fs.mkdirSync(path.join(root, 'aaaaaaaaaaaa', 'frames'), { recursive: true });
-fs.writeFileSync(path.join(root, 'aaaaaaaaaaaa', 'photo.png'), 'x'); fs.writeFileSync(path.join(root, 'aaaaaaaaaaaa', 'frames', 'x.png'), 'x');
-fs.writeFileSync(path.join(root, 'avatars.json'), '[]'); // a record the code never writes: valid JSON, wrong shape
-process.env.COMPANION_FACES_DIR = root;
-let ids, pruned;
-try { ids = JSON.stringify(await houses.readHouseIds()); } catch (e) { ids = `THREW ${e.message.slice(-40)}`; }
-try { pruned = JSON.stringify(await files.prune(new Set())); } catch (e) { pruned = `THREW ${e.message.slice(-40)}`; }
-console.log(`avatars.json "[]": readHouseIds -> ${ids} | prune -> ${pruned} | house photo and its crops kept: ${fs.existsSync(path.join(root, 'aaaaaaaaaaaa', 'frames', 'x.png'))}`);
-JS
-cat > "$D/p.sh" <<'SH'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$1/p.mjs" "$1" 2>&1 | grep -v Fontconfig
-SH
-bash "$D/p.sh" "$D"
-cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: today "avatars.json "[]": readHouseIds -> {} | prune -> [] | house photo and its crops kept: false"; cured: readHouseIds and prune both print THREW and the last field is true
-```
-
-measured 2026-11-01 by chain chain-animate-kaylee--avatars--house-20261031-225330-229c, finding L2, LOW
-probe-key: f81b9b004b170a74c52e63d958206b0edeb0c82c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-avatars.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-house-ids.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-root.ts
-
-## INV-10599 — probe — LOW — `face-root.ts`'s header says no other file names it; `face-house-ids.ts` does, and is the reason the file exists
-
-LOW — `face-root.ts`'s header says no other file names it; `face-house-ids.ts` does, and is the reason the file exists
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'SH'
-cd /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face || exit 1
-echo "face-root.ts says no other file names it: $(grep -c 'so no other file names this one' face-root.ts) | files that import './face-root.js' besides face-files.ts: $(grep -l "from './face-root.js'" *.ts | grep -v -e '^face-files.ts$' -e '^face-root.ts$' | tr '\n' ' ')"
-SH
-bash "$D/p.sh" "$D"
-cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: today "face-root.ts says no other file names it: 1 | files that import './face-root.js' besides face-files.ts: face-house-ids.ts"; cured: the first count is 0
-```
-
-measured 2026-11-01 by chain chain-animate-kaylee--avatars--house-20261031-225330-229c, finding L3, LOW
-probe-key: 54749782b914befc54abed82e9f0239ad1aa55db
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-avatars.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-house-ids.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-root.ts
-
 ## INV-10600 — src/modules/companion — her head while she speaks: the rules later edits keep
 
 Detail: MAN-9434 (the head), MAN-9435 (its proof), INV-10257 (the portrait's rules).
@@ -23735,7 +23566,7 @@ Detail: MAN-9434 (the head), MAN-9435 (its proof), INV-10257 (the portrait's rul
 | It moves in the picture's plane only and picks no frame: it opens no mouth and turns no head | her speaking frames face forward; no frame has an open mouth on a turned head |
 | The bob and roll are the individual `translate` and `rotate` of the layer, inside `@media (prefers-reduced-motion: no-preference)`, and `will-change` names `transform, translate, rotate` | they compose with the lean's `transform`, so its easing never smears a beat |
 | The sum is held to ±0.9% bob and ±1.8° roll. Raise a bound only with the rim arithmetic of MAN-9223 §"Layers" redone and measured painted | the bob's 0.95% of the disc and the breath's 0.64% leave 1.73% of the 3.32% rim slack; a clip's lift of 1.59% and the breath leave 1.09% for a painted edge |
-| A clip's keyframes replace the bob and are never added to it | added, a clip's lift, the bob and the breath leave less than a painted edge needs; the bob steps at a clip's first and last frame, by about 0.6% |
+| A clip's keyframes rest on the bob at their rest stops (`translate: 0 var(--kaylee-bob, 0%)`) and lift from it at their lift stops (absolute), never adding the lift to the bob | added to the bob, a clip's lift would leave 0.14% of the rim slack (1.09% after the clip and the breath, less the bob's 0.95%): 0.16 px at 115 px against a painted edge's 0.7 px |
 | The hair shows the head `--kaylee-lag` behind the face by a history of the engine's answers, never by a CSS delay or transition on the variables | a transition on the layer's `translate` or `rotate` would smear a beat |
 | The history is pruned by age: every step drops the samples older than the one the hair shows. `TRAIL_LENGTH` is a safety bound and never its length | a count cap alone fell short of the lag above 167 Hz |
 | Both variables leave both layers only once the engine's head is null and the hair's sample is null; the loop asks for animation frames until then | the hair finishes the motion it began late: gone 90 ms after the head's 300 ms settle |
@@ -23819,103 +23650,6 @@ probe-key: 56ce0248a28a502b4cb8bd2eddbe90acaa0f1680
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBrows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceNames.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-brows.ts
 
-## INV-10603 — probe — LOW — the replay's "no blink in the hold" check passes only because seed 7 has no blink in flight at the question's end
-
-LOW — the replay's "no blink in the hold" check passes only because seed 7 has no blink in flight at the question's end
-
-```probe
-R=/home/lyphe/.claude/claudecodeui_lyphe
-D=$(mktemp -d /tmp/athena-fence.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-R=/home/lyphe/.claude/claudecodeui_lyphe
-W=$(mktemp -d /tmp/athena-probe-seeds.XXXXXX) || exit 1
-cat > "$W/main.ts" <<EOT
-import { bakeManifest, levelAt, run } from '$R/.verify/lib/face-replay-kit.ts';
-const FACE = bakeManifest(true, true);
-const real = console.log;
-let fails = 0; let seed7 = 'n/a'; const seeds = 200;
-for (let seed = 1; seed <= seeds; seed += 1) {
-  const takes: Array<{ ms: number; target: string; base: string }> = []; let stop = -1;
-  const inputAt = (ms: number): any => { const s = ms >= 1000 && ms < 3400; const el = (ms - 1000) / 1000; if (stop < 0 && ms >= 3400) stop = ms;
-    return { now: ms, presence: ms < 1000 ? 'thinking' : s ? 'speaking' : 'idle', level: s ? levelAt(el) : 0, playing: s ? { mood: 'delighted', text: 'Want me to send it?', sounds: [], elapsed: el, duration: el < 0.5 ? null : 2.4, mouth: [] } : null, newestMood: null, turnRunning: false, look: null, reducedMotion: false }; };
-  console.log = () => {};
-  run('x', inputAt, 7400, { note: () => '', step: (i, d, names) => { takes.push({ ms: i.now, target: names[d.over ?? d.base], base: names[d.base] }); }, finish: () => {} }, { manifest: FACE, seed, quiet: true });
-  console.log = real;
-  const first = takes.find((t) => t.target.startsWith('brow.'));
-  if (first === undefined) continue;
-  const release = takes.find((t) => t.ms > first.ms && !t.target.startsWith('brow.'));
-  const inHold = takes.filter((t) => t.ms >= first.ms && t.ms < (release?.ms ?? first.ms));
-  const blink = inHold.some((t) => t.target.startsWith('blink.') || t.base.startsWith('blink.'));
-  if (blink) fails += 1;
-  if (seed === 7) seed7 = blink ? 'FAIL' : 'PASS';
-}
-console.log(\`the replay's own "no blink in the hold" criterion over \${seeds} seeds: \${fails} fail (seed 7, the one the replay plays: \${seed7})\`);
-EOT
-(cd "$R" && TSX_TSCONFIG_PATH=tsconfig.json node --import tsx "$W/main.ts" 2>&1 | grep -v Experimental | tail -2 | cut -c1-200)
-case "$W" in /tmp/athena-probe-seeds.*) rm -rf "$W" ;; esac
-EOF
-bash "$D/p.sh"; case "$D" in /tmp/athena-fence.*) rm -rf "$D" ;; esac
-# expect: prints `... over 200 seeds: 11 fail (seed 7, the one the replay plays: PASS)` while the defect stands (a count above 0 with seed 7 passing); 0 once the check ignores the fade's base or the engine finishes the blink first
-```
-
-measured 2026-11-01 by chain chain-animate-kaylee--eyes-and-brows--brows-20261031-235854-0e0a, finding L2, LOW
-probe-key: 9dc7ea45e66726314ad61a81148147029544d6c3
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBrows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceNames.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-brows.ts
-
-## INV-10605 — probe — LOW — the page probe's judges cannot fail on three things their checks' names promise
-
-LOW — the page probe's judges cannot fail on three things their checks' names promise
-
-```probe
-D=$(mktemp -d /tmp/athena-fence.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-W=$(mktemp -d /tmp/athena-judge.XXXXXX) || exit 1
-cat > "$W/j.mjs" <<'EOT'
-const V = '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib';
-const { judgeFull } = await import(`${V}/eyes-brows-full.mjs`);
-const rec = (scene, size, writes, counts) => ({ scene, size, writes, counts, frames: 1000, overFrames: 0, states: {} });
-const blink = (t, name) => [[t, `${name}.half`, null], [t + 40, `${name}.closed`, null], [t + 90, `${name}.half`, null]];
-const lines = [];
-const check = (name, ok, detail) => lines.push(`${ok ? 'PASS' : 'FAIL'} ${name.slice(0, 118)}`);
-const A = rec('question', 512, [[3969, 'blink.neutral.half', null], [4021, 'blink.neutral.half', 'brow.neutral'], [4180, 'brow.neutral', null], [5203, 'brow.neutral', 'mood.neutral.closed'], [5350, 'mood.neutral.closed', null]], { 'brow.neutral': 60, 'blink.neutral.half': 2, 'mood.neutral.closed': 100 });
-const B = rec('listening', 512, [[500, 'state.listening', null], ...blink(1000, 'blink.listening'), [1130, 'state.listening', null], [2500, 'mood.gentle.closed', null], [3000, 'state.listening', null], ...blink(5000, 'blink.listening'), [5130, 'state.listening', null]], { 'state.listening': 700, 'blink.listening.half': 4, 'blink.listening.closed': 2, 'mood.gentle.closed': 30 });
-const looks = [[100, 'gaze.up'], [1700, 'gaze.up_left'], [3300, 'gaze.right'], [5000, 'gaze.up'], [6500, 'gaze.up_left'], [8000, 'gaze.right'], [9500, 'gaze.up'], [11000, 'gaze.up_left'], [12500, 'gaze.right'], [14000, 'gaze.up']];
-const wC = looks.flatMap(([t, n]) => (t === 3300 ? [[t, n, null], ...blink(4000, 'blink.gaze.right'), [4130, 'gaze.right', null]] : [[t, n, null]]));
-const C = rec('thinking', 512, wC, { 'gaze.up': 300, 'gaze.up_left': 300, 'gaze.right': 300, 'blink.gaze.right.half': 2, 'blink.gaze.right.closed': 1 });
-judgeFull({ recs: [A, B, C], marks: { ask: { start: 1000, end: 4000 }, lookAt: null } }, check);
-console.log(lines.filter((line) => /question|listening|thinking/.test(line) && !/^ /.test(line)).join('\n'));
-EOT
-(cd /tmp && node "$W/j.mjs" 2>&1 | tail -6)
-case "$W" in /tmp/athena-judge.*) rm -rf "$W" ;; esac
-EOF
-bash "$D/p.sh"; case "$D" in /tmp/athena-fence.*) rm -rf "$D" ;; esac
-echo "[probe exit $?]"
-# expect: prints `PASS 512 px listening ...`, `PASS 512 px thinking ...` and `PASS 512 px the question ...` while the judges are blind (one run each carries a fault: a blink as the fade base under the lift, a mood.gentle.closed in listening, a search that begins on gaze.up); a cured judge prints FAIL for the run it now reads
-```
-
-measured 2026-11-01 by chain chain-animate-kaylee--eyes-and-brows--page-20261101-010730-d04a, finding L1, LOW
-probe-key: dda412e166fdb05478fca3655e9d41498f6aec40
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBlink.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-brows-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-full.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-reduced.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-stage.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/kaylee-eyes-brows-page/last-run.txt
-
-## INV-10606 — probe — LOW — the old story is kept in the cure's code and rows ("healed means deleted")
-
-LOW — the old story is kept in the cure's code and rows ("healed means deleted")
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe
-grep -c "flat 600" src/modules/companion/utils/faceBlink.ts
-docstore get MAN-9428 --text | grep -c "flat 600"
-docstore get MAN-9440 --text | grep -c "flat 600"
-# expect: prints 1, 1, 1 while the history stands; 0, 0, 0 once it is purged
-```
-
-measured 2026-11-01 by chain chain-animate-kaylee--eyes-and-brows--page-20261101-010730-d04a, finding L2, LOW
-probe-key: a5f9977843223841c65d14beec8475bcdc625202
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBlink.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-eyes-brows-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-full.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-reduced.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/eyes-brows-stage.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/kaylee-eyes-brows-page/last-run.txt
-
 ## INV-10607 — probe — LOW — the probe and its row never say it takes about 5½ minutes
 
 LOW — the probe and its row never say it takes about 5½ minutes
@@ -23973,7 +23707,7 @@ EOF
 bash "$D/p.sh" "$D"
 cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
 echo "[probe exit $?]"
-# expect today: run 2 FAIL (1 frame name differs, 110 ms gap), run 5 FAIL (2 clip frames at 0.043), runs 1, 3, 4, 6, 7 PASS; both tolerance lines present (1 and 1). Cured: the two lines changed so no run of the seven reads FAIL (re-record with KAYLEE_HEAD_RECORDING=<file> to add runs).
+# expect (2026-11-01, after the clips rest on the bob): run 2 FAIL (1 frame name differs, 110 ms gap), run 5 FAIL (2 clip frames at 0.043: the fence's own arithmetic keeps the old 0..-1.5% bound, which the page's clip check no longer has), runs 1, 3, 4, 6, 7 PASS; the clip check's upper bound 0 line(s) (the page's check reads between the same frame's bob and -1.5%), frame-names tolerance 1 line(s). The clip half is cured; cured whole: the frame-names line changed so no run of the seven reads FAIL (re-record with KAYLEE_HEAD_RECORDING=<file> to add runs).
 ```
 
 measured 2026-11-01 by chain chain-animate-kaylee--breath-and-head--whole-20261101-005840-ce94, finding M1, MEDIUM
@@ -24026,40 +23760,6 @@ probe-key: 2790eb126864e21110af0d56d96d43b88a22c7ce
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-settle.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-capture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-sampler.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-face-whole-capture.mjs
 
-## INV-10610 — probe — LOW — the one seam the docs name as "not cured" is left, the whole does not measure it, and the report does not name it
-
-LOW — the one seam the docs name as "not cured" is left, the whole does not measure it, and the report does not name it
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { readFileSync } from 'node:fs';
-const E = '/home/lyphe/.claude/state/pipeline-reviews/animate-kaylee--breath-and-head--whole/athena-1-evidence';
-// What the layer hops by when a clip's keyframes end: the clip's last stop is `translate: 0 0`, the declared translate then returns to the bob.
-for (const n of [1, 2, 3, 4, 5, 6, 7]) {
-  const { samples } = JSON.parse(readFileSync(`${E}/head-run${n}.json`, 'utf8')).recording;
-  const y = (s) => Number.parseFloat(s[512].computed.translate.split(' ')[1]);
-  const onClip = samples.map((s, k) => k).filter((k) => samples[k][512].motion === 'giggle' && samples[k][512].computed && Math.abs(y(samples[k]) - Number.parseFloat(samples[k][512].face.bob || '0')) > 0.001);
-  const after = samples.findIndex((s, k) => k > onClip.at(-1) && s[512].computed && Math.abs(y(s) - Number.parseFloat(s[512].face.bob || '0')) <= 0.001);
-  const bob = Number.parseFloat(samples[after][512].face.bob);
-  console.log(`run ${n}: last frame on the clip's keyframes ${y(samples[onClip.at(-1)]).toFixed(3)}%; first frame back on the bob ${y(samples[after]).toFixed(3)}%; hop by the bob: ${Math.abs(bob).toFixed(3)}% = ${(Math.abs(bob) * 5.43).toFixed(1)} px at 512, ${(Math.abs(bob) * 1.22).toFixed(1)} px at 115`);
-}
-EOF
-cat > "$D/p.sh" <<'EOF'
-node "$1/p.mjs"
-echo "giggle keyframes end on: $(sed -n '/@keyframes kaylee-giggle/,/^}/p' /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css | tr -s ' \n' ' ')"
-EOF
-bash "$D/p.sh" "$D"
-cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect today: hops of 0.19–0.50% (2.2–2.7 px at 512 in six of seven runs) and the giggle keyframes ending `0%, 50%, 100% { translate: 0 0; }`. Cured: the clip's end stops re-expressed on var(--kaylee-bob) (the stylesheet line differs) or the report names the seam and why the capture does not make it ugly.
-```
-
-measured 2026-11-01 by chain chain-animate-kaylee--breath-and-head--whole-20261101-005840-ce94, finding L2, LOW
-probe-key: 3fa09f008e178bd13bf60a08727cb1239cfd6311
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-settle.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-capture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-sampler.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-face-whole-capture.mjs
-
 ## INV-10611 — probe — LOW — the idle line says "never between" and its window explains half the ten seconds
 
 LOW — the idle line says "never between" and its window explains half the ten seconds
@@ -24094,3 +23794,234 @@ measured 2026-11-01 by chain chain-animate-kaylee--breath-and-head--whole-202611
 probe-key: 4d87ab19a954a9f53758eeb5e29e35a8cb2b9fc9
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-head-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-page-settle.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-capture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-judge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/head-whole-sampler.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-face-whole-capture.mjs
+
+## INV-10612 — probe — LOW — the "no Gemini spend" check compares the whole ledger directory, so any other plan's spend during the run fails it
+
+LOW — the "no Gemini spend" check compares the whole ledger directory, so any other plan's spend during the run fails it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "ledger files the driver's check reads: $(ls /opt/shadow-connector/state/gemini_plan_spend | wc -l)"
+ls /opt/shadow-connector/state/gemini_plan_spend | sed 's/-20[0-9]*-[0-9a-f]*\.jsonl$//; s/\.jsonl$//'
+echo "the check lists the whole directory: $(grep -c 'readdirSync(LEDGER)' .verify/lib/avatars-whole-kit.mjs)"
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+```
+
+measured 2026-11-01 by chain chain-animate-kaylee--avatars--whole-20261101-031301-92db, finding L1, LOW
+probe-key: bad8898dceea2c27109bf137b128c7d45747d8e6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-avatars.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatars-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-mouth-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatars-whole-kit.mjs
+
+## INV-10613 — probe — LOW — a stopped run puts the pick back and nothing else, while the driver's header says its model is put back too
+
+LOW — a stopped run puts the pick back and nothing else, while the driver's header says its model is put back too
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "stop handler: $(grep 'process.once(signal' .verify/kaylee-avatars-whole.mjs | cut -c1-170)"
+echo "stop handler calls tearDown: $(grep 'process.once(signal' .verify/kaylee-avatars-whole.mjs | grep -c tearDown)"
+echo "header says a stopped run puts the model back: $(grep -c 'even when a step throws or the run is stopped' .verify/kaylee-avatars-whole.mjs)"
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+```
+
+measured 2026-11-01 by chain chain-animate-kaylee--avatars--whole-20261101-031301-92db, finding L2, LOW
+probe-key: e88f50abbae6b5954e0d2ce784bbf20140a31e0c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-avatars.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatars-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-mouth-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatars-whole-kit.mjs
+
+## INV-10614 — probe — LOW — the typed turn's mood check can only pass vacuously on this turn text
+
+LOW — the typed turn's mood check can only pass vacuously on this turn text
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+sqlite3 -readonly ~/.cloudcli/auth.db "select coalesce(k.mood,'(none)') as mood, count(*) as sentences from companion_log o join companion_log k on k.user_id=o.user_id and k.role='kaylee' and k.id > o.id and k.id <= o.id+3 where o.user_id=1 and o.role='operator' and o.text='In one short sentence, say hello.' group by 1" || echo none
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+```
+
+measured 2026-11-01 by chain chain-animate-kaylee--avatars--whole-20261101-031301-92db, finding L3, LOW
+probe-key: b65a2d08a2582c391e184aeea166b301f56d65cf
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-avatars.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatars-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-mouth-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatars-whole-kit.mjs
+
+## INV-10615 — probe — LOW — step 4's child writes account 1's preferences twice per run, in a driver whose own pages are read-only
+
+LOW — step 4's child writes account 1's preferences twice per run, in a driver whose own pages are read-only
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'JS'
+import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
+const writes = [];
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (url, init = {}) => {
+  const method = (init.method ?? 'GET').toUpperCase();
+  if (method !== 'GET' && /\/api\/user\//.test(String(url))) writes.push(`node ${method} ${new URL(String(url)).pathname} ${String(init.body ?? '').slice(0, 100)}`);
+  return realFetch(url, init);
+};
+const launch = pw.chromium.launch.bind(pw.chromium);
+pw.chromium.launch = async (...args) => {
+  const browser = await launch(...args);
+  const newContext = browser.newContext.bind(browser);
+  browser.newContext = async (...a) => {
+    const context = await newContext(...a);
+    context.on('request', (r) => { if (r.method() !== 'GET' && /\/api\/user\//.test(r.url())) writes.push(`page ${r.method()} ${new URL(r.url()).pathname} ${(r.postData() ?? '').slice(0, 100)}`); });
+    return context;
+  };
+  return browser;
+};
+process.on('exit', () => { console.log(`WRITES TO account 1's preferences by one mouth-page run: ${writes.length}`); for (const w of writes) console.log(`  ${w}`); });
+await import('/home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-mouth-page.mjs');
+JS
+cat > "$D/p.sh" <<'SH'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 300 node "$1/p.mjs" 2>&1 | grep -E "^(WRITES|  (node|page) )|^face |^ALL PASS|^SOME FAILED"
+SH
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+```
+
+measured 2026-11-01 by chain chain-animate-kaylee--avatars--whole-20261101-031301-92db, finding L4, LOW
+probe-key: 2bede9c1e1b28bd0f15ad96a2336b2542021e7aa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-avatars.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatars-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-mouth-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatars-whole-kit.mjs
+
+## INV-10616 — probe — LOW — three small places say more than the code does
+
+LOW — three small places say more than the code does
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "station's speech list judged anywhere: $(grep -c 'stationWatch.speech' .verify/kaylee-avatars-whole.mjs)"
+echo "check title says no face file, predicate allows the office's: $(grep -c "asked for no face file during the turn" .verify/kaylee-avatars-whole.mjs) / $(grep -c "every((id) => id === office.faceId)" .verify/kaylee-avatars-whole.mjs)"
+echo "watchPage doc says errors count once told to: $(grep -c 'once told to count them' .verify/lib/avatars-whole-kit.mjs)"
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+```
+
+measured 2026-11-01 by chain chain-animate-kaylee--avatars--whole-20261101-031301-92db, finding L5, LOW
+probe-key: 145ea1ffcd92149464cd77fcc0b7cfeed9c630a4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/face/face-avatars.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatars-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-mouth-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatars-whole-kit.mjs
+
+## INV-10618 — probe — LOW — MAN-9431 still says the fade into the resting states is "140 ms steps"; the engine fades into them 180 ms, and the row still carries the store's `file-changed` flag
+
+LOW — MAN-9431 still says the fade into the resting states is "140 ms steps"; the engine fades into them 180 ms, and the row still carries the store's `file-changed` flag
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+R=/home/lyphe/.claude/claudecodeui_lyphe
+echo "MAN-9431's resting-states row, column 'fade into it': $(~/.claude/scripts/docstore get MAN-9431 --text | grep -m1 -F '`idle`, `asleep`, `loading`, `walking`' | awk -F'|' '{gsub(/^ +| +$/, "", $4); print $4}')"
+cat > "$1/fade.mts" <<'EOT'
+const { bakeManifest, run } = await import('/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-kit.ts');
+const FACE = bakeManifest(true, true); const real = console.log; const seen = new Set<number>();
+for (let seed = 1; seed <= 20; seed += 1) {
+  const takes: Array<{ ms: number; alpha: number; over: number | null }> = [];
+  const inputAt = (ms: number): any => ({ now: ms, presence: ms < 3000 ? 'thinking' : 'idle', level: 0, playing: null, newestMood: null, turnRunning: false, look: null, reducedMotion: false });
+  console.log = () => {};
+  run('x', inputAt, 4000, { note: () => '', step: (i: any, d: any) => { if (i.now >= 3000) takes.push({ ms: i.now, alpha: d.alpha, over: d.over }); }, finish: () => {} }, { manifest: FACE, seed, quiet: true });
+  console.log = real;
+  const start = takes.find((t) => t.over !== null); const f = takes.find((t) => t.over !== null && t.alpha > 0);
+  if (start && f) seen.add(Math.round((f.ms - start.ms) / f.alpha));
+}
+real(`the engine's fade from thinking into idle, 20 seeds: ${[...seen].sort((x, y) => x - y).join(', ')} ms`);
+EOT
+(cd "$R" && TSX_TSCONFIG_PATH=tsconfig.json node --import tsx "$1/fade.mts" 2>&1 | grep -v Experimental)
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: the row's cell reads `140 ms steps` and the engine prints `180 ms` while the defect stands; both read 180 ms once the row is made true
+```
+
+measured 2026-11-01 by chain chain-animate-kaylee--judgment--docs-20261101-060804-2d4c, finding L1, LOW
+probe-key: cd77d20146feb6e1360a81cc719aea7ac12851c7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceFader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceTurn.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts
+
+## INV-10619 — probe — LOW — no row says when the engine asks no carry, or that the cut's blink waits for a still step; two guards the blink-fade phase added to the engine
+
+LOW — no row says when the engine asks no carry, or that the cut's blink waits for a still step; two guards the blink-fade phase added to the engine
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+R=/home/lyphe/.claude/claudecodeui_lyphe; S=~/.claude/scripts/docstore
+cd "$R" || exit 1
+echo "engine: carry asked only outside a fade (now < bigFadeEndsAt in landing()): $(grep -c 'now < bigFadeEndsAt ? now : blinker.carry' src/modules/companion/utils/faceEngine.ts); the cut's blink gated on a still step (settled && !liftEnds): $(grep -c "presence === 'cut'.*settled && !liftEnds" src/modules/companion/utils/faceEngine.ts)"
+echo "rows that say a move asks no carry in a fade, a clip or a mood move (MAN-9428, MAN-9432): $(for t in MAN-9428 MAN-9432; do $S get $t --text | grep -c -i -E 'asks? no carr|no carry|carries no|no move carries|bigFadeEndsAt'; done | awk '{s+=$1} END {print s}'); rows that give the cut's blink its gate (MAN-9428, MAN-9431): $(for t in MAN-9428 MAN-9431; do $S get $t --text | grep -i 'cut' | grep -c -E 'settled|no fade|begins no fade|still step'; done | awk '{s+=$1} END {print s}')"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: `...: 1; ...: 1` for the engine and `...: 0 ...: 0` for the rows while the rows are silent; a row that states either guard makes its count 1
+```
+
+measured 2026-11-01 by chain chain-animate-kaylee--judgment--docs-20261101-060804-2d4c, finding L2, LOW
+probe-key: c808120c4d8fda10c79a4e6965316045ceeffa65
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceBlink.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceEngine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceFader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceSchedule.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/faceTurn.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-face-replay.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-blinks.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/face-replay-kit.ts
+
+## INV-10620 — probe — LOW — stale probe row INV-10617: the defect it names is cured, its fence prints a line in both states, and it still reads as a standing defect
+
+LOW — stale probe row INV-10617: the defect it names is cured, its fence prints a line in both states, and it still reads as a standing defect
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "the page's giggle line guards Math.min(...lifted) with lifted.length > 0: $(grep -c 'lifted.length > 0 ? `' .verify/kaylee-head-page.mjs); INV-10617 stands: $(~/.claude/scripts/docstore get INV-10617 --text 2>&1 | head -1 | grep -c -E '^INV-10617 ')"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: `...: 1; INV-10617 stands: 1` while the row is stale (the page is guarded, the row still says it prints Infinity%); the row is retired or rewritten once its second count is 0
+```
+
+measured 2026-11-01 by chain chain-animate-kaylee--judgment--docs-20261101-060804-2d4c, finding L3, LOW
+probe-key: ba26746b822da845627cae7ece78839c9ade7a36
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-10621 — probe — LOW — INV-10610's retirement reason names no plan; the brief asked each of the four to name this plan
+
+LOW — INV-10610's retirement reason names no plan; the brief asked each of the four to name this plan
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+~/.claude/scripts/docstore history INV-10610 --json | python3 -I -c '
+import json, sys
+e = [x for x in json.load(sys.stdin)["rows"] if x["verb"] == "retire"][0]
+print("INV-10610 retired by", e["actor"], "| reason names the plan:", "animate-kaylee--judgment" in e["after"]["reason"])'
+for t in INV-10599 INV-10603 INV-10606; do ~/.claude/scripts/docstore history "$t" --json | python3 -I -c '
+import json, sys
+e = [x for x in json.load(sys.stdin)["rows"] if x["verb"] == "retire"][0]
+print(e["before"]["body"].split(chr(10))[0][:20], "| names the plan:", "animate-kaylee--judgment" in e["after"]["reason"])'; done
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: INV-10610 prints `reason names the plan: False` while its reason names no plan; the other three print True
+```
+
+measured 2026-11-01 by chain chain-animate-kaylee--judgment--docs-20261101-060804-2d4c, finding L4, LOW
+probe-key: 894831869fe5a8f9afbebb6ccf73e34760a1d293
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/

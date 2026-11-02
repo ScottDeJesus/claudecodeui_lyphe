@@ -3,6 +3,9 @@
 // WHAT THE FACE SHOWS under it (`FaceLook`): a mood's face, her listening face, a gaze, or a turned pose. A manifest made before
 // `blinks` has frames only for the moods, and `blinkFramesOf` says so with null.
 //
+// A BLINK AND A FADE NEVER OVERLAP (the engine's rule, `faceEngine.ts`): a fade of a change of her face cuts a blink in play and begins from her open eyes. `openUnder` is the
+// blink's part in it: the open-eyed frame of the look the blink in play was last drawn over, which the engine reads before anything cuts the blink.
+//
 // The engine owns the clock: each deadline here is something it returns in `nextAt`, and nothing in this file schedules a timer.
 
 import { BLINK_GAP_BY_STATE, blinkAt, blinkGap, blinkIsDoubled, blinkLength, blinkSteps } from '@/modules/companion/utils/faceSchedule';
@@ -76,6 +79,8 @@ function closedFrom(blink: Blink, now: number): number {
 /** Used by `faceEngine.ts`: one per engine. It holds the blink in play, the next one's deadline (drawn from the state's range) and the blink a move carries. */
 export function createBlinker(random: Random) {
   let blink: Blink | null = null;
+  // The look the blink in play was last drawn over (every step of it, the open one between a double's two blinks too); null until its first step is drawn.
+  let lookUnder: FaceLook | null = null;
   // When the scheduled blink is due; null while the state has none (failed, cut).
   let due: number | null = null;
   // The state the gap after a blink is drawn from, as the engine last said.
@@ -92,6 +97,7 @@ export function createBlinker(random: Random) {
     lastEndedAt = now + blinkLength(steps);
     due = gapFrom(lastEndedAt);
     blink = { startedAt: now, steps };
+    lookUnder = null;
     return blink;
   };
 
@@ -101,6 +107,7 @@ export function createBlinker(random: Random) {
       retire(now);
       const step = blink === null ? null : blinkAt(blink.steps, now - blink.startedAt);
       if (blink === null || step === null) return { frame: null, nextAt: null };
+      lookUnder = look;
       const frames = blinkFramesOf(manifest, look);
       // Between the two blinks of a double the eyes are open: the look's own frame.
       const frame = step.look === 'open' ? stillFrameOf(manifest, look) : frames === null ? null : frames[step.look];
@@ -138,6 +145,7 @@ export function createBlinker(random: Random) {
     single(now: number): void {
       const steps = blinkSteps(false);
       blink = { startedAt: now, steps };
+      lookUnder = null;
       lastEndedAt = now + blinkLength(steps);
     },
     clear(): void {
@@ -145,5 +153,9 @@ export function createBlinker(random: Random) {
     },
     /** Whether a blink is in play at `now`, counting one whose last step ended since the engine last asked: the step out of it is a hard swap too. */
     inBlink: (now: number): boolean => blink !== null && blink.startedAt <= now,
+    /** The open-eyed frame of the look the blink in play at `now` was last drawn over by `frame`, counting a blink whose last step ended since the engine last asked; null when none was in play. The engine reads it once at the step's start, before a state change, the lift or a mood change cuts the blink: a fade that begins on that step begins from it. */
+    openUnder: (now: number, manifest: CompanionFaceManifest): number | null =>
+      // `inBlink`'s own test, so a blink that ended since the last ask still answers; nothing is retired here.
+      blink !== null && blink.startedAt <= now && lookUnder !== null ? stillFrameOf(manifest, lookUnder) : null,
   };
 }

@@ -230,8 +230,8 @@
   .kaylee-portrait__layer--hair { transition: transform 320ms ease-in-out 90ms; }
 
   /* Her head while she speaks: the portrait writes `--kaylee-bob` (% of the layer) and `--kaylee-roll` on each layer, the hair's 90 ms behind the face's.
-     The individual properties compose with the lean's `transform` untouched, so its easing never smears a beat, and a clip's keyframes on `translate`
-     take the bob's place while they run: a laugh is not doubled, and the bob returns after it. */
+     The individual properties compose with the lean's `transform` untouched, so its easing never smears a beat. A clip's keyframes on `translate`
+     rest on the bob and lift from it, so the layer never steps at a clip's edge and a laugh is not doubled. */
   .kaylee-portrait__layer {
     translate: 0 var(--kaylee-bob, 0%);
     rotate: var(--kaylee-roll, 0deg);
@@ -290,25 +290,25 @@
   38% { scale: 1.006; translate: 0 -0.6%; }
 }
 @keyframes kaylee-sway { from { rotate: -0.8deg; } to { rotate: 0.8deg; } }
-/* The clips lift and drop the whole layer by a share of its own height. */
+/* The clips lift and drop the layer by a share of its own height, from where her head is: a rest stop is the layer's own bob (0% with none), a lift stop absolute. */
 @keyframes kaylee-laugh {
-  0%, 33%, 67%, 100% { translate: 0 0; }
+  0%, 33%, 67%, 100% { translate: 0 var(--kaylee-bob, 0%); }
   17%, 50%, 83% { translate: 0 -1.5%; }
 }
 @keyframes kaylee-giggle {
-  0%, 50%, 100% { translate: 0 0; }
+  0%, 50%, 100% { translate: 0 var(--kaylee-bob, 0%); }
   25%, 75% { translate: 0 -1.5%; }
 }
 @keyframes kaylee-gasp {
-  0%, 100% { translate: 0 0; }
+  0%, 100% { translate: 0 var(--kaylee-bob, 0%); }
   29% { translate: 0 -1.5%; }
 }
 @keyframes kaylee-sigh {
-  0%, 100% { translate: 0 0; }
+  0%, 100% { translate: 0 var(--kaylee-bob, 0%); }
   40% { translate: 0 2%; }
 }
 @keyframes kaylee-nod {
-  0%, 100% { translate: 0 0; }
+  0%, 100% { translate: 0 var(--kaylee-bob, 0%); }
   50% { translate: 0 2%; }
 }
 @keyframes kaylee-swell {

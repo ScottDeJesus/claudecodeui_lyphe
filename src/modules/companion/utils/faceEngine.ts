@@ -16,9 +16,9 @@
 // those with a face of their own (listening, transcribing, speaking, cut, failed) turns her head toward the anchor instead.
 // While she speaks her head also moves with her voice's level (`faceHead.ts`, in the picture's plane): `FaceDraw.head`, null at rest.
 //
-// SHE BLINKS IN EVERY STATE BUT STOPPED on a face made with `blinks` (`faceBlink.ts`): over the look she holds, at a rhythm each state has, and a
-// move of her eyes or head (a sweep's turn, a search step, a glance, a turn level) may carry one: 40% of those after the state's shortest gap. A face made before them blinks at
-// rest and speaking only, and neither searches nor smiles: it plays as it always did.
+// SHE BLINKS IN EVERY STATE BUT STOPPED on a face made with `blinks` (`faceBlink.ts`): over the look she holds, at a rhythm each state has, and a move of her eyes or head (a sweep's turn, a search
+// step, a glance, a turn level) may carry one: 40% of those after the state's shortest gap. A BLINK AND A FADE NEVER OVERLAP: a fade of a change of her face (a state's, a mood's, the warm spell's, the brows')
+// cuts a blink in play and begins from her open eyes, and no blink starts on the step that begins one. A face made before them blinks at rest and speaking only, and neither searches nor smiles: it plays as it always did, but its fades too start from her open eyes.
 //
 // HER BROWS LIFT AT THE END OF A QUESTION (`faceBrows.ts`): when a sentence of her voice ending in a question mark stops sounding, her mood's
 // closed face with the brows lifted (`manifest.brows`) fades in over 140 ms and holds until her next sentence or 1200 ms, then eases back over
@@ -99,7 +99,7 @@ export function createFaceEngine(manifest: CompanionFaceManifest, seed: number):
   const headMotion = createHeadMotion(seed);
   const blinker = createBlinker(random);
   const browHold = createBrowHold();
-  // A face made before `blinks` plays as it always did, its seeded draws in today's order (the `legacy` rules below): it never searches or smiles.
+  // A face made before `blinks` plays as it always did, its seeded draws in today's order (the `legacy` rules below), but for the fade rule (its fades start from her open eyes too): it never searches or smiles.
   const legacy = manifest.blinks === undefined;
   const stateEyes = createStateEyes(random, !legacy);
   let warmth = createWarmth(random); // made again as each state begins: a change of state ends a spell and its count starts anew
@@ -160,9 +160,9 @@ export function createFaceEngine(manifest: CompanionFaceManifest, seed: number):
       else if (glanceLapsed) nextGlanceAt += glanceGap(random);
       else break;
     }
+    const openFrom = blinker.openUnder(now, manifest); // read before a state change, the lift or a mood change cuts the blink in play
     const presenceChanged = presence !== state;
     if (presenceChanged) enterState(presence, now, reduced);
-    const inBlinkAtStart = blinker.inBlink(now);
     const { move: moodMove, freshSentence } = moodHold.read(input);
     const mood = moodHold.mood();
     // THE BROWS: lifted when a question has just stopped sounding, on a face made with them; the hold's end is a deadline.
@@ -185,15 +185,15 @@ export function createFaceEngine(manifest: CompanionFaceManifest, seed: number):
     const clipWasPlaying = clips.playing();
     clips.advance(now);
     if (speaking && !reduced && playing !== null) clips.hear(soundAt(playing.text, playing.sounds, playing.elapsed, playing.duration), now);
-    if (clips.playing() || held.lifted) blinker.clear();
+    if (clips.playing() || held.lifted || moodMove !== 'same') blinker.clear();
 
     // THE HEAD moves with the voice's level; a clip that began with the sentence is its cue, so no breath in is drawn for it.
     const head = headMotion.step({ now, speaking, level: input.level, freshSentence, clipStarted: !clipWasPlaying && clips.playing(), reducedMotion: reduced });
     if (head !== null) wantAt(now + 1); // her head moves on every frame while it is not at rest
 
-    // THE TURN toward a look, one level every 140 ms (all at once under reduced motion). A move of the eyes or head lands now, or at the
-    // closed step of a blink that carries it (that step's start is the blink's own deadline).
-    const landing = (): number => (legacy || reduced || clips.playing() || held.lifted ? now : blinker.carry(now));
+    // THE TURN toward a look, one level every 140 ms (all at once under reduced motion). A move of the eyes or head lands now, or at the closed step of a blink that carries it (that step's start is the blink's own deadline);
+    // none carries it in a clip, the brows' hold or a fade of a change of her face (this step's mood move or ease back from the lift, or one still running: a turn level joins it), where a blink would cut the fade.
+    const landing = (): number => (legacy || reduced || clips.playing() || held.lifted || moodMove !== 'same' || (browsShown && !held.lifted) || now < bigFadeEndsAt ? now : blinker.carry(now));
     const turnable = TURNABLE.has(presence);
     const wantedTurn = turnable ? turnToward(input.look) : NO_TURN;
     if (reduced || !turnable) {
@@ -206,18 +206,19 @@ export function createFaceEngine(manifest: CompanionFaceManifest, seed: number):
     const turned = turn.level > 0;
     const lookHeld = wantedTurn.level > 0;
     const browFrame = brows !== undefined && held.lifted && !turned ? brows[mood] : null;
+    const liftEnds = browsShown && browFrame === null; // the ease back begins on this step, and no blink starts on it
 
-    // A step that changes the state or the mood starts that crossfade; no blink or glance cuts into it.
+    // A step that changes the state or the mood starts that crossfade; a blink in play is cut at it, and no blink or glance starts on it.
     const settled = !presenceChanged && moodMove === 'same';
 
     // THE BLINK waits for a still face and, while she speaks, a closed mouth; one that falls due in a face that cannot blink lapses (above, next step).
-    if (presence === 'cut' && !reduced && !cutBlinked && now - stateSince >= CUT_BLINK_AFTER_MS && !fader.fading(now)) {
+    if (presence === 'cut' && !reduced && !cutBlinked && now - stateSince >= CUT_BLINK_AFTER_MS && settled && !liftEnds && !fader.fading(now)) {
       cutBlinked = true;
       blinker.single(now);
     }
     const plain = RESTING.has(presence) && !turned;
     const hasBlinkFrames = !reduced && (legacy ? RESTING.has(presence) || speaking : presence !== 'failed' && presence !== 'cut');
-    const free = settled && !clips.playing() && !held.lifted && !fader.fading(now) && (drawn === null || drawn.closed) && (!legacy || (glance === null && !turned && !lookHeld));
+    const free = settled && !liftEnds && !clips.playing() && !held.lifted && !fader.fading(now) && (drawn === null || drawn.closed) && (!legacy || (glance === null && !turned && !lookHeld));
     blinker.tick(now, blinkState, hasBlinkFrames && free);
 
     // THE GLANCE, in a plain face with a neutral mood; its start and its end are moves a blink may carry.
@@ -276,21 +277,20 @@ export function createFaceEngine(manifest: CompanionFaceManifest, seed: number):
     }
     wantAt(moodHold.holdsUntil());
 
-    // A blink's steps are hard swaps, and so is the step out of the last one.
-    const sceneFadeMs = inBlinkAtStart || blinkNow ? 0 : fadeMs;
-    // A new state's face and a new mood's fade in over 180 ms (a mood easing back to neutral, 300); the nod's first frame is a clip's, at the clip's pace.
-    // The lift fades in over 140 ms with the step that starts it, a state change or not; a state change ends it into that state's own fade.
+    // A BLINK AND A FADE NEVER OVERLAP: a step that begins a fade of a change of her face cuts a blink in play (`openFrom`) and fades, at the length below, from the open eyes of the look it was drawn over; every other step of a blink, and the step out of the last, is a hard swap.
+    // A new state's face and a new mood's fade in over 180 ms, the ease back and the warm spell over 300, the nod's first frame at its clip's pace, the lift over 140 with the step that starts it (a state change ends it into that state's own fade).
     const lifts = browFrame !== null && !browsShown;
-    const liftEnds = browsShown && browFrame === null;
     browsShown = browFrame !== null;
     const faceChanged = (presenceChanged && clipShown === null && !lifts) || moodMove === 'changed';
     const eased = moodMove === 'eased' || ((warm !== warmWas || liftEnds) && !presenceChanged); // the warm spell eases in and out and the lifted brows out, as a mood does
     const startsBigFade = eased || faceChanged;
     const bigFadeMs = eased ? EASE_MS : MOOD_FADE_MS;
     if (startsBigFade && !reduced) bigFadeEndsAt = now + bigFadeMs;
+    const beginsFade = presenceChanged || startsBigFade || lifts;
+    const sceneFadeMs = !beginsFade && (openFrom !== null || blinkNow) ? 0 : fadeMs;
     // A frame that changes inside that fade (the mouth moving under a new mood) joins it and ends with it, not cutting it to its own 60 ms.
     const crossfadeMs = startsBigFade ? bigFadeMs : sceneFadeMs > 0 ? Math.max(sceneFadeMs, bigFadeEndsAt - now) : 0;
-    if (warm !== warmWas && inBlinkAtStart) fader.show(moods[warmWas ? 'gentle' : 'neutral'].mouths.closed, now, 0); // the step out of a blink opens her eyes at once: the spell's ease starts from that face, not the blink's half-lidded one
+    if (beginsFade && openFrom !== null && !reduced) fader.show(openFrom, now, 0);
     const shown = fader.show(frame, now, reduced ? 0 : crossfadeMs);
     wantAt(fader.endsAt());
 

@@ -45,9 +45,9 @@ const isTier = (value: unknown): value is CompanionFaceTier => isRecord(value) &
 /**
  * Only what the portrait and its engine read is checked, field by field: a manifest missing one (made by an older recipe, or cut short) would throw
  * inside the portrait's render and take the whole screen with it, so it is refused here and the disc keeps her ground. The neutral mood is the one
- * the engine starts from and falls back to. `blinks` is absent on a face made before it, which the engine plays as it always did, so it
+ * the engine starts from and falls back to. `blinks` is absent on a face made before it, which the engine still plays, so it
  * is checked only when present, and then whole: its listening blink and its gaze and pose tables. `brows` is absent on a face made before
- * it and plays as it always did too, and is checked only when present, as a record. The numbers inside the tables are the server's own and
+ * it and still plays too, and is checked only when present, as a record. The numbers inside the tables are the server's own and
  * are not checked one by one.
  */
 function isManifest(value: unknown): value is CompanionFaceManifest {
