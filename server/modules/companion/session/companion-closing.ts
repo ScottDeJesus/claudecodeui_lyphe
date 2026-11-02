@@ -25,7 +25,8 @@ import type { CompanionCli, CompanionContextReading } from './companion-process.
  * (`companion-refusal.ts`): a crash between the two leaves it held, and the next session reads it again and closes it. THE WALL: a turn answered
  * "Prompt is too long" means the CLI's own limit was reached and a last turn would be refused too: `full` writes the house's handover and ends it at once.
  * Unless the refused message was all that conversation held (a fresh launch's first): then the message is too long, not the conversation, and a handover
- * would reach the next launch with the same words, refused again, one summarizer call per round; `full` ends it with no handover and the words are not kept.
+ * would reach the next launch with the same words, refused again, one summarizer call per round; `full` ends it with no handover and the refused words are not kept
+ * (the session keeps the messages the CLI did not refuse, and puts back the handover the refused message carried).
  *
  * `arm` and `afterTurn` are reached by a normal turn and never throw or reject: a fault of the closing is a journal line. Nothing polls.
  */

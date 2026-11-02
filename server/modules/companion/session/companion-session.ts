@@ -73,8 +73,8 @@ import { guarded } from './guarded-callback.js';
 /** What a launch begins with: the CLI conversation it continues (`null` for a fresh one), the `tools` it is handed, the `systemPrompt` it is sent and the `shape` of those tools and that prompt, which is stored with the session id its `init` reports. The shape is taken from the very tools and the very prompt the launch gets. */
 type LaunchPlan = { resume: string | null; tools: CompanionSessionDeps['tools']; systemPrompt: string; shape: string };
 
-/** One launch and what the conversation has learned of it: the shape it was launched with, whether its first `init` has been seen (the process is up), whether the CLI refused its `resume`, whether it holds a message yet (a `warm` launch does not) and whether the CLI has taken a message of it without refusing it as too long (`answered`). */
-type Launch = { cli: CompanionCli; shape: string; initSeen: boolean; resumeRefused: boolean; messaged: boolean; answered: boolean };
+/** One launch and what the conversation has learned of it: the shape it was launched with, whether its first `init` has been seen (the process is up), whether the CLI refused its `resume`, whether it holds a message yet (a `warm` launch does not), whether the CLI has taken a message of it without refusing it as too long (`answered`) and the `handover` its first message carried, read as the row was emptied (`null`: none). */
+type Launch = { cli: CompanionCli; shape: string; initSeen: boolean; resumeRefused: boolean; messaged: boolean; answered: boolean; handover: string | null };
 
 /** A stop whose turn has not yet reported its result: the launch concerned, a promise that settles when the wait is over and the way to settle it. */
 type Stop = { launch: Launch; over: Promise<void>; end(): void };
@@ -98,6 +98,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   const onSystemLine = guarded('system line', userId, deps.onSystemLine);
   const writeProviderSession = guarded('session writer', userId, deps.writeProviderSession);
   const dropHandover = guarded('handover drop', userId, deps.dropHandover);
+  const restoreHandover = guarded('handover restore', userId, deps.writeHandover);
   // Her last turn is quiet to the page: no sentence, no turn frame, no speech-cache move. Her activity still passes, so she reads thinking.
   const unlessLastTurn =
     <Args extends unknown[]>(callback: (...args: Args) => void) =>
@@ -194,8 +195,19 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
    */
   function handoverReceived(): void {
     if (!assembler.handoverInFlight()) return;
+    if (live !== null) live.handover = rowHandover();
     assembler.releaseHandover();
     dropHandover();
+  }
+
+  /** The handover on her row, or `null` when there is none or the read threw (the callbacks of the deps never end her conversation). */
+  function rowHandover(): string | null {
+    try {
+      return deps.readHandover();
+    } catch (error) {
+      console.error(`[Companion] account ${userId}: the handover read callback threw`, error);
+      return null;
+    }
   }
 
   /** The same message under a new uuid, for the CLI that is to be told it again. His words are assembled afresh (the roster and the view in the old message are a snapshot) and his pictures ride again (`sent.images`); a message that cannot be goes as it was. */
@@ -279,20 +291,31 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   /**
    * A turn answered "Prompt is too long": everything the launch was handed and never answered is taken out, his words of it are kept on disk (without the `<cut>`
    * they carried: the fresh her never said that sentence) and parked FIRST, so the fresh launch's first message is his refused words with the handover.
-   * `tooLongAlone`: the launch held nothing but the refused message, so those words are not kept or parked: no launch could take them, and they would be
-   * refused again by every one that carried them (`closing.full` ends it without a handover).
+   * `tooLongAlone`: the launch held nothing but what it was handed, so the message the CLI refused is too long by itself: its words are not kept or parked (no launch
+   * could take them, every one that carried them would be refused again) and `closing.full` ends it without a handover. A refusal that lists messages refused only
+   * those, so the others the launch held are kept and parked as usual; one that lists none is the whole request's, and every message the launch held is dropped. The
+   * handover its first message carried was emptied from the row at `init`; it is put back for the next message, which is owed it.
    */
   function handOverRefused(launch: Launch, event: Extract<CompanionLoopEvent, { kind: 'result' }>, tooLongAlone: boolean): void {
     const refused = ledger.take(ledger.carry().map((sent) => sent.uuid));
     turns.result(event.answered.length > 0 ? event.answered : turns.inFlightUuids(), null);
     closing.full(launch, tooLongAlone);
-    for (const sent of tooLongAlone ? [] : refused) {
-      if (sent.words === null) continue;
+    if (tooLongAlone) putHandoverBack(launch);
+    const tooLong = (sent: Sent): boolean => tooLongAlone && (event.answered.length === 0 || event.answered.includes(sent.uuid));
+    for (const sent of refused) {
+      if (sent.words === null || tooLong(sent)) continue;
       const words = { ...sent.words };
       delete words.cut;
       const kept = ledger.keep(words);
       closing.park(() => deliver(wordsEnvelope(words), words, sent.images, kept));
     }
+  }
+
+  /** The handover a refused fresh launch carried goes back on her row unless the row holds another by now: the first message of the next launch carries it. */
+  function putHandoverBack(launch: Launch): void {
+    if (launch.handover === null || rowHandover() !== null) return;
+    restoreHandover(launch.handover);
+    console.log(`[Companion] account ${userId}: the handover her refused first message carried is put back on her row for her next message`);
   }
 
   function handle(launch: Launch, message: SDKMessage): void {
@@ -354,6 +377,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       resumeRefused: false,
       messaged: initial.length > 0,
       answered: false,
+      handover: null,
     };
     setCondition({ state: 'waking', error: null });
     return launch;
