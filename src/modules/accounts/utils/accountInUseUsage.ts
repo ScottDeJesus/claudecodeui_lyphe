@@ -24,9 +24,6 @@ import type { ClaudeAccountRow, ClaudeAccounts, ClaudeUsage, ClaudeUsagePace, Cl
  * the reading the meters draw, and the rings and the account rows ask `hasFiveHour` themselves.
  */
 
-/** Three minutes: the age past which a reading from the picture is drawn as old rather than current. */
-const PICTURE_READING_STALE_MS = 3 * 60_000;
-
 /** The two windows every account row states, and the labels the meters already give them. */
 const FIVE_HOUR = { key: 'five_hour', label: WINDOW_NAMES.five_hour } as const;
 const WEEKLY = { key: 'seven_day', label: WINDOW_NAMES.seven_day } as const;
@@ -112,13 +109,12 @@ function withoutFiveHour(usage: ClaudeUsage): ClaudeUsage {
 /**
  * The account in use's newest reading and pace, as the two-window `ClaudeUsage` the meters draw.
  *
- * `degraded: true` and `staleSince` — the reading's own filed-at stamp, epoch seconds — appear only
- * once the reading is older than three minutes, so the meters dim the bars and say "as of" instead
- * of presenting a filed figure as a fresh measurement. The reason is the usage route's own when that
- * body is degraded (it is the live attempt that failed); otherwise empty, which the meters word as
- * "the provider gave no figures" — true of the last three minutes even when older ones are drawn.
+ * Drawn at full strength whatever its age: never `degraded`, never an "as of" line. The account in use
+ * is read only through the rate-limit reports of the chats and jobs that run on it, and its figures move
+ * a whole percent at a time, so a filed-at stamp hours old is still the current figure while nothing
+ * has moved it.
  */
-function pictureReading(row: ClaudeAccountRow, usage: ClaudeUsage | null, nowMs: number): ClaudeUsage {
+function pictureReading(row: ClaudeAccountRow, nowMs: number): ClaudeUsage {
   const reading = row.reading;
   if (reading === null) {
     return {
@@ -134,12 +130,10 @@ function pictureReading(row: ClaudeAccountRow, usage: ClaudeUsage | null, nowMs:
 
   const five = points(reading.five);
   const week = points(reading.week);
-  // The row's filed-at is wire input as much as its figures are: a stamp naming no instant cannot
-  // establish an age, and `checkedAt` must stay a number. The moment this picture was read is the
-  // only time we can vouch for, so such a reading is stamped with it and never shown as stale.
+  // The row's filed-at is wire input as much as its figures are, and `checkedAt` must stay a number:
+  // a stamp naming no instant is replaced by the moment this picture was read, the only time we can
+  // vouch for.
   const filedAt = Number.isFinite(reading.at) ? reading.at : Math.floor(nowMs / 1000);
-  const stale = nowMs - filedAt * 1000 > PICTURE_READING_STALE_MS;
-  const usageExplains = usage !== null && usage.reachable && usage.degraded ? usage.reason : '';
   const pace = paceInPercent(row, five, week);
 
   return {
@@ -149,9 +143,9 @@ function pictureReading(row: ClaudeAccountRow, usage: ClaudeUsage | null, nowMs:
       { key: FIVE_HOUR.key, label: FIVE_HOUR.label, percent: five, resetsAt: resetStamp(reading.five_resets) },
       { key: WEEKLY.key, label: WEEKLY.label, percent: week, resetsAt: resetStamp(reading.week_resets) },
     ],
-    degraded: stale,
-    reason: stale ? usageExplains : '',
-    staleSince: stale ? filedAt : null,
+    degraded: false,
+    reason: '',
+    staleSince: null,
     checkedAt: filedAt,
     // The key stays absent, not null, when the pacer could weigh neither window.
     ...(pace === undefined ? {} : { pace }),
@@ -178,6 +172,6 @@ export function accountInUseUsage(
   if (row === null) return usage;
   const reading = usage !== null && usage.reachable && !usage.degraded && usage.account === row.digest
     ? usage
-    : pictureReading(row, usage, nowMs);
+    : pictureReading(row, nowMs);
   return hasFiveHour(row) ? reading : withoutFiveHour(reading);
 }

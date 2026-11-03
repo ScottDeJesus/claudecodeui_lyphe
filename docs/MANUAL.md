@@ -13930,7 +13930,7 @@ Reference: the meters' states MAN-464; the door's picture MAN-8843 and its relay
 |---|---|
 | no account in use (no picture, door unreachable) | `usage` untouched — what the panel drew before the file existed |
 | `usage` reachable, not `degraded`, and `usage.account === row.digest` | `usage` — a measurement taken now beats anything filed |
-| anything else | `pictureReading(row, usage, nowMs)` — the row's newest reading as a `ClaudeUsage` |
+| anything else | `pictureReading(row, nowMs)` — the row's newest reading as a `ClaudeUsage` |
 
 - The route's body is never drawn under another account's name: identity match plus health is the test. `GET /api/usage` measures the box's live login (`account` = its digest, MAN-464); once the store chooses another account those figures belong to the outgoing login.
 - Callers: `AccountPanelBody` (`UsageMeters`) — drawn by the popover and by the Accounts widget alike — and `UsageRings` (the two rings on the views rail, MAN-9033). Both read it so a ring and its meter show the same figure.
@@ -13941,21 +13941,21 @@ Reference: the meters' states MAN-464; the door's picture MAN-8843 and its relay
 | `reading === null` | both windows `percent: null`, `resetsAt: null`; `degraded: false`; `checkedAt` = now (seconds) |
 | `reading.five` / `.week` (fraction 0..1) | `percent` = `Math.round(fraction × 100)` on `five_hour` ("Current 5-hour window") and `seven_day` ("This week") |
 | `reading.five_resets` / `.week_resets` (epoch seconds) | `resetsAt` ISO-8601 |
-| `reading.at` (epoch seconds) older than 3 min (`PICTURE_READING_STALE_MS`) | `degraded: true`, `staleSince: at`; the meters dim to 60% under *As of \<local time\> — \<why\>* |
+| `reading.at` (epoch seconds) | `checkedAt` = `at`; `degraded: false`, `reason: ''`, `staleSince: null` at every age, so the meters and the rings draw it at full strength with no *As of* line. The account in use is read only through the rate-limit reports of the chats and jobs that run on it, and its figures move a whole percent at a time, so an `at` hours old is still the current figure while nothing has moved it (operator, 2026-11-02) |
 | `row.pace` | `ClaudeUsage.pace` in percent: `projected5` / `ceiling5` / `projected7` / `ceiling7` = `points(fraction)`; `used5` / `used7` = the reading's own percent; `words: ''`. Key ABSENT when `row.pace === null`; a null `pace.five` / `.week` is a null pair |
-| `reason` | the usage route's `reason` only when the route body is itself degraded AND the reading is stale; else `''` (the meters word that as "the provider gave no figures") |
 
 ## Rules an editor must not break
 1. **`accountInUseUsage.ts` is the one place the door's fractions become the meters' percent.** Any new window or pacer figure is converted here; no renderer multiplies.
 2. **Unknown is `null`, never `0` and never `NaN`.** `points(fraction)` returns `null` for `null`, absent or non-finite input (`Math.round(undefined*100)` is `NaN`, which `Meter` draws as a live bar with `aria-valuenow="NaN"`). `ClaudeAccountRow.reading.five` / `.week` are `number | null` (INV-9252): the pacer files one-window readings.
-3. **Every wire stamp is read through a finite check.** `resetStamp` returns `null` for null, absent or non-finite seconds (`new Date(undefined).toISOString()` throws in render and takes the whole app down). `reading.at` is normalised once into `filedAt`: unreadable → the conversion moment, never stale, and `checkedAt` stays a number.
-4. **The reading's age is judged from the picture's own clock.** `nowMs` is a minute tick (`useMinuteTick`: `AccountPanelBody`'s `now`, the row's `nowTick`, `UsageRings`' own), not a fresh `Date.now()`.
+3. **Every wire stamp is read through a finite check.** `resetStamp` returns `null` for null, absent or non-finite seconds (`new Date(undefined).toISOString()` throws in render and takes the whole app down). `reading.at` is normalised once into `filedAt`: unreadable → the conversion moment, so `checkedAt` stays a number.
+4. **`nowMs` is the callers' minute tick** (`useMinuteTick`: `AccountPanelBody`'s `now`, the row's `nowTick`, `UsageRings`' own), not a fresh `Date.now()`. This file reads it only to stamp `checkedAt` when there is no reading or its `at` is unreadable.
 5. **Row-side figures obey the same rules.** `ClaudeAccountRowViews.tsx` applies the null / non-finite / unreadable-instant guard at its own read sites (`figureInPoints`, `readingAgeInWords`, `tokenDateInWords`; MAN-8847); a guard added to one file is added to the other.
 6. **No whole-object validator at the door boundary.** The edge guards live at each read site, after the `resetStamp` precedent.
 
 ## Measured
-- 2026-10-21, `.verify/panel-fill.mjs` against dev client `:5183` / API `:3011`, `/api/accounts` and `/api/usage` stubbed: 90 ok, 0 failed (fallback panel: the door's 27% / 83% drawn, the route's other login's 5% / 6% not drawn; stale panel: same figures at 60% under *As of …*).
+- 2026-10-21, `.verify/panel-fill.mjs` against dev client `:5183` / API `:3011`, `/api/accounts` and `/api/usage` stubbed: 90 ok, 0 failed (fallback panel: the door's 27% / 83% drawn, the route's other login's 5% / 6% not drawn).
 - 2026-10-21, before the guards: a reading with no `five` drew `5h NaN% · wk 60%` and `aria-valuenow="NaN"`; one with no `at`, or an account with no `expires_at`, threw `RangeError: Invalid time value` and took the app to the error screen.
+- 2026-11-02, prod client `:5184` (build 20261102-171146) against the live `/api/accounts`, the in-use account's `reading.at` set 20 min back: the weekly ring at opacity 1, no meter dimmed, no *As of* line, 0 page errors.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts
 
