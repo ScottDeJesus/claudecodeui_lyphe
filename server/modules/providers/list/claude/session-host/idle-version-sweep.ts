@@ -38,6 +38,7 @@ import { observeInstalledCliVersionChanges } from '@/modules/cli-version/index.j
 import { chatRunRegistry } from '@/modules/websocket/index.js';
 import { isBehindInstalled } from '@/shared/version-order.js';
 
+import { noteHostRetiring } from './host-liveness.js';
 import { listLiveHosts, retireHost } from './hosts.js';
 import type { LiveHost } from './hosts.js';
 
@@ -120,6 +121,9 @@ export function retireStaleIdleHosts(
     // The journal is the version's source (`host-registry.js`'s `lastReportedCliVersion`), so this line can
     // only be printed for a version the process itself announced.
     console.log(`[keepalive] retiring idle host ${host.hostId}: cli ${reported} → ${installedVersion}`);
+    // Marked first: the retire makes the host end this process's own socket, so the end reads as a lost connection, and the
+    // auto-close of a chat that fell asleep must be able to tell the server's own act from one (`HostEnd.retiredByServer`).
+    noteHostRetiring(host.hostId);
     retire(host.hostId);
   }
   return standing;

@@ -242,7 +242,7 @@ const HAS_ZONE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
  *  ⚠ A timestamp with NO offset is read as UTC, the same rule the panel's `resetInstant()` applies
  *  (`src/modules/accounts/utils/usageWindows.ts`). The two MUST agree: this function decides
  *  `markRolled`'s flag from the same string the panel counts down to, so a second reading of it
- *  would put "was 88 % used" beside a countdown to a different instant. `Date` does the opposite by
+ *  would mark a window rolled by one instant and count down to another. `Date` does the opposite by
  *  default — it reads a zoneless stamp as LOCAL, which on this box would move a reset by seven
  *  hours, so a payload that ever drops its `+00:00` buys that divergence silently. The appended `Z`
  *  is the whole guard, and it is the same one on both sides of the wire. */
@@ -268,15 +268,13 @@ export function resetEpoch(value: unknown): number | null {
  * while utilisation climbed 14 % → 25 %. It does not SLIDE, so a reading the instant overtook is not
  * merely old: it describes a block that is over. That, and only that, is what this function claims.
  *
- * ⚠ ROLLED IS NOT ZERO, and the difference is the whole point. At the instant of reset the usage IS
- * 0, but anything running starts climbing immediately, and the case this exists for is precisely the
- * one where nobody can see it (a stale reading spanning a rollover while the token is expired or the
- * endpoint is refusing). Writing 0 % there would put a number on screen that nobody read — the one
- * thing this panel does not do. `rolled` says exactly what is known: the figure is HISTORICAL, and
- * how much of the current block is gone is unread. The UI keeps the last-known bar at low opacity and
- * labels the figure `was`. It neither drains the bar — that draws the full tank this refuses to
- * claim, and renders pixel-identical to a genuine measured 0 % — nor asserts that a new window exists
- * and is new, because under first-use anchoring there may not be one.
+ * ⚠ `rolled` IS THE SERVER'S FACT, NOT A FIGURE. It says exactly what is known: the reading describes a block
+ * that is over. This function writes no 0 % — the percent stays the closed window's, and nothing is filed from it
+ * (`pacer-door.ts` refuses a rolled window). What the panel draws for it is the client's own rule
+ * (`windowPastReset`, `src/modules/accounts/utils/usageWindows.ts`): the window that began at the reset, 0 % used,
+ * because a figure moves only when something uses the account (operator, 2026-11-03). A weekly window's reset steps
+ * forward in whole weeks; a 5-hour window states none, since under first-use anchoring it may have no successor at
+ * all and its next boundary is never knowable from this one.
  *
  * Pure, and applied at SERVE time rather than at parse time: the same cached reading is correct
  * before its reset and rolled after it, without being re-read.

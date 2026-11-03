@@ -23,7 +23,7 @@ export type FakeClaudeAccountsState =
   | 'in-use-no-token'
   | 'refused'
   | 'checking'
-  | 'old-reading'
+  | 'past-reset'
   | 'no-reading'
   | 'candidate'
   | 'auto-off'
@@ -173,8 +173,8 @@ export function claudeAccountFakes(nowMs: number): Record<FakeClaudeAccountsStat
       },
     }),
 
-    // The rule's own long sentence under the in-use row, with no last switch to repeat it: the
-    // heaviest state of the row's why at the narrowest width.
+    // The rule's own long sentence as the full account's warn line (`no room now — …`), with no last
+    // switch to say it too: the heaviest why a row carries, at the narrowest width.
     'real-why': picture({
       accounts: pair(
         nowMs,
@@ -256,9 +256,10 @@ export function claudeAccountFakes(nowMs: number): Record<FakeClaudeAccountsStat
       last_switch: switchedByHand(nowSeconds),
     }),
 
-    // Figures old enough that the row owes the reader their age.
-    'old-reading': picture({
-      accounts: pair(nowMs, {}, { reading: reading(nowMs, 0.02, 0.06, 2 * 60 * 60_000) }),
+    // A reading taken before both its resets: each window draws as the one that began at its reset (0%), the 5-hour
+    // states no reset and the weekly names the next one.
+    'past-reset': picture({
+      accounts: pair(nowMs, {}, { reading: reading(nowMs, 0.96, 0.97, 8 * DAY_SECONDS * 1000) }),
       chosen: chosenByHand(nowSeconds),
       last_switch: switchedByHand(nowSeconds),
     }),

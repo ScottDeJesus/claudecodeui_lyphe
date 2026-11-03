@@ -26,7 +26,9 @@ function asAccountId(value: unknown): number | null {
 
 /**
  * The id of the active account the chat acts for, or null. Consumed by `notes.command-routes.ts` and
- * `followups.command-routes.ts` (on `add`), the command doors that write an account's rows.
+ * `followups.command-routes.ts` (on `add`), the command doors that write an account's rows, and by `followups.service.ts`
+ * (`fileGapsForChat`, the house's own filing of a finished feature's build gaps), which is no door: when this answers null it
+ * takes the one account that already filed an item on the chat, and otherwise files nothing.
  */
 export function accountOfChat(appSessionId: string): number | null {
   const fromRun = asAccountId(chatRunRegistry.getRun(appSessionId)?.writer.userId);

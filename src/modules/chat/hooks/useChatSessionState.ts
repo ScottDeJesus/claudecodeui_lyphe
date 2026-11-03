@@ -948,6 +948,23 @@ export function useChatSessionState({
     });
   }, [lastSeqRef, selectedProject, selectedSession, sendMessage, statusCheckSentAtRef, ws]);
 
+  // Initial token usage for providers with file-backed usage data. The provider module resolves storage and
+  // provider details from the session id.
+  const fetchInitialTokenUsage = useCallback(async (sessionId: string) => {
+    try {
+      const response = await api.providers.sessionTokenUsage(sessionId);
+      if (activeSessionIdRef.current !== sessionId) return;
+      if (response.ok) {
+        const payload = await response.json();
+        setTokenBudget(payload.data ?? null);
+      } else {
+        setTokenBudget(null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch initial token usage:', error);
+    }
+  }, []);
+
   // Main session loading effect — store-based.
   //
   // The dependency list is deliberately narrower than the values the body
@@ -1008,8 +1025,14 @@ export function useChatSessionState({
 
     // Reset pagination/scroll state
     messagesOffsetRef.current = 0;
-    setHasMoreMessages(false);
-    setTotalMessages(0);
+    // The cached rows draw at once while the refetch below is out, so "older pages remain" is what the slot already
+    // knows (a chat revisited with only some pages loaded). Reading false here would tell the transcript every page is
+    // in: its outside-image caption (`complete`) would claim "no copy" for a `Read` on a page that is not loaded.
+    // A chat with no cached slot has no older pages to name yet, and starts at false/0 as ever. The total is seeded
+    // with it: the pane draws its "Showing N of M" strip whenever `hasMore` is true and fills the line only once the
+    // total is known, so a seeded flag beside a zero total would draw an empty bordered strip for the whole refetch.
+    setHasMoreMessages(existingSlot?.hasMore ?? false);
+    setTotalMessages(existingSlot?.total ?? 0);
     setVisibleMessageCount(INITIAL_VISIBLE_MESSAGES);
     setAllMessagesLoaded(false);
     allMessagesLoadedRef.current = false;
@@ -1045,6 +1068,10 @@ export function useChatSessionState({
         if (slot.tokenUsage !== undefined) {
           setTokenBudget((slot.tokenUsage as Record<string, unknown> | null) ?? null);
         }
+        // A chat that has had no turn has no transcript for the usage endpoint to read, and it answers 404 for
+        // it: ask only once the load reports rows. The first turn's usage reaches the panel through the stream's
+        // `token_budget` frame and the history refresh, never through this fetch.
+        if (slot.total > 0) void fetchInitialTokenUsage(selectedSessionId);
       }
       // No rows (an empty chat, or a load the hidden tab refused): nothing will settle.
       if (!slot || slot.total === 0) setIsOpeningSession(false);
@@ -1055,6 +1082,7 @@ export function useChatSessionState({
     });
   }, [
     isActive,
+    fetchInitialTokenUsage,
     resetStreamingState,
     requestLatestMessages,
     selectedProject,
@@ -1274,29 +1302,6 @@ export function useChatSessionState({
     scrollToTarget();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatMessages.length, isActive, isLoadingSessionMessages, searchTarget]);
-
-  // Initial token usage fetch for providers with file-backed usage data.
-  useEffect(() => {
-    if (!selectedSession?.id) {
-      setTokenBudget(null);
-      return;
-    }
-    const fetchInitialTokenUsage = async () => {
-      try {
-        // The provider module resolves storage and provider details from the session id.
-        const response = await api.providers.sessionTokenUsage(selectedSession.id);
-        if (response.ok) {
-          const payload = await response.json();
-          setTokenBudget(payload.data ?? null);
-        } else {
-          setTokenBudget(null);
-        }
-      } catch (error) {
-        console.error('Failed to fetch initial token usage:', error);
-      }
-    };
-    fetchInitialTokenUsage();
-  }, [selectedSession?.id]);
 
   const visibleMessages = useMemo(() => {
     if (chatMessages.length <= visibleMessageCount) return chatMessages;

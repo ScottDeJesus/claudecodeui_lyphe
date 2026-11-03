@@ -70,12 +70,11 @@ function heavyLine(tone: 'accent' | 'warn', sub: string | undefined): string | u
  * has no reset time, and then the line is simply not drawn.
  *
  * The instant comes from `resetInstant`, the one reader this module has, so the countdown here
- * and the `rolled` flag the server set describe the same moment.
+ * and the carry past a reset (`windowPastReset`) describe the same moment.
  *
- * `lead` opens the sentence. The meters say "Resets"; each account row (`ClaudeAccountRowViews`)
- * says "Weekly resets" for that account's own week.
+ * Said under each meter, and in each usage ring's words (`UsageRing`, on the rail and in the account rows).
  */
-export function resetsLine(resetsAt: string | null, lead = 'Resets'): string | undefined {
+export function resetsLine(resetsAt: string | null): string | undefined {
   if (!resetsAt) return undefined;
   const at = new Date(resetInstant(resetsAt));
   if (Number.isNaN(at.getTime())) return undefined;
@@ -88,15 +87,16 @@ export function resetsLine(resetsAt: string | null, lead = 'Resets'): string | u
   const clock = new Date(Math.round(at.getTime() / 60_000) * 60_000)
     .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msLeft = at.getTime() - Date.now();
-  if (msLeft <= 0) return `${lead} at ${clock}`;
+  if (msLeft <= 0) return `Resets at ${clock}`;
 
-  const hoursLeft = Math.round(msLeft / 3_600_000);
-  if (hoursLeft < 1) return `${lead} at ${clock} · under an hour left`;
-  if (hoursLeft < 24) return `${lead} at ${clock} · about ${hoursLeft} hour${hoursLeft === 1 ? '' : 's'} left`;
+  // Rounded UP, as `resetCountdown` rounds the rings' countdown, so the words and the ring name one number.
+  const hoursLeft = Math.ceil(msLeft / 3_600_000);
+  if (msLeft < 3_600_000) return `Resets at ${clock} · under an hour left`;
+  if (hoursLeft < 24) return `Resets at ${clock} · about ${hoursLeft} hour${hoursLeft === 1 ? '' : 's'} left`;
 
-  const daysLeft = Math.round(msLeft / 86_400_000);
+  const daysLeft = Math.ceil(msLeft / 86_400_000);
   const weekday = at.toLocaleDateString([], { weekday: 'long' });
-  return `${lead} ${weekday} ${clock} · about ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
+  return `Resets ${weekday} ${clock} · about ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
 }
 
 /**
@@ -201,14 +201,12 @@ function renderReading(usage: ClaudeUsage | null, pace: ClaudeUsagePace | null) 
           const tone = windowTone(usageWindow, percent);
           const paceMarks = paceForWindow(usageWindow.key, pace);
           return (
-            // A rolled window is dimmed on its own: its percent is real but its window has
-            // already ended, so it reads as history beside the bars that are still running.
-            <div key={usageWindow.key} className={usageWindow.rolled ? 'opacity-60' : undefined}>
+            <div key={usageWindow.key}>
               <Meter
                 percent={percent}
                 tone={tone}
                 label={windowLabel(usageWindow)}
-                value={windowValue(percent, Boolean(usageWindow.rolled))}
+                value={windowValue(percent)}
                 sub={heavyLine(tone, resetsLine(usageWindow.resetsAt))}
                 tickAt={paceMarks.tickAt}
                 markAt={paceMarks.markAt}

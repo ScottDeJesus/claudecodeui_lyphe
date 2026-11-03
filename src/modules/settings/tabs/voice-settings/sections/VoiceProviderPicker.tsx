@@ -1,27 +1,27 @@
 import { useTranslation } from 'react-i18next';
 
+import type { VoiceProvider } from '@/shared/types';
 import { Field, SegmentedControl } from '@/shared/ui';
 
 type VoiceProviderPickerProps = {
-  /** Which service turns the chat's mic into text: 'openai' (the OpenAI-compatible backend, today's) or 'gemini'. */
-  value: 'openai' | 'gemini';
-  onChange: (value: 'openai' | 'gemini') => void;
+  /** Which service hears the chat's mic and speaks its read-aloud: 'gemini' (the default) or 'openai' (the OpenAI-compatible backend). */
+  value: VoiceProvider;
+  onChange: (value: VoiceProvider) => void;
 };
 
 /**
- * The chat's mic provider: OpenAI-compatible or Gemini, as the kit's SegmentedControl (a radio group, the arrows moving
- * the choice) in the kit's Field, labelled "Speech to text" with "Which service turns the chat's mic into text." under it.
- * Composed for the settings module's VoiceSettingsTab, at the head of the voice-input section, above the OpenAI-compatible
- * fields; `.verify/kaylee-talk-scaffold.mjs` draws it on each value. It governs the chat's mic alone: Kaylee hears through
- * Gemini whatever it says, and read-aloud stays on the OpenAI-compatible backend, so on Gemini only the speech-to-text
- * model field goes and read-aloud's fields stay.
+ * The chat's voice provider: Gemini or OpenAI-compatible, as the kit's SegmentedControl (a radio group, the arrows moving
+ * the choice) in the kit's Field, labelled "Voice service" with "Which service hears the chat's mic and speaks its read-aloud."
+ * under it. Composed for the settings module's VoiceSettingsTab, at the head of the backend section, above the OpenAI-compatible
+ * fields, which stand only while 'openai' is picked. It governs the chat's mic and its read-aloud: Kaylee hears and speaks
+ * through Gemini whatever it says.
  */
 export function VoiceProviderPicker({ value, onChange }: VoiceProviderPickerProps) {
   const { t } = useTranslation('settings');
-  const label = t('voiceSettings.provider.label', { defaultValue: 'Speech to text' });
+  const label = t('voiceSettings.provider.label', { defaultValue: 'Voice service' });
 
   return (
-    <Field label={label} helper={t('voiceSettings.provider.help', { defaultValue: "Which service turns the chat's mic into text." })}>
+    <Field label={label} helper={t('voiceSettings.provider.help', { defaultValue: "Which service hears the chat's mic and speaks its read-aloud." })}>
       {/* A block around the tray, so the field's column does not stretch it: the tray is as wide as its two words. */}
       <div>
         <SegmentedControl

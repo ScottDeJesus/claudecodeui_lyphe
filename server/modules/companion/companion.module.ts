@@ -52,7 +52,7 @@ type CompanionModule = { router: Router; resendUnanswered(): void; stop(): Promi
 /** Consumed by `server/index.ts` (through the barrel), once at boot. */
 export function createCompanionModule({ runtime, house }: { runtime: ProviderRuntimeGateway; house: CompanionHouse }): CompanionModule {
   companionService.attachRuntime(runtime, house);
-  const stopAlertFeed = startAlertFeed(companionService);
+  const stopAlertFeed = startAlertFeed(companionService, house);
   const stopFocusFeed = startFocusFeed(companionService);
   const stopDeletedChatFeed = startDeletedChatFeed(companionService);
   const stopStationHint = startStationHint();

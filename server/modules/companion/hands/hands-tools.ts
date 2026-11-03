@@ -44,8 +44,9 @@ import { directTools } from './direct-tools.js';
  * said, which line of his it was. It CLAIMS the action's row first (the firing line is written on it), and from then to the end
  * of the door nothing else may end, replace or fire that action (`action-end.ts`): his ×, a newer prepare, a lapse, a Clear and a
  * second take all leave it to the take. The row then ends with the door's outcome and sentence, a `system` line goes on her
- * panel, and the pending action leaves it. Each of the three first ends an action it finds past its time `expired`; nothing times
- * a lapse out. None of the three is read-only: each changes what waits on him.
+ * panel, and the pending action leaves it. A prepare and a take first end an action they find past its time `expired`, and a
+ * cancel takes the action down `cancelled` whatever its age, so a card he dismissed is never re-armed; nothing times a lapse
+ * out. None of the three is read-only: each changes what waits on him.
  *
  * Each description is her prompt's own line for the tool (`toolLine`).
  *
@@ -180,12 +181,7 @@ function cancelAction(deps: CompanionToolDeps): Promise<ToolTextResult> {
     const withdrawal = withdrawStandingAction(deps.userId, deps.store);
     if (withdrawal === null) return textResult('Nothing was waiting for his word.');
     if (withdrawal.ended === 'busy') return deps.refuse(BEING_CARRIED_OUT);
-    const { standing } = withdrawal;
-    return textResult(
-      withdrawal.ended === 'expired'
-        ? `It had lapsed at ${clockOf(standing.expiresAt)}; it is off his panel and nothing was done.`
-        : `Took it off his panel: ${standing.say}. Nothing was done.`,
-    );
+    return textResult(`Took it off his panel: ${withdrawal.standing.say}. Nothing was done.`);
   });
 }
 

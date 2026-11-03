@@ -2,6 +2,7 @@
  * How a Gemini call that did not succeed is read and worded, for the two doors that make one (`gemini-transcribe.ts`,
  * `gemini-speech.ts`): which statuses are worth a second ask, whether a refusal is the key's fault, Google's own
  * message, and the key's redaction. One home, so a transcription and a sentence of speech word a refused key the same way.
+ * It also holds the status the chat's routes give each refusal.
  */
 
 /** The shape of a Google API key. Redacted from every sentence the voice module returns, whatever put it there. */
@@ -10,6 +11,15 @@ const KEY_SHAPE = /AIza[0-9A-Za-z_-]{20,}/g;
 /** A busy or rate-limited Gemini often answers the second ask; any other status will not change in a second or two. */
 const RETRY_STATUSES = new Set([429, 503]);
 const REFUSED_STATUSES = new Set([401, 403]);
+
+/**
+ * The HTTP status the chat's routes answer with for a refusal of a Gemini door: `no_key` and `refused` are the person's to fix in
+ * Settings → Voice (409); `failed` is Google's or the network's (502). One mapping for the chat mic (`voice-provider.ts`) and
+ * read-aloud (`gemini-read-aloud.ts`), so the two answer the same refusal the same way.
+ */
+export function chatStatusForRefusal(reason: 'no_key' | 'refused' | 'failed'): 409 | 502 {
+  return reason === 'failed' ? 502 : 409;
+}
 
 /** The part of Google's JSON error body the voice module reads: `{ error: { message } }`. Any Gemini reply type that carries `error` fits. */
 export type GoogleErrorBody = { error?: { message?: unknown } };

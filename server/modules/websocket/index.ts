@@ -23,8 +23,8 @@ export { onSessionUpserted } from './services/session-upsert-broadcast.service.j
 // broadcastSessionArchiveChanged: used by the providers module — the close and the reopen of a chat, and the sleep-time
 // auto-close — so every open sidebar loses or regains the chat at once (an archived row sends no `session_upserted`).
 export { broadcastSessionArchiveChanged } from './services/session-archive-broadcast.service.js';
-// runDetachedChatTurn: used by the scheduled-messages module to run a turn
-// from a timer, with no socket to stream to or report errors on.
+// runDetachedChatTurn: used by the scheduled-messages dispatcher, the companion's send, auto-compaction and keepalive
+// re-adoption to run a turn with no socket to report errors on; the tabs that have the session open join the run.
 export { runDetachedChatTurn } from './services/chat-websocket.service.js';
 // Started once by the server entrypoint after `listen`: the registry owns runs,
 // so the check for one that has gone silent lives beside it.

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useVocabulary } from '@/modules/settings/hooks/useVocabulary';
 import { VocabularyEntryRow } from '@/modules/settings/tabs/voice-settings/sections/VocabularyEntryRow';
-import type { VocabularyEntry } from '@/shared/types';
+import type { VocabularyEntry, VocabularyRow } from '@/shared/types';
 import { Button, SettingsCard, SettingsSection } from '@/shared/ui';
 
 const NEW_WORD: VocabularyEntry = { spelling: '', pronunciation: '', misheard: [] };
@@ -25,28 +25,31 @@ const NEW_WORD: VocabularyEntry = { spelling: '', pronunciation: '', misheard: [
  */
 export function VocabularySection() {
   const { t } = useTranslation('settings');
-  const { entries, saving, error, save, retry } = useVocabulary();
+  const { rows, saving, error, save, rowFor, retry } = useVocabulary();
   // The word being composed: it is not in the list, and not on the server, until he adds it; null when none is.
   const [draft, setDraft] = useState<VocabularyEntry | null>(null);
-  // The row the last save was made from (its place in the list, or the draft): a refusal is drawn there. A refused save leaves the list as it was, so the place still names the same row.
+  // The row a refused save was made from (its id, or the draft): a refusal is drawn there. Set when the answer comes, because saves queue and an answer can arrive after another row has been edited.
   const [editedRow, setEditedRow] = useState<number | 'draft' | null>(null);
 
-  const replaceAt = (index: number, next: VocabularyEntry) => {
-    if (entries === null) return;
-    setEditedRow(index);
-    void save(entries.map((entry, at) => (at === index ? next : entry)));
+  /** Saves what `change` makes of the list when this save's turn comes; a refusal is filed under `place`, the row it was made from. */
+  const saveFrom = async (place: number | 'draft', change: (current: VocabularyRow[]) => VocabularyRow[]): Promise<boolean> => {
+    const landed = await save(change);
+    if (!landed) setEditedRow(place);
+    return landed;
   };
 
-  const deleteAt = (index: number) => {
-    if (entries === null) return;
-    setEditedRow(index);
-    void save(entries.filter((_entry, at) => at !== index));
+  const changeEntry = (id: number, change: (entry: VocabularyEntry) => VocabularyEntry) => {
+    // The row keeps its id: a rename is the same row with a new spelling, so it stays mounted and its field keeps the focus. Found by id, never by place: a save asked for before this one may have moved the rows.
+    void saveFrom(id, (current) => current.map((row) => (row.id === id ? { ...row, entry: change(row.entry) } : row)));
+  };
+
+  const deleteRow = (id: number) => {
+    void saveFrom(id, (current) => current.filter((row) => row.id !== id));
   };
 
   const addWord = async (word: VocabularyEntry) => {
-    if (entries === null || saving) return;
-    setEditedRow('draft');
-    if (await save([...entries, word])) setDraft(null);
+    if (rows === null || saving) return;
+    if (await saveFrom('draft', (current) => [...current, rowFor(word)])) setDraft(null);
   };
 
   return (
@@ -56,9 +59,9 @@ export function VocabularySection() {
         defaultValue: "Words of your own that a transcriber mishears. It writes them as spelled, any misheard form (whole words, any case) is corrected, and Kaylee says each one the way it sounds. Separate several misheard forms with commas.",
       })}
     >
-      <div data-vocabulary-section={entries?.length ?? ''}>
+      <div data-vocabulary-section={rows?.length ?? ''}>
         <SettingsCard divided>
-          {entries === null ? (
+          {rows === null ? (
             <div className="flex flex-wrap items-center gap-3 p-4 text-sm text-muted-foreground">
               {error === null ? t('voiceSettings.vocabulary.loading', { defaultValue: 'Loading…' }) : (
                 <>
@@ -74,26 +77,27 @@ export function VocabularySection() {
             </div>
           ) : (
             <>
-              {entries.length === 0 && draft === null && (
+              {rows.length === 0 && draft === null && (
                 <p className="p-4 text-sm text-muted-foreground">
                   {t('voiceSettings.vocabulary.empty', { defaultValue: 'No words yet: nothing is corrected, and Kaylee says everything as written.' })}
                 </p>
               )}
-              {entries.map((entry, index) => (
+              {rows.map((row) => (
                 <VocabularyEntryRow
-                  key={entry.spelling}
-                  entry={entry}
+                  // The row's own id, never its spelling: a key made of the spelling would remount the row when a rename is saved and drop the focus from the field being typed in.
+                  key={row.id}
+                  entry={row.entry}
                   saving={saving}
-                  onChange={(next) => replaceAt(index, next)}
-                  onDelete={() => deleteAt(index)}
-                  refusal={editedRow === index ? error : null}
+                  onChange={(change) => changeEntry(row.id, change)}
+                  onDelete={() => deleteRow(row.id)}
+                  refusal={editedRow === row.id ? error : null}
                 />
               ))}
               {draft !== null && (
                 <VocabularyEntryRow
                   entry={draft}
                   saving={saving}
-                  onChange={setDraft}
+                  onChange={(change) => setDraft((current) => (current === null ? current : change(current)))}
                   draft={{ onSave: (word) => { void addWord(word); }, onCancel: () => setDraft(null) }}
                   refusal={editedRow === 'draft' ? error : null}
                 />

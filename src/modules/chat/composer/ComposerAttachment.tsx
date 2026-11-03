@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { FileIcon, XIcon } from 'lucide-react';
 
 import { ImageLightbox } from '@/modules/chat/transcript/ChatMessageImages';
+import { keepFieldFocus } from '@/shared/ui';
 
 type ComposerAttachmentProps = {
   file: File;
@@ -60,6 +61,8 @@ const ComposerAttachment = ({ file, onRemove }: ComposerAttachmentProps) => {
       <button
         type="button"
         onClick={onRemove}
+        // Removing a chip never takes the focus from the field under it (the kit's `keepFieldFocus`): on a phone the keys stay up.
+        onMouseDown={keepFieldFocus()}
         className="absolute -right-1.5 -top-1.5 rounded-full border border-border/40 bg-background/90 p-1 text-foreground shadow-sm backdrop-blur transition-opacity hover:bg-background focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
         aria-label={`Remove ${file.name}`}
       >

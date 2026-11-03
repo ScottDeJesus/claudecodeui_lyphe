@@ -2,7 +2,6 @@ import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod';
 
 import { sessionsDb } from '@/modules/database/index.js';
-import { listOpenFollowups } from '@/modules/followups/index.js';
 import { sessionsService } from '@/modules/providers/index.js';
 import type { CompanionSessionRef } from '@/shared/companion-types.js';
 import { isRecord } from '@/shared/document-fields.js';
@@ -13,8 +12,8 @@ import { toolLine } from '../session/companion-prompt.js';
 
 import type { CompanionToolDeps } from './companion-tools.js';
 import { resolveDactylFiles } from './dactyl-paths.js';
-import { stepBrackets } from './followup-plans.js';
-import { askLine, chatNameOf, chatState, pendingAsksOf, resolveChat } from './house-reads.js';
+import { listFollowups } from './followup-list.js';
+import { askLine, chatState, pendingAsksOf, resolveChat } from './house-reads.js';
 import {
   companionScratchDir,
   LAST_TURN_DIGEST_BRIEF,
@@ -29,7 +28,7 @@ import { groupTurns, newestThatFit, numberTurns, RECENT_TURN_COUNT, replyText, t
 
 /**
  * The three tools she reads with: `read_session` (what a chat said and did), `list_followups` (what chats left for
- * him) and `ask_dactyl` (a small reader per file, for anything too long to read herself).
+ * him; its code is `followup-list.ts`, registered here) and `ask_dactyl` (a small reader per file, for anything too long to read herself).
  *
  * A SESSION'S TRANSCRIPT IS SHARED GROUND. When the conversation is about what a chat did, she reads it before she
  * speaks, so her account is true. `read_session` answers by SCOPE:
@@ -61,12 +60,6 @@ const LONG_REPLY_CHARACTERS = 6_000;
 const BRIEF_MAX = 4_000;
 const FILES_MAX = 8;
 const PATH_MAX = 1_000;
-
-/** How many follow-ups an all-chats `list_followups` shows: the service is asked for one more, to know whether it cut the list. */
-const FOLLOWUPS_SHOWN = 20;
-
-/** The most open follow-ups the service answers for one chat (its own ceiling): a named chat is shown whole, as the widget shows it. */
-const CHAT_FOLLOWUPS_MAX = 200;
 
 /** The last line of every digest: where the rendered turns are, so a sharper question can go to a dactyl. */
 const readableAt = (file: string): string => `The turns are rendered at ${file}; ask_dactyl can read that file for a sharper question.`;
@@ -186,36 +179,6 @@ function readSession(deps: CompanionToolDeps, args: { session: string; scope: st
 }
 
 /**
- * `list_followups`: the open follow-ups of one chat, or of every chat (newest first), one line each:
- * `chat name · next|gap · text [<plan>: <step>] · #<id>`. The text is the widget's own (`Followup.text`, one plain line by
- * construction), untouched; the id is what `close_followup` takes; and each plan the text names as a whole word is followed
- * by its current step (`followup-plans.ts`), once per plan, so a follow-up that waits on a plan which has since shipped reads
- * stale at a glance. A named chat is listed whole, as the widget shows it (up to the service's 200); every chat together are cut
- * at 20, and the last line says so. It names a chat when one is given, but moves neither her focus nor her activity:
- * she looks at what a chat left for him in passing, while the conversation may be about another.
- */
-function listFollowups(deps: CompanionToolDeps, args: { session?: string }): Promise<ToolTextResult> {
-  return guardedToolResult('list_followups', 'read the follow-ups', async () => {
-    const wanted = args.session?.trim() ?? '';
-    let chat: CompanionSessionRef | null = null;
-    if (wanted !== '') {
-      const found = resolveChat(wanted);
-      if (!found.ok) return deps.refuse(found.sentence);
-      chat = found.chat;
-    }
-    const open = listOpenFollowups(deps.userId, chat?.sessionId ?? null, chat ? CHAT_FOLLOWUPS_MAX : FOLLOWUPS_SHOWN + 1);
-    if (open.length === 0) return textResult(chat ? `"${chat.name}" has no open follow-ups.` : 'No chat has an open follow-up.');
-    const shown = chat ? open : open.slice(0, FOLLOWUPS_SHOWN);
-    const steps = await stepBrackets(deps.house, shown.map(({ followup }) => followup.text));
-    const lines = shown.map(({ sessionId, followup }, index) => `${chat?.name ?? chatNameOf(sessionId)} · ${followup.kind} · ${followup.text}${steps[index]} · #${followup.id}`);
-    const cutNote = chat
-      ? open.length >= CHAT_FOLLOWUPS_MAX ? `\nThese are the newest ${CHAT_FOLLOWUPS_MAX}; older open ones are not listed.` : ''
-      : open.length > FOLLOWUPS_SHOWN ? `\nMore are open than these ${FOLLOWUPS_SHOWN}; name one chat to see its own.` : '';
-    return textResult(lines.join('\n') + cutNote);
-  });
-}
-
-/**
  * `ask_dactyl`: every file and the context are held to the path rules BEFORE any dactyl starts — one refusal sentence
  * naming every file refused, and nothing runs. Her activity is `reading_code` with the real paths of the files while
  * the dactyls read. A dactyl that refuses on its own (exit 2 or 3) answers its own line as the error. `signal` is the
@@ -268,7 +231,7 @@ export function readTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<a
       'list_followups',
       toolLine('list_followups'),
       {
-        session: z.string().trim().max(200).optional().describe('The chat whose open follow-ups to list, by its id or its whole name. Leave out for every chat.'),
+        session: z.string().trim().max(200).optional().describe('The chat whose follow-ups to list, by its id or its whole name. Leave out for every chat.'),
       },
       (args) => listFollowups(deps, args),
       readOnly

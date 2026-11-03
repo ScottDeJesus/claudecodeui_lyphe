@@ -25,12 +25,13 @@ function Field({ label, ...props }: { label: string } & InputHTMLAttributes<HTML
 }
 
 /**
- * Rendered by Settings for the "voice" tab: voice on or off; with it on, the chat mic's provider (VoiceProviderPicker)
- * heading the voice-input section. That section is the OpenAI-compatible backend, which read-aloud uses whatever the
- * picker says, so all of it stands on Gemini too but the speech-to-text model, the one field that is the chat mic's alone.
- * Then, whether or not voice is on, the transcript-cleanup switch (it governs the chat mic and Kaylee's presses alike), the
- * vocabulary of house words (VocabularySection: misheard spellings corrected for both ears, and how Kaylee says each),
- * Gemini (GeminiVoiceSection), because Kaylee hears and speaks through Gemini always, and her own section.
+ * Rendered by Settings for the "voice" tab: voice on or off; with it on, the chat's provider (VoiceProviderPicker: Gemini or
+ * an OpenAI-compatible backend, for the mic and read-aloud alike) heading the backend section. The OpenAI-compatible fields
+ * under it (base URL, key, speech-to-text model, speech model, voice, format) stand only while that provider is picked: on
+ * Gemini the server hears and speaks on its own key, in the speech model and voice of the Gemini section below, so those
+ * fields would change nothing. Then, whether or not voice is on, the transcript-cleanup switch (it governs the chat mic and
+ * Kaylee's presses alike), the vocabulary of house words (VocabularySection: misheard spellings corrected for both ears, and
+ * how Kaylee says each), Gemini (GeminiVoiceSection), because Kaylee hears and speaks through Gemini always, and her own section.
  */
 export default function VoiceSettingsTab() {
   const { t } = useTranslation('settings');
@@ -39,9 +40,9 @@ export default function VoiceSettingsTab() {
   const { config, update } = useVoiceConfig();
   const voiceEnabled = preferences.voiceEnabled;
   const { settings: voiceSettings, keyStatus, saving, error, providerRefusal, saveSettings, saveKey, clearKey, retry } = useVoiceSettings();
-  // The speech-to-text model field is the chat mic's alone, so it stands only while the OpenAI-compatible backend is
-  // picked. Before the settings are read the picker says OpenAI-compatible too, which is the server's default.
-  const pickedProvider = voiceSettings?.provider ?? 'openai';
+  // The OpenAI-compatible fields stand only while that backend is picked. Before the settings are read the picker says Gemini,
+  // which is the server's default.
+  const pickedProvider = voiceSettings?.provider ?? 'gemini';
   const openaiPicked = pickedProvider === 'openai';
 
   return (
@@ -69,50 +70,51 @@ export default function VoiceSettingsTab() {
                 {providerRefusal}
               </p>
             )}
-            <Field
-              label={t('voiceSettings.baseUrl')}
-              placeholder="https://api.openai.com/v1"
-              value={config.baseUrl}
-              onChange={(e) => update({ baseUrl: e.target.value })}
-            />
-            <Field
-              label={t('voiceSettings.apiKey')}
-              type="password"
-              autoComplete="off"
-              placeholder="sk-…"
-              value={config.apiKey}
-              onChange={(e) => update({ apiKey: e.target.value })}
-            />
-            {/* Three columns once the speech-to-text model is gone, so read-aloud's three fields close the row. */}
-            <div className={openaiPicked ? 'grid grid-cols-1 gap-4 sm:grid-cols-4' : 'grid grid-cols-1 gap-4 sm:grid-cols-3'}>
-              {openaiPicked && (
+            {openaiPicked && (
+              <>
                 <Field
-                  label={t('voiceSettings.sttModel')}
-                  placeholder="whisper-1"
-                  value={config.sttModel}
-                  onChange={(e) => update({ sttModel: e.target.value })}
+                  label={t('voiceSettings.baseUrl')}
+                  placeholder="https://api.openai.com/v1"
+                  value={config.baseUrl}
+                  onChange={(e) => update({ baseUrl: e.target.value })}
                 />
-              )}
-              <Field
-                label={t('voiceSettings.ttsModel')}
-                placeholder="tts-1"
-                value={config.ttsModel}
-                onChange={(e) => update({ ttsModel: e.target.value })}
-              />
-              <Field
-                label={t('voiceSettings.voice')}
-                placeholder="alloy"
-                value={config.ttsVoice}
-                onChange={(e) => update({ ttsVoice: e.target.value })}
-              />
-              <Field
-                label={t('voiceSettings.format')}
-                placeholder="mp3"
-                value={config.ttsFormat}
-                onChange={(e) => update({ ttsFormat: e.target.value })}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">{t('voiceSettings.note')}</p>
+                <Field
+                  label={t('voiceSettings.apiKey')}
+                  type="password"
+                  autoComplete="off"
+                  placeholder="sk-…"
+                  value={config.apiKey}
+                  onChange={(e) => update({ apiKey: e.target.value })}
+                />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                  <Field
+                    label={t('voiceSettings.sttModel')}
+                    placeholder="whisper-1"
+                    value={config.sttModel}
+                    onChange={(e) => update({ sttModel: e.target.value })}
+                  />
+                  <Field
+                    label={t('voiceSettings.ttsModel')}
+                    placeholder="tts-1"
+                    value={config.ttsModel}
+                    onChange={(e) => update({ ttsModel: e.target.value })}
+                  />
+                  <Field
+                    label={t('voiceSettings.voice')}
+                    placeholder="alloy"
+                    value={config.ttsVoice}
+                    onChange={(e) => update({ ttsVoice: e.target.value })}
+                  />
+                  <Field
+                    label={t('voiceSettings.format')}
+                    placeholder="mp3"
+                    value={config.ttsFormat}
+                    onChange={(e) => update({ ttsFormat: e.target.value })}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">{t('voiceSettings.note')}</p>
+              </>
+            )}
           </div>
         </SettingsSection>
       )}

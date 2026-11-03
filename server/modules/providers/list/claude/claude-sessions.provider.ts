@@ -15,6 +15,7 @@ import type {
 } from '@/shared/types.js';
 import { parseFilesInputTag } from '@/shared/image-attachments.js';
 import { queuedPromptAsUserRow } from '@/modules/providers/list/claude/claude-queued-prompt.js';
+import { indexNewestRowPerBranch, resolveResumePath } from '@/modules/providers/list/claude/claude-resume-path.js';
 import { liftToolResultImages, readImageBlockDataUrl, storeToolResultImages } from '@/modules/providers/list/claude/claude-image-blocks.js';
 import {
   isCompactionRow,
@@ -525,12 +526,22 @@ async function readTranscriptRows(jsonlPath: string, providerSessionId: string):
 }
 
 /**
- * Drops the rows belonging to prompts that were replaced by an edit.
+ * Drops the rows belonging to prompts the next resume will not replay.
  *
  * When a message is edited, Claude resumes the conversation partway and appends
  * the replacement, so two prompts end up sharing one parent and the file holds
  * both the abandoned attempt and the live one. A flat read would show them
- * stacked, which reads as the app having sent the message twice.
+ * stacked, which reads as the app having sent the message twice. The same shape
+ * appears without an edit when a session is driven from Chat and from the
+ * native `claude` CLI at once: both writers branch off the row each of them saw
+ * last.
+ *
+ * Which sibling survives is decided by the branch the runtime will actually
+ * resume: the sibling on the chain `resolveResumePath` returns. Going by the
+ * newest prompt, or by the newest row, would show a branch the model was never
+ * sent whenever the two writers exit in a different order than they wrote. A
+ * fork that is not on that chain at all (one made before a compaction) keeps
+ * the branch that was appended to last.
  *
  * Only sibling *prompts* are treated as a fork. Branch points made by parallel
  * tool calls are extremely common — one assistant turn writes several chained
@@ -551,15 +562,31 @@ function dropSupersededPromptBranches(rows: AnyRecord[]): AnyRecord[] {
     }
   }
 
+  const forks = [...promptSiblings.values()].filter((siblings) => siblings.length > 1);
+  if (forks.length === 0) {
+    return rows;
+  }
+
+  const resumePath = resolveResumePath(rows);
+  let newestByUuid: Map<string, number> | undefined;
+  const newestRowOf = (row: AnyRecord): number => {
+    newestByUuid ??= indexNewestRowPerBranch(rows);
+    return typeof row.uuid === 'string' ? newestByUuid.get(row.uuid) ?? -1 : -1;
+  };
+
   const supersededRoots = new Set<string>();
-  for (const siblings of promptSiblings.values()) {
-    if (siblings.length < 2) {
-      continue;
+  for (const siblings of forks) {
+    let live = siblings.find((row) => typeof row.uuid === 'string' && resumePath.has(row.uuid));
+    if (!live) {
+      live = siblings[0];
+      for (const row of siblings) {
+        if (newestRowOf(row) > newestRowOf(live)) {
+          live = row;
+        }
+      }
     }
-    // The transcript is append-only, so the last prompt written under a parent
-    // is the one that replaced the others.
-    for (const row of siblings.slice(0, -1)) {
-      if (typeof row.uuid === 'string') {
+    for (const row of siblings) {
+      if (row !== live && typeof row.uuid === 'string') {
         supersededRoots.add(row.uuid);
       }
     }
@@ -850,6 +877,30 @@ function isInternalContent(content: string): boolean {
 }
 
 /**
+ * Claude Code 2.1.282+ writes pasted text into the transcript already wrapped as
+ * `<pasted_content id="ID">\nBODY\n</pasted_content id="ID">`. The closing tag
+ * carries the id too, so a generic closing-tag stripper misses it.
+ */
+const PASTED_CONTENT =
+  /<pasted_content id="([^"]*)">\n?([\s\S]*?)\n?<\/pasted_content(?: id="\1")?>/g;
+
+/**
+ * Replaces each well-formed `<pasted_content>` wrapper with its body so a user
+ * message shows the text that was pasted. Unclosed or mismatched-id wrappers are
+ * left untouched, and a message with no wrapper is returned unchanged.
+ */
+function unwrapPastedContent(text: string): string {
+  let unwrapped = false;
+  const result = text.replace(PASTED_CONTENT, (_match, _id: string, body: string) => {
+    unwrapped = true;
+    return body;
+  });
+
+  if (!unwrapped) return text;
+  return result.replace(/^[\r\n]+|[\r\n]+$/g, '');
+}
+
+/**
  * Claude wraps local slash-command metadata in lightweight XML-like tags inside
  * a plain string payload. We intentionally parse only the small tag surface we
  * care about instead of introducing a generic XML parser for untrusted history.
@@ -906,6 +957,13 @@ export class ClaudeSessionsProvider implements IProviderSessions {
    */
   normalizeMessage(rawMessage: unknown, sessionId: string | null): NormalizedMessage[] {
     const messages = this.normalizeMessageRows(rawMessage, sessionId);
+    // Show the text that was pasted, not the wrapper tags Claude Code stores it in. This is the one entry
+    // point for history loads and live events, so both are covered.
+    for (const message of messages) {
+      if (message.role === 'user' && message.kind === 'text' && typeof message.content === 'string') {
+        message.content = unwrapPastedContent(message.content);
+      }
+    }
     // A synthesized id is useless as an anchor — it changes on every read — so
     // a row without its own uuid produces messages with no anchor at all.
     const raw = readObjectRecord(rawMessage);

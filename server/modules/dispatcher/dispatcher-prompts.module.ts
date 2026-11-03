@@ -68,6 +68,8 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
   answer(ask: DispatcherAsk, decision: ProviderPermissionDecision): Promise<DispatcherCardAnswer>;
   /** Kaylee's door — the ask as she read it back, the reply his word makes, and his press (`DispatcherAsks.answerOnHisWord`). */
   answerOnHisWord: DispatcherAsks['answerOnHisWord'];
+  /** Whether the book still holds a prompt by its key (`DispatcherAsks.isOpen`): the companion's last look before it says one. */
+  askOpen: DispatcherAsks['isOpen'];
 } {
   const { commands, log } = dependencies;
 
@@ -208,5 +210,6 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
     // lock orders of `relay` here).
     answer: asks.answer,
     answerOnHisWord: asks.answerOnHisWord,
+    askOpen: asks.isOpen,
   };
 }

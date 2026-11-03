@@ -2083,8 +2083,9 @@ export type VoiceAudioUpload = {
 /**
  * Successful speech payload returned by the Voice service.
  *
- * The route copies `contentType` to the client response and pipes `body`
- * without buffering the complete synthesized audio in application memory.
+ * The route copies `contentType` to the client response and pipes `body`. The OpenAI-compatible
+ * proxy's body is its own stream, never buffered in application memory; the Gemini read-aloud holds
+ * its one clip whole (`audio/wav`, whose header names its length) and hands it over as a one-piece stream.
  */
 export type VoiceSpeechPayload = {
   contentType: string;
@@ -2126,20 +2127,20 @@ export type VoiceService = {
 };
 
 /**
- * Which speech-to-text backend the chat composer's mic uses for an account.
+ * Which backend hears the chat composer's mic and speaks the chat's read-aloud for an account.
  *
- * `openai` is the OpenAI-compatible proxy (`voice.service.ts`, today's behavior and the
- * default); `gemini` is the Gemini transcription door. The choice governs only the chat
- * composer's mic: the companion always hears through Gemini, whatever this says. Read by
- * `voice-settings.ts` (which validates it), `voice-provider.ts` (which routes on it) and
- * the settings routes (which answer it).
+ * `gemini` (the default) is the Gemini doors: the transcription door for the mic and the speech door
+ * for read-aloud. `openai` is the OpenAI-compatible proxy (`voice.service.ts`), which an account that
+ * stored it keeps. The choice governs the chat alone: the companion hears and speaks through Gemini,
+ * whatever this says. Read by `voice-settings.ts` (which validates it), `voice-provider.ts` (which
+ * routes on it) and the settings routes (which answer it).
  */
 export type VoiceProvider = 'openai' | 'gemini';
 
 /**
  * One account's voice settings, the `voice` key of its `user_preferences`.
  *
- * `provider` defaults to `openai` and `gemini.transcriptionModel` to `gemini-3.8-flash`, the
+ * `provider` defaults to `gemini` and `gemini.transcriptionModel` to `gemini-3.8-flash`, the
  * house's transcriber role; a stored field that fails its limit reads as its default.
  * `gemini.speechModel` (default `gemini-3.8-flash-tts`) and `gemini.transcriptionModel` are each
  * 1-80 characters of `[A-Za-z0-9._-]`; `gemini.voice` (default `Kore`) is 1-40 characters of
@@ -2390,7 +2391,7 @@ export type ClaudeAccountsPicture = {
 export type ClaudeAccounts =
   | ({ reachable: true } & ClaudeAccountsPicture)
   | { reachable: false; reason: string };
-/** One usage window. A `null` `percent` is "no reading": draw an empty track, never 0 %. `rolled:true` is NOT that — the percent is a REAL but HISTORICAL figure whose window has since ended, so keep the bar at low opacity and label it "was"; draining it draws a full tank nobody measured (`server/modules/accounts/usage-windows.ts`, `markRolled`).
+/** One usage window. A `null` `percent` is "no reading": draw an empty track, never 0 %. `rolled:true` is the server's mark that the reading predates a reset that has passed: the percent is the closed window's, and the client draws the window that began at the reset instead (`src/modules/accounts/utils/usageWindows.ts`, `windowPastReset`); nothing is filed from it (`server/modules/accounts/usage-windows.ts`, `markRolled`).
  *  `severity` is present ONLY when the vendor flagged the window non-benign; it may ESCALATE a meter's tone, never soften it — a flagged window can read a comfortable 12 % and still mean an account lock (`usage-windows.ts`, `parseWindows`). */
 export type ClaudeUsageWindow = { key: string; label: string; percent: number | null; resetsAt: string | null; rolled?: boolean; severity?: string };
 /** The pacer's projection for the account in use, in PERCENT as the usage route converts it (`usage.pace`): the two windows' used and projected figures and the ceilings the pacer holds new starts under. `null` on any figure the pacer could not give. `words` is the dispatcher's own one sentence for the 5-hour meter's caption. The key is ABSENT on a reading with no pace (an older server, or a pacer that could not read the window), and an absent pace draws the meters exactly as they were drawn before it existed. */

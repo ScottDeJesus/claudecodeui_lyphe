@@ -17,6 +17,10 @@ export type {
 } from '@/modules/notifications/services/cerberus-red-copy.service.js';
 // Used by callers outside this module that show an event's wording: the one headline and body per code.
 export { buildNotificationText } from '@/modules/notifications/services/notification-copy.service.js';
+// wholeBodyKind: used by the companion module's alert block to choose which events it asks `spendFreeWording` for the whole body of
+// (a question card, a plan awaiting approval, a tool permission shown as its JSON input); WholeBodyKind is the kind it answers.
+export { wholeBodyKind } from '@/modules/notifications/services/notification-copy.service.js';
+export type { WholeBodyKind } from '@/modules/notifications/services/notification-copy.service.js';
 // spendFreeWording: used by the companion module's alert block, which tells her what the house said as it lands.
 // The title and body of an event with every cost, token and usage figure taken out — the one rule, beside
 // `buildNotificationPayload`, so no wording that reaches her can carry a cost.

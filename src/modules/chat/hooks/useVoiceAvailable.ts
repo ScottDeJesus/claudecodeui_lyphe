@@ -28,17 +28,19 @@ function checkVoiceHealth(): Promise<boolean> {
  * Whether the voice control for `purpose` should be drawn: 'speak' is read-aloud (the default, MessageSpeakControl) and
  * 'dictate' is the composer's mic (ChatComposer).
  *
- * Read-aloud needs the OpenAI-compatible backend, so its answer is the browser's base URL or the server's health. The mic
- * follows the account's provider: on Gemini the server transcribes on its own key, so the browser needs no backend and the
- * mic is drawn whenever voice input is on. On the OpenAI-compatible provider the mic's answer is read-aloud's, as before.
+ * Both controls follow the account's provider. On Gemini the server transcribes and speaks on its own key, so the browser needs
+ * no backend: the mic is drawn whenever voice input is on, and read-aloud is drawn when the server's health says the account has a
+ * Gemini key in reach (the browser's own base URL is never reached on Gemini, so it does not count). On the OpenAI-compatible
+ * provider both answers are the browser's base URL or the proxy's configuration, which the server's health reports.
  */
 export function useVoiceAvailable(purpose: 'speak' | 'dictate' = 'speak'): boolean {
   // Read through the shared preferences owner. This used to re-parse the
   // preferences blob and register its own storage + sync listeners, once per
   // assistant message row.
   const { voiceEnabled: enabled } = useUiPreferences();
-  // Only the composer's mic reads the provider, and only while voice is on: read-aloud and a page with voice off ask nothing.
-  const provider = useVoiceProvider(enabled && purpose === 'dictate');
+  // Both controls read the provider, and only while voice is on: a page with voice off asks nothing.
+  const provider = useVoiceProvider(enabled);
+  // Whether the backend this account's provider names is ready: the base URL or the server's health. Settled by the effect below, from a request that cannot run while rendering.
   const [available, setAvailable] = useState(false);
 
   useEffect(() => {
@@ -50,7 +52,8 @@ export function useVoiceAvailable(purpose: 'speak' | 'dictate' = 'speak'): boole
         setAvailable(false);
         return;
       }
-      if (readVoiceConfig().baseUrl.trim()) {
+      // A base URL held by the browser is an endpoint of its own, and only an OpenAI-compatible account ever reaches it.
+      if (provider === 'openai' && readVoiceConfig().baseUrl.trim()) {
         setAvailable(true);
         return;
       }
@@ -69,7 +72,7 @@ export function useVoiceAvailable(purpose: 'speak' | 'dictate' = 'speak'): boole
       active = false;
       window.removeEventListener(VOICE_CONFIG_SYNC_EVENT, check);
     };
-  }, [enabled]);
+  }, [enabled, provider]);
 
   if (purpose === 'dictate' && provider === 'gemini') return enabled;
   return enabled && available;

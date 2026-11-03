@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo } from 'react';
 import { COMPOSER_TARGET } from '@/modules/notes/context/NotesContext';
 import { api, attemptWrite } from '@/shared/api';
 import type { Note, NoteInput, NoteSaveOutcome, NoteSaveStatus } from '@/shared/types';
+import { randomHexId } from '@/shared/utils';
 
 /**
  * THE NOTES' AUTOSAVE: one writer per open card, each saving what is typed in it so nobody has to
@@ -22,7 +23,8 @@ import type { Note, NoteInput, NoteSaveOutcome, NoteSaveStatus } from '@/shared/
  * and that request is sent only after the answer — which a closing page may never see — so the newest
  * text is sent beside the one in flight. A note's id is known, so that is one more update of it; a
  * blank card whose first save is still in flight has no id yet, and what was typed after that save
- * left cannot be sent (a second create would make a second note).
+ * left cannot be sent (there is no note to update, and a second create under the first one's key
+ * would be answered with that note and take none of the new text).
  *
  * ORDER. A lane sends one request at a time and re-reads its newest text when each one lands, looping
  * until what the server holds is what is typed. Typing during a flight therefore costs one more save
@@ -45,6 +47,27 @@ import type { Note, NoteInput, NoteSaveOutcome, NoteSaveStatus } from '@/shared/
  * on (`onBound`), and every later save is an update of that note. If that note is deleted elsewhere
  * (the update answers 404 `NOTE_NOT_FOUND`) the card is the typist's still, so the lane lets go of the
  * dead id (`onBound(target, null)`) and the next save creates a new note from the text.
+ *
+ * THE FIRST SAVE IS IDEMPOTENT. A create whose answer never arrives (the connection dropped, the answer
+ * came back unreadable) may still have made the note, and the card is not bound to a note it was never
+ * told about, so its next save is a create again — which, sent plain, would make a second note. So the
+ * lane mints ONE key (`Idempotency-Key`) with its first create and every retry of that create carries
+ * it; the server answers a key it has seen with the note it already made. The key is dropped once a
+ * create lands (the lane is bound; a note deleted elsewhere is a new note and a new key). What the
+ * retry carries is the newest text, and the server hands back the note as the FIRST attempt left it,
+ * so a create that was ever unsure is followed at once by an update of the same note with the newest
+ * text — unless the answer's own title and description are exactly the draft, which a plain insert's
+ * are — and the lane does not call that text saved until that update lands. That update waits on the
+ * retry's answer, so text typed after a lost first save is not sent by a page that goes away before
+ * it (the page-going-away limit above, reached by this road).
+ *
+ * WHILE A CREATE IS UNSURE the wall keeps hiding what it did not hold when the first attempt left
+ * (`onCreating` stays `true`; a retry keeps that baseline instead of taking a new one that already
+ * holds the note), because the note the lost create may have made would otherwise stand on the wall
+ * beside the card that still holds its text. It ends when a create lands, or when the card is
+ * cleared of every word: that throws the text away, so the key goes with it — what is typed next is
+ * another note, never a rewrite of the first — and the first note stands on the wall as a note of
+ * its own.
  *
  * Used by `NotesProvider`, which owns the drafts and the list; the hook holds no React state of its own,
  * so a save landing redraws only what the provider chooses to redraw.
@@ -73,7 +96,11 @@ const DRAWS_AS_NOTHING = /[\s\p{Cf}\p{Cc}]/gu;
 type Lane = {
   /** The note this lane writes to; `null` until the blank card's first save creates one. */
   noteId: string | null;
-  /** The text the server is known to hold, as it was typed; `null` before the first save. */
+  /**
+   * The text the server is known to hold, as it was typed; `null` before the first save, and after a create
+   * that was ever unsure landed with text other than the draft (the note it answered with is an earlier
+   * attempt's).
+   */
   saved: NoteInput | null;
   /**
    * The `updatedAt` the note had when the card opened or its own last save answered; `null` before
@@ -88,6 +115,10 @@ type Lane = {
   leftWith: NoteInput | null;
   /** True for the blank card's lane: its text outlives the note it was saved as (see `onBound`). */
   recreatesWhenGone: boolean;
+  /** The idempotency key of the create not yet answered, minted at its first attempt; `null` while no create is pending. */
+  createKey: string | null;
+  /** A create under `createKey` ended without a usable answer, so the server may hold the note it was sent. */
+  createUnsure: boolean;
   timer: ReturnType<typeof setTimeout> | null;
   /** The running drain, or `null` while the lane is idle. */
   flight: Promise<NoteSaveOutcome> | null;
@@ -103,7 +134,11 @@ type NoteSaverDeps = {
   setStatus: (target: string, status: NoteSaveStatus | null) => void;
   /** The lane is now bound to this note (the blank card's first save landed), or to none (`null`: its note was deleted elsewhere). */
   onBound: (target: string, noteId: string | null) => void;
-  /** A create is in the air for the lane (`true`) or has ended, landed or not (`false`). */
+  /**
+   * The wall is to hide the notes it did not hold when a create left (`true`): a create is in the air, or
+   * ended in a failure whose note may still be made. `false` once a create landed or the card that was
+   * making it was cleared.
+   */
   onCreating: (target: string, creating: boolean) => void;
   /** Re-reads the list, resolving once the answer is on screen. */
   refresh: () => Promise<void>;
@@ -149,18 +184,28 @@ const drawsSomething = (text: string): boolean => text.replace(DRAWS_AS_NOTHING,
 const keepaliveOptions = (draft: NoteInput) =>
   new Blob([JSON.stringify(draft)]).size <= KEEPALIVE_BODY_MAX_BYTES ? { keepalive: true } : undefined;
 
-/** The id and `updatedAt` a landed save answered with; each `null` when the body does not carry it. */
-async function readSavedNote(response: Response): Promise<{ id: string | null; updatedAt: string | null }> {
+/** The note a landed save answered with: its id, `updatedAt`, title and description; each `null` when the body does not carry it. */
+async function readSavedNote(
+  response: Response,
+): Promise<{ id: string | null; updatedAt: string | null; title: string | null; description: string | null }> {
   try {
-    const body = (await response.json()) as { data?: { id?: unknown; updatedAt?: unknown } };
+    const body = (await response.json()) as {
+      data?: { id?: unknown; updatedAt?: unknown; title?: unknown; description?: unknown };
+    };
     return {
       id: typeof body.data?.id === 'string' ? body.data.id : null,
       updatedAt: typeof body.data?.updatedAt === 'string' ? body.data.updatedAt : null,
+      title: typeof body.data?.title === 'string' ? body.data.title : null,
+      description: typeof body.data?.description === 'string' ? body.data.description : null,
     };
   } catch {
-    return { id: null, updatedAt: null };
+    return { id: null, updatedAt: null, title: null, description: null };
   }
 }
+
+/** True for an unbound lane whose card has nothing in it: whatever it held was thrown away. */
+const isBlankUnbound = (lane: Lane): boolean =>
+  lane.noteId === null && !drawsSomething(lane.latest.title) && !drawsSomething(lane.latest.description);
 
 /**
  * What a lane with unsaved text says: it is saving, unless no title is there to save under. A blank
@@ -169,8 +214,7 @@ async function readSavedNote(response: Response): Promise<{ id: string | null; u
  */
 function pendingStatus(lane: Lane): NoteSaveStatus | null {
   if (drawsSomething(lane.latest.title)) return 'saving';
-  const nothingTyped = lane.noteId === null && !drawsSomething(lane.latest.description);
-  return nothingTyped ? null : 'titleNeeded';
+  return isBlankUnbound(lane) ? null : 'titleNeeded';
 }
 
 function newLane(noteId: string | null, text: NoteInput | null, updatedAt: string | null, recreatesWhenGone: boolean): Lane {
@@ -182,6 +226,8 @@ function newLane(noteId: string | null, text: NoteInput | null, updatedAt: strin
     sending: null,
     leftWith: null,
     recreatesWhenGone,
+    createKey: null,
+    createUnsure: false,
     timer: null,
     flight: null,
     complained: false,
@@ -189,8 +235,14 @@ function newLane(noteId: string | null, text: NoteInput | null, updatedAt: strin
   };
 }
 
-/** How one save ended: landed (the note's id and the `updatedAt` it answered), the note gone, or not landed. */
-type WriteResult = { kind: 'landed'; noteId: string; updatedAt: string | null } | { kind: 'gone' } | { kind: 'failed' };
+/**
+ * How one save ended: landed (the note's id, the `updatedAt` it answered, and whether the text it answered
+ * with is exactly the draft sent), the note gone, or not landed.
+ */
+type WriteResult =
+  | { kind: 'landed'; noteId: string; updatedAt: string | null; echoedDraft: boolean }
+  | { kind: 'gone' }
+  | { kind: 'failed' };
 
 /** The 404 `NOTE_NOT_FOUND` the service answers an update of a note that no longer exists. */
 const NOTE_GONE_CODE = 'NOTE_NOT_FOUND';
@@ -199,11 +251,18 @@ const NOTE_GONE_CODE = 'NOTE_NOT_FOUND';
 async function writeDraft(lane: Lane, draft: NoteInput, deps: NoteSaverDeps): Promise<WriteResult> {
   const noteId = lane.noteId;
   const options = keepaliveOptions(draft);
+  // The key is minted by the first attempt and kept by the lane, so every retry of this create carries it.
   const attempt = await attemptWrite(() =>
-    noteId === null ? api.notes.create(draft, options) : api.notes.update(noteId, draft, options),
+    noteId === null
+      ? api.notes.create(draft, (lane.createKey ??= randomHexId()), options)
+      : api.notes.update(noteId, draft, options),
   );
 
   if (!attempt.landed) {
+    // A failed create may still have landed (a lost answer, a proxy's 504), so its retry may be answered
+    // with an earlier attempt's note. A lane whose card was cleared meanwhile has let go of the key: no
+    // retry will carry it, so there is nothing to be unsure about.
+    if (noteId === null && lane.createKey !== null) lane.createUnsure = true;
     // The blank card's note was deleted on another device. What is typed in the card is still the
     // typist's, so the card is saved again as a new note — no failure, no toast — instead of failing on
     // a note that is gone for as long as the card stays open.
@@ -217,15 +276,20 @@ async function writeDraft(lane: Lane, draft: NoteInput, deps: NoteSaverDeps): Pr
 
   lane.complained = false;
   const saved = await readSavedNote(attempt.response);
-  if (noteId !== null) return { kind: 'landed', noteId, updatedAt: saved.updatedAt };
+  if (noteId !== null) return { kind: 'landed', noteId, updatedAt: saved.updatedAt, echoedDraft: true };
 
-  // A create that landed but did not say which note it made cannot be retried — the retry would make
-  // a second one — so it is reported as a failure, and the text stays in the card.
+  // A create that landed but did not say which note it made leaves the card unbound: it is reported as a
+  // failure and the text stays in the card. The next save is a create under the same key, and the server
+  // answers that with the note this one made.
   if (saved.id === null) {
+    if (lane.createKey !== null) lane.createUnsure = true;
     deps.onFailure(null);
     return { kind: 'failed' };
   }
-  return { kind: 'landed', noteId: saved.id, updatedAt: saved.updatedAt };
+  // Exact, not normalised: text the service stored untouched is the draft; anything it trimmed or folded
+  // reads as "not the draft" and costs one harmless update.
+  const echoedDraft = saved.title === draft.title && saved.description === draft.description;
+  return { kind: 'landed', noteId: saved.id, updatedAt: saved.updatedAt, echoedDraft };
 }
 
 /**
@@ -250,11 +314,14 @@ async function drain(target: string, lane: Lane, deps: NoteSaverDeps): Promise<N
 
       deps.setStatus(target, 'saving');
       const creating = lane.noteId === null;
-      if (creating) deps.onCreating(target, true);
+      // A retry of an unsure create keeps the wall's baseline from the first attempt: a new one would
+      // already hold the note the first attempt may have made.
+      if (creating && !lane.createUnsure) deps.onCreating(target, true);
       lane.sending = draft;
       const result = await writeDraft(lane, draft, deps);
       lane.sending = null;
-      if (creating) deps.onCreating(target, false);
+      // An unsure create leaves the wall hiding; it ends when a create lands or the card is cleared.
+      if (creating && !(result.kind === 'failed' && lane.createUnsure)) deps.onCreating(target, false);
 
       if (result.kind === 'gone') {
         // Let go of the dead id; the next turn of the loop creates a new note from the same text.
@@ -270,12 +337,17 @@ async function drain(target: string, lane: Lane, deps: NoteSaverDeps): Promise<N
         return 'failed';
       }
 
-      lane.saved = draft;
+      // A create that was ever unsure may have been answered with a note an earlier attempt made, holding
+      // that attempt's text: unless the answer is the draft itself, the draft is not known saved, and the
+      // next turn of the loop updates the note.
+      lane.saved = creating && lane.createUnsure && !result.echoedDraft ? null : draft;
       lane.baseUpdatedAt = result.updatedAt;
       wrote = true;
       unread = true;
       if (lane.noteId === null) {
         lane.noteId = result.noteId;
+        lane.createKey = null;
+        lane.createUnsure = false;
         deps.onBound(target, result.noteId);
       }
       continue;
@@ -351,6 +423,15 @@ function createNoteSaver(): NoteSaver {
 
       lane.latest = draft;
       clearTimer(lane);
+      // A card cleared of every word has thrown away the text its create carried: what is typed next is
+      // another note, so the create's key goes — with the wall's hiding, unless a retry is in the air and
+      // will end it — and the note that create may have made stands on the wall as a note of its own.
+      if (isBlankUnbound(lane) && lane.createKey !== null) {
+        const wasUnsure = lane.createUnsure;
+        lane.createKey = null;
+        lane.createUnsure = false;
+        if (wasUnsure && lane.flight === null) readDeps().onCreating(target, false);
+      }
       if (sameText(draft, lane.saved)) {
         // Typed back to what the server holds: nothing is owed.
         readDeps().setStatus(target, lane.flight ? 'saving' : null);

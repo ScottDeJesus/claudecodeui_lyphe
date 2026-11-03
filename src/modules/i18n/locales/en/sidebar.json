@@ -41,7 +41,13 @@
     "messageCount_one": "{{count}} message",
     "messageCount_other": "{{count}} messages",
     "showOlder_one": "↳ Show {{count}} older conversation",
-    "showOlder_other": "↳ Show {{count}} older conversations"
+    "showOlder_other": "↳ Show {{count}} older conversations",
+    "select": "Select",
+    "selectAll": "Select all",
+    "selectAllLoaded": "Select all loaded",
+    "clearSelection": "Clear",
+    "deleteSelected_one": "Delete {{count}} session",
+    "deleteSelected_other": "Delete {{count}} sessions"
   },
   "tooltips": {
     "viewEnvironments": "View Environments",
@@ -118,7 +124,9 @@
     "restoreProjectError": "Error restoring project. Please try again.",
     "reopenSessionFailed": "Failed to reopen session. Please try again.",
     "reopenSessionError": "Error reopening session. Please try again.",
-    "forkSessionError": "Could not fork this session. Please try again."
+    "forkSessionError": "Could not fork this session. Please try again.",
+    "deleteSessionsPartialFailure_one": "{{count}} session out of {{total}} could not be deleted. Please try again.",
+    "deleteSessionsPartialFailure_other": "{{count}} of {{total}} sessions could not be deleted. Please try again."
   },
   "version": {
     "updateAvailable": "Update available",
@@ -164,7 +172,16 @@
     "deleteSessionPermanently": "Delete permanently",
     "deleteAllData": "Delete all data permanently",
     "allConversationsDeleted": "The project will be removed from the sidebar. Your files, memories, and session data will be preserved.",
-    "cannotUndo": "You can re-add the project later."
+    "cannotUndo": "You can re-add the project later.",
+    "confirmDeleteSessions": "What would you like to do with",
+    "deleteSessions_one": "Delete {{count}} Session",
+    "deleteSessions_other": "Delete {{count}} Sessions",
+    "selectedSessions_one": "{{count}} selected session",
+    "selectedSessions_other": "{{count}} selected sessions",
+    "closeSessions_one": "Close {{count}} session",
+    "closeSessions_other": "Close {{count}} sessions",
+    "closeSessionsNotice_one": "Close keeps the session out of the active list while preserving its history.",
+    "closeSessionsNotice_other": "Close keeps the sessions out of the active list while preserving their history."
   },
   "simpleList": {
     "newChat": "New chat",

@@ -28,6 +28,9 @@ export const DEFAULT_SOUND_TAGS: readonly string[] = [
   'long pause',
 ];
 
+/** The provider an account holds until it chooses. */
+const DEFAULT_PROVIDER: VoiceProvider = 'gemini';
+
 const DEFAULT_GEMINI_SETTINGS = {
   // The house's transcriber role.
   transcriptionModel: 'gemini-3.8-flash',
@@ -127,7 +130,8 @@ function storedOverrides(userId: number): StoredOverrides {
 
 function withDefaults(overrides: StoredOverrides): VoiceSettings {
   return {
-    provider: overrides.provider ?? 'openai',
+    // Gemini is the only speech service this house runs: an account that never chose is on it. An account that stored `openai` keeps it.
+    provider: overrides.provider ?? DEFAULT_PROVIDER,
     cleanTranscripts: overrides.cleanTranscripts ?? DEFAULT_CLEAN_TRANSCRIPTS,
     gemini: {
       transcriptionModel: overrides.transcriptionModel ?? DEFAULT_GEMINI_SETTINGS.transcriptionModel,

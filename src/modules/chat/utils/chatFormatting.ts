@@ -75,11 +75,13 @@ export function formatTokenCount(value: number): string {
     return '0';
   }
 
-  if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
+  // Thresholds sit where rounding would carry into the next unit, so 9,960 reads "10K", not "10.0K",
+  // and 999,600 reads "1.0M", not "1000K".
+  if (value >= 999_500) {
+    return `${(value / 1_000_000).toFixed(value >= 9_950_000 ? 0 : 1)}M`;
   }
 
-  if (value >= 10_000) {
+  if (value >= 9_950) {
     return `${Math.round(value / 1_000)}K`;
   }
 

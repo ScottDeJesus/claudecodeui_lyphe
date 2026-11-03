@@ -80,9 +80,11 @@ export class ChatSessionWriter {
 
   constructor(options: ChatSessionWriterOptions) {
     this.options = options;
-    // A run started by a timer has no audience yet. Everything still goes
-    // through `decorateOutboundEvent` into the run's replay buffer, so a
-    // client that subscribes mid-run catches up from the beginning.
+    // A run started by a timer has no socket of its own: the tabs that already
+    // have its session open join before the provider is asked
+    // (`chatRunRegistry.joinOpenTabs`). Everything goes through
+    // `decorateOutboundEvent` into the run's replay buffer, so a client that
+    // subscribes mid-run catches up from the beginning.
     if (options.connection) {
       this.connections.add(options.connection);
     }

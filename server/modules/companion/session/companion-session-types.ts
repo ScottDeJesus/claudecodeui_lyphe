@@ -23,8 +23,8 @@ export type HeldSession = { id: string; shape: string | null };
  * account (`userId` names her working directory), her `tools` (the definitions her MCP server carries;
  * none is valid), the held conversation (`HeldSession`: the CLI session id and its shape) with its writer, the handover of one she is made to
  * drop (`writeHandover`, and the newest exchange the summarizer is not shown, `readLastWords`), the messages of his she has not answered with
- * theirs (`readUnanswered` once, when the session is made: a previous process left them; `writeUnanswered`
- * after every change to the list, so it is on disk before the CLI could lose it), the readers every message is
+ * theirs (`readUnanswered` when the session is made — a previous process left them — and again before each write and the takeover's resend, to
+ * see what the other process of a handover did to the row meanwhile; `writeUnanswered` after every change to the list, so it is on disk before the CLI could lose it), the readers every message is
  * assembled from (`MessageReaders`) and the callbacks that tell the house what she did (`TurnSink`, `onProcess` for the
  * process's condition, `onSystemLine` for a line the panel shows in its own tone). A callback that
  * throws is logged and the conversation goes on. `launch` starts one CLI and is the real launcher unless a
@@ -49,6 +49,16 @@ export type CompanionSessionDeps = MessageReaders &
     onProcess(process: CompanionProcess): void;
     onSystemLine(text: string): void;
   };
+
+/**
+ * One alert as the session takes it. `envelope` is the `<alert>` block she is told. `owed`, when the alert is about a prompt that can be
+ * answered (an Accept, a chat's tool permission), answers whether it is STILL open: it is asked at the last moment, when the message is
+ * given to the CLI, and an alert that is no longer owed is dropped silently (`companion-alert-hold.ts`); an alert with no `owed` (a failure,
+ * a landing) cannot be answered and is always said. `told` is called once, when the alert goes into her message, so the panel's row
+ * records what she was told and never an alert that was dropped. Consumed by `companion.service.ts` (builds them from the feed's alerts),
+ * `companion-alert-hold.ts` and `companion-session.ts` (`pushAlerts`).
+ */
+export type SessionAlert = { envelope: string; owed?(): boolean; told(): void };
 
 /**
  * The surface of her conversation. The five pushes each assemble and push ONE message, start a turn
@@ -76,7 +86,8 @@ export type CompanionSession = {
   pushOperatorEmpty(): void;
   /** A name press with nothing after her name: `<operator via="spoken" heard="name">`, a turn she answers as someone called by name does. Kept with his unanswered words as `heard: 'name'`, so a replay sends it again as a call. Consumed by `companion-press.ts`. */
   pushOperatorCalled(): void;
-  pushAlerts(blocks: string[]): void;
+  /** One message of the alerts the feed gathered, read at the last moment: an alert answered by then is dropped (`SessionAlert.owed`), and while a turn of hers is in flight the alerts that can be answered wait for it to end (the others go at once). `[]` pushes nothing. */
+  pushAlerts(alerts: SessionAlert[]): void;
   pushFocusNews(envelope: string): void;
   warm(): void;
   resendUnanswered(): Promise<void>;

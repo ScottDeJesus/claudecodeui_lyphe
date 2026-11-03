@@ -11,8 +11,9 @@ import type { NotesService } from './notes.service.js';
  * at `/api/notes`.
  *
  * WHAT A ROUTE DECIDES HERE, AND WHAT IT DOES NOT. These handlers decide transport SHAPE: that the
- * caller is an account, that `title` and a present `description` are strings, and that `:id` is a
- * path parameter. They decide nothing about the text itself — a blank title and an over-long one are
+ * caller is an account, that `title` and a present `description` are strings, that `:id` is a
+ * path parameter, and that a create's `Idempotency-Key` header, when there is one, is shaped like a
+ * key. They decide nothing about the text itself — a blank title and an over-long one are
  * the service's refusals, because the length that matters is the length of the text as STORED, and
  * only the service normalises. So every handler is three lines: read, call one verb, answer.
  *
@@ -45,6 +46,31 @@ export function readNoteInput(body: unknown): NoteInput {
   return { title: source.title, description: source.description ?? '' };
 }
 
+/**
+ * The header a create carries its idempotency key in, and the shape a key must have: 16 to 128 characters of
+ * letters, digits, `_` and `-`. The tab mints 32 hex characters; the shape only has to keep a key from being
+ * a body, a log line or a second header folded in with `, `.
+ */
+const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
+const IDEMPOTENCY_KEY_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
+
+/**
+ * The create's idempotency key, or `null` when the request sent none (every caller before the tab's
+ * autosave, and any script). A header that IS there and is not a key is refused rather than ignored: a
+ * caller that meant to be idempotent and was silently not would make the duplicate this exists to prevent.
+ */
+function readIdempotencyKey(request: Request): string | null {
+  const value = request.get(IDEMPOTENCY_KEY_HEADER);
+  if (value === undefined) return null;
+  if (!IDEMPOTENCY_KEY_SHAPE.test(value)) {
+    throw new AppError('Idempotency-Key must be 16 to 128 letters, digits, "_" or "-".', {
+      code: 'INVALID_IDEMPOTENCY_KEY',
+      statusCode: 400,
+    });
+  }
+  return value;
+}
+
 /** Creates the lane's router for `notes.module.ts`. Each handler is one service verb and its shape. */
 export function createNotesRoutes(service: NotesService): Router {
   const router = express.Router();
@@ -59,7 +85,8 @@ export function createNotesRoutes(service: NotesService): Router {
   router.post(
     '/',
     asyncHandler(async (request: Request, response: Response) => {
-      const note = service.create(readAuthenticatedUserId(request), readNoteInput(request.body));
+      const note = service.create(readAuthenticatedUserId(request), readNoteInput(request.body), readIdempotencyKey(request));
+      // 201 for a repeated key too: the answer is the create's own, replayed.
       response.status(201).json(createApiSuccessResponse(note));
     })
   );

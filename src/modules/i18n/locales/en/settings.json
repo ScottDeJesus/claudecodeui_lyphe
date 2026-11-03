@@ -82,6 +82,10 @@
       "simpleChatProject": {
         "label": "Project for new chats",
         "description": "New chats in the simple list start in this project."
+      },
+      "keepProjectsExpanded": {
+        "label": "Keep projects expanded",
+        "description": "Open several projects together and remember them after reloading."
       }
     },
     "toolDisplay": {
@@ -104,11 +108,11 @@
   },
   "voiceSettings": {
     "title": "Voice",
-    "description": "Speech-to-text input and read-aloud, via an OpenAI-compatible audio backend.",
+    "description": "Speech-to-text input and read-aloud, through Gemini or an OpenAI-compatible audio backend.",
     "enable": "Enable voice",
     "enableDescription": "Show the mic button and the read-aloud button on messages.",
     "backendTitle": "Backend",
-    "backendDescription": "Point at OpenAI, Groq, or a local server (LocalAI, Speaches, Kokoro-FastAPI). Leave blank to use the server default.",
+    "backendDescription": "Choose the service that hears the mic and speaks read-aloud. For an OpenAI-compatible one, point at OpenAI, Groq, or a local server (LocalAI, Speaches, Kokoro-FastAPI); leave blank to use the server default.",
     "baseUrl": "Base URL",
     "apiKey": "API key",
     "sttModel": "Speech-to-text model",
@@ -117,8 +121,8 @@
     "format": "Audio format",
     "note": "A custom base URL is called directly by your browser and must allow browser CORS requests. Leave it blank to use the server-configured backend.",
     "provider": {
-      "label": "Speech to text",
-      "help": "Which service turns the chat's mic into text.",
+      "label": "Voice service",
+      "help": "Which service hears the chat's mic and speaks its read-aloud.",
       "openai": "OpenAI-compatible",
       "gemini": "Gemini"
     },
@@ -151,7 +155,7 @@
     },
     "gemini": {
       "title": "Gemini",
-      "description": "Kaylee hears and speaks through Gemini. The chat's mic uses it when picked above.",
+      "description": "Kaylee hears and speaks through Gemini. The chat's mic and read-aloud use it when picked above.",
       "key": "API key",
       "keyField": "Gemini API key",
       "keyPlaceholder": "Paste a Gemini API key",
@@ -173,9 +177,9 @@
       "modelHelp": "The Gemini model that writes down what is said, by its exact name.",
       "modelInvalid": "A model name is 1–80 letters, digits, dots, dashes or underscores.",
       "speechModel": "Speech model",
-      "speechModelHelp": "The Gemini model that speaks her sentences, by its exact name. gemini-3.8-flash-lite-tts is the cheap choice.",
+      "speechModelHelp": "The Gemini model that speaks her sentences and the chat's read-aloud, by its exact name. gemini-3.8-flash-lite-tts is the cheap choice.",
       "voice": "Voice",
-      "voiceHelp": "The Gemini voice she speaks in, by its exact name.",
+      "voiceHelp": "The Gemini voice she speaks in, and the chat's read-aloud too, by its exact name.",
       "voiceInvalid": "A voice name is 1–40 letters, digits, dashes or underscores.",
       "soundTags": "Sound tags",
       "soundTagsHelp": "The sounds she may make, each voiced where she puts it. Any other bracket is dropped before she speaks.",

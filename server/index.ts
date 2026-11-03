@@ -407,6 +407,7 @@ const companion = createCompanionModule({
     roadmap: roadmap.picture,
     dispatcher: dispatcher.picture,
     cardText: dispatcher.cardText,
+    askOpen: dispatcher.askOpen,
     launches: dispatchSouls.launches,
     cerberus: cerberus.overview,
     heal: heal.service,
@@ -694,8 +695,9 @@ async function soleServerDuties() {
         console.log(`[keepalive] re-adopted ${keepalive.readopted} host(s), swept ${keepalive.swept} dead host file(s)`);
     } catch (error) { console.error('[keepalive] re-adopt failed (continuing):', getErrorMessage(error)); }
     markRunsReadopted();
-    // A chat that falls asleep unpinned is closed from here on. Armed after the re-adoption above and never
-    // before it: a host the boot retires or re-binds is a reconcile, and the listener hears sleeps only.
+    // A chat that falls asleep unpinned is closed from here on, however its last host ended. Armed after the re-adoption
+    // above and never before it: a host the boot retires, re-binds or finds gone is a reconcile, not a chat sleeping. A host
+    // that loses its socket while this server shuts down is not heard either (`isApiExiting`, session-auto-close.service.ts).
     startSessionAutoClose();
     // Sends anything that came due while the server was not running, then keeps polling.
     initializeScheduledMessageDispatcher(chatRuntime);

@@ -43,7 +43,13 @@
     "messageCount_other": "{{count}} messaggi",
     "showOlder_one": "↳ Mostra {{count}} conversazione precedente",
     "showOlder_many": "↳ Mostra {{count}} conversazioni precedenti",
-    "showOlder_other": "↳ Mostra {{count}} conversazioni precedenti"
+    "showOlder_other": "↳ Mostra {{count}} conversazioni precedenti",
+    "select": "Seleziona",
+    "selectAll": "Seleziona tutto",
+    "selectAllLoaded": "Seleziona le caricate",
+    "clearSelection": "Deseleziona tutto",
+    "deleteSelected_one": "Elimina {{count}} sessione",
+    "deleteSelected_other": "Elimina {{count}} sessioni"
   },
   "tooltips": {
     "viewEnvironments": "Visualizza ambienti",
@@ -120,7 +126,9 @@
     "restoreProjectError": "Errore durante il ripristino del progetto. Riprova.",
     "reopenSessionFailed": "Impossibile riaprire la sessione. Riprova.",
     "reopenSessionError": "Errore durante la riapertura della sessione. Riprova.",
-    "forkSessionError": "Impossibile creare un ramo da questa sessione. Riprova."
+    "forkSessionError": "Impossibile creare un ramo da questa sessione. Riprova.",
+    "deleteSessionsPartialFailure_one": "Impossibile eliminare {{count}} sessione su {{total}}. Riprova.",
+    "deleteSessionsPartialFailure_other": "Impossibile eliminare {{count}} sessioni su {{total}}. Riprova."
   },
   "version": {
     "updateAvailable": "Aggiornamento disponibile",
@@ -158,7 +166,16 @@
     "deleteSessionPermanently": "Elimina definitivamente",
     "deleteAllData": "Elimina tutti i dati permanentemente",
     "allConversationsDeleted": "Il progetto verrà rimosso dalla barra laterale. I tuoi file, memorie e dati delle sessioni verranno preservati.",
-    "cannotUndo": "Puoi riaggiungerlo in seguito."
+    "cannotUndo": "Puoi riaggiungerlo in seguito.",
+    "confirmDeleteSessions": "Cosa vuoi fare con",
+    "deleteSessions_one": "Elimina {{count}} sessione",
+    "deleteSessions_other": "Elimina {{count}} sessioni",
+    "selectedSessions_one": "{{count}} sessione selezionata",
+    "selectedSessions_other": "{{count}} sessioni selezionate",
+    "closeSessions_one": "Chiudi {{count}} sessione",
+    "closeSessions_other": "Chiudi {{count}} sessioni",
+    "closeSessionsNotice_one": "La chiusura rimuove la sessione dall'elenco attivo mantenendone la cronologia.",
+    "closeSessionsNotice_other": "La chiusura rimuove le sessioni dall'elenco attivo mantenendone la cronologia."
   },
   "simpleList": {
     "newChat": "Nuova chat",

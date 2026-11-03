@@ -27,7 +27,7 @@ export default function AppearanceSettingsTab({
   // The sun-follow switch reads the same theme context the Dark Mode switch beside it writes,
   // so the two can never disagree about who is in charge of the colour.
   const { followsSun, setFollowsSun } = useTheme();
-  const { hideShellTab, hideFilesTab, hideGitTab, hideBrowserTab, showRawParameters, showThinking, showWork, showCompactSummary, sendByCtrlEnter } = useUiPreferences();
+  const { hideShellTab, hideFilesTab, hideGitTab, hideBrowserTab, showRawParameters, showThinking, showWork, showCompactSummary, sendByCtrlEnter, keepProjectsExpanded } = useUiPreferences();
   // The transcript's reading size, read and written through the one hook the chat pane reads —
   // so the stepper and the messages can never disagree about how big the text is.
   const chatFontSize = useChatFontSize();
@@ -259,6 +259,17 @@ export default function AppearanceSettingsTab({
               options={simpleChatProjectOptions}
               placeholder={t('appearance.sidebar.simpleChatProject.label')}
               onChange={(next) => setSimpleChatProjectId(next || null)}
+            />
+          </SettingRow>
+
+          <SettingRow
+            label={t('appearance.sidebar.keepProjectsExpanded.label')}
+            description={t('appearance.sidebar.keepProjectsExpanded.description')}
+          >
+            <SettingsToggle
+              checked={keepProjectsExpanded}
+              onChange={(value) => setPreference('keepProjectsExpanded', value)}
+              ariaLabel={t('appearance.sidebar.keepProjectsExpanded.label')}
             />
           </SettingRow>
         </SettingsCard>

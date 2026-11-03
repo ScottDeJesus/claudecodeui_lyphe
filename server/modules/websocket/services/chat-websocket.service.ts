@@ -7,6 +7,11 @@ import { clearPresence, markPresence } from '@/modules/notifications/index.js';
 import { providerModelsService, sessionHostLivenessSnapshot, sessionsService } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/services/chat-run-registry.service.js';
 import { abortChatRun, answerChatPermission } from '@/modules/websocket/services/chat-run-verbs.service.js';
+import {
+  echoUserMessageOnRun,
+  markSocketShowing,
+  markSocketSubscribed,
+} from '@/modules/websocket/services/chat-session-audience.service.js';
 import { broadcastSessionUpserted } from '@/modules/websocket/services/session-upsert-broadcast.service.js';
 import {
   connectedClients,
@@ -276,6 +281,11 @@ async function dispatchRun(
     // be taken back. Inside the try so a rewind that throws still releases the
     // run instead of leaving the session processing forever.
     await beforeRun?.(run);
+    // A run nobody asked for from a browser (no socket) reaches the tabs that already have its session open: after the
+    // hook, so what the hook wrote is replayed to them, and before the provider, so they hear every event of it live.
+    if (!ws) {
+      chatRunRegistry.joinOpenTabs(run);
+    }
     await dependencies.runtime.run(provider, command, runtimeOptions, run.writer);
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error);
@@ -419,9 +429,11 @@ async function handleChatAbort(
 }
 
 /**
- * Handles `chat.subscribe`: for each requested session, reports whether a run
- * is processing, re-attaches the live stream to this socket, replays missed
- * events (seq > lastSeq), and includes pending permission requests.
+ * Handles `chat.subscribe`: for each requested session, records it as open on
+ * this socket (so a run that starts later joins this socket too), reports
+ * whether a run is processing, re-attaches the live stream to this socket,
+ * replays missed events (seq > lastSeq), and includes pending permission
+ * requests.
  *
  * This single message replaces the old `check-session-status`,
  * `get-pending-permissions`, and Claude-only writer reconnect flows.
@@ -444,6 +456,10 @@ function handleChatSubscribe(
     if (!sessionId) {
       continue;
     }
+
+    // Open on this socket from now, idle or not: a run that starts later with no socket (a scheduled message, a queued
+    // follow-up) joins this socket at its first event (`dispatchRun`), which is what a tab idle on the session needs to show it live.
+    markSocketSubscribed(ws, sessionId);
 
     const lastSeqRaw = (target as AnyRecord).lastSeq;
     let lastSeq = typeof lastSeqRaw === 'number' && Number.isFinite(lastSeqRaw)
@@ -527,6 +543,12 @@ function handleChatPresence(ws: WebSocket, userId: string | number | null, data:
 
   markPresence(ws, { userId, sessionId, visible, clientId, focused, view });
 
+  // The chat view's own report also says which session this socket now has open, and so which it has left: a station
+  // page's report (it carries a `view`) names its stage's chat, and a report with no session says nothing of either.
+  if (sessionId !== null && view === null) {
+    markSocketShowing(ws, sessionId);
+  }
+
   // A visible report is also the moment the chat came on screen, which is what
   // clears an unread dot left by a run that finished while it was away.
   if (visible && sessionId !== null) {
@@ -577,11 +599,11 @@ function markReadIfCompleted(sessionId: string): void {
 /**
  * Runs a turn for a session with no client attached.
  *
- * Used by scheduled messages, which fire from a timer, and by keepalive re-adoption at boot: there is no socket to
- * report errors to and no audience to stream to. The run is registered exactly
- * like an interactive one, so anyone who opens the session while it is going
- * subscribes and replays it from the start, and the session shows as busy
- * everywhere in the meantime.
+ * Used by scheduled messages, which fire from a timer, by the queued follow-up, the companion's send, auto-compaction
+ * and keepalive re-adoption: there is no socket to report errors to. The run is registered exactly like an interactive
+ * one, so every tab that has the session open is joined to it at its first event (`dispatchRun`), anyone who opens the
+ * session while it is going subscribes and replays it from the start, and the session shows as busy everywhere in the
+ * meantime.
  *
  * Resolves when the provider run settles. Returns false when the session has
  * gone away or is busy without `interruptActiveRun`, which the caller reports
@@ -599,6 +621,13 @@ export async function runDetachedChatTurn(
      * land mid-run, so the timer outranks whatever is running.
      */
     interruptActiveRun?: boolean;
+    /**
+     * Says `content` is the user's own words and the caller writes no echo of them: they are written onto the run's stream
+     * (`echoUserMessageOnRun`) so every open tab shows the message at the run's start. A scheduled message and a queued
+     * follow-up set it; the companion writes an echo of its own, a compaction's `/compact` and a re-adoption's empty
+     * prompt are no message of his.
+     */
+    echoUserMessage?: boolean;
     /** Runs after the run is registered, before the provider: re-adoption ends an already-completed turn here. */
     beforeRun?: (run: NonNullable<ReturnType<typeof chatRunRegistry.startRun>>) => void | Promise<void>;
     /**
@@ -633,6 +662,14 @@ export async function runDetachedChatTurn(
     await abortChatRun(input.sessionId, dependencies);
   }
 
+  // The echo is written first, so a caller's own hook sees the run with the message already on its stream.
+  const beforeRun = input.echoUserMessage && input.content.trim()
+    ? async (run: NonNullable<ReturnType<typeof chatRunRegistry.startRun>>) => {
+        echoUserMessageOnRun(run.writer, { sessionId: input.sessionId, provider, content: input.content });
+        await input.beforeRun?.(run);
+      }
+    : input.beforeRun;
+
   return dispatchRun(
     null,
     input.userId,
@@ -640,7 +677,7 @@ export async function runDetachedChatTurn(
     session,
     { sessionId: input.sessionId, content: input.content, options: input.options ?? {} },
     dependencies,
-    { messageUuid: input.messageUuid }, input.beforeRun, // the one extra runtime option; the hook is dispatchRun's eighth argument
+    { messageUuid: input.messageUuid }, beforeRun, // the one extra runtime option; the hook is dispatchRun's eighth argument
   );
 }
 

@@ -37,7 +37,7 @@ import { stationLanded } from './station/station-landed.js';
  *   - `sendDraft` is the panel's Send: the draft goes to its target (a turn, or folded into the running one) and the
  *     pressing page takes the floor, so the chat opens where he pressed;
  *   - `cancelAction` is the × on the action card: the one action waiting for his word comes off his panel and its row in her
- *     record of actions ends `cancelled` (or `expired`, when it had already lapsed); with none standing it changes nothing;
+ *     record of actions ends `cancelled`, lapsed or not; with none standing it changes nothing;
  *   - `speech` and `cut` are her voice (`companion-speech.ts`): the audio of one sentence for the floor page, and the
  *     press that stops her while she speaks and owes her next message a `<cut>`;
  *   - `pinNote` is his Pin on a card, and `moveWalk` and `endWalk` are his Back, Next and × on the walk (`companion-walk.ts`: the same
@@ -232,11 +232,11 @@ function createCompanionService() {
     },
 
     /**
-     * His × on the action card. The standing action's row ends `cancelled` — or `expired` when it is already past its
-     * `expiresAt`, a lapse found by this verb (nothing times a lapse out: the next prepare, take or cancel that meets it
-     * ends it) — and then the action leaves her state and his panel. With none standing it changes nothing and sends nothing,
-     * so a second page's × on an action the first already withdrew is not an error. An action a take is carrying out cannot be
-     * withdrawn: its door is out, the card goes when the take finishes, and the × changes nothing.
+     * His × on the action card. The standing action's row ends `cancelled`, even when it is already past its `expiresAt`: his × is
+     * a withdrawal, and only a lapse that a prepare or a take finds (nothing times one out) ends a row `expired`, which a later
+     * prepare of the same thing re-arms. Then the action leaves her state and his panel. With none standing it changes nothing and
+     * sends nothing, so a second page's × on an action the first already withdrew is not an error. An action a take is carrying
+     * out cannot be withdrawn: its door is out, the card goes when the take finishes, and the × changes nothing.
      */
     cancelAction(userId: number): void {
       // The same function her `cancel_action` ends an action through, so the two doors cannot end one two ways.
@@ -315,22 +315,29 @@ function createCompanionService() {
     },
 
     /**
-     * Alerts for this account that the alert feed let through: each is logged as an `alert` row on her panel
-     * (so the panel shows what the house said), then all are pushed to her as ONE message. Nothing is checked
-     * here — Live, the page and the repeat were judged by the feed. Refused silently once the server is stopping.
+     * Alerts for this account that the alert feed let through, pushed to her as ONE message. Live, the page and the repeat were
+     * judged by the feed; what the session judges is the last look: an alert about a prompt that has been answered by the time
+     * her message is built is dropped (`CompanionAlert.owed`, `session/companion-alert-hold.ts`). Each alert is logged as an
+     * `alert` row on her panel as it goes into her message, so the panel shows what she was told and never an alert that was
+     * dropped. Refused silently once the server is stopping.
      */
     alert(userId: number, alerts: CompanionAlert[]): void {
       if (stopped || alerts.length === 0) return;
       const { store, session } = accountOf(userId);
-      for (const { line } of alerts) {
-        // The panel's row is a record of the alert; a row that cannot be written must not cost her the alert itself.
-        try {
-          store.appendLog({ role: 'alert', text: line });
-        } catch (error) {
-          console.error(`[Companion] account ${userId}: an alert row could not be written to her panel`, error);
-        }
-      }
-      session.pushAlerts(alerts.map(({ envelope }) => envelope));
+      session.pushAlerts(
+        alerts.map(({ envelope, line, owed }) => ({
+          envelope,
+          owed,
+          told: () => {
+            // The panel's row is a record of the alert; a row that cannot be written must not cost her the alert itself.
+            try {
+              store.appendLog({ role: 'alert', text: line });
+            } catch (error) {
+              console.error(`[Companion] account ${userId}: an alert row could not be written to her panel`, error);
+            }
+          },
+        }))
+      );
     },
 
     /**

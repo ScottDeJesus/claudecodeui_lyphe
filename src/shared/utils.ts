@@ -694,6 +694,22 @@ export function troubleOfFailure(failure: unknown): AffectedAreasTrouble {
 
 // ---------------------------
 
+//----------------- A RANDOM ID THAT WORKS ON PLAIN HTTP ------------
+
+/**
+ * A fresh random id: 32 lowercase hex characters (128 bits) from `crypto.getRandomValues`.
+ *
+ * Not `crypto.randomUUID`: the app is reached over plain HTTP on a tailnet address, which is not a secure
+ * context, and `randomUUID` does not exist there. Used wherever the page names something itself — this page's
+ * companion client id, a queued chat message, and the idempotency key of a note's first save.
+ */
+export function randomHexId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// ---------------------------
+
 //----------------- THE COMPANION'S NAME FOR THIS PAGE ------------
 
 /** The sessionStorage key one tab keeps its companion client id under. */
@@ -707,9 +723,8 @@ let companionClientIdInMemory: string | null = null;
  * second tab gets its own. It rides every companion call as `x-companion-client`, and the page that last typed to her or
  * opened her panel holds the floor — the one page a `companion_open` frame is addressed to.
  *
- * Minted with `crypto.getRandomValues`, not `randomUUID`: the app is reached over plain HTTP on a tailnet address, which is
- * not a secure context, and `randomUUID` does not exist there. Used by `api.companion` (the header) and the companion
- * module's provider (to tell which page a frame is for).
+ * Minted by `randomHexId`. Used by `api.companion` (the header) and the companion module's provider (to tell which page a
+ * frame is for).
  */
 export function companionClientId(): string {
   try {
@@ -719,8 +734,7 @@ export function companionClientId(): string {
     // sessionStorage refused the read; the in-memory id below stands in for the page's life.
   }
   if (companionClientIdInMemory === null) {
-    const bytes = crypto.getRandomValues(new Uint8Array(16));
-    companionClientIdInMemory = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    companionClientIdInMemory = randomHexId();
     try {
       window.sessionStorage.setItem(COMPANION_CLIENT_STORAGE_KEY, companionClientIdInMemory);
     } catch {

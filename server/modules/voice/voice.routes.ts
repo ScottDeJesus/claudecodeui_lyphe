@@ -2,7 +2,7 @@ import { Readable } from 'node:stream';
 
 import express from 'express';
 
-import type { VoiceRequestOverrides, VoiceService, VoiceServiceResult } from '@/shared/types.js';
+import type { VoiceRequestOverrides, VoiceServiceResult } from '@/shared/types.js';
 import { asyncHandler, readAuthenticatedUserId } from '@/shared/utils.js';
 
 import { clearGeminiKey, geminiKeyStatus, saveGeminiKey } from './gemini-key.js';
@@ -11,7 +11,6 @@ import type { createVoiceProvider } from './voice-provider.js';
 import { readVoiceSettings, saveVoiceSettings } from './voice-settings.js';
 
 type VoiceRouterDependencies = {
-  voiceService: VoiceService;
   voiceProvider: ReturnType<typeof createVoiceProvider>;
   parseAudioUpload: express.RequestHandler;
 };
@@ -66,17 +65,18 @@ function readTextBody(request: express.Request, response: express.Response): str
 }
 
 /**
- * Creates the transport-only router for the Voice composition root (`voice.module.ts`), which hands it the proxy
- * service, the provider decision and the upload parser. Other modules consume only the composed router exposed
- * from the Voice barrel.
+ * Creates the transport-only router for the Voice composition root (`voice.module.ts`), which hands it the provider decision
+ * (which wraps the OpenAI-compatible proxy service) and the upload parser. Other modules consume only the composed router
+ * exposed from the Voice barrel.
  */
 export function createVoiceRouter(dependencies: VoiceRouterDependencies): express.Router {
   const router = express.Router();
 
-  // The OpenAI-compatible proxy's own answer, whatever the account's provider: read-aloud draws its speaker from it.
-  router.get('/health', (_request, response) => {
-    response.json(dependencies.voiceService.getHealth());
-  });
+  // Whether read-aloud has a backend for THIS account: its Gemini key on `gemini`, the OpenAI-compatible proxy's own `configured` on
+  // `openai`. The page's `useVoiceAvailable('speak')` draws the read-aloud button from it.
+  router.get('/health', asyncHandler(async (request, response) => {
+    response.json(dependencies.voiceProvider.healthForChat(readAuthenticatedUserId(request)));
+  }));
 
   // The account's voice settings and its one Gemini key. The key is never answered, only its status: where it
   // comes from and, for a stored key, its last four characters.
@@ -181,10 +181,16 @@ export function createVoiceRouter(dependencies: VoiceRouterDependencies): expres
       return;
     }
 
+    // A page that drops the request (Stop, another message) ends the speech calls behind it: a finished response closes too, which is then no abort.
+    const dropped = new AbortController();
+    response.on('close', () => {
+      if (!response.writableFinished) dropped.abort();
+    });
     const result = await dependencies.voiceProvider.synthesizeForChat(
       readAuthenticatedUserId(request),
       text,
       parseVoiceOverrides(request),
+      dropped.signal,
     );
     if (sendFailure(response, result)) {
       return;

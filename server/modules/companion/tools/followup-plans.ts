@@ -12,7 +12,7 @@ import type { CompanionHouse } from '../house.js';
  * Roadmap tab's words for a feature (`card-lines.ts`) and the In flight face's badge for a plan the roadmap does not hold. A lane that
  * has not landed, or whose read fails, adds no bracket: the lines are then exactly what they were without it.
  *
- * Consumer: `read-tools.ts` (`list_followups`).
+ * Consumer: `followup-list.ts` (`list_followups`).
  */
 
 /** Whether `name` stands in `text` as a whole word, and where it first does (-1 when it does not). */

@@ -1,4 +1,5 @@
-import { followupsDb, type FollowupRow } from '@/modules/database/index.js';
+import { accountOfChat } from '@/modules/chat-commands/index.js';
+import { followupsDb, userDb, type FollowupRow } from '@/modules/database/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import type {
   Followup,
@@ -12,6 +13,7 @@ import { AppError } from '@/shared/utils.js';
 import {
   closuresForArc,
   closuresForPlan,
+  completionMark,
   epicFinishedAt,
   type CompletionClosure,
 } from './followups-completion-rule.service.js';
@@ -37,18 +39,25 @@ import {
  * for every chat and every account at once — and marks it `closedBy: 'completion'` with `closedFor` naming what
  * finished. The rule is `followups-completion-rule.service.ts`; the dispatcher's watcher is the caller.
  *
+ * THE HOUSE FILES TOO, in one place only: `fileGapsForChat` files lines as GAPS on a chat that never asked, for the dispatcher
+ * (what a finished feature's builders flagged). It never files a line the chat already holds in ANY state, and it never guesses an
+ * account: the chat's own run says whose it is, else the one account that already filed on it.
+ *
  * THE FRAME NAMES THE CHAT. Every write that changed a row sends one `followups_changed` to every open
  * socket, carrying the chat's app session id; a widget of another chat ignores it, and a client that is not
  * the owner only learns that some chat moved. Nothing else rides the frame.
  *
  * Consumers: `followups.routes.ts` (the widget's door) and `followups.command-routes.ts` (the `followups`
  * command's), handed this object — so the two doors refuse alike and both send the frame. The companion
- * module reads through `listOpenForAccount` and `listOpenGroupsForAccount`, by way of the barrel's `listOpenFollowups` and `listOpenFollowupGroups`; the dispatcher
- * module's watcher calls `closeForCompletions`, by way of the barrel's `closeFollowupsForCompletions`.
+ * module reads through `listOpenForAccount`, `listSettledByCompletionForAccount` and `listOpenGroupsForAccount`, by way of the barrel's `listOpenFollowups`, `listCompletionClosedFollowups` and `listOpenFollowupGroups`; the dispatcher
+ * module's watcher calls `closeForCompletions` and `fileGapsForChat`, by way of the barrel's `closeFollowupsForCompletions` and `fileFollowupGapsForChat`.
  */
 
-/** A line's ceiling, in characters after trimming — the number the refusal sentence quotes back to the chat. */
-const TEXT_MAX = 240;
+/**
+ * A line's ceiling, in characters after trimming — the number the refusal sentence quotes back to the chat. Exported by the barrel
+ * as `FOLLOWUP_TEXT_MAX`: the dispatcher module cuts the lines it files to fit it (`dispatcher-build-gaps.service.ts`).
+ */
+export const TEXT_MAX = 240;
 
 /** The most lines one `add` may carry: a turn files its handful at once, and a call of more is a runaway. */
 const BATCH_MAX = 20;
@@ -220,6 +229,36 @@ export const followupsService = {
   },
 
   /**
+   * The account's items the house closed when the feature, task or epic they named finished — one chat's when `appSessionId` names
+   * it, every chat's when it is `null` — newest first, each beside the chat's app session id and its `mark`
+   * (`completionMark`: `done: feature <name> finished`). The recency is `listOpenForAccount`'s: the order the items were filed in.
+   * `limit` is held as `listOpenForAccount` holds it, and `leftOut` says whether more items exist than `limit` took — the service
+   * reads one row past the held limit to know, so a list cut at the ceiling of 200 still says so. The companion's read, which
+   * lists these under the open items so a settled line never passes for one that still waits on him.
+   */
+  listSettledByCompletionForAccount(
+    userId: number,
+    appSessionId: string | null,
+    limit = OPEN_LIST_DEFAULT,
+  ): { items: Array<{ sessionId: string; followup: Followup; mark: string }>; leftOut: boolean } {
+    const bounded = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), OPEN_LIST_MAX) : OPEN_LIST_DEFAULT;
+    const rows =
+      appSessionId === null
+        ? followupsDb.listSettledByCompletionOfUser(userId, bounded + 1)
+        : followupsDb
+            .listForChatOfUser(appSessionId, userId)
+            .filter((row) => row.state === 'done' && row.closed_for !== null)
+            .reverse()
+            .slice(0, bounded + 1);
+
+    // Both reads already hold only rows with a `closed_for`; the test is what lets the type know it.
+    const items = rows.slice(0, bounded).flatMap((row) =>
+      row.closed_for === null ? [] : [{ sessionId: row.session_id, followup: toFollowup(row), mark: completionMark(row.closed_for) }],
+    );
+    return { items, leftOut: rows.length > bounded };
+  },
+
+  /**
    * The account's open items grouped by chat, the chat with the newest one first: each group is the chat's app session id, how many
    * open items it holds and the newest of them, mapped as the widget maps it. The count is the table's own for the account, so it is
    * never a count of a capped read (`listOpenForAccount`'s ceiling cuts rows before any grouping). The station's read.
@@ -265,6 +304,31 @@ export const followupsService = {
   },
 
   /**
+   * Files each line as a GAP on a chat that did not ask for it, on the house's behalf, and answers the rows it wrote — only the
+   * lines the chat did not already hold. "Held" is any state: a line the person ticked or a completion closed is not filed
+   * again, which is what makes a second pass over the same finished feature file nothing (`addUnheldMany` checks and writes in one
+   * transaction, so two servers handing over do not both file it). Every line is judged first, as `add` judges them, and a bad
+   * one throws before a row is written; the caller cuts its lines to `TEXT_MAX`.
+   *
+   * WHOSE THEY ARE. The chat's own run names the account (`accountOfChat`); a chat with no run answers from its own record, the
+   * one account that already filed an item on it. Two accounts, or none, answer `null` and nothing is written: a gap filed under
+   * the wrong account is worse than a gap not filed (INV-9605), and `users` holds more than one account on this box. So an idle
+   * chat that never filed an item is never filed on — the common case for a finished feature's design chat (MAN-9498 has the count).
+   */
+  fileGapsForChat(appSessionId: string, lines: string[]): Followup[] | null {
+    const items = lines.map((line) => ({ kind: 'gap' as const, text: judgeLine(line, '') }));
+    if (items.length === 0) return [];
+
+    const owners = followupsDb.accountsOfChat(appSessionId).filter((id) => userDb.getUserById(id) !== undefined);
+    const userId = accountOfChat(appSessionId) ?? (owners.length === 1 ? owners[0] : null);
+    if (userId === null) return null;
+
+    const rows = followupsDb.addUnheldMany({ sessionId: appSessionId, userId, items });
+    if (rows.length > 0) broadcastFollowupsChanged(appSessionId);
+    return rows.map(toFollowup);
+  },
+
+  /**
    * Settles the named items on the chat's say-so and answers them as stored. Every id is checked against THIS
    * chat before any is closed, so one id of another chat refuses the whole call with a 404. An item already done
    * is answered as it stands.
@@ -280,12 +344,12 @@ export const followupsService = {
 
   /**
    * Settles every open item, of any chat and any account, whose feature, task or epic has finished, and answers the items
-   * it closed beside the chat each belongs to. `plans` and `arcs` are the dispatcher's picture (`DispatcherPlan[]` and
-   * `DispatcherArc[]` are assignable); the rules are `closuresForPlan` and `closuresForArc`. The plans run FIRST and
+   * it closed beside the chat each belongs to. `plans` and `arcs` are the dispatcher's store as the document gives it
+   * (`DispatcherPlan[]` and `DispatcherArc[]` are assignable); the rules are `closuresForPlan` and `closuresForArc`. The plans run FIRST and
    * their closures are written before an epic's candidates are read, so a feature or task claims an item before an epic
    * can: one item, one `closed_for`. Idempotent — an item already settled is not open and is never read again — so it is
-   * safe to run on every picture, including the first after a boot (which catches what finished while the server was
-   * down for as long as the picture still carries it). Sends ONE `followups_changed` per chat that moved, after the
+   * safe to run as often as the caller likes, including the first time after a boot. It ignores AGE: the caller hands it the
+   * dispatcher's store whole, so what finished while the server was down is settled however long ago it finished. Sends ONE `followups_changed` per chat that moved, after the
    * writes landed — and still when a later write throws, for the rows already closed — and logs one line per item closed.
    */
   closeForCompletions(

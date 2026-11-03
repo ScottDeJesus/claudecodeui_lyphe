@@ -3715,7 +3715,12 @@
         "today": "today {{clock}}",
         "yesterday": "yesterday {{clock}}"
       },
+      "channel": {
+        "spoken": "said",
+        "typed": "typed"
+      },
       "youSaid": "You said",
+      "youTyped": "You typed",
       "quoted": "“{{quote}}”",
       "noWords": "No words of yours are kept with this one.",
       "reading": "Reading her memory…",

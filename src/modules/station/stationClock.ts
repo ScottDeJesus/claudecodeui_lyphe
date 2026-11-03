@@ -10,7 +10,7 @@ type StationStamp = { day: StationStampDay; clock: string; date: string };
  * THE STATION'S ONE STAMP WRITER: every time the page draws as a moment, on his clock and in the locale's. Its readers each word
  * the three parts with keys of their own, so a clock is spelled in one place and said in four:
  * - the strip (`SinceYouLastLooked`: each landing's time and his last look, `station.strip.when.*`);
- * - the memory lines (`MemoryLine`: when he said it, `station.memory.when.*`);
+ * - the memory lines (`MemoryLine`: when he said or typed it, `station.memory.when.*`);
  * - the chat stage (`ChatStage`: "last moved <when>", `station.chat.when.*`);
  * - a red check's "since" (`NeedItem`, `station.needs.when.*`).
  *

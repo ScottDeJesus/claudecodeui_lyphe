@@ -47,6 +47,7 @@ The `sessions` table records no owner: a chat row names its project, model and t
 
 - The id must be a positive integer (a numeric string is read as one) and name an ACTIVE user (`userDb.getUserById`); otherwise the answer is `null` and the door refuses with 403 `CHAT_ACCOUNT_UNKNOWN`. Nothing is guessed: a note written for the wrong account is worse than a note not written.
 - A run started by something with no login carries `userId: null` and so has no account here.
+- One reader is no door: the followups service's `fileGapsForChat` (the house filing a finished feature's build gaps, MAN-9497). It asks `accountOfChat` first and, on a null, takes the one account that already filed an item on the chat (`followupsDb.accountsOfChat`); two accounts or none answer null and it files nothing. A chat with neither a run nor an item of its own is therefore never filed on.
 
 ## The link — `ensureChatCommandLink(commandName, logLabel)`
 

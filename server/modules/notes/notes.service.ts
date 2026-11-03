@@ -162,12 +162,21 @@ export const notesService = {
     return toNote(row);
   },
 
-  /** Creates one note from a whole draft and answers it as stored, `createdAt === updatedAt`. */
-  create(userId: number, input: NoteInput): Note {
+  /**
+   * Creates one note from a whole draft and answers it as stored, `createdAt === updatedAt`.
+   *
+   * `clientKey` makes the create IDEMPOTENT: the tab's blank card mints one key for its first save and sends
+   * it on every retry, because a save whose answer never arrived may have landed, and a retry without the key
+   * would make a second note. A key this account has already used answers with the note it made — as that note
+   * stands now, never rewritten by the repeat — and writes nothing, so it sends no frame either: the original
+   * create already did. The text of a repeat is still judged first, so a repeat that is itself refused is refused.
+   * No key (the notes command) is a plain create, as before.
+   */
+  create(userId: number, input: NoteInput, clientKey: string | null = null): Note {
     const { title, description } = validate(normaliseTitle(input.title), normaliseDescription(input.description));
-    const note = toNote(notesDb.create({ userId, title, description }));
-    broadcastNotesChanged();
-    return note;
+    const { row, created } = notesDb.create({ userId, clientKey, title, description });
+    if (created) broadcastNotesChanged();
+    return toNote(row);
   },
 
   /**

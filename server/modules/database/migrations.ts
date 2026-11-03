@@ -22,7 +22,7 @@ import { COMPANION_SCHEMA_SQL } from '@/modules/database/companion-schema.js';
 import { FOLLOWUPS_SCHEMA_SQL } from '@/modules/database/followups-schema.js';
 import { KANBAN_SCHEMA_SQL } from '@/modules/database/kanban-schema.js';
 import { MEMORY_SCHEMA_SQL } from '@/modules/database/memory-schema.js';
-import { NOTES_SCHEMA_SQL } from '@/modules/database/notes-schema.js';
+import { NOTES_CLIENT_KEY_INDEX_SQL, NOTES_SCHEMA_SQL } from '@/modules/database/notes-schema.js';
 import { NOTIFICATION_HISTORY_SCHEMA_SQL } from '@/modules/database/notification-history-schema.js';
 import { migrateProvenanceColumnToLegacyId } from '@/modules/database/migrations-legacy-id.js';
 import { visibleProjectPathSql } from '@/shared/hidden-project-paths.js';
@@ -721,6 +721,18 @@ const addCompanionNoteShapeColumns = (db: Database): void => {
 };
 
 /**
+ * Adds `notes.client_key` — the idempotency key a note's creating request carried — and the unique index that
+ * lets a repeated key answer with the note it already made. NULL on every row held before the column, which is
+ * the truth: none of them was made under a key, and the partial index leaves NULLs alone, so no backfill runs.
+ * Additive only; a re-run finds the column and the index and does nothing.
+ */
+const addNotesClientKeyColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'notes').map((column) => column.name);
+  addColumnToTableIfNotExists(db, 'notes', columnNames, 'client_key', 'TEXT');
+  db.exec(NOTES_CLIENT_KEY_INDEX_SQL);
+};
+
+/**
  * Adds `companion_actions.armed_from`: when the action's ceremony began. A prepare that re-arms an action which lapsed (the same
  * action on the same target) carries the first prepare's stamp here, so her read-back from before the lapse
  * still counts. NULL means the ceremony began at the row's own `prepared_at`, which is every row before this column.
@@ -806,12 +818,26 @@ const addSessionPermissionModeColumn = (db: Database): void => {
 };
 
 /**
- * Adds `session_drafts.last_claimed_queue_id`. Nothing reads or writes it any more; the column
- * stays until a migration drops it.
+ * Drops `session_drafts.last_claimed_queue_id`, a column nothing reads or writes. `SESSION_DRAFTS_TABLE_SCHEMA_SQL`
+ * no longer declares it, so a fresh database never has it; this is the half that reaches a database already on disk.
+ * SQLite refuses to drop a column that an index, trigger or view names (none does), and an unread column is no reason
+ * to stop the server booting, so a refusal is logged and the column stays until the next boot tries again.
  */
-const addLastClaimedQueueIdColumn = (db: Database): void => {
+const dropLastClaimedQueueIdColumn = (db: Database): void => {
   const columnNames = getTableInfo(db, 'session_drafts').map((column) => column.name);
-  addColumnToTableIfNotExists(db, 'session_drafts', columnNames, 'last_claimed_queue_id', 'TEXT');
+  if (!columnNames.includes('last_claimed_queue_id')) {
+    return;
+  }
+
+  console.log('Running migration: Dropping last_claimed_queue_id column from session_drafts table');
+  try {
+    db.exec('ALTER TABLE session_drafts DROP COLUMN last_claimed_queue_id');
+  } catch (dropError) {
+    console.error(
+      'Could not drop session_drafts.last_claimed_queue_id; leaving the unread column in place:',
+      dropError instanceof Error ? dropError.message : dropError,
+    );
+  }
 };
 
 const ensureProjectsForSessionPaths = (db: Database): void => {
@@ -907,7 +933,7 @@ export const runMigrations = (db: Database) => {
     `);
     db.exec(USER_PREFERENCES_TABLE_SCHEMA_SQL);
     db.exec(SESSION_DRAFTS_TABLE_SCHEMA_SQL);
-    addLastClaimedQueueIdColumn(db);
+    dropLastClaimedQueueIdColumn(db);
     db.exec(SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL);
     addSupersededTranscriptPathColumn(db);
     addSupersededCompactionColumns(db);
@@ -948,6 +974,7 @@ export const runMigrations = (db: Database) => {
     // The notes table, in its own script: one account's cards, not a board's and not a preference
     // document. It sits after the projects rebuild while referencing `users` alone.
     db.exec(NOTES_SCHEMA_SQL);
+    addNotesClientKeyColumn(db);
     // The followups table: a chat's own next steps and known gaps. It references `sessions` (its
     // cascade is what removes a deleted chat's items) and `users`, both of which exist by here.
     db.exec(FOLLOWUPS_SCHEMA_SQL);

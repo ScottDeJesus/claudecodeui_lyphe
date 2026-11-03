@@ -55,22 +55,42 @@ export const notesDb = {
 
   /**
    * Inserts one note under a `randomUUID()` id, both timestamps `new Date().toISOString()`, and
-   * answers the row as stored.
+   * answers the row as stored with whether this call made it.
+   *
+   * `clientKey` is the idempotency key of the request that asked, or `null` for a caller that sends
+   * none. A key the account has used before inserts nothing: the answer is the row that key made
+   * (`created: false`), exactly as it stands now — its text is NOT replaced by this call's. That is one
+   * statement, `ON CONFLICT … DO NOTHING`, so two requests with one key cannot both insert, and the
+   * partial unique index (`NOTES_CLIENT_KEY_INDEX_SQL`) is what the conflict is judged against.
+   * A `null` key can never conflict.
    */
-  create(input: { userId: number; title: string; description: string }): NoteRow {
+  create(input: {
+    userId: number;
+    clientKey: string | null;
+    title: string;
+    description: string;
+  }): { row: NoteRow; created: boolean } {
+    const db = getConnection();
     const now = new Date().toISOString();
-    const row = getConnection()
+    const inserted = db
       .prepare(
-        `INSERT INTO notes (id, user_id, title, description, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO notes (id, user_id, client_key, title, description, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (user_id, client_key) WHERE client_key IS NOT NULL DO NOTHING
          RETURNING ${NOTE_COLUMNS}`
       )
-      .get(randomUUID(), input.userId, input.title, input.description, now, now) as
+      .get(randomUUID(), input.userId, input.clientKey, input.title, input.description, now, now) as
       | NoteRow
       | undefined;
+    if (inserted) return { row: inserted, created: true };
 
-    if (!row) throw new Error(`Could not insert note "${input.title}".`);
-    return row;
+    // No row came back, so the conflict arm ran: the key's own row is there to read.
+    const existing = db
+      .prepare(`SELECT ${NOTE_COLUMNS} FROM notes WHERE user_id = ? AND client_key = ?`)
+      .get(input.userId, input.clientKey) as NoteRow | undefined;
+
+    if (!existing) throw new Error(`Could not insert note "${input.title}".`);
+    return { row: existing, created: false };
   },
 
   /**

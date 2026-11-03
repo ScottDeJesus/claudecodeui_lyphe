@@ -1,7 +1,6 @@
 import type { Router } from 'express';
 
 import { appConfigDb, sessionsDb, userDb } from '@/modules/database/index.js';
-import { closeFollowupsForCompletions } from '@/modules/followups/index.js';
 import { createNotificationEvent, notifyUserIfEnabled } from '@/modules/notifications/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import type { RelayAnswer, RelayOrder } from '@/shared/relayed-press-types.js';
@@ -13,11 +12,12 @@ import { createDispatcherAnswerRouter } from './dispatcher-answer.routes.js';
 import { readCardText, type DispatcherCardText } from './dispatcher-card-text.service.js';
 import { createDispatcherEndingsNotifier } from './dispatcher-endings.service.js';
 import type { DispatcherEnding } from './dispatcher-endings.service.js';
+import { createDispatcherFollowups } from './dispatcher-followups.module.js';
 import { createOffpeakClock } from './dispatcher-offpeak.service.js';
 import { createDispatcherPrompts } from './dispatcher-prompts.module.js';
 import { isLockOrder, relayAnswerOf, relayOrder, replyOfLockOrder } from './dispatcher-relay.service.js';
 import { createDispatcherRouter } from './dispatcher.routes.js';
-import { readDispatcherState, type DispatcherPicture } from './dispatcher-state.service.js';
+import { lanePictureOf, readDispatcherStore, type DispatcherPicture } from './dispatcher-state.service.js';
 import { runDispatcherVerb } from './dispatcher-verb.service.js';
 import { createDispatcherWatcher } from './dispatcher-watcher.service.js';
 
@@ -151,11 +151,14 @@ export function announceDispatcherEnding(ending: DispatcherEnding, logError: (me
 
 /**
  * What `createDispatcherModule` hands the server entrypoint: the router to mount, the poll's `start` (after `listen`)
- * and `stop` (at shutdown), and the two readers only this instance holds, which the entrypoint passes on to the
- * companion's house (`CompanionHouse.dispatcher` and `.cardText`):
+ * and `stop` (at shutdown), and the readers only this instance holds, which the entrypoint passes on to the
+ * companion's house (`CompanionHouse.dispatcher`, `.cardText`, `.askOpen`, `.relay`):
  *   - `picture()` is the lane's picture behind `whenLanded`, bounded exactly as the router's `current` is: `null`
  *     while this boot's first reading has not landed;
  *   - `cardText(name)` is `dispatcher show <name>`, run with the lane's own command and child environment;
+ *   - `askOpen(promptKey)` is whether the book of the open prompts still holds one, read at once from memory: false the moment an
+ *     answer is carried through any door or a picture shows the ask closed (`DispatcherAsks.isOpen`). The companion's alert feed asks
+ *     it at the last moment before she would say an Accept;
  *   - `relay(order)` carries one act of Kaylee's on his word, spoken or typed, with kaylee--press's record of it: the answer to an
  *     open prompt goes through the book of the open asks as its third door (`kaylee`, beside the card and the phone), every
  *     other act is a dispatcher verb of its own run with `--relay` (`dispatcher-relay.service.ts`). The companion's house
@@ -167,6 +170,7 @@ export type DispatcherModule = {
   stop(): void;
   picture(): Promise<DispatcherPicture | null>;
   cardText(name: string): Promise<DispatcherCardText>;
+  askOpen(promptKey: string): boolean;
   relay(order: RelayOrder): Promise<RelayAnswer>;
 };
 
@@ -210,23 +214,25 @@ export function createDispatcherModule(): DispatcherModule {
   const commands = { bin, timeoutMs: VERB_TIMEOUT_MS, env };
   const prompts = createDispatcherPrompts({ commands, log: logErrorOnce });
 
+  const followups = createDispatcherFollowups(logErrorOnce);
+
   const watcher = createDispatcherWatcher({
     // One subprocess, and the promise support in `polled-lane.service.ts` is what a tick does with
     // it: a tick that arrives while this read is still out is SKIPPED rather than queued, and a
     // read that throws (a different build's document, a store mid-move) leaves the last good picture
     // on the tab with one line in the journal.
-    snapshot: () => readDispatcherState({ bin, timeoutMs: VERB_TIMEOUT_MS, env }),
+    snapshot: async () => {
+      const store = await readDispatcherStore({ bin, timeoutMs: VERB_TIMEOUT_MS, env });
+      // The follow-ups lane reads the store WHOLE, before the lane cuts its picture from it: the picture forgets a
+      // plan a day after it ends, and a feature that finished while this server was down must still settle its items
+      // however long ago (`dispatcher-followups.module.ts`). Settled before the frame exists, so the "feature finished"
+      // alert `endings` raises next lists no item the completion closed and every gap the finish filed.
+      followups.settle(store);
+      return lanePictureOf(store);
+    },
     // Endings are read off the same picture the tabs receive, and only when it changed — which an
     // ending always is. A failure to announce never costs the tabs their frame.
     broadcast: (frame) => {
-      // The follow-ups that name a feature, task or epic this picture shows finished are settled FIRST, so the
-      // "feature finished" alert `endings` raises next no longer lists the items the completion closed. The
-      // closer is idempotent and reads only stamps, so the first picture after a boot is as good as any.
-      try {
-        closeFollowupsForCompletions(frame.plans, frame.arcs);
-      } catch (error) {
-        logErrorOnce(`[Dispatcher] could not close follow-ups for a completion: ${error instanceof Error ? error.message : String(error)}`);
-      }
       try {
         endings.observe(frame.plans, frame.arcs);
       } catch (error) {
@@ -278,6 +284,8 @@ export function createDispatcherModule(): DispatcherModule {
     },
     picture: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
     cardText: (name: string) => readCardText(name, commands),
+    // Whether the book of open prompts still holds one — the companion's alert feed asks it at the last moment before she would say an Accept.
+    askOpen: (promptKey: string) => prompts.askOpen(promptKey),
     relay: async (order: RelayOrder) => {
       const answer = await (isLockOrder(order)
         ? prompts.answerOnHisWord(order.ask, replyOfLockOrder(order), order.press).then(relayAnswerOf)

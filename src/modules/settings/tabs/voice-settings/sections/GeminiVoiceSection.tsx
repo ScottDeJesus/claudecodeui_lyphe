@@ -60,8 +60,9 @@ const MODEL_SHAPE = /^[A-Za-z0-9._-]{1,80}$/;
 const VOICE_SHAPE = /^[A-Za-z0-9_-]{1,40}$/;
 
 /**
- * Settings > Voice > Gemini, shown whatever the chat mic's provider, because Kaylee hears and speaks through Gemini either
- * way. Composed for the settings module's VoiceSettingsTab, after the voice-input section and before her own;
+ * Settings > Voice > Gemini, shown whatever the chat's voice provider, because Kaylee hears and speaks through Gemini either
+ * way, and the chat's own mic and read-aloud do when Gemini is the provider: the speech model and voice here speak both.
+ * Composed for the settings module's VoiceSettingsTab, after the voice-input section and before her own;
  * `.verify/kaylee-talk-scaffold.mjs` draws it for each key source, refused and waiting, and
  * `.verify/kaylee-voice-scaffold.mjs` with her voice's rows.
  *
@@ -226,7 +227,7 @@ export function GeminiVoiceSection({
               label={t('voiceSettings.gemini.speechModel', { defaultValue: 'Speech model' })}
               // The cheap model's name is one word: held whole, never broken at a hyphen across two lines.
               help={<WholeWords>{t('voiceSettings.gemini.speechModelHelp', {
-                defaultValue: 'The Gemini model that speaks her sentences, by its exact name. gemini-3.8-flash-lite-tts is the cheap choice.',
+                defaultValue: "The Gemini model that speaks her sentences and the chat's read-aloud, by its exact name. gemini-3.8-flash-lite-tts is the cheap choice.",
               })}</WholeWords>}
               invalid={modelInvalid}
               stored={speechModel}
@@ -240,7 +241,7 @@ export function GeminiVoiceSection({
           {voice !== undefined && onVoice && (
             <GeminiNameField
               label={t('voiceSettings.gemini.voice', { defaultValue: 'Voice' })}
-              help={t('voiceSettings.gemini.voiceHelp', { defaultValue: 'The Gemini voice she speaks in, by its exact name.' })}
+              help={t('voiceSettings.gemini.voiceHelp', { defaultValue: "The Gemini voice she speaks in, and the chat's read-aloud too, by its exact name." })}
               invalid={t('voiceSettings.gemini.voiceInvalid', { defaultValue: 'A voice name is 1–40 letters, digits, dashes or underscores.' })}
               stored={voice}
               placeholder="Kore"

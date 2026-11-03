@@ -13,15 +13,19 @@ import type { CompanionMemoryLines } from '@/shared/companion-types';
  * the corner's own read (`GET /api/companion/memory/lines`), whose answer is copied here whole — seven memories, newest said
  * first, each its token, title, kind (the invariant's own, or `manual`), the moment and account of its first quote, and his
  * words as `firstQuote(body, 200)` cut them. The moments are the bank's own, so the pictures say them as the corner says them
- * on the day they are drawn.
+ * on the day they are drawn. All seven were pressed, so each says "said" (`via: 'spoken'`).
  *
- * - `home`: the seven, closed.
- * - `waiting`: the seven, open, the words of "Hoge is said Hoagie" open under it: the first line, so the short list holds
+ * THE EIGHTH, `INV-10185`, IS NOT THE BANK'S: a line he TYPED, which the bank held none of on 2026-10-30 (a typed line became a
+ * memory on 2026-10-31). It is here so a picture shows both words in the one list, "typed" beside "said", and its words are
+ * his own typed rule about concurrency, the line `.verify/kaylee-memory-typed.mjs` remembers. Its token is a label no fixture reads back.
+ *
+ * - `home`: the eight, closed.
+ * - `waiting`: the eight, open, the words of "Hoge is said Hoagie" open under it: the first line, so the short list holds
  *   his words whole as drawn (a line drawn open is never scrolled to; only his press brings a line's words into view).
- * - `walkthrough`: the seven, closed.
+ * - `walkthrough`: the eight, closed.
  * - `empty`: nothing kept yet, open (closed, an empty corner is its one line, "· 0").
  *
- * THE STATES no picture shows, `CORNER_STATES`, each drawn by the shots probe over the `home` picture: `open` (the seven, no
+ * THE STATES no picture shows, `CORNER_STATES`, each drawn by the shots probe over the `home` picture: `open` (the eight, no
  * words open), `reading` (the first read still out), `unreadable` (her door's own sentence for a docstore that did not answer)
  * and `failed` (the page's own read failed over the reading it held, in the sentence `useMemoryLines` gives a read the server
  * never answered: `MEMORY_NO_ANSWER`, never the browser's own words).
@@ -30,38 +34,42 @@ import type { CompanionMemoryLines } from '@/shared/companion-types';
 /** The bank's page in DocSpace, as the corner's read names it (`BANK_PAGE_ID`). */
 const PAGE_ID = 'page-kaylee-memory';
 
-/** Her bank's seven memories, as `GET /api/companion/memory/lines` answered on 2026-10-30. */
+/** Her bank's seven memories, as `GET /api/companion/memory/lines` answered on 2026-10-30, and the one typed line drawn among them (the header). */
 const HER_BANK: CompanionMemoryLines = {
-  count: 7,
+  count: 8,
   pageId: PAGE_ID,
   reason: null,
   lines: [
     {
-      token: 'MAN-9219', title: 'Hoge is said Hoagie', kind: 'manual', saidAt: '2026-10-29T23:16:41.513Z', account: 'scott',
+      token: 'MAN-9219', title: 'Hoge is said Hoagie', kind: 'manual', via: 'spoken', saidAt: '2026-10-29T23:16:41.513Z', account: 'scott',
       quote: 'HOGE is actually pronounced hoggie, sorry.',
     },
     {
-      token: 'INV-10198', title: 'No restore drills, no VMs', kind: 'rule', saidAt: '2026-10-29T21:36:23.836Z', account: 'scott',
+      token: 'INV-10198', title: 'No restore drills, no VMs', kind: 'rule', via: 'spoken', saidAt: '2026-10-29T21:36:23.836Z', account: 'scott',
       quote: 'So in this whole backup thing, it\'s our backup file. We don\'t have to test if it loads properly because we can figure that out later. What\'s important is that we store all of our information and back…',
     },
     {
-      token: 'INV-10167', title: 'Doers run on Opus', kind: 'rule', saidAt: '2026-10-29T18:09:58.457Z', account: 'scott',
+      token: 'INV-10185', title: 'No fear of concurrency', kind: 'rule', via: 'typed', saidAt: '2026-10-29T20:12:05.331Z', account: 'scott',
+      quote: 'We don\'t need to fear any sort of concurrency in here. We have protocols in place to handle editing the same files with multiple sessions.',
+    },
+    {
+      token: 'INV-10167', title: 'Doers run on Opus', kind: 'rule', via: 'spoken', saidAt: '2026-10-29T18:09:58.457Z', account: 'scott',
       quote: 'Since you work on are working with Fable 5.1 model, do you think our and your writeups are so detailed? Do you think it would be okay to downgrade the models that you speak to to Opus 5.5?',
     },
     {
-      token: 'INV-10162', title: 'Shipped is not done', kind: 'gotcha', saidAt: '2026-10-29T16:34:49.785Z', account: 'scott',
+      token: 'INV-10162', title: 'Shipped is not done', kind: 'gotcha', via: 'spoken', saidAt: '2026-10-29T16:34:49.785Z', account: 'scott',
       quote: 'Just an FYI, sometimes the vendors sorry, just an FYI, um ignore what\'s out of done because I\'m not fully certain what else needs to be done. So if it says like seven out of seven done, don\'t assume t…',
     },
     {
-      token: 'INV-10161', title: 'Memory is the big picture', kind: 'rule', saidAt: '2026-10-29T16:15:29.590Z', account: 'scott',
+      token: 'INV-10161', title: 'Memory is the big picture', kind: 'rule', via: 'spoken', saidAt: '2026-10-29T16:15:29.590Z', account: 'scott',
       quote: 'Okay, let\'s talk about your compaction real quick. In terms of your compaction, you\'re auto-compacted, but before that step happens, I want you to be able to choose what goes into memory and be the ju…',
     },
     {
-      token: 'INV-10159', title: 'Restorly goal and my job', kind: 'rule', saidAt: '2026-10-29T15:57:32.413Z', account: 'scott',
+      token: 'INV-10159', title: 'Restorly goal and my job', kind: 'rule', via: 'spoken', saidAt: '2026-10-29T15:57:32.413Z', account: 'scott',
       quote: 'Okay I was using the wrong microphone so that was partially my fault. Forget everything that was the last spoken message. Restorely app is going to be the main goal. It\'s going to be due in January an…',
     },
     {
-      token: 'INV-10160', title: 'What my memory is for', kind: 'rule', saidAt: '2026-10-29T15:49:17.060Z', account: 'scott',
+      token: 'INV-10160', title: 'What my memory is for', kind: 'rule', via: 'spoken', saidAt: '2026-10-29T15:49:17.060Z', account: 'scott',
       quote: 'Great. I\'m glad everything is working and now that you can see everything we can really get started. Before we get started, however, I wanted to talk about your compassion protocol. Um what happened d…',
     },
   ],
@@ -78,7 +86,7 @@ const DOOR_DOWN: CompanionMemoryLines = {
 /** A press a picture never makes: the shots photograph, they do not press. */
 const NO_PRESS = () => {};
 
-/** The corner's drawing: closed, nothing open, her seven, unless `over` says otherwise. */
+/** The corner's drawing: closed, nothing open, her eight, unless `over` says otherwise. */
 function drawing(over: Partial<Omit<ComponentProps<typeof MemoryCornerView>, 'tier' | 'density'>>) {
   return {
     view: MemoryCornerView,

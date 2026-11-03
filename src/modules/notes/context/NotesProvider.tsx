@@ -50,6 +50,8 @@ function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T
  * (`finishComposer`), when a fresh blank card takes the place. While the create's answer is still on
  * its way the card does not know the id yet, so the wall hides every note that was not there when the
  * create left (`createBaseline`) — the server's own frame can bring the new note back before the answer.
+ * A create whose answer was lost keeps the wall hiding the same way, until a create lands or the card is
+ * cleared of every word: the note it may have made is that card's, and would otherwise stand beside it.
  *
  * THE READ IS THE LIST. A write answers the note it wrote and nothing draws from that body: the list on
  * screen comes from the read that follows the write, and an open card draws its draft, never the
@@ -99,9 +101,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   // save lands, cleared when the card lets go of the note.
   const [composerNoteId, setComposerNoteId] = useState<string | null>(null);
 
-  // The ids the wall held when the blank card's create left, while that create is in the air; `null`
-  // otherwise. Essential: the card learns its note's id only from the create's answer, and the server's
-  // frame can bring the note into the list first — this is what lets the wall hide it until then.
+  // The ids the wall held when the blank card's create left, while that create is in the air or ended
+  // in a failure whose note may still be made; `null` otherwise. Essential: the card learns its note's
+  // id only from the create's answer, and the server's frame can bring the note into the list first —
+  // this is what lets the wall hide it until then.
   const [createBaseline, setCreateBaseline] = useState<ReadonlySet<string> | null>(null);
 
   // What is typed over a note, by note id. Essential: a card is in edit mode exactly while it has an
@@ -223,8 +226,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // A create leaves: remember which notes the wall holds, so the new one is not drawn beside the card
-  // that is making it. The create ends (landed, failed or lost): the memory goes — a landed one has
-  // `composerNoteId` by then, in the same batch.
+  // that is making it. The create ends (landed, or its card was cleared): the memory goes — a landed one
+  // has `composerNoteId` by then, in the same batch. A failed one is not an end: the saver does not call
+  // this again until a retry lands or the card is cleared.
   const onCreating = useCallback((target: string, creating: boolean) => {
     if (!mountedRef.current || target !== COMPOSER_TARGET) return;
     setCreateBaseline(creating ? new Set((notesRef.current ?? []).map((note) => note.id)) : null);

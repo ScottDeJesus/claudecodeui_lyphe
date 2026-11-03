@@ -37,6 +37,9 @@ export type HouseText = DispatcherCardText;
  *   - `roadmap()` — the roadmap lane's picture (`whenLanded`, bounded), or `null` while this boot's first reading has not landed;
  *   - `dispatcher()` — the dispatcher lane's picture, bounded the same way, the same `null`;
  *   - `cardText(name)` — `dispatcher show <name>`, run with the dispatcher lane's own child environment;
+ *   - `askOpen(promptKey)` — whether the dispatcher lane's book still holds this prompt (an Accept or a questions round): a synchronous
+ *     read of memory, `false` the moment an answer is carried through any door or a picture shows the ask closed. The alert feed's check
+ *     that a prompt is still open when she is about to say it (`feeds/alert-block.ts`);
  *   - `launches()` — the dispatch-souls lane's picture: the souls and chains a chat launched, answered at once (the lane's reading is synchronous, so `null` is the shared lane's type and never a case it meets);
  *   - `cerberus()` — the Cerberus tab's overview, built from the module's own inputs on each call;
  *   - `heal` — the heal lane's service, narrowed to the two reads she makes (`summary`, `kind`); it runs the worker
@@ -54,6 +57,7 @@ export type CompanionHouse = {
   roadmap(): Promise<RoadmapPicture | null>;
   dispatcher(): Promise<DispatcherPicture | null>;
   cardText(name: string): Promise<HouseText>;
+  askOpen(promptKey: string): boolean;
   launches(): Promise<SoulLaunchSnapshot[] | null>;
   cerberus(): CerberusOverview;
   heal: Pick<HealService, 'summary' | 'kind'>;

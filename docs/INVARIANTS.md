@@ -636,40 +636,6 @@ probe-key: 4f7c74eb691241a84aeb62e24d17cf2d1d8e3a05
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
 
-## INV-10036 — probe — MEDIUM — "whole" was applied to every alert kind, and the cap that bounded a Bash command or an error text for her is gone with nothing downstream to replace it
-
-MEDIUM — "whole" was applied to every alert kind, and the cap that bounded a Bash command or an error text for her is gone with nothing downstream to replace it
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/q.mts" <<'TS'
-const m = await import('@/modules/database/index.js'); await m.initializeDatabase();
-const { buildNotificationText } = await import('@/modules/notifications/index.js');
-const { buildAlertBlock } = await import('@/modules/companion/feeds/alert-block.js');
-const ev = (code: string, meta: object) => ({ userId: 1, kind: 'action_required', code, provider: 'claude', sessionId: null, dedupeKey: 'x', meta }) as any;
-const bash = ev('permission.required', { toolName: 'Bash', toolInput: { command: 'python3 - <<EOF\n' + 'print("x")\n'.repeat(6000) + 'EOF' } });
-const failed = ev('run.failed', { error: 'Error: ' + 'frame\n'.repeat(50000) });
-for (const [label, e, kind] of [['Bash command 66 KB', bash, 'permission'], ['run.failed error 300 KB', failed, 'failed']] as const)
-  console.log(`F2 ${label}: push body ${buildNotificationText(e).body.length} | her envelope ${buildAlertBlock(1, e, kind).envelope.length}`);
-process.exit(0);
-TS
-cat > "$D/p.sh" <<'EOF'
-D=$1
-: > "$D/auth.db"
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-DATABASE_PATH=$D/auth.db TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/q.mts" 2>&1 | grep -E '^F2|Error' | head -5
-EOF
-bash "$D/p.sh" "$D"
-cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: `push body 1000 | her envelope 66108` and `… 300089` while the defect stands; cured when her envelope is bounded (a few thousand) for both
-```
-
-measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding M2, MEDIUM
-probe-key: 7ee59977ab23e7f5d956d650accdc2fe42f9485e
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
-
 ## INV-10037 — probe — LOW — `FollowupRow` throws on an item that has no `closedFor`, so a new client against an older server loses the widget
 
 LOW — `FollowupRow` throws on an item that has no `closedFor`, so a new client against an older server loses the widget
@@ -710,23 +676,6 @@ echo "[probe exit $?]"
 
 measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding L1, LOW
 probe-key: 13bf554839279545c4f20b438a282cd82143c3c7
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
-
-## INV-10038 — probe — LOW — MAN-9145, born from this phase's split of MAN-9003, still says nothing calls `listOpenFollowups`
-
-LOW — MAN-9145, born from this phase's split of MAN-9003, still says nothing calls `listOpenFollowups`
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-echo "MAN-9145 lines saying nothing calls it: $(docstore get MAN-9145 --text | grep -c 'nothing in .server/. calls')"
-echo "server files outside followups/ that call it: $(grep -rln 'listOpenFollowups(' server --include=*.ts | grep -vc '^server/modules/followups')"
-echo "[probe exit $?]"
-# expect: `1` and `2` while the sentence stands; cured when the first is 0
-```
-
-measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding L2, LOW
-probe-key: d8c99da807c52e6a873ddd3787d7f406bc83e86c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
 
@@ -820,3 +769,237 @@ measured 2026-10-30 by chain chain-usage-gauge-renews-login-20261030-164930-1667
 probe-key: 10bc211978d758b1c34fa208bc25ecc0c3990030
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-login-renewal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-10669 — probe — MEDIUM — the key outlives the text it was minted for: clearing the card after a lost reply and writing another note overwrites the first note's saved text
+
+MEDIUM — the key outlives the text it was minted for: clearing the card after a lost reply and writing another note overwrites the first note's saved text
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const NOTES_TAB = 'nav[aria-label="Views"] button[aria-label="Notes"]';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole({ dark: true, viewport: { width: 1440, height: 900 } });
+const page = s.page; page.setDefaultTimeout(150000);
+const token = await page.evaluate(() => localStorage.getItem('auth-token'));
+const api = async (path, init = {}) => { const r = await fetch(`http://127.0.0.1:3011${path}`, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' } }); return r.json().catch(() => null); };
+const mine = async () => (await api('/api/notes')).data.filter((n) => n.title.startsWith('athena-k '));
+const sweep = async () => { for (const n of await mine()) await api(`/api/notes/${n.id}`, { method: 'DELETE' }); };
+const T = '[data-note-composer] [data-note-title]', D = '[data-note-composer] [data-note-description]';
+const posts = [];
+try {
+  await page.locator(`${NOTES_TAB}:visible`).first().click();
+  await page.waitForSelector(T);
+  await sweep();
+  await page.route('**/api/notes', async (route) => {
+    const req = route.request();
+    if (req.method() !== 'POST') return route.continue();
+    posts.push((req.headers()['idempotency-key'] ?? 'none').slice(0, 8) + ':' + req.postDataJSON().title);
+    const r = await route.fetch();
+    if (posts.length === 1) return route.abort('connectionreset');   // the note is made; the answer is lost
+    return route.fulfill({ response: r });
+  });
+  await page.fill(T, 'athena-k first'); await page.fill(D, 'first note body'); await sleep(3000);
+  console.log('1 after the lost reply — the wall shows:', JSON.stringify(await page.locator('[data-note-id]').filter({ hasText: 'athena-k' }).allInnerTexts().then((a) => a.map((x) => x.replace(/\s+/g, ' ').slice(0, 40)))), '| server:', JSON.stringify((await mine()).map((n) => n.title + '/' + n.description)));
+  // the person sees the note on the wall, clears the card that still holds it, and writes another note
+  await page.fill(T, ''); await page.fill(D, ''); await sleep(1500);
+  await page.fill(T, 'athena-k second'); await page.fill(D, 'second note body'); await sleep(3500);
+  const after = await mine();
+  console.log('2 after clearing the card and writing another — POSTs:', JSON.stringify(posts), '| server notes:', after.length, JSON.stringify(after.map((n) => n.title + '/' + n.description)));
+} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
+finally { await sweep(); console.log('left behind:', (await mine()).length); await s.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+timeout 200 node "$1/p.mjs" 2>&1 | cut -c1-420
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: line 2 reads `POSTs: ["<key>:athena-k first","<key>:athena-k second"] | server notes: 1 ["athena-k second/second note body"]` while the defect stands (same key on both POSTs, the first note's text gone); cured when line 2 shows two notes, the first still holding `athena-k first/first note body`
+```
+
+measured 2026-11-03 by chain chain-note-first-save-idempotent-20261103-103125-1fe7, finding M1, MEDIUM
+probe-key: 160dc6f800fb74cd309cd86b83078c890d3022a1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notes-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notes.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/chatDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-10670 — probe — LOW — a lost first reply, more typing, then a hidden or closed page: the newest text is never sent
+
+LOW — a lost first reply, more typing, then a hidden or closed page: the newest text is never sent
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const NOTES_TAB = 'nav[aria-label="Views"] button[aria-label="Notes"]';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole({ dark: true, viewport: { width: 1440, height: 900 } });
+const page = s.page; page.setDefaultTimeout(150000);
+const token = await page.evaluate(() => localStorage.getItem('auth-token'));
+const api = async (path, init = {}) => { const r = await fetch(`http://127.0.0.1:3011${path}`, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' } }); return r.json().catch(() => null); };
+const mine = async () => (await api('/api/notes')).data.filter((n) => n.title.startsWith('athena-k '));
+const sweep = async () => { for (const n of await mine()) await api(`/api/notes/${n.id}`, { method: 'DELETE' }); };
+const T = '[data-note-composer] [data-note-title]', D = '[data-note-composer] [data-note-description]';
+const posts = [], puts = [];
+try {
+  await page.locator(`${NOTES_TAB}:visible`).first().click();
+  await page.waitForSelector(T);
+  await sweep();
+  await page.route('**/api/notes', async (route) => {
+    const req = route.request();
+    if (req.method() !== 'POST') return route.continue();
+    const n = posts.length + 1; posts.push({ n, text: req.postDataJSON().description });
+    const r = await route.fetch();
+    if (n === 1) return route.abort('connectionreset');          // the note is made; the answer is lost
+    await sleep(4000); return route.fulfill({ response: r }).catch(() => {});   // the retry's answer is slow: the tab closes first
+  });
+  await page.route('**/api/notes/*', async (route) => { if (route.request().method() === 'PUT') puts.push(route.request().postDataJSON().description); return route.continue(); });
+  await page.fill(T, 'athena-k hide'); await page.fill(D, 'one'); await sleep(2200);
+  console.log('B1 after the lost reply: server', JSON.stringify((await mine()).map((n) => n.description)), 'posts', posts.length);
+  await page.locator(D).click(); await page.keyboard.press('Control+End'); await page.keyboard.type(' two three');
+  await page.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('pagehide')); });
+  await sleep(700);
+  console.log('B2 retry left at pagehide: posts', JSON.stringify(posts), '| server', JSON.stringify((await mine()).map((n) => n.description)));
+  await page.close({ runBeforeUnload: true }).catch(() => {});
+  await sleep(5000);
+  const after = await mine();
+  console.log('B3 tab closed, 5 s later: server notes', after.length, JSON.stringify(after.map((n) => n.description)), '| puts sent', JSON.stringify(puts));
+} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
+finally { await sweep(); console.log('left behind:', (await mine()).length); await s.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+timeout 200 node "$1/p.mjs" 2>&1 | cut -c1-420
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: line B3 reads `server notes 1 ["one"] | puts sent []` while the defect stands (the retry carried "one two three" and the server answered with the first attempt's note); cured when the server holds "one two three" (or the newest text left in a note of its own)
+```
+
+measured 2026-11-03 by chain chain-note-first-save-idempotent-20261103-103125-1fe7, finding L1, LOW
+probe-key: 133b755808a424bb948194e36f6448978c311ed7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notes-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notes.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/chatDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-10671 — probe — LOW — after a lost reply the made note stands on the wall beside the unbound card for as long as nothing is typed (the builder's flag said "briefly")
+
+LOW — after a lost reply the made note stands on the wall beside the unbound card for as long as nothing is typed (the builder's flag said "briefly")
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const NOTES_TAB = 'nav[aria-label="Views"] button[aria-label="Notes"]';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole({ dark: true, viewport: { width: 1440, height: 900 } });
+const page = s.page; page.setDefaultTimeout(150000);
+const token = await page.evaluate(() => localStorage.getItem('auth-token'));
+const api = async (path, init = {}) => { const r = await fetch(`http://127.0.0.1:3011${path}`, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' } }); return r.json().catch(() => null); };
+const mine = async () => (await api('/api/notes')).data.filter((n) => n.title.startsWith('athena-k '));
+const sweep = async () => { for (const n of await mine()) await api(`/api/notes/${n.id}`, { method: 'DELETE' }); };
+const T = '[data-note-composer] [data-note-title]', D = '[data-note-composer] [data-note-description]';
+try {
+  await page.locator(`${NOTES_TAB}:visible`).first().click();
+  await page.waitForSelector(T);
+  await sweep();
+  let n = 0;
+  await page.route('**/api/notes', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    n += 1; const r = await route.fetch();
+    if (n === 1) return route.abort('connectionreset');   // the note is made; the answer is lost
+    return route.fulfill({ response: r });
+  });
+  await page.fill(T, 'athena-k dup'); await page.fill(D, 'typed once');
+  const seen = [];
+  for (let i = 0; i < 6; i += 1) { await sleep(1500); seen.push(await page.locator('[data-note-id]:has-text("athena-k dup")').count()); }
+  console.log('server notes with that title:', (await mine()).length, '| POSTs sent:', n);
+  console.log('wall cards for it, every 1.5 s after the lost reply, nothing typed since:', JSON.stringify(seen), '| the blank card still holds:', JSON.stringify(await page.locator(D).inputValue()));
+} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
+finally { await sweep(); console.log('left behind:', (await mine()).length); await s.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+timeout 200 node "$1/p.mjs" 2>&1 | cut -c1-420
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: the wall line reads `[0,1,1,1,1,1]` while the defect stands (the note stands on the wall beside the blank card that still holds its text, for as long as nothing is typed); cured when it reads `[0,0,0,0,0,0]` or the card retries by itself and binds
+```
+
+measured 2026-11-03 by chain chain-note-first-save-idempotent-20261103-103125-1fe7, finding L2, LOW
+probe-key: 29ccb892bfb013e6328df3ae6ae5d46bb763695f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notes-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notes.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/chatDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-10672 — probe — LOW — a create the server inserted fresh after a refused first attempt is followed by an identical PUT
+
+LOW — a create the server inserted fresh after a refused first attempt is followed by an identical PUT
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const NOTES_TAB = 'nav[aria-label="Views"] button[aria-label="Notes"]';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole({ dark: true, viewport: { width: 1440, height: 900 } });
+const page = s.page; page.setDefaultTimeout(150000);
+const token = await page.evaluate(() => localStorage.getItem('auth-token'));
+const api = async (path, init = {}) => { const r = await fetch(`http://127.0.0.1:3011${path}`, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' } }); return r.json().catch(() => null); };
+const mine = async () => (await api('/api/notes')).data.filter((n) => n.title.startsWith('athena-k '));
+const sweep = async () => { for (const n of await mine()) await api(`/api/notes/${n.id}`, { method: 'DELETE' }); };
+const T = '[data-note-composer] [data-note-title]', D = '[data-note-composer] [data-note-description]';
+const puts = []; let posts = 0;
+try {
+  await page.locator(`${NOTES_TAB}:visible`).first().click();
+  await page.waitForSelector(T);
+  await sweep();
+  await page.route('**/api/notes', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    posts += 1;
+    if (posts === 1) return route.fulfill({ status: 503, contentType: 'text/html', body: '<html>503</html>' });   // the server never saw it
+    return route.continue();
+  });
+  await page.route('**/api/notes/*', async (route) => { if (route.request().method() === 'PUT') puts.push(route.request().postDataJSON().description); return route.continue(); });
+  await page.fill(T, 'athena-k extra'); await page.fill(D, 'e1'); await sleep(2200);
+  await page.locator(D).click(); await page.keyboard.press('Control+End'); await page.keyboard.type('2'); await sleep(3000);
+  const ns = await mine();
+  console.log('POSTs:', posts, '| server notes:', ns.length, JSON.stringify(ns.map((x) => x.description)), '| PUTs after the retry that INSERTED the note:', JSON.stringify(puts));
+} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
+finally { await sweep(); console.log('left behind:', (await mine()).length); await s.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+timeout 200 node "$1/p.mjs" 2>&1 | cut -c1-420
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `POSTs: 2 | server notes: 1 ["e12"] | PUTs after the retry that INSERTED the note: ["e12"]` while the defect stands; cured when the PUT list is `[]` (a create the server inserted fresh is not followed by an identical update)
+```
+
+measured 2026-11-03 by chain chain-note-first-save-idempotent-20261103-103125-1fe7, finding L3, LOW
+probe-key: ac14beffa648b064f4e1c28ce88bbaf430aa4903
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notes-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notes.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/chatDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-10673 — probe — LOW — the six probe rows pinned on this ground (INV-9606 … INV-9611) open the Notes view through a tab that no longer exists
+
+LOW — the six probe rows pinned on this ground (INV-9606 … INV-9611) open the Notes view through a tab that no longer exists
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+for t in INV-9606 INV-9607 INV-9608 INV-9609 INV-9610 INV-9611; do
+  printf '%s opens Notes through the removed tab: ' "$t"; docstore get "$t" --probe 2>/dev/null | grep -c 'role="tab"\]\[aria-label="Notes"\]'
+done
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: 1 for INV-9606 to INV-9610 and 0 for INV-9611 (its script is the INV-6073 check, which names no tab) while the rows stand; cured when the rows are retired or carry the rail selector
+```
+
+measured 2026-11-03 by chain chain-note-first-save-idempotent-20261103-103125-1fe7, finding L4, LOW
+probe-key: 879fa8d790bed5a5b02b28fab6da54ceffcdbff8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notes-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notes.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/chatDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts

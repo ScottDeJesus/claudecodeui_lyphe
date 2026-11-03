@@ -152,6 +152,8 @@ export {
   PromptInputTools,
   PromptInputButton,
   PromptInputSubmit,
+  keepFieldFocus,
+  keepFieldFocusWhileDisabled,
 } from '@/shared/ui/PromptInput';
 export type {
   PromptInputProps,

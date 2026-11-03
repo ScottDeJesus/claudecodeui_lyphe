@@ -238,8 +238,8 @@ export function attachmentsEnvelope(attachments: readonly CompanionAttachment[])
 /**
  * `<alert kind="…" session="…" sessionId="…" project="…">`: one house notification, as the title and
  * body, then "Follow-ups it filed for him: …" and "Waiting on him: …", each line only when there is
- * something to say. `followups` are the texts of the open follow-ups the chat filed, `waiting` the
- * ask it is blocked on (`null` for none). Every text in the body is escaped (see the header) and
+ * something to say. `followups` are the texts of the follow-ups the chat filed — the open ones first, then any the house
+ * settled, each already ending its `[done: …]` mark — `waiting` the ask it is blocked on (`null` for none). Every text in the body is escaped (see the header) and
  * folded to one line, so a follow-up that spans lines is still one numbered item. Consumed by
  * `feeds/alert-block.ts`, which maps the orchestrator's event to these fields.
  */

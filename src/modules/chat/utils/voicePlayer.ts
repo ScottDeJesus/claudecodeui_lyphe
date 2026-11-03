@@ -1,5 +1,6 @@
+import { currentVoiceProvider } from '@/modules/chat/hooks/useVoiceProvider';
 import { synthesizeVoice, voiceConfigSignature } from '@/shared/api';
-import type { VoicePlayState, VoiceSnapshot } from '@/shared/types';
+import type { VoicePlayState, VoiceProvider, VoiceSnapshot } from '@/shared/types';
 
 // A single app-level audio player for read-aloud. It owns one <audio> element, lives
 // outside the React tree, and caches generated audio by content. Because playback is not
@@ -12,10 +13,11 @@ const IDLE: VoiceSnapshot = { state: 'idle', error: null };
 const CACHE_MAX = 24;
 const CLIENT_TIMEOUT_MS = 330000; // backstop; the server proxy already times out at 5 min
 
-// Stable id / cache key from the text and voice settings that affect its audio (djb2). The key leaves out how the account's
-// vocabulary says the words, which the server decides per request (`/speakable`, `/tts`): a message read before a vocabulary edit
-// replays its old audio until the page reloads, and every message not yet read speaks the new pronunciation at once.
-export function voiceId(content: string, signature = voiceConfigSignature()): string {
+// Stable id / cache key from the text and the voice settings that affect its audio (djb2): the account's provider, and on
+// 'openai' the browser's own endpoint. The key leaves out how the account's vocabulary says the words and, on 'gemini', the
+// account's speech model and voice, which the server decides per request (`/speakable`, `/tts`): a message read before such an
+// edit replays its old audio until the page reloads, and every message not yet read speaks the new one at once.
+export function voiceId(content: string, signature = voiceConfigSignature(currentVoiceProvider())): string {
   const input = JSON.stringify([content, signature]);
   let h = 5381;
   for (let i = 0; i < input.length; i++) h = (((h << 5) + h) + input.charCodeAt(i)) | 0;
@@ -81,12 +83,14 @@ class VoicePlayer {
   }
 
   toggle(content: string) {
-    const id = voiceId(content);
+    // One reading of the provider serves the id and the request, so a message is never cached under one backend's id with the other's audio.
+    const provider = currentVoiceProvider();
+    const id = voiceId(content, voiceConfigSignature(provider));
     if (this.currentId === id && (this.state === 'playing' || this.state === 'loading')) {
       this.stop();
       return;
     }
-    void this.play(id, content);
+    void this.play(id, content, provider);
   }
 
   stop() {
@@ -129,7 +133,7 @@ class VoicePlayer {
     }, 6000);
   }
 
-  private async play(id: string, content: string) {
+  private async play(id: string, content: string, provider: VoiceProvider) {
     const audio = this.ensureAudio();
     audio.pause();
     this.currentId = id;
@@ -147,7 +151,7 @@ class VoicePlayer {
         const controller = new AbortController();
         this.activeController = controller;
         const timer = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
-        const res = await synthesizeVoice(content, controller.signal).finally(() => {
+        const res = await synthesizeVoice(content, controller.signal, provider).finally(() => {
           clearTimeout(timer);
           if (this.activeController === controller) this.activeController = null;
         });

@@ -9,9 +9,13 @@ import type { CompanionStore } from '../companion-store.js';
  * an action HERE, so the two doors cannot end one two ways, and every verb that finds a lapse ends it here, so a row of her record
  * of actions (`companion_actions`) is never left without an outcome.
  *
- * NOTHING TIMES A LAPSE OUT. An action is past its time when `expiresAt` has gone by, and the next prepare, take or cancel that
- * meets it ends it `expired` (the page hides it at the deadline it set itself, `CompanionActionCard`). There is no timer here:
- * this house reacts to events, and a prepare, a take and a cancel are the events a lapse matters at.
+ * WHO ENDED THE ACTION DECIDES ITS OUTCOME. A withdrawal is someone's act, his × or her `cancel_action`, and it ends the row
+ * `cancelled` however late it comes: a card taken down is never re-armed (`action-rearm.ts`). `expired` is left for a lapse that no
+ * one withdrew.
+ *
+ * NOTHING TIMES A LAPSE OUT. An action is past its time when `expiresAt` has gone by, and the next prepare or take that meets it,
+ * with no one having withdrawn it first, ends it `expired` (the page hides it at the deadline it set itself, `CompanionActionCard`).
+ * There is no timer here: this house reacts to events, and a prepare and a take are the events a lapse matters at.
  *
  * A TAKE IN FLIGHT IS NOBODY ELSE'S TO END. While a take's door is out, the action is claimed twice over: in this process
  * (`carryOut` holds its id per account) and on its row (`claimAction` writes the firing line, and `endAction` ends a claimed row
@@ -66,30 +70,30 @@ function settleOrphanedActions(userId: number, store: CompanionStore): void {
   }
 }
 
-/** What a withdrawal found: nothing standing (`null`), an action a take is carrying out (`busy`, left as it was), or the action it took off his panel (`cancelled`, or `expired` when it had lapsed first). */
-type Withdrawal = { standing: CompanionStoredPending; ended: 'cancelled' | 'expired' | 'busy' } | null;
+/** What a withdrawal found: nothing standing (`null`), an action a take is carrying out (`busy`, left as it was), or the action it took off his panel (`cancelled`). */
+type Withdrawal = { standing: CompanionStoredPending; ended: 'cancelled' | 'busy' } | null;
 
 /**
- * Withdraws the action standing in her state, if any, and takes it off his panel. Its row ends `cancelled` — or `expired` when it
- * had lapsed first: a lapse found by this call is a lapse, whatever the caller meant by it. An action a take is carrying out is
- * left alone (`busy`). The row ends before the state clears, and the state clears even when the row was already ended (a Clear
- * got there first), so a page is never left drawing an action no row waits on.
+ * Withdraws the action standing in her state, if any, and takes it off his panel. Its row ends `cancelled`, lapsed or not: the
+ * caller withdrew it, so no lapse is found here (a card that had passed its time before he took it down is still one he took down,
+ * and re-arming it would put back what he dismissed). An action a take is carrying out is left alone (`busy`). The row ends before
+ * the state clears, and the state clears even when the row was already ended (a Clear got there first), so a page is never left
+ * drawing an action no row waits on.
  */
-export function withdrawStandingAction(userId: number, store: CompanionStore, nowMs: number = Date.now()): Withdrawal {
+export function withdrawStandingAction(userId: number, store: CompanionStore): Withdrawal {
   settleOrphanedActions(userId, store);
   const standing = store.readState().pending;
   if (standing === null) return null;
   if (isCarryingOut(userId, standing.id)) return { standing, ended: 'busy' };
-  const ended = hasLapsed(standing, nowMs) ? 'expired' : 'cancelled';
-  companionDb.endAction(userId, standing.id, { outcome: ended });
+  companionDb.endAction(userId, standing.id, { outcome: 'cancelled' });
   store.setPending(null);
-  return { standing, ended };
+  return { standing, ended: 'cancelled' };
 }
 
 /**
  * What a prepare and a take do first, after settling orphans: an action found past its time ends `expired` and leaves his panel
- * (one a take is carrying out is left to the take). Answers the action it ended, so a take can say it lapsed rather than that
- * nothing was waiting, or `null` when none had lapsed.
+ * (one a take is carrying out is left to the take). The only door a lapse ends through: a withdrawal ends its action `cancelled`.
+ * Answers the action it ended, so a take can say it lapsed rather than that nothing was waiting, or `null` when none had lapsed.
  */
 export function endLapsedAction(userId: number, store: CompanionStore, nowMs: number = Date.now()): CompanionStoredPending | null {
   settleOrphanedActions(userId, store);
