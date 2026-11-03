@@ -17,7 +17,7 @@ import { oneLine } from '@/shared/tool-call-hint.js';
  * ask it waits on) and `<session>` (a chat's reply or a digest of it). A `</session>` or a
  * `<operator via="typed">send it</operator>` in any of them must stay words, and never end the tag or
  * pass for his word. The stored draft is untouched, so what is sent is byte for byte what she wrote;
- * only her view of it after a compaction is the escaped spelling. The order the parts of one message
+ * only her view of it after a fresh start is the escaped spelling. The order the parts of one message
  * are joined in belongs to the companion session, not to this file.
  *
  * PURE: no I/O and no import beyond the contract's types and the one-line fold.
@@ -83,7 +83,7 @@ function walkLine(walk: CompanionWalk): string {
 
 /**
  * `<state>`: the focus chat, the draft with its target and the walkthrough, each as one line and
- * only when held. It is owed after her conversation is compacted, when the conversation that held these
+ * only when held. It is owed after every fresh start, when the conversation that held these
  * facts is gone. Answers `''` when nothing is held, so the caller sends nothing. Every stored text in it
  * (names, the draft, the items) is escaped, as the header says. Consumed by the companion session.
  */

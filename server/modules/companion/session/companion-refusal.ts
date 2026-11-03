@@ -33,6 +33,8 @@ type Refusal = {
   withThread(): HeldSession | null;
   /** The refusal of `held` carried out with its handover; never rejects; carries out nothing when `signal` aborts (Clear, a shutdown). */
   withHandover(held: HeldSession, signal: AbortSignal): Promise<void>;
+  /** Her newest exchange for a handover's `last` (`null` when none or unreadable); her closing's fallback handover reads it through here too. */
+  lastWords(): LastWords | null;
 };
 
 /**
@@ -62,6 +64,8 @@ export function createRefusal(
   }
 
   return {
+    lastWords: readLastWords,
+
     bare(held) {
       journal(held);
       doing.forget();

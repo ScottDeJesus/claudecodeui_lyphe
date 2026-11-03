@@ -8,7 +8,7 @@ import type { RecentConversationListItem } from '@/shared/types';
 /**
  * Mirrors STOP_TIMEOUT_MS in `src/modules/chat/hooks/useRestartOnInstalledCli.ts` — same
  * guarantee (the only thing that ends a stop the gateway never answers), a different outcome
- * here: archive the chat anyway, rather than abandon a restart. Deliberately not hoisted to
+ * here: close the chat anyway, rather than abandon a restart. Deliberately not hoisted to
  * `src/shared/constants.ts` — the two values happen to agree, not share a caller, and a shared
  * name would tempt a future change to one to drag the other along with it.
  */
@@ -18,22 +18,23 @@ const STOP_TIMEOUT_MS = 15_000;
 const REMOVE_FAILED_DISPLAY_MS = 4_000;
 
 /**
- * What a row's menu asked for. Archiving hides a chat and keeps its transcript; deleting takes
- * the transcript off disk, which is why only one of the two is worth stopping to confirm.
+ * What a row's menu asked for. Closing hides a chat and keeps its transcript (Closed lists it,
+ * Reopen brings it back); deleting takes the transcript off disk, which is why only one of the two
+ * is worth stopping to confirm.
  */
-export type SimpleChatDisposal = 'archive' | 'delete';
+export type SimpleChatDisposal = 'close' | 'delete';
 
 /**
  * Owns both disposals — idle, stop-then-dispose, the 15s fallback and the failure message — so
  * SidebarSimpleList and its rows stay presentational.
  *
  * The two differ only in the flag handed to the API and in what has to be confirmed first.
- * Archive confirms nothing when the chat is idle, and asks to stop it when it is running.
+ * Close confirms nothing when the chat is idle, and asks to stop it when it is running.
  * Delete always confirms, in ONE dialog that says whether a stop comes with it — asking twice
  * for one destructive act reads as a bug, and asking only about the stop would take a yes about
  * interrupting a run as a yes about erasing it.
  */
-export function useSimpleChatRemove(input: { onArchived: (sessionId: string) => void }): {
+export function useSimpleChatRemove(input: { onClosed: (sessionId: string) => void }): {
   pendingStop: RecentConversationListItem | null;
   pendingDelete: RecentConversationListItem | null;
   failedSessionId: string | null;
@@ -43,7 +44,7 @@ export function useSimpleChatRemove(input: { onArchived: (sessionId: string) => 
   confirmDelete: () => void;
   cancelDelete: () => void;
 } {
-  const { onArchived } = input;
+  const { onClosed } = input;
   const busySessionIds = useBusySessionIdSet();
   const { sendMessage } = useWebSocket();
 
@@ -54,7 +55,7 @@ export function useSimpleChatRemove(input: { onArchived: (sessionId: string) => 
   // The session a chat.abort was just sent for, waiting on the busy set to drop it — carrying
   // the disposal it was stopped FOR, so the wait cannot finish as the wrong one.
   const [awaiting, setAwaiting] = useState<{ id: string; disposal: SimpleChatDisposal } | null>(null);
-  // The id whose archive just failed; shown on its own row for REMOVE_FAILED_DISPLAY_MS.
+  // The id whose close just failed; shown on its own row for REMOVE_FAILED_DISPLAY_MS.
   const [failedSessionId, setFailedSessionId] = useState<string | null>(null);
 
   // The 15s fallback armed by confirmStop; cleared on success (below) and on unmount (here).
@@ -71,7 +72,7 @@ export function useSimpleChatRemove(input: { onArchived: (sessionId: string) => 
     try {
       const response = await api.deleteSession(sessionId, disposal === 'delete');
       if (response.ok) {
-        onArchived(sessionId);
+        onClosed(sessionId);
         return;
       }
       console.error('[SidebarSimpleList] Failed to %s session:', disposal, response.status);
@@ -80,7 +81,7 @@ export function useSimpleChatRemove(input: { onArchived: (sessionId: string) => 
       console.error('[SidebarSimpleList] Error running %s on session:', disposal, error);
       setFailedSessionId(sessionId);
     }
-  }, [onArchived]);
+  }, [onClosed]);
 
   // Clears the row's failure message on its own schedule, independent of any disposal above.
   useEffect(() => {
@@ -96,7 +97,7 @@ export function useSimpleChatRemove(input: { onArchived: (sessionId: string) => 
       return;
     }
     if (!busySessionIds.has(row.sessionId)) {
-      void dispose(row.sessionId, 'archive');
+      void dispose(row.sessionId, 'close');
       return;
     }
     setPendingStop(row);
@@ -119,7 +120,7 @@ export function useSimpleChatRemove(input: { onArchived: (sessionId: string) => 
     if (!pendingStop) return;
     const sessionId = pendingStop.sessionId;
     setPendingStop(null);
-    stopThenDispose(sessionId, 'archive');
+    stopThenDispose(sessionId, 'close');
   }, [pendingStop, stopThenDispose]);
 
   const cancelStop = useCallback(() => setPendingStop(null), []);
@@ -141,7 +142,7 @@ export function useSimpleChatRemove(input: { onArchived: (sessionId: string) => 
   // The busy set is the client's computed running model — chat_subscribed/complete frames plus
   // a GET /sessions/running re-sync every 5s — so reacting to it dropping the id is the whole
   // wait: no polling timer, no ref loop. This IS the "external system" the lint rule below asks
-  // an effect to be reserved for: the busy set lives outside React, and archiving is a side
+  // an effect to be reserved for: the busy set lives outside React, and closing is a side
   // effect (a fetch), not a value this component could derive during render.
   useEffect(() => {
     if (!awaiting || busySessionIds.has(awaiting.id)) return;

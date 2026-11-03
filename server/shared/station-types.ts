@@ -43,9 +43,10 @@ export type StationSessionState = 'working' | 'waiting' | 'live' | 'asleep';
 
 /**
  * One row of the station's sessions list: the chat's `sessionId`, its `name`, the `project` it belongs to, its `state`, a short
- * `activity` line saying what it is doing, and `updatedAt` (ISO, `null` when the chat has none yet).
+ * `activity` line saying what it is doing, `updatedAt` (ISO, `null` when the chat has none yet), and `pinned` (he pinned the chat: the
+ * list puts such chats first and the rail marks them).
  */
-export type StationSession = { sessionId: string; name: string; project: string; state: StationSessionState; activity: string; updatedAt: string | null };
+export type StationSession = { sessionId: string; name: string; project: string; state: StationSessionState; activity: string; updatedAt: string | null; pinned: boolean };
 
 /** What a waiting chat ask is: a `permission` for a tool, a `question` with options, or a `plan` to approve. */
 export type StationAskKind = 'permission' | 'question' | 'plan';

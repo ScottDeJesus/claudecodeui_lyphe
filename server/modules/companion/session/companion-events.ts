@@ -2,7 +2,7 @@ import type { SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sd
 
 /**
  * What each message of her CLI's stream MEANS to her session, read once and in one place: the SDK's
- * message shapes stop here, and `companion-session.ts` reasons about five events. PURE — no I/O, no
+ * message shapes stop here, and `companion-session.ts` reasons about four events. PURE — no I/O, no
  * state — so it is proven on messages recorded from the real CLI.
  *
  * Measured on the live CLI (2026-10-26, streaming input, Haiku):
@@ -16,6 +16,13 @@ import type { SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sd
  *   - An auth or API failure is a `result` of subtype `success` with `is_error: true`; its text is in
  *     `result`. The CLI writes that text as a synthetic assistant message, not as stream deltas, so it
  *     is never fed to the sentence stream — a failure of her account is never something she says.
+ *   - With the CLI's compaction off (`DISABLE_COMPACT=1`) a message past the CLI's limit is REFUSED before any API call: a `result` of
+ *     subtype `success` with `is_error: true`, the text "Prompt is too long", cost 0 and usage 0, listing the refused message in
+ *     `user_message_uuids`. The refused message stays counted, so every later message is refused too (measured 2026-11-01 on Claude Code
+ *     2.1.316, Haiku, through the CLI's own test seam `CLAUDE_CODE_BLOCKING_LIMIT_OVERRIDE=5000` with a 9,000-word message: the reading
+ *     after the refusal was 27,176 tokens, reserve 3,000, `isAutoCompactEnabled: false`).
+ *   - The final text of a turn is the `result` of a `success` that is not an error: the last assistant message's text, so what she wrote
+ *     before her tool calls is not part of it.
  *
  * Consumers: `session/companion-session.ts` (reads every message of her loop through `readLoopEvent`,
  * and words a thrown error through `failureSentence`).
@@ -24,20 +31,22 @@ import type { SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sd
 /**
  * One thing her loop must react to. `init` carries the session id the CLI filed her conversation
  * under, the tools it listed and the model it runs; `text` is a streamed delta of her speech and
- * `block_end` the end of a content block (the sentence stream is flushed there); `compacted` says her
- * conversation was summarised; `result` ends a turn — `answered` lists the uuids of our messages it consumed,
- * `failure` is the sentence for the panel when the turn failed (`null` when it succeeded) and
- * `resumeRefused` is set when the CLI says the conversation she was asked to resume does not exist.
+ * `block_end` the end of a content block (the sentence stream is flushed there); `result` ends a turn — `answered` lists the uuids of our messages it consumed,
+ * `failure` is the sentence for the panel when the turn failed (`null` when it succeeded),
+ * `resumeRefused` is set when the CLI says the conversation she was asked to resume does not exist,
+ * `text` is the turn's final text (`null` unless the turn succeeded: it is her note when the turn was her last one) and
+ * `contextFull` is set when the CLI refused the message as past its limit, which the session hands her conversation over for
+ * instead of failing the turn (a refused message stays counted, so every later one would be refused too).
  * Consumed by `companion-session.ts`, which reacts to each.
  */
 export type CompanionLoopEvent =
   | { kind: 'init'; sessionId: string; tools: string[]; model: string }
   | { kind: 'text'; delta: string }
   | { kind: 'block_end' }
-  | { kind: 'compacted' }
-  | { kind: 'result'; answered: string[]; failure: string | null; resumeRefused: boolean };
+  | { kind: 'result'; answered: string[]; failure: string | null; resumeRefused: boolean; text: string | null; contextFull: boolean };
 
 const RESUME_REFUSED = /No conversation found with session ID/i;
+const CONTEXT_FULL = /^Prompt is too long/;
 
 /**
  * A sentence of advice to a developer, not an account of what happened: a flag to pass ("Run --model …"),
@@ -69,8 +78,8 @@ function resultFailure(result: SDKResultMessage): string | null {
 /** Reads one message of her stream; `null` for every message her session has no use for. Consumed by `companion-session.ts`. */
 export function readLoopEvent(message: SDKMessage): CompanionLoopEvent | null {
   if (message.type === 'system') {
-    if (message.subtype === 'init') return { kind: 'init', sessionId: message.session_id, tools: message.tools, model: message.model };
-    return message.subtype === 'compact_boundary' ? { kind: 'compacted' } : null;
+    // Her CLI's compaction is off (`companion-launch.ts`), so no `compact_boundary` can reach her: every `system` message but `init` is nothing to her.
+    return message.subtype === 'init' ? { kind: 'init', sessionId: message.session_id, tools: message.tools, model: message.model } : null;
   }
   if (message.type === 'stream_event') {
     // She has no sub-agents, so a delta that belongs to one is not hers to speak.
@@ -85,8 +94,11 @@ export function readLoopEvent(message: SDKMessage): CompanionLoopEvent | null {
   if (message.type === 'result') {
     const answered = message.user_message_uuids ?? (message.user_message_uuid ? [message.user_message_uuid] : []);
     const resumeRefused = message.subtype !== 'success' && message.errors.some((line) => RESUME_REFUSED.test(line));
+    const text = message.subtype === 'success' && !message.is_error ? message.result : null;
+    // `=== true`: a result that carries no `is_error` is a boolean `false` here, never `undefined`.
+    const contextFull = message.subtype === 'success' && message.is_error === true && CONTEXT_FULL.test(message.result);
     // A refused resume is not a failed turn: the session relaunches without it and the turn goes on.
-    return { kind: 'result', answered, failure: resumeRefused ? null : resultFailure(message), resumeRefused };
+    return { kind: 'result', answered, failure: resumeRefused ? null : resultFailure(message), resumeRefused, text, contextFull };
   }
   return null;
 }

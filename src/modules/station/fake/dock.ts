@@ -72,15 +72,15 @@ const KANBAN_BRIEF = [
 /** A brief for a chat not yet started in this repo. */
 const NEW_CHAT_DRAFT: CompanionDraft = {
   target: { kind: 'new', projectPath: '/home/lyphe/.claude/claudecodeui_lyphe', projectName: 'claudecodeui_lyphe' },
-  text: 'List every chat asleep for more than a week, with its project and its last line, and give each one press to wake it or archive it. Read only until he presses.',
+  text: 'List every chat asleep for more than a week, with its project and its last line, and give each one press to wake it or close it. Read only until he presses.',
   updatedAt: ago(3),
 };
 
 /**
- * The server's refusal of a send to a chat he no longer has, word for word as `companion-send.ts` writes it (an archived or
+ * The server's refusal of a send to a chat he no longer has, word for word as `companion-send.ts` writes it (a closed or
  * deleted chat): three lines under the card's sends at 1440×900.
  */
-const ARCHIVED_REFUSAL = `"${UPLOADS.name}" is no longer a chat he has (it was archived or deleted), so nothing was sent. Tell him, and ask which chat the brief is for.`;
+const CLOSED_REFUSAL = `"${UPLOADS.name}" is no longer a chat he has (it was closed or deleted), so nothing was sent. Tell him, and ask which chat the brief is for.`;
 
 /**
  * The dock's drawing for one draft (null: she holds none), every verb recorded in `DOCK_PRESSES` and answered at once — a send
@@ -113,5 +113,5 @@ export const DOCK_FAKE = {
 /** The dock's states no picture shows, drawn by the shots probe over the `home` picture: a brief for a new chat, and a refused send. */
 export const DOCK_STATES = {
   newChat: dock(NEW_CHAT_DRAFT),
-  refused: dock(draftFor(UPLOADS, UPLOADS_BRIEF, 6), working(UPLOADS), ARCHIVED_REFUSAL),
+  refused: dock(draftFor(UPLOADS, UPLOADS_BRIEF, 6), working(UPLOADS), CLOSED_REFUSAL),
 };

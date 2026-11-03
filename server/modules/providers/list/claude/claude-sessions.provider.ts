@@ -35,7 +35,11 @@ import {
   truncateSubagentActivity,
 } from '@/shared/utils.js';
 import { sessionsDb } from '@/modules/database/index.js';
-import { summarizeClaudeTokenUsage, withOpeningContext } from '@/modules/providers/services/provider-token-usage.service.js';
+import {
+  getReportedClaudeContextWindow,
+  summarizeClaudeTokenUsage,
+  withOpeningContext,
+} from '@/modules/providers/services/provider-token-usage.service.js';
 
 const PROVIDER = 'claude';
 
@@ -1419,7 +1423,12 @@ export class ClaudeSessionsProvider implements IProviderSessions {
       // whatever it was when the session was opened.
       // The live transcript's rows alone: that is the context the chat now holds. Until its first reply
       // it holds none, and the compaction's own count stands in (`withOpeningContext`).
-      tokenUsage: withOpeningContext(summarizeClaudeTokenUsage(stitched.liveRows), stitched.openingContextTokens),
+      tokenUsage: withOpeningContext(
+        summarizeClaudeTokenUsage(stitched.liveRows, undefined, {
+          reportedContextWindow: getReportedClaudeContextWindow(providerSessionId),
+        }),
+        stitched.openingContextTokens,
+      ),
     };
   }
 }

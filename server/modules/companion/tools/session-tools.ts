@@ -6,7 +6,7 @@ import { guardedToolResult, textResult, type ToolTextResult } from '@/shared/too
 import { toolLine } from '../session/companion-prompt.js';
 
 import { firstWordsOf } from './chat-first-words.js';
-import { activityLine, chatRows, listVisibleProjects, type ChatRow } from './house-reads.js';
+import { activityLine, chatRows, listVisibleProjects, pinMark, type ChatRow } from './house-reads.js';
 
 /**
  * The two tools that show her the house: `list_sessions` (his chats with their state) and `list_projects` (where a
@@ -24,9 +24,9 @@ import { activityLine, chatRows, listVisibleProjects, type ChatRow } from './hou
 const RECENT_COUNT = 15;
 const PHRASE_MATCH_MAX = 10;
 
-/** `name · project · state · activity · id`: the one line a chat is listed as. */
+/** `name · project · pinned · state · activity · id`: the one line a chat is listed as (`pinned` only for a chat he pinned). */
 function chatLine({ chat, state }: ChatRow): string {
-  return [chat.name, chat.project, state, activityLine(chat.sessionId, state), chat.sessionId].join(' · ');
+  return [`${chat.name} · ${chat.project}${pinMark(chat)}`, state, activityLine(chat.sessionId, state), chat.sessionId].join(' · ');
 }
 
 /**

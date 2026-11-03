@@ -68,7 +68,7 @@ export default function SidebarSimpleList({
   const { items, hasMore, isLoading, hasError, reload, loadMore, patchLocal, patchFolderLocal, removeLocal, moveLocal } =
     useSimpleChatList(selectedSession?.id ?? null);
 
-  const handleArchived = useCallback((sessionId: string) => {
+  const handleClosed = useCallback((sessionId: string) => {
     removeLocal(sessionId);
     onSessionRemoved(sessionId);
   }, [removeLocal, onSessionRemoved]);
@@ -82,7 +82,7 @@ export default function SidebarSimpleList({
     cancelStop,
     confirmDelete,
     cancelDelete,
-  } = useSimpleChatRemove({ onArchived: handleArchived });
+  } = useSimpleChatRemove({ onClosed: handleClosed });
 
   const effectiveProject = useSimpleChatProject(projects);
   // Worked out over the whole project list, not per row, so a project reads the same here as in the
@@ -160,6 +160,21 @@ export default function SidebarSimpleList({
     }
   }, [iconTarget, patchLocal]);
 
+  // Pin or unpin from the row's menu. The mark shows at once; the server's own `session_upserted`
+  // re-read confirms it a moment later and puts the chat where the list draws pinned chats. A write
+  // the server refused puts the mark back where it was.
+  const handleTogglePin = useCallback(async (chat: RecentConversationListItem) => {
+    const next = !chat.pinned;
+    patchLocal(chat.sessionId, { pinned: next });
+    try {
+      const response = await api.setSessionPinned(chat.sessionId, next);
+      if (!response.ok) throw new Error(`setSessionPinned answered HTTP ${response.status}`);
+    } catch (error) {
+      console.error('[SidebarSimpleList] Failed to pin or unpin the chat:', error);
+      patchLocal(chat.sessionId, { pinned: chat.pinned });
+    }
+  }, [patchLocal]);
+
   // The folder verbs and the three facts behind them: the folder just made, the chat whose picker
   // is open, and the folder whose delete waits on a yes.
   const {
@@ -221,7 +236,8 @@ export default function SidebarSimpleList({
             dropTarget={dropTarget}
             dragProps={dragProps}
             onSelectChat={handleRowSelect}
-            onArchiveChat={(chat) => remove(chat, 'archive')}
+            onCloseChat={(chat) => remove(chat, 'close')}
+            onTogglePinChat={(chat) => void handleTogglePin(chat)}
             onDeleteChat={(chat) => remove(chat, 'delete')}
             onChooseIcon={(chat) => setIconTarget(chat)}
             onRenameChat={(sessionId, title) => void handleRename(sessionId, title)}

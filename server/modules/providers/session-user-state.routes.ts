@@ -27,9 +27,23 @@ const parseSessionIconBody = (payload: unknown): string | null => {
   });
 };
 
+/** The pin's body: `{ pinned: true | false }`, and nothing else is a pin. */
+const parseSessionPinnedBody = (payload: unknown): boolean => {
+  const pinned = readBody(payload).pinned;
+
+  if (typeof pinned === 'boolean') {
+    return pinned;
+  }
+
+  throw new AppError('pinned must be true or false.', {
+    code: 'INVALID_SESSION_PINNED',
+    statusCode: 400,
+  });
+};
+
 /**
- * The one session attribute the sidebar owns but the session itself does not:
- * its icon.
+ * The session attributes the sidebar owns but the session itself does not:
+ * its icon and its pin.
  *
  * Split from `provider.routes.ts` so that file keeps shrinking; mounted by it
  * with `router.use(sessionUserStateRoutes)`.
@@ -42,5 +56,14 @@ sessionUserStateRoutes.put(
     const sessionId = parseSessionId(req.params.sessionId);
     const icon = parseSessionIconBody(req.body);
     res.json(createApiSuccessResponse(sessionUserStateService.setIconById(sessionId, icon)));
+  }),
+);
+
+sessionUserStateRoutes.put(
+  '/sessions/:sessionId/pinned',
+  asyncHandler(async (req: Request, res: Response) => {
+    const sessionId = parseSessionId(req.params.sessionId);
+    const pinned = parseSessionPinnedBody(req.body);
+    res.json(createApiSuccessResponse(sessionUserStateService.setPinnedById(sessionId, pinned)));
   }),
 );

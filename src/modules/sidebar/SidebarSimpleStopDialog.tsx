@@ -11,7 +11,7 @@ type SidebarSimpleStopDialogProps = {
   t: TFunction;
 };
 
-/** The confirmation SidebarSimpleList opens before archiving a chat that is still running. */
+/** The confirmation SidebarSimpleList opens before closing a chat that is still running. */
 export default function SidebarSimpleStopDialog({ open, onConfirm, onCancel, t }: SidebarSimpleStopDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onCancel(); }}>

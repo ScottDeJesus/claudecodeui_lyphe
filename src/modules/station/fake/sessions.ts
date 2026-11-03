@@ -45,7 +45,7 @@ const idleFor = (minutes: number): string =>
 
 /** One chat: its state, the line she reads of it, and when it last moved, in minutes before now. `n` is its id's number, or the id. */
 const chat = (n: number | string, name: string, project: string, state: StationSessionState, activity: string, minutes: number): StationSession => ({
-  sessionId: typeof n === 'string' ? n : idOf(n), name, project, state, activity, updatedAt: ago(minutes),
+  sessionId: typeof n === 'string' ? n : idOf(n), name, project, state, activity, updatedAt: ago(minutes), pinned: false,
 });
 
 /** A chat at rest, idle (its process up) or asleep, its line how long it has rested. */

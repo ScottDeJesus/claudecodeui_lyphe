@@ -1,7 +1,7 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 
-import { sessionsService } from '@/modules/providers/index.js';
+import { sessionsService, sessionUserStateService } from '@/modules/providers/index.js';
 import { abortChatRun, answerChatPermission, broadcastSessionUpserted } from '@/modules/websocket/index.js';
 import type { CompanionSessionRef } from '@/shared/companion-types.js';
 import { guardedToolResult, textResult, type ToolTextResult } from '@/shared/tool-text-result.js';
@@ -13,7 +13,7 @@ import type { CompanionToolDeps } from './companion-tools.js';
 import { listHisChats, resolveChat } from './house-reads.js';
 
 /**
- * The three tools that ACT on a chat: `stop_session`, `rename_session` and `answer_session`. Each does what its
+ * The four tools that ACT on a chat: `stop_session`, `rename_session`, `pin_session` and `answer_session`. Each does what its
  * page door does, through the house's own verb, so a stop, a name or an answer from her is the same act as from
  * his hand and leaves the same marks:
  *   - `stop_session` is the page's `chat.abort` (`abortChatRun`). The turn ends aborted and the sidebar's
@@ -21,6 +21,11 @@ import { listHisChats, resolveChat } from './house-reads.js';
  *   - `rename_session` is the sidebar's rename (`sessionsService.renameSessionById`, the door that marks a name as
  *     given by a person, so the namer never replaces it) plus the `session_upserted` delta the sidebar draws the
  *     new name from without a reload;
+ *   - `pin_session` is the sidebar's Pin and Unpin (`sessionUserStateService.setPinnedById`, the write behind
+ *     `PUT /sessions/:id/pinned`), which broadcasts the `session_upserted` delta itself. A pinned chat sorts first
+ *     everywhere and is never closed when it falls asleep, so "keep this one" is a pin; her roster and `list_sessions`
+ *     show the pin, so what she did reads back. She holds no close and no reopen: a reopen would need a resolver for
+ *     the archived chats `resolveChat` leaves out, and a close she could not undo is one the sidebar's menu already offers;
  *   - `answer_session` answers the OLDEST ask the chat is waiting on through the runtime's own resolver
  *     (`answerChatPermission`); what an answer means to each kind of ask is `ask-decision.ts`'s. Only the "always"
  *     answer does more: it writes the rule into his `claudePermissions` preference first (`rememberAllowedTool`, `ask-decision.ts`),
@@ -34,7 +39,7 @@ import { listHisChats, resolveChat } from './house-reads.js';
  *
  * Each description is her prompt's own line for the tool (`toolLine`).
  *
- * Consumer: `tools/companion-tools.ts`, which adds these three to the tools it builds.
+ * Consumer: `tools/companion-tools.ts`, which adds these four to the tools it builds.
  */
 
 /** The longest name she may give a chat: the sidebar shows a title, not a sentence. */
@@ -76,7 +81,7 @@ function stopSession(deps: CompanionToolDeps, args: { session: string }): Promis
 
 /**
  * What she holds of the chat besides her focus follows its new name: the draft's target and the walkthrough each carry the
- * chat as a ref with the name it had, and the panel's draft card and `<state>` after a compaction would go on naming a chat
+ * chat as a ref with the name it had, and the panel's draft card and `<state>` after a fresh start would go on naming a chat
  * that `resolveChat` no longer finds by that name.
  */
 function carryRename(deps: CompanionToolDeps, renamed: CompanionSessionRef): void {
@@ -106,6 +111,20 @@ function renameSession(deps: CompanionToolDeps, args: { session: string; name: s
   });
 }
 
+/** `pin_session`: the sidebar's Pin or Unpin on the chat she names; the service's own broadcast draws the mark on every open page. */
+function pinSession(deps: CompanionToolDeps, args: { session: string; pinned: boolean }): Promise<ToolTextResult> {
+  return onNamedChat(deps, 'pin_session', args.pinned ? 'pin the chat' : 'unpin the chat', args.session, async (chat) => {
+    sessionUserStateService.setPinnedById(chat.sessionId, args.pinned);
+    return {
+      result: textResult(
+        args.pinned
+          ? `Pinned ${chat.name}: it sorts first, and it stays open when it falls asleep.`
+          : `Unpinned ${chat.name}: it falls back into the list's order, and it is closed when it falls asleep.`
+      ),
+    };
+  });
+}
+
 /** `answer_session`: the oldest ask of the chat, answered through the runtime's own resolver. */
 function answerSession(deps: CompanionToolDeps, args: { session: string; answer: string }): Promise<ToolTextResult> {
   return onNamedChat(deps, 'answer_session', 'answer the chat', args.session, async (chat) => {
@@ -123,7 +142,7 @@ function answerSession(deps: CompanionToolDeps, args: { session: string; answer:
   });
 }
 
-/** One chat, by its name or id: the argument all three tools open with. */
+/** One chat, by its name or id: the argument all four tools open with. */
 const sessionArgument = z
   .string()
   .trim()
@@ -132,7 +151,7 @@ const sessionArgument = z
   .describe('The chat, by its id or its whole name as he says it. When he says "it" or "that one", it is the focus chat: never ask him which.');
 
 /**
- * The definitions of `stop_session`, `rename_session` and `answer_session` (the order her prompt lists them), built
+ * The definitions of `stop_session`, `rename_session`, `pin_session` and `answer_session` (the order her prompt lists them), built
  * with the SDK's `tool()` and zod. None is read-only: each changes a chat, so none carries `readOnlyHint`; the CLI
  * asks no permission for them regardless, because `allowedTools` names every tool of hers.
  * Consumed by `tools/companion-tools.ts` (`buildCompanionTools`), once per account.
@@ -154,6 +173,15 @@ export function actTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<an
           .describe(`The name he calls the chat by, as he says it: one line, up to ${CHAT_NAME_MAX} characters.`),
       },
       (args) => renameSession(deps, args)
+    ),
+    tool(
+      'pin_session',
+      toolLine('pin_session'),
+      {
+        session: sessionArgument,
+        pinned: z.boolean().describe('true to pin the chat (keep it), false to unpin it.'),
+      },
+      (args) => pinSession(deps, args)
     ),
     tool(
       'answer_session',

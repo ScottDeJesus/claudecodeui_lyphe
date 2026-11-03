@@ -433,6 +433,10 @@ export const api = {
   // the default glyph.
   setSessionIcon: (sessionId: string, icon: string | null) =>
     put(`/api/providers/sessions/${encodeURIComponent(sessionId)}/icon`, { icon }),
+  // Pins or unpins a chat: a pinned chat sorts first in every list and is never closed when it
+  // falls asleep. The server broadcasts the change, so every open sidebar re-reads its order.
+  setSessionPinned: (sessionId: string, pinned: boolean) =>
+    put(`/api/providers/sessions/${encodeURIComponent(sessionId)}/pinned`, { pinned }),
 
   // The simple list's folders and the place of its rows. The feed keeps its own
   // helper (`recentConversations`) above.

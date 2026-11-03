@@ -67,7 +67,9 @@ export type CompanionSessionDeps = MessageReaders &
  * the aborted request; `setModel` applies a model change to a
  * running process (a closed one launches on the stored model); `clear` interrupts, closes and forgets
  * the held session (its id and its shape); `close` ends the input and the process. `process` is the condition the panel
- * shows and `turnId` the turn in flight (`null` when idle). Consumed by `companion.service.ts` and the voice.
+ * shows and `turnId` the turn in flight (`null` when idle); `inLastTurn` is true while her last turn runs (the one that closes her
+ * conversation: her tools read it to open only `recall` and `remember`, and the session keeps that turn off the page). Consumed by
+ * `companion.service.ts` and the voice, and by `companion-account.ts`, which binds her tools' gate to `inLastTurn`.
  */
 export type CompanionSession = {
   pushOperator(text: string, via: 'typed' | 'spoken', attached?: { attachments: CompanionAttachment[]; images: ClaudeImageBlock[] }): void;
@@ -85,4 +87,6 @@ export type CompanionSession = {
   close(reason: string): Promise<void>;
   readonly process: CompanionProcess;
   readonly turnId: string | null;
+  /** True while her last turn runs. Her tools read it (`CompanionToolDeps.inLastTurn`) and the session keeps that turn off the page: no frame, no log row, no speech. */
+  readonly inLastTurn: boolean;
 };

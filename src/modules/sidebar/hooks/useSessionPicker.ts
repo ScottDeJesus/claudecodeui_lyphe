@@ -50,7 +50,7 @@ type SessionPickerInput = {
  * `projects` with the reader's toggled stars applied (`projectStarOverrides`, the map the sidebar's own
  * order reads): `projects[].isStarred` is that of the last full project refresh, and `toggle-star`
  * broadcasts nothing. The picker's feed is its own instance of `useSimpleChatList`, and `removeLocal` on
- * any instance drops the row from every mounted one, because an archive or a delete sends no
+ * any instance drops the row from every mounted one, because a close or a delete sends no
  * `session_upserted`.
  *
  * THE STATUS follows the sidebar's simple list: the first fetch in flight is 'loading' and a failed

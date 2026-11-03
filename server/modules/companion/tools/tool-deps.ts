@@ -21,7 +21,9 @@ import type { CompanionToolDeps } from './companion-tools.js';
  *     (`companion_open` carries its client id and the spoken `label` the door resolved; every other page ignores it),
  *     and to nobody while no page holds the floor;
  *   - `refuse`: a refusal is `isError` text that says what to do next, never a throw;
- *   - `sendDraft`: the one door the draft goes out by (`companion-send.ts`), built on the two helpers above.
+ *   - `sendDraft`: the one door the draft goes out by (`companion-send.ts`), built on the two helpers above;
+ *   - `inLastTurn`: whether her last turn runs, which `buildCompanionTools` reads to open only `recall` and `remember` then. It
+ *     comes from the session (`companion-account.ts` binds it), and a caller with no session to ask (a probe) hands none: it is false.
  *
  * ACTIVITY has two writers, and they must not undo each other. The turn sets `thinking` as it starts and
  * `idle` as it ends; a tool sets its own while it runs. A tool changes the activity at its end ONLY when its own
@@ -55,8 +57,11 @@ export function createToolDeps(input: {
   runtime: ProviderRuntimeGateway;
   house: CompanionHouse;
   activity: ActivityHolder;
+  /** Whether her last turn runs; absent answers false, so a caller with no session (a probe) builds her tools as they always were. */
+  inLastTurn?: () => boolean;
 }): CompanionToolDeps {
   const { userId, store, runtime, house, activity } = input;
+  const inLastTurn = input.inLastTurn ?? (() => false);
   // The activities of the tools still running, oldest first: what the status line goes back to when the one standing ends.
   const running: CompanionActivity[] = [];
   const setFocus = (chat: CompanionSessionRef): void => {
@@ -73,6 +78,7 @@ export function createToolDeps(input: {
     house,
     setFocus,
     openOnFloor,
+    inLastTurn,
     sendDraft: createDraftSender({ userId, store, runtime, setFocus, openOnFloor }),
     async withActivity(phase, chat, files, run) {
       const mine: CompanionActivity = { phase, session: chat, files, walk: phase === 'walking' ? placeOf(store.readState().walk) : null };

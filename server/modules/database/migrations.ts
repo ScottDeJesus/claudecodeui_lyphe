@@ -25,6 +25,7 @@ import { MEMORY_SCHEMA_SQL } from '@/modules/database/memory-schema.js';
 import { NOTES_SCHEMA_SQL } from '@/modules/database/notes-schema.js';
 import { NOTIFICATION_HISTORY_SCHEMA_SQL } from '@/modules/database/notification-history-schema.js';
 import { migrateProvenanceColumnToLegacyId } from '@/modules/database/migrations-legacy-id.js';
+import { visibleProjectPathSql } from '@/shared/hidden-project-paths.js';
 
 const SQLITE_UUID_SQL = `
 lower(hex(randomblob(4))) || '-' ||
@@ -545,6 +546,48 @@ const addSessionToolsetsColumn = (db: Database): void => {
 };
 
 /**
+ * Adds `sessions.pinned`, and — only in the boot that actually adds the column — pins every chat the
+ * simple chat list shows right now, so the operator can go through them and unpin what he does not
+ * want kept.
+ *
+ * The pin is the guard of the sleep-time auto-close (`session-auto-close.service.ts`): a chat pinned
+ * here is never closed when its host sleeps. The rollout pin has to land before that listener is
+ * live, and it does by construction — this runs at boot before the server listens, the listener is
+ * armed after the boot's re-adoption.
+ *
+ * "Exactly once" is the column's own absence, not a flag of its own: a boot that finds `pinned`
+ * already there returns before the UPDATE, so a chat he unpins is never pinned again by a restart.
+ * The ALTER and the UPDATE share one transaction, so a failed UPDATE cannot leave the column behind
+ * with the pin undone — the next boot would read the column as present and never retry.
+ *
+ * The WHERE clause is the `simpleList=true` feed's own (`getRecentSessionsPage`): not archived, not in
+ * an archived project, tagged for the simple list, outside the scratch roots.
+ */
+const addSessionPinnedColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
+  if (columnNames.includes('pinned')) return;
+
+  const visiblePath = visibleProjectPathSql('sessions.project_path');
+  db.transaction(() => {
+    addColumnToTableIfNotExists(db, 'sessions', columnNames, 'pinned', 'INTEGER NOT NULL DEFAULT 0');
+    const { changes } = db
+      .prepare(
+        `UPDATE sessions
+         SET pinned = 1
+         WHERE isArchived = 0
+           AND simple_list_at IS NOT NULL
+           AND ${visiblePath.clause}
+           AND NOT EXISTS (
+             SELECT 1 FROM projects
+             WHERE projects.project_path = sessions.project_path AND projects.isArchived <> 0
+           )`
+      )
+      .run(...visiblePath.params);
+    console.log(`Running migration: pinned ${changes} chat(s) shown in the simple chat list`);
+  })();
+};
+
+/**
  * Adds the `model` column that records which model each session runs with.
  *
  * Left NULL for pre-existing rows on purpose: the model resolver falls back to
@@ -886,6 +929,8 @@ export const runMigrations = (db: Database) => {
     addSimpleListFolders(db);
     addSessionToolsetsColumn(db);
     ensureProjectsForSessionPaths(db);
+    // After the project rows exist: the rollout pin reads a chat's project to tell the feed's chats from the rest.
+    addSessionPinnedColumn(db);
     db.exec(SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL);
     // The cron registry: what the box schedules, and one row per sync that read it. Neither
     // table references another, so they sit here rather than behind any rebuild above.

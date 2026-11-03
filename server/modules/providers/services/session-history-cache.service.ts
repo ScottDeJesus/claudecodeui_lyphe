@@ -16,8 +16,12 @@ import type { FetchHistoryResult } from '@/shared/types.js';
  * request against the transcript file's identity (path + mtime + size), so
  * only the first read after the file changes pays the parse. Anything that
  * rewrites history (a new turn, an edit, a rewind, a fork) touches the file
- * and invalidates naturally; no explicit invalidation hooks exist or are
- * needed.
+ * and invalidates naturally.
+ *
+ * One thing the file cannot tell: the context window the SDK reported for the
+ * session. A page read before that turn's `result` carries a token-usage total
+ * measured against the CONTEXT_WINDOW fallback, so the runtime drops the
+ * session's entry (`invalidate`) the moment a window is first learned or changes.
  *
  * One thing a history read draws on does NOT live in that file: a subagent's own sidechain
  * transcript, which the Claude reader parses for the agent's status, its timeline and its token
@@ -159,6 +163,11 @@ export function createSessionHistoryCache(
       } finally {
         pendingLoads.delete(sessionId);
       }
+    },
+
+    /** Forgets a session's entry so the next read re-parses its transcript. */
+    invalidate(sessionId: string): void {
+      entries.delete(sessionId);
     },
   };
 }

@@ -227,6 +227,7 @@ export type GatewayEventKind =
   | 'cerberus_run_output'
   | 'cerberus_diag_step'
   | 'simple_list_changed'
+  | 'session_archive_changed'
   | 'session_toolsets_changed'
   | 'session_host_liveness'
   | 'universe_activity'
@@ -274,6 +275,8 @@ export type SessionUpsertedEvent = {
     summary: string;
     messageCount: number;
     lastActivity: string;
+    /** He pinned the chat: the project tree marks it and draws it first in its project. */
+    pinned: boolean;
   };
   project: SessionUpsertedProject | null;
   timestamp: string;
@@ -313,6 +316,18 @@ export type KanbanBoardEvent = {
  * Built only by `modules/providers/services/simple-list.service.ts`.
  */
 export type SimpleListChangedEvent = { kind: 'simple_list_changed'; at: number };
+
+/**
+ * A chat was closed or reopened (`isArchived` true or false): the row stays, its transcript, last reply and followups with it, but the
+ * lists of his chats gain or lose it. Built only by `modules/websocket/services/session-archive-broadcast.service.ts`, which the close
+ * and the reopen of `sessions.service.ts` and the sleep-time auto-close all go through. A page that hears it re-reads the simple
+ * feed and, for a close, drops the chat from the project tree; a reopen reaches the tree as the `session_upserted` the same door sends.
+ *
+ * The ids ride an ARRAY and not a `sessionId` key on purpose, for the reason `session_host_liveness` does: the workspace flags a chat
+ * for attention (the unread mark) when any frame carries a `sessionId` that is not the one on screen (`useProjectsState`), and a
+ * chat being filed away is no news in its transcript. `at` is epoch milliseconds.
+ */
+export type SessionArchiveChangedEvent = { kind: 'session_archive_changed'; sessionIds: string[]; isArchived: boolean; at: number };
 
 /**
  * Which chats have a live session host (a tmux session on the keepalive server, or on a node's

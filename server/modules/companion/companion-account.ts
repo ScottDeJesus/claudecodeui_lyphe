@@ -106,9 +106,18 @@ export function createCompanionAccount(userId: number, runtime: ProviderRuntimeG
     store.emit({ kind: 'companion_activity', activity: next });
   };
 
-  const toolDeps = createToolDeps({ userId, store, runtime, house, activity: { current: () => activity, set: setActivity } });
+  // The tools are built before the session, and the session is made from them: the gate reads it lazily, and no tool runs before it exists.
+  let session: CompanionSession | undefined;
+  const toolDeps = createToolDeps({
+    userId,
+    store,
+    runtime,
+    house,
+    activity: { current: () => activity, set: setActivity },
+    inLastTurn: () => session?.inLastTurn ?? false,
+  });
 
-  const session = createCompanionSession({
+  session = createCompanionSession({
     userId,
     tools: buildCompanionTools(toolDeps),
     readSettings: () => readCompanionSettings(userId),

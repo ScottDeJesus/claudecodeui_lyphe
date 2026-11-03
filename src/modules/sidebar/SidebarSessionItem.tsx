@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { Check, Copy, Edit2, GitBranch, Loader2, MoreHorizontal, Trash2, X } from 'lucide-react';
+import { Check, Copy, Edit2, GitBranch, Loader2, MoreHorizontal, Pin, PinOff, Trash2, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { ActionMenu, Badge, Dialog, DialogContent, DialogTitle, LLMProviderLogo, Tooltip, buttonVariants } from '@/shared/ui';
@@ -176,6 +176,19 @@ function SidebarSessionItem({
     onDeleteSession(session.id, sessionView.sessionName);
   };
 
+  // A pinned chat is drawn first in its project and is never closed when it falls asleep. The server
+  // answers a pin with a `session_upserted` carrying the new flag, which is how the mark and the
+  // order change here — no local copy of the flag is kept.
+  const isPinned = session.pinned === true;
+  const togglePinned = async () => {
+    try {
+      const response = await api.setSessionPinned(session.id, !isPinned);
+      if (!response.ok) throw new Error(`setSessionPinned answered HTTP ${response.status}`);
+    } catch (error) {
+      console.error('[SidebarSessionItem] Failed to pin or unpin the session:', error);
+    }
+  };
+
   const loadProviderSessionId = async () => {
     const requestId = ++providerIdRequestRef.current;
     setCopyState('loading');
@@ -320,6 +333,14 @@ function SidebarSessionItem({
                 >
                   {sessionView.sessionName}
                 </div>
+                {isPinned ? (
+                  <Pin
+                    data-testid="session-pinned"
+                    role="img"
+                    aria-label={t('simpleList.pinned')}
+                    className="h-3 w-3 flex-shrink-0 text-muted-foreground"
+                  />
+                ) : null}
                 {isProcessing || isAwaitingInput || isSubagentRunning ? (
                   <span className="ml-auto flex flex-shrink-0 items-center gap-1">
                     <SessionRunIndicator
@@ -456,6 +477,18 @@ function SidebarSessionItem({
                   </span>
                 </button>
 
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOptionsOpen(false);
+                    void togglePinned();
+                  }}
+                  className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-foreground transition-colors active:bg-muted"
+                >
+                  {isPinned ? <PinOff className="h-5 w-5 flex-shrink-0" /> : <Pin className="h-5 w-5 flex-shrink-0" />}
+                  <span className="text-sm font-medium">{isPinned ? t('simpleList.unpin') : t('simpleList.pin')}</span>
+                </button>
+
                 {!isProcessing && (
                   <button
                     type="button"
@@ -466,7 +499,7 @@ function SidebarSessionItem({
                     className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-destructive transition-colors active:bg-destructive/10"
                   >
                     <Trash2 className="h-5 w-5 flex-shrink-0" />
-                    <span className="text-sm font-medium">Archive or delete session</span>
+                    <span className="text-sm font-medium">Close or delete session</span>
                   </button>
                 )}
               </div>
@@ -525,6 +558,14 @@ function SidebarSessionItem({
                 >
                   {sessionView.sessionName}
                 </div>
+                {isPinned ? (
+                  <Pin
+                    data-testid="session-pinned"
+                    role="img"
+                    aria-label={t('simpleList.pinned')}
+                    className="h-3 w-3 flex-shrink-0 text-muted-foreground"
+                  />
+                ) : null}
                 {isProcessing || isAwaitingInput || isSubagentRunning ? (
                   <span
                     className={cn(
@@ -625,6 +666,12 @@ function SidebarSessionItem({
                     onSelect: () => onStartEditingSession(project.projectId, session.id, sessionView.sessionName),
                   },
                   {
+                    key: 'pin',
+                    label: isPinned ? t('simpleList.unpin') : t('simpleList.pin'),
+                    icon: isPinned ? PinOff : Pin,
+                    onSelect: () => void togglePinned(),
+                  },
+                  {
                     key: 'copy',
                     label: copyLabel,
                     description: copyState === 'error' ? 'Click to try again.' : undefined,
@@ -642,7 +689,7 @@ function SidebarSessionItem({
                   }] : []),
                   ...(!isProcessing ? [{
                     key: 'delete',
-                    label: 'Archive or delete session',
+                    label: 'Close or delete session',
                     icon: Trash2,
                     isDanger: true,
                     showDividerBefore: true,

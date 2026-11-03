@@ -10,7 +10,7 @@ export const SESSION_UNREAD_SQL =
 
 /**
  * Per-session state the sidebar reads and the run registry writes: the chosen
- * icon and the completion/read stamps. Callers outside the database module
+ * icon, the pin and the completion/read stamps. Callers outside the database module
  * reach it through the barrel.
  */
 export const sessionUserStateDb = {
@@ -53,6 +53,14 @@ export const sessionUserStateDb = {
   setIcon(sessionId: string, icon: string | null): boolean {
     const db = getConnection();
     const result = db.prepare('UPDATE sessions SET icon = ? WHERE session_id = ?').run(icon, sessionId);
+
+    return result.changes > 0;
+  },
+
+  /** Pins or unpins a chat. False when no such session exists. Consumed by `sessionUserStateService.setPinnedById` and, through it, Kaylee's `pin_session`. */
+  setPinned(sessionId: string, pinned: boolean): boolean {
+    const db = getConnection();
+    const result = db.prepare('UPDATE sessions SET pinned = ? WHERE session_id = ?').run(pinned ? 1 : 0, sessionId);
 
     return result.changes > 0;
   },

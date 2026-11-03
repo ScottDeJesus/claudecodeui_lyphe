@@ -34,6 +34,8 @@ type SessionRow = {
   last_completed_at: string | null;
   /** When this session was last on screen, ISO-8601 UTC. NULL until it has been once. */
   last_read_at: string | null;
+  /** `1` while a person has pinned the chat: it sorts first in every list and the sleep-time auto-close leaves it open. */
+  pinned: number;
   /** Present only on rows read through `getRecentSessionsPage`, as `1`/`0`. */
   unread?: number;
   isArchived: number;
@@ -47,7 +49,7 @@ type RecentSessionsPage = {
 };
 
 const SESSION_ROW_COLUMNS =
-  'session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, name_given, model, effort, permission_mode, forked_from_session_id, simple_list_at, simple_list_rank, icon, last_completed_at, last_read_at, isArchived, created_at, updated_at';
+  'session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, name_given, model, effort, permission_mode, forked_from_session_id, simple_list_at, simple_list_rank, icon, last_completed_at, last_read_at, pinned, isArchived, created_at, updated_at';
 
 /**
  * The same list, addressed to the `sessions` table, for the queries that join `projects` — both
@@ -772,10 +774,12 @@ export const sessionsDb = {
       AND ${visiblePath.clause}
     `;
     // The simple list sorts by its manual rank so a running chat never jumps
-    // and a drag sticks; the tree keeps sorting by last activity.
+    // and a drag sticks; the tree keeps sorting by last activity. Pinned chats come first in both,
+    // and inside the pinned and the unpinned group the order is the one each feed already had.
     const orderByClause = options.simpleListOnly
-      ? 'sessions.simple_list_rank DESC, sessions.session_id DESC'
-      : `julianday(COALESCE(sessions.updated_at, sessions.created_at)) DESC,
+      ? 'sessions.pinned DESC, sessions.simple_list_rank DESC, sessions.session_id DESC'
+      : `sessions.pinned DESC,
+                  julianday(COALESCE(sessions.updated_at, sessions.created_at)) DESC,
                   sessions.session_id DESC`;
     // `unread` is derived here, from the one unread expression, so the client
     // never re-derives the rule from the two raw timestamps.
@@ -895,7 +899,7 @@ export const sessionsDb = {
          FROM sessions
          WHERE project_path = ?
            AND isArchived = 0
-         ORDER BY datetime(COALESCE(updated_at, created_at)) DESC, session_id DESC
+         ORDER BY pinned DESC, datetime(COALESCE(updated_at, created_at)) DESC, session_id DESC
          LIMIT ? OFFSET ?`
       )
       .all(normalizedProjectPath, limit, offset) as SessionRow[];
@@ -952,6 +956,42 @@ export const sessionsDb = {
        WHERE session_id = ?`
     ).run(isArchived ? 1 : 0, sessionId);
     if (changes > 0) announceSessionArchiveChanged(sessionId, isArchived);
+  },
+
+  /**
+   * Closes (archives) one chat for the sleep-time auto-close — only if it is the kind of chat that
+   * auto-close may touch — and answers whether it did. Consumed by `session-auto-close.service.ts`.
+   *
+   * ONE conditional UPDATE, never a read followed by a write: a pin he sets in the instant between the
+   * two would be closed over. The test is the simple list's own membership (`getRecentSessionsPage`
+   * with `simpleListOnly`: not archived, not in an archived project, tagged for the list, outside the
+   * scratch roots) plus the rule of "his chats" in Kaylee's roster (an app chat, never a synced
+   * transcript whose session id IS its provider id), and the pin: a pinned chat never matches.
+   *
+   * It writes what a manual close writes, `isArchived`, and announces it to the same subscribers. The
+   * transcript, the last reply and the chat's followups are untouched — no row is deleted.
+   */
+  archiveIfAutoClosable(sessionId: string): boolean {
+    const db = getConnection();
+    const visiblePath = visibleProjectPathSql('sessions.project_path');
+    const { changes } = db
+      .prepare(
+        `UPDATE sessions
+         SET isArchived = 1
+         WHERE session_id = ?
+           AND isArchived = 0
+           AND pinned = 0
+           AND simple_list_at IS NOT NULL
+           AND (provider_session_id IS NULL OR session_id <> provider_session_id)
+           AND ${visiblePath.clause}
+           AND NOT EXISTS (
+             SELECT 1 FROM projects
+             WHERE projects.project_path = sessions.project_path AND projects.isArchived <> 0
+           )`
+      )
+      .run(sessionId, ...visiblePath.params);
+    if (changes > 0) announceSessionArchiveChanged(sessionId, true);
+    return changes > 0;
   },
 
   deleteSessionById(sessionId: string): boolean {

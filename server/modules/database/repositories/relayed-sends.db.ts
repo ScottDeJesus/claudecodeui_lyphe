@@ -27,6 +27,13 @@ import { getConnection } from '@/modules/database/connection.js';
  * hands a brief to a chat, and `server/modules/providers/services/session-relayed-sends.ts` reads a
  * chat's rows to mark the matching user messages "Through Kaylee" when history is fetched. Reach it
  * through `@/modules/database/index.js`.
+ *
+ * A READER OUTSIDE THIS REPO: the house's heal friction reading (`~/.claude/scripts/heal_friction_who.py`, step 3b) selects
+ * `message_uuid` straight from this table to know a transcript row is Kaylee's brief and not the operator's own turn — her
+ * briefs are imperative prose that the reading would otherwise file as his rebukes. Let a turn go out without recording its
+ * uuid and her briefs file as `operator-correction` rows again, silently. Rename the column or move the table and the
+ * reading cannot read its registry at all: it answers UNKNOWN for EVERY chat turn, his own included, and holds its tail
+ * (`census["holds"]`) until the table is readable again, so no chat turn is read in the meantime.
  */
 
 /** One `relayed_sends` row, exactly as the table stores it. */
