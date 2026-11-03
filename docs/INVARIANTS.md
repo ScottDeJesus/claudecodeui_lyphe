@@ -177,34 +177,6 @@ probe-key: 247eff9f2e5e8c2ae9266dac25e3b73c4604a9f1
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-endings.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts
 
-## INV-6576 — probe — the roadmap lane's rows are not in `docs/MANUAL.md`'s family, and the report does not say why
-
-the roadmap lane's rows are not in `docs/MANUAL.md`'s family, and the report does not say why
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe; for t in MAN-1498 MAN-7628 MAN-7629; do printf '%s ' $t; docstore get $t | python3 -c "import sys,json;p=json.load(sys.stdin)['row']['package'];print(p['repo']+':'+p['path'])"; done; grep -c '^## MAN-7628' docs/MANUAL.md
-expect: MAN-1498 prints cloudcli:docs, MAN-7628 and MAN-7629 print cloudcli:. and the grep prints 0 (cured when the two print cloudcli:docs and the grep prints 1)
-```
-
-measured 2026-10-03 by chain chain-roadmap--lane--docs-20261003-180710-2122, finding M1, MEDIUM
-probe-key: a27055db666a8a0c1d7ddd7c3399c36867113d4c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
-
-## INV-6577 — probe — MAN-7626, the lane's shared-door row, sits in the repo-root `MANUAL.md` while every other row of the lane lives in `docs/MANUAL.md`
-
-MAN-7626, the lane's shared-door row, sits in the repo-root `MANUAL.md` while every other row of the lane lives in `docs/MANUAL.md`
-
-```probe
-docstore get MAN-7626 | python3 -c "import sys,json;p=json.load(sys.stdin)['row']['package'];print(p['repo']+':'+p['path'])"
-expect: cloudcli:docs — the package of MAN-7631 and MAN-1498 (today cloudcli:.)
-```
-
-measured 2026-10-03 by chain chain-roadmap--lane--whole-20261003-183736-de24, finding L2, LOW
-probe-key: 84ae870657a8db5dfbd97279f63b4c2619ad3e16
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
-
 ## INV-6580 — roadmapSeen is entry-patched and forward-only — a writer never sends an older at
 
 `roadmapSeen` is the second entry-patched preference, beside `dispatcher` (INV-4406). Shape: `{ seen: { name: string; at: string }[] }`, one entry per roadmap; `name` is the roadmap's, `at` is the dispatcher's UTC string of the newest `shipped_at`, `completed_at` or `reached_at` this user's screen celebrated.
