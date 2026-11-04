@@ -641,9 +641,9 @@
     },
     "runnerGeminiBudget": {
       "label": "Gemini budget per plan",
-      "description": "The most one plan may spend on the Gemini API — design, build, review and testing together, across all its souls. An /inline chain is a budget of its own. At the cap the backend refuses that budget’s Gemini calls. Takes effect at the next call.",
+      "description": "The most one plan may spend on the Gemini API — design, build, review and testing together, across all its souls. An /inline chain is a budget of its own, and so is a chat with the souls it launches by hand. At the cap the backend refuses that budget’s Gemini calls. Takes effect at the next call.",
       "field": "USD per plan",
-      "zero": "Every plan’s and chain’s Gemini calls are refused at $0.00 — zero does not mean unlimited.",
+      "zero": "Every plan’s, chain’s and chat’s Gemini calls are refused at $0.00 — zero does not mean unlimited.",
       "unreadable": "The cap could not be read from the server, so its amount is unknown — this is not the $5.00 default. It is retried whenever this page regains focus."
     },
     "runnerCompaction": {

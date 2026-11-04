@@ -93,7 +93,7 @@ export default function RunnerGeminiBudgetRow() {
           <div id={ABOUT_ID}>
             <p>
               {t('agents.runnerGeminiBudget.description', {
-                defaultValue: 'The most one plan may spend on the Gemini API — design, build, review and testing together, across all its souls. An /inline chain is a budget of its own. At the cap the backend refuses that budget’s Gemini calls. Takes effect at the next call.',
+                defaultValue: 'The most one plan may spend on the Gemini API — design, build, review and testing together, across all its souls. An /inline chain is a budget of its own, and so is a chat with the souls it launches by hand. At the cap the backend refuses that budget’s Gemini calls. Takes effect at the next call.',
               })}
             </p>
             {usd === 0 && (
@@ -103,7 +103,7 @@ export default function RunnerGeminiBudgetRow() {
                 <span aria-hidden="true">▲</span>
                 <span className="min-w-0">
                   {t('agents.runnerGeminiBudget.zero', {
-                    defaultValue: 'Every plan’s and chain’s Gemini calls are refused at $0.00 — zero does not mean unlimited.',
+                    defaultValue: 'Every plan’s, chain’s and chat’s Gemini calls are refused at $0.00 — zero does not mean unlimited.',
                   })}
                 </span>
               </p>

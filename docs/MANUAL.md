@@ -14097,7 +14097,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-s
 
 ## MAN-8966 — Gemini budget per plan — the Settings row and its hook: files, handle, strings, states
 
-`RunnerGeminiBudgetRow.tsx` (Settings → Agents → Claude → Account) is the operator's view of the Gemini plan cap: ONE dollar amount that binds every plan's and every ownerless chain's Gemini spend. The server half (file, GET/PUT `/api/settings/gemini-plan-cap`): MAN-8963. The gate that enforces it: MAN-8959.
+`RunnerGeminiBudgetRow.tsx` (Settings → Agents → Claude → Account) is the operator's view of the Gemini plan cap: ONE dollar amount that binds every plan's, every ownerless chain's and every chat's Gemini spend. The server half (file, GET/PUT `/api/settings/gemini-plan-cap`): MAN-8963. The gate that enforces it: MAN-8959.
 
 ## Status
 - 2026-10-23: LIVE. `RunnerModelContent.tsx` draws `<RunnerGeminiBudgetRow />` directly under `<RunnerParkAtPeakRow />`, and its docstring names the row among its siblings. The row reads and writes through `useGeminiPlanCap`, the one reader and writer of the cap in `src/`.
@@ -14133,7 +14133,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-s
 - `$0.00` is a real cap every call has met, not "unlimited"; the row says so while the file holds 0.
 
 ## Strings
-`agents.runnerGeminiBudget` in `src/modules/i18n/locales/en/settings.json`, directly after `runnerParkAtPeak`: `label`, `description`, `field`, `zero`, `unreadable`. Every call carries a `defaultValue`; `buttons.retry` and `status.loading` come from `common`. The row's `buttons.retry` fallback is `'Try again'`, the card's other rows' fallback; the key shows `Retry`.
+`agents.runnerGeminiBudget` in `src/modules/i18n/locales/en/settings.json`, directly after `runnerParkAtPeak`: `label`, `description`, `field`, `zero`, `unreadable`. `description` names the three budget kinds the cap binds (a plan, "an /inline chain is a budget of its own", "and so is a chat with the souls it launches by hand"); `zero` says "plan’s, chain’s and chat’s". Every call carries a `defaultValue`; `buttons.retry` and `status.loading` come from `common`. The row's `buttons.retry` fallback is `'Try again'`, the card's other rows' fallback; the key shows `Retry`.
 
 ## Measured
 - 2026-10-23, the served app (:5184, `.verify/gemini-budget-cap-row.mjs`; `.verify/` is gitignored): with no cap file the row reads `5.00` at 1440×900 and 390×844, light and dark. Typing `5` and leaving the field PUTs once, the file then holds `5\n`, and the field draws the read-back. `-1` and a blank each snap back to `5.00` with no PUT in the page's network log and the file's bytes and mtime unchanged. A PUT answered 500 inside the page snaps the field back to `5.00` after a re-read GET, the file untouched. `PUT {"usd": -1}` on :3011 answers 400 `INVALID_GEMINI_PLAN_CAP`. The probe refuses to start (exit 2) when a cap file exists, types the amount the row reads, and removes the file it created, so the host is left with none and an operator's own cap is never typed over.
