@@ -158,7 +158,7 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's twenty-five routes: three reads of the plan list, twelve presses on a plan, six on
+ * The dispatcher lane's twenty-seven routes: three reads of the plan list, twelve presses on a plan, eight on
  * an arc, four on the board. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
@@ -170,9 +170,9 @@ function statusForVerb(result: DispatcherVerbResult): number {
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
  * first: the two together are what keep a handover from being drawn as an empty plan list.
  *
- * FIVE OF THE SIXTEEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
- * the dispatcher's own doors open on both: `model`, `stop`, `resume` and the `arm-accept` /
- * `disarm-accept` pair take an arc's name as readily as a plan's. The two spellings are two routes
+ * SIX OF THE SIXTEEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
+ * the dispatcher's own doors open on both: `model`, `stop`, `resume`, the `arm-accept` /
+ * `disarm-accept` pair and `override` (with its `override-off` undo) take an arc's name as readily as a plan's. The two spellings are two routes
  * rather than one param because the NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a
  * fence that would be lost the moment one route accepted either adornment. `schedule` is a PLAN'S alone
  * here (the card's `Resume at …`): the deck's `Schedule start` is gone, though the terminal's
@@ -321,7 +321,7 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   }));
 
   /**
-   * The ARC's six verbs — `model`, `stop`, `resume`, `arm-accept`, `disarm-accept` and `queue` —
+   * The ARC's seven verbs — `model`, `stop`, `resume`, `arm-accept`, `disarm-accept`, `override` and `queue` —
    * relayed to the arc's own door.
    *
    * AN ARC IS ADDRESSED BY ITS OWN NAME, and the dispatcher is what resolves it. Each of the five
@@ -339,6 +339,10 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
    * it waits at the gate or was stopped mid-walk, which is what makes `resume <arc>` the arc's Start;
    * The next frame redraws the arc's header and its plans together — nothing here is optimistic, and nothing
    * is copied by this server.
+   *
+   * `override` is the one verb here that acts on the ARC'S OWN outings and none of its plans: the epic's design, its
+   * whole-arc cut, a tell and its judgment are rows aimed at the epic, and its Override lifts the pacer's hold on
+   * exactly those (`hooks/dispatcher/cmd/override.py`).
    *
    * `queue` IS THE ARC'S ALONE: `dispatcher queue <arc> --before <arc> | --last | --at N` moves the
    * epic in the order In flight runs them top down, and the dispatcher refuses an epic that is not in
@@ -381,6 +385,13 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // own current design, so no stamp travels — the card never read the members' designs one by one.
   router.post('/arcs/:name/arm-accept', arcRelay('arm-accept', () => ['--by', 'app:card']));
   router.post('/arcs/:name/disarm-accept', arcRelay('disarm-accept'));
+  // The deck's `Override` (`dispatcher override <arc> --by app:card`) and its `Turn off` (`… --off --by app:card`): the
+  // operator's lift of the pacer's hold for the EPIC'S OWN outings — its design before any plan of it exists, its
+  // whole-arc cut, a tell, its judgment — and for none of its plans' phases, which each plan card lifts for itself. The
+  // same dispatcher verb as the plan's, resolved by the name; the two words are ours. A refusal (a finished epic, one
+  // already past the pacer, `--off` on one that carries none) is a 409 whose body is the dispatcher's own sentence.
+  router.post('/arcs/:name/override', arcRelay('override', () => ['--by', 'app:card']));
+  router.post('/arcs/:name/override-off', arcRelay('override', () => ['--off', '--by', 'app:card']));
   // An epic moved in the queue (`dispatcher queue <arc> --before <arc> | --last | --at N`): In flight's drag.
   router.post('/arcs/:name/queue', arcRelay('queue', queueArgs, QUEUE_BODY_ERROR));
 

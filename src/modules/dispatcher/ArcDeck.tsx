@@ -18,6 +18,7 @@ import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlan
 import { usePutAway } from '@/modules/dispatcher/hooks/usePutAway';
 import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
 import { phaseWord } from '@/modules/dispatcher/phaseWord';
+import { PaceOverride } from '@/modules/dispatcher/PaceOverride';
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanCard } from '@/modules/dispatcher/PlanCard';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
@@ -95,7 +96,8 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * while `arc.queue` is set) before the hour a Schedule start armed, led by the flow's `◷`
  * (`data-dispatch-arc-schedule-note`); then the arc's description (`cardDescription`: its design's
  * `delivers` line, else its goal's where that yields nothing), folded to one line until pressed
- * (`CardDescription`), and who is out on it; then its books as pills, counting at first sight
+ * (`CardDescription`), who is out on it, and the pacer's hold on its own queued outings with its Override
+ * (`PaceOverride`, `arc.pace_hold`); then its books as pills, counting at first sight
  * (`darc:<name>`), the last of them how long agents have
  * worked on the epic (`WorkingPill`). The corner is `⋯` — carrying `Dismiss done
  * features · N` while some plans of the deck are done and some are not — then the deck's own press, which
@@ -243,6 +245,14 @@ export function DispatchArcDeck({
               {/* Who is out on the arc, under its description: a planner badge is a LONG LINE, and on
                   row one it would take the room the arc's name and word are read in. Nothing when none is. */}
               {arc.planner && <PlannerBadge planner={arc.planner} />}
+              {/* The pacer's hold on the epic's OWN queued outings — its design before any plan of it exists, its
+                  whole-arc cut, a tell, its judgment — with its Override, or the Override standing with its Turn
+                  off. It is the epic's alone: no plan card repeats it, so each hold has one press. */}
+              {(arc.pace_hold || arc.overridden) && (
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <PaceOverride name={arc.name} hold={arc.pace_hold} overridden={arc.overridden} scope="arc" />
+                </div>
+              )}
             </>
           )}
           spend={spend.paid !== null || spend.tokens !== null || arc.runtime_s > 0 || agentsOut

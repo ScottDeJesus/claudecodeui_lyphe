@@ -1,6 +1,6 @@
 import type { DispatcherPlanner } from '@/shared/types.js';
 
-import { each, field, isCount, isFlag, isRecord, isText, isTextOrNull, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { each, field, flagSince, isCount, isFlag, isRecord, isText, isTextOrNull, need, oneOf, textSince } from './dispatcher-state.transport.js';
 
 /**
  * One planner outing of the dispatcher's document, read field by field into the type the badges draw.
@@ -66,6 +66,12 @@ export function plannerOf(raw: unknown): DispatcherPlanner {
     // The vendor those dollars were billed by, off the launch's own bill word: `Claude API` for a
     // key-paid outing, `DeepSeek` for the vendor, `""` for a subscription ride. Tolerant.
     paid_vendor: textSince(field(planner, 'paid_vendor'), 'planner.paid_vendor'),
+    // THIS ROW'S OWN HOLD AND OVERRIDE (`pace_report.mark_outings`), the dispatcher's readings off the walk it made once:
+    // the pacer's clause on the queued row (`""` when it is not held, or lifted) and whether its target carries the
+    // operator's override. They are what a loose planner badge — an epic's design with no plan yet, so no card and no
+    // deck — draws its Override from. ABSENT reads `""` and `false` (a build older than the keys held nothing here).
+    pace_hold: textSince(field(planner, 'pace_hold'), `planner.pace_hold for ${target}`) ?? '',
+    overridden: flagSince(field(planner, 'overridden'), `planner.overridden for ${target}`),
   };
 }
 

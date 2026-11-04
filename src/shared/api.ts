@@ -1265,6 +1265,10 @@ export const api = {
     // as a 409. `overrideOff` puts the hold back (`… --off`). The pacer's gate only — no model word moves.
     override: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/override`, {}),
     overrideOff: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/override-off`, {}),
+    // The same lift for an EPIC's own queued outings (`dispatcher override <arc> --by app:card`) — its design before any plan of
+    // it exists, its whole-arc cut, a tell, its judgment — and its undo. Never its plans' phases: each plan card lifts its own.
+    arcOverride: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/override`, {}),
+    arcOverrideOff: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/override-off`, {}),
     // "Accept when cut" on a DESIGNED plan (`dispatcher arm-accept <plan> --by app:card --design <stamp>`): the
     // stamp is the plan's `design_loaded_at` as the card drew it, so a press on a design that has since moved is
     // refused by the dispatcher. `disarmAccept` is its Cancel. The arc pair presses/cancels every designed (armed)

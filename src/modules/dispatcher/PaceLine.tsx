@@ -45,8 +45,8 @@ export function PaceLine({ pace }: { pace?: DispatcherPace | null }) {
  * clause in the dispatcher's words, on the same rule as the queue's: the card says "Held by pace"
  * itself, so the `pace:` lead is stripped and never read twice.
  *
- * The gate sends one of the two holds at a time, so the card draws whichever one arrived; a hold
- * that is absent (an older dispatcher), empty, or only a lead draws nothing at all.
+ * The card draws whichever of the two holds arrived, both when both did (a plan the queue holds can carry the clause of a
+ * planner outing aimed at it); a hold that is absent (an older dispatcher), empty, or only a lead draws nothing at all.
  *
  * `children` is the press that sits beside the clause (`PaceOverride`'s Override): the clause and its
  * press are one unbreakable pair in the card's wrapping row, and a hold that draws nothing draws no press.

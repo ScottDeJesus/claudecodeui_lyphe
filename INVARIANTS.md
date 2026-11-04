@@ -745,30 +745,6 @@ probe-key: d0acbb8cd3549ac83ed13eaec368502feb5d83e0
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useUnreadReply.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs
 
-## INV-6016 — probe — a `requestWindow` that throws synchronously, or returns a non-promise, wedges the door for the life of the page
-
-a `requestWindow` that throws synchronously, or returns a non-promise, wedges the door for the life of the page
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node --input-type=module -e "
-import { openConsole } from './.verify/lib/console.mjs';
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const s = await openConsole({ viewport: { width: 1440, height: 900 } });
-await s.page.unrouteAll({ behavior: 'ignoreErrors' }); await s.page.context().unrouteAll({ behavior: 'ignoreErrors' });
-await s.page.waitForSelector('textarea'); const errs = []; s.page.on('pageerror', (e) => errs.push(String(e).slice(0, 40)));
-await s.page.evaluate(() => { window.documentPictureInPicture.requestWindow = () => { throw new Error('sync boom'); }; });
-await s.page.keyboard.press('Control+.'); await sleep(400);
-await s.page.evaluate(() => { delete window.documentPictureInPicture.requestWindow; });
-await s.page.keyboard.press('Control+.'); await sleep(1500);
-console.log('pages', s.page.context().pages().length, JSON.stringify(errs)); await s.browser.close();"
-expect: pages 1 ["Error: sync boom"]   (a healthy door would show pages 2 after the second, good press)
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--float-window-20260930-002344-4b26, finding M1, MEDIUM
-probe-key: 24f5e1c8ad434587d730bcfcc15bc55278fe9914
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostWindow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/usePictureInPicture.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-window.mjs
-
 ## INV-6017 — probe — a window closed between the browser making it and the app attaching its `pagehide` listener strands the tab: placement `'window'`, no window, the door dead, sometimes the chat lost in the dead document
 
 a window closed between the browser making it and the app attaching its `pagehide` listener strands the tab: placement `'window'`, no window, the door dead, sometimes the chat lost in the dead document
@@ -1051,38 +1027,6 @@ measured 2026-10-01 by chain chain-card-order-drag-20261001-152353-c269, finding
 probe-key: 44e21d54a9185ed78094e1ebb08b12ce9801a104
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
-
-## INV-6326 — probe — MEDIUM — `status=running` + "wait again" is an instant-return loop when a soul outlived its walker
-
-MEDIUM — `status=running` + "wait again" is an instant-return loop when a soul outlived its walker
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-held-XXXXXX) || exit 1
-case "$D" in /tmp/athena-probe-held-*) ;; *) echo refusing; exit 1;; esac
-S="$D/state"; C=chain-x-20261001-000000-aaaa
-mkdir -p "$S/dispatcher" "$S/runner" "$S/dispatch-chains/$C" "$S/dispatch-souls/dispatch-x-1" || exit 1
-export DISPATCHER_HOME="$S/dispatcher" EXECUTE_LEDGER_STATE_DIR="$S" PLAN_RUNNER_STATE_DIR="$S/runner"
-python3 -c "import time; time.sleep(60)" soul-run dispatch-x-1 & SOUL=$!
-echo $SOUL > "$S/dispatch-souls/dispatch-x-1/launcher.pid"
-python3 - "$S/dispatch-chains/$C" "$C" <<'PY'
-import json, sys, time
-d, i = sys.argv[1:3]
-json.dump({"id": i, "slug": "x", "agent": "hephaestus", "cwd": "/tmp", "add_dirs": [], "docs": True, "pause": True,
-           "builder_brief": d + "/b.md", "break_it": None, "rulings": None, "fix_round": 0, "status": "running",
-           "stage": "builder", "targets": [], "flags": [], "cause": "", "failed_stage": None, "started_at": time.time(),
-           "updated_at": time.time(), "unattributed": [], "resume_at": None, "ruled": False,
-           "stages": [{"name": "builder", "attempt": 1, "launch": "dispatch-x-1", "provider": "claude",
-                       "status": "waiting", "at": time.time()}]}, open(d + "/chain.json", "w"))
-PY
-for n in 1 2 3; do ( time timeout 60 ~/.claude/scripts/soul-back "$C" ) 2>&1 | grep -oE "STILL RUNNING|real.*"; done
-kill $SOUL; wait 2>/dev/null
-case "$D" in /tmp/athena-probe-held-*) rm -r "$D";; esac
-```
-
-measured 2026-10-01 by chain chain-metis-foreground-wait-20261001-165407-e80a, finding M1, MEDIUM
-probe-key: a687bea1bcba6afd52d5005b40205ef04d58ad0a
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/recovery.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/METIS.md, /home/lyphe/.claude/hooks/plan_runner/solo/chain_adopt.py, /home/lyphe/.claude/scripts/soul-back, /home/lyphe/.claude/skills/inline/SKILL.md
 
 ## INV-6327 — probe — MEDIUM — `blocked` is a `--resume` case in one rule and a `file_issue` case in another, inside her one prompt
 
@@ -10616,64 +10560,6 @@ expect: while the defect stands — the first line ends /home/lyphe/.claude/stat
 
 measured 2026-10-21 by chain chain-plan-card-override-20261021-171051-2000, finding H1, HIGH
 probe-key: 479625b53c76dcb450b2cb853b3222c42f808d3c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.sh, /home/lyphe/.claude/hooks/dispatcher/pace_demand.py, /home/lyphe/.claude/hooks/dispatcher/pace_report.py
-
-## INV-9264 — probe — MEDIUM — an outing aimed at the plan's EPIC is held by the pacer, shown nowhere, and no door lifts it
-
-MEDIUM — an outing aimed at the plan's EPIC is held by the pacer, shown nowhere, and no door lifts it
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-arccut.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'INNER'
-D=$(cd "$(dirname "$0")" && pwd)
-mkdir -p "$D/disp" "$D/pacer" || exit 1
-sqlite3 -readonly ~/.claude/state/dispatcher/dispatcher.db ".backup '$D/disp/dispatcher.db'" || exit 1
-sqlite3 -readonly ~/.claude/state/pacer/readings.sqlite ".backup '$D/pacer/readings.sqlite'" || exit 1
-cp ~/.claude/state/pacer/rates.json "$D/pacer/"
-export DISPATCHER_HOME="$D/disp" PLAN_RUNNER_PACER_HOME="$D/pacer" DISPATCHER_EPICS_FLAG_PATH="$D/epics.flag" PYTHONPATH=/home/lyphe/.claude/hooks
-printf 'paused no\n' > "$D/epics.flag"
-unset CLAUDE_CODE_SESSION_ID DISPATCHER_SESSION
-python3 - <<'PY'
-import time
-from plan_runner import claude_account
-from plan_runner.pacer import readings
-from dispatcher import planners, store
-now = time.time(); who = claude_account.current()
-readings.note(who, {"five": 0.30, "five_resets": (int(now // 3600) + 3) * 3600.0, "week": 0.995, "week_resets": (int(now // 86400) + 4) * 86400.0, "status": "allowed"}, source="athena", at=now)
-c = store.connect()
-arc = c.execute("select name from arcs order by id desc limit 1").fetchone()[0]
-with c: planners.queue_cut(c, arc, session=None, repo="/home/lyphe/.claude")
-open("arc.txt", "w").write(arc)
-PY
-ARC=$(cat arc.txt)
-~/.claude/scripts/dispatcher status --json 2>/dev/null > "$D/doc.json"
-echo "a cut aimed at the epic $ARC is queued; the pacer's picture says: held $(jq -r '.route.pace.held' "$D/doc.json")"
-jq -r --arg a "$ARC" '[.plans[] | select(.arc==$a)] | "plans of that epic: \(length) | showing a pace hold: \([.[]|select(.pace_hold!="")]|length) | showing the queued cut badge: \([.[]|select(.planner.verb=="cut" and .planner.state=="queued")]|length)"' "$D/doc.json"
-~/.claude/scripts/dispatcher override "$ARC" --by app:card 2>&1 | grep -v 'started no daemon'
-INNER
-cd "$D" && bash "$D/p.sh"; cd /tmp; case "$D" in /tmp/athena-probe-arccut.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-expect: `held 1` (or more), `showing a pace hold: 0 | showing the queued cut badge: 1`, and `no plan <arc>` while the gap stands; cured when the epic's plan(s) carry the clause and the press reaches the row
-```
-
-measured 2026-10-21 by chain chain-plan-card-override-20261021-171051-2000, finding M1, MEDIUM
-probe-key: cd6795e3adf079267c3d7e77181f20b3946c2453
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.sh, /home/lyphe/.claude/hooks/dispatcher/pace_demand.py, /home/lyphe/.claude/hooks/dispatcher/pace_report.py
-
-## INV-9265 — probe — MEDIUM — the manuals now state three things this change made false, and carry no row for the new surface
-
-MEDIUM — the manuals now state three things this change made false, and carry no row for the new surface
-
-```probe
-cd /home/lyphe/.claude && echo "dispatcher MANUAL: planner_hold=$(grep -c 'planner_hold' hooks/dispatcher/MANUAL.md) overridden-key=$(grep -c 'plan_dict.overridden\|`overridden`' hooks/dispatcher/MANUAL.md) | stale pace_hold sentence=$(grep -c "for the plan's first ready phase, asked only while the plan is" hooks/dispatcher/MANUAL.md)"; echo "CloudCLI docs: override-off=$(grep -c 'override-off' claudecodeui_lyphe/docs/MANUAL.md) data-dispatcher-override=$(grep -c 'data-dispatcher-override' claudecodeui_lyphe/docs/MANUAL.md) PaceOverride=$(grep -c 'PaceOverride' claudecodeui_lyphe/docs/MANUAL.md) | 'NEVER A PRESS'=$(grep -c "THE PACER'S HOLD IS NEVER A PRESS" claudecodeui_lyphe/docs/MANUAL.md) | 'twenty-three routes'=$(grep -c 'twenty-three routes' claudecodeui_lyphe/docs/MANUAL.md)"
-echo "[probe exit $?]"
-expect: today `planner_hold=0 overridden-key=0 | stale pace_hold sentence=2` (two places state it) and `override-off=0 data-dispatcher-override=0 PaceOverride=0 | 'NEVER A PRESS'=1 | 'twenty-three routes'=1`; cured: the first three > 0 and the last three 0 (stale ones), the stale-sentence count reads 0
-```
-
-measured 2026-10-21 by chain chain-plan-card-override-20261021-171051-2000, finding M2, MEDIUM
-probe-key: bd0bbfc8200e40beee0dd68d62c64ec254450f88
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.sh, /home/lyphe/.claude/hooks/dispatcher/pace_demand.py, /home/lyphe/.claude/hooks/dispatcher/pace_report.py
 
@@ -24638,3 +24524,130 @@ measured 2026-11-03 by chain chain-usage-limits--gemini-feature-id--browser-door
 probe-key: 2c277fb5ec5a1afd05166a2214186bd87f35336c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/browser-use/browser-use-budget-follow.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/browser-use/browser-use-budget.ts
+
+## INV-10780 — probe — MEDIUM — a hold on a FINISHED subject shows its clause, and its Override is refused
+
+MEDIUM — a hold on a FINISHED subject shows its clause, and its Override is refused
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-rejudge.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(cd "$(dirname "$0")" && pwd)
+mkdir -p "$D/state" "$D/pacer" "$D/work" "$D/ledger" "$D/runner" || exit 1
+cp ~/.claude/state/pacer/rates.json "$D/pacer/" || exit 1
+git init -q "$D/work" || exit 1
+printf 'paused no\n' > "$D/epics.flag"; printf 'off\n' > "$D/flash.flag"; printf 'off\n' > "$D/features.flag"
+export DISPATCHER_HOME="$D/state" PLAN_RUNNER_PACER_HOME="$D/pacer" DISPATCHER_EPICS_FLAG_PATH="$D/epics.flag"
+export PLAN_RUNNER_DEEPSEEK_FEATURES_FLAG_PATH="$D/features.flag" PLAN_RUNNER_DEEPSEEK_FLAG_PATH="$D/flash.flag"
+export EXECUTE_LEDGER_STATE_DIR="$D/ledger" PLAN_RUNNER_STATE_DIR="$D/runner" PYTHONPATH=/home/lyphe/.claude/hooks PYTHONDONTWRITEBYTECODE=1
+unset CLAUDE_CODE_SESSION_ID DISPATCHER_SESSION PLAN_RUNNER_DEEPSEEK DISPATCHER_SCRATCH_DAEMON
+cat > "$D/build.py" <<'PY'
+import os, sys, time
+sys.path.insert(0, "/home/lyphe/.claude/hooks")
+from dispatcher import loader, store, store_write, store_roadmap
+from plan_runner import claude_account
+from plan_runner.pacer import readings
+D = os.path.dirname(os.path.abspath(__file__)); W = D + "/work"
+now = time.time(); who = claude_account.current()
+readings.note(who, {"five": 0.30, "five_resets": (int(now // 3600) + 3) * 3600.0, "week": 0.995,
+                    "week_resets": (int(now // 86400) + 4) * 86400.0, "status": "allowed"}, source="athena", at=now)
+def load(text, name):
+    path = f"{D}/{name}.toml"; open(path, "w").write(text)
+    code, line = loader.load_file(path)
+    if code: raise SystemExit(f"load {name}: {line}")
+def design(p):
+    load(f'[design]\nplan = "{p}"\nrepo = "{W}"\ngoal = "g"\ndelivers = "d"\narchitecture = "a"\ninterfaces = "i"\nconstraints = "c"\nwaits_on = []\n', f"d-{p}")
+    load(f'[plan]\nname = "{p}"\n\n[[phase]]\nkey = "one"\ntitle = "t"\ngoal = "g"\nassignee = "hephaestus"\nwaits_on = []\nstart_here = ["x.py:1"]\n', f"p-{p}")
+c = store.connect()
+with c:
+    store_roadmap.add_roadmap(c, "rm", title="rm", goal=None); store_roadmap.add_milestone(c, "ms", roadmap="rm", title="ms", goal=None)
+    store_roadmap.add_arc(c, "rj", milestone="ms", title="t", goal="g", repo=W)
+c.close()
+load(f'[arc]\nname = "rj"\nrepo = "{W}"\ngoal = "g"\narchitecture = "a"\ndelivers = "d"\n\n[[plan]]\nname = "r1"\nwaits_on = []\ntitle = "t"\n\n[[plan]]\nname = "r2"\nwaits_on = []\ntitle = "t"\n', "arc-rj")
+for p in ("r1", "r2"): design(p)
+c = store.connect()
+with c:
+    for p in ("r1", "r2"): store_write.approve(c, p, by="cli", paused=False)
+    for p in ("r1", "r2"):
+        c.execute("UPDATE phases SET status='done' WHERE plan_id=(SELECT id FROM plans WHERE name=?)", (p,)); store_write.mark_complete(c, p)
+    c.execute("UPDATE phases SET status='done' WHERE plan_id=(SELECT id FROM plans WHERE name='rj--judgment')")
+    store_write.mark_complete(c, "rj--judgment")
+c.close()
+PY
+python3 "$D/build.py" || { echo "[build failed]"; exit 1; }
+DSP=/home/lyphe/.claude/scripts/dispatcher
+$DSP judge rj 2>&1 | grep -v 'no daemon'
+$DSP status --json 2>/dev/null | jq -r '.arcs[] | select(.name=="rj") | "arc rj: status=\(.status) pace_hold=\(if .pace_hold=="" then "none" else "SET" end) overridden=\(.overridden)"'
+$DSP status --json 2>/dev/null | jq -r '"route.pace.held=\(.route.pace.held)"'
+$DSP override rj --by app:card 2>&1 | grep -v 'no daemon'
+EOF
+bash "$D/p.sh"
+echo "[probe exit $?]"
+cd /tmp; case "$D" in /tmp/athena-probe-rejudge.??????) rm -r "$D";; esac
+# expect: `arc rj: status=complete pace_hold=SET overridden=false`, `route.pace.held=1`, `REFUSED override rj: rj is complete — nothing of it is left to start` while the gap stands; cured: the press answers `OVERRIDDEN rj …` (or the arc shows no pace_hold)
+```
+
+measured 2026-11-04 by chain chain-pace-override-every-hold-20261104-070306-9181, finding M1, MEDIUM
+probe-key: e834146355f9fd87d5c27f4abc7c49fc4c6df6d5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/cmd/override.py, /home/lyphe/.claude/hooks/dispatcher/report.py, /home/lyphe/.claude/hooks/dispatcher/store_override.py
+
+## INV-10781 — probe — MEDIUM — two sentences still state the queue-then-pace rule the cure deleted (and one contradicts its own paragraph)
+
+MEDIUM — two sentences still state the queue-then-pace rule the cure deleted (and one contradicts its own paragraph)
+
+```probe
+D=$(mktemp -d); cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude
+echo "queue-first sentence #1 (MAN-8419): $(grep -c 'with `pace_hold` null while `queue_hold` is set' hooks/dispatcher/MANUAL.md)"
+echo "queue-first sentence #2 (MAN-8692): $(grep -c 'asks `plan_hold` only while `queue_hold` is unset' hooks/dispatcher/MANUAL.md)"
+EOF
+bash "$D/p.sh"
+echo "[probe exit $?]"; cd /tmp; case "$D" in /tmp/tmp.??????????) rm -r "$D";; esac
+# expect: `sentence #1 (MAN-8419): 1` and `sentence #2 (MAN-8692): 1` while stale; cured: 0 and 0
+```
+
+measured 2026-11-04 by chain chain-pace-override-every-hold-20261104-070306-9181, finding M2, MEDIUM
+probe-key: e00227b39dbc81262e8132f4fd20a0ec0569b662
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/cmd/override.py, /home/lyphe/.claude/hooks/dispatcher/report.py, /home/lyphe/.claude/hooks/dispatcher/store_override.py
+
+## INV-10782 — probe — LOW — the `status` text-face bullet and the verbs row disagree about the epic's pacer line
+
+LOW — the `status` text-face bullet and the verbs row disagree about the epic's pacer line
+
+```probe
+D=$(mktemp -d); cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude
+echo "status row names the epic's line: $(grep 'Override line: a plan carrying' hooks/dispatcher/MANUAL.md | grep -c 'epic')"
+echo "status.py prints one under an epic: $(grep -c 'arc=True' hooks/dispatcher/cmd/status.py)"
+EOF
+bash "$D/p.sh"
+echo "[probe exit $?]"; cd /tmp; case "$D" in /tmp/tmp.??????????) rm -r "$D";; esac
+# expect: `status row names the epic's line: 0`, `status.py prints one under an epic: 1` while the row is silent; cured: first line ≥ 1
+```
+
+measured 2026-11-04 by chain chain-pace-override-every-hold-20261104-070306-9181, finding L1, LOW
+probe-key: 69dc31bd5d7c7e6c380d84cac69d8d8bd909687e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/cmd/override.py, /home/lyphe/.claude/hooks/dispatcher/report.py, /home/lyphe/.claude/hooks/dispatcher/store_override.py
+
+## INV-10783 — probe — LOW (outside TARGET, not edited) — `cmd/override.py`'s module docstring still states the deleted reach
+
+LOW (outside TARGET, not edited) — `cmd/override.py`'s module docstring still states the deleted reach
+
+```probe
+D=$(mktemp -d); cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude
+echo "override.py docstring keeps the old reach: $(grep -c 'goes while ANY open plan of it carries the override' hooks/dispatcher/cmd/override.py)"
+echo "pace_demand marks epic rows from the epic's own override: $(grep -c 'lifted = past | _overridden_arcs' hooks/dispatcher/pace_demand.py)"
+EOF
+bash "$D/p.sh"
+echo "[probe exit $?]"; cd /tmp; case "$D" in /tmp/tmp.??????????) rm -r "$D";; esac
+# expect: `override.py docstring keeps the old reach: 1`, `pace_demand marks epic rows from the epic's own override: 1` while stale; cured: 0 and 1
+```
+
+measured 2026-11-04 by chain chain-pace-override-every-hold-20261104-070306-9181, finding L2, LOW
+probe-key: 6ca7f12b7f59070aae14ebe0e23c74ea37106fc3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/cmd/override.py
