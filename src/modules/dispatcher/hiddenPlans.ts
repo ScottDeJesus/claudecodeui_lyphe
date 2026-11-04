@@ -60,7 +60,7 @@ import type { DispatcherPlan, PreferenceEntryPatch } from '@/shared/types';
  * The lane only carries a finished plan for a day, so a dismissal is pruned soon after its plan leaves.
  * The lane handed in is the WHOLE lane, put-away plans included (`carriedNames`). Pruning against the
  * drawn cards would drop every earlier entry the moment a second was made. A plan name is a slug alone
- * (`^[a-z0-9][a-z0-9-]{0,99}$`, `hooks/dispatcher/store.py`), so nothing else can be addressed here.
+ * (`store.NAME_RE` in `hooks/dispatcher/store.py`, MAN-1445), so nothing else can be addressed here.
  *
  * `usePutAwayEntries` hands React a STABLE array: `useSyncExternalStore` compares snapshots by
  * identity, and a getter that rebuilt the list on every call would report a change on every render and

@@ -24419,3 +24419,125 @@ measured 2026-11-03 by chain chain-turn-error-result-shown-20261103-151239-a3a7,
 probe-key: 41c889fbd67bf214dfc102b1825e8bda386b679e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/focus-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-error-result.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime-signals.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-error-result.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-error-result-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-error-result.sh
+
+## INV-10751 — probe — MEDIUM — the reservation misses the derived `<arc>--judgment` plan name: arcs `session` and `chain` are legal and complete into `session--judgment` / `chain--judgment`
+
+MEDIUM — the reservation misses the derived `<arc>--judgment` plan name: arcs `session` and `chain` are legal and complete into `session--judgment` / `chain--judgment`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+export DISPATCHER_HOME="$D/home" XDG_RUNTIME_DIR="$D/xdg"
+mkdir -p "$DISPATCHER_HOME" "$D/repo" && git -C "$D/repo" init -q
+cat > "$D/p.py" <<'PY'
+import sys
+D = sys.argv[1]
+sys.path.insert(0, "/home/lyphe/.claude/hooks")
+from dispatcher import store
+conn = store.connect()
+def step(label, fn):
+    try:
+        with conn:
+            fn()
+        return True
+    except Exception as e:
+        print(f"{label}: refused — {type(e).__name__}: {str(e)[:120]}")
+        return False
+for arc in ("session", "chain"):
+    ok = (step("add_roadmap", lambda: store.add_roadmap(conn, f"rm-{arc}", title="t", goal="g"))
+          and step("add_milestone", lambda: store.add_milestone(conn, f"ms-{arc}", roadmap=f"rm-{arc}", title="t", goal="g"))
+          and step(f"add_arc {arc}", lambda: store.add_arc(conn, arc, milestone=f"ms-{arc}", title="t", goal="g", repo=D + "/repo")))
+    if not ok:
+        continue
+    def finish():
+        arc_id = store.open_arc(conn, arc, repo=D + "/repo", goal="g", architecture="a", delivers="d", session="athena-probe")
+        for n in ("one", "two"):
+            store.open_plan(conn, f"{n}-of-{arc}", repo=D + "/repo", session="athena-probe", arc_id=arc_id)
+            store.record_founding(conn, f"{n}-of-{arc}", arc, by="athena-probe", count=2)
+        for n in ("one", "two"):
+            store.mark_complete(conn, f"{n}-of-{arc}")
+    step(f"complete {arc}", finish)
+names = [r["name"] for r in conn.execute("select name from plans where name like '%--judgment'")]
+print("judgment plans minted:", names or "none")
+for n in names:
+    print(n, "passes NAME_RE:", bool(store.NAME_RE.fullmatch(n)))
+PY
+python3 -I "$D/p.py" "$D"
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-11-03 by chain chain-usage-limits--gemini-feature-id--plan-names-20261103-171311-38d6, finding M1, MEDIUM
+probe-key: 89c5110d85ecb9b5d8ef5020d50f9d9efb7242e9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/hooks/dispatcher/store_roadmap.py, /opt/shadow-connector/core/gemini_budget/attribution.py
+
+## INV-10752 — probe — MEDIUM — a TITLE mints a reserved name, the add is refused about a name the operator never typed, and the app has no name field to get out
+
+MEDIUM — a TITLE mints a reserved name, the add is refused about a name the operator never typed, and the app has no name field to get out
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+export DISPATCHER_HOME="$D/home" XDG_RUNTIME_DIR="$D/xdg"
+unset CLAUDE_CODE_SESSION_ID
+mkdir -p "$DISPATCHER_HOME" "$XDG_RUNTIME_DIR"
+DP=/home/lyphe/.claude/scripts/dispatcher
+$DP roadmap add roadmap r1 --title t | head -1
+for t in "Session picker" "Chain of custody" "Production" "Sessions"; do
+  echo "title: $t"
+  $DP roadmap add milestone --roadmap r1 --title "$t" 2>&1 | head -1 | cut -c1-150
+done
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-11-03 by chain chain-usage-limits--gemini-feature-id--plan-names-20261103-171311-38d6, finding M2, MEDIUM
+probe-key: 53730f060fa2bbe8d456a3ec535e66865fa1aec5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/hooks/dispatcher/store_roadmap.py, /opt/shadow-connector/core/gemini_budget/attribution.py
+
+## INV-10753 — probe — LOW — statements of the plan-name rule that the change made false stay in the tree
+
+LOW — statements of the plan-name rule that the change made false stay in the tree
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude
+grep -n "interior dashes" skills/feature/SKILL.md skills/roadmap/SKILL.md | cut -c1-140
+echo "MAN-5636 PLAN_NAME old-pattern lines: $(grep -c "PLAN_NAME. is the dispatcher's own name rule" claudecodeui_lyphe/docs/MANUAL.md)"
+grep -n "fences every name with" claudecodeui_lyphe/server/modules/dispatcher/dispatcher-card-text.service.ts | cut -c1-140 || true
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-11-03 by chain chain-usage-limits--gemini-feature-id--plan-names-20261103-171311-38d6, finding L1, LOW
+probe-key: 43a43f1ba5cbb8e1ad448cd4efa9777842eacbe8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/hooks/dispatcher/store_roadmap.py, /opt/shadow-connector/core/gemini_budget/attribution.py
+
+## INV-10754 — probe — LOW — five refusals print the lookahead regex where one sibling now prints the rule's words
+
+LOW — five refusals print the lookahead regex where one sibling now prints the rule's words
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+export DISPATCHER_HOME="$D/home" XDG_RUNTIME_DIR="$D/xdg"
+unset CLAUDE_CODE_SESSION_ID
+mkdir -p "$DISPATCHER_HOME" "$XDG_RUNTIME_DIR"
+DP=/home/lyphe/.claude/scripts/dispatcher
+$DP design session-x 2>&1 | head -1
+$DP roadmap add roadmap session-x --title t 2>&1 | head -1 | cut -c1-200
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-11-03 by chain chain-usage-limits--gemini-feature-id--plan-names-20261103-171311-38d6, finding L2, LOW
+probe-key: bcd50591d0ca17e113b7ed62fb7cc3df7c7b425a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/hooks/dispatcher/store_roadmap.py, /opt/shadow-connector/core/gemini_budget/attribution.py
