@@ -71,7 +71,7 @@ export type LaneRequest = {
   /** The signed-in operator's name, or null when the request carried none. */
   actingUser: string | null;
   /**
-   * The Gemini budget to carry as `X-Gemini-Budget-Plan`, from `relayBudget` over the inbound request; null
+   * The Gemini budget to carry as `X-Gemini-Budget-Plan`, from `relayBudgetOf` over the inbound request; null
    * carries none. The names and the rule live in shadow-connector's `core/gemini_budget/attribution.py`.
    */
   budget: string | null;

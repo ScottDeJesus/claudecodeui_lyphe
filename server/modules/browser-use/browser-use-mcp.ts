@@ -62,20 +62,28 @@ function ownGeminiBudgetId(env: NodeJS.ProcessEnv): string {
   return (env.CLAUDECODE ?? '').trim() ? '' : 'production';
 }
 
+// What one header line can carry. A hand-set value outside it (the house's own names are [a-z0-9-] and a
+// session id) is refused by name, as _restorly_auth.mjs refuses a line break, and not left to fail as a
+// ByteString error or a cut-off reply.
+const HEADER_SAFE_ID = /^[\x20-\x7e]{1,512}$/;
+
 async function callBrowserUseApi(toolName: string, input: Record<string, unknown>) {
   if (!apiToken) {
     throw new Error('CLOUDCLI_BROWSER_USE_MCP_TOKEN is not configured.');
   }
 
-  // Read at each call, like the rule's own() in the backend; a header cannot carry a line break, so a value
-  // with one is not sent.
+  // Read at each call, like the rule's own() in the backend.
   const geminiBudgetId = ownGeminiBudgetId(process.env);
+  if (geminiBudgetId && !HEADER_SAFE_ID.test(geminiBudgetId)) {
+    const source = (process.env.GEMINI_BUDGET_PLAN ?? '').trim() ? 'GEMINI_BUDGET_PLAN' : 'CLAUDE_CODE_SESSION_ID';
+    throw new Error(`${source} holds a value a header cannot carry (a line break, a character outside printable ASCII, or more than 512 characters) — nothing sent`);
+  }
   const response = await fetch(`${apiUrl}/tools/${encodeURIComponent(toolName)}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiToken}`,
       'Content-Type': 'application/json',
-      ...(geminiBudgetId && !/[\r\n]/.test(geminiBudgetId) ? { [GEMINI_BUDGET_HEADER]: geminiBudgetId } : {}),
+      ...(geminiBudgetId ? { [GEMINI_BUDGET_HEADER]: geminiBudgetId } : {}),
     },
     body: JSON.stringify(input),
     signal: AbortSignal.timeout(API_TIMEOUT_MS),

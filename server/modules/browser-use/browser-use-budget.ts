@@ -1,6 +1,8 @@
 import net from 'node:net';
 import os from 'node:os';
 
+import { sendRequestWithBudget } from './browser-use-budget-follow.js';
+
 // The header that carries a Gemini budget's ID. Its home is
 // /opt/shadow-connector/core/gemini_budget/attribution.py (PLAN_HEADER), whose docstring states every name.
 // Consumer: browser-use-mcp.routes.ts reads it off each MCP tool call.
@@ -52,7 +54,8 @@ function hostIsOnThisBox(hostname: string): boolean {
   if (address === null) {
     return false;
   }
-  if (address.startsWith('127.') || address === '::1') {
+  // The unspecified addresses reach this box on Linux, and scripts/curl counts 0.0.0.0 as this box too.
+  if (address.startsWith('127.') || address === '::1' || address === '0.0.0.0' || address === '::') {
     return true;
   }
   return Object.values(os.networkInterfaces()).some((entries) => (
@@ -69,10 +72,42 @@ function urlIsOnThisBox(rawUrl: string): boolean {
   }
 }
 
+// The request's headers for a hop bound for `url`: the page's own budget header never survives, and the
+// session's ID is on the hop only when `url` is on this box.
+function headersForHop(url: string, headers: Record<string, string>, budgetId: string): Record<string, string> {
+  const edited: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (name.toLowerCase() !== GEMINI_BUDGET_HEADER.toLowerCase()) {
+      edited[name] = value;
+    }
+  }
+  if (urlIsOnThisBox(url)) {
+    edited[GEMINI_BUDGET_HEADER] = budgetId;
+  }
+  return edited;
+}
+
+// A stream is answered by Chromium itself: a buffered fetch would hold its first chunk until its last. Its
+// request therefore goes out with the header added, and if its server redirects it, Playwright replays that
+// header list onto the hop (see browser-use-budget-follow.ts). Measured: the apps this browser drives open
+// their streams as EventSource.
+function isStream(request: any): boolean {
+  return request.resourceType() === 'eventsource' || /text\/event-stream/i.test(request.headers().accept ?? '');
+}
+
 // Called by browser-use.service.ts for every new agent context, both kinds (a persistent profile's and a
-// temporary one's): one route that adds the session's budget ID to each request bound for this box and lets
-// every other request go out untouched. The ID is read at request time, so a later tool call's ID applies from
-// that call on.
+// temporary one's): one route that sends each request bound for this box with the session's budget ID, hop by
+// hop (browser-use-budget-follow.ts), and lets every other request go out untouched. The ID is read at request
+// time, so a later tool call's ID applies from that call on.
+//
+// KNOWN LIMITS (measured in real Chromium):
+//   * a redirect's hop is a request Playwright does not route: the one a navigation makes, and any made by a
+//     request to another host, goes out as Chromium sends it, with no ID, so a redirect INTO this box lands
+//     without one; the next request the page makes is routed again;
+//   * a stream's redirect hop carries the header, as above;
+//   * a request other than a navigation that this box's server redirects resolves with the final response, so
+//     the page's `response.url` and `redirected` read as if no redirect happened, and a response from another
+//     origin reaches the page without the CORS check a browser would have made.
 export async function installBudgetRoute(
   sessionId: string,
   context: { route: (url: string, handler: (route: any) => Promise<void>) => Promise<void> },
@@ -83,17 +118,12 @@ export async function installBudgetRoute(
     const request = route.request();
     const budgetId = budgetBySession.get(sessionId) ?? null;
     try {
-      if (budgetId && urlIsOnThisBox(request.url())) {
-        const headers: Record<string, string> = {};
-        for (const [name, value] of Object.entries(request.headers() as Record<string, string>)) {
-          if (name.toLowerCase() !== GEMINI_BUDGET_HEADER.toLowerCase()) {
-            headers[name] = value;
-          }
-        }
-        headers[GEMINI_BUDGET_HEADER] = budgetId;
-        await route.continue({ headers });
-      } else {
+      if (!budgetId || !urlIsOnThisBox(request.url())) {
         await route.continue();
+      } else if (isStream(request)) {
+        await route.continue({ headers: headersForHop(request.url(), request.headers(), budgetId) });
+      } else {
+        await sendRequestWithBudget(route, (url, headers) => headersForHop(url, headers, budgetId));
       }
     } catch (error) {
       console.warn('[Browser] Budget route could not continue', request.url(), error);

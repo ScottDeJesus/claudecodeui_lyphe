@@ -1,3 +1,4 @@
+import type { IncomingHttpHeaders } from 'node:http';
 import net from 'node:net';
 
 /**
@@ -11,7 +12,10 @@ import net from 'node:net';
  * must carry the ID or say nothing, never guess.
  *
  *  - a client off this box is a person → `production`; whatever header it sent is ignored, because the
- *    budgets belong to this box's souls and a person must not be able to spend one by sending its name;
+ *    budgets belong to this box's souls and a person must not be able to spend one by sending its name.
+ *    A request that came through a reverse proxy's front is a person too, though its socket is this box's:
+ *    `tailscale serve` (`https://eis1.…ts.net` → :5183) dials from 127.0.0.1, so only the stamp the front
+ *    writes on every request (`isFronted`) tells him from a soul;
  *  - a client on this box with a clean header is a soul → that header, unchanged;
  *  - a client on this box with none → `null`, and nothing is carried. The connector then answers a request
  *    that reaches Gemini with its own refusal, which the sender can always fix.
@@ -22,12 +26,22 @@ import net from 'node:net';
 
 /**
  * The header a budget travels in. Consumers: `vite.config.js` (the `/api` proxy sets it) and the lane
- * forwarder and router in this directory (the forwarder sends it, the router reads the caller's).
+ * forwarder in this directory (it sends it).
  */
 export const BUDGET_HEADER = 'X-Gemini-Budget-Plan';
 
 /** The budget of work outside the caps: what a person off this box is always judged as. */
 const PRODUCTION_BUDGET = 'production';
+
+/**
+ * What a reverse proxy's front writes on every request it forwards, lower-cased (its home is attribution.py's
+ * `_FRONT_STAMP`). Measured 2026-11-03 on the
+ * live `tailscale serve` front (tcpdump on lo): `Tailscale-Headers-Info` (user-owned nodes only),
+ * `X-Forwarded-For` and `X-Forwarded-Host` (every node), and tailscaled REPLACES any copy the client sent. The
+ * names are read, never the values. A soul on this box that writes one is production, which is no more than
+ * writing the word `production`: forbidden by the house's law, not prevented.
+ */
+const FRONT_STAMP = ['tailscale-headers-info', 'x-forwarded-for', 'x-forwarded-host'] as const;
 
 type ParsedAddress = { text: string; family: 'ipv4' | 'ipv6' };
 
@@ -62,7 +76,7 @@ function sameAddress(first: ParsedAddress, second: ParsedAddress): boolean {
  * THE OFF-BOX TEST: is the client at `remoteAddress` not on this box? It is off the box when its address is
  * neither loopback nor equal to `localAddress`, the address it connected to — a process here that dials one of
  * the box's own addresses arrives from that same address. A missing or unparseable address (a unix socket)
- * counts as this box, on either side. Consumers: `relayBudget` below; exported because the design names the
+ * counts as this box, on either side. Consumer: `relayBudget` below; exported because the design names the
  * test as part of this module's surface, so a probe can ask it alone.
  */
 export function isOffBox(remoteAddress: string | null | undefined, localAddress: string | null | undefined): boolean {
@@ -72,28 +86,66 @@ export function isOffBox(remoteAddress: string | null | undefined, localAddress:
   return local !== null && !sameAddress(remote, local);
 }
 
+/**
+ * Did this request come through a reverse proxy's front? True when it carries any name of `FRONT_STAMP`; the
+ * stamp is stated in `core/gemini_budget/attribution.py` too, and the two lists are kept alike. Consumer:
+ * `relayBudgetOf` below; exported so a probe can ask the test alone.
+ */
+export function isFronted(headers: IncomingHttpHeaders): boolean {
+  return FRONT_STAMP.some((name) => headers[name] !== undefined);
+}
+
 /** The client's own header when it is usable: trimmed, not blank, and free of CR and LF. Else null. */
-function carriedHeader(header: string | string[] | null | undefined): string | null {
-  const value = (Array.isArray(header) ? header[0] : header)?.trim();
+function carriedHeader(header: string | null | undefined): string | null {
+  const value = header?.trim();
   return value !== undefined && value !== '' && !/[\r\n]/.test(value) ? value : null;
 }
 
 /**
  * The budget to carry on a hop to shadow-connector for one inbound request, or null to carry none. Its
- * addresses are the request's socket's (`remoteAddress`, `localAddress`) and `header` is the request's own
- * `X-Gemini-Budget-Plan`. Consumers: `vite.config.js` (the `/api` proxy of :5183 and :5184) and
- * `shadow-connector-lane-router.ts` (both lanes, so a caller that reaches the API's tailnet listener from off
- * the box is judged by the same rule).
+ * addresses are the request's socket's (`remoteAddress`, `localAddress`), `fronted` is whether it came through a
+ * reverse proxy's front (`isFronted`) and `header` is the request's own `X-Gemini-Budget-Plan`. Consumer:
+ * `relayBudgetOf` below, the one caller that builds these from a request.
  */
 export function relayBudget({
   remoteAddress,
   localAddress,
+  fronted,
   header,
 }: {
   remoteAddress: string | null | undefined;
   localAddress: string | null | undefined;
-  header: string | string[] | null | undefined;
+  fronted: boolean;
+  header: string | null | undefined;
 }): string | null {
-  if (isOffBox(remoteAddress, localAddress)) return PRODUCTION_BUDGET;
+  if (fronted || isOffBox(remoteAddress, localAddress)) return PRODUCTION_BUDGET;
   return carriedHeader(header);
+}
+
+/** The first `X-Gemini-Budget-Plan` of a request's raw header list: Node joins a doubled header with `, `, and the connector reads the first. */
+function firstBudgetHeader(rawHeaders: readonly string[]): string | undefined {
+  const wanted = BUDGET_HEADER.toLowerCase();
+  for (let index = 0; index + 1 < rawHeaders.length; index += 2) {
+    if (rawHeaders[index].toLowerCase() === wanted) return rawHeaders[index + 1];
+  }
+  return undefined;
+}
+
+/**
+ * `relayBudget` over an inbound Node request (an `http.IncomingMessage` or an express `Request`): its socket's
+ * addresses, its front stamp and its first budget header. Consumers: `vite.config.js` (the `/api` proxy of :5183 and
+ * :5184) and `shadow-connector-lane-router.ts` (both lanes, so a caller that reaches the API's tailnet listener from
+ * off the box is judged by the same rule).
+ */
+export function relayBudgetOf(request: {
+  socket: { remoteAddress?: string; localAddress?: string };
+  headers: IncomingHttpHeaders;
+  rawHeaders: readonly string[];
+}): string | null {
+  return relayBudget({
+    remoteAddress: request.socket.remoteAddress,
+    localAddress: request.socket.localAddress,
+    fronted: isFronted(request.headers),
+    header: firstBudgetHeader(request.rawHeaders),
+  });
 }

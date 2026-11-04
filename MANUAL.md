@@ -3965,7 +3965,11 @@ Consumers (each owns its allowlist, id rules and image type; none owns a transpo
 4. Usable means printable ASCII with no whitespace at either end (`USABLE_SECRET`): the gate compares bytes, and an HTTP stack trims a header's edges.
 5. A missing file or an unusable line logs one `[<label>] no usable internal secret in <file>: <cause>` line per distinct cause; never the line parsed, and never anything parsed from it.
 
-## Headers sent
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js
+
+## MAN-9522 — The shadow-connector lane forwarder — createShadowConnectorLane, the one read of — Headers sent
+section: The shadow-connector lane forwarder — createShadowConnectorLane, the one read of EIS_INTERNAL_SECRET (server/shared)/001 Headers sent
+
 | Header | Value |
 |---|---|
 | `X-Internal-Secret` | the secret |
@@ -3976,23 +3980,35 @@ Consumers (each owns its allowlist, id rules and image type; none owns a transpo
 
 A bytes route asks for `image/*` and not one type because the Tours lane's images are JPEGs and the bulletins lane's are PNGs; the forwarder does not know which, so it asks for any image, and each lane's router enforces its own type on the answer's Content-Type. Changed from `image/jpeg` on 2026-10-22 (the engine answers a PNG whatever `Accept` says, so this made the request truthful and changed no answer: a Tours image was byte-identical before and after).
 
-## The budget carried (`server/shared/gemini-budget-relay.ts`)
-A Gemini call the connector makes is counted against the budget its request names. This server is one hop on the way, and `relayBudget({ remoteAddress, localAddress, header })` is its whole share: a string to carry as `X-Gemini-Budget-Plan`, or `null` to carry nothing. The names, the relay rule and the off-box test are the connector package's, stated in MAN-8961 (home: `/opt/shadow-connector/core/gemini_budget/attribution.py`); this module spells them in TypeScript and restates none of them here. It imports node built-ins only, because two loaders read the one file: the Vite config (esbuild bundles it when Vite loads `vite.config.js`, which names it by its relative `.ts` path) and the server (tsx).
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js
+
+## MAN-9523 — The shadow-connector lane forwarder — createShadowConnectorLane, the one read of — The budget carried (`server/shared/gemini-budget-relay.ts`)
+section: The shadow-connector lane forwarder — createShadowConnectorLane, the one read of EIS_INTERNAL_SECRET (server/shared)/002 The budget carried (`server/shared/gemini-budget-relay.ts`)
+
+A Gemini call the connector makes is counted against the budget its request names. This server is one hop on the way, and `relayBudgetOf(request)` (`relayBudget({ remoteAddress, localAddress, fronted, header })` over a Node request's socket addresses, its front stamp and its FIRST `X-Gemini-Budget-Plan` from `rawHeaders`, as the connector reads it — Node joins a doubled header with `, `) is its whole share: a string to carry as `X-Gemini-Budget-Plan`, or `null` to carry nothing. The names, the relay rule and the off-box test are the connector package's, stated in MAN-8961 (home: `/opt/shadow-connector/core/gemini_budget/attribution.py`); this module spells them in TypeScript and restates none of them here. It imports node built-ins only, because two loaders read the one file: the Vite config (esbuild bundles it when Vite loads `vite.config.js`, which names it by its relative `.ts` path) and the server (tsx).
 
 | applied at | to | how |
 |---|---|---|
-| `vite.config.js` `/api` proxy: :5183 (dev) and :5184 (`vite preview`, which inherits `server.proxy`) | each browser request on its way to the API on :3011, judged by the browser's own socket | `proxyReq` sets the header to the answer, or removes the one the browser sent when the answer is null |
-| `createLaneRouter`'s handler (MAN-8908), so both lanes: Tours (MAN-8559, whose surface reaches Gemini vision) and Bulletins (MAN-8909) | each request a lane forwards, from `request.socket` and `request.get('X-Gemini-Budget-Plan')` | `LaneRequest.budget`; this forwarder sends it. A caller that reaches the API's tailnet listener (:3012) from off the box is judged by the same rule as the proxy's |
+| `vite.config.js` `/api` proxy: :5183 (dev) and :5184 (`vite preview`, which inherits `server.proxy`) | each browser request on its way to the API on :3011, judged by the browser's own socket | `proxyReq` sets the header to the answer, or removes the one the browser sent when the answer is null. The entry is an object, so it carries `changeOrigin: true` itself (Vite adds it only to a plain-string entry): the API sees its own Host |
+| `createLaneRouter`'s handler (MAN-8908), so both lanes: Tours (MAN-8559, whose surface reaches Gemini vision) and Bulletins (MAN-8909) | each request a lane forwards, from `relayBudgetOf(request)` | `LaneRequest.budget`; this forwarder sends it. A caller that reaches the API's tailnet listener (:3012) from off the box is judged by the same rule as the proxy's |
+
+A person on the operator's HTTPS name (`tailscale serve`, `https://eis1.…ts.net` → :5183) has a loopback socket, because tailscaled dials from 127.0.0.1; `isFronted(headers)` tells him from a soul by the front's stamp, and `relayBudget` answers `production` for it before it looks at any header (the stamp's names and measurement: MAN-8961, row 1 of the request rule; the relay keeps the same list).
 
 Why both: the API sees only the proxy's loopback socket for a browser request, which is this box, so the header the proxy left is the one the router trusts; a caller that skips the proxy shows its own socket to the router. `affected-areas.routes.ts` and `carrier-bulletins.routes.ts` hand the router a table and hold no request, so they carry nothing of this.
 
-Measured 2026-11-03 against a scratch `vite preview` on the real config and a scratch express app mounting the real forwarder and router, both aimed at an echo on 127.0.0.1: from the box with a header → that header; from the box with none (`/usr/bin/curl`) → no header sent; the box dialling its own tailnet address with a header → that header; a container on the docker bridge dialling 172.17.0.1, with or without a header → `production`.
+Measured 2026-11-03 against a scratch `vite preview` on the real config and a scratch express app mounting the real forwarder and router, both aimed at an echo on 127.0.0.1: from the box with a header → that header; from the box with none (`/usr/bin/curl`) → no header sent; the box dialling its own tailnet address with a header → that header; a container on the docker bridge dialling 172.17.0.1, with or without a header → `production`. Re-measured the same day on the live fronts with the real `vite preview` config: a loopback request carrying the front's stamp, with a forged header, none or a blank one → `production`; the same without the stamp → the header as sent, or nothing.
 
 Rules (they bind the file; INV-8633 holds them for both lanes)
 1. The secret is read from shadow-connector's env file at CALL time: `fs.stat` on every call, re-parse only when `mtimeMs` or `size` changed, so a rotation lands on the next request with no restart and no watcher. It is never written to `process.env`, this server's `.env`, a log line, an error message or a cache.
 2. Nothing is forwarded without it: a missing, empty, padded, non-ASCII or unclosed-quote secret answers `no_secret` (`CloudCLI could not read shadow-connector's internal secret`) and sends no request.
 3. Nothing throws. A lane fault is a RESULT; an upstream answer (404, 422, a refusal) is a RESULT carried whole.
 4. `fetch` runs `redirect: 'manual'`, so the secret header never follows a `Location`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js
+
+## MAN-9524 — The shadow-connector lane forwarder — createShadowConnectorLane, the one read of — `describeFailure` uses only an error's NAME and its cause's CODE, never its message: a transport
+section: The shadow-connector lane forwarder — createShadowConnectorLane, the one read of EIS_INTERNAL_SECRET (server/shared)/003 `describeFailure` uses only an error's NAME and its cause's CODE, never its message: a transport
+
 5. `describeFailure` uses only an error's NAME and its cause's CODE, never its message: a transport error can quote the request, and the request carries the secret.
 6. `X-Acting-User` is display only (the engine derives `origin` itself, R-CAP-21): non-printable characters become `?`, trimmed, at most 64 characters, absent when none.
 7. `X-Gemini-Budget-Plan` is `LaneRequest.budget` and nothing else: the forwarder never reads `process.env` for it, so a lane never spends under this server's own name (the agent sessions this server spawns inherit its environment).
@@ -4154,7 +4170,7 @@ Rules (they bind the file; a lane that needs different behaviour changes the def
 4. An upstream answer keeps its status and its JSON untouched, and carries back the response headers the lane named in `passHeaders` and no others. Only the lane's own faults carry a body of the lane's making, `{ error }`, and their statuses are fixed: `unreachable` 503, `unreadable` 502, `no_secret` 503. A fault the forwarder cannot name (an error thrown, not returned) is passed to `next(error)` and answered by the app's error handler, not by a body of the lane's own. why: turning a fault into a 200 with an empty body would replace the one useful thing in the answer, that nothing was read, with silence a screen shows as data; and a header the engine sets that a lane did not name (`Set-Cookie`, a `Location`) must not reach a browser by accident.
 5. A `bytes` route is relayed only on a 2xx, under its row's `image` when it names one (the Tours lane's plan drawing: an SVG) and the lane's `image` otherwise, and `Cache-Control: private, max-age=31536000, immutable` (the id is the sha256 of the bytes, so it never changes). A 2xx whose Content-Type is not that type, or whose first bytes are not `image.signature`, is `unreadable` (502 `shadow-connector did not answer with <image.noun>`). why: the Content-Type is the engine's word, and the bytes are what a browser would keep for a year. A non-2xx image answer is the engine's JSON, passed through (the forwarder reads bytes only on success).
 6. The acting user is read from `request.user.username` (the mount's `authenticateToken` set it) and sent as `X-Acting-User`, display only.
-7. The Gemini budget is `relayBudget` over the request's own socket and `X-Gemini-Budget-Plan` header, set as `LaneRequest.budget` here and nowhere else, so both lanes carry it and a caller that reaches the API's tailnet listener from off the box is judged by the same rule as the Vite proxy's (MAN-8863, "The budget carried").
+7. The Gemini budget is `relayBudgetOf` over the request's own socket, front stamp and `X-Gemini-Budget-Plan` header, set as `LaneRequest.budget` here and nowhere else, so both lanes carry it and a caller that reaches the API's tailnet listener from off the box is judged by the same rule as the Vite proxy's, and so is one that came through a reverse proxy's front (MAN-8863, "The budget carried").
 8. Routes here validate and translate and do nothing else: no secret read, no socket, no cache, no model call.
 
 Traps
