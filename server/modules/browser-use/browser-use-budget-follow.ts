@@ -23,8 +23,9 @@ const BODY_HEADERS = ['content-type', 'content-encoding', 'content-language', 'c
 // Called by browser-use-budget.ts for every request of a session bound for this box that is not a stream.
 // Sends the request with the session's ID, and follows each redirect with the ID on a hop that is on this box
 // and without it on a hop that is not (`hopHeaders` decides), dropping Authorization when the hop changes
-// origin, as a browser does. A navigation's redirect is handed back to Chromium, because the page's address must
-// change with it; the hop it makes is then not routed and carries no ID.
+// origin, as a browser does, and the first request's Cookie header on every hop. A navigation's redirect is
+// handed back to Chromium, because the page's address must change with it; the hop it makes is then not routed
+// and carries no ID.
 export async function sendRequestWithBudget(route: any, hopHeaders: HopHeaders): Promise<void> {
   const request = route.request();
   let url: string = request.url();
@@ -50,7 +51,9 @@ export async function sendRequestWithBudget(route: any, hopHeaders: HopHeaders):
       });
     } catch (error) {
       // The hop may already have reached its server, so Chromium is not offered the request again: it fails.
-      console.warn('[Browser] Budget route could not send', url, error);
+      // First line only: Playwright's message carries the whole call log, once per request still in flight when
+      // a context closes.
+      console.warn('[Browser] Budget route could not send', url, error instanceof Error ? error.message.split('\n')[0] : error);
       await route.abort('failed').catch(() => undefined);
       return;
     }
@@ -70,6 +73,11 @@ export async function sendRequestWithBudget(route: any, hopHeaders: HopHeaders):
       return;
     }
 
+    // The first request's Cookie header is the browser's own for the first URL. Playwright fills a request's
+    // Cookie from the context's jar only when it carries none, so this one must go before every hop: the jar then
+    // answers for the hop's own URL, set-cookies of the hop before included. Chromium sends a hop none of the
+    // first host's.
+    delete headers.cookie;
     if (next.origin !== new URL(url).origin) {
       delete headers.authorization;
     }

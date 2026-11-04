@@ -106,8 +106,15 @@ function isStream(request: any): boolean {
 //     without one; the next request the page makes is routed again;
 //   * a stream's redirect hop carries the header, as above;
 //   * a request other than a navigation that this box's server redirects resolves with the final response, so
-//     the page's `response.url` and `redirected` read as if no redirect happened, and a response from another
-//     origin reaches the page without the CORS check a browser would have made.
+//     the page's `response.url` and `redirected` read as if no redirect happened, and `redirect: 'manual'`
+//     resolves `basic` and `redirect: 'error'` resolves with the final response;
+//   * a response is fetched and then fulfilled, not a browser's own, so for any on-box request of a session with
+//     an ID: a cross-origin response reaches the page without the CORS check (Playwright adds the permissive
+//     headers to a fulfilled cross-origin response), the cookie jar answers whatever `credentials` or SameSite
+//     said, a fetch that streams under an Accept other than text/event-stream reaches the page at its last
+//     byte, a request the page abandons stays open at its server until the context closes, an
+//     EventSource that the server redirects to another origin fails, and a form POST's chosen file loses its
+//     bytes (no browser tool can choose one).
 export async function installBudgetRoute(
   sessionId: string,
   context: { route: (url: string, handler: (route: any) => Promise<void>) => Promise<void> },
