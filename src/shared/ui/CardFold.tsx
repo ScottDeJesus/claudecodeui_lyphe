@@ -28,8 +28,8 @@ import { cn } from '@/shared/utils';
  * a touch screen, or a window under 768 px) and the card's own tight 28px at a desk — the desktop header is a row of
  * 20px text and does not want a 44px button in it. The glyph stays small either way; only the pressable box changes.
  *
- * The toggle is drawn by the dispatcher's `LaneCardHead` — the one head of the plan card and the arc deck — and
- * the glyph alone by the chat's `ShapeFrame`.
+ * The toggle is drawn by the dispatcher's `LaneCardHead` — the one head of the plan card and the arc deck — and by the
+ * companion's `CompanionNotes`, at the end of her notes' count line; the glyph alone by the chat's `ShapeFrame`.
  */
 export function FoldChevron({ collapsed, className }: { collapsed: boolean; className?: string }) {
   return (
@@ -97,7 +97,7 @@ const INERT_WHILE_CLOSED = { inert: '', 'aria-hidden': true } as unknown as HTML
  *
  * Used by every fold whose hidden body holds words or controls: the dispatcher's `PlanCard`, `DeckFrame` and
  * `OverrideFold`, the Cerberus sheet's `DiagnosisPanel`, and the companion's `CompanionActionCard` (a round's
- * questions, folded behind one press).
+ * questions, folded behind one press) and `CompanionNotes` (her notes' cards, folded to their count line).
  */
 export function CardFoldBody({ children, className }: { children: ReactNode; className?: string }) {
   const { open } = useCollapsible();

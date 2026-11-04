@@ -2,6 +2,7 @@ import type { Router } from 'express';
 
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import { sessionlessEnv } from '@/shared/child-env.js';
+import type { DispatcherStoreWatch } from '@/shared/dispatcher-store-watch.service.js';
 import { createPolledLane } from '@/shared/polled-lane.service.js';
 import type { RoadmapAct, RoadmapPicture, RoadmapStateEvent } from '@/shared/roadmap-types.js';
 import { expandHome } from '@/shared/utils.js';
@@ -14,16 +15,17 @@ import { createRoadmapRouter } from './roadmap.routes.js';
 /**
  * The roadmap lane: the picture of what this host is building toward, and the nine words the operator
  * may say to it — the dispatcher lane's twin, kept as a module of its own because the roadmap is a
- * separate picture with its own cadence and its own consumers.
+ * separate picture with its own consumers.
  *
  * The dispatcher is the roadmap's OWN owner, exactly as it is the plans': the store, the words each
  * row reads as, the names and the refusals are all its. NOTHING HERE WRITES ANY OF IT, and nothing here
- * decides a word. The poll reads one document (`dispatcher roadmap show --json`), validates it field
+ * decides a word. The lane reads one document (`dispatcher roadmap show --json`), validates it field
  * by field, serves it, and relays a closed set of dispatcher verbs by argv with words this server
- * spelled itself; the dispatcher's sentence travels back untouched. A write pressed on the screen
- * pokes the lane, so its frame goes out within moments instead of at the next tick.
+ * spelled itself; the dispatcher's sentence travels back untouched. It reads when the store watch
+ * pokes it (`dispatcher-store-watch.service.ts`) and on a backstop; a write pressed on the screen
+ * pokes the lane too, so its frame goes out at once.
  *
- * It reads a second document, on request and never in the poll: one feature's active regression cases,
+ * It reads a second document, on request and never on the lane's own reading: one feature's active regression cases,
  * `cases list --plan <feature> --state active --json`, asked of the cases door (`CASES_BIN`, a binary
  * of its own) when the feature dialog opens and served by `GET /cases`. The cases door has its own
  * owner and its own words as well; this reads its answer the same way and keeps its sentence.
@@ -39,11 +41,14 @@ const DEFAULT_BIN = '~/.claude/scripts/dispatcher';
 const DEFAULT_CASES_BIN = '~/.claude/scripts/cases';
 
 /**
- * How often the document is read. `roadmap show` reads the store and no stage record, so it costs
- * about a fifth of a second on this host; two seconds is the dispatcher lane's own cadence, and a
- * write pressed on the screen does not wait for it (the poke).
+ * How long the lane goes without reading when nothing has poked it — the dispatcher lane's own
+ * backstop, for the same reason (`dispatcher.module.ts`). `roadmap show` reads the store, about ten
+ * thousand per-launch `result.json` (most of its CPU) and, for the few phases walking, their chain
+ * records and the walker's pid; the row's word `stalled` comes from the same grace-timed
+ * `report_stall` the dispatcher's cards use, so a walker killed with nothing left to write moves this
+ * picture with no write to announce it. A reading is half a second of CPU.
  */
-const POLL_MS = 2000;
+const BACKSTOP_MS = 60_000;
 
 /**
  * Wall-clock ceiling for one command, the read and the writes alike. A write may kick the daemon
@@ -59,7 +64,7 @@ const READ_TIMEOUT_MS = 20000;
 const FIRST_READ_WAIT_MS = 5000;
 
 /**
- * What `createRoadmapModule` hands the server entrypoint: the router to mount, the poll's `start` (after `listen`) and
+ * What `createRoadmapModule` hands the server entrypoint: the router to mount, the lane's `start` (after `listen`) and
  * `stop` (at shutdown), and `picture()`, the lane's picture behind `whenLanded` with the same bound as the router's
  * `current` — `null` while this boot's first reading has not landed. The entrypoint passes `picture` on to the
  * companion's house (`CompanionHouse.roadmap`), so her reads and the Roadmap tab are one reading.
@@ -71,7 +76,8 @@ export type RoadmapModule = {
   picture(): Promise<RoadmapPicture | null>;
 };
 
-export function createRoadmapModule(): RoadmapModule {
+/** `storeWatch` is the one watch both dispatcher lanes share; the server entrypoint builds it and starts it before either lane. */
+export function createRoadmapModule(storeWatch: DispatcherStoreWatch): RoadmapModule {
   const dependencies = {
     bin: expandHome(process.env.DISPATCHER_BIN || DEFAULT_BIN),
     timeoutMs: READ_TIMEOUT_MS,
@@ -97,8 +103,8 @@ export function createRoadmapModule(): RoadmapModule {
   };
 
   /**
-   * The lane's one door to the journal, and the one thing that bounds its volume: a read that fails
-   * every two seconds would bury the journal in copies of one line, so each distinct message is
+   * The lane's one door to the journal, and the one thing that bounds its volume: a read that keeps
+   * failing on every poke would bury the journal in copies of one line, so each distinct message is
    * said once for the life of the process. A document past `ROADMAP_MAX_BUFFER` is told as the
    * ceiling it crossed (`dispatcher-command.ts`'s `describeFailure`), one sentence for as long as it
    * stays too big, so it is said once too. This server has no logger; a module that must say
@@ -118,11 +124,11 @@ export function createRoadmapModule(): RoadmapModule {
     snapshot: () => readRoadmapState(dependencies),
     frame: (picture) => ({ kind: 'roadmap_state', ...picture, at: Date.now() }),
     // The read's own clock is stamped at second resolution on every read: compared whole, the
-    // picture would differ from itself on every tick and the lane would speak on every one of them.
+    // picture would differ from itself on every reading and the lane would speak after every one of them.
     // The frame still carries it (`frame` above), so this changes when the lane speaks, never what.
     serialize: (picture) => JSON.stringify({ ...picture, generated_at: undefined }),
     broadcast,
-    pollMs: POLL_MS,
+    backstopMs: BACKSTOP_MS,
     logError: logErrorOnce,
   });
 
@@ -141,10 +147,20 @@ export function createRoadmapModule(): RoadmapModule {
       }),
   });
 
+  let detach: (() => void) | null = null;
+
   return {
     router,
-    start: () => watcher.start(),
-    stop: () => watcher.stop(),
+    start: () => {
+      // Attached before the lane's first reading, so a write that lands during it is remembered as a poke.
+      detach ??= storeWatch.attach('roadmap', () => watcher.poke());
+      watcher.start();
+    },
+    stop: () => {
+      detach?.();
+      detach = null;
+      watcher.stop();
+    },
     picture: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
   };
 }

@@ -24651,3 +24651,462 @@ measured 2026-11-04 by chain chain-pace-override-every-hold-20261104-070306-9181
 probe-key: 6ca7f12b7f59070aae14ebe0e23c74ea37106fc3
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/cmd/override.py
+
+## INV-10788 — probe — a multi-word credential under a credential-named field reaches the model (INV-7153)
+
+a multi-word credential under a credential-named field reaches the model (INV-7153)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+cat > "$D/p.mts" <<'EOT'
+import { reportedLines } from '@/modules/cerberus/diagnosis/diagnosis-reported.js';
+const data = JSON.stringify({ db: { password: 'correct horse battery staple' }, api_key: 'sk-live-0123456789abcdef' });
+console.log(reportedLines(data).join('\n'));
+EOT
+cd /home/lyphe/.claude/claudecodeui_lyphe && cloudcli-tsx "$D/p.mts" 2>&1 | grep -v 'Migrated legacy\|^  from:\|^  to:\|^}\|Cerberus store' || echo none
+EOF
+bash "$D/p.sh" "$D"; cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--prompt-20261104-101031-7e0e, finding M1, MEDIUM
+probe-key: 304d8315347da075777d018c712cf93579572c75
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-leads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-reported.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-10789 — probe — an honest number or boolean under a credential-word name is masked: the field that explains a dark token poller reads `<masked>`
+
+an honest number or boolean under a credential-word name is masked: the field that explains a dark token poller reads `<masked>`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+cat > "$D/p.mts" <<'EOT'
+import { reportedLines } from '@/modules/cerberus/diagnosis/diagnosis-reported.js';
+// eis1/shadow-connector/xactimate_poller and xactimate_token, newest stored `data` of 2026-11-04
+const rows = [
+  '{"running":true,"poll_count":1,"total_updates":35,"last_poll":"2026-11-04T18:13:12.427669+00:00","age_seconds":655,"token_remaining_hours":7.6}',
+  '{"ttl_hours":7.6,"has_refresh_token":true,"auth_mode":"totp"}',
+];
+for (const data of rows) console.log(reportedLines(data).filter((l) => /token/.test(l)).join('\n'));
+EOT
+cd /home/lyphe/.claude/claudecodeui_lyphe && cloudcli-tsx "$D/p.mts" 2>&1 | grep -v 'Migrated legacy\|^  from:\|^  to:\|^}\|Cerberus store' || echo none
+EOF
+bash "$D/p.sh" "$D"; cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--prompt-20261104-101031-7e0e, finding M2, MEDIUM
+probe-key: f3fbcb8a0d2bec83bb1d7095bf62450ea4e33084
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-leads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-reported.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-10790 — probe — a cut at 240 can leave half a character in a line, and a lone surrogate in a stored field reaches the prompt as one
+
+a cut at 240 can leave half a character in a line, and a lone surrogate in a stored field reaches the prompt as one
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+cat > "$D/p.mts" <<'EOT'
+import { reportedLines } from '@/modules/cerberus/diagnosis/diagnosis-reported.js';
+const cut = reportedLines(JSON.stringify({ a: 'x'.repeat(239) + '\u{1F600}' }))[0];
+const lone = reportedLines('{"a":"\\ud800 x"}')[0];
+console.log('cut-through-a-pair well-formed:', cut.isWellFormed(), '| lone-surrogate well-formed:', lone.isWellFormed());
+EOT
+cd /home/lyphe/.claude/claudecodeui_lyphe && cloudcli-tsx "$D/p.mts" 2>&1 | grep -v 'Migrated legacy\|^  from:\|^  to:\|^}\|Cerberus store' || echo none
+EOF
+bash "$D/p.sh" "$D"; cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--prompt-20261104-101031-7e0e, finding L1, LOW
+probe-key: ae198040f2d7b312281de1dc44d42afcbe45d213
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-leads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-reported.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-10791 — probe — `.verify/cerberus-diagnosis-agent.mjs` hands `siblings: []` to the agent, so its proof runs a prompt the service never sends
+
+`.verify/cerberus-diagnosis-agent.mjs` hands `siblings: []` to the agent, so its proof runs a prompt the service never sends
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "const { check\(, siblings\)\? }\|siblings:" .verify/cerberus-diagnosis-agent.mjs || echo none
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--prompt-20261104-101031-7e0e, finding L2, LOW
+probe-key: 78eb15aa2d9bc834a793e1ae05d942a35336bd7f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-10792 — probe — the journal lead names the check's "since" when the check has none
+
+the journal lead names the check's "since" when the check has none
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+cat > "$D/p.mts" <<'EOT'
+import { leadLines } from '@/modules/cerberus/diagnosis/diagnosis-leads.js';
+import { buildDiagnosisSystemPrompt } from '@/modules/cerberus/diagnosis/diagnosis-prompt.js';
+const check: any = { node: 'eis1', key: 'shadow-connector/poller', service: 'shadow-connector', id: 'poller', label: 'WorkCenter poller', status: 'failing', stored: 'failing', value: null, since: null };
+const leads = leadLines(check, [], true);
+const p = buildDiagnosisSystemPrompt({ check, node: 'eis1', nodeToolsOpen: true, changes: [], measures: [], reported: null, leads, fixes: [], now: Date.now(), maxTurns: 24, readBudget: 16 });
+console.log(p.split('\n').filter((l) => l.startsWith('  since:') || l.includes('the journal: log_read')).join('\n'));
+EOT
+cd /home/lyphe/.claude/claudecodeui_lyphe && cloudcli-tsx "$D/p.mts" 2>&1 | grep -v 'Migrated legacy\|^  from:\|^  to:\|^}\|Cerberus store' || echo none
+EOF
+bash "$D/p.sh" "$D"; cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--prompt-20261104-101031-7e0e, finding L3, LOW
+probe-key: 130eec5c84076f3d9e4d29a2b11d800eb99c01b7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-leads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-reported.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-10793 — probe — five pinned probes of `cerberus-diagnoses.db.ts` now crash: `insert` is called without `by` (INV-7132, 7133, 7134, 7135, 7136)
+
+five pinned probes of `cerberus-diagnoses.db.ts` now crash: `insert` is called without `by` (INV-7132, 7133, 7134, 7135, 7136)
+
+```probe
+for t in INV-7132 INV-7133 INV-7134 INV-7135 INV-7136; do printf '%s: ' "$t"; docstore get "$t" --probe | bash 2>&1 | grep -c 'Missing named parameter'; done
+# expect: five lines each ending `: 1` while the rows call insert without by (measured 2026-11-04 18:23); each `: 0` once rewritten to pass by: 'you' or retired
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--store-20261104-101030-d060, finding L1, LOW
+probe-key: c389d7181ed470a73080fedd1438be044e981f96
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/check-trouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/cerberus-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-auto-diagnosis.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-diagnoses.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-results.db.ts
+
+## INV-10794 — probe — a trouble older than 90 days reaches back to a stale ok row; neither the header nor the report names the prune (latent until 2027-01-04)
+
+a trouble older than 90 days reaches back to a stale ok row; neither the header nor the report names the prune (latent until 2027-01-04)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-s25.XXXXXX) || exit 1
+case "$D" in /tmp/athena-probe-s25.*) ;; *) exit 1;; esac
+cat > "$D/q.mjs" <<'JS'
+const P = '/home/lyphe/.claude/claudecodeui_lyphe';
+const m = await import(P + '/server/modules/database/index.ts');
+const { lastOkAt, troubleDiagnoses } = await import(P + '/server/modules/cerberus/check-trouble.ts');
+const R = m.cerberusResultsDb, D = m.cerberusDiagnosesDb;
+const DAY = 864e5, now = Date.now(), K = 'scratch/long';
+const row = (at, status, prev, kind) => ({ node: 'eis1', check_key: K, at, source: null, seq: null, fetched_at: null, status, doc_status: null, value: null, data: null, took_ms: null, prev_at: null, prev_status: prev, kind });
+R.insert(row(now - 200 * DAY, 'ok', null, 'change'));
+for (let d = 199; d >= 101; d--) R.insert(row(now - d * DAY, 'ok', 'ok', 'keepalive'));
+R.insert(row(now - 100 * DAY, 'failing', 'ok', 'change'));
+D.insert({ id: 'press', node: 'eis1', check_key: K, asked_by: 'op', by: 'you', model: 'haiku', started_at: now - 150 * DAY });
+D.end('press', 'done', { endedAt: now - 150 * DAY + 10, summary: 's', evidence: '[]' });
+const age = () => ((now - lastOkAt('eis1', K)) / DAY).toFixed(0);
+console.log('before the daily prune: last ok', age(), 'days ago; trouble holds', JSON.stringify(troubleDiagnoses('eis1', K).map((r) => r.id)));
+R.pruneKeepalivesBefore(now - 90 * DAY);
+console.log('after the daily prune:  last ok', age(), 'days ago; trouble holds', JSON.stringify(troubleDiagnoses('eis1', K).map((r) => r.id)));
+JS
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+CERBERUS_DB_PATH="$D/c.db" DATABASE_PATH="$D/a.db" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/q.mjs" 2>&1 | grep -v '^Cerberus store'
+cd /tmp && rm -rf "$D"
+# expect: `before the daily prune: last ok 101 days ago; trouble holds []` then `after the daily prune:  last ok 200 days ago; trouble holds ["press"]` while it stands; cured, the second line reads `101 days ago` and `[]`
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--store-20261104-101030-d060, finding L2, LOW
+probe-key: 4474aa8121fec47f00eb8e3ccd65d055268933db
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/check-trouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/cerberus-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-auto-diagnosis.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-diagnoses.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-results.db.ts
+
+## INV-10817 — probe — LOW — the live-tab script presses a real ON on a check it never reads the status of, and its `finally` does not put the switch back
+
+LOW — the live-tab script presses a real ON on a check it never reads the status of, and its `finally` does not put the switch back
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -c "\.status\|status ===\|status !==\|'ok'" .verify/cerberus-auto-diagnosis-switch-shot.mjs || echo none
+cd /home/lyphe/.claude/claudecodeui_lyphe && awk '/^} finally \{/{f=1} f{print} /^}$/{if(f)exit}' .verify/cerberus-auto-diagnosis-switch-shot.mjs | grep -c "toggle\|click\|auto-diagnosis\|auto_diagnosis" || echo none
+# expect: both print 0 (or none) while the script has no green-check guard and no switch restore in `finally`; a fix prints a non-zero count on the first line (a status read) and on the second (a restore in the finally block)
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--fill-20261104-105956-525d, finding L1, LOW
+probe-key: 08290df78a3ed665bcf1ab278e1050298363f70d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosisVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-auto-diagnosis-switch-shot.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-auto-panel-shot.mjs
+
+## INV-10826 — probe — MEDIUM — at its least height the dock is a 17px strip: an action card waiting for his word (and the draft, walkthrough and notes) is out of sight
+
+MEDIUM — at its least height the dock is a 17px strip: an action card waiting for his word (and the draft, walkthrough and notes) is out of sight
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
+try {
+  await installCompanionKit(page);
+  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
+  await page.evaluate(() => { localStorage.setItem('companion-panel', JSON.stringify({ left: 300, top: 8, width: 320, height: 100 })); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('actionAnswer'); });
+  await page.waitForTimeout(600);
+  const r = await page.evaluate(() => {
+    const p = document.querySelector('[data-companion-panel]'); const d = p.querySelector('[data-companion-dock]').getBoundingClientRect(); const a = p.querySelector('[data-companion-action]').getBoundingClientRect();
+    const seen = Math.max(0, Math.min(a.bottom, d.bottom) - Math.max(a.top, d.top));
+    const buttons = [...p.querySelectorAll('[data-companion-action] button')];
+    return { panelHeight: Math.round(p.getBoundingClientRect().height), dockHeight: Math.round(d.height), actionHeight: Math.round(a.height), actionPxInSight: Math.round(seen), buttonsInSight: buttons.filter((b) => { const x = b.getBoundingClientRect(); return x.top >= d.top && x.bottom <= d.bottom; }).length, buttons: buttons.length };
+  });
+  await page.evaluate(() => localStorage.removeItem('companion-panel'));
+  console.log('at its least height with an action waiting:', JSON.stringify(r));
+} finally { await browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 120 node "$1/p.mjs" 2>&1 | tail -3
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `actionPxInSight` of the whole card and `buttonsInSight` equal to `buttons` (cured, a dock that shows the card at the least height); today {"panelHeight":259,"dockHeight":17,"actionHeight":399,"actionPxInSight":4,"buttonsInSight":0,"buttons":2}
+```
+
+measured 2026-11-04 by chain chain-kaylee-panel-move-resize-notes-fold-20261104-102647-b803, finding M1, MEDIUM
+probe-key: 31d056f9b2ca05c2a37c3ee840e70261dcba0632
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ResizeGrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+
+## INV-10827 — probe — MEDIUM — the right edge's 6px grip sits over 7 of the 10px of the log's and the notes' scrollbars: a press on the thumb's edge resizes the panel instead of scrolling
+
+MEDIUM — the right edge's 6px grip sits over 7 of the 10px of the log's and the notes' scrollbars: a press on the thumb's edge resizes the panel instead of scrolling
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false, launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } });
+try {
+  await installCompanionKit(page);
+  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
+  await page.evaluate(() => { localStorage.removeItem('companion-panel'); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
+  await page.waitForTimeout(600);
+  const info = await page.evaluate(() => {
+    const p = document.querySelector('[data-companion-panel]'); const right = p.getBoundingClientRect().right;
+    const log = p.querySelector('[role="log"]').parentElement; const r = log.getBoundingClientRect(); const y = Math.round((r.top + r.bottom) / 2);
+    const who = (inset) => { const e = document.elementFromPoint(right - inset, y); const g = e && e.closest('[data-companion-grip]'); return g ? `grip:${g.getAttribute('data-companion-grip')}` : 'scroller'; };
+    return { scrollbarPx: log.offsetWidth - log.clientWidth, answers: Object.fromEntries([2, 5, 7, 10, 14].map((i) => [`${i}px in`, who(i)])), right, y, width: Math.round(p.getBoundingClientRect().width), scrollTop: log.scrollTop };
+  });
+  await page.mouse.move(info.right - 3, info.y); await page.mouse.down(); await page.mouse.move(info.right - 123, info.y, { steps: 8 }); await page.mouse.up(); await page.waitForTimeout(300);
+  const after = await page.evaluate(() => ({ width: Math.round(document.querySelector('[data-companion-panel]').getBoundingClientRect().width) }));
+  await page.evaluate(() => localStorage.removeItem('companion-panel'));
+  console.log('scrollbar', info.scrollbarPx + 'px; who answers a press', JSON.stringify(info.answers), '| a press 3px in dragged 120px left: panel width', info.width, '->', after.width);
+} finally { await browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 120 node "$1/p.mjs" 2>&1 | tail -3
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: every `px in` up to the scrollbar's own width answers `scroller` and the width stays 400 (cured); today `scrollbar 10px; who answers a press {"2px in":"grip:right","5px in":"grip:right","7px in":"grip:right","10px in":"scroller","14px in":"scroller"} | … panel width 400 -> 320`
+```
+
+measured 2026-11-04 by chain chain-kaylee-panel-move-resize-notes-fold-20261104-102647-b803, finding M2, MEDIUM
+probe-key: d50692ab6a45af8dac15937ab42c6a2960759a8b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ResizeGrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+
+## INV-10828 — probe — LOW — the keyboard grip changes corner and drops the focus in the middle of a keyboard resize; no key moves the panel
+
+LOW — the keyboard grip changes corner and drops the focus in the middle of a keyboard resize; no key moves the panel
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
+try {
+  await installCompanionKit(page);
+  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
+  await page.evaluate(() => { localStorage.setItem('companion-panel', JSON.stringify({ left: 500, top: 50, width: 400, height: 600 })); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
+  await page.waitForTimeout(600);
+  await page.locator('[data-companion-panel] button.vv-resize-grip').focus();
+  const out = [];
+  for (let i = 1; i <= 4; i++) {
+    await page.keyboard.press('ArrowRight'); await page.waitForTimeout(120);
+    out.push(await page.evaluate((n) => { const a = document.activeElement; const r = document.querySelector('[data-companion-panel]').getBoundingClientRect(); return `#${n} width ${Math.round(r.width)} centre ${Math.round(r.left + r.width / 2)} focus ${a === document.body ? 'BODY' : a.getAttribute('aria-label')}`; }, i));
+  }
+  await page.evaluate(() => localStorage.removeItem('companion-panel'));
+  console.log(out.join(' | '));
+} finally { await browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 120 node "$1/p.mjs" 2>&1 | tail -3
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: every step's focus reads `Resize Kaylee's panel` (cured); today `#3 width 448 centre 724 focus BODY` and #4 stays at 448
+```
+
+measured 2026-11-04 by chain chain-kaylee-panel-move-resize-notes-fold-20261104-102647-b803, finding L1, LOW
+probe-key: 0b44738ba9d665d994f741be2dff7bdb28551747
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ResizeGrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+
+## INV-10830 — probe — `--mode off` presses the switch even when it already reads OFF, turning it ON (live write, no guard)
+
+`--mode off` presses the switch even when it already reads OFF, turning it ON (live write, no guard)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+awk "/the switch reads ON before the press/{v=NR} /await toggle.click\\(\\);/&&v&&!c{c=NR} END{ if (c==v+1) print \"guard between failed verdict and click: none\"; else print \"guard between failed verdict and click: present\" }" .verify/cerberus-auto-diagnosis-whole-live.mjs
+grep -n 'onClick' src/shared/ui/Switch.tsx
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: guard between failed verdict and click: none   (and Switch.tsx:26 onClick={() => onChange(!checked)})
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--whole-20261104-115437-97c3, finding M1, MEDIUM
+probe-key: 9c6c8f6a9426578ce2fead6f604d5a5fca4dd770
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-auto-diagnosis-whole-live.mjs
+
+## INV-10831 — probe — the 25-minute wait cannot reach the "three counted failures" it promises
+
+the 25-minute wait cannot reach the "three counted failures" it promises
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+retry=$(grep -oP 'AUTO_DIAGNOSIS_RETRY_MS = \K[0-9]+(?= \* 60_000)' server/modules/cerberus/auto-diagnosis-plan.ts)
+fails=$(grep -oP 'AUTO_DIAGNOSIS_FAILURES_PER_TROUBLE = \K[0-9]+' server/modules/cerberus/auto-diagnosis-plan.ts)
+wait=$(grep -oP 'WAIT_FOR_DONE_MS = \K[0-9]+(?= \* 60_000)' .verify/cerberus-auto-diagnosis-whole-live.mjs)
+echo "retry ${retry} min, counted failures ${fails}, script waits ${wait} min; the third failure cannot end before $(( (fails-1)*retry )) min"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: retry 15 min, counted failures 3, script waits 25 min; the third failure cannot end before 30 min
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--whole-20261104-115437-97c3, finding L1, LOW
+probe-key: 9740b88cf715847f4fc7d5add1d43fcd16a4e06b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-auto-diagnosis-whole-live.mjs
+
+## INV-10832 — probe — the journal verdict only matches a red measured in days
+
+the journal verdict only matches a red measured in days
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+re=$(grep -oP "/on its own · red since[^/]*/" .verify/cerberus-auto-diagnosis-whole-live.mjs | head -1)
+RE="$re" node -e '
+const re = new RegExp(process.env.RE.slice(1, -1));
+for (const [k, l] of Object.entries({ days: "on its own · red since 13:32 (28 d)", hours: "on its own · red since 09:10 (3 h)", minutes: "on its own · red since 11:50 (14 m)" })) console.log(k, re.test(l));
+'
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: days true / hours false / minutes false
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--whole-20261104-115437-97c3, finding L2, LOW
+probe-key: 3634e2a23a8cb5dfaf890a56145591b3e9863a13
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-auto-diagnosis-whole-live.mjs
+
+## INV-10833 — probe — `--mode on` is a one-shot, not "re-runnable"; its header and its code disagree
+
+`--mode on` is a one-shot, not "re-runnable"; its header and its code disagree
+
+```probe
+sqlite3 -readonly ~/.cloudcli/cerberus.db "select count(*) from diagnoses where node='eis1' and check_key='shadow-connector/normalization_issues'"
+# expect: 1   (the script's on-mode precondition, line 96, demands 0 for its default check, so it refuses)
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--whole-20261104-115437-97c3, finding L3, LOW
+probe-key: 25feae097b827faed23a018b35f7b4746fe5d5d7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-auto-diagnosis-whole-live.mjs
+
+## INV-10834 — probe — `--mode on` never makes branch 1 of the brief's choice
+
+`--mode on` never makes branch 1 of the brief's choice
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+echo "on-mode precondition lines that look at the seeded checks: $(sed -n '/MODE === .on.) {/,/nothing was pressed/p' .verify/cerberus-auto-diagnosis-whole-live.mjs | grep -c seed)"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: on-mode precondition lines that look at the seeded checks: 0
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--whole-20261104-115437-97c3, finding L4, LOW
+probe-key: a2da81e736cb03677dd4dee789ae390a29d8f381
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-auto-diagnosis-whole-live.mjs
+
+## INV-10835 — probe — after the press, any throw leaves the live switch ON; the closing `bringPanelIntoView` has no null guard
+
+after the press, any throw leaves the live switch ON; the closing `bringPanelIntoView` has no null guard
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+f=.verify/cerberus-auto-diagnosis-whole-live.mjs
+echo "null guard in bringPanelIntoView: $(sed -n '/const bringPanelIntoView/,/^  });/p' $f | grep -c 'if (!dialog)\|dialog?')"
+echo "word about the switch in the catch/finally: $(sed -n '/^} catch/,$p' $f | grep -c 'toggle.click\|switch')"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: null guard in bringPanelIntoView: 0 / word about the switch in the catch/finally: 0
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--whole-20261104-115437-97c3, finding L5, LOW
+probe-key: 8b3bcf176ce2ea50efe239327c066345eecea502
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-auto-diagnosis-whole-live.mjs
+
+## INV-10836 — probe — a press on a still-green check, minutes before it goes red, spares the trigger from reading the red (`check-trouble.ts`, an earlier phase's file the whole exercises)
+
+a press on a still-green check, minutes before it goes red, spares the trigger from reading the red (`check-trouble.ts`, an earlier phase's file the whole exercises)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/g.mts" <<'EOF'
+import { cerberusDiagnosesDb, cerberusResultsDb } from '@/modules/database/index.js';
+import { troubleDiagnoses } from '@/modules/cerberus/check-trouble.js';
+const K = 'scratch/green-press', T = Date.now() - 60 * 60_000;
+const row = (at: number, status: string, prev: string | null, kind: string) => ({ node: 'eis1', check_key: K, at, source: null, seq: null, fetched_at: null, status, doc_status: null, value: null, data: null, took_ms: null, prev_at: null, prev_status: prev, kind }) as any;
+cerberusResultsDb.insert(row(T, 'ok', null, 'change')); cerberusResultsDb.insert(row(T + 300_000, 'ok', 'ok', 'keepalive'));
+cerberusDiagnosesDb.insert({ id: 'greenpress000001', node: 'eis1', check_key: K, asked_by: 'scott', by: 'you', model: 'sonnet', started_at: T + 420_000 });
+cerberusDiagnosesDb.end('greenpress000001', 'done', { endedAt: T + 450_000, summary: 'the check reads ok', evidence: '[]' });
+cerberusResultsDb.insert(row(T + 540_000, 'failing', 'ok', 'change'));
+console.log('trouble holds the green-check press:', JSON.stringify(troubleDiagnoses('eis1', K).map((r) => r.id + ':' + r.status)));
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+D="$1"
+CERBERUS_DB_PATH="$D/c.db" DATABASE_PATH="$D/a.db" cloudcli-tsx "$D/g.mts" 2>&1 | grep 'trouble holds' || echo "trouble holds the green-check press: (no line)"
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: trouble holds the green-check press: ["greenpress000001:done"]   (cured: [])
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--whole-20261104-115437-97c3, finding L6, LOW
+probe-key: c7a8d076fddefbb922a4cf2a36dc0dd59b4fbf85
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-auto-diagnosis-whole-live.mjs

@@ -37,18 +37,31 @@ import type {
  * kind of frame for a diagnosis: one step, the moment center has stored it, never coalesced and never
  * merged with another diagnosis's — the sheet draws each as it is said.
  *
+ * A HINT IS ALSO AN EVENT TO THE SERVER. `onHintSent` hands the nodes and checks a closed window's frame named to
+ * whoever listens, after the frame has gone out to the browsers: every Cerberus writer already hints once its write
+ * committed (a stored status move, a link up or down, a mute, a diagnosis starting or ending, an update moving, the
+ * auto-diagnosis switch), so one subscription hears every writer there is and every one added later, with no tick of
+ * its own. A listener that throws is logged and costs no other listener and no browser; a flagged update frame
+ * (`hintUpdateMoved`) closes through the same function and counts.
+ *
  * Consumers: `definitions.service.ts` (a definition, label or retire write), `ingest.service.ts`
  * (a stored change), `warden-gateway.ts` (link changes, through `wardenLinks.onChange`),
  * `warden-link.ts` (a node's first heartbeat), `mutes.service.ts` (a mute set or lifted),
  * `catalog.service.ts` and `run-frames.ts` (an entry or a run moving; `sendRunOutput` for a stored
  * batch of lines), `diagnosis/diagnosis-steps.ts` (`sendDiagStep` for a stored step) and, through the cerberus barrel, the projects module's `project-node.service.ts`
- * (a project moved to or from a node).
+ * (a project moved to or from a node). The listener is `auto-diagnosis.service.ts`, the trigger that
+ * diagnoses a red check on its own (`onHintSent`).
  */
 
 /** How long a window stays open after its first hint, collecting the rest. */
 const COALESCE_WINDOW_MS = 1000;
 
 type OpenWindow = { nodes: Set<string>; checks: Set<string> };
+
+/** What a closed window's frame named: node ids, and `<node>/<key>` for each check. */
+export type SentHint = { nodes: string[]; checks: string[] };
+
+const hintListeners = new Set<(change: SentHint) => void>();
 
 let openWindow: OpenWindow | null = null;
 /** The open window's timer, kept so a window closed early by `hintUpdateMoved` does not leave it to close the NEXT one short. */
@@ -78,13 +91,40 @@ function closeWindow(updates = false): void {
   openWindow = null;
   if (!closing) return;
 
+  const nodes = [...closing.nodes];
+  const checks = [...closing.checks];
   sendToBrowsers({
     kind: 'cerberus_changed',
     at: Date.now(),
-    nodes: [...closing.nodes],
-    checks: [...closing.checks],
+    nodes,
+    checks,
     ...(updates ? { updates: true } : {}),
   });
+
+  // After the frame, so a slow or failing listener never delays a screen. Each has its own catch: one that throws
+  // costs the others nothing. A listener added or removed while this runs is not heard until the next window.
+  for (const listener of [...hintListeners]) {
+    try {
+      listener({ nodes, checks });
+    } catch (error) {
+      console.error(`[Cerberus] a hint listener threw: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+
+/**
+ * Hears every hint the moment its frame goes out, with the nodes and checks it named (a coalesced window's, or a
+ * flagged update frame's). Answers its unsubscribe. The listener runs inside the window's timer, so a listener that
+ * has work to do schedules it rather than doing it there (`auto-diagnosis.service.ts` plans on the next turn of the
+ * event loop).
+ *
+ * Consumers: `auto-diagnosis.service.ts`.
+ */
+export function onHintSent(listener: (change: SentHint) => void): () => void {
+  hintListeners.add(listener);
+  return () => {
+    hintListeners.delete(listener);
+  };
 }
 
 /**

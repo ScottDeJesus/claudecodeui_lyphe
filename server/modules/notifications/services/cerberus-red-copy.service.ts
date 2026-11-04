@@ -1,3 +1,5 @@
+import { causeOf, fixSentence, readDiagnosis } from './cerberus-red-cause.js';
+
 /**
  * The words of the Cerberus red watch's three pushes: `cerberus.red` (a check has been failing or denied for
  * an hour), `cerberus.red.reminder` (it still is), `cerberus.recovered` (it is green again).
@@ -15,11 +17,24 @@
  *
  * Durations are written as the Cerberus tab writes an age: `42 m`, `1 h 02 m`, `22 d` (whole days, rounded down).
  *
+ * A RED OR REMINDED ITEM MAY CARRY ITS TROUBLE'S DIAGNOSIS (`diagnosis`, set by `modules/cerberus/red-watch.service.ts`
+ * from the stored one). Its headline, the tap and the priority are what they were. A LONE check's body is its reason (cut
+ * at 200), `Likely cause: <cause>` (300), `Proposed fix: <name> — <cmd>` (250) or `No fix proposed.`, and `Evidence: its sheet
+ * in the Cerberus tab.`; in a LIST (several checks, or the headed groups of a mixed tick) a diagnosed check's line is
+ * followed by `  Likely cause: …` (140) and `  Proposed fix: …` (120) or `  No fix proposed.`. Each limit is the length of the
+ * whole line, its words included. A check's lines are ONE block to `fitLines`, so "+N more" still counts checks and no page is
+ * cut mid-line. The cause is the summary's first sentence (`cerberus-red-cause.ts`, which also holds the shape an item may
+ * carry it in). An item without a diagnosis is worded exactly as before; a recovery never carries one.
+ *
  * Consumed by `notification-copy.service.ts` (the table entries of the three codes) and, for its meta type,
  * by `modules/cerberus/red-watch.service.ts` through the notifications barrel.
  */
 
-/** One check as a red-watch push names it. `minutes` is how long it has been red (a recovery: how long it was). */
+/**
+ * One check as a red-watch push names it. `minutes` is how long it has been red (a recovery: how long it was).
+ * `diagnosis` is the finished diagnosis of its trouble when it has one: the summary, and the name and command of the
+ * one fix it proposed (`fix` is `null` when it proposed none).
+ */
 export type CerberusRedItem = {
   node: string;
   key: string;
@@ -27,6 +42,7 @@ export type CerberusRedItem = {
   status: string;
   minutes: number;
   reason: string;
+  diagnosis?: { summary: string; fix: { name: string; cmd: string } | null };
 };
 
 /** What a red-watch event carries in `meta`: the newly red, the reminded, the recovered. `count` is `items.length`. */
@@ -44,6 +60,14 @@ const BODY_BUDGET = 900;
 /** A reason in a list of lines, and a lone check's reason that is the whole body. */
 const REASON_CHARS = 50;
 const SINGLE_REASON_CHARS = 300;
+/** A lone diagnosed check's lines: its reason, then each line of its diagnosis (whole line, words included). */
+const DIAGNOSED_REASON_CHARS = 200;
+const SINGLE_CAUSE_CHARS = 300;
+const SINGLE_FIX_CHARS = 250;
+/** The same lines under a check in a list, each indented under it. */
+const LIST_CAUSE_CHARS = 140;
+const LIST_FIX_CHARS = 120;
+const EVIDENCE_LINE = 'Evidence: its sheet in the Cerberus tab.';
 /** The body of an event whose meta names no check: a malformed event still sends a sentence, never an empty push. */
 const NO_CHECKS_LISTED = 'Open the Cerberus tab to see which checks.';
 const LABEL_CHARS = 48;
@@ -57,6 +81,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function readItem(raw: unknown): CerberusRedItem | null {
   if (!isRecord(raw) || typeof raw.node !== 'string' || typeof raw.key !== 'string') return null;
+  const diagnosis = readDiagnosis(raw.diagnosis);
   return {
     node: raw.node,
     key: raw.key,
@@ -64,6 +89,7 @@ function readItem(raw: unknown): CerberusRedItem | null {
     status: typeof raw.status === 'string' ? raw.status : 'failing',
     minutes: typeof raw.minutes === 'number' && Number.isFinite(raw.minutes) ? Math.max(0, Math.floor(raw.minutes)) : 0,
     reason: typeof raw.reason === 'string' ? raw.reason : '',
+    ...(diagnosis === undefined ? {} : { diagnosis }),
   };
 }
 
@@ -75,9 +101,17 @@ function readGroups(meta: Record<string, unknown>): Omit<CerberusRedMeta, 'count
   return { items: readGroup(meta.items), reminders: readGroup(meta.reminders), recovered: readGroup(meta.recovered) };
 }
 
-/** `text` cut to `limit` characters, an ellipsis marking the cut. */
+/**
+ * `text` cut to `limit` characters, an ellipsis marking the cut. The cut never lands between the two halves of a character
+ * outside the Basic Multilingual Plane (an emoji): a lone half would reach the phone as U+FFFD, and the diagnosis text this
+ * cuts is model-written, so it can hold one.
+ */
 function clip(text: string, limit: number): string {
-  return text.length <= limit ? text : `${text.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+  if (text.length <= limit) return text;
+  let end = Math.max(0, limit - 1);
+  const lastKept = end > 0 ? text.charCodeAt(end - 1) : 0;
+  if (lastKept >= 0xd800 && lastKept <= 0xdbff) end -= 1;
+  return `${text.slice(0, end).trimEnd()}…`;
 }
 
 /** A reason on one line: every run of whitespace, newlines included, becomes one space. */
@@ -115,6 +149,22 @@ function lonelyReason(item: CerberusRedItem, none: string): string {
   return clip(oneLine(item.reason), SINGLE_REASON_CHARS) || none;
 }
 
+/**
+ * A lone check's whole body: its reason alone (as ever), or, when it carries a diagnosis, its reason (when it has one),
+ * the likely cause, the proposed fix, and where the evidence is.
+ */
+function loneBody(item: CerberusRedItem, none: string): string {
+  const { diagnosis } = item;
+  if (diagnosis === undefined) return lonelyReason(item, none);
+  const reason = clip(oneLine(item.reason), DIAGNOSED_REASON_CHARS);
+  return [
+    ...(reason ? [reason] : []),
+    clip(`Likely cause: ${causeOf(diagnosis.summary)}`, SINGLE_CAUSE_CHARS),
+    clip(fixSentence(diagnosis.fix), SINGLE_FIX_CHARS),
+    EVIDENCE_LINE,
+  ].join('\n');
+}
+
 function nameOf(item: CerberusRedItem): string {
   return clip(oneLine(item.label), HEADLINE_LABEL_CHARS);
 }
@@ -127,12 +177,27 @@ function redLine(item: CerberusRedItem, wholeHours: boolean, withNode: boolean):
   return reason ? `${head} — ${clip(reason, REASON_CHARS)}` : head;
 }
 
+/**
+ * A red check's entry in a list: its line, and, when it carries a diagnosis, the two lines under it. The entry is ONE string,
+ * so `fitLines` keeps or drops it whole and "+N more" counts checks.
+ */
+function redEntry(item: CerberusRedItem, wholeHours: boolean, withNode: boolean): string {
+  const line = redLine(item, wholeHours, withNode);
+  const { diagnosis } = item;
+  if (diagnosis === undefined) return line;
+  return [
+    line,
+    clip(`  Likely cause: ${causeOf(diagnosis.summary)}`, LIST_CAUSE_CHARS),
+    clip(`  ${fixSentence(diagnosis.fix)}`, LIST_FIX_CHARS),
+  ].join('\n');
+}
+
 function greenLine(item: CerberusRedItem, withNode: boolean): string {
   const label = clip(oneLine(item.label), LABEL_CHARS);
   return `${withNode ? `${label} (${item.node})` : label} — after ${spanText(item.minutes)}`;
 }
 
-/** Lines while they fit the budget, then "+N more" for the rest. */
+/** Entries (a line, or a check's line with its diagnosis under it) while they fit the budget, then "+N more" for the rest. */
 function fitLines(lines: string[], used: number): { text: string[]; used: number } {
   const text: string[] = [];
   let total = used;
@@ -154,8 +219,8 @@ function fitLines(lines: string[], used: number): { text: string[]; used: number
 function groupedBody(groups: Omit<CerberusRedMeta, 'count'>): string {
   const withNode = spansNodes([...groups.items, ...groups.reminders, ...groups.recovered]);
   const sections: Array<{ heading: string; lines: string[] }> = [
-    { heading: 'Red over an hour', lines: groups.items.map((item) => redLine(item, false, withNode)) },
-    { heading: 'Still red', lines: groups.reminders.map((item) => redLine(item, true, withNode)) },
+    { heading: 'Red over an hour', lines: groups.items.map((item) => redEntry(item, false, withNode)) },
+    { heading: 'Still red', lines: groups.reminders.map((item) => redEntry(item, true, withNode)) },
     { heading: 'Green again', lines: groups.recovered.map((item) => greenLine(item, withNode)) },
   ];
   const out: string[] = [];
@@ -190,8 +255,8 @@ export function redCopy(meta: Record<string, unknown>): Copy {
   if (items.length === 0) return { headline: 'Checks red over an hour', body: NO_CHECKS_LISTED };
   let body: string;
   if (groupCount(groups) > 1) body = groupedBody(groups);
-  else if (items.length === 1) body = lonelyReason(items[0], 'No reason given');
-  else body = plainBody(items.map((item) => redLine(item, false, spansNodes(items))));
+  else if (items.length === 1) body = loneBody(items[0], 'No reason given');
+  else body = plainBody(items.map((item) => redEntry(item, false, spansNodes(items))));
   const headline =
     items.length === 1
       ? `${nameOf(items[0])} on ${items[0].node} — red for ${spanText(items[0].minutes)}`
@@ -206,8 +271,8 @@ export function redReminderCopy(meta: Record<string, unknown>): Copy {
   if (reminders.length === 0) return { headline: 'Still red', body: NO_CHECKS_LISTED };
   let body: string;
   if (groupCount(groups) > 1) body = groupedBody(groups);
-  else if (reminders.length === 1) body = lonelyReason(reminders[0], 'No reason given');
-  else body = plainBody(reminders.map((item) => redLine(item, true, spansNodes(reminders))));
+  else if (reminders.length === 1) body = loneBody(reminders[0], 'No reason given');
+  else body = plainBody(reminders.map((item) => redEntry(item, true, spansNodes(reminders))));
   const headline =
     reminders.length === 1
       ? `Still red: ${nameOf(reminders[0])} on ${reminders[0].node} — ${spanText(reminders[0].minutes, true)}`

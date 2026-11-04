@@ -80,6 +80,7 @@ function diagnosisViews(rows: CerberusDiagnosisRow[], withRunLines: boolean): Ce
       node: row.node,
       check: row.check_key,
       askedBy: row.asked_by,
+      by: row.by,
       model: row.model,
       startedAt: row.started_at,
       endedAt: row.ended_at,
@@ -146,6 +147,7 @@ export function diagnosisEvents(
       check: row.check_key,
       label: labelOf(row.node, row.check_key),
       diagId: row.id,
+      by: row.by,
     };
     if (row.started_at < before) events.push({ ...common, at: row.started_at, event: 'asked', summary: null });
     if (row.ended_at !== null && row.ended_at < before && row.status !== 'running') {

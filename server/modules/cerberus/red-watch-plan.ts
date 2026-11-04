@@ -39,8 +39,12 @@ export const RED_AFTER_MS = 60 * 60_000;
 /** How often a reminder repeats while an incident stays open, and the wait before a silently closed one may re-open. */
 export const REMINDER_EVERY_MS = 6 * 60 * 60_000;
 
-/** The statuses that page. `warn` never does. */
-const PAGING_STATUSES: ReadonlySet<string> = new Set(['failing', 'denied']);
+/**
+ * The statuses that page. `warn` never does. Exported because the auto-diagnosis trigger reads it too
+ * (`auto-diagnosis-plan.ts`): the watch and the trigger work from one set, so the check that is diagnosed
+ * on its own is the check whose page the diagnosis rides.
+ */
+export const PAGING_STATUSES: ReadonlySet<string> = new Set(['failing', 'denied']);
 
 export type RedWatchPlan = {
   /** Checks to open an incident for and page as newly red; `redSince` is when the red began, on center's clock. */

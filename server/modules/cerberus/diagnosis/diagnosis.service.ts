@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-import { cerberusDiagnosesDb, cerberusUpdatesDb } from '@/modules/database/index.js';
+import { cerberusDiagnosesDb, cerberusUpdatesDb, type CerberusDiagnosisBy } from '@/modules/database/index.js';
 import type {
   CerberusCheckView,
   CerberusDiagnosisSubmission,
@@ -18,6 +18,7 @@ import { wardenLinks } from '../warden-links.js';
 
 import { DiagnosisAgentFailure, resolveDiagnosisModel, runDiagnosisAgent } from './diagnosis-agent.js';
 import { buildDiagnosisToolDeps } from './diagnosis-deps.js';
+import { RESTART_SENTENCE } from './diagnosis-endings.js';
 import { unknownDiagnosis } from './diagnosis-proposal.js';
 import { CLOSED_SESSION_STEP, historyOnlyStep, openedSessionStep } from './diagnosis-step-words.js';
 import { createDiagnosisStepLog, type DiagnosisStepLog } from './diagnosis-steps.js';
@@ -103,7 +104,6 @@ type Outcome =
 const live = new Map<string, LiveDiagnosis>();
 
 const CEILING_SENTENCE = 'The diagnosis ran past its 3-minute limit and was stopped before it submitted an answer.';
-const RESTART_SENTENCE = 'Cerberus restarted while the diagnosis was running, so it was stopped. Ask again.';
 
 const lostLinkSentence = (node: string): string => `The link to ${node} was lost during the diagnosis, so it was stopped.`;
 
@@ -240,7 +240,7 @@ function failureSentence(error: unknown): string {
   return `The diagnosis could not run: ${describe(error).replace(/[.\s]+$/, '')}.`;
 }
 
-async function runDiagnosis(diag: LiveDiagnosis, check: CerberusCheckView, model: string): Promise<void> {
+async function runDiagnosis(diag: LiveDiagnosis, check: CerberusCheckView, siblings: CerberusCheckView[], model: string): Promise<void> {
   try {
     const linked = await openSession(diag);
     if (diag.ended) return;
@@ -261,6 +261,7 @@ async function runDiagnosis(diag: LiveDiagnosis, check: CerberusCheckView, model
     );
     const submission = await runDiagnosisAgent({
       check,
+      siblings,
       node: diag.node,
       model,
       tools,
@@ -279,17 +280,22 @@ async function runDiagnosis(diag: LiveDiagnosis, check: CerberusCheckView, model
 /**
  * Starts a diagnosis of `check` on `node`, asked by `askedBy`, and answers its id; the loop runs on in
  * the background. `model` is the model asked for (`haiku`, a full id) — absent, `CERBERUS_DIAG_MODEL`,
- * else `sonnet` (`resolveDiagnosisModel`). The check is read as the sheet reads it NOW, with `inputs`
- * (the moment, the links, ingest's memory): it is what the agent's prompt names.
+ * else `sonnet` (`resolveDiagnosisModel`). `by` is who started it, stored on the row: `auto` when Cerberus
+ * started it on its own, `you` — the default — for a press of Diagnose. The check is read as the sheet reads
+ * it NOW, with `inputs` (the moment, the links, ingest's memory): it is what the agent's prompt names.
  */
-export function startDiagnosis(input: { node: string; check: string; model?: string | null; askedBy: string }, inputs: CerberusReadInputs): string {
-  const { node, check: checkKey, askedBy } = input;
-  const check = checkDetail(node, checkKey, {}, inputs).check;
+export function startDiagnosis(
+  input: { node: string; check: string; model?: string | null; askedBy: string; by?: CerberusDiagnosisBy },
+  inputs: CerberusReadInputs
+): string {
+  const { node, check: checkKey, askedBy, by = 'you' } = input;
+  // One read: the check for the row and the prompt, its siblings for the prompt's leads.
+  const { check, siblings } = checkDetail(node, checkKey, {}, inputs);
   const model = resolveDiagnosisModel(input.model);
   const id = crypto.randomBytes(8).toString('hex');
   const startedAt = Date.now();
 
-  if (!cerberusDiagnosesDb.insert({ id, node, check_key: checkKey, asked_by: askedBy, model, started_at: startedAt })) {
+  if (!cerberusDiagnosesDb.insert({ id, node, check_key: checkKey, asked_by: askedBy, by, model, started_at: startedAt })) {
     throw new AppError(`A diagnosis of ${check.label ?? checkKey} is already running on ${node}.`, {
       code: 'CERBERUS_DIAG_RUNNING',
       statusCode: 409,
@@ -312,7 +318,7 @@ export function startDiagnosis(input: { node: string; check: string; model?: str
   live.set(id, diag);
   hintChanged({ nodes: [node], checks: [`${node}/${checkKey}`] });
 
-  void runDiagnosis(diag, check, model);
+  void runDiagnosis(diag, check, siblings, model);
   return id;
 }
 

@@ -6,9 +6,10 @@
  * module is built ONCE by the server entrypoint and named by `listen`, because three of its parts are
  * ARMED rather than called. The store, the center key and the gateway start in the `listen`
  * callback — the gateway is a listener of its own on the tailnet, and a boot that never got as far
- * as serving has no business opening a second port. The self-checks and the daily prune are SOLE
- * duties, started from `soleServerDuties` so that only the process holding the takeover writes a hub
- * row or deletes one (a handover's second process on the same store would do both twice). And
+ * as serving has no business opening a second port. The self-checks, the red watch, the auto-diagnosis and
+ * the daily prune are SOLE duties, started from `soleServerDuties` so that only the process holding the
+ * takeover writes a hub row, deletes one, pages an incident or starts a diagnosis (a handover's second
+ * process on the same store would do each twice). And
  * shutdown has to be able to name them all: `stop()` is the first thing the entrypoint's shutdown
  * runs, so no new tick, prune or connection begins on a process that is leaving, and the gateway
  * stops accepting while the links it already holds are left to the process's exit (a warden
@@ -19,8 +20,8 @@
  */
 
 // createCerberusModule: used by the server entrypoint to mount the authenticated fleet-health router
-// at `/api/cerberus`, to start the store and the gateway after `listen`, to start the self-checks and
-// the prune from `soleServerDuties`, and to stop them first on shutdown.
+// at `/api/cerberus`, to start the store and the gateway after `listen`, to start the self-checks, the red
+// watch, the auto-diagnosis and the prune from `soleServerDuties`, and to stop them first on shutdown.
 export { createCerberusModule } from './cerberus.module.js';
 // wardenLinks: the registry of warden links (`send`, `registerHandler`, `onChange`). The handlers of
 // `run.*`, `diag.*`, `update.*`, `session.*` and `catalog.ack` register from inside this directory;

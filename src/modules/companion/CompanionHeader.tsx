@@ -1,5 +1,5 @@
 import { AudioLines, Crosshair, LayoutDashboard, X } from 'lucide-react';
-import { useState } from 'react';
+import { type PointerEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionControls } from '@/modules/companion/CompanionControls';
@@ -7,6 +7,7 @@ import { CompanionStatus } from '@/modules/companion/CompanionStatus';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
 import type { CompanionEars, CompanionPresence, CompanionVoice } from '@/shared/types';
 import { Button, Tooltip } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 type CompanionHeaderProps = {
   /** Her name as he set it, or the default while the picture loads. */
@@ -32,6 +33,12 @@ type CompanionHeaderProps = {
   onClose: () => void;
   /** The station button beside her close: the door into Kaylee Station (`CompanionPanel` binds `openStation`). Absent, no button is drawn. */
   onOpenStation?: () => void;
+  /**
+   * Given while her panel floats (from lg, under a fine pointer): a press on the header's empty space moves the panel
+   * (`useCompanionPanelPlace`, which refuses a press on any of the header's controls), and the header wears the grab cursor.
+   * Absent — her sheet on a phone — the header is only a header.
+   */
+  onMovePress?: (event: PointerEvent<HTMLElement>) => void;
 };
 
 /**
@@ -47,8 +54,13 @@ type CompanionHeaderProps = {
  * focus chat, "Focus · Kanban lanes · its project", the chat "it" and "this" mean in what she says. Then `CompanionControls`:
  * ROW THREE, the model picker, the Live switch and Clear behind its question; ROW FOUR, given `voice`, "Voice on this
  * device"; ROW FIVE, given `ears`, "Listen for her name on this device", and while it is on what her ears are doing.
+ *
+ * Where her panel floats, the header is what he moves it by (`onMovePress`): its empty space, her mark, her name and the
+ * lines of words take the grab cursor and the press; every button, switch and row label keeps its own.
  */
-export function CompanionHeader({ name, picture, presence, voice, ears, onModelChange, onLiveChange, onInterrupt, onClear, onClose, onOpenStation }: CompanionHeaderProps) {
+export function CompanionHeader({
+  name, picture, presence, voice, ears, onModelChange, onLiveChange, onInterrupt, onClear, onClose, onOpenStation, onMovePress,
+}: CompanionHeaderProps) {
   const { t } = useTranslation();
   // The node row one keeps for Stop. The controls own Stop (its busy state and its refusal toast) and draw it here, so it stands
   // beside the way out as it always has; a DOM node only exists once the row has mounted, hence state, set by the ref.
@@ -56,7 +68,7 @@ export function CompanionHeader({ name, picture, presence, voice, ears, onModelC
   const focus = picture?.focus ?? null;
 
   return (
-    <div data-companion-header="" className="shrink-0 border-b border-border bg-card">
+    <div data-companion-header="" onPointerDown={onMovePress} className={cn('shrink-0 border-b border-border bg-card', onMovePress && 'cursor-grab')}>
       <div className="flex items-center gap-2.5 py-2.5 pl-3 pr-2">
         <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-ink">
           <AudioLines className="size-4" strokeWidth={1.75} />

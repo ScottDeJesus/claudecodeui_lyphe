@@ -1958,6 +1958,7 @@
       },
       "diagnosis": {
         "asked": "You asked for a diagnosis",
+        "askedAuto": "Diagnosed on its own",
         "askedSummary": "{{label}} · read-only",
         "ready": "Diagnosis ready",
         "failed": "Diagnosis failed"
@@ -2152,6 +2153,7 @@
       "failed": "Failed",
       "scope": "Read-only on {{node}}. It reads logs, status and Cerberus history. It can't run fixes or change files.",
       "scopeHistory": "Read-only. It reads Cerberus history: {{node}}'s logs and status were not reachable.",
+      "startedAuto": "Started on its own once the check had stayed red 10 minutes.",
       "steps_one": "{{count}} step · {{from}}",
       "steps_other": "{{count}} steps · {{from}}–{{to}}",
       "proposal": {
@@ -2179,6 +2181,10 @@
       "diagnosing": "Diagnosing…",
       "see": "See diagnosis",
       "again": "Diagnose again",
+      "auto": {
+        "label": "Diagnose on its own",
+        "helper": "When it stays red 10 minutes, Cerberus reads it, read-only, and your phone's alert says what it found."
+      },
       "hint": "Diagnose it — a good diagnosis can become one."
     },
     "promote": {
@@ -3216,7 +3222,8 @@
       "loadingStatus": "Loading…",
       "readFailed": "Couldn't open {{name}}'s conversation: {{reason}}",
       "retry": "Try again",
-      "failedUnknown": "{{name}} stopped."
+      "failedUnknown": "{{name}} stopped.",
+      "resize": "Resize {{name}}'s panel"
     },
     "status": {
       "asleep": "Asleep · your next message wakes her",
@@ -3302,6 +3309,8 @@
       "label": "Notes from {{name}}",
       "count_one": "{{count}} note",
       "count_other": "{{count}} notes",
+      "new_one": "{{count}} new",
+      "new_other": "{{count}} new",
       "dismiss": "Dismiss “{{title}}”",
       "dismissRefused": "“{{title}}” wasn't dismissed"
     },

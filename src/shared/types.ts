@@ -1182,6 +1182,25 @@ export type CompanionPresence = {
 
 // ---------------------------
 
+//----------------- COMPANION PANEL, FLOATING ------------
+
+/**
+ * Her panel's box where it floats (from lg, under a fine pointer), in CSS pixels from the workspace shell's top-left corner:
+ * the panel is `absolute` in that shell. What he last dragged it to is kept per browser under `companion-panel`
+ * (`companionPanelStorage.ts`) and drawn held inside the shell (`clampPanelRect`); the companion module's
+ * `companionPanelGeometry.ts` moves and resizes it and `useCompanionPanelPlace` draws it.
+ */
+export type CompanionPanelRect = { left: number; top: number; width: number; height: number };
+
+/**
+ * The eight handles her floating panel is resized by: four edges, each moving the side it names, and four corners, each
+ * moving its two sides. Read by `resizePanelRect` (which sides a drag moves), `useCompanionPanelPlace` (one resize per
+ * handle) and `CompanionPanelGrips` (which grip stands where).
+ */
+export type CompanionPanelHandle = 'top' | 'right' | 'bottom' | 'left' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+// ---------------------------
+
 //----------------- CHAT STREAM FLUSH ------------
 
 /** The one pending stream flush of a live chat: the timer's id, the window it was armed on (a timer id means something only to the window that issued it, so it must be cleared there), and the timer's own body, kept so a move of the chat between hosts can run it at once instead of losing it with a closing window. Held in a ref by the chat interface and read by the realtime handlers through `armStreamFlush`, `clearStreamFlush` and `flushStreamNow`. */

@@ -9,6 +9,8 @@ export {
   getCerberusConnection,
   getCerberusDatabasePath,
 } from '@/modules/database/cerberus-connection.js';
+export { cerberusAutoDiagnosisDb } from '@/modules/database/repositories/cerberus-auto-diagnosis.db.js';
+export type { CerberusAutoDiagnosisRow } from '@/modules/database/repositories/cerberus-auto-diagnosis.db.js';
 export { cerberusCatalogDb } from '@/modules/database/repositories/cerberus-catalog.db.js';
 export type {
   CerberusCatalogChangeRow,
@@ -27,6 +29,7 @@ export {
   cerberusDiagnosesDb,
 } from '@/modules/database/repositories/cerberus-diagnoses.db.js';
 export type {
+  CerberusDiagnosisBy,
   CerberusDiagnosisEndFields,
   CerberusDiagnosisInsert,
   CerberusDiagnosisRow,

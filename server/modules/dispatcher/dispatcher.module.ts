@@ -6,6 +6,7 @@ import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import type { RelayAnswer, RelayOrder } from '@/shared/relayed-press-types.js';
 import type { DispatcherStateEvent, DispatcherVerb } from '@/shared/types.js';
 import { sessionlessEnv } from '@/shared/child-env.js';
+import type { DispatcherStoreWatch } from '@/shared/dispatcher-store-watch.service.js';
 import { expandHome } from '@/shared/utils.js';
 
 import { createDispatcherAnswerRouter } from './dispatcher-answer.routes.js';
@@ -46,11 +47,20 @@ import { createDispatcherWatcher } from './dispatcher-watcher.service.js';
 const DEFAULT_BIN = '~/.claude/scripts/dispatcher';
 
 /**
- * How often the document is read. One subprocess per tick over a store of a few dozen plans is tens
- * of milliseconds; fast enough that a phase changing state reaches the tab while the reader is still
- * looking at the previous one, and long enough that a walk in progress costs this host nothing.
+ * How long the lane goes without reading when nothing has poked it. The document is read when
+ * something it is read from is WRITTEN (`dispatcher-store-watch.service.ts` pokes the lane); this is
+ * the one clock left, and it exists for the state no write announces — a walker, a soul or the daemon
+ * killed with nothing left to write (`report_stall` calls a walk ended only after a 60 s grace
+ * of silence, and nothing writes when that grace runs out), the UTC hour a peak window ends at
+ * (`route.peak_until`, `offpeak_at`), the pacer's projection drifting on its own clock.
+ *
+ * Sixty seconds because every one of those is a minute-scale fact — the shortest is that grace — and a
+ * reading costs seconds of CPU (`status --json` walks every plan's chain record and asks systemd about
+ * each one's armed hour): a shorter backstop would buy nothing a reader could see at the price of a
+ * continuous load. It is measured from the last reading that settled, so a lane that is being poked
+ * often never fires it.
  */
-const POLL_MS = 2000;
+const BACKSTOP_MS = 60_000;
 
 /**
  * Wall-clock ceiling for one relayed verb. The verbs act on the store and may kick the daemon before
@@ -150,7 +160,7 @@ export function announceDispatcherEnding(ending: DispatcherEnding, logError: (me
 }
 
 /**
- * What `createDispatcherModule` hands the server entrypoint: the router to mount, the poll's `start` (after `listen`)
+ * What `createDispatcherModule` hands the server entrypoint: the router to mount, the lane's `start` (after `listen`)
  * and `stop` (at shutdown), and the readers only this instance holds, which the entrypoint passes on to the
  * companion's house (`CompanionHouse.dispatcher`, `.cardText`, `.askOpen`, `.relay`):
  *   - `picture()` is the lane's picture behind `whenLanded`, bounded exactly as the router's `current` is: `null`
@@ -174,7 +184,19 @@ export type DispatcherModule = {
   relay(order: RelayOrder): Promise<RelayAnswer>;
 };
 
-export function createDispatcherModule(): DispatcherModule {
+/** The chains of the phases running in this picture: the records `dispatcher-store-watch.service.ts` keeps watched. */
+function runningChainIds(picture: DispatcherPicture): string[] {
+  const ids: string[] = [];
+  for (const plan of picture.plans) {
+    for (const phase of plan.phases) {
+      if (phase.status === 'running' && phase.chain_id) ids.push(phase.chain_id);
+    }
+  }
+  return ids;
+}
+
+/** `storeWatch` is the one watch both dispatcher lanes share; the server entrypoint builds it and starts it before either lane. */
+export function createDispatcherModule(storeWatch: DispatcherStoreWatch): DispatcherModule {
   const bin = expandHome(process.env.DISPATCHER_BIN || DEFAULT_BIN);
   // The lane's child environment: the server's own, minus the names that say whose Claude session a verb runs in.
   const env = sessionlessEnv();
@@ -190,7 +212,7 @@ export function createDispatcherModule(): DispatcherModule {
   /**
    * The lane's one door to the journal, and the one thing that bounds its volume.
    *
-   * A read that fails every two seconds is a read that fails thousands of times an hour, and a body
+   * A read that keeps failing keeps failing on every poke and every backstop, and a body
    * this build cannot parse would bury the journal in copies of one line. Said once per distinct
    * message, for the life of the process. This server has no logger; a module that must say
    * something takes a closure from its composition root (`system.module.ts:57-58`) rather than
@@ -218,7 +240,8 @@ export function createDispatcherModule(): DispatcherModule {
 
   const watcher = createDispatcherWatcher({
     // One subprocess, and the promise support in `polled-lane.service.ts` is what a tick does with
-    // it: a tick that arrives while this read is still out is SKIPPED rather than queued, and a
+    // it: a tick that arrives while this read is still out is SKIPPED rather than queued (a poke
+    // that lands mid-read is remembered and answered by one more), and a
     // read that throws (a different build's document, a store mid-move) leaves the last good picture
     // on the tab with one line in the journal.
     snapshot: async () => {
@@ -228,7 +251,11 @@ export function createDispatcherModule(): DispatcherModule {
       // however long ago (`dispatcher-followups.module.ts`). Settled before the frame exists, so the "feature finished"
       // alert `endings` raises next lists no item the completion closed and every gap the finish filed.
       followups.settle(store);
-      return lanePictureOf(store);
+      const picture = lanePictureOf(store);
+      // The running phases name the chain records the watch follows: a walk's progress is written there
+      // and nowhere in the store until it ends.
+      storeWatch.followChains(runningChainIds(picture));
+      return picture;
     },
     // Endings are read off the same picture the tabs receive, and only when it changed — which an
     // ending always is. A failure to announce never costs the tabs their frame.
@@ -243,7 +270,7 @@ export function createDispatcherModule(): DispatcherModule {
       prompts.observe(frame);
       broadcast(frame);
     },
-    pollMs: POLL_MS,
+    backstopMs: BACKSTOP_MS,
     logError: logErrorOnce,
   });
 
@@ -252,7 +279,8 @@ export function createDispatcherModule(): DispatcherModule {
     // has read; past the bound it is told so, and the landing's own frame fills the tab.
     current: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
     // A verb the dispatcher took pokes the lane (`PolledLane.poke`, as the roadmap's writes do): the card, the Inbox and the
-    // station's rail redraw on the picture that follows the press, not up to two seconds later on the next poll.
+    // station's rail redraw on the picture that follows the press. The store watch pokes for the same commit a moment
+    // later, so this is the press's own door: it does not wait on a watch having armed, nor on the watch's settle window.
     runVerb: async (verb: DispatcherVerb, plan: string, verbArgs?: readonly string[]) => {
       const result = await runDispatcherVerb(verb, plan, commands, verbArgs);
       if (result.ok) watcher.poke();
@@ -267,7 +295,7 @@ export function createDispatcherModule(): DispatcherModule {
   // book owns the ask, and because that router is at its size ceiling already.
   router.use(createDispatcherAnswerRouter({
     // An answer the dispatcher took pokes the lane for the same reason a verb does: an Accept answered from the card leaves the
-    // card, the Inbox and the station's rail on the next picture, which the poke brings within moments.
+    // card, the Inbox and the station's rail on the next picture, which the poke brings at once.
     answer: async (ask, decision) => {
       const reply = await prompts.answer(ask, decision);
       if (reply.outcome === 'took') watcher.poke();
@@ -275,11 +303,19 @@ export function createDispatcherModule(): DispatcherModule {
     },
   }));
 
+  let detach: (() => void) | null = null;
+
   return {
     router,
-    start: () => watcher.start(),
+    start: () => {
+      // Attached before the lane's first reading, so a write that lands during it is remembered as a poke.
+      detach ??= storeWatch.attach('status', () => watcher.poke());
+      watcher.start();
+    },
     stop: () => {
       prompts.stop();
+      detach?.();
+      detach = null;
       watcher.stop();
     },
     picture: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
@@ -291,7 +327,7 @@ export function createDispatcherModule(): DispatcherModule {
         ? prompts.answerOnHisWord(order.ask, replyOfLockOrder(order), order.press).then(relayAnswerOf)
         : relayOrder(order, commands, (line) => console.log(line)));
       // His word, carried by Kaylee, is the third door beside the card's verbs and answers, and it pokes the lane for the same reason they do: the card, the
-      // Inbox and the station's rail leave the Accept on the picture that follows his yes, not up to two seconds later on the next poll.
+      // Inbox and the station's rail leave the Accept on the picture that follows his yes.
       if (answer.outcome === 'took') watcher.poke();
       return answer;
     },

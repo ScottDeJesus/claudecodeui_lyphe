@@ -11,6 +11,7 @@ import {
 } from '@/modules/notifications/index.js';
 import type { CerberusOverview } from '@/shared/cerberus-types.js';
 
+import { pushDiagnosisOf } from './red-watch-diagnosis.js';
 import { planRedWatch, type RedWatchPlan } from './red-watch-plan.js';
 import { wardenLinks } from './warden-links.js';
 
@@ -31,6 +32,14 @@ import { wardenLinks } from './warden-links.js';
  * a fresh process knows nothing; what it reads from `cerberus_red_alerts` is which incidents were already
  * pushed and when. The incident is recorded BEFORE its push is handed over, in one transaction: a process that
  * dies between the two costs one missed page, where the other order would cost a double page on every restart.
+ *
+ * A PAGE CARRIES ITS TROUBLE'S FINISHED DIAGNOSIS. After the incident's transaction and before the event is handed
+ * over, each newly red and each reminded check is looked up (`red-watch-diagnosis.ts`): the newest `done`
+ * diagnosis since the check was last ok, whoever asked for it, becomes the page's Likely cause and Proposed fix
+ * (`cerberus-red-copy.service.ts`). The page keeps its own clock and never waits on a diagnosis: a red whose trouble
+ * has none yet, one still running or one that failed pages on time without a cause, no second push follows
+ * when a diagnosis finishes, and the next reminder carries it — a trouble already paged included. A lookup that
+ * throws pages without it. Recoveries carry none.
  *
  * The event's code and priority follow the strongest group in the tick: any new red → `cerberus.red` (urgent),
  * only reminders → `cerberus.red.reminder`, only recoveries → `cerberus.recovered`. A mixed tick is one
@@ -103,6 +112,12 @@ function applyPlan(plan: RedWatchPlan, now: number): AppliedTick {
   return applied;
 }
 
+/** `item` with its trouble's finished diagnosis, or as it is when the trouble has none (or its lookup failed). */
+function withDiagnosis(item: CerberusRedItem): CerberusRedItem {
+  const diagnosis = pushDiagnosisOf(item.node, item.key);
+  return diagnosis === undefined ? item : { ...item, diagnosis };
+}
+
 /** The event's code: the strongest group the tick moved. */
 function codeOf(applied: AppliedTick): RedWatchCode {
   if (applied.opened.length > 0) return 'cerberus.red';
@@ -164,6 +179,9 @@ export function tickRedWatch(overview: CerberusOverview): void {
     console.log(`[red-watch] ${counts}${closed} → no enabled ntfy endpoint, nobody paged`);
     return;
   }
+  // After the incident is recorded, never before it: the lookup reads the store and adds a cause, it never decides a page.
+  applied.opened = applied.opened.map(withDiagnosis);
+  applied.reminded = applied.reminded.map(withDiagnosis);
   pushToUsers(applied, userIds, now);
   console.log(`[red-watch] ${counts}${closed} → pushed to ${userIds.length} user${userIds.length === 1 ? '' : 's'}`);
 }

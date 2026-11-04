@@ -18,7 +18,8 @@ import type { CerberusDiagnosisSubmission } from '@/shared/cerberus-types.js';
  * command and leaving it would keep a secret, so it is neither altered nor kept.
  *
  * Consumers: `diagnosis-prompt.ts`, `diagnosis-history.ts`, `diagnosis-measurement.ts` and `diagnosis-step-words.ts`,
- * through `oneMaskedLine`; `diagnosis-deps.ts` (a note, and `carriesCredential` for a proposal); and
+ * through `oneMaskedLine`; `diagnosis-reported.ts` (`oneMaskedFieldText`) and `diagnosis-leads.ts` (`oneWellFormedLine`),
+ * the two sections that carry a service's own fields and sentences; `diagnosis-deps.ts` (a note, and `carriesCredential` for a proposal); and
  * `diagnosis.service.ts`, which stores every conclusion through `maskedConclusion`.
  */
 
@@ -64,6 +65,32 @@ export function oneMaskedLine(text: string | null, limit: number): string {
   const folded = maskCredentials(text).replace(/\s+/g, ' ').trim();
   if (folded === '') return '—';
   return folded.length > limit ? `${folded.slice(0, limit)}…` : folded;
+}
+
+/** A lone half of a surrogate pair: a high surrogate with no low one after it, or a low one with no high one before it. */
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
+
+/**
+ * `oneMaskedLine` for a text whose characters are a service's own (a field of its document, a sentence of its health check):
+ * a lone surrogate it stored is replaced by U+FFFD first, and a cut that fell between the two halves of a pair drops the half
+ * it left, so the line is always well-formed text. `oneMaskedLine` itself is untouched, and its other callers keep their cut.
+ */
+export function oneWellFormedLine(text: string | null, limit: number): string {
+  const line = oneMaskedLine(text === null ? null : text.replace(LONE_SURROGATE, '�'), limit);
+  // The only lone surrogate left is one the cut made, and it stands right before the cut mark.
+  return line.replace(/[\ud800-\udbff]…$/, '…');
+}
+
+/**
+ * One value of a document's field, as the field's line shows it: `oneWellFormedLine`, except that a text under a credential's NAME
+ * (`db.password`, `refresh_token`, in the words of `KEY_WORD_VALUE`) is `<masked>` whole. The line mask takes only the one word after
+ * `name:`, so a passphrase of four words would otherwise keep three of them. A number or a boolean is no credential whatever its
+ * name says (`token_remaining_hours: 7.6`), so the caller hands only a STRING here and reads the rest as written.
+ */
+export function oneMaskedFieldText(name: string, text: string, limit: number): string {
+  const credentialName = maskCredentials(`${name}: x`) !== `${name}: x`;
+  // An empty text under such a name says "nothing is set", which is a fact worth keeping.
+  return credentialName && text.trim() !== '' ? MASKED : oneWellFormedLine(text, limit);
 }
 
 /**

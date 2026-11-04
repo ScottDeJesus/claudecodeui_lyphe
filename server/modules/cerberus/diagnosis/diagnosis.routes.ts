@@ -4,14 +4,24 @@ import type { Request, Response, Router } from 'express';
 import type { CerberusReadInputs } from '@/shared/cerberus-types.js';
 import { asyncHandler, readPathParam } from '@/shared/utils.js';
 
-import { badRequest, optionalText, readBody, readUsername, requiredNumber, requiredObject, requiredText } from '../route-input.js';
+import { setAutoDiagnosis } from '../auto-diagnosis.service.js';
+import {
+  badRequest,
+  optionalText,
+  readBody,
+  readCheckKey,
+  readUsername,
+  requiredNumber,
+  requiredObject,
+  requiredText,
+} from '../route-input.js';
 import { startRun } from '../runs.service.js';
 
 import { promoteDiagnosis } from './diagnosis-promotion.js';
 import { getDiagnosis, startDiagnosis } from './diagnosis.service.js';
 
 /**
- * The four routes of a diagnosis, mounted by `cerberus.routes.ts` under `/api/cerberus`: what a route
+ * The five routes of a diagnosis, mounted by `cerberus.routes.ts` under `/api/cerberus`: what a route
  * decides here is transport SHAPE only — that a field is text, a number, a true/false — and every
  * refusal worth the name (no such check, a diagnosis already running, no proposal, a lapsed one-off, a
  * limit that is not offered) is the service's, in the app's `{ success: false, error }` envelope.
@@ -20,6 +30,7 @@ import { getDiagnosis, startDiagnosis } from './diagnosis.service.js';
  *   GET  /diagnoses/:id           `CerberusDiagnosisView`, with every step and its run's lines
  *   POST /diagnoses/:id/run       "Run it once": → `{ runId }`; 409 with no proposal, or once its one-off has lapsed
  *   POST /diagnoses/:id/promote   `{ name, auto, limit: { runs, per: 3600 } }` → `CerberusCatalogEntryView`
+ *   PUT /checks/:node/:service/:check/auto-diagnosis  `{ on }` → 204; 404 for a check that is not active
  *
  * Like the rest of the module the answer is the wire shape itself, not wrapped in `{ success, data }`.
  * Running a proposal once never touches the catalog; promoting it is the only route that does.
@@ -85,6 +96,22 @@ export function createDiagnosisRouter(readInputs: () => CerberusReadInputs): Rou
         readUsername(request)
       );
       response.json(entry);
+    })
+  );
+
+  router.put(
+    '/checks/:node/:service/:check/auto-diagnosis',
+    asyncHandler(async (request: Request, response: Response) => {
+      const body = readBody(request);
+      setAutoDiagnosis(
+        {
+          node: readPathParam(request.params.node, 'node'),
+          key: readCheckKey(request),
+          on: requiredBoolean(body, 'on'),
+        },
+        readUsername(request)
+      );
+      response.status(204).end();
     })
   );
 

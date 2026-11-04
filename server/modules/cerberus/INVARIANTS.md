@@ -2,17 +2,18 @@
 
 ## INV-7004 — Cerberus store — edits that break it
 
-Behaviour of each: MAN-7805 (connection, steps), MAN-7806 (repositories, updates included), MAN-7896 (catalog and runs), MAN-7927 (diagnoses).
+Behaviour of each: MAN-7805 (connection, steps), MAN-7806 (repositories, updates included), MAN-7896 (catalog and runs), MAN-7927 (diagnoses), MAN-9532 (`auto_diagnosis`, step 7). The auto-diagnosis store's own rules: INV-10787.
 
 | Edit | Breaks | Why |
 |---|---|---|
-| Edit, reorder or remove a step in `CERBERUS_MIGRATIONS` that has run on the live store | the live store keeps the old shape while every scratch file builds the new one | position is the version; a change is a new step appended |
+| Edit, reorder or remove a step in `CERBERUS_MIGRATIONS` that has run on the live store | the live store keeps the old shape while every scratch file builds the new one | position is the version; a change is a new step appended. Step 7 has run on the live store: its seed (the eleven pollers), `diagnoses.by` and `auto_diagnosis` are frozen with it (INV-10787) |
 | Run a step in a deferred transaction, or read `user_version` outside `BEGIN IMMEDIATE` | the overlapping process of a handover fails on its first `CREATE TABLE` | measured 2026-10-06: 6 processes, 4 rounds — deferred failed 20 of 24 with `database is locked`, `.immediate()` opened 24 of 24 |
 | Replace the two `CROSS JOIN`s in `rowsInWindow` with plain `JOIN` | a window read walks every row of the node | no `ANALYZE` ever runs on this store, so the planner drives from `results` on `node` alone: 200 ms a part against 0.1 ms pinned, 466k rows |
 | Turn `results.insert`'s `ON CONFLICT … DO NOTHING` into `INSERT OR IGNORE` | a malformed row answers `false` exactly as a resend does, so a lost row is acked as a duplicate | a `false` is a resend, which the caller acks |
 | Change `transitions`' whole-instant return or the activity cursor (`before = last.at`, strict `<`) without the other | rows sharing one `at` are skipped at a page boundary | a health document stamps every component with one `at` |
 | Edit `transitions`' CTE WHERE (`kind = 'change' AND prev_status IS NOT NULL AND ${statusDiffers()}`) or `pruneKeepalivesBefore`'s (`kind = 'keepalive'`) so it no longer carries its partial index's terms, or edit `ix_results_moves` / `ix_results_keepalives` in step 4 | What happened walks every row of `results` again, and the 04:10 prune scans the table to find keep-alives | SQLite uses a partial index only when the query states the index's WHERE, so the two sides are spelled to match word for word (`statusDiffers()` spells the third term); step 4 has run on the live store, so a changed index is a new step appended at the end |
 | Start the prune at `start()` or on a timer measured from the last run, instead of at the next 04:10 (`nextPruneAt`) | every handover pays a full `DELETE` (the server hands over about 170 times a day: 56 runs measured 2026-10-06), and a daylight-saving change moves the hour | an hour of the day is a fixed point, not a wait a restart resets; each run arms the next from the clock |
+| Narrow `cerberusResultsDb.lastOkAt` to `change` rows, or read the check's `since` instead of its newest `ok` row | a check ok all night reads a last ok of days ago, so a diagnosis started while it was green counts as inside a red's trouble; a failing → warn → failing check reads as a second trouble | a keep-alive repeats an `ok` and is the newest evidence of green; `since` moves at every change of word and a trouble ends only in a recovery (MAN-9533) |
 | Pass an unclamped `limit` to SQL | `LIMIT -1` dumps the table | SQLite reads a negative limit as no limit |
 | Let a new `results.at` be a string or fraction | that row is the check's latest for ever | TEXT sorts above every number; the column's affinity cannot refuse it |
 | Drop the JS line check or the run-exists read in `cerberusRunsDb.insertOutput` | a malformed line answers as a resend; output filed under no `runs` row is kept for ever | `INSERT OR IGNORE` swallows a NOT NULL / CHECK violation; the prune reaches output only through `runs.requested_at` |
@@ -224,7 +225,7 @@ cat > "$S/q.mjs" <<'JS'
 const m = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts');
 const D = m.cerberusDiagnosesDb;
 const t = (f) => { try { return f(); } catch (e) { return 'threw ' + (e.code || e.name); } };
-const ins = (o) => D.insert({ id: 'd', node: 'eis1', check_key: 'a/x', asked_by: 'op', model: 'haiku', started_at: 1000, ...o });
+const ins = (o) => D.insert({ id: 'd', node: 'eis1', check_key: 'a/x', asked_by: 'op', by: 'you', model: 'haiku', started_at: 1000, ...o });
 const P = '{"name":"n","cmd":"c","general":"c"}';
 ins({ id: 'ok1' });
 console.log('insert started_at zzz:', t(() => { ins({ id: 'bad', started_at: 'zzz' }); return 'accepted'; }), '| latestForCheck since 0:', D.latestForCheck('eis1', 'a/x', 0)?.id);
@@ -259,7 +260,7 @@ cat > "$S/q.mjs" <<'JS'
 const m = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts');
 const D = m.cerberusDiagnosesDb;
 const t = (f) => { try { return f(); } catch (e) { return 'threw ' + (e.code || e.name); } };
-const ins = (o) => D.insert({ id: 'd', node: 'eis1', check_key: 'a/x', asked_by: 'op', model: 'haiku', started_at: 1000, ...o });
+const ins = (o) => D.insert({ id: 'd', node: 'eis1', check_key: 'a/x', asked_by: 'op', by: 'you', model: 'haiku', started_at: 1000, ...o });
 for (const [id, text] of [['e1', 'null'], ['e2', 'not json'], ['e3', '{}'], ['e4', '']]) { ins({ id, check_key: id }); console.log('proposal', JSON.stringify(text), '->', t(() => { D.end(id, 'done', { endedAt: 5000, summary: 's', evidence: '[]', proposal: text }); return 'stored'; })); }
 console.log('openOneOffs:', D.openOneOffs('eis1', 6000).map((r) => r.id + '=' + JSON.stringify(r.proposal)).join(' ') || 'none');
 ins({ id: 'f1', check_key: 'f1' }); ins({ id: 'f2', check_key: 'f2' });
@@ -291,7 +292,7 @@ cat > "$S/q.mjs" <<'JS'
 const m = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts');
 const D = m.cerberusDiagnosesDb;
 const t = (f) => { try { return f(); } catch (e) { return 'threw ' + (e.code || e.name); } };
-D.insert({ id: 's', node: 'eis1', check_key: 's/z', asked_by: 'op', model: 'haiku', started_at: 1000 });
+D.insert({ id: 's', node: 'eis1', check_key: 's/z', asked_by: 'op', by: 'you', model: 'haiku', started_at: 1000 });
 D.end('s', 'done', { endedAt: 50, summary: 's', evidence: '[]' });
 console.log('step filed after the end:', t(() => D.insertStep('s', 0, 60, 'late')), '| steps:', D.steps('s').length);
 JS
@@ -319,7 +320,7 @@ S=$(mktemp -d /tmp/athena-probe-s.XXXXXX) || exit 1
 case "$S" in /tmp/athena-probe-s.*) ;; *) exit 1;; esac
 cat > "$S/q.mjs" <<'JS'
 const m = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts');
-m.cerberusDiagnosesDb.insert({ id: 'orphan', node: 'eis1', check_key: 'o/y', asked_by: 'op', model: 'haiku', started_at: 1 });
+m.cerberusDiagnosesDb.insert({ id: 'orphan', node: 'eis1', check_key: 'o/y', asked_by: 'op', by: 'you', model: 'haiku', started_at: 1 });
 m.closeCerberusConnection();
 const D2 = (await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts')).cerberusDiagnosesDb;
 console.log('after reopen runningForCheck:', D2.runningForCheck('eis1', 'o/y')?.id ?? 'none', '| statements that list running rows:', Object.keys(D2).filter((k) => /running|active|unended/i.test(k) && k !== 'runningForCheck').join(',') || 'none');
@@ -350,7 +351,7 @@ cat > "$S/q.mjs" <<'JS'
 const m = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts');
 const D = m.cerberusDiagnosesDb, db = m.getCerberusConnection();
 const t = (f) => { try { return f(); } catch (e) { return 'threw ' + (e.code || e.name); } };
-const ins = (o) => D.insert({ id: 'd', node: 'eis1', check_key: 'tw', asked_by: 'op', model: 'haiku', started_at: 1000, ...o });
+const ins = (o) => D.insert({ id: 'd', node: 'eis1', check_key: 'tw', asked_by: 'op', by: 'you', model: 'haiku', started_at: 1000, ...o });
 ins({ id: 'twin' });
 console.log('second running insert for one check:', t(() => { ins({ id: 'twin2', started_at: 2000 }); return 'accepted'; }), '| running rows:', db.prepare("select count(*) c from diagnoses where check_key = 'tw' and status = 'running'").get().c);
 JS
@@ -720,13 +721,16 @@ Behaviour of each: MAN-7930 (the agent), MAN-7806 (the history statements). The 
 | Let a text reach the agent without `oneMaskedLine` (a new field in the prompt or in a history line), or change the warden's `maskSecrets` without `diagnosis-text.ts` | a credential-looking value in a check's value, a result, a fix's command, a run or a summary reaches the model, which can quote it into `evidence` or a `proposal` that is stored for ever and drawn on the sheet | the two doors are masked by two copies of one set of patterns; the warden's file cannot be imported here |
 | Drop `submit_diagnosis`'s once-guard or its `submitting` guard, its "no proposal without evidence" refusal, or let `captureSubmission` overwrite the first accepted call | two parallel submissions reach `deps.submit` and the agent answers the second while a first-end-wins store keeps the first; a fix proposed with no cause found is stored and offered as a one-off | the gate is the only place that can refuse a conclusion the agent can still correct; `deps.submit` awaits the summary audit, so the second call of a pair arrives while the first is still being checked |
 | Make the summary audit (`diagnosis-audit.ts`) refuse without a cap, or fail a submission when the auditor cannot answer; or give its session tools, MCP servers or a visible cwd | a diagnosis that can never land because a second model keeps naming clauses, or one that fails for want of a courtesy check; or a read-only auditor with hands | the audit is a courtesy to the sheet's reader: `AUDIT_REFUSALS_ALLOWED = 2`, `AUDIT_ROOM_MS` (it starts only with a minute left), null (logged) when it cannot answer or the diagnosis ends, and the same options as the agent (`tools: []`, `strictMcpConfig`, `settingSources: []`, `persistSession: false`, the hidden `cwd`, the `init` tool-list check) |
-| Rename a heading of the prompt's given sections (`THE CHECK`, `WHAT THE CHECK MEASURES`, `ITS LAST …` in `diagnosis-prompt.ts`) without `GIVEN_HEADINGS` | `givenFactsOf` returns nothing for it, and the audit names a figure the agent was told as invented | the given facts are cut out of the built prompt by their headings |
+| Rename a heading of the prompt's given sections (`THE CHECK`, `WHAT THE CHECK MEASURES`, `WHAT IT LAST REPORTED`, `WHERE TO LOOK`, `ITS LAST …` in `diagnosis-prompt.ts`) without `GIVEN_HEADINGS` | `givenFactsOf` returns nothing for it, and the audit names a figure the agent was told as invented | the given facts are cut out of the built prompt by their headings |
+| Mask a service's own field as a `name: value` text, hand a number or boolean to the credential-name rule, or cut a service's text with `oneMaskedLine` alone (`diagnosis-reported.ts`, `diagnosis-leads.ts`) | a four-word passphrase under `db.password` keeps three words (the line mask takes one word after `name:`); `token_remaining_hours: 7.6` reads `<masked>` and the figure a token-driven poller turns on is gone; a stored lone surrogate reaches the prompt, or a cut leaves half a pair | `oneMaskedFieldText` masks a STRING under a credential's NAME whole; a number, boolean, null or empty container is read as written; `oneWellFormedLine` repairs a surrogate before the cut and drops a half pair after it |
+| Cut `THE CHECK`'s value line to `PROMPT_TEXT_LIMIT` (240), or widen another stored text to `CHECK_VALUE_LIMIT` (600) | a poller's cause past the 240th character never reaches the agent; or every stored text rides 600 wide | the check's value is the one sentence its service wrote for a reader, and a dark poller's cause can sit past 240; every other text keeps 240 |
+| Gather the prompt's facts anywhere but `diagnosisPromptOf` (`diagnosis-agent.ts`), or leave `reported` or `leads` out of it | a probe prints a prompt the agent was never told; a section vanishes from the diagnosis the trigger starts | `runDiagnosisAgent` builds its prompt through it, so a probe that calls it prints what the agent reads |
 | Let `callNode` run unbounded in `readFromNode` | a read the warden never answers (a lost frame) blocks the agent until the loop's 3-minute ceiling, and it never learns to go on with history | the warden answers a read at 10 s, so 15 s of silence is a lost frame |
 | Add a read the budget does not count, drop `DIAGNOSIS_READ_BUDGET`'s refusal, or put the probe's `dsn` in `describeMeasurement` | an exploring model reads until its turns end and the diagnosis "failed" for want of a conclusion (measured 2026-10-07: 24 turns on Haiku, never submitted); or a connection string reaches the model | the budget and the refusal bound the reads well inside the turn ceiling; the prompt names what a check measures so the first read has somewhere to go, and a credential is never among the fields |
-| Pass `model` through a second default | the row says one model and the run used another | `resolveDiagnosisModel` is the one place `CERBERUS_DIAG_MODEL` and `sonnet` are named |
+| Pass `model` through a second default, or pass one from the auto-diagnosis trigger | the row says one model and the run used another | `resolveDiagnosisModel` is the one place `CERBERUS_DIAG_MODEL` and `sonnet` are named |
 | Drop `keepAnswersInline` (`_meta['anthropic/maxResultSizeChars']` 72 000 on a tool definition), or return a definition without it | an answer past the CLI's default per-tool limit is written under `~/.claude/projects/<cwd>/<session>/tool-results/` and the model gets a preview and a path it has no Read tool to open; measured 2026-10-07: a 64 KB `file_read` left 65 514 bytes of masked text there and the next step re-read the log as a 100-line tail | the warden caps an answer at 64 KiB and the tool frames it, so 72 000 holds the largest read; the limit is put on once where the list returns, so a seventh tool cannot miss it |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-audit.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-history.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-measurement.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-text.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-history-filter.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-audit.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-history.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-leads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-measurement.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-reported.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-text.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-history-filter.ts
 
 ## INV-7167 — Warden updates (center) — edits that break them
 
@@ -754,7 +758,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/hello-up
 
 ## INV-7177 — The diagnosis service — edits that break it
 
-Behaviour of each: MAN-7936 (the lifecycle), MAN-7937 (the one-off, run, promotion), MAN-7938 (routes, read model), MAN-7904 (runs). The agent's own rules: INV-7153. The warden's half: INV-7130.
+Behaviour of each: MAN-7936 (the lifecycle), MAN-7937 (the one-off, run, promotion), MAN-7938 (routes, read model), MAN-7904 (runs). The agent's own rules: INV-7153. The warden's half: INV-7130. The sentence a restart ends a diagnosis with (`RESTART_SENTENCE`, `diagnosis-endings.ts`), and what counts it: INV-10805. What starts a diagnosis by itself: INV-10818, INV-10822.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-absence.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-endings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-promotion.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-proposal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-steps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-step-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-wire.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/diagnosis-views.ts
+
+## INV-10823 — The diagnosis service — edits that break it — End a diagnosis anywhere but `conclude` (the ceiling, the link handlers or the agent's catch calling
 
 | Edit | Breaks | Why |
 |---|---|---|
@@ -767,7 +775,16 @@ Behaviour of each: MAN-7936 (the lifecycle), MAN-7937 (the one-off, run, promoti
 | Open a session on a node another live diagnosis already holds one on (drop `sessionHeldByAnother`), or take the warden's `diag.opened` for proof the session is this diagnosis's | the second diagnosis's sheet says "Opened a read-only session" and "Closed the session · nothing was changed" though the warden refused it, its three reads each come back refused with nothing saying so, and it ends `done` on history alone with evidence quoting the other diagnosis (measured 2026-10-07: two ordinary clicks on two red checks of one node) | a warden holds one open diagnosis and sends the receipt for every `diag.open`; only center knows which of its own diagnoses holds the node, and the first step says it reads history only |
 | Let `storeOutcome` drop the verdict of `cerberusDiagnosesDb.end`, or publish on a `done` the row does not hold | a row ended out of band (a boot sweep, an older process at a handover) is followed by a spurious catalog version and `catalog.set` for a conclusion it never stored | `end` answers whether THIS call ended the row; `conclude` publishes only on that |
 | Hand the agent a `diag.result` text unbounded (drop `holdToContractCap`) | a warden that missed its 64 KB cap turns sixteen reads into up to 128 MiB of model context in one diagnosis (the gateway admits 8 MiB frames) | the cap is the contract's; center holds it too, as defence in depth |
-| Replace an event with a poll (a timer that looks for a dead link or a stuck diagnosis) | a lazy watchdog decides what an event already knows | the waits are the receipt (5 s), a call (20 s) and the ceiling (3 min) — deadlines on work in flight, `unref`'d |
+| Replace an event with a poll (a timer that looks for a dead link or a stuck diagnosis) | a lazy watchdog decides what an event already knows | the waits are the receipt (5 s), a call (20 s) and the ceiling (3 min) — deadlines on work in flight, `unref`'d; the auto-diagnosis's one deadline is the same kind (INV-10818) |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-absence.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-endings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-promotion.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-proposal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-steps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-step-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-wire.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/diagnosis-views.ts
+
+## INV-10824 — The diagnosis service — edits that break it — Start a diagnosis from anywhere but `startDiagnosis`, or let a start that is not a press of Diagnose
+
+| Edit | Breaks | Why |
+|---|---|---|
+| Start a diagnosis from anywhere but `startDiagnosis`, or let a start that is not a press of Diagnose leave `by` at its default | a diagnosis written past the one door's guards; a trigger's start stored as `you`, so its failed tries are never counted and a press reads as the trigger's | `by` defaults to `you` for a press; the trigger passes `auto` and ends nothing (INV-10818) |
+| Store another sentence than `RESTART_SENTENCE` (`diagnosis-endings.ts`) in `stopDiagnoses` or the boot sweep, or define it a second time | a restart's ending reads as a failed try of the trigger, and the dev server restarts on every save | one constant, moved word for word out of `diagnosis.service.ts`; `endedByRestart` compares it exactly (INV-10805) |
 | Publish a one-off's `cmd` from `general`, or build the set's one-offs from anything but `openOneOffs` | `run.start` carries `proposal.cmd`, the warden compares byte for byte, and the set holds another text: every Run it once is refused; or a failed diagnosis's command is offered | one text on both sides; `general` is what a PROMOTION saves, and only `end` guarantees a stored proposal is well-formed |
 | Let a run of a one-off write `catalog`, `catalog_changes`, or ask `auto-run` anything | running a proposal once changes the catalog | spec §3: "Running a proposal once never touches the catalog" — the run row's `diagnosis` is the whole of its trace |
 | Make `ackedVersionCovering` look only at `entries`, or end the wait before the NEWEST set is acked | a one-off run waits the full 10 s and ends `failed`, or its `run.start` names a version the warden has not acked and is refused | the warden holds entries and one-offs in one table by id; a `run.start` names the newest ACKED set that holds the id |
@@ -777,12 +794,19 @@ Behaviour of each: MAN-7936 (the lifecycle), MAN-7937 (the one-off, run, promoti
 | Put text the agent typed (a path, a `contains`, a unit) into a step without `oneMaskedLine` | a credential-looking value is stored for ever and drawn on the sheet | the step is the one stored text that comes straight from the model's arguments |
 | File a `note` as a step without `oneMaskedLine`, or store a submission's summary, evidence or fix-button name without `maskedConclusion` (`diagnosis.service.ts`) | a credential the model reassembled from pieces is drawn on the sheet and kept for ever | every input the model sees is masked, but its own words are not; the mask runs on the way out too, before any cut |
 | Mask a proposal's `cmd` or `general` instead of refusing it, or drop the `carriesCredential` refusal in `submit` | the masked command does not run; an unmasked one is stored and offered to a warden | `submit` throws "A proposed command may not carry a credential" to the agent, which resubmits without it; a proposal the mask would change is never stored |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-absence.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-endings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-promotion.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-proposal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-steps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-step-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-wire.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/diagnosis-views.ts
+
+## INV-10825 — The diagnosis service — edits that break it — Drop `submit`'s `unquotedLines` refusal (`diagnosis-absence.ts`), hold an evidence line to the
+
+| Edit | Breaks | Why |
+|---|---|---|
 | Drop `submit`'s `unquotedLines` refusal (`diagnosis-absence.ts`), hold an evidence line to the prompt as a source, count a read's own empty sentence (`EMPTY_ANSWERS`, `ABSENCE_PHRASES`) as a line, or accept a line that is a share of a line, a label before one, or a word list's idea of what is not an absence | a run files the read's own empty answer ("journal: -- No entries --", "Nothing recorded since …"), the check's own value, a count of what was not there ("zero approval-engine sweep entries found"), a paraphrase of a file, a journal line cut in the middle with `...`, its time moved or two lines spliced, or "approval sweeper silent;" before a real line, as evidence, and may propose a fix on it | measured 2026-10-07 (INV-7169): three Haiku runs on empty reads filed 0, 0 and 3 absence lines, one proposing a restart; a live diagnosis of `shadow-connector/approval_engine` filed "zero approval-engine sweep entries found" and a paraphrase of a drift report; a gate on "a quoted piece of 8 characters" passed the check's own value, another engine's line decorated with its dict keys and an absence behind one quoted identifier; a gate on a share of the line plus a negative-word list passed a line cut with `...`, its time moved and its own conclusion on the end. An absence has nothing to copy and an edited line is not a line of a read, so an evidence line is held to ONE rule: one verbatim stretch of one line of an answer of a read that SUCCEEDED (never the prompt, the reads' empty sentences dropped), at least 20 characters, the punctuation at its two ends let go, nothing of the agent's own on it |
 | Send a read after the diagnosis ended (drop `isOver`), or write a `diag.call` frame from anywhere but `diagnosis-wire.ts` | a late tool call reaches a warden that closed the session; a second place speaks the wire | one file owns the five frames' center side |
 | Recheck only entries (drop `run.diagnosis !== null` in `run-frames.ts`) | a one-off that fixed the check leaves it red until its next cadence, and the sheet shows a green fix beside a red check | a one-off was proposed for this very check |
 | Name the run of a one-off by its diagnosis id | the sheet and the feed say "ran 61d4ee4f…" | `run-views.ts` reads the proposal's name |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-absence.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-promotion.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-proposal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-steps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-step-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-wire.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/diagnosis-views.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-absence.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-endings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-promotion.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-proposal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-steps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-step-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-wire.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/diagnosis-views.ts
 
 ## INV-7231 — The hub and ingest — edits that break them: `start()` before READY, the re-seed at hello, the storage rule, the newest value
 
@@ -894,25 +918,286 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus
 
 ## INV-10187 — Cerberus red watch — edits that break it
 
-Behaviour of each: MAN-9205. The table's steps 5 and 6 are frozen like every step: INV-7004.
+Behaviour of each: MAN-9205. The diagnosis a page carries: MAN-9541, its edits INV-10804. The auto-diagnosis trigger shares the watch's sole duty: INV-10822. The table's steps 5 and 6 are frozen like every step: INV-7004.
 
 | Edit | Breaks | Why |
 |---|---|---|
 | Hand the event over BEFORE the transaction writes the incident | a double page on every restart | the dev server restarts on every save under `server/`; a process that dies between the two must cost one missed page, never a repeat |
+| Look a page's diagnosis up inside `applyPlan`'s transaction or before it, or let a failed lookup stop the page | the incident's write waits on a read of diagnoses, or a store that cannot be read costs the page itself | the lookup runs after the transaction and before `pushToUsers`, and answers `undefined` (logged) when it throws (INV-10804) |
 | Tick at arming in `startRedWatch` | the first page is pushed and absent from the notification history and the companion's alert feed | both attach to the orchestrator in the `listen` callback, after `cerberus.start()`; measured on the first page (2026-10-29) |
 | Arm the watch outside `soleDuties()` / `armSoleDuties()` | two API processes page one incident from their own memory | `ix_red_alerts_open` stops a second row, but a second process still reads the fleet and pushes first |
 | Give `cerberusRedAlertsDb.open` a conflict target, or make it throw on `ON CONFLICT` | a NOT NULL or CHECK violation reads as "already open" and pages nothing; or the loser of an open race pages | `open` answers `null` only for the open-incident index; any other violation must throw |
 | Push what the plan holds instead of what `applyPlan` answers for `open` / `close` | an incident another process opened or closed is pushed twice | the push belongs to the process whose write changed the row |
 | One `dedupeKey` per tick for all recipients, or one that repeats across ticks | the second user's push, or the next minute's, is swallowed | the orchestrator's 20-second dedupe is keyed on `dedupeKey` alone |
 | Compare a check's `since` with center's `now` without `wardenLinks.clockOffsetMs` | an hour is judged on two clocks: early or late pages by the node's skew | `since` is the warden's clock |
-| Add `warn` to `PAGING_STATUSES` | every warn check pages at the hour (12 of them on 2026-10-29, next to 8 red) | `warn` is for the tab; `denied` and `failing` page |
+| Add `warn` to `PAGING_STATUSES`, or give the auto-diagnosis plan a set of its own | every warn check pages at the hour (12 of them on 2026-10-29, next to 8 red); or a check is diagnosed that never pages | `warn` is for the tab; `denied` and `failing` page; the plan reads this exported set (INV-10805), so the diagnosis rides the page |
 | Take the `held` test out of the re-open rule | a mute lifted at minute 20, or a node blip, re-pages at once | a `since` that never changed is still over an hour old |
 | Hold every re-open for 6 h (drop `redSince <= previous.opened_at`) | a new red after a recovery the mute or silence hid is held up to 6 h | only the SAME red waits out the cadence |
 | Compare `redSince` with `previous.red_since` instead of `previous.opened_at` | an offset median shifting a few ms reads the same red as new: an early re-page | an incident opens only for a red an hour old, so the same red began an hour before `opened_at`: the margin absorbs the jitter |
 | Leave `redSince` to the open call's `now` (drop `red_since` from `open`) | a recovery push reports how long it was PAGED, not how long it was red | `opened_at` is an hour or more after the red began |
 | Add the three `cerberus.*` codes to `COLLAPSIBLE_CODES`, or drop their `RED_WATCH` row | the flood window swallows a page, or a page arrives at a chat turn's priority | one event per tick, so a flood window can only lose a page; priority 5 sounds through Do Not Disturb |
-| Raise `BODY_BUDGET` (900) past what `buildNotificationText` keeps (1,000), or build the body without it | a page is cut mid-line, and the items past the cut are named nowhere | the copy counts the lines that do not fit as `+N more` |
-| Take the `cerberus.` branch out of `metaWithoutSpend` | the notification history and `list_alerts` keep a check's usage or spend sentence ("Gemini and DeepSeek spend is normal", dollar figures) | the history never holds usage or spend text; the phone's push is not worded there and keeps it |
+| Raise `BODY_BUDGET` (900) past what `buildNotificationText` keeps (1,000), or build the body without it | a page is cut mid-line, and the items past the cut are named nowhere | the copy counts the lines that do not fit as `+N more`; a check's cause and fix lines are fitted with it as one block (INV-10804) |
+| Take the `cerberus.` branch out of `metaWithoutSpend` | the notification history and `list_alerts` keep a check's usage or spend sentence ("Gemini and DeepSeek spend is normal", dollar figures), or a diagnosis that speaks of it | the history never holds usage or spend text; the phone's push is not worded there and keeps it |
 | Delete a closed `cerberus_red_alerts` row, or prune the table | a lifted mute re-pages at once | a closed row is what `lastClosed` judges a re-open against |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/red-watch-plan.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/red-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-red-alerts.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/cerberus-red-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-spend-free.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/red-watch-diagnosis.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/red-watch-plan.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/red-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-red-alerts.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/cerberus-red-cause.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/cerberus-red-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-spend-free.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts
+
+## INV-10787 — Auto-diagnosis store and a red's trouble — edits that break them
+
+Behaviour: MAN-9532 (`cerberusAutoDiagnosisDb`, step 7's tables), MAN-9533 (`check-trouble.ts`), MAN-9534 (the switch's write, route and read; its rules INV-10797).
+
+| Edit | Breaks | Why |
+|---|---|---|
+| Bound a trouble (`troubleDiagnoses`, the trigger, the push) by the check's `since` instead of `lastOkAt` | a failing → warn → failing check, or failing → denied, is diagnosed or pushed a second time for one trouble | `since` moves at every change of word; a trouble ends only in a recovery |
+| Give the trigger and the red-watch push each their own bound | the phone names a diagnosis the trigger did not count | one bound, `check-trouble.ts`, for both |
+| Compare a result's `at` with a diagnosis's `started_at` without the node's clock offset, or add the offset a second time to `lastOkAt`'s answer | a diagnosis is read as inside or outside a trouble by the node's clock skew | a result's `at` is the warden's clock, `started_at` center's; `check-trouble.ts`'s `lastOkAt` converts once |
+| Bound `troubleDiagnoses` by a row limit (a window of the newest rows) | a restart storm (one restart-cut row per cut diagnosis, unbounded: the dev server restarts on every save) pushes a `done` row out of sight, so the trigger starts the check again and the page goes out without its diagnosis, or a third counted failure, so the guard against a loop sees two | the trouble is read WHOLE (`WHOLE_TROUBLE`); any later bound must keep every running or done row and every counted failure (INV-10805) |
+| Edit step 7's seed (the eleven poller keys) or `diagnoses.by`'s DEFAULT in place | the live store keeps the old seed, every scratch store builds the new one | step 7 has run on the live store (INV-7004); a change of seed is a NEW step, or a `set` through the switch |
+| Write an `auto_diagnosis` row for a check nobody switched, or read a check with no row as on | Cerberus diagnoses by itself a check nobody switched on | no row = off; a row is a check ever switched |
+| Drop the safe-integer check on `cerberusAutoDiagnosisDb.set`'s `at`, or split `set` into a read then an insert / update | a text `set_at` sorts above every number; two writers of one check race to a duplicate-key throw | the column's affinity refuses nothing; the one `ON CONFLICT(node, check_key) DO UPDATE` is the whole write |
+| Let `diagnoses.by` take a value outside `'auto'` / `'you'`, or write `'auto'` for a press of Diagnose | the sheet and What happened say who started a diagnosis wrongly; every pre-step row (`'you'`) stops meaning "pressed" | `by` mirrors `runs.by`; the table's CHECK is the last guard |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/check-trouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-auto-diagnosis.db.ts
+
+## INV-10797 — The auto-diagnosis switch — edits that break it
+
+Behaviour: MAN-9534. The repository's rules: INV-10787. The trigger's: INV-10818.
+
+| Edit | Breaks | Why |
+|---|---|---|
+| Write the row in `setAutoDiagnosis` before `findActiveCheck`, or drop `findActiveCheck` | a row for a name that is no active check; it reads on the day a check of that name appears | the switch is the operator's choice about a check that exists; the 404 is judged before any write |
+| Call `hintChanged` before `cerberusAutoDiagnosisDb.set`, or never | whoever hears the hint reads the old switch | the hint goes out after the write, as a mute's does |
+| Put `autoDiagnosis` on `CerberusCheckView` | every overview build reads one `auto_diagnosis` row per check | it rides `CerberusCheckDetail` only: the sheet's own read |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-diagnosis.service.ts
+
+## INV-10804 — Cerberus red watch — the diagnosis on a page: edits that break it
+
+Behaviour of each: MAN-9541. The watch's own rules: INV-10187. The trouble's bound: INV-10787.
+
+| Edit | Breaks | Why |
+|---|---|---|
+| Let `pushDiagnosisOf` throw, or take out its `try` / `catch` | a store or a stored proposal that cannot be read costs the page itself | the page is the operator's alarm; the lookup adds a cause and decides nothing |
+| Wait for a diagnosis before `pushToUsers`, or push again when one finishes | a page late by a model run; a second page for one red | the page keeps its own clock; the next reminder carries the diagnosis |
+| Let the lookup's answer into `planRedWatch` or an incident rule | a diagnosis decides whether, when or how often a check pages | it is read after the incident is recorded |
+| Give the lookup its own bound instead of `troubleDiagnoses` (`check-trouble.ts`) | the phone names a diagnosis the trigger did not count (INV-10787) | one bound for both |
+| Attach a diagnosis to a recovered item | a "green again" page carries a cause for a red that ended | recoveries carry none |
+| Cut a diagnosis line with `slice` or `substring`, or any cutter but `clip` | half an emoji reaches the phone as U+FFFD | the text is model-written; `clip` steps back off a high surrogate |
+| Write a check's lines as separate entries to `fitLines` | `+N more` counts lines, not checks; a check is cut mid-block | one string per check (`redEntry`) |
+| Raise the line limits (200, 300, 250 alone; 140, 120 in a list) so a page nears `BODY_BUDGET` | items past the cut are named nowhere | each limit is the whole line; the copy counts the rest as `+N more` |
+| Take the `diagnosis` branch out of `checksWithoutSpend` | the notification history and `list_alerts` keep a usage or spend sentence a diagnosis wrote | the history never holds usage or spend text |
+| Accept any shape in `readDiagnosis` | an item with a malformed `diagnosis` throws in the copy and the page is lost | a malformed one pages as if it had none |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/red-watch-diagnosis.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/red-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/cerberus-red-cause.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/cerberus-red-copy.service.ts
+
+## INV-10805 — The auto-diagnosis plan — edits that break it
+
+Behaviour: MAN-9542. The trigger that applies it: INV-10818. The red watch's own rules: INV-10187. The trouble's: INV-10787.
+
+| Edit | Breaks | Why |
+|---|---|---|
+| Count a restart-cut diagnosis (`endedByRestart`) as a failed try, or stop skipping it in `isCountedFailure` | every save of the dev server spends a check's three tries; the check lands in `exhausted` and is never read | a restart is neither a reading nor a failure; 135 handover boots in 24 hours (2026-11-04) |
+| Reword `RESTART_SENTENCE` in place | rows stored with the old words stop matching `endedByRestart` and count as failures | the sentence is stored on each row and compared exactly; a new wording needs the old one matched beside it |
+| Add a cap to the plan: an age limit, a per-check bound, a daily cap | a red goes unread because of how many were read before | operator, 2026-11-04: "There shouldn't be a cap"; the three-failure guard is the only brake |
+| Spare the trigger by its own (`by: 'auto'`) diagnoses only, or count a failed press of Diagnose toward the three | a press at minute 5 does not spare the read at minute 10; or a failed press shortens the trigger's tries | `running` and `done` of any `by` spare the trigger; only a `by: 'auto'` failure that no restart ended counts toward the three |
+| Ask `troubleDiagnoses` before the `enabled`, link and `since` tests | a check switched off costs a store read per plan | the store is asked only for a candidate that can still start |
+| Give a ready candidate that cannot start (node unlinked, updating, busy, or already started in this plan) a `nextAt` | a timer fires, plans, cannot start, and fires again: a poll | the event that frees the node plans again |
+| Start two checks of one node in one plan, or order `starts` by anything but oldest red | the warden refuses the second session; a newer red is read before an older one | a warden holds one diagnosis session; oldest red first |
+| Choose candidates by a set of the plan's own instead of `PAGING_STATUSES`, or compare `since` with `now` without `clockOffsetMs` | a diagnosis starts for a check that never pages, or the hold runs early or late by the node's skew | the diagnosis rides the page: one set (INV-10187), one clock |
+| Hand the timer `nextAt` unclamped | a `nextAt` over 2^31−1 ms ahead fires at once and plans in a loop | `setTimeout` truncates a delay past 32 bits |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-diagnosis-plan.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-endings.ts
+
+## INV-10818 — The auto-diagnosis trigger — edits that break it
+
+Behaviour: MAN-9545. The plan's own rules: INV-10805. The red watch's: INV-10187. The switch's: INV-10797. The trouble's: INV-10787.
+
+| Edit | Breaks | Why |
+|---|---|---|
+| Drive plans from a tick, `setInterval`, the red watch's 60 s tick or any loop that re-reads, instead of `onHintSent` and the one deadline | a watchdog; a plan per minute with nothing changed | operator, 2026-10-06: "Always event driven, no lazy watchdog checks ever"; every writer already hints |
+| Plan inside the listener, or one plan per hint instead of one pending `setImmediate` | a plan runs inside a writer's window timer; a burst of hints plans a burst of times | one plan per turn, never inside a writer's call |
+| `.unref()` the `setImmediate` | the plan waits for the loop's next wake instead of its next turn | it lives one turn and is scheduled only after settle; every TIMER stays unref'd |
+| Drop `.unref()` from the settle timer or the deadline timer | a process asked to exit waits up to a minute, or a deadline's delay | a deadline on work the plan computed is no reason to stay up |
+| Arm the deadline after the starts, or inside the start loop | a start that throws costs the deadline; a ready red waits for an unrelated hint | `armDeadline` runs before `sayExhausted` and the starts |
+| Hand `setTimeout` `plan.nextAt` without the `LONGEST_TIMER_MS` clamp | a `nextAt` over 2^31−1 ms ahead fires at once and plans in a loop | `setTimeout` truncates a delay past 32 bits |
+| Plan on a hint before the settle minute, or shorten `SETTLE_MS` | every dev save starts a model run in a process that lives seconds | 135 handover boots in a day; the next process plans from the store |
+| Drop `retryAfterThrow`, or make the retry unbounded, or let it replace a nearer deadline | a transient overview or store failure leaves a ready red unread; an unbounded retry polls; a nearer moment is lost | bounded by `PLAN_RETRIES` at `PLAN_RETRY_MS`; `deadlineAt` guards the nearer |
+| Reset `throwsInARow` anywhere but after a plan ran to the end, or never | a throwing plan retries forever, or never retries | the count is plans that threw in a row |
+| Start the trigger outside `armSoleDuties`, or call `stopAutoDiagnosis` after `stopDiagnoses` | two API processes start the same diagnoses from their own memory; the ends a shutdown stores and hints start a diagnosis again | one process's duty (INV-10187); the stop comes first |
+| Swallow every error of a start, or let an `AppError` end the plan | a bug hides as a refusal; or one 409 stops every later check of the plan | `AppError` is that start's alone; anything else reaches the plan's catch |
+| Start with a `by` other than `'auto'`, an `askedBy` other than `'cerberus'`, or a model | a failed try is not counted toward the three, so a failing check is read every 15 minutes forever; or the model is not the operator's pick | the plan counts `by: 'auto'` failures only (INV-10805); `resolveDiagnosisModel` picks the model |
+| End, cancel or re-score a diagnosis from the trigger | a run the operator pressed or watched is cut by a timer | the trigger starts and never ends; the lifecycle is INV-7177's |
+| Key `saidExhausted` by `check-trouble.ts` `lastOkAt`, or forget a slot when it leaves `exhausted` | the line repeats on every heartbeat (the offset drifts) or on every failing → warn → failing flip | the key is `cerberusResultsDb.lastOkAt`, the warden's own clock: one per trouble |
+| Let a second `startAutoDiagnosis` subscribe again | every hint plans twice | `if (unsubscribe) return` |
+| Leave `settled`, `throwsInARow` or `saidExhausted` out of `stopAutoDiagnosis` | a re-armed trigger plans at once on a hint before its settle minute, or inherits the old process's counts | stop returns every piece of state to its start |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-diagnosis.service.ts
+
+## INV-10819 — probe — a plan that throws on the deadline's own firing loses the one deadline; a ready red waits for an unrelated hint
+
+a plan that throws on the deadline's own firing loses the one deadline; a ready red waits for an unrelated hint
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+# F1: the plan the deadline fires throws once; nothing re-arms the deadline. Settle minute scaled to 0.3 s; copy of the live store.
+cd /tmp || exit 1
+sqlite3 ~/.cloudcli/cerberus.db ".backup /tmp/athena-probe-f1.db" || exit 1
+cat > /tmp/athena-probe-f1.mts <<'TS'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
+const realSetTimeout = globalThis.setTimeout;
+(globalThis as any).setTimeout = (fn: any, ms?: number, ...rest: any[]) => realSetTimeout(fn, ms === 60000 ? 300 : ms, ...rest);
+const lines: string[] = [];
+for (const m of ['log', 'error'] as const) { const o = console[m].bind(console); (console as any)[m] = (...a: unknown[]) => { lines.push(a.map(String).join(' ')); o(...a); }; }
+const { getCerberusConnection, cerberusAutoDiagnosisDb } = await import(`${R}/database/index.js`) as any;
+const { ingest } = await import(`${R}/cerberus/ingest.service.js`) as any;
+const { wardenLinks } = await import(`${R}/cerberus/warden-links.js`) as any;
+const { buildOverview } = await import(`${R}/cerberus/read-model/overview.js`) as any;
+const svc = await import(`${R}/cerberus/auto-diagnosis.service.js`) as any;
+const conn = getCerberusConnection();
+const inputs = () => { ingest.seedMemory(); return { now: Date.now(), links: wardenLinks.states(), gateway: { listen: null, address: null, error: null }, memory: (n: string, k: string) => ingest.memory(n, k) } as any; };
+cerberusAutoDiagnosisDb.set('center', 'cerberus/wardens.fresh', true, Date.now(), 'probe');
+const t0 = Date.now(), readyAt = t0 + 2500;
+const check = { node: 'center', key: 'cerberus/wardens.fresh', service: 'cerberus', id: 'wardens.fresh', label: 'w', serviceLabel: 'w', status: 'failing', stored: 'failing', value: null, at: t0, since: readyAt - 600_000, every: 10, staleAfter: 60, origin: 'self', kind: 'self', mute: null };
+const base = buildOverview(inputs());
+let thrown = 0;
+const overview = () => { if (!thrown && Date.now() >= readyAt - 50) { thrown++; throw new Error('probe: transient'); } return { ...base, now: Date.now(), needsYou: [{ check, fix: null, run: null, diagnosis: null }], muted: [] }; };
+svc.startAutoDiagnosis({ overview, readInputs: inputs });
+setInterval(() => {}, 50); // keeps the loop awake so only the deadline logic is measured
+await new Promise((r) => realSetTimeout(r, 7000));
+const n = (conn.prepare("select count(*) n from diagnoses where by='auto'").get() as any).n;
+console.log(`PROBE thrown=${thrown} autoRows=${n} didNothingLines=${lines.filter((l) => l.includes('a plan did nothing')).length}`);
+process.exit(0);
+TS
+CERBERUS_DB_PATH=/tmp/athena-probe-f1.db DATABASE_PATH=/tmp/athena-probe-f1.app.db CERBERUS_DIAG_MODEL=athena-no-such-model timeout 150 cloudcli-tsx /tmp/athena-probe-f1.mts 2>&1 | grep -E "^PROBE" || echo "PROBE did not answer"
+rm -f /tmp/athena-probe-f1.db /tmp/athena-probe-f1.db-wal /tmp/athena-probe-f1.db-shm /tmp/athena-probe-f1.app.db /tmp/athena-probe-f1.app.db-wal /tmp/athena-probe-f1.app.db-shm /tmp/athena-probe-f1.mts
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--trigger-20261104-110515-7df3, finding M1, MEDIUM
+probe-key: a9c3ef7b0cf8e66b026594024ed626015d91fc55
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-diagnosis.service.ts
+
+## INV-10820 — probe — `pendingPlan.unref()` makes a plan wait for the loop's next wake, not its next turn
+
+`pendingPlan.unref()` makes a plan wait for the loop's next wake, not its next turn
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+# F2: with nothing else waking the loop, the settle plan (an unref'd setImmediate) runs at the loop's next wake. Settle minute scaled to 0.3 s.
+cd /tmp || exit 1
+sqlite3 ~/.cloudcli/cerberus.db ".backup /tmp/athena-probe-f2.db" || exit 1
+cat > /tmp/athena-probe-f2.mts <<'TS'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
+const realSetTimeout = globalThis.setTimeout;
+(globalThis as any).setTimeout = (fn: any, ms?: number, ...rest: any[]) => realSetTimeout(fn, ms === 60000 ? 300 : ms, ...rest);
+let startedAt = 0;
+const t0 = Date.now();
+for (const m of ['log', 'error'] as const) { const o = console[m].bind(console); (console as any)[m] = (...a: unknown[]) => { if (String(a[0]).includes('] diagnosing ')) startedAt = Date.now(); o(...a); }; }
+const { getCerberusConnection, cerberusAutoDiagnosisDb } = await import(`${R}/database/index.js`) as any;
+const { ingest } = await import(`${R}/cerberus/ingest.service.js`) as any;
+const { wardenLinks } = await import(`${R}/cerberus/warden-links.js`) as any;
+const { buildOverview } = await import(`${R}/cerberus/read-model/overview.js`) as any;
+const svc = await import(`${R}/cerberus/auto-diagnosis.service.js`) as any;
+getCerberusConnection();
+const inputs = () => { ingest.seedMemory(); return { now: Date.now(), links: wardenLinks.states(), gateway: { listen: null, address: null, error: null }, memory: (n: string, k: string) => ingest.memory(n, k) } as any; };
+cerberusAutoDiagnosisDb.set('center', 'cerberus/wardens.fresh', true, Date.now(), 'probe');
+const check = { node: 'center', key: 'cerberus/wardens.fresh', service: 'cerberus', id: 'wardens.fresh', label: 'w', serviceLabel: 'w', status: 'failing', stored: 'failing', value: null, at: t0, since: t0 - 3600_000, every: 10, staleAfter: 60, origin: 'self', kind: 'self', mute: null };
+const base = buildOverview(inputs());
+const overview = () => ({ ...base, now: Date.now(), needsYou: [{ check, fix: null, run: null, diagnosis: null }], muted: [] });
+const armed = Date.now();
+svc.startAutoDiagnosis({ overview, readInputs: inputs });
+await new Promise((r) => realSetTimeout(r, 3000)); // the only other timer: the loop wakes at 3000 ms and at no time before
+console.log(`PROBE settle=300ms; the start came ${startedAt === 0 ? 'never' : (startedAt - armed) + ' ms'} after arming`);
+process.exit(0);
+TS
+CERBERUS_DB_PATH=/tmp/athena-probe-f2.db DATABASE_PATH=/tmp/athena-probe-f2.app.db CERBERUS_DIAG_MODEL=athena-no-such-model timeout 150 cloudcli-tsx /tmp/athena-probe-f2.mts 2>&1 | grep -E "^PROBE" || echo "PROBE did not answer"
+rm -f /tmp/athena-probe-f2.db /tmp/athena-probe-f2.db-wal /tmp/athena-probe-f2.db-shm /tmp/athena-probe-f2.app.db /tmp/athena-probe-f2.app.db-wal /tmp/athena-probe-f2.app.db-shm /tmp/athena-probe-f2.mts
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--trigger-20261104-110515-7df3, finding L1, LOW
+probe-key: f218688c0951333d2cf6bb3de100d6c2efcb7439
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-diagnosis.service.ts
+
+## INV-10821 — probe — the "failed 3 times" line is said again inside one trouble when the check flips failing ↔ warn
+
+the "failed 3 times" line is said again inside one trouble when the check flips failing ↔ warn
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+# F3: the "failed 3 times" line, said once, is said again after the check flips failing -> warn -> failing (the same trouble: never ok in between). Settle scaled to 0.3 s.
+cd /tmp || exit 1
+sqlite3 ~/.cloudcli/cerberus.db ".backup /tmp/athena-probe-f3.db" || exit 1
+cat > /tmp/athena-probe-f3.mts <<'TS'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
+const realSetTimeout = globalThis.setTimeout;
+(globalThis as any).setTimeout = (fn: any, ms?: number, ...rest: any[]) => realSetTimeout(fn, ms === 60000 ? 300 : ms, ...rest);
+let said = 0;
+for (const m of ['log', 'error'] as const) { const o = console[m].bind(console); (console as any)[m] = (...a: unknown[]) => { if (String(a[0]).includes('failed 3 times')) said++; o(...a); }; }
+const { getCerberusConnection, cerberusAutoDiagnosisDb } = await import(`${R}/database/index.js`) as any;
+const { ingest } = await import(`${R}/cerberus/ingest.service.js`) as any;
+const { wardenLinks } = await import(`${R}/cerberus/warden-links.js`) as any;
+const { buildOverview } = await import(`${R}/cerberus/read-model/overview.js`) as any;
+const bc = await import(`${R}/cerberus/cerberus-broadcast.js`) as any;
+const svc = await import(`${R}/cerberus/auto-diagnosis.service.js`) as any;
+const conn = getCerberusConnection();
+const inputs = () => { ingest.seedMemory(); return { now: Date.now(), links: wardenLinks.states(), gateway: { listen: null, address: null, error: null }, memory: (n: string, k: string) => ingest.memory(n, k) } as any; };
+const key = 'cerberus/wardens.fresh';
+cerberusAutoDiagnosisDb.set('center', key, true, Date.now(), 'probe');
+for (let i = 0; i < 3; i++) conn.prepare("insert into diagnoses (id,node,check_key,asked_by,by,model,started_at,status,ended_at,error) values (?,?,?,?,?,?,?,'failed',?,'probe failure.')").run(`f3f3f3f3f3f3f3f${i}`, 'center', key, 'cerberus', 'auto', 'seed', Date.now() + i, Date.now() + i + 1);
+let status = 'failing'; const t0 = Date.now();
+const base = buildOverview(inputs());
+const overview = () => ({ ...base, now: Date.now(), needsYou: [{ check: { node: 'center', key, service: 'cerberus', id: 'wardens.fresh', label: 'w', serviceLabel: 'w', status, stored: status, value: null, at: t0, since: t0 - 3600_000, every: 10, staleAfter: 60, origin: 'self', kind: 'self', mute: null }, fix: null, run: null, diagnosis: null }], muted: [] });
+svc.startAutoDiagnosis({ overview, readInputs: inputs });
+setInterval(() => {}, 50);
+const sleep = (ms: number) => new Promise((r) => realSetTimeout(r, ms));
+await sleep(1500); const first = said;
+for (let i = 0; i < 3; i++) { bc.hintChanged({ nodes: ['center'] }); await sleep(1300); }
+const afterHints = said;
+status = 'warn'; bc.hintChanged({ nodes: ['center'] }); await sleep(1500);
+status = 'failing'; bc.hintChanged({ nodes: ['center'] }); await sleep(1500);
+console.log(`PROBE said=${first} after3hints=${afterHints} afterFailing->warn->failing=${said}`);
+process.exit(0);
+TS
+CERBERUS_DB_PATH=/tmp/athena-probe-f3.db DATABASE_PATH=/tmp/athena-probe-f3.app.db CERBERUS_DIAG_MODEL=athena-no-such-model timeout 150 cloudcli-tsx /tmp/athena-probe-f3.mts 2>&1 | grep -E "^PROBE" || echo "PROBE did not answer"
+rm -f /tmp/athena-probe-f3.db /tmp/athena-probe-f3.db-wal /tmp/athena-probe-f3.db-shm /tmp/athena-probe-f3.app.db /tmp/athena-probe-f3.app.db-wal /tmp/athena-probe-f3.app.db-shm /tmp/athena-probe-f3.mts
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--trigger-20261104-110515-7df3, finding L2, LOW
+probe-key: 48114310210caaa41f078eb6c89e5d099d4d42c3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-diagnosis.service.ts
+
+## INV-10822 — The auto-diagnosis — edits that break it
+
+Behaviour of each: MAN-9546. The detail rows keep each edit's measurement: the plan INV-10805, the trigger INV-10818, the switch INV-10797, the store and the trouble INV-10787.
+
+| Edit | Breaks | Why |
+|---|---|---|
+| Start a diagnosis anywhere but `startDiagnosis`, or end, cancel or re-score one from the trigger | a second door writes `diagnoses` rows past the lifecycle; a run the operator pressed or watched is cut by a timer | `startDiagnosis` is the one door and `conclude` the one end (INV-7177): the trigger starts and never ends |
+| Plan from a tick, a `setInterval`, the red watch's tick or any loop that re-reads, in place of `onHintSent` and the one deadline | a watchdog: a plan a minute with nothing changed | operator, 2026-10-06: "Always event driven, no lazy watchdog checks ever"; every writer already hints |
+| Run a plan inside the hint listener, a writer's call or the window's timer, or one plan per hint | a burst of hints plans a burst of times inside a writer's window | one plan per loop turn: one pending `setImmediate` |
+| Arm the trigger outside `armSoleDuties` | two API processes start the same diagnoses from their own memory | one process's duty (INV-10187) |
+| Call `stopAutoDiagnosis` after `stopDiagnoses` | the ends a shutdown stores and hints start a diagnosis again | the stop comes first |
+| Bound a trouble by the check's `since`, or bound it one way for the trigger and another for the push | a failing → warn → failing check is read twice; the phone names a diagnosis the trigger did not count | a trouble runs from the last ok; `check-trouble.ts` is the one bound (INV-10787) |
+| Count a restart's ending (`endedByRestart`) as a failed try | each save of the dev server spends a try; the check lands in `exhausted` and is never read | a restart is neither a reading nor a failure: 135 handover boots in 24 hours, 2026-11-04 (INV-10805) |
+| Pass a model from the trigger | the row says one model and the run used another | `resolveDiagnosisModel` is the one place a model is picked (INV-7153) |
+| Diagnose a check under its mute (take `mute.until` out of `readyAt`), or leave `overview.muted` out of the candidates | a silenced page is diagnosed; or a mute that ends by itself, which no event announces, leaves a ready red waiting for an unrelated hint | the diagnosis rides the page, and the mute's end is the clock moment the one deadline holds |
+| Make the switch a column of `checks` or of `CerberusCheckView` | the next definitions write rewrites the operator's choice; every overview build reads a row per check | its own table `auto_diagnosis`, read by the check's detail only (INV-10797) |
+| Bring a cap back (an age limit, a per-check bound, a daily cap) without the operator | a red goes unread for how many were read before | operator, 2026-11-04: "There shouldn't be a cap."; three counted failures per trouble is the only brake |
+| Change `AUTO_DIAGNOSIS_HOLD_MS` without the two words that say "10 minutes" (`diagnosis.auto.helper`, `diagnosis.startedAuto`) | the helper and the panel's line state a hold the plan does not keep | the words hold the number as text (MAN-7870) |
+| Edit step 7 after it ran (its seed, `diagnoses.by`'s DEFAULT, `auto_diagnosis`'s columns) | the live store keeps the old shape and the old seed while every scratch store builds the new | position is the version: a change is a new step appended (INV-7004) |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-diagnosis-plan.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/check-trouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-auto-diagnosis.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/AutoDiagnosisSwitch.tsx

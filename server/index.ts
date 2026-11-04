@@ -80,6 +80,7 @@ import { createJevModule } from './modules/jev/index.js';
 import { createAffectedAreasModule } from './modules/affected-areas/index.js';
 import { createCarrierBulletinsModule } from './modules/carrier-bulletins/index.js';
 import { createDispatcherModule } from './modules/dispatcher/index.js';
+import { createDispatcherStoreWatch } from './shared/dispatcher-store-watch.service.js';
 import { createRoadmapModule } from './modules/roadmap/index.js';
 import { createUniverseModule } from './modules/universe/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
@@ -344,16 +345,21 @@ app.use('/api/cli-version', authenticateToken, createCliVersionModule());
 // the vendor directly with the key in this host's .env.
 app.use('/api/deepseek', authenticateToken, createDeepseekModule());
 
-// The dispatcher's plans — the poll behind the `dispatcher_state` frame, and the relay for the
+// The dispatcher's plans — the lane behind the `dispatcher_state` frame, and the relay for the
 // dispatcher's own stop/resume/park/unpark/schedule (protected). Built once here rather than inline:
-// the poll behind its websocket frame is started after `listen` and stopped on shutdown, so the
-// module has to be something both can name.
-const dispatcher = createDispatcherModule();
+// the lane behind its websocket frame is started after `listen` and stopped on shutdown, so the
+// module has to be something both can name. The store watch is the one both dispatcher lanes read
+// from — what pokes them when the store (or a file beside it) is written — so it is built here and
+// handed to each.
+const dispatcherStoreWatch = createDispatcherStoreWatch({
+  logError: (message) => console.error(message),
+});
+const dispatcher = createDispatcherModule(dispatcherStoreWatch);
 app.use('/api/dispatcher', authenticateToken, dispatcher.router);
 
-// The roadmap — the poll behind the `roadmap_state` frame, and the relay for the screen's nine
-// writes (protected). Built once here for the dispatcher's reason: its poll starts after `listen`.
-const roadmap = createRoadmapModule();
+// The roadmap — the lane behind the `roadmap_state` frame, and the relay for the screen's nine
+// writes (protected). Built once here for the dispatcher's reason: its lane starts after `listen`.
+const roadmap = createRoadmapModule(dispatcherStoreWatch);
 app.use('/api/roadmap', authenticateToken, roadmap.router);
 
 // The heal reflex's ledger, the switches that steer it, and the door to a heal on demand
@@ -784,6 +790,9 @@ async function startServer() {
 
             // The dispatcher's plans, read off its own command and broadcast after `listen`,
             // because the frames are for sockets this server is only now able to accept.
+            // The store watch is armed first, so a write that lands while either lane takes its first
+            // reading is a poke the lane remembers and not a change nobody saw.
+            dispatcherStoreWatch.start();
             dispatcher.start();
             roadmap.start();
 
@@ -837,6 +846,7 @@ async function startServer() {
             stopChatCompaction();
             dispatcher.stop();
             roadmap.stop();
+            dispatcherStoreWatch.stop();
             claudeUpdates.stop();
             dispatchSouls.stop();
             universe.stop();

@@ -83,6 +83,12 @@ export type CerberusValue = {
    */
   diagnose: (node: string, key: string) => Promise<boolean>;
   /**
+   * Switches "Diagnose on its own" on or off for one check (`service` and `id` the two halves of its key). Answers
+   * `true` when it landed, with the overview re-read; on `false` the toast has said why (a check that is not active).
+   * Silent when it lands: the switch is its own proof.
+   */
+  setAutoDiagnosis: (input: { node: string; service: string; id: string; on: boolean }) => Promise<boolean>;
+  /**
    * Runs a diagnosis's proposal once, by you. Answers `true` when the warden accepted the run and the fleet was
    * re-read; on `false` the toast has said why (no proposal, its one-off ran out, a run already going on the check,
    * the node's warden not linked). It never touches the catalog.

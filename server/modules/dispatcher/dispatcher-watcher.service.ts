@@ -1,16 +1,18 @@
-import { createPolledLane, type PolledLane } from '@/shared/polled-lane.service.js';
+import { createPolledLane, type PolledLane, type PolledLaneClock } from '@/shared/polled-lane.service.js';
 import type { DispatcherStateEvent } from '@/shared/types.js';
 
 import type { DispatcherPicture } from './dispatcher-state.service.js';
 
 /**
- * The poll behind the `dispatcher_state` frame: every plan on this host, read off
+ * The lane behind the `dispatcher_state` frame: every plan on this host, read off
  * `dispatcher status --json` and put on the wire when the picture moves.
  *
- * The mechanism — why it polls rather than watches, when it speaks and when it stays quiet, and why
- * a tick never takes the interval down with it — is `server/shared/polled-lane.service.ts`, where
- * the lanes that share it can read it once. What is THIS lane's is named here: the frame it sends,
- * and the snapshot it takes.
+ * The mechanism — when it reads, when it speaks and when it stays quiet, and why a reading that
+ * fails never takes the lane down with it — is `server/shared/polled-lane.service.ts`, where the lanes
+ * that share it can read it once. This lane has no interval: it reads when
+ * `dispatcher-store-watch.service.ts` pokes it for a write to something the document is read from,
+ * and on a backstop for what no write announces. What is THIS lane's is named here: the frame it
+ * sends, and the snapshot it takes.
  *
  * This is the one lane on the server whose reading is a SUBPROCESS, so its snapshot answers a
  * promise; the lane's own rules cover that (a tick with a reading still out is skipped, the picture
@@ -20,13 +22,11 @@ import type { DispatcherPicture } from './dispatcher-state.service.js';
  * pictures are compared (`changeOf`) — without that, it would speak on every tick.
  */
 
-export type DispatcherWatcherDependencies = {
+export type DispatcherWatcherDependencies = PolledLaneClock & {
   /** The whole picture as of now, off the dispatcher's own command. Called on every tick; it never resolves on a body it cannot read. */
   snapshot: () => Promise<DispatcherPicture>;
   /** Puts one frame on every open chat socket. Called only when the picture changed. */
   broadcast: (frame: DispatcherStateEvent) => void;
-  /** How often to look, in milliseconds. */
-  pollMs: number;
   /** Injected by the composition root — this server has no logger (see `polled-lane.service.ts`). */
   logError: (message: string) => void;
 };
@@ -37,10 +37,10 @@ export type DispatcherWatcher = PolledLane<DispatcherPicture>;
  * The picture as the lane compares it for change: everything but the read's own clock.
  *
  * `report.py::snapshot` stamps `generated_at` from the dispatcher's clock at SECOND resolution on
- * every read, and this lane polls every two seconds, so two successive readings can never carry the
- * same one. Compared whole, the picture would therefore differ from itself on every single tick — and
- * the lane would put its ~28 KB frame on every open socket every two seconds on a host where nothing
- * moved, which is the one thing a change-only lane exists not to do.
+ * every read, so two successive readings can never carry the same one. Compared whole, the picture
+ * would therefore differ from itself on every single reading — and the lane would put its ~28 KB
+ * frame on every open socket after every read on a host where nothing moved, which is the one thing
+ * a change-only lane exists not to do.
  *
  * `generated_at` is a READING CLOCK: it says when the dispatcher looked, not what it found. Every
  * frame still carries it whole (`frame` below spreads the picture as the service built it), because
@@ -49,7 +49,7 @@ export type DispatcherWatcher = PolledLane<DispatcherPicture>;
  *
  * SO IS EACH PLAN'S AND ARC'S `runtime_s`, for the same reason: an interval still open ends at the
  * reading's own `now` (`report_runtime`), so the figure of any plan with an agent out differs on
- * every read — and the lane would speak every two seconds for as long as anything is working, which
+ * every read — and the lane would speak after every reading for as long as anything is working, which
  * is nearly always. It is not lost: a card ticks it between frames from the frame's `at` while an
  * agent is out (`useWorkedSeconds`), and every way a figure STOPS moving — a stage ending, a planner
  * landing, a walk settling — changes something else in the picture, which sends a frame carrying the

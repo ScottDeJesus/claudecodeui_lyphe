@@ -1,6 +1,6 @@
 import type { Request } from 'express';
 
-import { AppError } from '@/shared/utils.js';
+import { AppError, readPathParam } from '@/shared/utils.js';
 
 /**
  * The transport-shape readers every Cerberus route file shares: what a route decides is only that a
@@ -61,6 +61,11 @@ export function requiredObject(source: Record<string, unknown>, field: string): 
   const value = source[field];
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw badRequest(`${field} must be an object.`);
   return value as Record<string, unknown>;
+}
+
+/** The key of a check named by the path parts `:service/:check` — `<service>/<check>`; one reading for every router that names a check that way. */
+export function readCheckKey(request: Request): string {
+  return `${readPathParam(request.params.service, 'service')}/${readPathParam(request.params.check, 'check')}`;
 }
 
 /** The signed-in user's name — who muted, wrote a fix, switched auto-run or asked for a diagnosis — or a 401. */

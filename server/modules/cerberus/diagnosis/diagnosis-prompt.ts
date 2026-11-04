@@ -18,6 +18,11 @@ import { oneMaskedLine } from './diagnosis-text.js';
  * not there. The evidence rule is the spec's sentence verbatim (§3), because it is quoted back to the
  * operator on the sheet.
  *
+ * The facts the agent is handed before it reads anything are, in order: THE CHECK, WHAT THE CHECK MEASURES, WHAT IT LAST
+ * REPORTED (every field its stored result carries, `diagnosis-reported.ts`), WHERE TO LOOK FOR <service> ON <node> (the
+ * service's unit, its deploy log and the checks it leans on, `diagnosis-leads.ts`), and ITS LAST changes. All are GIVEN
+ * facts for the summary audit and none is a source for an evidence line: only a read is (INV-7177).
+ *
  * Consumers: `diagnosis-agent.ts`, which builds it once per diagnosis from the check, its last stored
  * changes and its fixes; `diagnosis-absence.ts`, which reads `ABSENCE_PHRASES` to drop an answer line that says nothing from what an evidence line is held to.
  */
@@ -38,12 +43,23 @@ export const ABSENCE_PHRASES: readonly string[] = [
   'no errors',
 ];
 
-/** The headings of the sections that are FACTS the agent is handed (not rules, not tools): the check, what it measures, its recent results. */
-const GIVEN_HEADINGS: readonly string[] = ['THE CHECK\n', 'WHAT THE CHECK MEASURES\n', 'ITS LAST '];
+/**
+ * The headings of the sections that are FACTS the agent is handed (not rules, not tools): the check, what it measures, what it last
+ * reported, where to look, its recent results. The two with a heading that runs on (`WHAT IT LAST REPORTED (…`, `WHERE TO LOOK FOR …`)
+ * are matched by their first words.
+ */
+const GIVEN_HEADINGS: readonly string[] = [
+  'THE CHECK\n',
+  'WHAT THE CHECK MEASURES\n',
+  'WHAT IT LAST REPORTED',
+  'WHERE TO LOOK',
+  'ITS LAST ',
+];
 
 /**
- * The sections of a built prompt that the agent was TOLD rather than read — the check's own value, what it measures and its last
- * changes — as the summary audit's given facts: a figure there is shown, a figure in neither these nor an evidence line is invented.
+ * The sections of a built prompt that the agent was TOLD rather than read — the check's own value, what it measures, every field it
+ * last reported, where to look and its last changes — as the summary audit's given facts: a figure there is shown, a figure in neither
+ * these nor an evidence line is invented.
  * The sections are the ones `buildDiagnosisSystemPrompt` joins with a blank line, found by their headings above.
  *
  * Consumers: `diagnosis-deps.ts`, for the summary audit (`diagnosis-audit.ts`).
@@ -55,8 +71,14 @@ export function givenFactsOf(prompt: string): string {
     .join('\n\n');
 }
 
-/** Free text from the store (a check's value, a command) is cut to this before it enters the prompt. */
+/** Free text from the store (a past result's value, a fix's command) is cut to this before it enters the prompt; the check's own value is the one wider text. */
 const PROMPT_TEXT_LIMIT = 240;
+
+/**
+ * The check's own value is the sentence its service wrote for the person reading it, and a poller's cause can sit past the 240th
+ * character; it is the one text cut wider.
+ */
+const CHECK_VALUE_LIMIT = 600;
 
 /** One piece of stored text made fit for one prompt line: credentials masked, on one line, cut to size. */
 const oneLine = (text: string | null): string => oneMaskedLine(text, PROMPT_TEXT_LIMIT);
@@ -71,7 +93,7 @@ function checkSection(check: CerberusCheckView, node: string, now: number): stri
     `  key:    ${check.key}`,
     `  node:   ${node}`,
     `  status: ${status}`,
-    `  value:  ${oneLine(check.value)}`,
+    `  value:  ${oneMaskedLine(check.value, CHECK_VALUE_LIMIT)}`,
     `  since:  ${since}`,
     `  now:    ${localStamp(now)} (UTC${localOffset(now)})`,
     '  Times below are in that local time; journal lines carry their own offset.',
@@ -81,6 +103,23 @@ function checkSection(check: CerberusCheckView, node: string, now: number): stri
 /** What the check measures — where its probe looks and the rule that judges it; omitted when none is known. */
 function measuresSection(measures: string[]): string | null {
   return measures.length === 0 ? null : ['WHAT THE CHECK MEASURES', ...measures].join('\n');
+}
+
+/**
+ * Every field the check's newest stored result carries, one line each (`diagnosis-reported.ts`): the facts a service sends beside its
+ * status and its sentence. `at` is that result's own time, in the center's local time like every other time here. Omitted when it has no lines.
+ */
+function reportedSection(reported: { at: number; lines: string[] } | null): string | null {
+  if (reported === null || reported.lines.length === 0) return null;
+  return [
+    `WHAT IT LAST REPORTED (its stored result of ${localStamp(reported.at)}: every field it sent beside its status and its sentence; a time in it carries its own offset)`,
+    ...reported.lines,
+  ].join('\n');
+}
+
+/** Where to start looking for this service on this node (`diagnosis-leads.ts`); omitted when it has no lines. */
+function leadsSection(service: string, node: string, leads: string[] | null): string | null {
+  return leads === null || leads.length === 0 ? null : [`WHERE TO LOOK FOR ${service} ON ${node}`, ...leads].join('\n');
 }
 
 function resultsSection(changes: CerberusStoredResultRow[]): string {
@@ -142,7 +181,9 @@ function scopeSection(node: string, nodeToolsOpen: boolean): string {
  * first (no keep-alives); `measures` the lines saying what the check measures (`diagnosis-measurement.ts`:
  * the probe's target and the pass rule, which are where a read starts); `fixes` the catalog entries on the
  * check, `now` the moment the diagnosis starts, `maxTurns` the ceiling the agent is told about so it
- * submits before it is cut off and `readBudget` how many reads it may make.
+ * submits before it is cut off and `readBudget` how many reads it may make. `reported` is the check's newest stored
+ * result's time and the lines of its fields (`diagnosis-reported.ts`) and `leads` the lines of where to look for its
+ * service (`diagnosis-leads.ts`); each section is left out when it has no lines.
  */
 export function buildDiagnosisSystemPrompt(input: {
   check: CerberusCheckView;
@@ -150,16 +191,20 @@ export function buildDiagnosisSystemPrompt(input: {
   nodeToolsOpen: boolean;
   changes: CerberusStoredResultRow[];
   measures: string[];
+  reported: { at: number; lines: string[] } | null;
+  leads: string[] | null;
   fixes: CerberusCatalogEntryView[];
   now: number;
   maxTurns: number;
   readBudget: number;
 }): string {
-  const { check, node, nodeToolsOpen, changes, measures, fixes, now, maxTurns, readBudget } = input;
+  const { check, node, nodeToolsOpen, changes, measures, reported, leads, fixes, now, maxTurns, readBudget } = input;
   return [
     `You are the diagnosing agent inside Cerberus, a fleet-health monitor. One check on the node "${node}" needs a person. Find out why, say it plainly, and propose at most one fix the operator may choose to run. You work alone, read-only, and you end by calling submit_diagnosis.`,
     checkSection(check, node, now),
     measuresSection(measures),
+    reportedSection(reported),
+    leadsSection(check.service, node, leads),
     resultsSection(changes),
     fixesSection(fixes),
     scopeSection(node, nodeToolsOpen),

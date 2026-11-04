@@ -30,10 +30,10 @@ import type { DispatcherArc, DispatcherDaemon, DispatcherLanePicture, Dispatcher
  * nobody would ever clear.
  *
  * WHAT THE PAYLOAD LEAVES OUT IS THE POINT. The frame carries two keys that change without anything
- * moving — `home`, and `generated_at`, restamped from the dispatcher's clock on every poll — plus
+ * moving — `home`, and `generated_at`, restamped from the dispatcher's clock on every reading — plus
  * the frame's own `at`, which the bus carries as the value's clock. Republishing the frame whole
- * would make every poll a new reading by `JSON.stringify`, which is exactly how a lane wakes every
- * open screen twice a second with no news in it. So the payload is the seven keys a reader draws
+ * would make every reading a new picture by `JSON.stringify`, which is exactly how a lane wakes every
+ * open screen after every reading with no news in it. So the payload is the seven keys a reader draws
  * from — `plans`, `arcs`, `planners`, the route, the daemon and the next off-peak moment — with the
  * document's own spellings left alone.
  *

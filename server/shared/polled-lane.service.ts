@@ -2,12 +2,22 @@
  * The poll-and-broadcast mechanism every state lane on this server shares: read a picture off
  * disk, put a frame on the wire when — and only when — that picture changed.
  *
- * A POLL, deliberately, and not `fs.watch`. Three of the four things a lane like this must notice
- * emit no usable watch event: a state file is often REPLACED through a scratch file plus
- * `os.replace`, so a change arrives as a rename on a path that keeps being recreated; a brand-new
- * run or launch directory can appear at any moment under a root that would need its own recursive
- * watch; and a run going stale is a LAPSED heartbeat — the absence of a write, which no filesystem
- * event can ever report. Two seconds of stats over a few dozen small files is the cheaper honesty.
+ * A POLL, deliberately, and not `fs.watch`, for the lanes that read a few dozen small files. Three
+ * of the four things such a lane must notice emit no usable watch event: a state file is often
+ * REPLACED through a scratch file plus `os.replace`, so a change arrives as a rename on a path that
+ * keeps being recreated; a brand-new run or launch directory can appear at any moment under a root
+ * that would need its own recursive watch; and a run going stale is a LAPSED heartbeat — the absence
+ * of a write, which no filesystem event can ever report. Two seconds of stats over a few dozen small
+ * files is the cheaper honesty.
+ *
+ * THE LANES WHOSE READING IS A SUBPROCESS ARE NOT ON A CLOCK. `dispatcher status --json` costs
+ * seconds of CPU a run and `roadmap show --json` half a second, and on a quiet host nearly every
+ * reading finds nothing; what those lanes read from is a store and a few named files whose writes
+ * CAN be watched (`dispatcher-store-watch.service.ts`). They pass `backstopMs` where the others pass
+ * `pollMs`: no interval at all, a reading at start, a reading each time the lane's owner `poke`s it —
+ * the watch does, on a write to anything the document is read from — and one more reading
+ * `backstopMs` after the last one settled, for exactly what no write announces: a process that died
+ * with nothing left to write, a grace that ran out, a window that ends on the hour.
  *
  * The frame is sent only when the picture actually changed, so a quiet host puts nothing on the
  * wire. What "changed" means is the lane's own serialization of its picture — for most of this
@@ -15,8 +25,8 @@
  * heartbeat going stale with the same comparison.
  *
  * The lanes that use it are `dispatch-souls` (its launcher souls), `kanban-metis` (its board
- * sessions), `dispatcher` (its plans) and `roadmap` (its picture). They differ in what they read and
- * in what they send, and in nothing below.
+ * sessions), `dispatcher` (its plans) and `roadmap` (its picture). They differ in what they read, in
+ * what they send and in what makes them read, and in nothing below.
  *
  * A PICTURE MAY TAKE ITS TIME TO ARRIVE. Most of those lanes answer from memory, but the dispatcher's
  * whole picture is one `dispatcher status --json` — a subprocess — so its `snapshot` answers a
@@ -33,7 +43,21 @@
  * from a real reading of an empty host.
  */
 
-export type PolledLaneDependencies<TPicture, TFrame> = {
+/**
+ * What makes a lane read. Exactly one of the two, so a lane can never be both on a clock and on
+ * pokes by accident:
+ *   - `pollMs` — a fixed interval: the lane looks that often whether or not anything moved;
+ *   - `backstopMs` — no interval: the lane reads at start and on every `poke`, and, when this is a
+ *     number, once that long after its last reading settled (the timer is re-armed by each reading,
+ *     so a lane that is being poked often never fires it). `null` is no backstop at all. A reading that
+ *     FAILED arms it too: the lane keeps its last picture and reads again at the next poke or after
+ *     `backstopMs` — a store caught mid-move is being written, and its next write is the poke.
+ */
+export type PolledLaneClock =
+  | { pollMs: number; backstopMs?: undefined }
+  | { backstopMs: number | null; pollMs?: undefined };
+
+export type PolledLaneDependencies<TPicture, TFrame> = PolledLaneClock & {
   /**
    * The whole picture as of now. Called on every tick; it is expected to be cheap and to never
    * throw — and it may answer a PROMISE, for a lane whose reading is not from memory (see the note
@@ -51,8 +75,8 @@ export type PolledLaneDependencies<TPicture, TFrame> = {
    * A lane whose picture carries a CLOCK RE-DERIVED ON EVERY READ has to state its own, or its
    * picture differs from itself between two ticks and the lane speaks on every one of them. The
    * dispatcher's and the roadmap's are the two that do: the dispatcher stamps `generated_at` from its
-   * own clock at second resolution, on a poll of two seconds, so each lane drops that key here
-   * (`dispatcher-watcher.service.ts`, `roadmap.module.ts`).
+   * own clock at second resolution, so two readings a second apart differ, and each lane drops that
+   * key here (`dispatcher-watcher.service.ts`, `roadmap.module.ts`).
    *
    * What is compared is not what is sent. `frame` is what goes on the wire and it carries the clock
    * whole, so a lane's own serialization changes WHEN the lane speaks and never WHAT it says.
@@ -60,8 +84,6 @@ export type PolledLaneDependencies<TPicture, TFrame> = {
   serialize?: (picture: TPicture) => string;
   /** Puts one frame on every open chat socket. Called only when the picture changed. */
   broadcast: (frame: TFrame) => void;
-  /** How often to look, in milliseconds. */
-  pollMs: number;
   /**
    * Injected by the composition root — this server has no logger, and a module that must say
    * something takes a closure rather than reaching for one (`system.module.ts:57-58`).
@@ -93,7 +115,8 @@ export type PolledLane<TPicture> = {
   whenLanded(timeoutMs: number): Promise<TPicture | null>;
   /**
    * One tick now, while the lane is started; a no-op otherwise. For a write the lane's owner has just
-   * seen land: a press on the screen redraws within moments instead of up to two seconds later. It is
+   * seen land: a press on the screen redraws within moments instead of at the next interval. On a
+   * lane with no interval it is what makes the lane read at all. It is
    * an ordinary tick — same snapshot, compare and broadcast. A reading already out began before the
    * write and may have taken the old picture, so the poke is REMEMBERED and one more tick runs the
    * moment that reading lands: one reading at a time still (no queue, a flag), and the press is never
@@ -110,6 +133,10 @@ function isThenable<TPicture>(value: TPicture | Promise<TPicture>): value is Pro
 export function createPolledLane<TPicture, TFrame>(
   dependencies: PolledLaneDependencies<TPicture, TFrame>,
 ): PolledLane<TPicture> {
+  /** Between `start` and `stop`. Not the timer's presence: a lane with no interval and no backstop still runs. */
+  let running = false;
+
+  /** The interval on a `pollMs` lane, or the pending backstop on a `backstopMs` lane; `null` when neither is armed. */
   let timer: NodeJS.Timeout | null = null;
 
   /**
@@ -138,7 +165,7 @@ export function createPolledLane<TPicture, TFrame>(
   let lastBroadcast: string | null = null;
 
   /**
-   * Messages already reported. A tick failing usually keeps failing every two seconds, and a
+   * Messages already reported. A tick failing usually keeps failing at every tick, and a
    * broken state directory would otherwise write thousands of identical lines into the journal and
    * bury everything else in it.
    *
@@ -191,8 +218,8 @@ export function createPolledLane<TPicture, TFrame>(
     // carrying it makes it out to some socket.
     picture = next;
     wakeWaiting(next);
-    // A landing with no interval armed seeds the picture and says nothing.
-    if (timer === null) return;
+    // A landing before `start` (or after `stop`) seeds the picture and says nothing.
+    if (!running) return;
     try {
       const serialized = compare(next);
       if (serialized === lastBroadcast) return;
@@ -222,11 +249,29 @@ export function createPolledLane<TPicture, TFrame>(
   /** A `poke` arrived while a reading was out: that reading may have taken the picture without the write. A flag, never a queue. */
   let pokedWhileReading = false;
 
+  /**
+   * Arms the backstop of a `backstopMs` lane: one tick that long after now, replacing any pending one.
+   * Called when a reading settles, never on a clock of its own, so the wait is always measured from the
+   * last time the lane looked.
+   */
+  const armBackstop = (): void => {
+    if (!running || dependencies.backstopMs === undefined || dependencies.backstopMs === null) return;
+    if (timer !== null) clearTimeout(timer);
+    timer = setTimeout(tick, dependencies.backstopMs);
+    // The backstop is never a reason for the process to stay alive at shutdown.
+    timer.unref();
+  };
+
   /** Runs after a reading settles, either way: the one more tick a poke made mid-reading is owed. */
   const replayPoke = (): void => {
-    if (!pokedWhileReading) return;
-    pokedWhileReading = false;
-    if (timer !== null) tick();
+    if (pokedWhileReading) {
+      pokedWhileReading = false;
+      if (running) {
+        tick(); // starts the next reading, whose own settling re-arms the backstop
+        return;
+      }
+    }
+    armBackstop();
   };
 
   /**
@@ -260,6 +305,7 @@ export function createPolledLane<TPicture, TFrame>(
       next = dependencies.snapshot();
     } catch (error) {
       fail(error);
+      armBackstop();
       return;
     }
     if (isThenable(next)) {
@@ -271,31 +317,36 @@ export function createPolledLane<TPicture, TFrame>(
       return;
     }
     land(next);
+    armBackstop();
   };
 
   return {
     start(): void {
-      if (timer !== null) return; // idempotent: a second start would double every frame
-      // The interval is armed BEFORE the first reading, because `land` puts a frame on the wire only
-      // while the lane runs: a reading that landed during a tick with no timer set would seed the
+      if (running) return; // idempotent: a second start would double every frame
+      // The lane is marked running BEFORE the first reading, because `land` puts a frame on the wire
+      // only while the lane runs: a reading that landed during a tick before that would seed the
       // picture and hold the frame back for a whole interval.
-      timer = setInterval(tick, dependencies.pollMs);
-      // The poll is never a reason for the process to stay alive at shutdown.
-      timer.unref();
+      running = true;
+      if (dependencies.pollMs !== undefined) {
+        timer = setInterval(tick, dependencies.pollMs);
+        // The poll is never a reason for the process to stay alive at shutdown.
+        timer.unref();
+      }
       // One reading immediately, so the first GET after boot answers with the real picture rather
       // than an empty list for the length of one interval.
       tick();
     },
 
     poke(): void {
-      if (timer === null) return;
+      if (!running) return;
       if (inFlight !== null) pokedWhileReading = true;
       else tick();
     },
 
     stop(): void {
-      if (timer === null) return;
-      clearInterval(timer);
+      if (!running) return;
+      running = false;
+      if (timer !== null) clearTimeout(timer); // an interval and a timeout are cleared by the same call
       timer = null;
       pokedWhileReading = false;
       // A restarted lane announces the truth again: the sockets listening then are not the ones

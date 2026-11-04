@@ -1156,6 +1156,10 @@ export const api = {
     diagnosis: (id: string, options: ApiRequestOptions = {}) => get(`/api/cerberus/diagnoses/${encodeURIComponent(id)}`, options),
     runProposal: (id: string) => post(`/api/cerberus/diagnoses/${encodeURIComponent(id)}/run`, {}),
     promote: (id: string, input: CerberusPromoteInput) => post(`/api/cerberus/diagnoses/${encodeURIComponent(id)}/promote`, input),
+    // The per-check switch for "Diagnose on its own": answers 204, and the sheet's own re-read of the check shows it.
+    // A check that is not active is a 404 (`CERBERUS_UNKNOWN_CHECK`).
+    setAutoDiagnosis: (node: string, service: string, id: string, on: boolean) =>
+      put(`/api/cerberus/checks/${encodeURIComponent(node)}/${encodeURIComponent(service)}/${encodeURIComponent(id)}/auto-diagnosis`, { on }),
   },
 
   // The affected-areas lane (the Tours tab; wire shapes in `@/shared/affected-areas-types`): DocuSketch tours,

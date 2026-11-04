@@ -16,8 +16,10 @@ import { buildNotificationPayload } from './notification-orchestrator.service.js
  * speaks of usage or spend (the CLI's own "usage limit reached" is exactly a failed run's error). The rest of every sentence
  * is the house's own. A Cerberus red-watch event (`cerberus.*`) names fleet checks, and a check's label and its reported
  * sentence are free text of the same kind ("Gemini and DeepSeek spend is normal", "~$0.77 today"): an item whose reason speaks
- * of usage or spend loses the reason, and one whose label does is called "A check". The phone's push is not worded here, so it
- * keeps the whole sentence.
+ * of usage or spend loses the reason, and one whose label does is called "A check"; and one whose diagnosis speaks of it — its
+ * summary, its fix's name or its fix's command — loses the whole diagnosis, the Likely cause and Proposed fix lines it would
+ * have carried, so Kaylee's feed and the history read the same page, filtered. The phone's push is not worded here, so it keeps
+ * the whole sentence and its diagnosis.
  *
  * Consumers: the companion module's alert block (`buildAlertBlock`, what she is told unasked) and this module's history
  * service (what is kept of each event). Both reach it through the module barrel.
@@ -49,7 +51,15 @@ const RED_WATCH_GROUPS = ['items', 'reminders', 'recovered'] as const;
 /** The label an item is given when its own label speaks of usage or spend. */
 const NEUTRAL_CHECK_LABEL = 'A check';
 
-/** `group`'s items with the free text that speaks of usage or spend taken out (a reason dropped, a label made neutral); anything that is not a list of records is left as it came. */
+/** Whether a red-watch item's diagnosis (`{ summary, fix: { name, cmd } | null }`) speaks of usage or spend in its summary, its fix's name or its fix's command. */
+function diagnosisSpeaksOfSpend(diagnosis: unknown): boolean {
+  if (diagnosis === null || typeof diagnosis !== 'object') return false;
+  const { summary, fix } = diagnosis as { summary?: unknown; fix?: unknown };
+  const fixed = fix !== null && typeof fix === 'object' ? (fix as { name?: unknown; cmd?: unknown }) : {};
+  return [summary, fixed.name, fixed.cmd].some((text) => typeof text === 'string' && USAGE_OR_SPEND_TEXT.test(text));
+}
+
+/** `group`'s items with the free text that speaks of usage or spend taken out (a reason or a diagnosis dropped, a label made neutral); anything that is not a list of records is left as it came. */
 function checksWithoutSpend(group: unknown): unknown {
   if (!Array.isArray(group)) return group;
   return group.map((item: unknown) => {
@@ -57,6 +67,7 @@ function checksWithoutSpend(group: unknown): unknown {
     const clean: Record<string, unknown> = { ...item };
     if (typeof clean.reason === 'string' && USAGE_OR_SPEND_TEXT.test(clean.reason)) delete clean.reason;
     if (typeof clean.label === 'string' && USAGE_OR_SPEND_TEXT.test(clean.label)) clean.label = NEUTRAL_CHECK_LABEL;
+    if ('diagnosis' in clean && diagnosisSpeaksOfSpend(clean.diagnosis)) delete clean.diagnosis;
     return clean;
   });
 }

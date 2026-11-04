@@ -332,4 +332,34 @@ CREATE INDEX ix_red_alerts_check ON cerberus_red_alerts(node, "key", opened_at);
   `
 ALTER TABLE cerberus_red_alerts ADD COLUMN red_since INTEGER NOT NULL DEFAULT 0;
 `,
+
+  // Step 7 (user_version 7 → 8) — a red check Cerberus diagnoses on its own. `diagnoses.by` says who started a
+  // diagnosis: 'auto' when Cerberus started it on its own, 'you' for a press of Diagnose and for every row
+  // before this step (the DEFAULT is that answer), mirroring `runs.by`. `auto_diagnosis` is the per-check
+  // switch "Diagnose on its own": one row per check that was ever switched, so a check with no row is off.
+  // The seed is in the same step — the feature is live the moment the store opens — and it names keys and
+  // no node, so its rows follow whichever node reports them. Additive: no existing row is rewritten.
+  `
+ALTER TABLE diagnoses ADD COLUMN by TEXT NOT NULL DEFAULT 'you' CHECK(by IN ('auto','you'));
+
+-- One row per check that was ever switched on or off, on the center's clock. enabled is 1 for "Diagnose on
+-- its own" on and 0 for off; set_at is when it was last written and set_by who wrote it ('seed' for the
+-- rows this step writes, else the person's username).
+CREATE TABLE auto_diagnosis (
+    node TEXT NOT NULL,
+    check_key TEXT NOT NULL,
+    enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
+    set_at INTEGER NOT NULL,
+    set_by TEXT NOT NULL,
+    PRIMARY KEY(node, check_key)
+);
+
+INSERT INTO auto_diagnosis (node, check_key, enabled, set_at, set_by)
+  SELECT node, key, 1, CAST(strftime('%s','now') AS INTEGER) * 1000, 'seed' FROM checks
+   WHERE key IN ('shadow-connector/poller', 'shadow-connector/xactimate_poller', 'shadow-connector/jfa_poller',
+                 'shadow-connector/companycam_poller', 'shadow-connector/docusketch_poller',
+                 'shadow-connector/xactanalysis_session', 'shadow-connector/extractor_health',
+                 'shadow-connector/iicrc_sync', 'shadow-connector/drybook_readings_sweep',
+                 'shadow-connector/pricing_probe', 'shadow-connector/monday');
+`,
 ];

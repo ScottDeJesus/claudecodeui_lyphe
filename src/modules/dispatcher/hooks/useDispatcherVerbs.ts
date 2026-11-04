@@ -163,7 +163,7 @@ export function useDispatcherVerbs(
   // would race two dispatcher processes at the same store; the answer rides the same flag, its form
   // disables while `answer` is out, so the card cannot carry one word twice — and the toast. `drop` alone
   // still speaks after its card is gone: its card leaving IS what a drop that worked does, and the
-  // 2-second poll can deliver that frame before the answer arrives.
+  // store watch's reading can deliver that frame before the answer arrives.
   const { busy, send } = useVerbSend<DispatcherPress>({
     keep: [name],
     titles: { refused: word, done: doneWord },

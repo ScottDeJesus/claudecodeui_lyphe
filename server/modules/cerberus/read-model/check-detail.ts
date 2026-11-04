@@ -1,4 +1,4 @@
-import { cerberusDefinitionsDb, cerberusResultsDb } from '@/modules/database/index.js';
+import { cerberusAutoDiagnosisDb, cerberusDefinitionsDb, cerberusResultsDb } from '@/modules/database/index.js';
 import type {
   CerberusCheckDetail,
   CerberusCheckIndexEntry,
@@ -28,11 +28,22 @@ const RECENT_WINDOW_MS = 3 * 60 * 60 * 1000;
  */
 const RECENT_LIMIT = 100;
 
+/** The check's "Diagnose on its own" switch: no row reads off, with nobody and no moment to name. */
+function autoDiagnosisOf(node: string, key: string): CerberusCheckDetail['autoDiagnosis'] {
+  const row = cerberusAutoDiagnosisDb.get(node, key);
+  return { on: row?.enabled === 1, setAt: row?.set_at ?? null, setBy: row?.set_by ?? null };
+}
+
 /**
  * Everything the check's sheet opens with: the check as it reads now, its siblings in the same
  * service (the service's other active checks), a strip of 60 one-minute cells, the change rows of
  * the 3 h before the strip's end (`recent`, newest first) and the lookup at `lookupAt`. A 404
  * `AppError` when the check is not an active one.
+ *
+ * `autoDiagnosis` is the check's own "Diagnose on its own" switch (`auto_diagnosis`), as of now: `on`
+ * is whether its row says enabled, and a check that was never switched has no row and reads off, with
+ * `setAt` and `setBy` null. It rides this read and not `CerberusCheckView`, so the overview's
+ * per-check build is as it was.
  *
  * `end` is the moment the strip and `recent` stand at, and it defaults to now: the cells are the 60
  * one-minute windows ending at the minute boundary after `end` (the last one read over `[from, end)`),
@@ -95,6 +106,7 @@ export function checkDetail(
     run: sheetRunOf(node, key, now),
     // As of now too, reaching back the further of 24 hours and the check's `since` (`diagnosis-views.ts`).
     diagnosis: sheetDiagnosisOf(checkView, inputs),
+    autoDiagnosis: autoDiagnosisOf(node, key),
   };
 }
 

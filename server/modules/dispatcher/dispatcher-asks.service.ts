@@ -93,7 +93,7 @@ import type { AskRaisedMemory } from './dispatcher-raised-asks.service.js';
 
 /**
  * How long a prompt stays down after the dispatcher took its answer, while the store's own close of it
- * reaches the picture. A poll is two seconds (`POLL_MS`); a `tell` is live the moment it is queued.
+ * reaches the picture. The lane reads when the store watch pokes it, a status read (seconds) later; a `tell` is live the moment it is queued.
  * Past this, an ask the picture still carries is up again: the answer went and changed nothing — a
  * designer who came back having written nothing — and his word is still owed.
  */

@@ -33,10 +33,10 @@ import {
  * Consumers: `server/modules/cerberus/` — ingest (`insert`, and `latestPerCheck` to seed its memory at
  * start and to re-read one node's at its hello), the read model (`rowsInWindow` for cells and
  * lookups, `recentChanges` for a check's detail, `transitions` for What happened), the diagnosis
- * agent (`recentChanges` for its prompt, `transitionsSince` for its `history_read`) and the daily
- * prune (`pruneKeepalivesBefore`). Reach it through `@/modules/database/index.js`. Every statement
- * runs on the caller's connection and opens no transaction of its own — ingest's "one transaction
- * per frame" is its own.
+ * agent (`recentChanges` for its prompt, `transitionsSince` for its `history_read`), `check-trouble.ts`
+ * (`lastOkAt`, where a red's trouble begins) and the daily prune (`pruneKeepalivesBefore`). Reach it
+ * through `@/modules/database/index.js`. Every statement runs on the caller's connection and opens no
+ * transaction of its own — ingest's "one transaction per frame" is its own.
  *
  * Two reads are served by PARTIAL indexes (`cerberus-schema.ts`, step 4), which SQLite uses only when
  * the query carries the index's own terms: `transitions` spells `ix_results_moves`'s WHERE out and
@@ -234,6 +234,22 @@ export const cerberusResultsDb = {
           ORDER BY at DESC LIMIT ?`
       )
       .all(node, key, since, until, Math.max(0, Math.trunc(limit))) as CerberusStoredResultRow[];
+  },
+
+  /**
+   * The `at` of a check's newest `ok` row, or `null` when it has never been ok. It answers on the
+   * WARDEN's clock, like every `at` here: the caller adds the node's clock offset. A keep-alive counts —
+   * it repeats an `ok` — so a check ok all night answers the keep-alive of a few minutes ago; the daily
+   * prune deletes keep-alives past 90 days, so for a check red longer than that it is the last ok that
+   * survives. Its reader is `check-trouble.ts`, which bounds a red's trouble by it. Served by the primary
+   * key, walked back from the check's newest row
+   * (`SEARCH results USING INDEX sqlite_autoindex_results_1 (node=? AND check_key=?)`).
+   */
+  lastOkAt(node: string, key: string): number | null {
+    const row = getCerberusConnection()
+      .prepare("SELECT at FROM results WHERE node = ? AND check_key = ? AND status = 'ok' ORDER BY at DESC LIMIT 1")
+      .get(node, key) as { at: number } | undefined;
+    return row?.at ?? null;
   },
 
   /**

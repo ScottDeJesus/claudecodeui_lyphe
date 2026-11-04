@@ -2,8 +2,8 @@ import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef 
 
 import { followTouch, holdScrollersStill } from '@/shared/ui/sortable/touchCarry';
 
-/** The five gestures this hook serves, and the two body classes a drag of any one sets. */
-export type PointerDragKind = 'fab' | 'split' | 'resize' | 'sort' | 'draw';
+/** The six gestures this hook serves, and the two body classes a drag of any one sets. */
+export type PointerDragKind = 'fab' | 'split' | 'resize' | 'sort' | 'draw' | 'move';
 
 /** Where a drag is, and how far it has come: absolute client coordinates plus the delta from the press. */
 export type PointerDragPoint = { x: number; y: number; dx: number; dy: number };
@@ -40,16 +40,18 @@ type Gesture = {
 
 /**
  * The kit's one pointer-drag mechanism: what `DockableFab`'s drag, `SplitPane`'s seam, `ResizeGrip`'s
- * corner, the sortable lists' carry (`sortable/useSortable.ts`) and `RegionImage`'s drawn box
- * (`RegionDrawLayer`) all run on.
+ * corners and edges, the sortable lists' carry (`sortable/useSortable.ts`) and `RegionImage`'s drawn box
+ * (`RegionDrawLayer`) all run on; and, called directly by a feature module, the sidebar's tree carry
+ * (`useSimpleChatDrag`, kind `sort`) and Kaylee's floating panel moved by its header
+ * (`useCompanionPanelPlace`, kind `move`).
  *
- * It lives here, beside its only five consumers, and it is deliberately NOT in the barrel: what
+ * It lives here, beside the kit's own consumers, and it is deliberately NOT in the barrel: what
  * `src/shared/ui/index.ts` re-exports is components, and it is not one. It is also deliberately not in
- * `src/shared/hooks/`: this repo's frontend standard sends a hook that multiple FEATURE modules use
- * there, and this one has none. What binds it to the kit is direction — it writes `vv-dragging` and
- * `vv-drag-<kind>`, class names whose only meaning is in `src/shared/ui/verve/surfaces.css`, and its
- * `PointerDragKind` names the kit's own gestures. Moving it up would point the kit's own mechanism out
- * of the kit and back down at its own stylesheet.
+ * `src/shared/hooks/`, although the frontend standard sends a hook that several FEATURE modules call
+ * there: what binds it to the kit is direction — it writes `vv-dragging` and `vv-drag-<kind>`, class
+ * names whose only meaning is in `src/shared/ui/verve/surfaces.css`, and its `PointerDragKind` names
+ * the kit's own gestures. Moving it up would point the kit's own mechanism out of the kit and back
+ * down at its own stylesheet.
  *
  * The body class is the whole reason this hook exists. A drag that begins on a handle and continues
  * over a cross-origin iframe dies there: the frame swallows the pointer events and the drag stops

@@ -133,7 +133,7 @@ function CheckSheetBody({ node, service, check, lookupAt, run, nodeView, service
   // run of the check begins; only this body saw the press, and the check's read does not say which run it was.
   const [startedRuns, setStartedRuns] = useState<Record<string, string>>({});
   const { detail, error, refresh } = useCheckDetail({ node, service, id: selectedId, lookupAt: moment });
-  const { liftMute, setLabel } = useCerberus();
+  const { liftMute, setLabel, setAutoDiagnosis } = useCerberus();
 
   /** A minute pressed on the strip: the lookup goes to the moment its word was reached, and the time input follows the read. */
   const pickMinute = (cell: CerberusCell) => {
@@ -252,6 +252,13 @@ function CheckSheetBody({ node, service, check, lookupAt, run, nodeView, service
             diagnosisRead={detail !== null}
             // Center hints the check a second late; the sheet reads it at once, so the new diagnosis stands before Diagnose lets go.
             onDiagnosisStarted={refresh}
+            // `?? null`: an older server's answer has no such field, and the switch is not drawn until the read says where it stands.
+            autoDiagnosis={detail?.autoDiagnosis?.on ?? null}
+            // The write, then this sheet's own read, so the switch settles on what the server holds (a refused write falls back on its own).
+            onAutoDiagnosis={async (on) => {
+              await setAutoDiagnosis({ node, service, id: selectedId, on });
+              await refresh();
+            }}
           />
         </div>
       )}

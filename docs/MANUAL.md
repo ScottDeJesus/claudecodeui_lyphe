@@ -1074,21 +1074,28 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DockableFab.tsx, /
 ## MAN-9244 — The kit the switcher is built on — `usePointerDrag.ts` — the one drag mechanism all of them, the sortable lists' carry
 section: applications/012 The kit the switcher is built on/001 `usePointerDrag.ts` — the one drag mechanism all of them, the sortable lists' carry
 
-- **`usePointerDrag.ts`** — the one drag mechanism all of them, the sortable lists' carry (`src/shared/ui/sortable/`, MAN-7577) and `RegionImage`'s drawn box (`RegionDrawLayer`, MAN-8579), run on. It lives with the kit rather
-  than in `src/shared/hooks/`, and is not exported from the barrel: the frontend standard sends a
-  hook used by multiple FEATURE modules to `src/shared/hooks/`, and this one has none — what binds
-  it here is direction, since it writes class names whose only meaning is in the kit's own
-  stylesheet and its `PointerDragKind` (`'fab' | 'split' | 'resize' | 'sort' | 'draw'`) names the kit's gestures. The options `accept`, `captureOnStart`, `holdMs` and `onStart`, and the `cancelled` flag of the `onEnd` payload, serve the sortable carry (MAN-7577); the other consumers leave them unset, `draw` reading `cancelled` alone (a drag the browser took away reports no box).
-- **`ResizeGrip.tsx`** — a button the caller stands at one corner of
-  a panel, dragged to size it; its one caller outside the kit is chat-host's `ChatHostPanel` (MAN-7491). It
-  paints and never places. Props: `label` (aria-label), `corner` (`'top-left' | 'top-right' |
-  'bottom-left' | 'bottom-right'`, which sets its cursor and glyph), `onResize({dx, dy})`,
-  `onResizeEnd({dx, dy})`. It reports raw pointer deltas since the press and never a size — the sign
-  per corner is the caller's. `onResize` is live; `onResizeEnd` fires once at release and only when
+- **`usePointerDrag.ts`** — the one drag mechanism all of them, the sortable lists' carry (`src/shared/ui/sortable/`, MAN-7577) and `RegionImage`'s drawn box (`RegionDrawLayer`, MAN-8579), run on; two feature modules call it directly, the sidebar's tree carry (`useSimpleChatDrag`, kind `sort`) and Kaylee's floating panel moved by its header (`useCompanionPanelPlace`, kind `move`, MAN-9062). It lives with the kit rather
+  than in `src/shared/hooks/`, and is not exported from the barrel: what binds it here is direction,
+  since it writes class names whose only meaning is in the kit's own stylesheet and its
+  `PointerDragKind` (`'fab' | 'split' | 'resize' | 'sort' | 'draw' | 'move'`) names the kit's gestures
+  (`body.vv-drag-move` and everything in it wear `grabbing`). The options `accept`, `captureOnStart`, `holdMs` and `onStart`, and the `cancelled` flag of the `onEnd` payload, serve the sortable carry (MAN-7577); `accept`, `captureOnStart` and `onStart` serve the panel move too (a press its controls own is refused through `isPlainPress`, `sortable/freePress.ts`, the test `isFreePress` runs on; the capture is taken at the drag's start, so a click or double-click on the header is the page's); the other consumers leave them unset, `draw` reading `cancelled` alone (a drag the browser took away reports no box).
+- **`ResizeGrip.tsx`** — a grip the caller stands at one corner or along one edge of a panel, dragged to
+  size it; its callers outside the kit are chat-host's `ChatHostPanel` (one corner grip, MAN-7491) and the
+  companion's `CompanionPanelGrips` (four edges and four corners around Kaylee's floating panel, one of them the
+  keyboard's, MAN-9062). It paints and never places. Props, one of three shapes: `corner` with `label`
+  (the keyboard's grip: a button with the glyph, a tab stop; `corner` sets its cursor and glyph); `corner`
+  with `pointerOnly` (a zone with no glyph, no tab stop, `aria-hidden`, filling its caller's box); or `edge`
+  (`'top' | 'right' | 'bottom' | 'left'`: always pointer-only, the kit's 6px thickness across, 12px under a
+  finger, and its caller's box along; under the pointer and while held it draws a 2px accent line along its
+  own side, an inset shadow, and its whole strip in `Highlight` under forced colours). With all of them
+  `onResize({dx, dy})` and `onResizeEnd({dx, dy})`. It reports raw pointer deltas since the press and never
+  a size — the sign per side is the caller's. `onResize` is live; `onResizeEnd` fires once at release and only when
   the drag moved, so a click cannot commit a size. It runs on `usePointerDrag` kind `'resize'`, so
-  frames are inert for the drag. Each arrow key is one whole 16px resize (`onResize` then
+  frames are inert for the drag, and the body wears the held grip's cursor (`:has()` on its `data-corner` or
+  `data-edge`). Each arrow key on the keyboard's grip is one whole 16px resize (`onResize` then
   `onResizeEnd`); an arrow with Alt, Ctrl or ⌘ is ignored, and so is any arrow once a pointer drag has
-  passed its 4px threshold — a key between the press and that threshold still resizes.
+  passed its 4px threshold — a key between the press and that threshold still resizes. A panel framed in
+  edges stands one keyboard corner grip beside them: its arrows move both its sides, which is every resize.
 
 **The body class is the reason the drag exists in this shape.** A pane is a cross-origin iframe, and
 an iframe is its own browsing context: the moment a drag crosses into one, the frame swallows the
@@ -3118,15 +3125,21 @@ knows whether it would rather wait or be told), answering "not read yet" when th
 That dispatcher lane
 also supplies the mechanism's `serialize` (the roadmap lane does too, for the same `generated_at`) — how a picture becomes the string a lane
 compares for change, the whole picture `JSON.stringify`ed by default: its document is stamped
-`generated_at` from the dispatcher's own clock at SECOND resolution on a poll of two seconds, so
-compared whole it would differ from itself on every tick and the lane would put its 28 KB frame on
-every open socket every two seconds on a host where nothing moved. The read's clock is left out of
+`generated_at` from the dispatcher's own clock at SECOND resolution, so
+compared whole it would differ from itself on every read and the lane would put its 28 KB frame on
+every open socket after every one on a host where nothing moved. The read's clock is left out of
 the comparison and out of nothing else — every frame still carries it, since a client is owed the
-reading's own time beside the frame's arrival one. Why it polls rather than watches, when it speaks, why the dedup records
-a picture as sent only AFTER the send returns, and why a failing tick never takes the interval down
+reading's own time beside the frame's arrival one. Why those two lanes are not on a clock, when it speaks, why the dedup records
+a picture as sent only AFTER the send returns, and why a failing tick never takes the lane down
 with it are documented once, there.
 
-`poke()` runs one tick now while the lane is started, a no-op otherwise: the roadmap routes call it after every `ok` write. It is an ordinary tick, and a poke that arrives while a reading is out is REMEMBERED (a flag, never a queue: one reading at a time) and one more tick runs the moment that reading lands, because that reading began before the write and may have taken the old picture. A press is therefore never more than one read late.
+What makes a lane read is one of two clocks, a type that admits no third (`PolledLaneClock`): `pollMs`, a fixed interval, which
+`dispatch-souls` and `kanban-metis` keep at two seconds over a few dozen small files; or `backstopMs`, NO interval — the lane reads at `start()`, on
+every `poke()`, and once `backstopMs` after its last reading settled (the timer is re-armed by each settling, so a lane that is
+poked often never fires it; `null` is no backstop at all). The dispatcher and roadmap lanes are on `backstopMs` (60 s), poked by
+`server/shared/dispatcher-store-watch.service.ts` (MAN-9543).
+
+`poke()` runs one tick now while the lane is started, a no-op otherwise: the roadmap routes call it after every `ok` write, and on a `backstopMs` lane the store watch calls it. It is an ordinary tick, and a poke that arrives while a reading is out is REMEMBERED (a flag, never a queue: one reading at a time) and one more tick runs the moment that reading lands, because that reading began before the write and may have taken the old picture. A press is therefore never more than one read late.
 
 What is THIS lane's and not the mechanism's: the launch root, the two-second cadence, the six-hour
 window, and the frame. The root is `dispatchSoulsStateDir()` in `server/shared/utils.ts`
@@ -3227,7 +3240,7 @@ governs: /home/lyphe/.claude/hooks/skill_router.py, /home/lyphe/.claude/skills/h
 ## MAN-1498 — The dispatcher lane
 section: dispatcher/000
 
-A polled lane on this server: twenty-eight routes under `/api/dispatcher` (twenty-seven in `dispatcher.routes.ts`: three reads, twelve presses on a plan, eight on an arc, four on the board; plus the card's `POST /answer`, MAN-7534), behind `authenticateToken` in `server/index.ts` (`createDispatcherModule()`, the mount, its `start()`/`stop()` after `listen` and on shutdown, and its `picture()`, `cardText(name)` and `relay(order)` handles, which the entrypoint hands the companion's house: MAN-9142, MAN-9152), wired in `dispatcher.module.ts`, plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
+A state lane on this server: twenty-eight routes under `/api/dispatcher` (twenty-seven in `dispatcher.routes.ts`: three reads, twelve presses on a plan, eight on an arc, four on the board; plus the card's `POST /answer`, MAN-7534), behind `authenticateToken` in `server/index.ts` (`createDispatcherModule()`, the mount, its `start()`/`stop()` after `listen` and on shutdown, and its `picture()`, `cardText(name)` and `relay(order)` handles, which the entrypoint hands the companion's house: MAN-9142, MAN-9152), wired in `dispatcher.module.ts`, plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
 'dispatcher_state'` — and the notifications its endings earn (a feature in no epic pushes each ending; a feature of an epic pushes once per wave of trouble, its own finish is kept as `dispatcher.feature_finished` for the station's strip and pushed nowhere, and the epic's own finish pushes once — MAN-5639). A plan that lands owing the OPERATOR's word has its prompt put up on the plan's card (In flight face, Runs widget) and on his phone — the Accept prompt or the designer's questions, raised by this lane itself through `dispatcher ask <name>` and answered back through `dispatcher accept` and `dispatcher tell` (MAN-7400) — and still not a word of it is this lane's composition: the census, the options and the questions are the dispatcher's. A path under `/api` that no lane names answers 404 JSON (MAN-5437). Beside the routes the module hands the entrypoint `relay(order)`: Kaylee's acts on his spoken word, with kaylee--press's record of it (MAN-9152).
 
 The dispatcher is a separate program. It owns a SQLite store under `~/.claude/state/dispatcher`
@@ -3236,7 +3249,7 @@ prints one document whole. **This lane writes none of it**: it reads that docume
 dispatcher's own verbs. No route here can put this server's words into the store, and no
 file of the lane holds anything of the store but a reading.
 
-Its twin is the roadmap lane (`server/modules/roadmap/`, MAN-7631): the same command door (`server/shared/dispatcher-command.ts`, MAN-7633) and the same poll mechanism (MAN-534), its own frame, routes and reading. What the two share and where they differ: MAN-7632.
+Its twin is the roadmap lane (`server/modules/roadmap/`, MAN-7631): the same command door (`server/shared/dispatcher-command.ts`, MAN-7633) and the same lane mechanism (MAN-534) and the same store watch (MAN-9543), its own frame, routes and reading. What the two share and where they differ: MAN-7632.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-epics.reader.ts
 
@@ -3244,7 +3257,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 section: dispatcher/000/001 The poll. `dispatcher-watcher.service.ts` wraps `createPolledLane`
 
 **The poll.** `dispatcher-watcher.service.ts` wraps `createPolledLane`
-(`server/shared/polled-lane.service.ts`) with `POLL_MS` 2000 and the frame above. It is one of the two lanes
+(`server/shared/polled-lane.service.ts`) on `backstopMs` (`BACKSTOP_MS`, 60 s) — NO interval — and the frame above. The lane
+reads when `server/shared/dispatcher-store-watch.service.ts` pokes it (MAN-9543: a write to the store, the daemon's lock or wake
+socket, the chain record of a running phase, a switch, the pacer's readings or an armed hour's timer unit), at boot, and
+once more 60 s after its last reading settled, for what no write announces: a walker, soul or daemon killed with nothing left
+to write, `report_stall`'s 60 s grace running out, the UTC hour a peak window ends at. It is one of the two lanes
 here whose reading is a SUBPROCESS (the roadmap's, MAN-7631, is the other), which is what the mechanism's promise support was added for: a
 tick that arrives while the previous read is still out is SKIPPED rather than queued, and `current()`
 answers `null` — no reading has landed, and none is invented — until the first one does. A route
@@ -3253,10 +3270,10 @@ that must not answer an unread lane waits for that first landing (`whenLanded`, 
 200, because a read with nothing to say yet is not a fault, and a body that is not the picture, so
 no client draws it (`DispatcherFeed`'s `asPicture` refuses anything that is not the whole picture),
 and the frame the first landing broadcasts fills the tab a moment later. The tick is a bare
-`setInterval` (`polled-lane.service.ts`): it reads whether or not a socket is open. A read of the live
-store, 2026-10-14: a 5 MB document, 1.4–1.9 s wall (3.2 s before the `stages_by_phase`, `events_by_phase` and
-`events_by_plan` indexes, MAN-1444): 70–95% of the 2 s interval, and a read that runs past it skips the next
-tick; the roadmap's read is 0.3 s. A read that throws leaves the LAST good picture on the tab with one line in the
+`poke` (`polled-lane.service.ts`) or the backstop: it reads whether or not a socket is open. A read of the live
+store, 2026-11-04: a 9.1 MB document, 3.9–4.4 s wall and 2.9 s of CPU (every plan's chain record, every stage's
+`result.json` and one `systemctl show` per plan's armed hour), the roadmap's 0.5 s wall and 0.44 s of CPU. A poke that lands
+while a read is out is remembered and answered by one more, never queued. A read that throws leaves the LAST good picture on the tab with one line in the
 journal per distinct message. Each read of the store is first handed WHOLE to the follow-ups lane (`dispatcher-followups.module.ts`
 `settle`, MAN-9144), before the lane's picture is cut from it (`lanePictureOf`): it settles the follow-ups that name a feature, task
 or epic the store shows finished, whatever its age, and files the build gaps of a feature that just finished. Each CHANGED picture
@@ -3267,16 +3284,13 @@ on every plan and every arc, `runtime_s`: the dispatcher derives the first at se
 every read, and the second ends every interval still open at that same reading (`report_runtime`,
 MAN-7770), so a plan with an agent out reads differently on every read. The watcher supplies the
 mechanism's `serialize` (its own `changeOf`) and those keys alone are left out of the comparison.
-Compared whole, the picture would differ from itself on every tick and the lane would put ~28 KB on
-every open socket every two seconds on a host where nothing moved — or, with an agent out, on every
+Compared whole, the picture would differ from itself on every read and the lane would put ~28 KB on
+every open socket after every read, on a host where nothing moved — or, with an agent out, on every
 host. Every frame still carries both keys whole: a client is owed the reading's own time next to the
 frame's arrival time, and a card ticks `runtime_s` between frames from the browser's own clock at the frame's arrival (`received_at`) while an agent
 is out on the plan (`useWorkedSeconds`, MAN-6789). The figure is not lost to the comparison: every way
 it STOPS moving — a stage ending, a planner landing, a walk settling — changes something else in the
-picture, which sends a frame carrying the figure as it then stood. On the live host, 120 s of
-listening over 59 reads — 59 distinct readings of that clock and no other movement — puts one frame
-on the wire, and that one is the first tick after a restart; 40 s of listening with the arc's
-judgment walking (its `runtime_s` moving on every read) puts none.
+picture, which sends a frame carrying the figure as it then stood.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/
 
@@ -3401,6 +3415,34 @@ announces nothing; every later observation announces the events past the mark ol
 they join, live in `notification-copy.service.ts` and `ntfy-channel.service.ts`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/
+
+## MAN-9543 — The dispatcher lane — The store watch: what pokes the dispatcher and roadmap lanes
+section: dispatcher/000/008 The store watch. `dispatcher-store-watch.service.ts` pokes the dispatcher and roadmap lanes
+
+**The store watch.** `server/shared/dispatcher-store-watch.service.ts` (one instance, built in `server/index.ts` and handed to `createDispatcherModule` and `createRoadmapModule`) is what pokes the two dispatcher lanes (`PolledLane.poke`, MAN-534). It is a set of `fs.watch`es on DIRECTORIES (`directory-watch.service.ts`: a WAL checkpoint or an atomic `os.replace` kills a watch on a file with its inode), filtered to the names below, coalesced into ONE poke per lane per burst (`SETTLE_MS` 300 ms from the first event; a source that asks for longer never delays a quicker one), and re-armed by event when its directory is deleted or moved (the parent is watched for the name; an unarmable watch is said once and the lane's backstop keeps it honest).
+
+THE INPUTS, measured with strace over `dispatcher status --json` and `dispatcher roadmap show --json` — the list that says the screen reads what it read under a poll:
+
+| input | read by | covered by |
+|---|---|---|
+| `dispatcher.db`, `dispatcher.db-wal` | both | `change` events (every commit lands in the WAL; a checkpoint writes the db) |
+| `daemon.lock` | status always (`daemon.alive`); roadmap only while a phase is stalled (`report_stall` asks the daemon's state for the cause, and only then) | `change` (the daemon rewrites it with its pid at claim) |
+| `wake.sock` | nobody — it is the daemon's up/down ANNOUNCEMENT, watched and never read | any event (bound on the way up, unlinked on the way out, one rule pass before the lock is released) |
+| `dispatch-chains/<chain>/chain.json`, `walker.pid` | both — a RUNNING phase's stage rows, tries and `busy` come off its chain record, which the walker rewrites with no store write | one directory watch per chain of a phase running in the last picture (`followChains`, called from the status lane's reading); a chain newly watched pokes once, closing the gap before the watch armed |
+| `epics.flag`, `planners.flag`, `park_at_peak.flag`, `weekly_stop.flag`, `deepseek_features.flag` | status | one watch on `~/.claude/state`, filtered to those names |
+| `claude_account/accounts.json`, `chosen.json` | status | watch on that directory |
+| `pacer/readings.sqlite`(`-wal`), `pacer/rates.json` | status (`route.pace`, `pace_hold`) | watch on `pacer/`, SLOW: a 10 s window (`PACER_SETTLE_MS`), because every agent step appends a reading. The SQLite files on `change` only; `rates.json` on any event, since it is replaced atomically |
+| `dispatcher-*.timer` units under `/run/user/<uid>/systemd/transient` | status (`schedule`: an armed hour) | watch on that directory: an armed hour appearing, firing or being stopped by hand |
+| per-launch `result.json` / `spec.json` / pid files under `dispatch-souls/` | both, for spend, tries and liveness — about 10,200 `result.json` opens per roadmap read (most of its 0.44 CPU-s) and 33,000 per status read | NOT watched (thousands of directories): a stage's end is a `chain.json` write and a planner's end is a store write |
+| the clock, and the absence of a write | both (`report_stall`'s 60 s grace, walker/soul/daemon liveness after a kill, `route.peak_until`, `offpeak_at`, the pacer's projection) | NO FILE CAN SAY IT: the lanes' backstop, `BACKSTOP_MS` 60 s on each, re-armed when each reading settles |
+
+WHICH EVENTS COUNT. A reader of a WAL database that is the last connection open creates and deletes `-wal` and `-shm` around its own read — measured on a scratch copy of the store: two `rename` events per read — so a lane watching anything in the store directory would trigger itself forever. A commit is a `change`; a reader's comings and goings are `rename`s and `-shm` churn. The SQLite files (the store's and the pacer's) are therefore taken on `change` alone. A status read itself writes nothing to either database (strace: only `-shm` initialisation). The lane's own reading changes no watched file.
+
+THE BACKSTOP IS 60 s, measured from the last reading that settled. Every fact it exists for is minute-scale — the shortest is `report_stall`'s own 60 s grace, which nothing writes when it runs out — and a status read costs seconds of CPU. The roadmap lane carries it too: `roadmap show` reaches the same grace-timed stall reading through `_flight_step`, so a walker killed with nothing left to write moves that picture with no event.
+
+MEASURED 2026-11-04 on the live host (agents out): the old lanes (HEAD's `polled-lane` at 2 s around the real readers) in a scratch process spawned 7 `status --json` and 19 `roadmap show --json` in 38 s; the live server on the watch, in 30–40 s windows, 2–4 and 1–4, every one traced to an event or the backstop (a 22 s stretch with no event had no spawn but the roadmap's backstop). The lanes' own CPU over a 120 s window of busy host — 4 status and 4 roadmap reads — was 13.8 CPU-s, 11.5% of one core, against ≈ 29 CPU-s per 38 s (≈ 75%) for the old lanes; what else the server's cgroup spends (its node process, `heal_reflex --status`, `jev stats`, `claude_account status`) is not these lanes'. A real write → the lane's read spawns +200–300 ms after the verb exits → `roadmap_state` lands +650–880 ms after it (a probe roadmap/milestone/arc/plan row added and removed); `dispatcher_state` lands one status read later (3.7–4.4 s), the read's own cost. A chain record replaced → spawn +0.2 s.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-watcher.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/directory-watch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/dispatcher-store-watch.service.ts
 
 ## MAN-1557 — The plan card
 section: dispatcher/010 The plan card
@@ -10478,7 +10520,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 **The prompts a plan owes the operator, raised for the plan's card and the phone.** Composed in `dispatcher-prompts.module.ts` under the lane's root from three pieces that watch the SAME picture the endings do (`dispatcher.module.ts`'s `broadcast`, the lane's own picture and nothing else). No model is involved, no chat turn is spent, nothing is written into a transcript in the operator's name, no frame about a prompt goes to any socket. The prompt is DRAWN by the plan's card in the In flight face and the Runs widget (client MAN-7537) and PUSHED to the phone (MAN-618). A plan's session is consulted at the raise alone, to name the push. Three doors answer it: the card, the phone and Kaylee (`answerOnHisWord`, his spoken word with kaylee--press's record of it; MAN-8494, MAN-9152). She draws and pushes nothing.
 
 ## The raise (`dispatcher-raise.service.ts`)
-- Events: `design-loaded`, `phases-loaded`. It runs `dispatcher ask <name>` (`dispatcher-ask.transport.ts`, `hooks/dispatcher/ask.py`, MAN-7399), which records the ask in the STORE (`prompted_at` and an `asked` event) and prints it in the document's `asking` shape; the prompt goes up at once (`asks.show`), on the tick that saw the landing (measured 2026-09-29: 0.7 s from a probe plan's landing to its push, the lane polling every 2 s).
+- Events: `design-loaded`, `phases-loaded`. It runs `dispatcher ask <name>` (`dispatcher-ask.transport.ts`, `hooks/dispatcher/ask.py`, MAN-7399), which records the ask in the STORE (`prompted_at` and an `asked` event) and prints it in the document's `asking` shape; the prompt goes up at once (`asks.show`), on the reading that saw the landing (the store watch pokes the lane 300 ms after the landing's write and the status read that follows takes 3.7–4.4 s, measured 2026-11-04).
 - Every landing that owes a word is asked for, whatever session the plan names. `RaiseOutcome` is `raised | nothing | refused`. A plan with no session this server knows (`plan.session_app_id` null, or an id no `sessionsDb` row carries) is raised all the same: `sessionOf` answers `null`, and the push carries `provider: 'system'`, `sessionId: null`, `meta.sessionName: null`.
 - `refused` is a debt the verb will not take (no Eupalinos to take a Rework's notes or a round's answers): journalled once, marked, and left on the owning session's Stop hold.
 - THE MARK IS A MAP: `dispatcher_raised_through` in `app_config` holds one entry PER PLAN, the highest landing id already answered. why: a landing whose answer is still coming must stay DUE while other plans' marks advance; a single watermark (the endings' `dispatcher_announced_through`, MAN-5639) would swallow it.
@@ -12160,7 +12202,7 @@ Users: the In flight face and widget (above); the roadmap tree panel's `Mileston
 | file | owns |
 |---|---|
 | `useSortable.ts` | the carry: preview order, frame loop, drop, cancel |
-| `freePress.ts` | `isFreePress(target, item)`: a press may carry unless it lands on a control, an ARIA-role widget, inside an ancestor scrolling sideways right now, or inside a list nested in the item (its nearest `[data-sortable-item]` ancestor is not this item: that press is the inner list's own) |
+| `freePress.ts` | `isPlainPress(target, root)`: a press landed inside `root` on no control, no ARIA-role widget and inside no ancestor scrolling sideways right now; exported alone for a handle that is a whole region (Kaylee's floating panel moved by its header, MAN-9062). `isFreePress(target, item)` = `isPlainPress` and the press's nearest `[data-sortable-item]` ancestor is this item (a press inside a list nested in the item is the inner list's own) |
 | `slotAt.ts` | `slotAt` (the slot a pointer names), `moveKey`, `layoutRectOf` (box with translates taken off) |
 | `carried.ts` | the item in the hand, one copy for `useSortable` and the sidebar chat list's carry: `takeUp(element, x, y)` (marks: above its neighbours, own layer, an opaque ground, its corners, `data-carried`), `placeUnder(grip, x \| null, y)` (the translate that keeps it under the pointer; null x = on the list's rail), `putDown(element, from?)` (slides to its slot, then lets go; an item taken up again mid-slide keeps its marks), `dropNow` (no slide, for a list unmounting). Verve draws `[data-carried]` (`surfaces.css`) |
 | `motion.ts` | `slideFrom`, `scrollerOf`, `edgeStep`, `edgeHoldAt`, `surfaceBehind` (the ground an item stands on as ONE OPAQUE colour: translucent grounds, the sidebar's `bg-background/80` among them, are painted over one another up to the first opaque one), `radiusOf`, `scrollOffsetsWithin` + `restoreScrollOffsets` |
@@ -12458,7 +12500,7 @@ Wiring, `server/index.ts`
 Constants, `roadmap.module.ts` unless named
 | name | value | why |
 |---|---|---|
-| `POLL_MS` | 2000 | the dispatcher lane's cadence; `roadmap show` reads the store only, about 0.2 s |
+| `BACKSTOP_MS` | 60000 | the longest the lane goes without a reading when nothing poked it (the store watch, MAN-9543, pokes it on a write); `roadmap show` is 0.5 s wall and 0.44 s of CPU, and reads the store, about 10,200 per-launch `result.json` (most of that CPU) and, for the few phases walking, their chain record and the walker's pid |
 | `READ_TIMEOUT_MS` | 20000 | one command, read and writes alike; a write may kick the daemon first |
 | `FIRST_READ_WAIT_MS` | 5000 | how long a GET waits for this boot's first reading |
 | `ROADMAP_MAX_BUFFER` | 1 MiB, in `roadmap-state.service.ts` | the document is 190 KB (2026-10-03: two roadmaps, 51 features) |
@@ -12523,9 +12565,9 @@ section: The roadmap lane — the module: GET /api/roadmap, GET /api/roadmap/cas
 - `roadmap_state` = `{ kind: 'roadmap_state', ...picture, at: Date.now() }` to every open `/ws` client; nothing else rides it.
 - `serialize` drops `generated_at` (second-resolution clock, moves every read): the lane speaks only when the picture changed. The frame still carries it.
 - A frame goes out when a tick's picture differs from the last one sent (the first reading after `start()` always differs):
-  1. the poll, every `POLL_MS`: a change from any source (daemon, a terminal verb, another session) reaches the screen within one tick plus the read;
-  2. `poke()` (`PolledLane`, MAN-534) after a write that answered `ok` (exit 0): one tick now, so the screen need not wait for the interval. A 400, 409, 503 or 504 pokes nothing.
-- An interval tick that finds a reading still out is SKIPPED; a poke that finds one is remembered and replayed when that reading lands (MAN-534), so a pressed write's frame is never more than one read late.
+  1. the store watch (MAN-9543): a change from any source (daemon, a terminal verb, another session) pokes the lane within 300 ms and the frame follows one read later (0.5 s); the lane's own `BACKSTOP_MS` of 60 s reads once more for what no write announces (a walker killed with nothing left to write moves a row to `stalled`);
+  2. `poke()` (`PolledLane`, MAN-534) after a write that answered `ok` (exit 0): one tick now, so the screen need not wait for the watch. A 400, 409, 503 or 504 pokes nothing.
+- A poke that finds a reading still out is remembered and replayed when that reading lands (MAN-534), so a pressed write's frame is never more than one read late.
 - Measured 2026-10-03: five frames, each 132 to 170 ms after its write's response; the 400 and the 409 sent none.
 - Journal lines carry a `[Roadmap]` prefix; each distinct message is said once for the life of the process (`logErrorOnce`), a failed cases read's `cases read failed: <sentence>` among them.
 
@@ -12550,7 +12592,7 @@ Same on both
 | what | how |
 |---|---|
 | subprocess, document readers | MAN-7633: `runDispatcherCommand`, `readDispatcherJson`, `document-fields.ts` |
-| the poll | MAN-534: `createPolledLane`, `POLL_MS` 2000, `FIRST_READ_WAIT_MS` 5000, `serialize` without `generated_at`; a read that fails keeps the last good picture |
+| the lane's reads | MAN-534: `createPolledLane` on `backstopMs` (`BACKSTOP_MS` 60 s, no interval), poked by the one store watch (MAN-9543); `FIRST_READ_WAIT_MS` 5000, `serialize` without `generated_at`; a read that fails keeps the last good picture |
 | not read yet | a 200 `{ error }` body, never a non-2xx |
 | a relayed command's status | `statusForWrite` (roadmap) = `statusForVerb` (dispatcher): 200 ok, 409 refusal, 504 `timeout`, 503 `spawn-failed`; the dispatcher's sentence travels in `stdout` untouched |
 | child env | `sessionlessEnv()` (`@/shared/child-env.ts`, one copy for both lanes and dispatch-souls): `userFacingEnv({ PATH })` minus `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION`. why: this server is no Claude session; `accept` refuses inside one, every door that carries Kaylee's relay of his word does too, and `tell` stamps it onto the outing |
@@ -12565,7 +12607,7 @@ Differs
 | reading | refuses a field it cannot read, by path; two tolerances: an absent `cases` key reads as six zeros (MAN-7631) and an absent `runtime_s` reads `0`; no plan resolved or filtered out (keys the contract does not name are dropped, MAN-7631) | tolerant `…Since` readers for keys an older build lacks; resolves `session_app_id`; drops plans ended over 24 h and their empty arcs (MAN-5634) |
 | second read | `GET /cases?feature=<name>`, on request and never polled: `cases list --plan <name> --state active --json` through the cases door, `door: 'cases'` (MAN-7658) | none |
 | writes | nine acts, a JSON body per route, argv composed by `writeArgv`, relayed by `relayRoadmapWrite` (MAN-7630) | verbs named by the URL (`/plans/:name/<verb>`, `/arcs/:name/<verb>`), relayed by `runDispatcherVerb` (MAN-5636) |
-| poke | `watcher.poke()` after an `ok` write | `watcher.poke()` after a verb with `result.ok`, after the card's answer and after `relay(order)` when the outcome is `took`: the card, the Inbox and the station's rail follow the act on the next picture, not on the next tick |
+| poke | `watcher.poke()` after an `ok` write | `watcher.poke()` after a verb with `result.ok`, after the card's answer and after `relay(order)` when the outcome is `took`: the card, the Inbox and the station's rail follow the act on the next picture, which the press's own `poke` reads at once, not the store watch's poke a moment later |
 | pushes, asks | none | endings, prompts, the card's answer door (MAN-5639, MAN-7400) |
 | routes | 11 | 25 (24 in `dispatcher.routes.ts`, the card's `POST /answer`) |
 

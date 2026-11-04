@@ -8,9 +8,12 @@ import { CompanionDraftCard } from '@/modules/companion/CompanionDraftCard';
 import { CompanionHeader } from '@/modules/companion/CompanionHeader';
 import { CompanionLog } from '@/modules/companion/CompanionLog';
 import { CompanionNotes } from '@/modules/companion/CompanionNotes';
+import { CompanionPanelGrips } from '@/modules/companion/CompanionPanelGrips';
 import { CompanionWalkStrip } from '@/modules/companion/CompanionWalkStrip';
 import { useCompanion } from '@/modules/companion/context/CompanionContext';
+import { useCompanionPanelPlace } from '@/modules/companion/hooks/useCompanionPanelPlace';
 import { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
+import { useNotesFold } from '@/modules/companion/hooks/useNotesFold';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
 import { openStation } from '@/shared/cloudcliDoors';
 import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
@@ -80,6 +83,15 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  * meant for send. The sheet carries its own close, and whatever the FAB opens in the shell — an application at 40, the
  * floating chat at 45 — would open under the sheet anyway; dialogs, menus and toasts are portalled and stay above it.
  *
+ * FROM LG, UNDER A FINE POINTER, HE MOVES AND RESIZES IT (`useCompanionPanelPlace`): a press on the header's empty space
+ * carries it, and the kit's grips on its four edges and four corners (`CompanionPanelGrips`) size it, held inside the
+ * shell, 8px in, and never smaller than her header, the composer, the log's floor and every card in the dock at its own
+ * floor stand in (measured from the panel), nor narrower than 320px. Where he leaves it is kept in this browser and drawn
+ * inline; with nothing kept nothing is, and the column above is what stands. While it floats, the two rows that scroll at
+ * its right edge — the log and the dock, the notes' scroller inside it — keep a 6px gutter there (a transparent border
+ * over their own ground), the width of the right edge's grip, so the strip stands beside their scrollbars and never on
+ * one. Under a finger at lg it stays that column; below lg it is the sheet, with no grips and no gutter.
+ *
  * TOP TO BOTTOM: the header (who, what she is doing, the focus, the controls, this device's voice switch given `voice`, and
  * this device's ears given `ears`; its status line draws `presence` alone, in which the page's own state wins over her process and her activity: Cut
  * for a breath after a press that stopped her voice, then his press, Listening or Transcribing, then Speaking while this
@@ -103,7 +115,9 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  * waiting for his word, whole (it is what will happen: its prompt scrolls inside a cap that is a share of the panel's
  * height, and his lines, which travel word for word, stand whole at any length); and so do the draft's target, its notice
  * and its sends: the draft is the one thing ever sent. The notes give way first, down to a floor that keeps the first
- * note's title and its ✕ (with the count of all of them), then the draft's field, down to its 88px floor, scrolling inside.
+ * note's title and its ✕ (with their count line), then the draft's field, down to its 88px floor, scrolling inside. Folded
+ * (`useNotesFold`, his press on their count line, kept in this browser), the notes are that one line, which stands, and the
+ * room they leave goes to the rest of the dock and then to the log, in the same order.
  * Where those floors fit — a phone held upright, a laptop — the dock never scrolls. On a shorter panel (the keyboard up, a
  * phone turned sideways), with an action and a draft docked together, or with his lines at their longest, the dock scrolls
  * as the last resort, each card whole within it and the action's foot (sticky) in sight: the draft card holds a floor of
@@ -122,6 +136,8 @@ export function CompanionPanelView({
 }: CompanionPanelViewProps) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
+  const place = useCompanionPanelPlace(panelRef, open);
+  const notesFold = useNotesFold(picture?.notes ?? null);
   const name = picture?.settings.name ?? t('companion.defaultName');
   const failed = picture?.process.state === 'failed';
   const docked = picture !== null && (picture.walk !== null || picture.notes.length > 0 || picture.pending !== null || picture.draft !== null);
@@ -163,7 +179,11 @@ export function CompanionPanelView({
         open ? 'flex' : 'hidden',
         'absolute inset-0 z-[61] flex-col overflow-hidden [container-type:size] max-lg:rounded-none max-lg:border-0 max-lg:shadow-none',
         'lg:inset-y-3 lg:left-auto lg:right-3 lg:z-[45] lg:w-[400px] lg:border-input lg:shadow-lift',
+        // The right edge's grip is the kit's 6px strip (`--vv-grip-edge` under a fine pointer, which floating always is).
+        place.floating && '[&>[data-companion-log]]:border-r-[6px] [&>[data-companion-log]]:border-r-transparent',
+        place.floating && '[&>[data-companion-dock]]:border-r-[6px] [&>[data-companion-dock]]:border-r-transparent',
       )}
+      style={place.style}
     >
       <CompanionHeader
         name={name}
@@ -177,6 +197,7 @@ export function CompanionPanelView({
         onClear={onClear}
         onClose={close}
         onOpenStation={onOpenStation}
+        onMovePress={place.onMovePress}
       />
 
       {failed && (
@@ -205,10 +226,13 @@ export function CompanionPanelView({
 
       {docked && (
         // Gives way to the panel (`min-h-0`), and scrolls only once its floors no longer fit. Its cap holds while no action card
-        // is drawn in it: an action's lapsed card draws nothing, so the cap comes back with no word from the page.
+        // is drawn in it: an action's lapsed card draws nothing, so the cap comes back with no word from the page. `relative`,
+        // so it is the containing block of everything it scrolls: the draft field's `sr-only` label, placed against the panel,
+        // escaped the dock's scroll once it was squeezed and gave the clipped panel a scroll range of its own (106px measured
+        // at a 285px panel), which a focus could scroll and nothing scrolls back.
         <div
           data-companion-dock=""
-          className="flex max-h-[max(55%,23rem)] min-h-0 flex-col gap-2 overflow-y-auto border-t border-border bg-background px-3 pb-1 pt-3 empty:hidden has-[[data-companion-action]]:max-h-none"
+          className="relative flex max-h-[max(55%,23rem)] min-h-0 flex-col gap-2 overflow-y-auto border-t border-border bg-background px-3 pb-1 pt-3 empty:hidden has-[[data-companion-action]]:max-h-none"
         >
           {picture.walk && (
             <div className="shrink-0">
@@ -218,9 +242,25 @@ export function CompanionPanelView({
           {picture.notes.length > 0 && (
             // The notes scroll as one. They start at their full height and give way ten thousand times faster than the
             // draft — all of the shrinking, to the pixel — so the draft's field keeps every word until the notes reach their
-            // floor (the count and the first title with its ✕). The inset keeps the cards' edges and shadows clear of the clip.
-            <div data-companion-notes-scroll="" className="-mx-3 min-h-[4.25rem] flex-[0_10000_auto] overflow-y-auto px-3 py-0.5">
-              <CompanionNotes notes={picture.notes} name={name} onDismiss={onDismissNote} />
+            // floor (the count line and the first title with its ✕), measured: the scroller's 2px inset, the count line's 28px
+            // (its fold control's), the 8px under it and the first card down to its ✕ (37px), 4.75rem; under a finger, where
+            // the fold control is 44px, 5.75rem. Folded, they are their count line, which stands. The inset keeps the cards'
+            // edges and shadows clear of the clip; a section with nothing left to show draws no band.
+            <div
+              data-companion-notes-scroll=""
+              className={cn(
+                '-mx-3 overflow-y-auto px-3 py-0.5 empty:hidden',
+                notesFold.folded ? 'shrink-0' : 'min-h-[4.75rem] flex-[0_10000_auto] finger:min-h-[5.75rem]',
+              )}
+            >
+              <CompanionNotes
+                notes={picture.notes}
+                name={name}
+                folded={notesFold.folded}
+                onFoldChange={notesFold.setFolded}
+                fresh={notesFold.fresh}
+                onDismiss={onDismissNote}
+              />
             </div>
           )}
           {picture.pending && (
@@ -246,6 +286,10 @@ export function CompanionPanelView({
       )}
 
       <CompanionComposer name={name} ready={picture !== null} visible={open} onSend={onSendText} talk={talk} />
+
+      {place.floating && (
+        <CompanionPanelGrips label={t('companion.panel.resize', { name })} keyboardCorner={place.keyboardCorner} resizeBy={place.resizeBy} />
+      )}
     </Card>
   );
 }

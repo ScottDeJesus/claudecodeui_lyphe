@@ -9,7 +9,8 @@ import type { SoulLaunchSnapshot } from '@/shared/types.js';
  * The house, handed in: the readers only a MODULE INSTANCE holds, which Kaylee's tools read the panels through.
  *
  * The operator's ruling is that her reads go through the same server-side readers the panels use. The roadmap lane and
- * the dispatcher lane each hold a validated picture behind `whenLanded`, refreshed every two seconds; the souls lane holds
+ * the dispatcher lane each hold a validated picture behind `whenLanded`, refreshed when the store watch pokes them and at
+ * least once a minute; the souls lane holds
  * its launches; Cerberus builds its overview from its own inputs; the heal lane holds the one service that runs the
  * worker. None of those handles is reachable from a barrel — each exists only on the instance `server/index.ts` built —
  * so the entrypoint, the composition root, builds the house from those instances AFTER them (Kaylee is mounted after the
