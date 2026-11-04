@@ -3998,17 +3998,16 @@ Why both: the API sees only the proxy's loopback socket for a browser request, w
 
 Measured 2026-11-03 against a scratch `vite preview` on the real config and a scratch express app mounting the real forwarder and router, both aimed at an echo on 127.0.0.1: from the box with a header → that header; from the box with none (`/usr/bin/curl`) → no header sent; the box dialling its own tailnet address with a header → that header; a container on the docker bridge dialling 172.17.0.1, with or without a header → `production`. Re-measured the same day on the live fronts with the real `vite preview` config: a loopback request carrying the front's stamp, with a forged header, none or a blank one → `production`; the same without the stamp → the header as sent, or nothing.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js
+
+## MAN-9524 — The shadow-connector lane forwarder — createShadowConnectorLane, the one read of — Rules 1-7 and traps
+section: The shadow-connector lane forwarder — createShadowConnectorLane, the one read of EIS_INTERNAL_SECRET (server/shared)/003 `describeFailure` uses only an error's NAME and its cause's CODE, never its message: a transport
+
 Rules (they bind the file; INV-8633 holds them for both lanes)
 1. The secret is read from shadow-connector's env file at CALL time: `fs.stat` on every call, re-parse only when `mtimeMs` or `size` changed, so a rotation lands on the next request with no restart and no watcher. It is never written to `process.env`, this server's `.env`, a log line, an error message or a cache.
 2. Nothing is forwarded without it: a missing, empty, padded, non-ASCII or unclosed-quote secret answers `no_secret` (`CloudCLI could not read shadow-connector's internal secret`) and sends no request.
 3. Nothing throws. A lane fault is a RESULT; an upstream answer (404, 422, a refusal) is a RESULT carried whole.
 4. `fetch` runs `redirect: 'manual'`, so the secret header never follows a `Location`.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js
-
-## MAN-9524 — The shadow-connector lane forwarder — createShadowConnectorLane, the one read of — `describeFailure` uses only an error's NAME and its cause's CODE, never its message: a transport
-section: The shadow-connector lane forwarder — createShadowConnectorLane, the one read of EIS_INTERNAL_SECRET (server/shared)/003 `describeFailure` uses only an error's NAME and its cause's CODE, never its message: a transport
-
 5. `describeFailure` uses only an error's NAME and its cause's CODE, never its message: a transport error can quote the request, and the request carries the secret.
 6. `X-Acting-User` is display only (the engine derives `origin` itself, R-CAP-21): non-printable characters become `?`, trimmed, at most 64 characters, absent when none.
 7. `X-Gemini-Budget-Plan` is `LaneRequest.budget` and nothing else: the forwarder never reads `process.env` for it, so a lane never spends under this server's own name (the agent sessions this server spawns inherit its environment).
