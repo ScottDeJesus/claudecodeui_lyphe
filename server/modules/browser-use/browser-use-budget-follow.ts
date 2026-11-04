@@ -22,10 +22,10 @@ const BODY_HEADERS = ['content-type', 'content-encoding', 'content-language', 'c
 
 // Called by browser-use-budget.ts for every request of a session bound for this box that is not a stream.
 // Sends the request with the session's ID, and follows each redirect with the ID on a hop that is on this box
-// and without it on a hop that is not (`hopHeaders` decides), dropping Authorization when the hop changes
-// origin, as a browser does, and the first request's Cookie header on every hop. A navigation's redirect is
-// handed back to Chromium, because the page's address must change with it; the hop it makes is then not routed
-// and carries no ID.
+// and without it on a hop that is not (`hopHeaders` decides), dropping Authorization and Referer when the hop
+// changes origin, as a browser does, and the first request's Cookie header on every hop. A navigation's redirect
+// is handed back to Chromium, because the page's address must change with it; the hop it makes is then not
+// routed and carries no ID.
 export async function sendRequestWithBudget(route: any, hopHeaders: HopHeaders): Promise<void> {
   const request = route.request();
   let url: string = request.url();
@@ -80,6 +80,11 @@ export async function sendRequestWithBudget(route: any, hopHeaders: HopHeaders):
     delete headers.cookie;
     if (next.origin !== new URL(url).origin) {
       delete headers.authorization;
+      // The first request's Referer is the page's whole address, query included. A browser recomputes it for each
+      // hop under the page's referrer policy (the origin alone by default, nothing under same-origin or
+      // no-referrer); replaying it would hand the next host what the policy keeps from it. Dropping sends no
+      // more than any policy would.
+      delete headers.referer;
     }
     if (status === 303 ? method !== 'HEAD' : (status === 301 || status === 302) && method === 'POST') {
       method = 'GET';

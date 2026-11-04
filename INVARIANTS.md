@@ -24542,3 +24542,99 @@ measured 2026-11-03 by chain chain-usage-limits--gemini-feature-id--plan-names-2
 probe-key: bcd50591d0ca17e113b7ed62fb7cc3df7c7b425a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/hooks/dispatcher/store_roadmap.py, /opt/shadow-connector/core/gemini_budget/attribution.py
+
+## INV-10774 — probe — LOW — the stamp's three names are spelled in two languages and no case compares them
+
+LOW — the stamp's three names are spelled in two languages and no case compares them
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+grep -h "FRONT_STAMP = " /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts /opt/shadow-connector/core/gemini_budget/attribution.py | cut -c1-150
+cd /opt/eis-app/cases
+echo "stamp arms in the lockstep case and its child: $(cat relays/cloudclis-relay-rule-is-production-off-the-box-its-clean-header-on-it-else-null-as-the-backend.mjs lib/relay_rule_child.mjs | grep -c -i 'fronted\|forwarded\|tailscale-headers-info')"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today the two lists name the same three headers and `stamp arms … : 0`; cured when the count is 1 or more (the lists still equal)
+```
+
+measured 2026-11-03 by chain chain-usage-limits--gemini-feature-id--cloudcli-relays-20261103-181107-75fb, finding L1, LOW
+probe-key: 91269d010384b46193362cb564f11ebbcaacb71e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /opt/shadow-connector/core/gemini_budget/attribution.py
+
+## INV-10775 — probe — LOW — the split left MAN-9524 a sentence-cut title over rules 5–7 with no heading, and six rows cite a section it now holds elsewhere
+
+LOW — the split left MAN-9524 a sentence-cut title over rules 5–7 with no heading, and six rows cite a section it now holds elsewhere
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+docstore get MAN-9524 | python3 -c 'import sys,json; r=json.load(sys.stdin)["row"]; print("title ends:", repr(r["title"][-34:])); print("body opens:", r["body"].splitlines()[0][:48])'
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today the title ends `…never its message: a transport'` and the body opens "5. `describeFailure` uses only an error's NAME"; cured when the title names the part and the body opens with a heading
+```
+
+measured 2026-11-03 by chain chain-usage-limits--gemini-feature-id--cloudcli-relays-20261103-181107-75fb, finding L2, LOW
+probe-key: 4fe20f2623f12f1bdf296c36cf78f3a755f00cef
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /opt/shadow-connector/core/gemini_budget/attribution.py
+
+## INV-10776 — probe — MEDIUM — A redirect carries the first request's `Referer` — the page's whole address, query string included — to the next host, an off-box one included; Chromium sends the origin alone
+
+MEDIUM — A redirect carries the first request's `Referer` — the page's whole address, query string included — to the next host, an off-box one included; Chromium sends the origin alone
+
+```probe
+D0=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D0/a.sh" <<'OUTER'
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mts" <<'EOF'
+import http from "node:http";
+import { chromium } from "playwright";
+import { installBudgetRoute } from "/home/lyphe/.claude/claudecodeui_lyphe/server/modules/browser-use/browser-use-budget.ts";
+let landedReferer: string | null = "never landed";
+let policy = "";
+const server = http.createServer((req, res) => {
+  const u = new URL(req.url!, "http://x"); const o = req.headers.origin;
+  const cors = { "access-control-allow-origin": o ?? "*", "access-control-allow-credentials": "true" };
+  if (u.pathname.startsWith("/page")) { res.writeHead(200, { "content-type": "text/html", ...(policy ? { "referrer-policy": policy } : {}) }); return res.end("<html>p</html>"); }
+  if (u.pathname === "/go") { res.writeHead(302, { ...cors, location: u.searchParams.get("to")! }); return res.end(); }
+  if (u.pathname === "/echo") { landedReferer = (req.headers.referer as string) ?? null; res.writeHead(200, cors); return res.end("ok"); }
+  res.writeHead(404, cors); res.end();
+});
+await new Promise<void>((r) => server.listen(0, "::", () => r()));
+const port = (server.address() as any).port; const O = `http://127.0.0.1:${port}`; const OFF = `http://localhost.localdomain:${port}`;
+for (const pol of ["", "same-origin"]) {
+  policy = pol; const row: string[] = [];
+  for (const routed of [false, true]) {
+    landedReferer = "never landed";
+    const browser = await chromium.launch({ headless: true, args: ["--disable-dev-shm-usage"] });
+    const ctx = await browser.newContext({ serviceWorkers: "block" });
+    if (routed) await installBudgetRoute("athena-probe", ctx, "probe-id");
+    const page = await ctx.newPage(); await page.goto(`${O}/page/x?token=SECRET123`);
+    const w = console.warn; console.warn = () => {};
+    await page.evaluate(async ([o, off]: string[]) => { try { await fetch(`${o}/go?to=${encodeURIComponent(off + "/echo")}`); } catch {} }, [O, OFF]);
+    console.warn = w; await browser.close();
+    row.push(`${routed ? "routed" : "control"}=${JSON.stringify(landedReferer)}`);
+  }
+  console.log(`page Referrer-Policy ${pol || "(default)"}: landed Referer at the off-box name: ${row.join("  ")}`);
+}
+server.closeAllConnections?.(); server.close(); process.exit(0);
+EOF
+( cd /tmp && timeout 120 /home/lyphe/.claude/scripts/cloudcli-tsx "$D/p.mts" 2>&1 | grep 'landed Referer' )
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+OUTER
+bash "$D0/a.sh"
+case "$D0" in /tmp/athena-probe.??????) rm -r "$D0";; esac
+# expect: two lines `page Referrer-Policy …: landed Referer at the off-box name: control=… routed=…`; while the leak stands the default line reads `control="http://127.0.0.1:P/"  routed="http://127.0.0.1:P/page/x?token=SECRET123"` and the same-origin line `control=null  routed="http://127.0.0.1:P/page/x?token=SECRET123"`; cured, `routed=` carries no `/page/x` and no `token=` on either line (null or the origin alone)
+```
+
+measured 2026-11-03 by chain chain-usage-limits--gemini-feature-id--browser-doors-20261103-181108-8a6d, finding M1, MEDIUM
+probe-key: 2c277fb5ec5a1afd05166a2214186bd87f35336c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/browser-use/browser-use-budget-follow.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/browser-use/browser-use-budget.ts
