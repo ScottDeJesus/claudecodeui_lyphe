@@ -13,6 +13,7 @@ import { userFacingEnv } from '@/shared/child-env.js';
 import { resolveMcpCommand } from '@/shared/mcp-command.js';
 import { loopbackApiOrigin } from '@/shared/utils.js';
 
+import { forgetBudget, installBudgetRoute, rememberBudget } from './browser-use-budget.js';
 import { getBrowserUseRuntime } from './browser-use-runtime.js';
 
 const require = createRequire(import.meta.url);
@@ -346,6 +347,7 @@ function ownerSessions(ownerId: string): BrowserUseSession[] {
 async function closeHandle(sessionId: string): Promise<void> {
   const handle = handles.get(sessionId);
   handles.delete(sessionId);
+  forgetBudget(sessionId);
   await handle?.context?.close?.().catch(() => undefined);
   await handle?.browser?.close().catch(() => undefined);
 }
@@ -490,7 +492,7 @@ export const browserUseService = {
       .map(publicSession);
   },
 
-  async createAgentSession(options?: { profileName?: string | null }) {
+  async createAgentSession(options?: { profileName?: string | null; budget?: string | null }) {
     const settings = readSettings();
     if (!settings.enabled) {
       throw new Error('Browser agent tools are disabled.');
@@ -558,6 +560,8 @@ export const browserUseService = {
     session.message = 'Browser session is ready.';
     sessions.set(session.id, session);
     handles.set(session.id, { browser, context, page });
+    // After the handle is registered, so a failure here leaves a session the TTL can still reap.
+    await installBudgetRoute(session.id, context, options?.budget ?? null);
     await captureSession(session, page);
     return publicSession(session);
   },
@@ -573,7 +577,8 @@ export const browserUseService = {
       .map(publicSession);
   },
 
-  async getAgentSession(sessionId: string) {
+  // `budget` is the Gemini budget ID the calling tool brought (null: none); undefined leaves the session's as is.
+  async getAgentSession(sessionId: string, budget?: string | null) {
     const settings = readSettings();
     if (!settings.enabled) {
       throw new Error('Browser agent tools are disabled.');
@@ -582,11 +587,12 @@ export const browserUseService = {
     if (!session || session.ownerId !== AGENT_OWNER_ID) {
       throw new Error('Browser session not found.');
     }
+    rememberBudget(sessionId, budget);
     return session;
   },
 
-  async agentNavigate(sessionId: string, rawUrl: string) {
-    await this.getAgentSession(sessionId);
+  async agentNavigate(sessionId: string, rawUrl: string, budget?: string | null) {
+    await this.getAgentSession(sessionId, budget);
     await expireStaleSessions();
 
     const session = sessions.get(sessionId);
@@ -611,8 +617,8 @@ export const browserUseService = {
     return publicSession(session);
   },
 
-  async agentSnapshot(sessionId: string) {
-    const session = await this.getAgentSession(sessionId);
+  async agentSnapshot(sessionId: string, budget?: string | null) {
+    const session = await this.getAgentSession(sessionId, budget);
     const handle = handles.get(sessionId);
     if (!handle?.page) {
       throw new Error('Browser runtime handle is not available.');
@@ -625,8 +631,8 @@ export const browserUseService = {
     };
   },
 
-  async agentClick(sessionId: string, input: { selector?: string; text?: string; x?: number; y?: number }) {
-    const session = await this.getAgentSession(sessionId);
+  async agentClick(sessionId: string, input: { selector?: string; text?: string; x?: number; y?: number }, budget?: string | null) {
+    const session = await this.getAgentSession(sessionId, budget);
     const handle = handles.get(sessionId);
     if (!handle?.page) {
       throw new Error('Browser runtime handle is not available.');
@@ -649,8 +655,8 @@ export const browserUseService = {
     return publicSession(session);
   },
 
-  async agentType(sessionId: string, input: { selector?: string; text: string; submit?: boolean }) {
-    const session = await this.getAgentSession(sessionId);
+  async agentType(sessionId: string, input: { selector?: string; text: string; submit?: boolean }, budget?: string | null) {
+    const session = await this.getAgentSession(sessionId, budget);
     const handle = handles.get(sessionId);
     if (!handle?.page) {
       throw new Error('Browser runtime handle is not available.');
@@ -673,8 +679,8 @@ export const browserUseService = {
     return publicSession(session);
   },
 
-  async agentFillForm(sessionId: string, fields: Array<{ selector: string; value: string }>) {
-    const session = await this.getAgentSession(sessionId);
+  async agentFillForm(sessionId: string, fields: Array<{ selector: string; value: string }>, budget?: string | null) {
+    const session = await this.getAgentSession(sessionId, budget);
     const handle = handles.get(sessionId);
     if (!handle?.page) {
       throw new Error('Browser runtime handle is not available.');
@@ -692,8 +698,8 @@ export const browserUseService = {
     return publicSession(session);
   },
 
-  async agentPressKey(sessionId: string, key: string) {
-    const session = await this.getAgentSession(sessionId);
+  async agentPressKey(sessionId: string, key: string, budget?: string | null) {
+    const session = await this.getAgentSession(sessionId, budget);
     const handle = handles.get(sessionId);
     if (!handle?.page) {
       throw new Error('Browser runtime handle is not available.');
@@ -704,8 +710,8 @@ export const browserUseService = {
     return publicSession(session);
   },
 
-  async agentSelectOption(sessionId: string, selector: string, values: string[]) {
-    const session = await this.getAgentSession(sessionId);
+  async agentSelectOption(sessionId: string, selector: string, values: string[], budget?: string | null) {
+    const session = await this.getAgentSession(sessionId, budget);
     const handle = handles.get(sessionId);
     if (!handle?.page) {
       throw new Error('Browser runtime handle is not available.');
@@ -719,8 +725,8 @@ export const browserUseService = {
     return publicSession(session);
   },
 
-  async agentWaitFor(sessionId: string, input: { text?: string; url?: string; timeoutMs?: number }) {
-    const session = await this.getAgentSession(sessionId);
+  async agentWaitFor(sessionId: string, input: { text?: string; url?: string; timeoutMs?: number }, budget?: string | null) {
+    const session = await this.getAgentSession(sessionId, budget);
     const handle = handles.get(sessionId);
     if (!handle?.page) {
       throw new Error('Browser runtime handle is not available.');
@@ -738,8 +744,8 @@ export const browserUseService = {
     return publicSession(session);
   },
 
-  async agentTabs(sessionId: string, input: { action?: 'list' | 'new' | 'select' | 'close'; index?: number; url?: string }) {
-    const session = await this.getAgentSession(sessionId);
+  async agentTabs(sessionId: string, input: { action?: 'list' | 'new' | 'select' | 'close'; index?: number; url?: string }, budget?: string | null) {
+    const session = await this.getAgentSession(sessionId, budget);
     const handle = handles.get(sessionId);
     if (!handle?.context || !handle?.page) {
       throw new Error('Browser runtime handle is not available.');

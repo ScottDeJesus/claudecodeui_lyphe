@@ -92,6 +92,7 @@
           "server/shared/station-types.ts",
           "server/shared/shadow-connector-lane.ts",
           "server/shared/shadow-connector-lane-router.ts",
+          "server/shared/gemini-budget-relay.ts",
           "server/shared/prompt-stream.ts",
           "server/shared/tool-call-hint.ts",
           "server/shared/tool-text-result.ts",
