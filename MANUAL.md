@@ -3330,7 +3330,7 @@ A method+path not in the table is the lane's own 404 `{ error: 'not a route of t
 The lane's own 422 is `{ error }`; the engine's is `{ detail: [...] }`: a client reads both. Status mapping, the body-must-be-an-object check and the malformed-escape 422 are the shared router's (MAN-8908 rules 2–4): an upstream answer keeps its status and body; unreachable 503, unreadable 502, no secret 503. Image 2xx: `Content-Type: image/jpeg` and bytes that begin `ffd8ff` (`JPEG_SIGNATURE`; anything else is 502 `shadow-connector did not answer with a JPEG`), `Cache-Control: private, max-age=31536000, immutable`; a non-2xx image answer passes through as its JSON. The one exception is the plan drawing row, which names its own image type (`SVG_IMAGE`: `image/svg+xml`, bytes that begin `<svg`, 502 `shadow-connector did not answer with an SVG`): a row's `image` wins over the lane's, so a JPEG answered for a drawing, and an SVG for a view, are each a 502 (measured 2026-10-26 through the real router with a stub forwarder). The layout press has 270 s because six views at HIGH thinking can outlast the reader's 120 s (`LAYOUT_PRESS_TIMEOUT_MS`); a press the lane gives up on is not cancelled, the engine's reads are kept and the next press finds them cached.
 
 ## The secret read and the headers sent
-Both belong to the forwarder: MAN-8863 (the read: `parseSecret`, `currentSecret`, a rotation lands on the next request) and INV-8633 (the rules). The one fact to carry here: a bytes route is asked for with `Accept: image/*` since 2026-10-22 (it was `image/jpeg`), and this lane still insists on its image type in the answer (a JPEG; an SVG for a drawing).
+Both belong to the forwarder: MAN-8863 (the read: `parseSecret`, `currentSecret`, a rotation lands on the next request) and INV-8633 (the rules). The Gemini budget header is the router's: this lane's surface reaches Gemini vision, so every request it forwards carries `X-Gemini-Budget-Plan` when its caller has one (MAN-8863, "The budget carried"); the lane's own files hold no request and change nothing for it. The one fact to carry here: a bytes route is asked for with `Accept: image/*` since 2026-10-22 (it was `image/jpeg`), and this lane still insists on its image type in the answer (a JPEG; an SVG for a drawing).
 
 ## Probes
 - 2026-10-17: `GET /api/affected-areas/tours?limit=3` → 200, three tours; `GET …/images/<sha>` → 200 JPEG whose `sha256sum` equals the id. `GET /nope`, `DELETE /tours`, `POST /codebook` → 404 with no `shadow-connector` journal line; 422 cases (bad id, `limit=0|101`, 81-char `q`, `mode=bogus`) likewise never reach the journal. An empty env file → 503 `no_secret`, 0 engine requests; writing the secret into it → next request 200, no restart.
@@ -3955,7 +3955,7 @@ Consumers (each owns its allowlist, id rules and image type; none owns a transpo
 | `createShadowConnectorLane({ baseUrl, envFile, label })` | builds a forwarder; the module that calls it is the ONLY reader of `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` for its lane, and passes the values down |
 | `ShadowConnectorLane` | `{ forward(LaneRequest): Promise<LaneAnswer> }`; a router takes `Pick<ShadowConnectorLane, 'forward'>` |
 | `ShadowConnectorLaneDependencies` | `{ baseUrl, envFile, label }`; `label` is the one word the log warning leads with |
-| `LaneRequest` | `{ method: GET\|POST\|PUT, path, query?, body?, actingUser, timeoutMs, expect: json\|bytes, passHeaders? }`; the route has already validated every part. `passHeaders` names (lower case) the upstream response headers a JSON answer carries back; absent or empty carries none |
+| `LaneRequest` | `{ method: GET\|POST\|PUT, path, query?, body?, actingUser, budget: string\|null, timeoutMs, expect: json\|bytes, passHeaders? }`; the route has already validated every part. `passHeaders` names (lower case) the upstream response headers a JSON answer carries back; absent or empty carries none |
 | `LaneAnswer` | `{ ok: true, status, kind: json, body, headers }` (`headers`: the `passHeaders` the engine sent, lower-case keys, `{}` when none), `{ ok: true, status, kind: bytes, body: Buffer, contentType }` (no headers carried), or `{ ok: false, reason: unreachable\|unreadable\|no_secret, message }` |
 
 ## The secret read (`parseSecret`, `currentSecret`)
@@ -3972,8 +3972,21 @@ Consumers (each owns its allowlist, id rules and image type; none owns a transpo
 | `Accept` | `application/json`, or `image/*` for a bytes route |
 | `Content-Type` | `application/json` when a body is sent |
 | `X-Acting-User` | signed-in username, non-printable → `?`, trimmed, ≤ 64 chars; absent when none. Display only: the engine derives `origin` itself (R-CAP-21) |
+| `X-Gemini-Budget-Plan` | `LaneRequest.budget` when it is a string; absent when null. What the router computed from the request (below) |
 
 A bytes route asks for `image/*` and not one type because the Tours lane's images are JPEGs and the bulletins lane's are PNGs; the forwarder does not know which, so it asks for any image, and each lane's router enforces its own type on the answer's Content-Type. Changed from `image/jpeg` on 2026-10-22 (the engine answers a PNG whatever `Accept` says, so this made the request truthful and changed no answer: a Tours image was byte-identical before and after).
+
+## The budget carried (`server/shared/gemini-budget-relay.ts`)
+A Gemini call the connector makes is counted against the budget its request names. This server is one hop on the way, and `relayBudget({ remoteAddress, localAddress, header })` is its whole share: a string to carry as `X-Gemini-Budget-Plan`, or `null` to carry nothing. The names, the relay rule and the off-box test are the connector package's, stated in MAN-8961 (home: `/opt/shadow-connector/core/gemini_budget/attribution.py`); this module spells them in TypeScript and restates none of them here. It imports node built-ins only, because two loaders read the one file: the Vite config (esbuild bundles it when Vite loads `vite.config.js`, which names it by its relative `.ts` path) and the server (tsx).
+
+| applied at | to | how |
+|---|---|---|
+| `vite.config.js` `/api` proxy: :5183 (dev) and :5184 (`vite preview`, which inherits `server.proxy`) | each browser request on its way to the API on :3011, judged by the browser's own socket | `proxyReq` sets the header to the answer, or removes the one the browser sent when the answer is null |
+| `createLaneRouter`'s handler (MAN-8908), so both lanes: Tours (MAN-8559, whose surface reaches Gemini vision) and Bulletins (MAN-8909) | each request a lane forwards, from `request.socket` and `request.get('X-Gemini-Budget-Plan')` | `LaneRequest.budget`; this forwarder sends it. A caller that reaches the API's tailnet listener (:3012) from off the box is judged by the same rule as the proxy's |
+
+Why both: the API sees only the proxy's loopback socket for a browser request, which is this box, so the header the proxy left is the one the router trusts; a caller that skips the proxy shows its own socket to the router. `affected-areas.routes.ts` and `carrier-bulletins.routes.ts` hand the router a table and hold no request, so they carry nothing of this.
+
+Measured 2026-11-03 against a scratch `vite preview` on the real config and a scratch express app mounting the real forwarder and router, both aimed at an echo on 127.0.0.1: from the box with a header → that header; from the box with none (`/usr/bin/curl`) → no header sent; the box dialling its own tailnet address with a header → that header; a container on the docker bridge dialling 172.17.0.1, with or without a header → `production`.
 
 Rules (they bind the file; INV-8633 holds them for both lanes)
 1. The secret is read from shadow-connector's env file at CALL time: `fs.stat` on every call, re-parse only when `mtimeMs` or `size` changed, so a rotation lands on the next request with no restart and no watcher. It is never written to `process.env`, this server's `.env`, a log line, an error message or a cache.
@@ -3982,6 +3995,7 @@ Rules (they bind the file; INV-8633 holds them for both lanes)
 4. `fetch` runs `redirect: 'manual'`, so the secret header never follows a `Location`.
 5. `describeFailure` uses only an error's NAME and its cause's CODE, never its message: a transport error can quote the request, and the request carries the secret.
 6. `X-Acting-User` is display only (the engine derives `origin` itself, R-CAP-21): non-printable characters become `?`, trimmed, at most 64 characters, absent when none.
+7. `X-Gemini-Budget-Plan` is `LaneRequest.budget` and nothing else: the forwarder never reads `process.env` for it, so a lane never spends under this server's own name (the agent sessions this server spawns inherit its environment).
 
 Traps
 | trap | fact |
@@ -3989,10 +4003,10 @@ Traps
 | state is per forwarder | each `createShadowConnectorLane` call holds its own parse of the env file and its own last-reported cause: two lanes log one line per distinct cause EACH, and each warning leads with its own `[<label>]`. A lane built without a distinct label is indistinguishable in the journal |
 | the label is the log's only lane word | the Tours warning reads `[affected-areas] no usable internal secret in <file>: <cause>`, the bulletins warning `[carrier-bulletins] …`; everything else the forwarder logs or answers is identical for every lane |
 | a response header travels only when the lane names it | `LaneRequest.passHeaders`; the bulletins lane names `x-left-out` (the overview's left-out carriers, MAN-8906) and `cache-control` (MAN-8909), the Tours lane none. An engine header no lane names is dropped here, by design: never carry one on a hunch, and never `Set-Cookie` |
-| a new top-level `server/shared/*.ts` file | joins `.oxlintrc.json`'s `backend-shared-utils` list (INV-6548); `shadow-connector-lane.ts` and `shadow-connector-lane-router.ts` are listed |
+| a new top-level `server/shared/*.ts` file | joins `.oxlintrc.json`'s `backend-shared-utils` list (INV-6548); `shadow-connector-lane.ts`, `shadow-connector-lane-router.ts` and `gemini-budget-relay.ts` are listed |
 | measured 2026-10-21 | with a missing env file, an empty one and an unreachable engine, `forward` answers `no_secret`, `no_secret` and `unreachable` (`CloudCLI could not reach shadow-connector`), and a repeated cause logs one warning, not two; `GET /api/affected-areas/tours?limit=3` and `GET /api/affected-areas/images/<sha>` through the dev API (:3011) answer 200 with the same body sha256 as before the forwarder moved here |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js
 
 ## MAN-8865 — Carrier-bulletins client wire — src/shared/carrier-bulletins-types.ts and api.carrierBulletins
 
@@ -4140,7 +4154,8 @@ Rules (they bind the file; a lane that needs different behaviour changes the def
 4. An upstream answer keeps its status and its JSON untouched, and carries back the response headers the lane named in `passHeaders` and no others. Only the lane's own faults carry a body of the lane's making, `{ error }`, and their statuses are fixed: `unreachable` 503, `unreadable` 502, `no_secret` 503. A fault the forwarder cannot name (an error thrown, not returned) is passed to `next(error)` and answered by the app's error handler, not by a body of the lane's own. why: turning a fault into a 200 with an empty body would replace the one useful thing in the answer, that nothing was read, with silence a screen shows as data; and a header the engine sets that a lane did not name (`Set-Cookie`, a `Location`) must not reach a browser by accident.
 5. A `bytes` route is relayed only on a 2xx, under its row's `image` when it names one (the Tours lane's plan drawing: an SVG) and the lane's `image` otherwise, and `Cache-Control: private, max-age=31536000, immutable` (the id is the sha256 of the bytes, so it never changes). A 2xx whose Content-Type is not that type, or whose first bytes are not `image.signature`, is `unreadable` (502 `shadow-connector did not answer with <image.noun>`). why: the Content-Type is the engine's word, and the bytes are what a browser would keep for a year. A non-2xx image answer is the engine's JSON, passed through (the forwarder reads bytes only on success).
 6. The acting user is read from `request.user.username` (the mount's `authenticateToken` set it) and sent as `X-Acting-User`, display only.
-7. Routes here validate and translate and do nothing else: no secret read, no socket, no cache, no model call.
+7. The Gemini budget is `relayBudget` over the request's own socket and `X-Gemini-Budget-Plan` header, set as `LaneRequest.budget` here and nowhere else, so both lanes carry it and a caller that reaches the API's tailnet listener from off the box is judged by the same rule as the Vite proxy's (MAN-8863, "The budget carried").
+8. Routes here validate and translate and do nothing else: no secret read, no socket, no cache, no model call.
 
 Traps
 | trap | fact |
@@ -4199,6 +4214,9 @@ The overview has the longer timeout because it plans every carrier's current fil
 An upstream answer — the overview, a page list, a page reading, and the engine's 404 `{ detail }` (no such bulletin, replaced by a newer file, no such page) or its 502 `{ detail }` (the stored file could not be fetched, is not the file named, or could not be opened) — passes through with its status and JSON untouched. The lane's own faults are `{ error }`: unreachable 503, unreadable 502, no secret 503 (MAN-8908 rules 4 and 5).
 
 The image is relayed as bytes with `Content-Type: image/png` and `Cache-Control: private, max-age=31536000, immutable`, and only on a 2xx: it is keyed by the file's sha256 and the page, so the same URL always draws the same picture. A 2xx that is not a PNG is the lane's `unreadable` (502 `shadow-connector did not answer with a PNG`): the check reads the Content-Type AND the first eight bytes (`89504e470d0a1a0a`, `PNG_SIGNATURE`), because an error page stamped `image/png` would otherwise be cached for a year under the page's URL. The shared forwarder asks for a bytes answer with `Accept: image/*`, so the Tours lane's JPEGs and this lane's PNGs share one transport; each lane enforces its own type on the answer.
+
+## The budget header sent
+This lane's requests carry `X-Gemini-Budget-Plan` when their caller has one, set by the shared router from the request (MAN-8863, "The budget carried"); `carrier-bulletins.routes.ts` holds no request and changes nothing for it.
 
 ## Headers carried back (`PASSED_HEADERS`)
 A JSON answer carries back two of the engine's response headers, and no other (the shared router's `passHeaders`, MAN-8908; a header travels only when a lane names it):
