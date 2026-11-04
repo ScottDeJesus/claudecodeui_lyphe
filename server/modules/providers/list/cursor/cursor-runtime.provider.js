@@ -125,6 +125,9 @@ async function spawnCursor(command, options = {}, ws, context) {
     const runCursorProcess = (args, runReason = 'initial') => {
       const isTrustRetry = runReason === 'trust-retry';
       let runSawWorkspaceTrustPrompt = false;
+      // Whether this process has already put an error row on the page (its stderr does), so a failed
+      // `result` that follows says nothing a second time.
+      let errorRowSent = false;
       let stdoutLineBuffer = '';
       let terminalNotificationSent = false;
 
@@ -234,6 +237,20 @@ async function spawnCursor(command, options = {}, ws, context) {
               break;
 
             case 'result': {
+              // A run that ends on a result that is not a success says what failed ahead of its `complete`:
+              // the `error` row is the only place the cause reaches the page, since the result itself
+              // normalizes to nothing. Not for the trust prompt's run (it is retried with --trust), not for
+              // a run the user stopped, and not for a failure stderr has already put on the page.
+              if (response.subtype !== 'success' && !errorRowSent && !runSawWorkspaceTrustPrompt && !cursorProcess.aborted) {
+                errorRowSent = true;
+                const cause = typeof response.result === 'string' ? response.result.trim() : '';
+                ws.send(createNormalizedMessage({
+                  kind: 'error',
+                  content: cause || `Cursor ended the run without success (${response.subtype ?? 'no subtype'}).`,
+                  sessionId: capturedSessionId || sessionId || null,
+                  provider: 'cursor'
+                }));
+              }
               // Session complete — terminal lifecycle event for this run
               if (!completeSent) {
                 completeSent = true;
@@ -283,6 +300,7 @@ async function spawnCursor(command, options = {}, ws, context) {
           return;
         }
 
+        errorRowSent = true;
         ws.send(createNormalizedMessage({ kind: 'error', content: stderrText, sessionId: capturedSessionId || sessionId || null, provider: 'cursor' }));
       });
 

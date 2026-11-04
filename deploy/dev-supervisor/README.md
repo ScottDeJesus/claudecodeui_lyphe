@@ -159,7 +159,7 @@ answer). Everything the children themselves write is relayed untouched.
 
 | Constant | Value | Home | Why |
 | -------- | ----- | ---- | --- |
-| `DEBOUNCE_MS` | 300 | `watch.mjs` | one save is several inotify events; a checkout is hundreds |
+| `DEBOUNCE_MS` | 120000 | `watch.mjs` | two quiet minutes: a builder's burst of saves, or a checkout's hundreds of events, becomes one boot (operator, 2026-11-03) |
 | `BOOT_TIMEOUT_MS` | 30 000 | `child.mjs` | a healthy boot is ~1-4 s here; this only has to outlast the slowest honest one |
 | `STOP_TIMEOUT_MS` | 10 000 | `child.mjs` | SIGTERM, then SIGKILL — a server that will not close its sockets still has to go |
 
@@ -171,7 +171,7 @@ Each lives in the module that consumes it, because `watchServerDir(dir, onChange
 | Situation | What happens |
 | --------- | ------------ |
 | **Broken edit** (syntax error) | the child exits before READY; `boot failed — previous server kept: Error: Transform failed with 1 error:`; the old server keeps serving; the next save boots again (measured) |
-| **Coalesced edits** (save, save, save) | the 300 ms trailing debounce makes one boot; an edit landing mid-boot stops that child and restarts the boot (`change during boot`) |
+| **Coalesced edits** (save, save, save) | the two-minute trailing debounce makes one boot once no save has landed for two minutes. A save restarts that wait, and a boot (30 s at most) and a retirement (10 s at most) both end inside it, so a save never lands mid-boot; `change during boot` is reached only by a `reboot` request from the serving API while a boot is pending |
 | **Boot timeout** | after 30 s the pending child is stopped and the old one kept; `boot timed out after 30 s` |
 | **Crash after READY** | one line, then the supervisor waits for the next change. It never auto-restarts — a server that crashes on this code crashes again on it, and a crash loop is what the watchdog's three-heal rule exists to catch |
 | **First boot fails** (nothing serving) | `boot failed — no previous server: …`. The supervisor stays alive, so `Restart=always` does not turn a broken edit into a 5-second crash loop. Nothing is listening, so the API canary fails and `/usr/local/bin/cloudcli-dev-watchdog.sh` heals the unit on its own 60 s timer — that script is never edited by this package |
@@ -243,7 +243,7 @@ systemctl status cloudcli-server-dev            # → active
 journalctl -u cloudcli-server-dev -f            # → [supervisor] serving pid <n>
 ```
 
-Prove a handover: `bash .verify/handover/smoke.sh` → `HANDOVER old=<pid> new=<pid> seconds=<n>`.
+Prove a handover: `bash .verify/handover/smoke.sh` → `HANDOVER old=<pid> new=<pid> seconds=<n>`. It reads `DEBOUNCE_MS` from `watch.mjs` and waits that plus 30 s, so `<n>` is at least the debounce (120 on the two-minute setting).
 
 ## See also
 

@@ -22,9 +22,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// A single save is several inotify events (write, attrib, rename-into-place) and a checkout is
-// hundreds; the trailing edge is what turns any of those bursts into exactly one boot.
-export const DEBOUNCE_MS = 300;
+// Two quiet minutes: the trailing edge waits until no save under server/ has landed for two
+// minutes, so a builder's burst of edits (and a checkout's hundreds of inotify events) becomes one
+// boot, not one per save — every swap cuts Kaylee off and drops live connections (operator, 2026-11-03).
+export const DEBOUNCE_MS = 120_000;
 
 const WATCHED_EXTENSIONS = ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.json'];
 

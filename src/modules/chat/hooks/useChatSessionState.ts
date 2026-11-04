@@ -1069,9 +1069,10 @@ export function useChatSessionState({
           setTokenBudget((slot.tokenUsage as Record<string, unknown> | null) ?? null);
         }
         // A chat that has had no turn has no transcript for the usage endpoint to read, and it answers 404 for
-        // it: ask only once the load reports rows. The first turn's usage reaches the panel through the stream's
-        // `token_budget` frame and the history refresh, never through this fetch.
-        if (slot.total > 0) void fetchInitialTokenUsage(selectedSessionId);
+        // it: ask only once the load reports rows. A load that failed reports nothing about the transcript (a
+        // chat with no turn loads fine, with no rows), so it asks too. The first turn's usage reaches the panel
+        // through the stream's `token_budget` frame and the history refresh, never through this fetch.
+        if (slot.total > 0 || slot.status === 'error') void fetchInitialTokenUsage(selectedSessionId);
       }
       // No rows (an empty chat, or a load the hidden tab refused): nothing will settle.
       if (!slot || slot.total === 0) setIsOpeningSession(false);

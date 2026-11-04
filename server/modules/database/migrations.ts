@@ -414,17 +414,29 @@ const rebuildSessionsTableWithProjectSchema = (db: Database): void => {
  * Rows that existed before this migration were always keyed directly by the
  * provider-native session id, so backfilling `provider_session_id` with
  * `session_id` keeps every legacy row resolvable through the new mapping.
+ *
+ * "Exactly once" is the column's own absence, not a flag of its own: a boot that finds the column
+ * already there returns before the UPDATE. NULL is a LIVE state of this column, not a gap — a chat
+ * created into the app (`createAppSession`) holds NULL from its creation until its first run announces
+ * the provider's own id, and every runtime reads NULL as "start the conversation". An UPDATE that ran
+ * at every boot stamped the app id onto each chat waiting for its first turn (the supervisor boots a
+ * candidate server on every `server/` save, so a busy hour is dozens of boots), and that turn then
+ * RESUMED a conversation that did not exist: "No conversation found with session ID". The ALTER and
+ * the UPDATE share one transaction, so a failed UPDATE cannot leave the column behind with the
+ * backfill undone — the next boot would read the column as present and never retry.
  */
 const addProviderSessionIdMapping = (db: Database): void => {
-  const sessionsTableInfo = getTableInfo(db, 'sessions');
-  const columnNames = sessionsTableInfo.map((column) => column.name);
+  const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
+  if (columnNames.includes('provider_session_id')) return;
 
-  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'provider_session_id', 'TEXT');
-  db.exec(`
-    UPDATE sessions
-    SET provider_session_id = session_id
-    WHERE provider_session_id IS NULL
-  `);
+  db.transaction(() => {
+    addColumnToTableIfNotExists(db, 'sessions', columnNames, 'provider_session_id', 'TEXT');
+    db.exec(`
+      UPDATE sessions
+      SET provider_session_id = session_id
+      WHERE provider_session_id IS NULL
+    `);
+  })();
 };
 
 /**

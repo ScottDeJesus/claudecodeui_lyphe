@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo } from 'react';
 
 import { COMPOSER_TARGET } from '@/modules/notes/context/NotesContext';
 import { api, attemptWrite } from '@/shared/api';
-import type { Note, NoteInput, NoteSaveOutcome, NoteSaveStatus } from '@/shared/types';
+import type { Note, NoteInput, NoteSaveOutcome, NoteSaveStatus, SaveOrder } from '@/shared/types';
 import { randomHexId } from '@/shared/utils';
 
 /**
@@ -22,15 +22,22 @@ import { randomHexId } from '@/shared/utils';
  * newest text at once; a lane with a save already in the air has the loop's NEXT request ahead of it,
  * and that request is sent only after the answer — which a closing page may never see — so the newest
  * text is sent beside the one in flight. A note's id is known, so that is one more update of it; a
- * blank card whose first save is still in flight has no id yet, and what was typed after that save
- * left cannot be sent (there is no note to update, and a second create under the first one's key
- * would be answered with that note and take none of the new text).
+ * blank card whose first save is still in flight has no id yet, so it is the create again under the
+ * first one's key, which the server answers by writing the newer text to the note the first one made
+ * (or by making it, if the first never arrived).
  *
  * ORDER. A lane sends one request at a time and re-reads its newest text when each one lands, looping
  * until what the server holds is what is typed. Typing during a flight therefore costs one more save
- * after it, carrying the newest text — an older text never lands last, because there is never a second
- * request in the air to overtake the first. Callers that `flush` while a flight is up are handed that
- * same flight, which already includes their text — the one exception is the page going away, above.
+ * after it, carrying the newest text. Callers that `flush` while a flight is up are handed that same
+ * flight, which already includes their text. The page going away is the one time a second request is
+ * in the air beside the first, so every save also carries a `Save-Order` (`nextSaveOrder`: this page's
+ * id and a count of its sends, which rises with the text's age). The server keeps the highest count it
+ * applied per note and writes no save with a lower one — an older text arriving late is answered as
+ * landed and changes nothing, so within one page load the newest text stands whichever request arrives
+ * first. The count is the page load's, not the lane's, so a card closed and opened again is one timeline;
+ * two pages (devices) and a page with the reload that replaced it are never compared — a request a
+ * reloaded page left in the network can still land over the new page's save — so another device's save
+ * still lands on arrival and a clean card still follows it.
  *
  * A CLEAN CARD FOLLOWS THE SERVER. A lane remembers the `updatedAt` its note had when the card opened
  * or when its own last save answered. A re-read that brings a NEWER `updatedAt` for a lane with nothing
@@ -54,12 +61,9 @@ import { randomHexId } from '@/shared/utils';
  * lane mints ONE key (`Idempotency-Key`) with its first create and every retry of that create carries
  * it; the server answers a key it has seen with the note it already made. The key is dropped once a
  * create lands (the lane is bound; a note deleted elsewhere is a new note and a new key). What the
- * retry carries is the newest text, and the server hands back the note as the FIRST attempt left it,
- * so a create that was ever unsure is followed at once by an update of the same note with the newest
- * text — unless the answer's own title and description are exactly the draft, which a plain insert's
- * are — and the lane does not call that text saved until that update lands. That update waits on the
- * retry's answer, so text typed after a lost first save is not sent by a page that goes away before
- * it (the page-going-away limit above, reached by this road).
+ * retry carries is the newest text, and its order is newer than the first attempt's, so the server
+ * writes it to the note the first attempt made: the answer is the retry's own text, and a page that
+ * goes away before the retry's answer still leaves the newest text in the one note.
  *
  * WHILE A CREATE IS UNSURE the wall keeps hiding what it did not hold when the first attempt left
  * (`onCreating` stays `true`; a retry keeps that baseline instead of taking a new one that already
@@ -96,11 +100,7 @@ const DRAWS_AS_NOTHING = /[\s\p{Cf}\p{Cc}]/gu;
 type Lane = {
   /** The note this lane writes to; `null` until the blank card's first save creates one. */
   noteId: string | null;
-  /**
-   * The text the server is known to hold, as it was typed; `null` before the first save, and after a create
-   * that was ever unsure landed with text other than the draft (the note it answered with is an earlier
-   * attempt's).
-   */
+  /** The text the server is known to hold, as it was typed; `null` before the first save. */
   saved: NoteInput | null;
   /**
    * The `updatedAt` the note had when the card opened or its own last save answered; `null` before
@@ -111,7 +111,7 @@ type Lane = {
   latest: NoteInput;
   /** The text the request now in the air carries, or `null` while none is. */
   sending: NoteInput | null;
-  /** The text `leave` last sent beside a request in the air, so a page's two leaving events send it once. */
+  /** The text `leave` last sent beside a request in the air (an update, or the blank card's create again), so a page's two leaving events send it once. */
   leftWith: NoteInput | null;
   /** True for the blank card's lane: its text outlives the note it was saved as (see `onBound`). */
   recreatesWhenGone: boolean;
@@ -184,22 +184,23 @@ const drawsSomething = (text: string): boolean => text.replace(DRAWS_AS_NOTHING,
 const keepaliveOptions = (draft: NoteInput) =>
   new Blob([JSON.stringify(draft)]).size <= KEEPALIVE_BODY_MAX_BYTES ? { keepalive: true } : undefined;
 
-/** The note a landed save answered with: its id, `updatedAt`, title and description; each `null` when the body does not carry it. */
-async function readSavedNote(
-  response: Response,
-): Promise<{ id: string | null; updatedAt: string | null; title: string | null; description: string | null }> {
+/** This page's writer id for `Save-Order`: one per page load, so two tabs are two writers. */
+const SAVE_WRITER = randomHexId();
+let lastSaveSeq = 0;
+
+/** The order of the next note save this page sends. Called once per request, at the moment it is built — every request, the leave's included. */
+const nextSaveOrder = (): SaveOrder => ({ writer: SAVE_WRITER, seq: (lastSaveSeq += 1) });
+
+/** The note a landed save answered with: its id and `updatedAt`; each `null` when the body does not carry it. */
+async function readSavedNote(response: Response): Promise<{ id: string | null; updatedAt: string | null }> {
   try {
-    const body = (await response.json()) as {
-      data?: { id?: unknown; updatedAt?: unknown; title?: unknown; description?: unknown };
-    };
+    const body = (await response.json()) as { data?: { id?: unknown; updatedAt?: unknown } };
     return {
       id: typeof body.data?.id === 'string' ? body.data.id : null,
       updatedAt: typeof body.data?.updatedAt === 'string' ? body.data.updatedAt : null,
-      title: typeof body.data?.title === 'string' ? body.data.title : null,
-      description: typeof body.data?.description === 'string' ? body.data.description : null,
     };
   } catch {
-    return { id: null, updatedAt: null, title: null, description: null };
+    return { id: null, updatedAt: null };
   }
 }
 
@@ -235,12 +236,9 @@ function newLane(noteId: string | null, text: NoteInput | null, updatedAt: strin
   };
 }
 
-/**
- * How one save ended: landed (the note's id, the `updatedAt` it answered, and whether the text it answered
- * with is exactly the draft sent), the note gone, or not landed.
- */
+/** How one save ended: landed (the note's id and the `updatedAt` it answered), the note gone, or not landed. */
 type WriteResult =
-  | { kind: 'landed'; noteId: string; updatedAt: string | null; echoedDraft: boolean }
+  | { kind: 'landed'; noteId: string; updatedAt: string | null }
   | { kind: 'gone' }
   | { kind: 'failed' };
 
@@ -254,8 +252,8 @@ async function writeDraft(lane: Lane, draft: NoteInput, deps: NoteSaverDeps): Pr
   // The key is minted by the first attempt and kept by the lane, so every retry of this create carries it.
   const attempt = await attemptWrite(() =>
     noteId === null
-      ? api.notes.create(draft, (lane.createKey ??= randomHexId()), options)
-      : api.notes.update(noteId, draft, options),
+      ? api.notes.create(draft, (lane.createKey ??= randomHexId()), nextSaveOrder(), options)
+      : api.notes.update(noteId, draft, nextSaveOrder(), options),
   );
 
   if (!attempt.landed) {
@@ -276,20 +274,17 @@ async function writeDraft(lane: Lane, draft: NoteInput, deps: NoteSaverDeps): Pr
 
   lane.complained = false;
   const saved = await readSavedNote(attempt.response);
-  if (noteId !== null) return { kind: 'landed', noteId, updatedAt: saved.updatedAt, echoedDraft: true };
+  if (noteId !== null) return { kind: 'landed', noteId, updatedAt: saved.updatedAt };
 
   // A create that landed but did not say which note it made leaves the card unbound: it is reported as a
-  // failure and the text stays in the card. The next save is a create under the same key, and the server
-  // answers that with the note this one made.
+  // failure and the text stays in the card. The next save is a create under the same key, which the
+  // server answers with the note this one made, rewritten with that save's text.
   if (saved.id === null) {
     if (lane.createKey !== null) lane.createUnsure = true;
     deps.onFailure(null);
     return { kind: 'failed' };
   }
-  // Exact, not normalised: text the service stored untouched is the draft; anything it trimmed or folded
-  // reads as "not the draft" and costs one harmless update.
-  const echoedDraft = saved.title === draft.title && saved.description === draft.description;
-  return { kind: 'landed', noteId: saved.id, updatedAt: saved.updatedAt, echoedDraft };
+  return { kind: 'landed', noteId: saved.id, updatedAt: saved.updatedAt };
 }
 
 /**
@@ -337,10 +332,7 @@ async function drain(target: string, lane: Lane, deps: NoteSaverDeps): Promise<N
         return 'failed';
       }
 
-      // A create that was ever unsure may have been answered with a note an earlier attempt made, holding
-      // that attempt's text: unless the answer is the draft itself, the draft is not known saved, and the
-      // next turn of the loop updates the note.
-      lane.saved = creating && lane.createUnsure && !result.echoedDraft ? null : draft;
+      lane.saved = draft;
       lane.baseUpdatedAt = result.updatedAt;
       wrote = true;
       unread = true;
@@ -454,14 +446,22 @@ function createNoteSaver(): NoteSaver {
           continue;
         }
         // A save is in the air and the loop's next request would go out only after its answer, which a
-        // closing page may never see: send the newest text beside it. Only a note's own lane can — the
-        // id is known — and only text the request in the air does not already carry.
+        // closing page may never see: send the newest text beside it, ordered after it. A note's lane
+        // updates the note; a blank card's create is still unanswered, so it creates again under the same
+        // key. Only text the request in the air does not already carry.
         const newest = lane.latest;
         const noteId = lane.noteId;
-        if (noteId === null || !drawsSomething(newest.title)) continue;
+        const createKey = lane.createKey;
+        const send =
+          noteId !== null
+            ? () => api.notes.update(noteId, newest, nextSaveOrder(), keepaliveOptions(newest))
+            : createKey !== null
+              ? () => api.notes.create(newest, createKey, nextSaveOrder(), keepaliveOptions(newest))
+              : null;
+        if (send === null || !drawsSomething(newest.title)) continue;
         if (sameText(newest, lane.sending) || sameText(newest, lane.saved) || sameText(newest, lane.leftWith)) continue;
         lane.leftWith = newest;
-        void attemptWrite(() => api.notes.update(noteId, newest, keepaliveOptions(newest)));
+        void attemptWrite(send);
       }
     },
 

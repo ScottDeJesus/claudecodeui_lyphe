@@ -2836,6 +2836,9 @@ export type Note = { id: string; title: string; description: string; createdAt: 
 /** What the two writes take: the whole of both fields, never a patch. It is also the shape of a draft, and both fields are the writer's own text, drawn as text nodes. */
 export type NoteInput = { title: string; description: string };
 
+/** The order a note save carries (the `Save-Order` header): `writer` names this tab, `seq` counts its sends from 1. The server refuses to write a save whose `seq` is not above one it already applied from the same writer — an older text arriving late. Mirror of the server's `SaveOrder`. */
+export type SaveOrder = { writer: string; seq: number };
+
 /** What a card says quietly about its own saving: `saving` while typed text is waiting for or on its way to the server, `saved` once the newest text has landed, `titleNeeded` while a title is missing and nothing can be sent. A card with no entry says nothing. */
 export type NoteSaveStatus = 'saving' | 'saved' | 'titleNeeded';
 

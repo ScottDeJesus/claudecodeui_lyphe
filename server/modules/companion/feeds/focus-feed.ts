@@ -15,11 +15,12 @@ import { companionScratchDir, FOCUS_NEWS_BRIEF, nextScratchFile, pruneScratch, r
  *
  * It applies when the run was not aborted (an aborted run was a stop), did not fail and she is live;
  * `companion.service.ts` (`runCompleted`) decides the account, Live and failure, this file reads the run and writes
- * the envelope. A failed run is already a `failed` alert, and the runtime does NOT leave an `error` row for most
- * failures: a failed result raises `run.failed` / `run.limit` and then still sends a `complete` with exit code 0.
- * So the alert feed marks the chat when it hears such a code (`service.runFailed`) and `runCompleted` consumes the
- * mark; an `error` row (the runtime's catch path) is the second sign, read here. Starting and working are not
- * pushed: the roster at her next message carries them.
+ * the envelope. A failed run is already a `failed` alert. A failed result raises `run.failed` / `run.limit` /
+ * `api.error` / `login.expired`; only the first two leave an `error` row (the runtime's result handler, then a
+ * `complete` with exit 1): an API error or an expired login ends as an assistant message and a `complete` with no
+ * `error` row. So the alert feed marks the chat when it hears such a code (`service.runFailed`) and `runCompleted`
+ * consumes the mark; an `error` row (the result handler's, or the runtime's catch path) is the second sign, read
+ * here. Starting and working are not pushed: the roster at her next message carries them.
  *
  * A reply of at most 1,500 characters (as a person counts them: an emoji is one) goes in as it is. A longer one is written to her scratch folder and a dactyl
  * answers the fixed focus-news brief about it, so she is told what it reports rather than a wall to read aloud;

@@ -37,6 +37,20 @@ CREATE TABLE IF NOT EXISTS notes (
 
 -- The one read: an account's notes, newest first.
 CREATE INDEX IF NOT EXISTS ix_notes_user_created ON notes(user_id, created_at);
+
+-- The newest save order each WRITER (one open tab) has had applied to a note: a save of that writer whose seq is not
+-- above its row's is an older save arriving late, and the repository refuses to write it. One row per (note, writer), so
+-- two tabs never compare with each other. The rows leave with the note, and the repository drops a writer's row a day
+-- after its last save (no request is in the air that long).
+CREATE TABLE IF NOT EXISTS note_save_orders (
+    note_id TEXT NOT NULL,
+    writer TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    -- ISO-8601 UTC with milliseconds, written by the repository.
+    applied_at TEXT NOT NULL,
+    PRIMARY KEY (note_id, writer),
+    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+);
 `;
 
 /**

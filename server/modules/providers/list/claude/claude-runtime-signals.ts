@@ -14,6 +14,7 @@
  * never the live login: after a switch the chat keeps riding its own account.
  */
 import { noteChatWindows } from '@/modules/providers/list/claude/claude-chat-readings.js';
+import { endedByInterrupt, resultErrorLines } from '@/modules/providers/list/claude/claude-error-result.js';
 import { accountLimitMemory, saveLimitMemory, windowMemory, type LimitMemory } from '@/modules/providers/list/claude/claude-limit-memory.js';
 
 
@@ -62,8 +63,6 @@ const LOW_WARNING_PCT = 80;
 const HARD_LIMIT_CODES = new Set(['limit.reached', 'limit.out_of_credits']);
 /** Assistant errors that mean the credentials, not the request, are the problem. */
 const LOGIN_ERRORS = new Set(['authentication_failed', 'oauth_org_not_allowed']);
-/** The CLI's own instrumentation line inside a failed result's `errors`. */
-const INTERNAL_DIAGNOSTIC_PREFIX = '[ede_diagnostic]';
 /** The two ceilings a run can end on, and the figure each one reports. */
 const RUN_LIMITS: Record<string, (message: Record<string, unknown>) => Record<string, unknown>> = {
   error_max_turns: (message) => ({ limit: 'turns', numTurns: readNumber(message.num_turns) }),
@@ -315,11 +314,9 @@ function handleErrorResult(message: Record<string, unknown>, context: SignalCont
   }
 
   // The CLI prepends its own `[ede_diagnostic] result_type=… stop_reason=…` line to `errors`;
-  // it is instrumentation, not a cause, and the push says what went wrong or nothing at all.
-  const errors = Array.isArray(message.errors)
-    ? message.errors.map((entry) => String(entry)).filter((entry) => !entry.startsWith(INTERNAL_DIAGNOSTIC_PREFIX))
-    : [];
-  const error = errors.join('; ') || subtype;
+  // `resultErrorLines` leaves it out: it is instrumentation, not a cause, and the push says what
+  // went wrong or nothing at all.
+  const error = resultErrorLines(message).join('; ') || subtype;
   emitError(context, 'run.failed', { error }, error);
 }
 
@@ -362,7 +359,9 @@ export function detectRuntimeSignals(message: unknown, state: SignalState, conte
     return;
   }
 
-  if (message.type === 'result' && readText(message.subtype) !== 'success') {
+  // A turn the CLI ended because it was interrupted answers with `error_during_execution` too; it is
+  // the person's own Stop (or a denied tool), and "Session crashed" is the last thing it deserves.
+  if (message.type === 'result' && readText(message.subtype) !== 'success' && !endedByInterrupt(message)) {
     handleErrorResult(message, context);
   }
 }

@@ -2439,6 +2439,8 @@ export type MemoryCandidateRead =
 export type Note = { id: string; title: string; description: string; createdAt: string; updatedAt: string };
 /** What the two writes take: the whole of both fields, never a patch. */
 export type NoteInput = { title: string; description: string };
+/** The order a save carries: `writer` names one open tab, `seq` counts that tab's sends from 1, so a save with a lower `seq` than one already applied from the same writer is an older text arriving late. Orders of two writers are never compared. */
+export type SaveOrder = { writer: string; seq: number };
 
 //----------------- FOLLOWUPS ------------
 // The followups lane's wire shapes, produced by `server/modules/followups/` and mirrored field-for-field in

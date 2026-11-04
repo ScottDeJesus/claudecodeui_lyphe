@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult, VocabularyEntry, VoiceProvider, VoiceSettingsPatch, WriteAttempt } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SaveOrder, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult, VocabularyEntry, VoiceProvider, VoiceSettingsPatch, WriteAttempt } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
@@ -249,6 +249,9 @@ export async function refusalCode(response: Response): Promise<string | null> {
     return null;
   }
 }
+
+/** A note save's `Save-Order` header value: `<writer>:<seq>`. The server's route reads exactly this shape. */
+const formatSaveOrder = (order: SaveOrder): string => `${order.writer}:${order.seq}`;
 
 const get = (url: string, options: ApiRequestOptions = {}) => authenticatedFetch(url, options);
 
@@ -1064,9 +1067,18 @@ export const api = {
     list: () => get('/api/notes'),
     // `idempotencyKey` is the blank card's one key for its first save: a retry of a create whose answer
     // never arrived sends the same key, and the server answers it with the note the first one made.
-    create: (input: NoteInput, idempotencyKey: string, options?: ApiRequestOptions) =>
-      post('/api/notes', input, { ...options, headers: { ...options?.headers, 'Idempotency-Key': idempotencyKey } }),
-    update: (id: string, input: NoteInput, options?: ApiRequestOptions) => put(`/api/notes/${encodeURIComponent(id)}`, input, options),
+    // `order` is the save's place in this tab's sends (the `Save-Order` header): a save the server has already
+    // seen a newer one from this tab for is answered with the note as it stands and writes nothing.
+    create: (input: NoteInput, idempotencyKey: string, order: SaveOrder, options?: ApiRequestOptions) =>
+      post('/api/notes', input, {
+        ...options,
+        headers: { ...options?.headers, 'Idempotency-Key': idempotencyKey, 'Save-Order': formatSaveOrder(order) },
+      }),
+    update: (id: string, input: NoteInput, order: SaveOrder, options?: ApiRequestOptions) =>
+      put(`/api/notes/${encodeURIComponent(id)}`, input, {
+        ...options,
+        headers: { ...options?.headers, 'Save-Order': formatSaveOrder(order) },
+      }),
     remove: (id: string) => del(`/api/notes/${encodeURIComponent(id)}`),
   },
 

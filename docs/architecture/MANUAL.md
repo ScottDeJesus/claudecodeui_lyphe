@@ -1644,7 +1644,10 @@ Reading in the other direction, runtimes receive the **app** id and translate it
 `provider-runtime.service.ts` injects `context.resolveProviderSessionId`, which is
 `sessionsService.resolveProviderSessionId`:
 
-- a row with a mapping returns its `provider_session_id`;
+- a row with a mapping returns its `provider_session_id` — and the Claude runtime then confirms the
+  transcript is on disk before it resumes (`claude-resumable-session.ts`): a mapping with no
+  conversation behind it is detached and the turn starts one, instead of resuming a dead id on every
+  later turn;
 - a row without one returns `null`, which every runtime reads as "start fresh";
 - an id with no row at all is returned unchanged, on the assumption that a direct API caller
   passed a provider-native id the watcher has not indexed yet.
@@ -1680,17 +1683,34 @@ stateDiagram-v2
   Pending --> Mapped : a run announces a native id and assignProviderSessionId records it
   Mapped --> Mapped : a Codex edit rewind repoints the row to the forked thread
   Mapped --> Pending : a Codex edit of the first prompt detaches the row
+  Mapped --> Pending : the Claude runtime finds no transcript behind the id and detaches the row
   Mapped --> [*] : the session is deleted
 ```
+
+No boot writes the column once the column exists, so a chat created into the app and not yet
+sent on keeps its NULL (`Pending`) across every server boot. What writes it: a run's announcement, a
+detach (Codex's edit above, the Claude runtime's check below), a compaction's swap or an edit's repoint
+(`repointSessionToProviderSession`), and a fork's insert (`createForkedSession`).
+`addProviderSessionIdMapping` (`migrations.ts`) backfills `provider_session_id =
+session_id` ONCE, with the column's own absence as the gate (the same shape as `addSessionPinnedColumn`);
+run at every boot it stamped the app id onto every waiting chat — the supervisor boots a candidate on each
+`server/` save — and that chat's first turn resumed a conversation that did not exist ("No conversation
+found with session ID", no reply on the page, the same failure on every later turn).
+
+The Claude runtime also checks before it resumes (`claude-resumable-session.ts`, asked by `spawnProcess`
+once per process start): a provider id whose transcript is on no project folder of
+`~/.claude/projects` is a conversation that was never written, so the row is detached
+(`detachProviderSession`, back to `Pending`) and the turn starts the conversation. Skipped for a re-adopted
+host and for a Cerberus node's project, whose transcript is not on this disk.
 
 `Draft` is a UI state only — no row exists yet. In `Pending`,
 `GET /api/providers/sessions/:id/messages` returns an empty page by design, because
 `sessionsService.fetchHistory` short-circuits on a NULL `provider_session_id`. So during the
 very first turn the transcript on screen is entirely realtime rows.
 
-Only a provider that rewinds by branching reaches `Pending` again:
+An EDIT reaches `Pending` again only for a provider that rewinds by branching:
 `CodexSessionsProvider.rewindSession` calls `markProviderSessionSuperseded` and then
-`detachProviderSession` when nothing survives the cut. Claude never detaches — it re-runs
+`detachProviderSession` when nothing survives the cut. Claude never detaches for an edit — it re-runs
 with `resumeFromScratch` and the row is remapped when the SDK announces its new id; the session
 the row leaves is marked superseded first (`recordProviderSessionId`), so the abandoned original
 stays on disk, goes with the chat and is never indexed as a second sidebar chat.
@@ -2049,8 +2069,9 @@ which is why neither caller — `ChatInterface.handleForkFromMessage` and the si
 
 Resuming needs no special path. Opening an old session and sending is an ordinary
 `chat.send`: the gateway reads provider, `cwd` and `provider_session_id` from the row, the
-runtime resolves the native id through `resolveProviderSessionId`, and the SDK resumes. A
-`null` there means "start a new provider session", which is the same code path a brand-new
+runtime resolves the native id through `resolveProviderSessionId`, and the SDK resumes. The Claude
+runtime first confirms the id's transcript is on disk (MAN-339); one with none is detached and starts
+over. A `null` there means "start a new provider session", which is the same code path a brand-new
 conversation takes.
 
 The client drives one of those resumes itself. When a live run's `cliVersion` differs from the
@@ -6751,8 +6772,15 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `session_host_liveness` | gateway | Which chats have a live session host (the CLI's tmux session). One shape, `{ kind, change: 'snapshot' \| 'live' \| 'asleep', sessionIds, at }`: a `snapshot` is sent once per connection, held until the keepalive hosts are re-adopted, then a `live` or `asleep` names the chats that gained their first or lost their last host. The ids ride an array, never a `sessionId` key, so the workspace's attention rule cannot mark the chat; no `seq`, so never a transcript row. Read by `SessionHostLivenessContext`, which grays the simple list's asleep rows (session-host, MAN-695). |
 | `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `soul_launch_state`. |
 | `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [docs/architecture/MANUAL.md (01-websocket-transport)](MANUAL.md) §"Fan-out: who receives what". |
+| `dispatcher_state` | lane | The dispatcher's status document, key for key, pushed on change by the dispatcher lane, with the frame's clock added as `at` (epoch milliseconds). Typed `DispatcherStateEvent`. |
+| `roadmap_state` | lane | The roadmap's whole picture, pushed on change by the roadmap lane and stamped `at` (epoch milliseconds) the moment it was cut; the roadmap screen's feed reads it. Typed `RoadmapStateEvent`. |
+| `companion_*` | lane | The companion's own frames — every kind of `CompanionFrame` (`companion_turn`, `companion_log`, `companion_face`, `companion_memory` and the rest) — carried to the account's pages on this socket. Listed whole, with their shapes, in MAN-9243. |
+| `station_sessions_changed` | lane | A chat changed, for the companion's station: the page reads its sessions again. `states` is `true` when a chat's state moved (starting, waiting, ending) and `false` when only its activity did, which the page may fold more slowly. Sent by `station-hint.ts`, at most one a second. |
+| `station_landed` | lane | One new `entry` of what has landed (a feature shipped, an epic finished, a build landed, a chain recovered). Sent by `station-landed-feed.ts`. |
 | `pong` | gateway | The answer to `chat.ping`. The browser cannot see protocol-level pings, so it proves a socket alive with this round trip before trusting it with a send (`WebSocketContext.tsx`). |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |
+
+The `lane` rows ride the same socket but sit outside `ServerEventKind`: each is typed beside its own lane (`DispatcherStateEvent`, `RoadmapStateEvent`, `CompanionFrame`, and the station's frame union in `server/shared/station-types.ts`), so a switch over `ServerEventKind` never sees them.
 
 One more kind never crosses the wire: **`websocket_reconnected`** is synthesized inside
 `src/shared/context/WebSocketContext.tsx` when the socket re-opens, so features can catch

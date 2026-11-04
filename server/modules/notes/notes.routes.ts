@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Request, Response, Router } from 'express';
 
-import type { NoteInput } from '@/shared/types.js';
+import type { NoteInput, SaveOrder } from '@/shared/types.js';
 import { AppError, asyncHandler, createApiSuccessResponse, readAuthenticatedUserId, readPathParam } from '@/shared/utils.js';
 
 import type { NotesService } from './notes.service.js';
@@ -71,6 +71,31 @@ function readIdempotencyKey(request: Request): string | null {
   return value;
 }
 
+/**
+ * The header a write carries its save order in — `<writer>:<seq>`, the writer 16 to 128 characters of letters,
+ * digits, `_` and `-` (the tab mints 32 hex) and the seq a whole number from 1 — and the shape it must have.
+ */
+const SAVE_ORDER_HEADER = 'save-order';
+const SAVE_ORDER_SHAPE = /^([A-Za-z0-9_-]{16,128}):([1-9][0-9]{0,14})$/;
+
+/**
+ * The write's save order, or `null` when it sent none (the notes command, a script, a tab from before the
+ * header): such a write always applies. A header that IS there and is not an order is refused rather than
+ * ignored — a caller that meant to be ordered and silently was not could write an older text over a newer one.
+ */
+function readSaveOrder(request: Request): SaveOrder | null {
+  const value = request.get(SAVE_ORDER_HEADER);
+  if (value === undefined) return null;
+  const match = SAVE_ORDER_SHAPE.exec(value);
+  if (!match) {
+    throw new AppError('Save-Order must be "<writer>:<seq>": a writer of 16 to 128 letters, digits, "_" or "-", and a whole number from 1.', {
+      code: 'INVALID_SAVE_ORDER',
+      statusCode: 400,
+    });
+  }
+  return { writer: match[1], seq: Number(match[2]) };
+}
+
 /** Creates the lane's router for `notes.module.ts`. Each handler is one service verb and its shape. */
 export function createNotesRoutes(service: NotesService): Router {
   const router = express.Router();
@@ -85,8 +110,13 @@ export function createNotesRoutes(service: NotesService): Router {
   router.post(
     '/',
     asyncHandler(async (request: Request, response: Response) => {
-      const note = service.create(readAuthenticatedUserId(request), readNoteInput(request.body), readIdempotencyKey(request));
-      // 201 for a repeated key too: the answer is the create's own, replayed.
+      const note = service.create(
+        readAuthenticatedUserId(request),
+        readNoteInput(request.body),
+        readIdempotencyKey(request),
+        readSaveOrder(request)
+      );
+      // 201 for a repeated key too: the answer is the note that key made, as it stands.
       response.status(201).json(createApiSuccessResponse(note));
     })
   );
@@ -95,7 +125,7 @@ export function createNotesRoutes(service: NotesService): Router {
     '/:id',
     asyncHandler(async (request: Request, response: Response) => {
       const id = readPathParam(request.params.id, 'id');
-      const note = service.update(readAuthenticatedUserId(request), id, readNoteInput(request.body));
+      const note = service.update(readAuthenticatedUserId(request), id, readNoteInput(request.body), readSaveOrder(request));
       response.json(createApiSuccessResponse(note));
     })
   );
