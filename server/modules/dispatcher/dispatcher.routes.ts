@@ -20,8 +20,13 @@ import type { DispatcherPicture } from './dispatcher-state.service.js';
  * array at all. Everything the regex refuses — a slash, a space, a `$`, a leading `.` — is a string
  * no verb could act on, and refusing it here is what keeps any future caller of this router from
  * having to remember that.
+ *
+ * The lookahead is the store's reservation of the three Gemini budget kinds that wear a name's shape
+ * (`/opt/shadow-connector/core/gemini_budget/attribution.py`, their home): `production` is work outside
+ * the caps, `chain-…` a chain's budget and `session-…` a chat's. A plan's name is its budget's ID, so none
+ * of the three may be a plan's.
  */
-const PLAN_NAME = /^[a-z0-9][a-z0-9-]{0,99}$/;
+const PLAN_NAME = /^(?!production$|chain-|session-)[a-z0-9][a-z0-9-]{0,99}$/;
 
 /**
  * What an ARC may be called in a URL: the same name class with the arc's own adornment
@@ -31,7 +36,7 @@ const PLAN_NAME = /^[a-z0-9][a-z0-9-]{0,99}$/;
  * A SEPARATE FENCE FROM THE PLAN'S (`PLAN_NAME`), and the same fence in kind: this route answers
  * `<name>` or `<name>.arc`, that one the bare name alone and refuses the `.arc` ending.
  */
-const ARC_NAME = /^[a-z0-9][a-z0-9-]{0,99}(\.arc)?$/;
+const ARC_NAME = /^(?!production(?:\.arc)?$|chain-|session-)[a-z0-9][a-z0-9-]{0,99}(\.arc)?$/;
 
 /** The 400 sentence the queue route answers with when the body is not exactly one of the three moves the dispatcher's `queue` verb takes. */
 const QUEUE_BODY_ERROR = 'body must be exactly one of { "before": <epic name> }, { "last": true } or { "at": <whole number from 1 to 9999> }';

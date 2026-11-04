@@ -4,6 +4,7 @@ import type { NotificationEvent } from '@/shared/types.js';
 
 import { readCompanionSettings } from '../companion-settings.js';
 import type { CompanionService } from '../companion.service.js';
+import type { CompanionHouse } from '../house.js';
 import type { CompanionAlertKind } from '../session/companion-envelopes.js';
 
 import { buildAlertBlock, type CompanionAlert } from './alert-block.js';
@@ -24,7 +25,15 @@ import { buildAlertBlock, type CompanionAlert } from './alert-block.js';
  * with the first survivor and is a one-shot timer, not a poll; Live is read again when it closes, so a switch turned
  * off in the meantime is honored. Each alert is built as the window closes, one at a time inside its own guard.
  * Her process is started when the window OPENS (`service.warm`): measured on the live CLI, a message that wakes her
- * reaches her about a second later than one that finds her up, and the alert is owed to her within four seconds of the event.
+ * reaches her about a second later than one that finds her up, and the alert is owed to her within four seconds of the event
+ * while she is idle. An alert that can be answered and arrives while she is mid-turn waits for that turn to end (below).
+ *
+ * AN ALERT ANSWERED BEFORE SHE SPEAKS IS NEVER SAID. The gather window and a turn of hers in flight both put time between the house raising
+ * a prompt and her saying it, and he can answer it in that time. This feed does not judge that: each permission alert carries `owed`, the
+ * check that its prompt is still open (`alert-block.ts`), and the session asks it at the last moment, when her message is built — after
+ * the window, after the wait for her turn to end (only the answerable alerts of a window wait; a failure or a landing goes at once), after a
+ * closing or a stop — and drops an alert that is no longer owed (`session/companion-alert-hold.ts`).
+ * A window whose every alert was answered says nothing and wakes nothing (her process, started when the window opened, closes idle).
  *
  * A window builds at most 20 alerts; the rest are one sentence saying how many, so a flood cannot stall the server.
  * The same listener tells the focus feed (`service.runFailed`) when a chat's run fails, whatever the gates decide, so
@@ -83,9 +92,10 @@ function eventKeyOf(event: NotificationEvent): string {
 
 /**
  * Starts listening; answers the unsubscribe. Consumed by `companion.module.ts`. `service.alert` is where
- * the gathered alerts are logged on her panel and pushed to her.
+ * the gathered alerts are pushed to her and logged on her panel; `house.askOpen` is the dispatcher lane's book, which
+ * the check of a dispatcher prompt's alert reads.
  */
-export function startAlertFeed(service: CompanionService): () => void {
+export function startAlertFeed(service: CompanionService, house: Pick<CompanionHouse, 'askOpen'>): () => void {
   // Event key → when it was heard. Pruned as it is read, so it holds only the last twenty seconds: no timer sweeps it.
   const heardAt = new Map<string, number>();
   const gathering = new Map<number, Gathering>();
@@ -111,7 +121,7 @@ export function startAlertFeed(service: CompanionService): () => void {
       const alerts: CompanionAlert[] = [];
       for (const { event, kind } of gathered.heard.slice(0, ALERTS_PER_WINDOW_MAX)) {
         try {
-          alerts.push(buildAlertBlock(accountId, event, kind));
+          alerts.push(buildAlertBlock(accountId, event, kind, house.askOpen));
         } catch (error) {
           console.error(`[Companion] account ${accountId}: the alert for ${event.code} (session ${event.sessionId ?? 'none'}) could not be built`, error);
         }

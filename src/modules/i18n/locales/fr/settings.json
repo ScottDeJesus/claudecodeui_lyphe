@@ -45,6 +45,10 @@
       "simpleChatProject": {
         "label": "Projet pour les nouvelles discussions",
         "description": "Les nouvelles discussions de la liste simple démarrent dans ce projet."
+      },
+      "keepProjectsExpanded": {
+        "label": "Garder les projets dépliés",
+        "description": "Ouvrir plusieurs projets ensemble et les retrouver dépliés après rechargement."
       }
     },
     "toolDisplay": {

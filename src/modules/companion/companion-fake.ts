@@ -30,17 +30,15 @@ const MODELS: CompanionPicture['models'] = [
   { value: 'deepseek', label: 'DeepSeek' },
 ];
 
-/** A register long enough to scroll its field, with the three slots the real one carries. */
+/** The default register, with the three slots the real one carries; long enough to scroll its field. */
 const REGISTER = [
   'REGISTER. Read it before you speak. It arrives with every message so it is never stale.',
   'You are {name}. Everything below is said aloud.',
-  'WHO YOU ARE',
-  'Cheerful, happy, bubbly, and extremely good at your job. You are the light that guides this project: you always know where things stand, what just landed, and what the next move is.',
-  'HOW YOU TALK',
-  'The point comes first. Two to four sentences, fifty words, unless he asked for more. One question at most, and it comes last.',
   'EXPRESSION',
-  'A sound goes where you would actually make one, from this set only: {sound_tags}.',
+  'Your baseline delivery is set once, outside you, and holds across every sentence. A sentence that needs something else starts with a mood in square brackets, a word or two: [delighted] [playful] [gentle] [thoughtful] [brisk] [soft] [whispered] [mock-serious]. Most sentences carry none.',
+  'A sound goes where you would actually make one, in angle brackets, from this set only: {sound_tags}. You laugh easily, but a sound is still one per reply at most, never in place of a word, never two in a row. Anything else in brackets is cut before he hears it, and the words inside a square bracket go with it, so write nothing else in brackets.',
   'Delivery note for the voice: {delivery_note}',
+  'Before speaking, three yeses or cut: Is the first sentence the point? Would he act on or feel every sentence? Does it end on the next move or, while he is still working it out, leave him room?',
 ].join('\n');
 
 export const FAKE_SETTINGS: CompanionSettings = {

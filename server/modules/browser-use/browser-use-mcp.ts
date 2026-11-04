@@ -39,16 +39,51 @@ const apiUrl = (process.env.CLOUDCLI_BROWSER_USE_API_URL || 'http://127.0.0.1:30
 const apiToken = process.env.CLOUDCLI_BROWSER_USE_MCP_TOKEN || '';
 const API_TIMEOUT_MS = Number.parseInt(process.env.CLOUDCLI_BROWSER_USE_API_TIMEOUT_MS || '60000', 10);
 
+// The Gemini budget this process's session works under, spelled by the process rule. Its home, with every
+// name below, is /opt/shadow-connector/core/gemini_budget/attribution.py (own(), PLAN_ENV, PLAN_HEADER,
+// SESSION_ENV, SESSION_MARK_ENV, SESSION_PREFIX, PRODUCTION). This process is the session's own child, so it
+// carries the session's environment; the browser itself lives in CloudCLI's server, which is no session's
+// process, so the ID rides each tool call to it.
+//   1. GEMINI_BUDGET_PLAN, stripped, when non-blank (`production` stays production);
+//   2. else session-<CLAUDE_CODE_SESSION_ID>;
+//   3. else none ('') when CLAUDECODE is set: a session's process naming no budget;
+//   4. else production: a process no session started.
+const GEMINI_BUDGET_HEADER = 'X-Gemini-Budget-Plan';
+
+function ownGeminiBudgetId(env: NodeJS.ProcessEnv): string {
+  const plan = (env.GEMINI_BUDGET_PLAN ?? '').trim();
+  if (plan) {
+    return plan;
+  }
+  const sessionId = (env.CLAUDE_CODE_SESSION_ID ?? '').trim();
+  if (sessionId) {
+    return `session-${sessionId}`;
+  }
+  return (env.CLAUDECODE ?? '').trim() ? '' : 'production';
+}
+
+// What one header line can carry. A hand-set value outside it (the house's own names are [a-z0-9-] and a
+// session id) is refused by name, as _restorly_auth.mjs refuses a line break, and not left to fail as a
+// ByteString error or a cut-off reply.
+const HEADER_SAFE_ID = /^[\x20-\x7e]{1,512}$/;
+
 async function callBrowserUseApi(toolName: string, input: Record<string, unknown>) {
   if (!apiToken) {
     throw new Error('CLOUDCLI_BROWSER_USE_MCP_TOKEN is not configured.');
   }
 
+  // Read at each call, like the rule's own() in the backend.
+  const geminiBudgetId = ownGeminiBudgetId(process.env);
+  if (geminiBudgetId && !HEADER_SAFE_ID.test(geminiBudgetId)) {
+    const source = (process.env.GEMINI_BUDGET_PLAN ?? '').trim() ? 'GEMINI_BUDGET_PLAN' : 'CLAUDE_CODE_SESSION_ID';
+    throw new Error(`${source} holds a value a header cannot carry (a line break, a character outside printable ASCII, or more than 512 characters) — nothing sent`);
+  }
   const response = await fetch(`${apiUrl}/tools/${encodeURIComponent(toolName)}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiToken}`,
       'Content-Type': 'application/json',
+      ...(geminiBudgetId ? { [GEMINI_BUDGET_HEADER]: geminiBudgetId } : {}),
     },
     body: JSON.stringify(input),
     signal: AbortSignal.timeout(API_TIMEOUT_MS),

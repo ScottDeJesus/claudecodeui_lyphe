@@ -101,9 +101,9 @@ type VoiceSettingsState = {
   providerRefusal: string | null;
   /** Merges a partial into the account's settings. A change of provider tells the open composers (VOICE_CONFIG_SYNC_EVENT) once the server has it. */
   saveSettings: (patch: VoiceSettingsPatch) => Promise<void>;
-  /** Stores this as the account's Gemini key, replacing any earlier one. The key is passed through, never kept here. */
+  /** Stores this as the account's Gemini key, replacing any earlier one, and tells the open message rows once the server has it. The key is passed through, never kept here. */
   saveKey: (key: string) => Promise<void>;
-  /** Forgets the account's stored key, so the house's key serves again. */
+  /** Forgets the account's stored key, so the house's key serves again, and tells the open message rows once the server has done it. */
   clearKey: () => Promise<void>;
   /** Reads the settings again, for the Try again of a read that failed. */
   retry: () => Promise<void>;
@@ -118,9 +118,10 @@ type VoiceSettingsState = {
  * standing with the server's sentence under it. Saves run one at a time in the order they were made, so two quick picks
  * cannot land out of order, and a read that was out when a save landed is dropped as older than it.
  *
- * The provider is the one setting other parts of the page follow: after a save that carried it lands, the voice-config
- * sync event goes out, which the chat's `useVoiceAvailable` and `useVoiceProvider` re-check on, so an open composer
- * follows the picker in the same tab.
+ * The provider and the key are the settings other parts of the page follow: after a save that carried the provider lands, and
+ * after a key save or clear lands, the voice-config sync event goes out, which the chat's `useVoiceAvailable` and
+ * `useVoiceProvider` re-check on, so an open composer follows the picker, and a message's read-aloud button follows the
+ * key (on Gemini it is drawn only while a key is in reach), in the same tab.
  */
 export function useVoiceSettings(): VoiceSettingsState {
   // The settings as the server last answered, drawn by the picker and the model field. Null before any answer: the page
@@ -220,11 +221,14 @@ export function useVoiceSettings(): VoiceSettingsState {
   }, [enqueueSave, applySettingsAnswer]);
 
   const saveKey = useCallback(async (key: string) => {
-    await enqueueSave(() => api.voice.saveGeminiKey(key), parseKeyAnswer, setKeyStatus);
+    const outcome = await enqueueSave(() => api.voice.saveGeminiKey(key), parseKeyAnswer, setKeyStatus);
+    // After the answer, like the provider's: the listeners ask the server whether a key is in reach, and it must already know.
+    if (outcome.landed) window.dispatchEvent(new Event(VOICE_CONFIG_SYNC_EVENT));
   }, [enqueueSave]);
 
   const clearKey = useCallback(async () => {
-    await enqueueSave(() => api.voice.clearGeminiKey(), parseKeyAnswer, setKeyStatus);
+    const outcome = await enqueueSave(() => api.voice.clearGeminiKey(), parseKeyAnswer, setKeyStatus);
+    if (outcome.landed) window.dispatchEvent(new Event(VOICE_CONFIG_SYNC_EVENT));
   }, [enqueueSave]);
 
   return { settings, keyStatus, saving, error, providerRefusal, saveSettings, saveKey, clearKey, retry };

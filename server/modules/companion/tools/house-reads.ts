@@ -13,8 +13,8 @@ export { activityLine, askLine, chatState, pendingAsksOf } from './chat-activity
 export type { ChatState } from './chat-activity.js';
 
 /**
- * The house as she sees it: his chats with their state and activity, his projects, the two resolvers that turn
- * a name into one of them, and the roster that rides inside her next message. Every read answers from the
+ * The house as she sees it: his chats with their state and activity, his projects, the three resolvers that turn
+ * a name into one of them (an open chat, a closed chat, a project), and the roster that rides inside her next message. Every read answers from the
  * database and the running server at the moment it is called — nothing is cached, nothing polls — and none of
  * it carries usage or spend (ruling 17).
  *
@@ -65,10 +65,11 @@ type ChatSqlRow = { session_id: string; custom_name: string | null; project_path
 
 /**
  * The non-archived app chats of projects in a visible root (`'visible'`, his chats) or in a hidden one
- * (`'hidden'`, the fallback's pool), newest first. The visibility test is the sidebar's own
+ * (`'hidden'`, the fallback's pool), newest first — or, with `closed`, the same chats that ARE archived (the Closed view's:
+ * `reopen_session`'s pool). The visibility test is the sidebar's own
  * (`visibleProjectPathSql`, as `sessionsDb.getRecentSessionsPage` reads it), so the two never disagree.
  */
-function chatsInRoots(scope: 'visible' | 'hidden'): HisChat[] {
+function chatsInRoots(scope: 'visible' | 'hidden', closed = false): HisChat[] {
   const visiblePath = visibleProjectPathSql('sessions.project_path');
   const rows = getConnection()
     .prepare(
@@ -76,7 +77,7 @@ function chatsInRoots(scope: 'visible' | 'hidden'): HisChat[] {
               sessions.pinned, COALESCE(sessions.updated_at, sessions.created_at) AS updated_at
        FROM sessions
        LEFT JOIN projects ON projects.project_path = sessions.project_path
-       WHERE sessions.isArchived = 0
+       WHERE sessions.isArchived = ${closed ? 1 : 0}
          AND (projects.isArchived IS NULL OR projects.isArchived = 0)
          AND ${scope === 'visible' ? '' : 'NOT '}${visiblePath.clause}
          AND (sessions.provider_session_id IS NULL OR sessions.session_id <> sessions.provider_session_id)
@@ -101,7 +102,7 @@ export function listHisChats(): HisChat[] {
 /**
  * The name a chat shows in the sidebar, for ANY chat row — an archived chat, one of a hidden project, one the
  * resolvers above would not offer — because a follow-up outlives the sidebar entry it was filed from. The same
- * fallback (`Untitled Session`) and the same one-line fold as the lists. Consumed by `read-tools.ts`'s `list_followups`.
+ * fallback (`Untitled Session`) and the same one-line fold as the lists. Consumed by `followup-list.ts`'s `list_followups`.
  */
 export function chatNameOf(sessionId: string): string {
   return oneLine(sessionsDb.getSessionById(sessionId)?.custom_name ?? '') || UNTITLED_CHAT;
@@ -148,26 +149,60 @@ function describeChats(chats: HisChat[]): string {
 /** The answer of a resolver: the one match, or the sentence that says what to do next. Consumed by every tool that takes a chat. */
 export type ChatResolution = { ok: true; chat: CompanionSessionRef } | { ok: false; sentence: string };
 
+/** The chats of `chats` that the lowercased `wanted` names: by id, by exact name, or by the roster's escaped spelling of the name. */
+const namedAmong = (chats: HisChat[], wanted: string): HisChat[] =>
+  chats.filter((chat) => chat.sessionId.toLowerCase() === wanted || chat.name.toLowerCase() === wanted || inRosterBody(chat.name).toLowerCase() === wanted);
+
+/** The one match as an answer, or the sentence that names every candidate of several; null when none matched. Shared by both resolvers. */
+function oneOf(found: HisChat[], ref: string): ChatResolution | null {
+  if (found.length === 1) return { ok: true, chat: refOf(found[0]) };
+  if (found.length === 0) return null;
+  return { ok: false, sentence: `"${ref.trim()}" fits ${found.length} chats: ${describeChats(found)}. Pass the id of the one meant, or ask him which.` };
+}
+
 /**
  * A chat by its id or by a case-insensitive exact name, among his chats — and, only when none of his fits,
  * among the non-archived app chats of hidden projects (the probe's chats). One match is the answer; none or
  * several is a sentence naming every candidate (twelve at most) with its project and id, and what to do next.
+ * A name that fits none of them but fits ONE CLOSED chat says so, and that `reopen_session` brings it back: a
+ * closed chat is not in his list, and "no such chat" would send her looking for one that is only closed.
  * Consumed by every tool that takes a chat: they resolve it here and never take a name on trust.
  */
 export function resolveChat(ref: string): ChatResolution {
   const wanted = ref.trim().toLowerCase();
   if (!wanted) return { ok: false, sentence: 'Name the chat by its name or its id; list_sessions shows his chats.' };
-  const named = (chats: HisChat[]) =>
-    chats.filter((chat) => chat.sessionId.toLowerCase() === wanted || chat.name.toLowerCase() === wanted || inRosterBody(chat.name).toLowerCase() === wanted);
   const his = listHisChats();
-  const found = named(his).length > 0 ? named(his) : named(chatsInRoots('hidden'));
-  if (found.length === 1) return { ok: true, chat: refOf(found[0]) };
-  if (found.length > 1) {
-    return { ok: false, sentence: `"${ref.trim()}" fits ${found.length} chats: ${describeChats(found)}. Pass the id of the one meant, or ask him which.` };
-  }
+  const hisNamed = namedAmong(his, wanted);
+  const found = oneOf(hisNamed.length > 0 ? hisNamed : namedAmong(chatsInRoots('hidden'), wanted), ref);
+  if (found) return found;
+  const closed = namedAmong(chatsInRoots('visible', true), wanted);
+  if (closed.length === 1) return { ok: false, sentence: `${closed[0].name} is closed, so it is not among his open chats: reopen_session brings it back.` };
   const near = wanted.length >= 3 ? his.filter((chat) => chat.name.toLowerCase().includes(wanted)) : [];
   const hint = near.length > 0 ? ` Chats with that in the name: ${describeChats(near)}.` : '';
   return { ok: false, sentence: `No chat of his is named or numbered "${ref.trim()}".${hint} Call list_sessions to see his chats, then use a name or id from it.` };
+}
+
+/**
+ * `resolveChat`'s sibling over the CLOSED chats (archived, in a visible root and a project that is not archived; a hidden root's closed
+ * chat only when no visible one fits, as the probe's chat is found): the pool `reopen_session` names from, matched by the same rules.
+ * `list_sessions` shows no closed chat, so a miss names the closed chats with that in the name, else the most recent ones; a name that
+ * fits an OPEN chat says that chat is not closed. Consumed by `tools/act-tools.ts`.
+ */
+export function resolveClosedChat(ref: string): ChatResolution {
+  const wanted = ref.trim().toLowerCase();
+  if (!wanted) return { ok: false, sentence: 'Name the closed chat by its name or its id.' };
+  const closed = chatsInRoots('visible', true);
+  const closedNamed = namedAmong(closed, wanted);
+  const found = oneOf(closedNamed.length > 0 ? closedNamed : namedAmong(chatsInRoots('hidden', true), wanted), ref);
+  if (found) return found;
+  const open = namedAmong(listHisChats(), wanted);
+  if (open.length === 1) return { ok: false, sentence: `${open[0].name} is not closed: it is in his open chats.` };
+  const near = wanted.length >= 3 ? closed.filter((chat) => chat.name.toLowerCase().includes(wanted)) : [];
+  const recent = closed.slice(0, 5);
+  const hint = near.length > 0
+    ? ` Closed chats with that in the name: ${describeChats(near)}.`
+    : recent.length > 0 ? ` His most recent closed chats: ${describeChats(recent)}.` : ' He has no closed chats.';
+  return { ok: false, sentence: `No closed chat of his is named or numbered "${ref.trim()}".${hint}` };
 }
 
 //----------------- HIS PROJECTS ------------

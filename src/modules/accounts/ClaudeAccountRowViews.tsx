@@ -1,45 +1,29 @@
 import { MoreHorizontal } from 'lucide-react';
 
+import { UsageRing } from '@/modules/accounts/UsageRing';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
-import { hasFiveHour } from '@/modules/accounts/utils/accountInUseUsage';
-import { resetsLine } from '@/modules/accounts/UsageMeters';
+import { hasFiveHour, rowWindows } from '@/modules/accounts/utils/accountInUseUsage';
+import { ringWindowKeys } from '@/modules/accounts/utils/usageWindows';
 import { ActionMenu, Avatar } from '@/shared/ui';
 import type { ClaudeAccountRow } from '@/shared/types';
-import { formatRelativeTime, formatShortDate } from '@/shared/utils';
-
-/** A reading older than this says when it was taken; below it, the figures read as current. */
-const READING_STALE_MS = 3 * 60_000;
+import { cn, formatShortDate } from '@/shared/utils';
 
 /**
- * One window as the row states it, in points (the door's fractions ×100). The wire is untrusted at
- * its edges: a null, absent or unreadable fraction is an em-dash — never `0%` for a number nobody
- * measured, and never `NaN%` for one `Math.round` could not read.
+ * A row's one act — Use, Set up — as a press: the accent word with the accent wash under the pointer, the panel's
+ * `↻ Re-login` press. As tall as the state slot it stands in (32px), so a finger has the whole line to land on; pulled
+ * left by its own padding, so its word starts under the name.
  */
-function figureInPoints(fraction: number | null): string {
-  if (fraction === null || !Number.isFinite(fraction)) return '—';
-  return `${Math.round(fraction * 100)}%`;
-}
+const ROW_ACT_CLASS =
+  '-ml-2 rounded-md px-2 py-2 text-left text-xs text-accent-ink transition-colors hover:bg-primary/10 disabled:opacity-60';
 
 /**
- * The two windows each row states, through the one reading rule above. An account with no 5-hour window states
- * the weekly alone: its "5h" figure would be an em-dash for a window that does not exist.
+ * A line under a row that says something is wrong with the account: one short line, in the warn tone. Kept off the
+ * row's right edge, which the rings' column runs to.
  */
-function figuresInPoints(reading: ClaudeAccountRow['reading'], withFiveHour: boolean): string {
-  const week = `wk ${figureInPoints(reading?.week ?? null)}`;
-  if (!withFiveHour) return week;
-  return `5h ${figureInPoints(reading?.five ?? null)} · ${week}`;
-}
+const WARN_LINE_CLASS = 'pr-2 text-xs leading-relaxed text-tone-ink';
 
-/** How old a row's figures are, in words — only once they are old enough that "current" would be a lie. */
-function readingAgeInWords(reading: ClaudeAccountRow['reading'], nowMs: number): string | null {
-  if (reading === null) return null;
-  // `at` is wire input: a stamp naming no instant has no age to state, and
-  // `new Date(NaN).toISOString()` throws in render — taking the whole app down, not one row.
-  const takenAt = new Date(reading.at * 1000);
-  if (Number.isNaN(takenAt.getTime())) return null;
-  if (nowMs - takenAt.getTime() <= READING_STALE_MS) return null;
-  return `as of ${formatRelativeTime(takenAt.toISOString())}`;
-}
+/** A token is worth a line only this close to its expiry: further out, its date is a fact nobody has to act on yet. */
+const TOKEN_NOTICE_MS = 30 * 86_400_000;
 
 /**
  * The rule's why names the account; the row already does, so drop the leading name and keep the
@@ -52,17 +36,20 @@ function withoutOwnName(why: string, slug: string): string {
   return why;
 }
 
-/** The day a saved token stops working. A past date says `expired`, because "valid until" a past day is false. */
-function tokenDateInWords(expiresAt: number | null, nowMs: number): string | null {
+/**
+ * The saved token's expiry, said only when someone has to act on it: within `TOKEN_NOTICE_MS` of the day, or past it.
+ * `null` otherwise, and for an expiry that names no day — an absent or unreadable `expires_at`, on which
+ * `new Date(NaN).toISOString()` throws before the row can draw.
+ */
+function tokenNoticeInWords(expiresAt: number | null, nowMs: number): string | null {
   if (expiresAt === null) return null;
-  // The same untrusted edge as the reading's: an absent or unreadable expiry names no day, and
-  // `new Date(NaN).toISOString()` throws before the row can draw.
   const expiresAtMs = expiresAt * 1000;
   const instant = new Date(expiresAtMs);
   if (Number.isNaN(instant.getTime())) return null;
+  if (expiresAtMs - nowMs > TOKEN_NOTICE_MS) return null;
   const date = formatShortDate(instant.toISOString());
   if (date === null) return null;
-  return expiresAtMs < nowMs ? `expired ${date}` : `valid until ${date}`;
+  return expiresAtMs < nowMs ? `sign-in token expired ${date}` : `sign-in token expires ${date}`;
 }
 
 type AccountRowViewProps = {
@@ -71,8 +58,6 @@ type AccountRowViewProps = {
   hue: number;
   nowMs: number;
   busy: boolean;
-  /** The chosen record's why, passed only to the account in use when the last choice was automatic. */
-  autoWhy: string | null;
   /** Whether the chosen record waits for room; only the account in use can say so. */
   held: boolean;
   onUse: (slug: string) => void;
@@ -81,143 +66,142 @@ type AccountRowViewProps = {
 };
 
 /**
- * One account the store holds: its name, its two windows, its token, and the one act it is owed.
- * Used by the accounts module's ClaudeAccountRows, one per account in slug order.
+ * One account the store holds: its name, then its state and its act on the left and its usage rings on the right, then
+ * a warn line only when something needs the reader. Used by the accounts module's ClaudeAccountRows, one per account in
+ * slug order.
+ *
+ * THE RINGS LINE UP DOWN THE LIST. Every row draws them at the right end of its second line, weekly last, each in a
+ * cell of one fixed width: the weekly rings of every account stand in one column, the 5-hour rings beside them on the
+ * accounts that have that window, so the accounts compare in one look. They are the rail's ring (`UsageRing`), with the
+ * window's name and countdown written under each, because a phone has no hover.
+ *
+ * The rings stand outside every press: the act is its own small button (`Use`, `Set up`), never the whole row, so a
+ * long press that reads a ring's words cannot switch the account.
  */
-export function AccountRowView({ account, hue, nowMs, busy, autoWhy, held, onUse, onSetup, onRemove }: AccountRowViewProps) {
+export function AccountRowView({ account, hue, nowMs, busy, held, onUse, onSetup, onRemove }: AccountRowViewProps) {
   const refused = account.wall?.kind === 'refused';
-  // A checked token is one click from being in use; a refused or absent one needs Set up first, and
+  // A checked token is one press from being in use; a refused or absent one needs Set up first, and
   // "checking" is not a verdict yet.
   const canUse = account.token === 'saved' && !refused && !account.in_use;
   const needsSetup = account.token === 'none' || refused;
-  const age = readingAgeInWords(account.reading, nowMs);
-  // The account's own weekly reset, in the meters' words, so each row says when its week turns
-  // over and how many days away that is. A reset already past belongs to a closed week: no line.
-  const weekResetsAt = account.reading?.week_resets ?? null;
-  const weekResets = weekResetsAt !== null && weekResetsAt * 1000 > nowMs
-    ? resetsLine(new Date(weekResetsAt * 1000).toISOString(), 'Weekly resets')
-    : undefined;
-  // A refused token's saved expiry promises what the amber line below denies. The row shows the
-  // wall, not the date; `checking` keeps its date, qualified by its own state word.
-  const tokenDate = refused ? null : tokenDateInWords(account.expires_at, nowMs);
+  // The windows as every surface draws them: one whose reset has passed with no reading since is the window that began
+  // there — 0%, counting down to its next reset — so a ring never shows a closed week's figure.
+  const { five, week } = rowWindows(account, nowMs);
+  // A refused token's saved expiry promises what the warn line denies: the row shows the wall, not the date.
+  const tokenNotice = refused ? null : tokenNoticeInWords(account.expires_at, nowMs);
   // The in-use row says why it waits instead, so it does not repeat the same fact twice.
   const noRoom = account.token === 'saved' && !refused && !account.room && !(account.in_use && held);
-  // A press still works — it chooses an account that waits for room (the held case) — but the cue
-  // says so rather than promising a switch that will not happen yet.
-  const useCue = noRoom ? 'Use anyway' : 'Use';
-
-  const details = (
-    <>
-      {/* The email keeps its line whole: a cue that does not fit beside it wraps under it. */}
-      <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
-        <span className="min-w-0 grow truncate text-[13px] font-medium text-foreground" title={account.email ?? account.slug}>{account.email ?? account.slug}</span>
-        {account.in_use && <span className="flex-none text-xs text-accent-ink">✓ in use now</span>}
-        {canUse && <span className="flex-none text-xs text-accent-ink">{useCue}</span>}
-      </span>
-      <span className="block text-xs text-muted-foreground">
-        {figuresInPoints(account.reading, hasFiveHour(account))}
-        {age !== null && <span className="text-ink-faint"> · {age}</span>}
-      </span>
-      {weekResets !== undefined && <span className="block text-xs text-ink-faint">{weekResets}</span>}
-      {tokenDate !== null && <span className="block text-xs text-ink-faint">{tokenDate}</span>}
-      {refused && (
-        <span data-tone="warn" className="block text-xs leading-relaxed text-tone-ink">
-          sign-in token refused — set it up again
-        </span>
-      )}
-      {account.token === 'checking' && <span className="block text-xs text-ink-faint">checking</span>}
-      {noRoom && (
-        <span className="block text-xs leading-relaxed text-muted-foreground">
-          {`no room now — ${withoutOwnName(account.why, account.slug)}`}
-        </span>
-      )}
-      {account.in_use && held && (
-        <span className="block text-xs leading-relaxed text-ink-faint">stays chosen until it has room again</span>
-      )}
-      {account.in_use && autoWhy !== null && (
-        <span className="block text-xs leading-relaxed text-ink-faint">{autoWhy}</span>
-      )}
-      {needsSetup && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onSetup(account.slug)}
-          aria-label={`Set up ${account.slug}`}
-          title={`Set up ${account.slug}`}
-          className="mt-0.5 rounded-md px-2 py-1.5 text-left text-xs text-accent-ink transition-colors hover:bg-primary/10 disabled:opacity-60"
-        >
-          Set up
-        </button>
-      )}
-    </>
-  );
+  const name = account.email ?? account.slug;
 
   return (
     <div
       data-account-slug={account.slug}
-      className={`flex items-start gap-1 rounded-lg ${account.in_use ? 'bg-primary/10' : ''}`}
+      className={cn('flex items-start gap-2.5 rounded-lg py-1.5 pl-2', account.in_use && 'bg-primary/10')}
     >
-      {canUse ? (
-        <button
-          type="button"
-          disabled={busy}
-          aria-label={noRoom ? `Use ${account.slug} anyway` : `Use ${account.slug}`}
-          onClick={() => onUse(account.slug)}
-          className="flex min-w-0 flex-1 items-start gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted/60 disabled:opacity-60"
-        >
-          <Avatar initials={accountInitials(account.slug)} hue={hue} size={24} />
-          <span className="min-w-0 flex-1">{details}</span>
-        </button>
-      ) : (
-        <div className="flex min-w-0 flex-1 items-start gap-2.5 px-2 py-1.5">
-          <Avatar initials={accountInitials(account.slug)} hue={hue} size={24} />
-          <span className="min-w-0 flex-1">{details}</span>
+      <Avatar initials={accountInitials(account.slug)} hue={hue} size={24} />
+      <div className="min-w-0 flex-1">
+        {/* The name and the row's menu. The state and the rings stand under the name, so only a name wider than the
+            row ends in an ellipsis. The menu stands over the weekly ring's column: its 28px trigger sits 10px in from the
+            row's edge, centred on the 48px ring cell below it (`UsageRing`'s `w-12`). */}
+        <div className="flex items-center gap-1">
+          <div className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground" title={name}>{name}</div>
+          <ActionMenu
+            label={`Account actions for ${account.slug}`}
+            iconOnly
+            icon={MoreHorizontal}
+            variant="ghost"
+            size="icon"
+            className="-my-1 mr-2.5 flex-none"
+            triggerClassName="h-7 w-7"
+            disabled={busy}
+            items={[
+              {
+                key: 'remove',
+                label: 'Remove',
+                isDanger: true,
+                onSelect: () => onRemove(account.slug),
+              },
+            ]}
+          />
         </div>
-      )}
-      <ActionMenu
-        label={`Account actions for ${account.slug}`}
-        iconOnly
-        icon={MoreHorizontal}
-        variant="ghost"
-        size="icon"
-        className="flex-none"
-        triggerClassName="h-7 w-7"
-        disabled={busy}
-        items={[
-          {
-            key: 'remove',
-            label: 'Remove',
-            isDanger: true,
-            onSelect: () => onRemove(account.slug),
-          },
-        ]}
-      />
+        <div className="flex items-start justify-between gap-2">
+          {/* The state and the one act, level with the rings' middles. */}
+          <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-1.5">
+            {account.in_use && <span className="text-xs font-medium text-accent-ink">✓ In use</span>}
+            {canUse && (
+              // A press still works on a full account — it chooses an account that waits for room (the held case) —
+              // but the act says so rather than promising a switch that will not happen yet.
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onUse(account.slug)}
+                aria-label={noRoom ? `Use ${account.slug} anyway` : `Use ${account.slug}`}
+                className={ROW_ACT_CLASS}
+              >
+                {noRoom ? 'Use anyway' : 'Use'}
+              </button>
+            )}
+            {needsSetup && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onSetup(account.slug)}
+                aria-label={`Set up ${account.slug}`}
+                title={`Set up ${account.slug}`}
+                className={ROW_ACT_CLASS}
+              >
+                Set up
+              </button>
+            )}
+            {account.token === 'checking' && <span className="text-xs text-ink-faint">checking sign-in</span>}
+          </div>
+          <div className="flex flex-none items-start">
+            {/* `owner`: three rows draw three "This week" rings, and a screen reader must hear whose each one is. */}
+            {ringWindowKeys(hasFiveHour(account)).map((windowKey) => (
+              <UsageRing
+                key={windowKey}
+                windowKey={windowKey}
+                usageWindow={windowKey === 'five_hour' ? five : week}
+                now={nowMs}
+                captioned
+                owner={account.slug}
+              />
+            ))}
+          </div>
+        </div>
+        {refused && <p data-tone="warn" className={WARN_LINE_CLASS}>sign-in token refused</p>}
+        {tokenNotice !== null && <p data-tone="warn" className={WARN_LINE_CLASS}>{tokenNotice}</p>}
+        {noRoom && <p data-tone="warn" className={WARN_LINE_CLASS}>{`no room now — ${withoutOwnName(account.why, account.slug)}`}</p>}
+        {account.in_use && held && <p data-tone="warn" className={WARN_LINE_CLASS}>stays chosen until it has room again</p>}
+      </div>
     </div>
   );
 }
 
 /**
- * A live identity the store does not hold yet: the same Set up row, with no figures and no menu.
+ * A live identity the store does not hold yet: the same Set up act, with no rings and no menu.
  * Used by the accounts module's ClaudeAccountRows, one per live identity the store does not hold.
  */
 export function CandidateRow({ slug, email, hue, busy, onSetup }: { slug: string; email: string | null; hue: number; busy: boolean; onSetup: (slug: string) => void }) {
   return (
     <div data-account-candidate={slug} className="flex items-start gap-2.5 px-2 py-1.5">
       <Avatar initials={accountInitials(slug)} hue={hue} size={24} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-medium text-foreground" title={email ?? slug}>{email ?? slug}</span>
-        <span className="block text-xs leading-relaxed text-ink-faint">signed in on this box — not set up yet</span>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onSetup(slug)}
-          aria-label={`Set up ${slug}`}
-          title={`Set up ${slug}`}
-          className="mt-0.5 rounded-md px-2 py-1.5 text-left text-xs text-accent-ink transition-colors hover:bg-primary/10 disabled:opacity-60"
-        >
-          Set up
-        </button>
-      </span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13px] font-medium text-foreground" title={email ?? slug}>{email ?? slug}</div>
+        <div className="flex min-h-8 flex-wrap items-center gap-x-1.5">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onSetup(slug)}
+            aria-label={`Set up ${slug}`}
+            title={`Set up ${slug}`}
+            className={ROW_ACT_CLASS}
+          >
+            Set up
+          </button>
+          <span className="text-xs text-ink-faint">signed in here, not set up yet</span>
+        </div>
+      </div>
     </div>
   );
 }

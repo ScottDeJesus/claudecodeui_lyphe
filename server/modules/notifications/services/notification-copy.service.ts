@@ -29,7 +29,11 @@ type NotificationEventLike = {
 
 type NotificationText = { title: string; body: string };
 
-type CodeCopy = (context: { meta: Record<string, unknown>; providerLabel: string }) => {
+/**
+ * What a code's copy is handed: the event's `meta`, the provider's label, and `whole` — true when the caller asked for the
+ * whole body (`bodyLimit` of `null`), so a copy that only EXCERPTS a long text for the push (a plan, a tool's input) says it whole.
+ */
+type CodeCopy = (context: { meta: Record<string, unknown>; providerLabel: string; whole: boolean }) => {
   headline: string;
   body: string;
 };
@@ -71,14 +75,15 @@ const ACCOUNT_LIMIT_CODES = new Set([
 /** Tools whose approval body is the path they touch. */
 const FILE_PATH_TOOLS = new Set(['Edit', 'Write', 'Read', 'MultiEdit', 'NotebookEdit']);
 
+/** What the push shows of a plan awaiting approval and of a tool's input as JSON; a caller that asks for the whole body gets the whole text. */
 const PLAN_EXCERPT_CHARS = 600;
 const TOOL_INPUT_JSON_CHARS = 300;
 
 /**
  * The push channels' body ceiling, and the default of `buildNotificationText`. Web push refuses a payload over
  * ~4 KB and the orchestrator settles those refusals silently, so a long Bash command or a many-option question
- * must never be the reason a push does not arrive. The companion's alert asks for the whole body of a question card
- * only (`companion/feeds/alert-block.ts`).
+ * must never be the reason a push does not arrive. The companion's alert asks for the whole body of the kinds
+ * `wholeBodyKind` names (`companion/feeds/alert-block.ts`).
  */
 const MAX_BODY_CHARS = 1000;
 
@@ -176,9 +181,10 @@ function humanDuration(ms: number): string {
   return `${seconds}s`;
 }
 
-function stringifyToolInput(toolInput: Record<string, unknown>): string | null {
+function stringifyToolInput(toolInput: Record<string, unknown>, whole: boolean): string | null {
   try {
-    return JSON.stringify(toolInput).slice(0, TOOL_INPUT_JSON_CHARS);
+    const json = JSON.stringify(toolInput);
+    return whole ? json : json.slice(0, TOOL_INPUT_JSON_CHARS);
   } catch {
     return null;
   }
@@ -206,23 +212,36 @@ function questionBody(toolInput: Record<string, unknown> | null): string {
   return blocks.length ? blocks.join('\n\n') : 'Claude has a question — open the session to answer.';
 }
 
-function toolApprovalBody(toolName: string | null, toolInput: Record<string, unknown> | null): string {
-  const fallback = 'A tool is waiting for your approval.';
-  if (!toolInput || Object.keys(toolInput).length === 0) return fallback;
+/**
+ * What a tool approval's body is made of: a Bash command, a file tool's path, or — for every other tool, and for a Bash or file
+ * call that names neither — the input as JSON. `null` when the call carries no input at all. One reading serves the body
+ * (`toolApprovalBody`) and the question of which bodies a caller may ask whole (`wholeBodyKind`), so the two never disagree.
+ */
+type ApprovalSource = { kind: 'command' | 'path'; text: string } | { kind: 'json'; input: Record<string, unknown> };
+
+function approvalSource(toolName: string | null, toolInput: Record<string, unknown> | null): ApprovalSource | null {
+  if (!toolInput || Object.keys(toolInput).length === 0) return null;
 
   if (toolName === 'Bash') {
     const command = readText(toolInput.command);
-    if (command) return command;
+    if (command) return { kind: 'command', text: command };
   }
   if (toolName && FILE_PATH_TOOLS.has(toolName)) {
     // NotebookEdit names its target `notebook_path`; every other file tool says `file_path`.
     const filePath = readText(toolInput.file_path) ?? readText(toolInput.notebook_path);
-    if (filePath) return filePath;
+    if (filePath) return { kind: 'path', text: filePath };
   }
-  return stringifyToolInput(toolInput) ?? fallback;
+  return { kind: 'json', input: toolInput };
 }
 
-function permissionCopy(meta: Record<string, unknown>): { headline: string; body: string } {
+function toolApprovalBody(toolName: string | null, toolInput: Record<string, unknown> | null, whole: boolean): string {
+  const fallback = 'A tool is waiting for your approval.';
+  const source = approvalSource(toolName, toolInput);
+  if (source === null) return fallback;
+  return source.kind === 'json' ? stringifyToolInput(source.input, whole) ?? fallback : source.text;
+}
+
+function permissionCopy(meta: Record<string, unknown>, whole: boolean): { headline: string; body: string } {
   const toolName = readText(meta.toolName);
   const toolInput = isRecord(meta.toolInput) ? meta.toolInput : null;
 
@@ -240,13 +259,36 @@ function permissionCopy(meta: Record<string, unknown>): { headline: string; body
     const plan = readText(toolInput?.plan);
     return {
       headline: 'Plan ready for approval',
-      body: plan ? plan.slice(0, PLAN_EXCERPT_CHARS) : 'Claude has a plan ready to review.',
+      body: plan ? (whole ? plan : plan.slice(0, PLAN_EXCERPT_CHARS)) : 'Claude has a plan ready to review.',
     };
   }
   return {
     headline: toolName ? `Approve ${toolName}` : 'Approve a tool',
-    body: toolApprovalBody(toolName, toolInput),
+    body: toolApprovalBody(toolName, toolInput, whole),
   };
+}
+
+/**
+ * How an event's body may be asked for whole: `question` is a question card (`AskUserQuestion`) — a design's questions, an Accept
+ * census or a chat's own question — which the push cuts only at its 1,000-character cap and the companion takes at any size;
+ * `excerpt` is a plan awaiting approval (`ExitPlanMode`) or a tool permission that shows its input as JSON — free text the push cuts
+ * to 600 and 300 characters, which a caller that asks for it whole must bound itself. Consumed by the companion's alert block (`companion/feeds/alert-block.ts`).
+ */
+export type WholeBodyKind = 'question' | 'excerpt';
+
+/**
+ * Which kind of whole body `event` has, or `null` for every other body: a Bash command, a file path, an error or a message stays on
+ * the push cap, because a caller that passes `null` for free text owns an unbounded string. Reads the same `approvalSource` the body
+ * is built from, so a tool whose body is a command or a path is never offered whole. Consumed by the companion's alert block, through
+ * the module barrel, to choose the `bodyLimit` it asks `spendFreeWording` for.
+ */
+export function wholeBodyKind(event: NotificationEventLike): WholeBodyKind | null {
+  if (event.code !== 'permission.required') return null;
+  const meta = isRecord(event.meta) ? event.meta : {};
+  const toolName = readText(meta.toolName);
+  if (toolName === 'AskUserQuestion') return 'question';
+  if (toolName === 'ExitPlanMode') return 'excerpt';
+  return approvalSource(toolName, isRecord(meta.toolInput) ? meta.toolInput : null)?.kind === 'json' ? 'excerpt' : null;
 }
 
 /**
@@ -270,7 +312,7 @@ function epicWaveText(meta: Record<string, unknown>, noun: 'retries' | 'stops'):
 }
 
 const COPY_BY_CODE = new Map<string, CodeCopy>([
-  ['permission.required', ({ meta }) => permissionCopy(meta)],
+  ['permission.required', ({ meta, whole }) => permissionCopy(meta, whole)],
   ['agent.notification', ({ meta }) => ({
     headline: 'Claude needs you',
     body: readText(meta.message) ?? FALLBACK_COPY.body,
@@ -437,7 +479,7 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
  *
  * Consumed by the notification orchestrator's `buildNotificationPayload` (web
  * push, desktop and ntfy all send its output) and, through the module barrel, by
- * the companion's alert block (`buildAlertBlock`), which asks for the whole body of a question card. The title is the
+ * the companion's alert block (`buildAlertBlock`), which asks for the whole body of the kinds `wholeBodyKind` names. The title is the
  * code's headline followed by ` · <session name>` when one is known — except
  * an account-limit code, whose headline names the window instead, followed by
  * the launch account's slug when the emitter sent one; an unknown code renders
@@ -445,13 +487,14 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
  *
  * `bodyLimit` is the most characters the body keeps, cut without an ellipsis: the push cap (`MAX_BODY_CHARS`) when
  * omitted, so every push channel is unchanged, or `null` for the whole body — the companion's alert
- * (`companion/feeds/alert-block.ts`) for a question card, which is a message to a model and not a payload a push
- * service refuses. A caller passing `null` owns the bound: a body built from free text (a Bash command, an error) is unbounded.
+ * (`companion/feeds/alert-block.ts`) for the kinds `wholeBodyKind` names, which is a message to a model and not a payload a push
+ * service refuses. `null` also lifts the push's own excerpts of a plan (600 characters) and of a tool's JSON input (300). A caller
+ * passing `null` owns the bound: a body built from free text (a Bash command, an error, a plan) is unbounded.
  */
 export function buildNotificationText(event: NotificationEventLike, bodyLimit: number | null = MAX_BODY_CHARS): NotificationText {
   const meta = isRecord(event.meta) ? event.meta : {};
   const copy = typeof event.code === 'string' ? COPY_BY_CODE.get(event.code) : undefined;
-  const { headline, body } = copy ? copy({ meta, providerLabel: providerLabel(event.provider) }) : FALLBACK_COPY;
+  const { headline, body } = copy ? copy({ meta, providerLabel: providerLabel(event.provider), whole: bodyLimit === null }) : FALLBACK_COPY;
   const accountLimit = ACCOUNT_LIMIT_CODES.has(event.code ?? '');
   const sessionName = accountLimit ? null : event.sessionName ?? readText(meta.sessionName);
   // A limit belongs to ONE account, so its title names that account's slug when the emitter knows

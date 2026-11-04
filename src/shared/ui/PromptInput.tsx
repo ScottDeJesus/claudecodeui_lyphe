@@ -147,8 +147,15 @@ PromptInputTools.displayName = 'PromptInputTools';
  * button no longer stands: the first tap dismissed the keyboard and sent nothing. A default-prevented `mousedown` leaves the focus
  * where it was, the keys stay up, nothing is re-laid and the `click` lands as pressed; typing goes on after the press. The caller's
  * own `onMouseDown` runs first. A press from the keyboard (Enter or Space on a focused button) has no `mousedown` and is untouched.
+ *
+ * Exported for the presses that stand beside the field without being the kit's own buttons, so none writes a second copy of the cure:
+ * the companion module's talk buttons (the station's large one and the phone's round one), the chat module's attachment chips (the
+ * remove control, in the chat's composer and Kaylee's) and the station module's draft dock (through its scope test, which decides
+ * where the cure applies). `Target` is the element the handler is read on: a button by default, the dock's section there.
  */
-const keepFieldFocus = (own?: React.MouseEventHandler<HTMLButtonElement>): React.MouseEventHandler<HTMLButtonElement> => (event) => {
+export const keepFieldFocus = <Target extends HTMLElement = HTMLButtonElement>(
+  own?: React.MouseEventHandler<Target>,
+): React.MouseEventHandler<Target> => (event) => {
   own?.(event);
   event.preventDefault();
 };
@@ -159,11 +166,14 @@ const keepFieldFocus = (own?: React.MouseEventHandler<HTMLButtonElement>): React
  * send, or the second tap of a double tap, which lands on the Send the first tap has just disabled. A `pointerdown` still reaches a
  * disabled button, and a default-prevented one leaves the focus where it was. Only while the button is disabled: an enabled press keeps
  * `keepFieldFocus` alone, so its `:active` look and its compatibility events are as they were. The caller's own `onPointerDown` runs first.
+ *
+ * Exported with `keepFieldFocus`, for the one caller that reads a press on its section and not on the button: the station module's draft
+ * dock, whose card's Send is disabled while his brief is empty. `Target` is the element the handler is read on, as for `keepFieldFocus`.
  */
-const keepFieldFocusWhileDisabled = (
+export const keepFieldFocusWhileDisabled = <Target extends HTMLElement = HTMLButtonElement>(
   disabled: boolean | undefined,
-  own?: React.PointerEventHandler<HTMLButtonElement>,
-): React.PointerEventHandler<HTMLButtonElement> => (event) => {
+  own?: React.PointerEventHandler<Target>,
+): React.PointerEventHandler<Target> => (event) => {
   own?.(event);
   if (disabled) event.preventDefault();
 };

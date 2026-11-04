@@ -177,34 +177,6 @@ probe-key: 247eff9f2e5e8c2ae9266dac25e3b73c4604a9f1
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-endings.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts
 
-## INV-6576 — probe — the roadmap lane's rows are not in `docs/MANUAL.md`'s family, and the report does not say why
-
-the roadmap lane's rows are not in `docs/MANUAL.md`'s family, and the report does not say why
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe; for t in MAN-1498 MAN-7628 MAN-7629; do printf '%s ' $t; docstore get $t | python3 -c "import sys,json;p=json.load(sys.stdin)['row']['package'];print(p['repo']+':'+p['path'])"; done; grep -c '^## MAN-7628' docs/MANUAL.md
-expect: MAN-1498 prints cloudcli:docs, MAN-7628 and MAN-7629 print cloudcli:. and the grep prints 0 (cured when the two print cloudcli:docs and the grep prints 1)
-```
-
-measured 2026-10-03 by chain chain-roadmap--lane--docs-20261003-180710-2122, finding M1, MEDIUM
-probe-key: a27055db666a8a0c1d7ddd7c3399c36867113d4c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
-
-## INV-6577 — probe — MAN-7626, the lane's shared-door row, sits in the repo-root `MANUAL.md` while every other row of the lane lives in `docs/MANUAL.md`
-
-MAN-7626, the lane's shared-door row, sits in the repo-root `MANUAL.md` while every other row of the lane lives in `docs/MANUAL.md`
-
-```probe
-docstore get MAN-7626 | python3 -c "import sys,json;p=json.load(sys.stdin)['row']['package'];print(p['repo']+':'+p['path'])"
-expect: cloudcli:docs — the package of MAN-7631 and MAN-1498 (today cloudcli:.)
-```
-
-measured 2026-10-03 by chain chain-roadmap--lane--whole-20261003-183736-de24, finding L2, LOW
-probe-key: 84ae870657a8db5dfbd97279f63b4c2619ad3e16
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
-
 ## INV-6580 — roadmapSeen is entry-patched and forward-only — a writer never sends an older at
 
 `roadmapSeen` is the second entry-patched preference, beside `dispatcher` (INV-4406). Shape: `{ seen: { name: string; at: string }[] }`, one entry per roadmap; `name` is the roadmap's, `at` is the dispatcher's UTC string of the newest `shipped_at`, `completed_at` or `reached_at` this user's screen celebrated.
@@ -664,40 +636,6 @@ probe-key: 4f7c74eb691241a84aeb62e24d17cf2d1d8e3a05
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
 
-## INV-10036 — probe — MEDIUM — "whole" was applied to every alert kind, and the cap that bounded a Bash command or an error text for her is gone with nothing downstream to replace it
-
-MEDIUM — "whole" was applied to every alert kind, and the cap that bounded a Bash command or an error text for her is gone with nothing downstream to replace it
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/q.mts" <<'TS'
-const m = await import('@/modules/database/index.js'); await m.initializeDatabase();
-const { buildNotificationText } = await import('@/modules/notifications/index.js');
-const { buildAlertBlock } = await import('@/modules/companion/feeds/alert-block.js');
-const ev = (code: string, meta: object) => ({ userId: 1, kind: 'action_required', code, provider: 'claude', sessionId: null, dedupeKey: 'x', meta }) as any;
-const bash = ev('permission.required', { toolName: 'Bash', toolInput: { command: 'python3 - <<EOF\n' + 'print("x")\n'.repeat(6000) + 'EOF' } });
-const failed = ev('run.failed', { error: 'Error: ' + 'frame\n'.repeat(50000) });
-for (const [label, e, kind] of [['Bash command 66 KB', bash, 'permission'], ['run.failed error 300 KB', failed, 'failed']] as const)
-  console.log(`F2 ${label}: push body ${buildNotificationText(e).body.length} | her envelope ${buildAlertBlock(1, e, kind).envelope.length}`);
-process.exit(0);
-TS
-cat > "$D/p.sh" <<'EOF'
-D=$1
-: > "$D/auth.db"
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-DATABASE_PATH=$D/auth.db TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/q.mts" 2>&1 | grep -E '^F2|Error' | head -5
-EOF
-bash "$D/p.sh" "$D"
-cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: `push body 1000 | her envelope 66108` and `… 300089` while the defect stands; cured when her envelope is bounded (a few thousand) for both
-```
-
-measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding M2, MEDIUM
-probe-key: 7ee59977ab23e7f5d956d650accdc2fe42f9485e
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
-
 ## INV-10037 — probe — LOW — `FollowupRow` throws on an item that has no `closedFor`, so a new client against an older server loses the widget
 
 LOW — `FollowupRow` throws on an item that has no `closedFor`, so a new client against an older server loses the widget
@@ -738,23 +676,6 @@ echo "[probe exit $?]"
 
 measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding L1, LOW
 probe-key: 13bf554839279545c4f20b438a282cd82143c3c7
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
-
-## INV-10038 — probe — LOW — MAN-9145, born from this phase's split of MAN-9003, still says nothing calls `listOpenFollowups`
-
-LOW — MAN-9145, born from this phase's split of MAN-9003, still says nothing calls `listOpenFollowups`
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-echo "MAN-9145 lines saying nothing calls it: $(docstore get MAN-9145 --text | grep -c 'nothing in .server/. calls')"
-echo "server files outside followups/ that call it: $(grep -rln 'listOpenFollowups(' server --include=*.ts | grep -vc '^server/modules/followups')"
-echo "[probe exit $?]"
-# expect: `1` and `2` while the sentence stands; cured when the first is 0
-```
-
-measured 2026-10-28 by chain chain-kaylee-followups-alerts-20261028-113355-f414, finding L2, LOW
-probe-key: d8c99da807c52e6a873ddd3787d7f406bc83e86c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx
 

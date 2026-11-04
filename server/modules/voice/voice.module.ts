@@ -43,7 +43,6 @@ const audioUpload = multer({
 
 /** Voice router assembled for the server entrypoint. */
 export const voiceRoutes = createVoiceRouter({
-  voiceService,
   voiceProvider: createVoiceProvider(voiceService),
   parseAudioUpload: audioUpload.single('audio'),
 });

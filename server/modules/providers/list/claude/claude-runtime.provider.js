@@ -79,6 +79,8 @@ import { readReportedContextWindow, resolveContextWindow } from './claude-contex
 import { reportRestoredTurn } from './claude-compaction-restore.js';
 import { applyToolsetLaunch, askToolsetLaunch, createToolsetSync, toolsetDigest } from './claude-toolset-seams.js';
 import { assertProjectFolderExists, ProjectFolderMissingError } from './claude-project-folder.js';
+import { confirmResumableProviderSession } from './claude-resumable-session.js';
+import { describeErrorResult } from './claude-error-result.js';
 import { createSignalState, detectRuntimeSignals } from './claude-runtime-signals.js';
 import { installedCliVersionForLaunch } from './installed-cli-version.js';
 import { readMcpSignIn } from './mcp-sign-in.js';
@@ -839,10 +841,14 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
   return spawnProcess(command, options, ws, context);
 }
 
-/** The SDK options one message asks for, resolved the same way whether it spawns or joins. */
-async function resolveSdkOptions(options, context) {
+/**
+ * The SDK options one message asks for, resolved the same way whether it spawns or joins.
+ * `providerSessionId` is the id the launch resumes: a spawn passes the one it has already confirmed
+ * (`confirmResumableProviderSession`), a join leaves it to be read off the row — a live process takes no
+ * resume, so its profile never depends on whether the conversation is on disk.
+ */
+async function resolveSdkOptions(options, context, providerSessionId = context.resolveProviderSessionId(options.sessionId)) {
   const { sessionId } = options;
-  const providerSessionId = context.resolveProviderSessionId(sessionId);
   const resolvedModel = await context.resolveResumeModel(sessionId, options.model);
   let effortModels = CLAUDE_FALLBACK_MODELS;
   try {
@@ -964,7 +970,8 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
   // provider-native id recorded on the session row. A run that resumes nothing
   // (`resumeFromScratch`: an edited first prompt, a compaction's seed append) carries none: seeded with
   // the chat's old id, the capture below never fired and the session it starts was never announced.
-  const providerSessionId = options.resumeFromScratch === true ? null : context.resolveProviderSessionId(sessionId);
+  // `let`: the run loop's first act replaces it with null when the conversation it names is not on disk.
+  let providerSessionId = options.resumeFromScratch === true ? null : context.resolveProviderSessionId(sessionId);
   // Provider-native id as the SDK reports it (starts as the resume id, or is
   // captured from the stream for brand-new sessions).
   let capturedSessionId = providerSessionId;
@@ -1366,7 +1373,16 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
 
   const runLoop = async () => {
     try {
-      const resolved = await resolveSdkOptions(options, context);
+      // A turn resumes a conversation only when its transcript is there: the CLI answers a resume of any
+      // other id with "No conversation found", and the row would hand it the same id on every later turn.
+      // After the reservation above (this await must not open a gap for a second spawn). Not asked for a
+      // re-adopted process (its CLI holds the conversation live) or a node's project (the transcript is on
+      // the node's disk, out of this machine's reach).
+      if (providerSessionId && !reattach && !options.node) {
+        providerSessionId = await confirmResumableProviderSession({ appSessionId: sessionId ?? null, providerSessionId });
+        capturedSessionId = providerSessionId;
+      }
+      const resolved = await resolveSdkOptions(options, context, providerSessionId);
       sdkOptions = resolved.sdkOptions;
       // The account in use and the environment its sign-in token rides, read ONCE here — the spawn —
       // and never for a re-adoption, whose CLI already runs with the environment it was started on.
@@ -1865,9 +1881,22 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
           // The result of a missed steer's own turn: told apart here so it is not taken for a background task finishing.
           const ownSteers = Array.isArray(message.user_message_uuids) ? message.user_message_uuids.filter((uuid) => missedSteers.delete(uuid)) : [];
           if (ownSteers.length > 0) console.log(`[Claude SDK] The steer for session ${sessionKey() || 'NEW'} that missed its turn has finished its own`);
+          // A turn the CLI ended in error says what failed, on the page, ahead of the run's one
+          // `complete` (an `error` row is informational, never terminal). This result is the only thing
+          // on the stream that names the cause. The process often fails right behind it with a throw of
+          // its own ("exited with code 1"); the catch below drops that one as an idle process failing
+          // between turns, rightly, because the turn is closed and this row has already said it. A turn
+          // we ended ourselves (Stop, retirement) stays silent: whoever ended it owns the client's frames.
+          // (A Stop pressed before this process registered found no instance to mark, so that turn runs on
+          // and is told like any other, as its reply text is.)
+          const errorText = abortPending || supersededInstances.has(queryInstance) ? null : describeErrorResult(message);
+          if (errorText) {
+            ws.send(createNormalizedMessage({ kind: 'error', content: errorText, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
+          }
           // A failed result already went out as its own signal; neither "finished" nor
-          // "background agent finished" beside it would be true.
-          const failedResult = message.is_error === true;
+          // "background agent finished" beside it would be true, and neither is the page's
+          // `complete` a success (`success: false` is what keeps the completion chime quiet).
+          const failedResult = message.is_error === true || errorText !== null;
           if (answersTurn) {
             if (!abortPending) {
               // An append-only turn ran no request, so no assistant message carried a budget: the CLI's own
@@ -1886,7 +1915,7 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
                 }
               }
               // (An aborted turn's terminal `complete` was sent by the abort handler.)
-              ws.send(createCompleteMessage({ provider: 'claude', sessionId: capturedSessionId || sessionId || null, exitCode: 0 }));
+              ws.send(createCompleteMessage({ provider: 'claude', sessionId: capturedSessionId || sessionId || null, exitCode: failedResult ? 1 : 0 }));
               if (!failedResult && !isSeedAppend(turnOptions)) notifyRunStopped({
                 userId: ws?.userId || null,
                 provider: 'claude',

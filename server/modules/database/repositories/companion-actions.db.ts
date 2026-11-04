@@ -14,7 +14,7 @@ import { getConnection } from '@/modules/database/connection.js';
  * `endAction` and `listActions` (reach it through `@/modules/database/index.js`).
  */
 
-/** How an action ended: `took` and `already` are the door's answers, `refused` the door's refusal, `cancelled` his withdrawal or a Clear, `replaced` a newer prepare, `expired` a lapse found by the next verb. */
+/** How an action ended: `took` and `already` are the door's answers, `refused` the door's refusal, `cancelled` his withdrawal or a Clear, `replaced` a newer prepare, `expired` a lapse that no one withdrew, found by the next prepare or take. */
 export type CompanionActionOutcome = 'took' | 'already' | 'refused' | 'cancelled' | 'replaced' | 'expired';
 
 /** One `companion_actions` row, exactly as the table stores it. `outcome` is NULL while the action still waits for his word. */

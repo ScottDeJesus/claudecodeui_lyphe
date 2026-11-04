@@ -80,8 +80,10 @@ export type NoteDraftsValue = {
   composerNoteId: string | null;
   /**
    * The ids of the notes the wall held when the blank card's first save left, while that save's answer
-   * is still on its way; `null` otherwise. The wall hides any note outside it, because the new note can
-   * reach the list (through the server's frame) before the answer names it.
+   * is still on its way or was lost (its note may still be made); `null` otherwise. The wall hides any
+   * note outside it, because the new note can reach the list (through the server's frame) before the
+   * answer names it. A note made elsewhere meanwhile is hidden too, until the create lands or the card
+   * is cleared.
    */
   createBaseline: ReadonlySet<string> | null;
   /** What is typed over a note, by note id. A card is in edit mode exactly while it has an entry. */

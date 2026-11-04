@@ -1,5 +1,6 @@
 import express from 'express';
 
+import { relayBudgetOf } from './gemini-budget-relay.js';
 import type { LaneAnswer, ShadowConnectorLane } from './shadow-connector-lane.js';
 
 /**
@@ -235,6 +236,10 @@ export function createLaneRouter({
             query: forwardedQuery(spec, request),
             body: spec.body === 'object' ? request.body : undefined,
             actingUser: actingUserOf(request),
+            // Judged here, off the request's own socket and headers, so a caller that reaches the tailnet
+            // listener directly from off this box, or through a reverse proxy's front, is `production`
+            // whatever header it sent.
+            budget: relayBudgetOf(request),
             timeoutMs: spec.timeoutMs,
             expect: spec.expect,
             passHeaders,

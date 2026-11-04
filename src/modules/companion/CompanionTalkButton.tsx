@@ -3,7 +3,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { TalkPressState } from '@/shared/types';
-import { Button, PromptInputButton, Spinner } from '@/shared/ui';
+import { Button, keepFieldFocus, PromptInputButton, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type CompanionTalkButtonProps = {
@@ -81,6 +81,8 @@ function LargeTalkButton({ state, error, onToggle, label, bindingLabel, compact 
             aria-describedby={error === null ? undefined : errorId}
             data-tone={error === null ? undefined : 'warn'}
             onClick={onToggle}
+            // A tap on it never takes the focus from the typing box beside it (the kit's `keepFieldFocus`, as the composer's own presses): the keys stay up.
+            onMouseDown={keepFieldFocus()}
             // Its padding, the mic's box and the gap are as small as reads well: 12rem across (StationTalk's cell) leaves its
             // words 121 px, and "press to talk again" takes 119 px of them, so no state's words are ever cut.
             // Compact, 44 px: the touch law's catch, its two lines of words set tighter so both stand inside it.
@@ -164,6 +166,8 @@ function RoundTalkButton({ state, error, onToggle, label, compact = false }: Pic
         aria-describedby={error === null ? undefined : errorId}
         data-tone={error === null ? undefined : 'warn'}
         onClick={onToggle}
+        // The bar stands over the keys only while the mic is open, and this press ends the recording: it must not take the focus from the typing box and drop them.
+        onMouseDown={keepFieldFocus()}
         className={cn(
           'rounded-full p-0',
           compact ? 'size-[3.25rem] [&_svg]:size-6' : 'size-16 [&_svg]:size-7',

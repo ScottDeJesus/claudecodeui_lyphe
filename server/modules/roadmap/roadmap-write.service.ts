@@ -65,9 +65,10 @@ const ADD_TAKES: Record<RoadmapKind, readonly string[]> = {
 const ACTOR: readonly string[] = ['--by', 'app:card'];
 
 /**
- * The dispatcher's own name rule (`store.NAME_RE`), written out for the reason the plan lane's is.
- * Consumed by this file's fence and by the router's `GET /cases`, which fences its `feature` query
- * to the same rule before the cases door is asked about it.
+ * The dispatcher's own name rule (`store.NAME_RE`), written out for the reason the plan lane's is — but
+ * WITHOUT its reservation of `production`, `chain-…` and `session-…`: a reserved name passes this fence and
+ * the dispatcher refuses it. Consumed by this file's fence and by the router's `GET /cases`, which fences its
+ * `feature` query to the same class before the cases door is asked about it.
  */
 export const NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,99}$/;
 

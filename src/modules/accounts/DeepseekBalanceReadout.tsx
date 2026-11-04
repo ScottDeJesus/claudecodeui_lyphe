@@ -34,10 +34,14 @@ const UNKNOWN_REASONS: Record<string, string> = {
  * `unknown` rather than `string` on purpose: a body that reached this component without being the
  * contract would otherwise print `(undefined)` in an accessible name, which reads as a bug in this
  * app rather than as the unknown it is. A missing word is its own sentence.
+ *
+ * The table is read by OWN key only: `UNKNOWN_REASONS['constructor']` resolves up the prototype chain to
+ * `Object`, and the note would print that function's source as the reason.
  */
 function unknownReasonInWords(reason: unknown): string {
   if (typeof reason !== 'string') return 'the balance could not be read';
-  return UNKNOWN_REASONS[reason] ?? `the balance could not be read (${reason})`;
+  if (Object.prototype.hasOwnProperty.call(UNKNOWN_REASONS, reason)) return UNKNOWN_REASONS[reason];
+  return `the balance could not be read (${reason})`;
 }
 
 /** A plain decimal as a vendor writes money: digits, an optional fraction, an optional sign. */
@@ -50,9 +54,10 @@ const MAX_EXACT_INTEGER_DIGITS = 15;
  * The figure as a person reads money, from the vendor's own decimal string.
  *
  * `total` is never arithmetic here beyond formatting, and only a plain decimal takes even that much:
- * the vendor's string is parsed to place a thousands separator and two decimals, and ANY other
- * string — `1e3`, `0x10`, a word — is drawn exactly as it arrived. The float ceiling is the second
- * half of the same rule: `"12345678901234567890.99"` through a `Number` prints
+ * the vendor's string is parsed to place a thousands separator and two decimals, and any other
+ * string that IS a number — `1e3`, `0x10` — is drawn exactly as it arrived. A string that is no number
+ * at all (`NaN`, `n/a`, `Infinity`) is no amount: it is a `null`, never `$NaN`. The float ceiling is
+ * the second half of the verbatim rule: `"12345678901234567890.99"` through a `Number` prints
  * `$12,345,678,901,234,567,000.00`, so past fifteen integer digits the string is drawn verbatim too.
  * A balance is the one number on this screen that must never be invented.
  *
@@ -60,24 +65,39 @@ const MAX_EXACT_INTEGER_DIGITS = 15;
  * is `0`, so a blank would otherwise draw as a confident `$0.00` on the one screen where that is a
  * lie about money. The server refuses blanks (`isReadableEntry`); this is the second lock on the
  * same door, and it says "nothing here" in the type rather than in a string the caller must test.
+ *
+ * Both arguments are `unknown` on purpose, for the same reason `unknownReasonInWords` takes one: the
+ * wire is untrusted at its edges, and `undefined.trim()` is a throw in render that takes the whole
+ * app down. An amount that is not a string, or a currency that is not a non-blank string, is no
+ * figure — an amount with no currency is not an amount, and guessing one is a wrong figure about money.
  */
-function moneyInWords(currency: string, total: string): string | null {
+function moneyInWords(currency: unknown, total: unknown): string | null {
+  if (typeof total !== 'string' || typeof currency !== 'string') return null;
   const amount = total.trim();
-  if (amount.length === 0) return null;
+  const code = currency.trim().toUpperCase();
+  if (amount.length === 0 || code.length === 0) return null;
+  // `Number` is the one judge of "is this a number": `NaN`, `n/a` and `Infinity` (and `1e999`) are not finite.
+  if (!Number.isFinite(Number(amount))) return null;
 
   const integerDigits = amount.replace(/^-/, '').split('.')[0]?.length ?? 0;
   const exact = DECIMAL.test(amount) && integerDigits <= MAX_EXACT_INTEGER_DIGITS;
   const figure = exact
     ? Number(amount).toLocaleString([], { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : amount;
-  const code = currency.trim().toUpperCase();
   const symbol = CURRENCY_SYMBOLS[code];
   return symbol ? `${symbol}${figure}` : `${figure} ${code}`;
 }
 
-/** When the reading was taken, on the reader's own clock — the fact that keeps a stale figure from looking fresh. */
-function readAtInWords(checkedAt: number): string {
-  return new Date(checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+/**
+ * When the reading was taken, on the reader's own clock — the fact that keeps a stale figure from looking fresh.
+ * `null` when the stamp names no instant (absent, a string, non-finite, or past the Date range, which prints
+ * "Invalid Date"): the caller says the time is unknown rather than printing one.
+ */
+function readAtInWords(checkedAt: unknown): string | null {
+  if (typeof checkedAt !== 'number' || !Number.isFinite(checkedAt)) return null;
+  const readAt = new Date(checkedAt);
+  if (Number.isNaN(readAt.getTime())) return null;
+  return readAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 /** The em-dash that stands for every unknown — never `$0.00`, which is a reading. */
@@ -106,16 +126,15 @@ function readOut(balance: DeepseekBalance | null): Readout {
     return { figure: null, note: `Balance unknown — ${reason}.` };
   }
 
-  if (!balance.available) {
-    return {
-      figure: moneyInWords(balance.currency, balance.total),
-      note: 'DeepSeek reports this account is not available for requests.',
-    };
+  const figure = moneyInWords(balance.currency, balance.total);
+  // Only an `available` of exactly `false` is the vendor saying the account cannot serve requests. An ABSENT one says
+  // nothing, and putting that sentence in the vendor's mouth would be inventing a reading of the account.
+  if (balance.available === false) {
+    return { figure, note: 'DeepSeek reports this account is not available for requests.' };
   }
 
-  const figure = moneyInWords(balance.currency, balance.total);
-  // A blank amount is a reading of NOTHING, not a reading of zero — and it is the server's own lock
-  // failing rather than a shape the vendor sends. It is answered in the server's word for an answer
+  // A blank, missing or non-numeric amount is a reading of NOTHING, not a reading of zero — and it is the
+  // server's own lock failing (`isReadableEntry` refuses only blanks) rather than a shape the vendor sends. It is answered in the server's word for an answer
   // this app could not read, because that is what it is; inventing a figure here is the one thing
   // this screen must never do.
   if (!figure) {
@@ -127,8 +146,9 @@ function readOut(balance: DeepseekBalance | null): Readout {
   // self-explanatory about its age: the panel is where someone checks the money after something
   // stopped, and a frozen tab would otherwise hold a five-minute-old number that looks fresh — and
   // a read the client's own floor skipped (see `useDeepseekBalance`) shows as its age, not as a
-  // figure that merely looks new.
-  return { figure, note: `Read at ${readAt}` };
+  // figure that merely looks new. A stamp that names no instant says so, for the same reason: a
+  // figure with no age line is the one that looks fresh.
+  return { figure, note: readAt === null ? 'Read at an unknown time' : `Read at ${readAt}` };
 }
 
 type DeepseekBalanceReadoutProps = {

@@ -1,5 +1,7 @@
 import fs from 'node:fs/promises';
 
+import { BUDGET_HEADER } from './gemini-budget-relay.js';
+
 /**
  * Relaying a request to shadow-connector's internal-caller-gated surface — the one forwarder every
  * lane to shadow-connector goes through. Consumers: the `affected-areas` module (the Tours lane,
@@ -68,6 +70,11 @@ export type LaneRequest = {
   body?: unknown;
   /** The signed-in operator's name, or null when the request carried none. */
   actingUser: string | null;
+  /**
+   * The Gemini budget to carry as `X-Gemini-Budget-Plan`, from `relayBudgetOf` over the inbound request; null
+   * carries none. The names and the rule live in shadow-connector's `core/gemini_budget/attribution.py`.
+   */
+  budget: string | null;
   timeoutMs: number;
   /** What a 2xx answer carries: a JSON document, or the bytes of an image. */
   expect: 'json' | 'bytes';
@@ -221,6 +228,7 @@ export function createShadowConnectorLane({
     };
     const actingUser = sanitiseActingUser(request.actingUser);
     if (actingUser !== null) headers[ACTING_USER_HEADER] = actingUser;
+    if (request.budget !== null) headers[BUDGET_HEADER] = request.budget;
     if (request.body !== undefined) headers['Content-Type'] = 'application/json';
 
     let status: number;

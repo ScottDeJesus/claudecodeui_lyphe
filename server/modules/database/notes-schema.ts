@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS notes (
     user_id INTEGER NOT NULL,
     title TEXT NOT NULL,
     description TEXT NOT NULL,
+    -- The idempotency key the creating request carried, or NULL (a note made without one, or before the column).
+    -- See NOTES_CLIENT_KEY_INDEX_SQL below.
+    client_key TEXT,
     -- ISO-8601 UTC with milliseconds, written by the repository.
     -- created_at orders the list and never moves; updated_at is the last save.
     created_at TEXT NOT NULL,
@@ -34,4 +37,33 @@ CREATE TABLE IF NOT EXISTS notes (
 
 -- The one read: an account's notes, newest first.
 CREATE INDEX IF NOT EXISTS ix_notes_user_created ON notes(user_id, created_at);
+
+-- The newest save order each WRITER (one open tab) has had applied to a note: a save of that writer whose seq is not
+-- above its row's is an older save arriving late, and the repository refuses to write it. One row per (note, writer), so
+-- two tabs never compare with each other. The rows leave with the note, and the repository drops a writer's row a day
+-- after its last save (no request is in the air that long).
+CREATE TABLE IF NOT EXISTS note_save_orders (
+    note_id TEXT NOT NULL,
+    writer TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    -- ISO-8601 UTC with milliseconds, written by the repository.
+    applied_at TEXT NOT NULL,
+    PRIMARY KEY (note_id, writer),
+    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+);
+`;
+
+/**
+ * Makes a repeated create key answer with the note it already made: one row per `(user_id, client_key)`.
+ *
+ * It is NOT in `NOTES_SCHEMA_SQL` above because that script runs before `addNotesClientKeyColumn` has added
+ * `client_key` to a database that already holds the table, and an index on a column that is not there yet
+ * fails the boot. `migrations.ts` runs this after the column exists, on every boot (`IF NOT EXISTS`).
+ *
+ * PARTIAL, so every note made without a key (the notes command, and every row from before the column) is
+ * outside it: NULL keys never collide, and the list's own index above is untouched. The key is scoped to
+ * the account — two accounts that happened to mint the same key still make two notes.
+ */
+export const NOTES_CLIENT_KEY_INDEX_SQL = `
+CREATE UNIQUE INDEX IF NOT EXISTS ux_notes_user_client_key ON notes(user_id, client_key) WHERE client_key IS NOT NULL;
 `;

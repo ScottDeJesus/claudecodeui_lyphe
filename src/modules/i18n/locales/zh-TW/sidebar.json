@@ -37,7 +37,13 @@
     "showMore": "顯示更多工作階段",
     "showOlderUnknown": "↳ 顯示更早的對話",
     "messageCount_other": "{{count}} 則訊息",
-    "showOlder_other": "↳ 顯示 {{count}} 個更早的對話"
+    "showOlder_other": "↳ 顯示 {{count}} 個更早的對話",
+    "select": "選取",
+    "selectAll": "全選",
+    "selectAllLoaded": "全選已載入",
+    "clearSelection": "清除選取",
+    "deleteSelected_one": "刪除 {{count}} 個工作階段",
+    "deleteSelected_other": "刪除 {{count}} 個工作階段"
   },
   "tooltips": {
     "viewEnvironments": "查看環境",
@@ -113,7 +119,9 @@
     "restoreProjectError": "還原專案時出錯，請重試。",
     "reopenSessionFailed": "重新開啟工作階段失敗，請重試。",
     "reopenSessionError": "重新開啟工作階段時出錯，請重試。",
-    "forkSessionError": "無法分支此工作階段，請再試一次。"
+    "forkSessionError": "無法分支此工作階段，請再試一次。",
+    "deleteSessionsPartialFailure_one": "{{total}} 個工作階段中有 {{count}} 個刪除失敗，請重試。",
+    "deleteSessionsPartialFailure_other": "{{total}} 個工作階段中有 {{count}} 個刪除失敗，請重試。"
   },
   "version": {
     "updateAvailable": "有可用更新",
@@ -151,7 +159,16 @@
     "deleteSessionPermanently": "永久刪除",
     "deleteAllData": "永久刪除所有資料",
     "allConversationsDeleted": "專案將從側邊欄中移除。您的檔案、記憶和工作階段資料將會保留。",
-    "cannotUndo": "您可以稍後重新新增此專案。"
+    "cannotUndo": "您可以稍後重新新增此專案。",
+    "confirmDeleteSessions": "您想如何處理",
+    "deleteSessions_one": "刪除 {{count}} 個工作階段",
+    "deleteSessions_other": "刪除 {{count}} 個工作階段",
+    "selectedSessions_one": "選取的 {{count}} 個工作階段",
+    "selectedSessions_other": "選取的 {{count}} 個工作階段",
+    "closeSessions_one": "關閉 {{count}} 個工作階段",
+    "closeSessions_other": "關閉 {{count}} 個工作階段",
+    "closeSessionsNotice_one": "關閉會將工作階段移出使用中清單，但保留其歷史記錄。",
+    "closeSessionsNotice_other": "關閉會將工作階段移出使用中清單，但保留其歷史記錄。"
   },
   "simpleList": {
     "newChat": "新增對話",

@@ -4,8 +4,10 @@ import type { FollowupCompletionArc, FollowupCompletionPlan } from '@/shared/typ
  * The rule that decides which open follow-ups a finished feature, task or epic settles — pure, with no database and no clock.
  *
  * A follow-up is one free-text line, so "points at a feature" can only mean "names it". The rule is idempotent and
- * stateless: it reads stamps, never a mark of what was already swept, so running it on every picture the dispatcher
- * sends — and again after a restart — closes exactly what the stamps say and nothing twice.
+ * stateless: it reads stamps, never a mark of what was already swept, so running it again — after a restart, on a store
+ * that moved — closes exactly what the stamps say and nothing twice. It has no age in it: a feature that finished a year
+ * ago settles its items exactly as one that finished a minute ago, so long as the caller hands it the plan (the dispatcher
+ * module hands it the store whole, never the lane's picture, which forgets a plan a day after it ends).
  *
  *  - A FEATURE finished (`completed_at` set): every open item that names the feature and has stood untouched since
  *    before the stamp.
@@ -28,8 +30,8 @@ import type { FollowupCompletionArc, FollowupCompletionPlan } from '@/shared/typ
  * or the name in quotes or backticks.
  *
  * "UNTOUCHED SINCE" IS `updated_at`, NOT `created_at`. An open item's `updated_at` is its `created_at` until a person
- * unticks it in the widget, which sets it to now — later than every stamp the lane already holds. Compared on
- * `created_at`, the rule would close the item again on the next picture (seconds later), and an untick would never
+ * unticks it in the widget, which sets it to now — later than every stamp the store already holds. Compared on
+ * `created_at`, the rule would close the item again on the next sweep (seconds later), and an untick would never
  * hold. Compared on `updated_at`, a reopened item is left open for good, and the rule still keeps no mark of its own.
  *
  * The dispatcher names these things arc, plan and phase; the code keeps those words, and the strings a person reads say
@@ -93,6 +95,19 @@ function pointsAtTask(text: string, feature: string, taskKey: string): boolean {
   ];
 
   return forms.some((form) => new RegExp(form, 'i').test(text));
+}
+
+/**
+ * `closedFor` as the mark a list puts on an item the house settled: `done: feature <feature> finished`,
+ * `done: task <key> of feature <feature> finished` or `done: epic <epic> finished` — the words `followups --all` prints inside its
+ * brackets (`bin/followups.mjs`), so a chat and Kaylee read one mark. The epic prefix is tested BEFORE the slash split, as
+ * the header says every reader of a `closed_for` must. Used by `followups.service.ts` (`listSettledByCompletionForAccount`).
+ */
+export function completionMark(closedFor: string): string {
+  if (closedFor.startsWith(EPIC_CLOSED_FOR_PREFIX)) return `done: epic ${closedFor.slice(EPIC_CLOSED_FOR_PREFIX.length)} finished`;
+  const slash = closedFor.indexOf('/');
+  if (slash === -1) return `done: feature ${closedFor} finished`;
+  return `done: task ${closedFor.slice(slash + 1)} of feature ${closedFor.slice(0, slash)} finished`;
 }
 
 /** The dispatcher's stamp as milliseconds, or `null` when it is missing or unreadable (an unreadable stamp closes nothing). */
@@ -162,7 +177,7 @@ export function closuresForPlan(plan: FollowupCompletionPlan, candidates: OpenIt
  *    reads `complete` again only when the new plans end;
  *  - an epic the roadmap made is never stamped at all, yet reads `complete` off its plans.
  * So an item filed while the epic's last plan was still walking is not stale: it closes when the epic finishes. A
- * plan the picture no longer carries (the lane drops one 24 h after it ends) simply adds no stamp. Used by
+ * plan the store does not hold adds no stamp. Used by
  * `followups.service.ts` (`closeForCompletions`), which skips the candidate read for an epic that has not finished,
  * and hands the stamp to `closuresForArc`.
  */

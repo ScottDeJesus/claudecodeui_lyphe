@@ -2,11 +2,22 @@ import { JevLogo } from '@/shared/ui/JevLogo';
 import { cn } from '@/shared/utils';
 import type { JevBalance } from '@/modules/accounts/hooks/useJevBalance';
 
-/** The em-dash that stands for "no account seeded" — never `$0.00`, which is a reading. */
+/** The em-dash that stands for every unknown — no account seeded, or a figure the reply left out — never `$0.00`, which is a reading. */
 const NO_FIGURE = '—';
 
-const usd = (amount: number, digits = 2) =>
-  `$${amount.toLocaleString([], { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+/** One dollar figure as money, or the em-dash for an unknown one: `0` is a real reading and draws `$0.00`. */
+const usd = (amount: number | null) =>
+  amount === null ? NO_FIGURE : `$${amount.toLocaleString([], { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** The line under the figure: what was spent of what credit, an unknown half drawn as an em-dash beside the half that arrived. */
+function noteInWords(balance: JevBalance | null): string {
+  if (!balance) return 'No credit seeded.';
+  // All three unknown is not an estimate of nothing, it is a reply this app could not read — and `— of — spent` does not say so.
+  if (balance.creditUsd === null && balance.spentUsd === null && balance.leftUsd === null) {
+    return 'Balance unknown — the summary carried no readable figure.';
+  }
+  return `${usd(balance.spentUsd)} of ${usd(balance.creditUsd)} spent, metered here. TypeSafe has no balance API.`;
+}
 
 type JevBalanceReadoutProps = {
   balance: JevBalance | null;
@@ -22,7 +33,7 @@ type JevBalanceReadoutProps = {
  * this screen cannot see.
  */
 export function JevBalanceReadout({ balance }: JevBalanceReadoutProps) {
-  const figure = balance ? `≈ ${usd(balance.leftUsd)}` : null;
+  const figure = balance && balance.leftUsd !== null ? `≈ ${usd(balance.leftUsd)}` : null;
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -35,11 +46,7 @@ export function JevBalanceReadout({ balance }: JevBalanceReadoutProps) {
           {figure ?? NO_FIGURE}
         </span>
       </div>
-      <span className="text-xs leading-relaxed text-ink-faint">
-        {balance
-          ? `${usd(balance.spentUsd)} of ${usd(balance.creditUsd)} spent, metered here. TypeSafe has no balance API.`
-          : 'No credit seeded.'}
-      </span>
+      <span className="text-xs leading-relaxed text-ink-faint">{noteInWords(balance)}</span>
     </div>
   );
 }

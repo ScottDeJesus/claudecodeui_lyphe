@@ -25,6 +25,11 @@ export type UiPreferences = {
   showThinking: boolean;
   sendByCtrlEnter: boolean;
   sidebarVisible: boolean;
+  /**
+   * Lets several project groups in the sidebar stay open at once and remembers which, in this browser,
+   * across reloads. Default OFF: one group open at a time, as the sidebar has always behaved.
+   */
+  keepProjectsExpanded: boolean;
   voiceEnabled: boolean;
   /**
    * Keeps the Shell view off the views rail. Default ON, because the terminal is
@@ -56,6 +61,7 @@ const DEFAULTS: UiPreferences = {
   showThinking: true,
   sendByCtrlEnter: false,
   sidebarVisible: true,
+  keepProjectsExpanded: false,
   voiceEnabled: false,
   hideShellTab: true,
   hideFilesTab: false,

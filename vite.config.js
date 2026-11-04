@@ -2,6 +2,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { getConnectableHost, normalizeLoopbackHost } from './shared/networkHosts.js'
+import { BUDGET_HEADER, relayBudgetOf } from './server/shared/gemini-budget-relay.ts'
 import keepPageOnReconnect from './vite-plugins/keepPageOnReconnect.js'
 import compressResponses from './vite-plugins/compressResponses.js'
 import precompressedAssets from './vite-plugins/precompressedAssets.js'
@@ -88,8 +89,21 @@ export default defineConfig(({ mode }) => {
       // The :5184 build tree lives in the repo; left watched, every production build rewrote three
       // .html files there and full-reloaded every open :5183 tab.
       watch: { ignored: [(file) => /[\\/](?:\.prod-client|dist-server)(?:[\\/]|$)/.test(file)] },
+      // `preview.proxy` inherits this table, so :5183 (dev) and :5184 (`vite preview`) relay alike.
       proxy: {
-        '/api': `http://${proxyHost}:${serverPort}`,
+        // The Gemini budget relay: what the API (and through it shadow-connector) is told about who this
+        // request is. The rule is `relayBudgetOf`'s; its home is shadow-connector's core/gemini_budget/attribution.py.
+        // A header the browser sent is replaced by the rule's answer, or removed when the rule has none.
+        // `changeOrigin` is what Vite itself sets for a plain-string entry: the API sees its own Host.
+        '/api': {
+          target: `http://${proxyHost}:${serverPort}`,
+          changeOrigin: true,
+          configure: (proxy) => proxy.on('proxyReq', (proxyReq, req) => {
+            const budget = relayBudgetOf(req)
+            if (budget === null) proxyReq.removeHeader(BUDGET_HEADER)
+            else proxyReq.setHeader(BUDGET_HEADER, budget)
+          })
+        },
         '/ws': {
           target: `ws://${proxyHost}:${serverPort}`,
           ws: true

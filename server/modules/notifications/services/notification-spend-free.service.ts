@@ -88,9 +88,10 @@ export type SpendFreeWording = { title: string; body: string; sessionName: strin
 
 /**
  * `event`'s title and body as the house words them, with no cost, token or usage figure in either. The body is cut at the push
- * channels' 1000 characters, as every push is; `bodyLimit` of `null` asks for the whole body (the alert block, for a question
- * card, which she must not be told half of) and a number cuts there. A caller passing `null` owns the bound: a body built
- * from free text (a Bash command, an error message) is unbounded. Never throws for an event the wording does not know: an
+ * channels' 1000 characters, as every push is; `bodyLimit` of `null` asks for the whole body (the alert block, for the kinds
+ * `wholeBodyKind` names — a question card, a plan, a tool's input — which she must not be told half of; the push's own 600- and
+ * 300-character excerpts of the last two are lifted with it) and a number cuts there. A caller passing `null` owns the bound: a body
+ * built from free text (a Bash command, an error message, a plan) is unbounded. Never throws for an event the wording does not know: an
  * unknown code is the generic copy.
  * Consumed by `buildAlertBlock` (companion alert feed) and `startNotificationHistory`; exported through the module barrel.
  */

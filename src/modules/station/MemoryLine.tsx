@@ -7,7 +7,7 @@ import type { CompanionMemoryLine } from '@/shared/companion-types';
 import { CardFoldBody, Collapsible, CollapsibleTrigger, FoldChevron } from '@/shared/ui';
 
 /**
- * When he said it, on his clock, in the spelling her `whenWords` gives a moment: "today 4:34 PM", "yesterday 7:34 PM", then
+ * When he said or typed it, on his clock, in the spelling her `whenWords` gives a moment: "today 4:34 PM", "yesterday 7:34 PM", then
  * the page's one spelling of a day ("Oct 26"; `stationStamp` cuts it, the locale's clock and all). Null for a memory that records
  * no moment.
  */
@@ -18,6 +18,15 @@ function momentOf(saidAt: string | null, t: TFunction): string | null {
   if (stamp.day === 'yesterday') return t('station.memory.when.yesterday', { clock: stamp.clock, defaultValue: 'yesterday {{clock}}' });
   return stamp.date;
 }
+
+/**
+ * How a memory's first quote came, in the word her recall uses for it ("said <when>", "typed <when>"): `spoken` is the log's word for a talk
+ * press and says "said"; `typed` is a line he typed on her panel and says "typed". A Map, as the corner's kinds are.
+ */
+const CHANNEL_WORDS: ReadonlyMap<string, { wordKey: string; word: string }> = new Map([
+  ['spoken', { wordKey: 'station.memory.channel.spoken', word: 'said' }],
+  ['typed', { wordKey: 'station.memory.channel.typed', word: 'typed' }],
+]);
 
 type MemoryLineProps = {
   line: CompanionMemoryLine;
@@ -31,11 +40,12 @@ type MemoryLineProps = {
 
 /**
  * ONE MEMORY OF THE CORNER, A DISCLOSURE (`button`, `aria-expanded`), drawn as the left rail draws a fold: the house's chevron,
- * then its title in the ink and under it its kind and the moment he said it in the muted ink, the rail's own reading order
- * (a session's name over its project, a feature's title over its step). Its press opens his first words under it ("You
- * said", then his words as the line carries them, cut at 200 characters), in place and never onto the stage; a second press
- * folds them. It works the same under a finger and a pointer, so no tooltip carries his words, and below 768 px it is a 44 px
- * catch (the touch law). Nothing of hers stands as his: the words shown are the line's `quote` alone.
+ * then its title in the ink and under it its kind, whether he said or typed it and the moment, in the muted ink, the rail's own
+ * reading order (a session's name over its project, a feature's title over its step). Its press opens his first words under it
+ * ("You said", or "You typed" for a line he typed, then his words as the line carries them, cut at 200 characters), in place and
+ * never onto the stage; a second press folds them. The word follows the line's `via` and nothing else: a typed line is never
+ * "said". It works the same under a finger and a pointer, so no tooltip carries his words, and below 768 px it is a 44 px catch
+ * (the touch law). Nothing of hers stands as his: the words shown are the line's `quote` alone.
  *
  * His words, once their fold has finished opening, are brought into the nearest scroller's view: a line at the foot of the
  * short list would otherwise open out of sight. A line drawn already open ran no transition and moves nothing.
@@ -45,6 +55,8 @@ type MemoryLineProps = {
 export function MemoryLine({ line, kind, open, onOpenChange }: MemoryLineProps) {
   const { t } = useTranslation();
   const moment = momentOf(line.saidAt, t);
+  const channelWord = line.via === null ? undefined : CHANNEL_WORDS.get(line.via);
+  const channel = channelWord === undefined ? null : t(channelWord.wordKey, { defaultValue: channelWord.word });
   const reveal = (event: TransitionEvent<HTMLLIElement>) => {
     if (open && event.propertyName === 'grid-template-rows') event.currentTarget.scrollIntoView({ block: 'nearest' });
   };
@@ -60,10 +72,15 @@ export function MemoryLine({ line, kind, open, onOpenChange }: MemoryLineProps) 
             <span className="break-words text-sm font-medium leading-5 text-foreground">{line.title}</span>
             <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs leading-4 text-muted-foreground">
               {kind}
-              {moment !== null && (
+              {(channel !== null || moment !== null) && (
                 <>
                   <span aria-hidden="true">·</span>
-                  <time dateTime={line.saidAt ?? undefined} className="whitespace-nowrap tabular-nums">{moment}</time>
+                  {/* "typed today 4:34 PM" stays one unit when the row wraps; a memory with no parseable moment still says how it came. */}
+                  <span className="whitespace-nowrap">
+                    {channel !== null && <span data-station-memory-via={line.via}>{channel}</span>}
+                    {channel !== null && moment !== null && ' '}
+                    {moment !== null && <time dateTime={line.saidAt ?? undefined} className="tabular-nums">{moment}</time>}
+                  </span>
                 </>
               )}
             </span>
@@ -78,7 +95,11 @@ export function MemoryLine({ line, kind, open, onOpenChange }: MemoryLineProps) 
               </p>
             ) : (
               <>
-                <p className="text-xs leading-4 text-muted-foreground">{t('station.memory.youSaid', { defaultValue: 'You said' })}</p>
+                <p className="text-xs leading-4 text-muted-foreground">
+                  {line.via === 'typed'
+                    ? t('station.memory.youTyped', { defaultValue: 'You typed' })
+                    : t('station.memory.youSaid', { defaultValue: 'You said' })}
+                </p>
                 <p className="mt-1 break-words text-[13px] leading-relaxed text-foreground">
                   {t('station.memory.quoted', { quote: line.quote, defaultValue: '“{{quote}}”' })}
                 </p>

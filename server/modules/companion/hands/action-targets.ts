@@ -105,7 +105,7 @@ export function findFollowup(userId: number, ref: string): Found<Extract<Compani
   const id = /^(?:follow-?up\s*)?#?(\d{1,9})$/i.exec(ref.trim())?.[1];
   if (id === undefined) return refused('A follow-up is named by its number, #<id>, as list_followups prints it.');
   const item = findFollowupForAccount(userId, Number(id));
-  if (item === null) return refused(`#${id} is not one of his follow-ups; list_followups shows the open ones.`);
+  if (item === null) return refused(`#${id} is not one of his follow-ups; list_followups lists them.`);
   const spoken = item.followup.text.split(/\s+/).slice(0, 5).join(' ').replace(/[\s.,;:!?"“”]+$/u, '');
   return { ok: true, value: { kind: 'followup', id: item.followup.id, sessionId: item.sessionId, spoken, text: item.followup.text } };
 }

@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next';
 
 import { Badge, Button } from '@/shared/ui';
 import { cn } from '@/shared/utils';
-import type { LLMProvider, MCPServerStatus, Project, ProjectSession, SessionWithProvider } from '@/shared/types';
+import type { LLMProvider, MCPServerStatus, Project, ProjectSession, SessionWithProvider, SidebarSessionSelection } from '@/shared/types';
 import { getTaskIndicatorStatus } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import TaskIndicator from '@/modules/sidebar/TaskIndicator';
 import SidebarProjectSessions from '@/modules/sidebar/SidebarProjectSessions';
@@ -30,9 +30,9 @@ type SidebarProjectItemProps = {
   tasksEnabled: boolean;
   mcpServerStatus: MCPServerStatus;
   onRenameDraftChange: (name: string) => void;
-  onToggleProject: (projectName: string) => void;
+  onToggleProject: (projectId: string) => void;
   onProjectSelect: (project: Project) => void;
-  onToggleStarProject: (projectName: string) => void;
+  onToggleStarProject: (projectId: string) => void;
   onStartEditingProject: (project: Project) => void;
   onCancelEditingProject: () => void;
   onSaveProjectName: (projectId: string, nextName: string) => void;
@@ -47,6 +47,12 @@ type SidebarProjectItemProps = {
   onStartEditingSession: (projectId: string, sessionId: string, initialName: string) => void;
   onCancelEditingSession: () => void;
   onSaveEditingSession: (projectName: string, sessionId: string, summary: string, provider: LLMProvider) => void;
+  /** The sessions ticked in this project's list, or null when it is not the one selecting. */
+  selectedSessionIds: ReadonlySet<string> | null;
+  onSetSessionSelection: (selection: SidebarSessionSelection) => void;
+  onToggleSessionSelected: (projectId: string, sessionId: string) => void;
+  onCancelSessionSelection: () => void;
+  onDeleteSelectedSessions: (sessionIds: string[]) => void;
   t: TFunction;
 };
 
@@ -101,6 +107,11 @@ function SidebarProjectItem({
   onStartEditingSession,
   onCancelEditingSession,
   onSaveEditingSession,
+  selectedSessionIds,
+  onSetSessionSelection,
+  onToggleSessionSelected,
+  onCancelSessionSelection,
+  onDeleteSelectedSessions,
   t,
 }: SidebarProjectItemProps) {
   // Project identity is tracked by the DB-assigned `projectId` everywhere
@@ -455,6 +466,11 @@ function SidebarProjectItem({
         onForkSession={onForkSession}
         onLoadMoreSessions={onLoadMoreSessions}
         onNewSession={onNewSession}
+        selectedSessionIds={selectedSessionIds}
+        onSetSessionSelection={onSetSessionSelection}
+        onToggleSessionSelected={onToggleSessionSelected}
+        onCancelSessionSelection={onCancelSessionSelection}
+        onDeleteSelectedSessions={onDeleteSelectedSessions}
         t={t}
       />
     </div>
@@ -467,6 +483,6 @@ function SidebarProjectItem({
  *
  * Both renames are resolved to scalars by SidebarProjectList and the sorted
  * session array is cached per project, so a keystroke changes props on exactly
- * one row and every other row's compare succeeds. See sidebarRowProps.test.tsx.
+ * one row and every other row's compare succeeds.
  */
 export default memo(SidebarProjectItem);

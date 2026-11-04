@@ -7,6 +7,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 
 import { normalizeInlineCodeFences } from '@/modules/chat/utils/chatFormatting';
+import { normalizeLatexDelimiters } from '@/modules/chat/utils/latexDelimiters';
 import { CodeBlock, CodePre } from '@/modules/chat/transcript/shapes/code';
 import { MarkdownImage } from '@/modules/chat/transcript/shapes/MarkdownImage';
 import { MarkdownLink } from '@/modules/chat/transcript/shapes/MarkdownLink';
@@ -43,8 +44,10 @@ type MarkdownProps = {
   breaks?: boolean;
 };
 
-// The delimiters `remark-math` recognizes with `singleDollarTextMath` off.
-const MATH_DELIMITER = /\$\$|\\\(|\\\[/;
+// The only delimiter `remark-math` recognizes with `singleDollarTextMath` off.
+// `\(…\)` and `\[…\]` are already rewritten to `$$` by normalizeLatexDelimiters,
+// so this one probe covers both notations.
+const MATH_DELIMITER = /\$\$/;
 
 const EMPTY_PLUGINS: never[] = [];
 
@@ -111,7 +114,9 @@ const SHAPE_COMPONENTS = {
  */
 function MarkdownBodyRenderer({ children, breaks = false, streaming = false }: Omit<MarkdownProps, 'className'> & { streaming?: boolean }) {
   const content = useMemo(
-    () => normalizeInlineCodeFences(String(children ?? '')),
+    // The LaTeX pass runs second because it reads the code spans the fence pass
+    // normalizes, and must leave the LaTeX inside them literal.
+    () => normalizeLatexDelimiters(normalizeInlineCodeFences(String(children ?? ''))),
     [children],
   );
   // Math support costs a remark tree pass plus a full KaTeX walk on every

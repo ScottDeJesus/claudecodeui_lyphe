@@ -43,7 +43,13 @@
     "messageCount_other": "{{count}} mensajes",
     "showOlder_one": "↳ Mostrar {{count}} conversación anterior",
     "showOlder_many": "↳ Mostrar {{count}} conversaciones anteriores",
-    "showOlder_other": "↳ Mostrar {{count}} conversaciones anteriores"
+    "showOlder_other": "↳ Mostrar {{count}} conversaciones anteriores",
+    "select": "Seleccionar",
+    "selectAll": "Seleccionar todo",
+    "selectAllLoaded": "Seleccionar las cargadas",
+    "clearSelection": "Quitar selección",
+    "deleteSelected_one": "Eliminar {{count}} sesión",
+    "deleteSelected_other": "Eliminar {{count}} sesiones"
   },
   "tooltips": {
     "viewEnvironments": "Ver entornos",
@@ -120,7 +126,9 @@
     "restoreProjectError": "Error al restaurar el proyecto. Inténtalo de nuevo.",
     "reopenSessionFailed": "No se pudo reabrir la sesión. Inténtalo de nuevo.",
     "reopenSessionError": "Error al reabrir la sesión. Inténtalo de nuevo.",
-    "forkSessionError": "No se pudo bifurcar esta sesión. Inténtalo de nuevo."
+    "forkSessionError": "No se pudo bifurcar esta sesión. Inténtalo de nuevo.",
+    "deleteSessionsPartialFailure_one": "No se pudo eliminar {{count}} sesión de {{total}}. Inténtalo de nuevo.",
+    "deleteSessionsPartialFailure_other": "No se pudieron eliminar {{count}} de {{total}} sesiones. Inténtalo de nuevo."
   },
   "version": {
     "updateAvailable": "Actualización disponible",
@@ -158,7 +166,16 @@
     "deleteSessionPermanently": "Eliminar permanentemente",
     "deleteAllData": "Eliminar todos los datos permanentemente",
     "allConversationsDeleted": "El proyecto se quitará de la barra lateral. Tus archivos, memorias y datos de sesión se conservarán.",
-    "cannotUndo": "Puedes volver a añadir el proyecto más tarde."
+    "cannotUndo": "Puedes volver a añadir el proyecto más tarde.",
+    "confirmDeleteSessions": "¿Qué quieres hacer con",
+    "deleteSessions_one": "Eliminar {{count}} sesión",
+    "deleteSessions_other": "Eliminar {{count}} sesiones",
+    "selectedSessions_one": "{{count}} sesión seleccionada",
+    "selectedSessions_other": "{{count}} sesiones seleccionadas",
+    "closeSessions_one": "Cerrar {{count}} sesión",
+    "closeSessions_other": "Cerrar {{count}} sesiones",
+    "closeSessionsNotice_one": "Cerrar mantiene la sesión fuera de la lista activa y conserva su historial.",
+    "closeSessionsNotice_other": "Cerrar mantiene las sesiones fuera de la lista activa y conserva su historial."
   },
   "simpleList": {
     "newChat": "Nuevo chat",

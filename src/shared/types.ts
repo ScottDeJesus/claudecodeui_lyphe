@@ -981,19 +981,19 @@ export type VoicePlayState = 'idle' | 'loading' | 'playing';
 
 // ---------------------------
 
-//----------------- CHAT MIC PROVIDER AND GEMINI VOICE SETTINGS ------------
+//----------------- CHAT VOICE PROVIDER AND GEMINI VOICE SETTINGS ------------
 
 /**
- * Which speech-to-text backend the chat composer's mic uses for the account: 'openai' (the OpenAI-compatible backend,
- * today's behavior and the default) or 'gemini' (Gemini on the server's key, with no key or header from the browser).
- * Client mirror of the server's `VoiceProvider`. Read by the settings module's provider picker and voice-settings hook, and
- * by the chat module's provider hook and `transcribeVoice`, which routes the clip on it. It governs the chat's mic alone:
- * read-aloud stays on the OpenAI-compatible backend.
+ * Which backend hears the chat composer's mic and speaks the chat's read-aloud for the account: 'gemini' (the default: Gemini
+ * on the server's key, with no key or header from the browser) or 'openai' (the OpenAI-compatible backend, which an account
+ * that stored it keeps). Client mirror of the server's `VoiceProvider`. Read by the settings module's provider picker and
+ * voice-settings hook, and by the chat module's provider hook, `transcribeVoice` and `synthesizeVoice`, which route the clip
+ * and the text on it. It governs the chat alone: Kaylee hears and speaks through Gemini whatever it says.
  */
 export type VoiceProvider = 'openai' | 'gemini';
 
 /**
- * The account's voice settings as `GET /api/voice/settings` answers them: the chat mic's `provider` and the Gemini choices
+ * The account's voice settings as `GET /api/voice/settings` answers them: the chat's `provider` and the Gemini choices
  * (`gemini.transcriptionModel` and `gemini.speechModel`, 1-80 characters of letters, digits, `.`, `_` and `-`; `gemini.voice`,
  * 1-40 characters of letters, digits, `_` and `-`; `gemini.soundTags`, the one list of sounds Kaylee may make: 1-30 tags, each 1-24
  * lower-case letters with single spaces between words), and `cleanTranscripts` (default true): whether a transcript has its um,
@@ -1028,6 +1028,15 @@ export type VocabularyEntry = {
   pronunciation: string;
   misheard: string[];
 };
+
+/**
+ * One row of the vocabulary editor: an entry with a client-only `id` that names the row for as long as the page keeps it, whatever
+ * its spelling becomes. React keys the row by `id`, so renaming a word keeps the row mounted and the caret in the field it is typed
+ * in (a key made of the spelling would remount the row at the first save of a rename). Made by the settings module's `useVocabulary`
+ * (at the first read, when a word is added, or when an answer's count differs from the list sent), kept through every other read and
+ * save, and read by its `VocabularySection`; never sent to the server, which stores `entry` alone.
+ */
+export type VocabularyRow = { id: number; entry: VocabularyEntry };
 
 /**
  * Which Gemini key the account's calls use, and the only part of it the page ever sees: 'stored' is his own (`last4` its
@@ -2194,7 +2203,8 @@ export type SidebarProjectListProps = {
   selectedSession: ProjectSession | null;
   isLoading: boolean;
   loadingProgress: LoadingProgress | null;
-  expandedProjects: Set<string>;
+  /** Whether a project's session list is open in the tab on screen (the Running tab keeps its own collapses). */
+  isProjectExpanded: (projectId: string) => boolean;
   activeRename: ActiveSidebarRename | null;
   initialSessionsLoaded: Set<string>;
   currentTime: Date;
@@ -2206,12 +2216,11 @@ export type SidebarProjectListProps = {
   loadingMoreProjects: Set<string>;
   activeSessions: ReadonlySet<string>;
   attentionSessionIds: ReadonlySet<string>;
-  forceExpanded?: boolean;
-  isProjectStarred: (projectName: string) => boolean;
+  isProjectStarred: (projectId: string) => boolean;
   onRenameDraftChange: (draft: string) => void;
-  onToggleProject: (projectName: string) => void;
+  onToggleProject: (projectId: string) => void;
   onProjectSelect: (project: Project) => void;
-  onToggleStarProject: (projectName: string) => void;
+  onToggleStarProject: (projectId: string) => void;
   onStartEditingProject: (project: Project) => void;
   onCancelEditingProject: () => void;
   onSaveProjectName: (projectId: string, nextName: string) => void;
@@ -2224,6 +2233,16 @@ export type SidebarProjectListProps = {
   onStartEditingSession: (projectId: string, sessionId: string, initialName: string) => void;
   onCancelEditingSession: () => void;
   onSaveEditingSession: (projectName: string, sessionId: string, summary: string, provider: LLMProvider) => void;
+  /** The project whose session list is in bulk-selection mode and the rows ticked in it, or null while no list is selecting. */
+  sessionSelection: SidebarSessionSelection | null;
+  /** Enters bulk-selection mode for one project, or replaces its ticked rows (used by "Select all" and "Clear"). */
+  onSetSessionSelection: (selection: SidebarSessionSelection) => void;
+  /** Ticks or unticks one row; takes the owning projectId so a memoized row can bind itself without a per-row closure. */
+  onToggleSessionSelected: (projectId: string, sessionId: string) => void;
+  /** Leaves bulk-selection mode, discarding the ticked rows. */
+  onCancelSessionSelection: () => void;
+  /** Opens the bulk close/delete confirmation for the ids the list resolved as still deletable. */
+  onDeleteSelectedSessions: (sessionIds: string[]) => void;
   t: TFunction;
 };
 
@@ -2321,11 +2340,23 @@ export type ActiveSidebarRename =
  * The sidebar's pending delete confirmation. One value rather than a pair of
  * nullable states, so a project dialog and a session dialog cannot both be
  * open — they are portalled at the same z-index and would stack. The project
- * variant carries the session count the dialog warns with.
+ * variant carries the session count the dialog warns with, and the `sessions`
+ * variant the ids of a bulk delete, resolved when the dialog was opened.
  */
 export type PendingSidebarDeletion =
   | { kind: 'project'; project: Project; sessionCount: number }
-  | { kind: 'session'; sessionId: string; sessionTitle: string; isArchived: boolean };
+  | { kind: 'session'; sessionId: string; sessionTitle: string; isArchived: boolean }
+  | { kind: 'sessions'; sessionIds: string[] };
+
+/**
+ * The sessions ticked for a bulk action, scoped to the one project whose list
+ * is in selection mode. Scoping it keeps a delete from mixing rows of two
+ * projects, and lets every other project row be handed a constant `null`.
+ */
+export type SidebarSessionSelection = {
+  projectId: string;
+  sessionIds: ReadonlySet<string>;
+};
 
 /** Whether a TaskMaster MCP server is present and configured for a project, or null while that status is still unknown. */
 export type MCPServerStatus = {
@@ -2680,8 +2711,9 @@ export type ClaudeAccounts =
 /**
  * One usage window as the meter measured it.
  * `percent: null` is "no reading" (em-dash, empty track); `0` is a REAL reading and says
- * "0% used". `rolled: true` keeps a real but HISTORICAL percent — show it dim and say "was",
- * never drain it to zero. `severity` is present only when the vendor flagged the window, and
+ * "0% used". `rolled: true` is the server's mark that the reading predates a reset that has
+ * passed: its percent describes a closed window, and the client draws the window that began at the
+ * reset instead (`windowPastReset`). `severity` is present only when the vendor flagged the window, and
  * may only ESCALATE a meter's tone: a flagged window can read a comfortable 12 % and still
  * mean an account lock.
  */
@@ -2803,6 +2835,9 @@ export type Note = { id: string; title: string; description: string; createdAt: 
 
 /** What the two writes take: the whole of both fields, never a patch. It is also the shape of a draft, and both fields are the writer's own text, drawn as text nodes. */
 export type NoteInput = { title: string; description: string };
+
+/** The order a note save carries (the `Save-Order` header): `writer` names this tab, `seq` counts its sends from 1. The server refuses to write a save whose `seq` is not above one it already applied from the same writer — an older text arriving late. Mirror of the server's `SaveOrder`. */
+export type SaveOrder = { writer: string; seq: number };
 
 /** What a card says quietly about its own saving: `saving` while typed text is waiting for or on its way to the server, `saved` once the newest text has landed, `titleNeeded` while a title is missing and nothing can be sent. A card with no entry says nothing. */
 export type NoteSaveStatus = 'saving' | 'saved' | 'titleNeeded';

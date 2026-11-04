@@ -6,11 +6,13 @@ import { formatShortDate } from '@/shared/utils';
 
 /**
  * The line that closes the section. A switch raises one question — "will this lose my work?" — and
- * this answers it: work already running finishes on its account, and an open conversation moves at
- * its next message.
+ * this answers it: work already running finishes on its account, and an open chat moves at its next message.
  */
 const SWITCHING_IN_WORDS =
-  'Switching changes which account new chats and plan runs start on. Work already running finishes on its account; an open conversation moves at its next message.';
+  'Switching sets where new chats and plan runs start. Running work stays on its account; an open chat moves at its next message.';
+
+/** The automatic switch's whole sentence: its accessible name, which the short visible label stands for. */
+const AUTO_SWITCH_WORDS = 'Switch automatically when the account in use fills';
 
 /**
  * The door could not answer. One calm line and never a banner: nothing on this screen is wrong —
@@ -21,34 +23,22 @@ const DOOR_UNREACHABLE_LINE = 'The server could not read the accounts — which 
 /** The default for a caller that passes no act (the fakes' fixture): a press with no handler must do nothing at all. */
 const NO_ACT = () => undefined;
 
-/** The last switch as one sentence, naming the day only when it was not today. */
-function lastSwitchInWords(
-  lastSwitch: ClaudeAccountSwitch,
-  nowMs: number,
-  why = typeof lastSwitch.why === 'string' ? lastSwitch.why.trim() : '',
-): string {
+/**
+ * The last switch in two parts: who and when ("Switched to sdjesus89 · Oct 30, 11:41 pm", the day only when it was not
+ * today), and its reason, whole. `why` is `null` when the door gave none.
+ */
+function lastSwitchInWords(lastSwitch: ClaudeAccountSwitch, nowMs: number): { lead: string; why: string | null } {
+  const why = typeof lastSwitch.why === 'string' && lastSwitch.why.trim() ? lastSwitch.why.trim() : null;
   // `at` is wire input like every reading's stamp: a row relayed without a readable time has no
   // clock to state, and `new Date(NaN).toISOString()` throws in render — taking the whole app down
   // over one line. The switch is still a fact; say it without the time.
   const at = new Date(lastSwitch.at * 1000);
-  if (Number.isNaN(at.getTime())) {
-    return why ? `Switched to ${lastSwitch.to_slug} — ${why}` : `Switched to ${lastSwitch.to_slug}.`;
-  }
+  if (Number.isNaN(at.getTime())) return { lead: `Switched to ${lastSwitch.to_slug}`, why };
   const clock = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase();
   const day = formatShortDate(at.toISOString());
   const sameDay = at.toDateString() === new Date(nowMs).toDateString();
-  const when = sameDay || day === null ? `at ${clock}` : `on ${day} at ${clock}`;
-  return why ? `Switched to ${lastSwitch.to_slug} ${when} — ${why}` : `Switched to ${lastSwitch.to_slug} ${when}.`;
-}
-
-/**
- * The why's headline — what filled, without the figures — for the visible record. The design's own
- * example of this line is exactly this: "sdjesus89's weekly reached its ceiling". The figures stay
- * in the title, where the row above also carries them.
- */
-function whyHeadline(why: string | null | undefined): string {
-  if (typeof why !== 'string' || !why) return '';
-  return why.split(';')[0].split(' (')[0].trim();
+  const when = sameDay || day === null ? clock : `${day}, ${clock}`;
+  return { lead: `Switched to ${lastSwitch.to_slug} · ${when}`, why };
 }
 
 type ClaudeAccountRowsProps = {
@@ -86,12 +76,12 @@ export function ClaudeAccountRows(props: ClaudeAccountRowsProps) {
 /** The section with its own minute, for a caller that has no clock to hand it. */
 function SelfTickingAccountRows(props: ClaudeAccountRowsProps) {
   // The panel is open only while this is mounted, so this tick costs one interval and nothing behind
-  // a closed panel; it is what keeps "as of" and the last switch's clock true while it is open.
+  // a closed panel; it is what keeps the rings' countdowns and the last switch's clock true while it is open.
   const nowMs = useMinuteTick();
   return <AccountRowsBody {...props} nowMs={nowMs} />;
 }
 
-/** The composition itself. `nowMs` drives the reading ages and the last switch's clock. */
+/** The composition itself. `nowMs` drives the rings' countdowns, the token notices and the last switch's clock. */
 function AccountRowsBody({
   picture = null,
   busy = false,
@@ -116,13 +106,9 @@ function AccountRowsBody({
   const candidates = [...picture.candidates].sort((left, right) => left.slug.localeCompare(right.slug));
   const auto = picture.auto;
   const held = picture.held;
-  const chosen = picture.chosen;
-  const lastSwitch = picture.last_switch;
-  // The in-use row already carries this sentence in full, so the record's visible line stops at the
-  // headline that says what filled; the whole sentence — figures included — stays in the title. The
-  // two-line clamp is the safety net for a headline that still runs long with two long slugs at 320.
-  const lastSwitchWords = lastSwitch === null ? null : lastSwitchInWords(lastSwitch, nowMs);
-  const lastSwitchLine = lastSwitch === null ? null : lastSwitchInWords(lastSwitch, nowMs, whyHeadline(lastSwitch.why));
+  // The one place the last switch's reason is stated, whole and dated: no row repeats it, because a reason's
+  // figures are that day's and a row would present them as current.
+  const lastSwitch = picture.last_switch === null ? null : lastSwitchInWords(picture.last_switch, nowMs);
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -136,7 +122,6 @@ function AccountRowsBody({
             hue={index}
             nowMs={nowMs}
             busy={busy}
-            autoWhy={chosen?.by === 'auto' && chosen.slug === account.slug ? chosen.why : null}
             held={held}
             onUse={onUse}
             onSetup={onSetup}
@@ -160,26 +145,21 @@ function AccountRowsBody({
 
       {accounts.length > 0 && (
         <div className="mt-0.5 flex items-center justify-between gap-3 px-2">
-          <span className="text-xs leading-relaxed text-muted-foreground">
-            Switch automatically when the account in use fills
-          </span>
-          <Switch
-            checked={auto}
-            onChange={onSetAuto}
-            label="Switch automatically when the account in use fills"
-            disabled={busy}
-          />
+          {/* Short to the eye; the switch's accessible name keeps the whole sentence. */}
+          <span className="text-xs leading-relaxed text-muted-foreground">Auto-switch when full</span>
+          <Switch checked={auto} onChange={onSetAuto} label={AUTO_SWITCH_WORDS} disabled={busy} />
         </div>
       )}
 
       {!auto && accounts.length > 0 && (
-        <p className="px-2 text-xs leading-relaxed text-ink-faint">
-          Automatic switching is off — the account in use stays chosen even when it fills.
-        </p>
+        <p className="px-2 text-xs leading-relaxed text-ink-faint">Off: the account in use stays chosen even when full.</p>
       )}
 
-      {lastSwitchLine !== null && (
-        <p className="line-clamp-2 px-2 text-xs leading-relaxed text-ink-faint" title={lastSwitchWords ?? undefined}>{lastSwitchLine}</p>
+      {lastSwitch !== null && (
+        <p className="px-2 text-xs leading-relaxed text-ink-faint">
+          <span className="block text-muted-foreground">{lastSwitch.lead}</span>
+          {lastSwitch.why}
+        </p>
       )}
 
       {accounts.length > 0 && (

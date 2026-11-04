@@ -58,6 +58,9 @@ async function sendClaimedQueuedMessage(
       userId: candidate.userId,
       content: message.content,
       options: { ...message.options, attachments: message.attachments },
+      // His words stand in every open tab as the run starts. Not with attachments: the echo is text alone, and the
+      // history's retirement of it matches a row's images and files too.
+      echoUserMessage: message.attachments.length === 0,
     },
     { runtime },
   );
@@ -132,6 +135,8 @@ async function sendClaimedMessage(
         // is aborted so the scheduled message lands when it was due, instead
         // of being recorded as "not sent — session was busy".
         interruptActiveRun: true,
+        // His words stand in every open tab as the run starts, not when the turn ends.
+        echoUserMessage: true,
       },
       { runtime },
     );

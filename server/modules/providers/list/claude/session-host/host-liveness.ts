@@ -36,12 +36,37 @@ import type { Facade } from './facade.js';
 const hostsByChat = new Map<string, Set<string>>();
 
 /**
- * How a host ended, as its CLI reported it on the exit frame: the exit `code` and the `signal`, each null when the other
- * is the answer. A CLI wound down by the end of its stdin (the idle closer, a retirement, `close()`) exits `code` 0 with no
- * signal; a Stop, a `kill-session`, the tmux server going down and a socket lost with no exit frame all end with a signal
- * (or no code). Nothing here judges which is a sleep — a listener reads the facts (`session-auto-close.service.ts`).
+ * The held hosts this server has asked to wind down (`noteHostRetiring`). An entry is only ever made for a host in `hostsByChat`, and
+ * leaves with that host's end, so the set cannot outlive the hosts it names.
  */
-export type HostEnd = { code: number | null; signal: NodeJS.Signals | null };
+const retiringHosts = new Set<string>();
+
+/**
+ * Records that this server is winding `hostId` down on purpose — a retirement the server chose (the idle-host version sweep after
+ * a Claude CLI update), not a chat going to sleep. Called by `retireStaleIdleHosts` just before it retires a host, which is the one
+ * door the install sweep, the boot's version test and a node's link-up all use; the host's end then reaches the listeners with
+ * `retiredByServer` set. A host this process does not hold is ignored: nothing here hears its end, so there is nothing to mark.
+ *
+ * consumer: idle-version-sweep.ts (`retireStaleIdleHosts`)
+ */
+export function noteHostRetiring(hostId: string): void {
+  for (const held of hostsByChat.values()) {
+    if (held.has(hostId)) {
+      retiringHosts.add(hostId);
+      return;
+    }
+  }
+}
+
+/**
+ * How a host ended: the exit `code` and the `signal` its CLI's `exit` frame reported (each null when the other is the answer; both
+ * null for a socket lost with no `exit` frame, which reads as `SIGHUP`), and whether THIS server was the one that ended it
+ * (`retiredByServer`: it asked the host to wind down through `noteHostRetiring`, as the install sweep does). A retirement over a
+ * second socket makes the host end the API's own socket, so it reads as a lost socket and the code and signal alone cannot tell it
+ * from a connection that dropped — which is why the server's own act is carried as a fact. Nothing here judges which end is a
+ * sleep: a listener reads the facts (`session-auto-close.service.ts`).
+ */
+export type HostEnd = { code: number | null; signal: NodeJS.Signals | null; retiredByServer: boolean };
 
 /** What a liveness listener is told: the chats, which way it went (`live` or `asleep`), and — for `asleep` only — how the last host ended. */
 type HostLivenessListener = (sessionIds: string[], change: 'live' | 'asleep', end: HostEnd | null) => void;
@@ -98,13 +123,14 @@ function hostBound(appSessionId: string, hostId: string): void {
   broadcastLiveness({ kind: 'session_host_liveness', change: 'live', sessionIds: [appSessionId], at: Date.now() });
 }
 
-function hostEnded(appSessionId: string, hostId: string, end: HostEnd): void {
+function hostEnded(appSessionId: string, hostId: string, exit: Pick<HostEnd, 'code' | 'signal'>): void {
+  const retiredByServer = retiringHosts.delete(hostId);
   const held = hostsByChat.get(appSessionId);
   if (!held || !held.delete(hostId) || held.size > 0) return;
   hostsByChat.delete(appSessionId);
   // D-10: a facade that settles while the API exits was detached, not ended; the successor snapshots.
   if (!isApiExiting()) {
-    broadcastLiveness({ kind: 'session_host_liveness', change: 'asleep', sessionIds: [appSessionId], at: Date.now() }, end);
+    broadcastLiveness({ kind: 'session_host_liveness', change: 'asleep', sessionIds: [appSessionId], at: Date.now() }, { ...exit, retiredByServer });
   }
 }
 

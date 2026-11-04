@@ -153,6 +153,11 @@ export type DispatcherAsks = {
   observe(picture: Pick<DispatcherStateEvent, 'plans' | 'generated_at'>): void;
   /** Puts up the ask the raise has just recorded, a poll before any picture can carry it. */
   show(plan: DispatcherStateEvent['plans'][number], ask: DispatcherAsk): void;
+  /**
+   * Whether the book holds this prompt NOW: a synchronous read of memory, false the moment an answer is carried through any door (the book retracts
+   * the ask before the verb runs) or a picture shows the ask closed. Read by Kaylee's alert feed at the last moment before she would say the prompt.
+   */
+  isOpen(promptKey: string): boolean;
   /** The door every reader of the phone's answers walks (`registerPermissionGateway`). */
   gateway: ProviderRuntimePermissionGateway;
   /** The card's door: the ask exactly as the card drew it, and the operator's decision. Never throws. */
@@ -545,5 +550,5 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
 
   const gateway: ProviderRuntimePermissionGateway = { resolve, recall };
 
-  return { observe, show, gateway, answer: answerFromCard, answerOnHisWord };
+  return { observe, show, isOpen: (promptKey) => raised.has(promptKey), gateway, answer: answerFromCard, answerOnHisWord };
 }

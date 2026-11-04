@@ -71,9 +71,11 @@ touched, so the answers may not change underneath it. What each answer looks lik
    so. Units differ and are not converted: the door's times (`expires_at`, `reading.at`,
    `last_switch.at`) and the meter's `checkedAt` / `staleSince` are epoch SECONDS, `resetsAt` an
    ISO-8601 string, and `reading.five` / `reading.week` fractions 0..1.
-4. **`rolled: true` is not zero.** The percent is real but historical, its window since ended, and it
-   survives intact — `markRolled` (`usage-windows.ts`) decides it from the window's own stamp, taking
-   an offset-less stamp as UTC, the same rule the client's countdown applies.
+4. **`rolled: true` marks a closed window; the server writes no zero for it.** The percent stays the
+   closed window's and goes on the wire intact — `markRolled` (`usage-windows.ts`) decides it from the
+   window's own stamp, taking an offset-less stamp as UTC, the same rule the client's countdown applies.
+   The panel draws the window that began at the reset instead, at 0% (`windowPastReset`, MAN-8862); the
+   pacer is never handed a rolled window (`pacer-door.ts`).
 5. **`severity` is present only when the vendor flagged that window.** Its mere PRESENCE is the
    signal, and it may ESCALATE a meter's tone, never soften it.
 6. **Two answers are neither a picture nor a failure**, both arriving `reachable: true` with nobody's
@@ -149,7 +151,7 @@ right in the same type the `Meter`'s value uses, and one faint line under it —
 there is one: *Balance unknown — no DeepSeek API key is set on this server.*, *…DeepSeek refused the
 API key this server holds*, *…DeepSeek did not answer in time*, *…DeepSeek could not be reached*,
 *…DeepSeek answered with something this app could not read*. With nothing to explain the line is
-*Read at 13:43*: a healthy figure still owes its age, because the panel is where someone checks the
+*Read at 13:43* (*Read at an unknown time* when the stamp names no instant): a healthy figure still owes its age, because the panel is where someone checks the
 money after something stopped, and a frozen tab would otherwise hold an old number that looks fresh.
 
 It is deliberately NOT a `Meter`. Every other reading on this surface is a share of a limit, and the
@@ -158,7 +160,7 @@ so a bar over money would have to invent the ceiling it is measured against. It 
 own for exactly that reason: `UsageMeters` draws windows, and this is not one.
 
 The account section (rows, candidates, the automatic switch, the last switch, the closing sentence
-*Switching changes which account new chats and plan runs start on. …*) is MAN-8847; its closing
+*Switching sets where new chats and plan runs start. …*) is MAN-8847; its closing
 sentence draws only with at least one account. Under it `↻ Re-login` is always drawn: it opens the
 provider's login window and nothing else (MAN-465), and a refused write's warn banner follows it.
 Codex is deliberately absent; these are the Claude accounts the door holds, and Codex stays in
@@ -179,7 +181,7 @@ the provider's own label, which is the only place a `weekly_scoped:*` plan is ev
 | `percent: null`, or the key absent / not a finite number (`windowPercent` answers `null`, never `NaN`) | "—", no fill at all, and no `aria-valuenow` |
 | `percent ≥ 80` | amber, the library's `▲`, and *Running heavy* in words under the bar |
 | `severity` present | amber at any percent — a flagged window can read a comfortable 12 % and still mean an account lock |
-| `rolled: true` | the real percent, dimmed, as "was 36% used" — draining it would draw a full tank nobody measured |
+| `rolled: true` (the server's mark: the reading predates a reset that has passed) | the window that began at the reset: "0% used" at full strength, no dim, no "was". The client carries it (`windowPastReset`, MAN-8862): a weekly window's reset steps to the first one ahead, a 5-hour window states none. The server keeps the closed window's percent on the wire and files nothing from it |
 | `degraded: true` | the last figures at 60 % opacity under *As of \<local time\> — \<why\>.* |
 | `windows` absent (a reachable body with no `windows` array) | read as `windows: []` — the three rows below; never a TypeError in render |
 | `windows: []` + `reason: 'pending'` | *A fresh reading is on its way.* — reading, not broken |
@@ -192,7 +194,7 @@ the provider's own label, which is the only place a `weekly_scoped:*` plan is ev
 A window with a `resetsAt` also says when it turns over, counted in hours inside a day and in
 weekdays past one. The instant is read by `resetInstant` (`utils/usageWindows.ts`), which takes a
 stamp carrying no offset as UTC — the rule `server/modules/accounts/usage-windows.ts` applies when it
-decides `rolled` — so the countdown and the *was 36% used* dimming describe one moment. The block
+decides `rolled` — so the countdown and the carry past a reset describe one moment. The block
 closes with the sentence that makes a blank bar readable: *Figures come from the provider and can lag
 a few minutes. A blank reading means unknown, never zero.* There is no flexible-spend bar — the
 provider reports no such window, and a third bar reading "—" would invent a limit nobody set.
@@ -219,7 +221,7 @@ note costs one reading, and the next poll reads again. `note` takes the source w
 argument (`'meter'` here); a chat's own `rate_limit_event` files through the same function with
 `'chat'`, under the account its process was launched on (MAN-8859).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage-windows.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage-windows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts
 
 ## MAN-465 — The writes — the door's acts and the sign-in windows
 section: accounts/005 The two writes
@@ -254,7 +256,7 @@ section: accounts/006 The rules that bite
    at. The shared `Dialog` does stop it, because a modal has nothing in front of it.
 
 4. **A door write is unguarded by a dialog; a second write is not.** The soft gate is the fact on
-   the row — *✓ in use now*, and the `no room now —` caveat on a held account (MAN-8847) — rather
+   the row — *✓ In use*, and the `no room now —` warn line on a held account (MAN-8847) — rather
    than a modal. What is refused is a write while one is in flight, read from a ref rather than from
    `busy`, since a render value lands too late to stop a second press in the same tick. The door's
    three acts (`chooseAccount`, `setAuto`, `removeAccount`, through `doorWrite`) share that one guard.
@@ -322,8 +324,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRail
 section: accounts/008 Proving it
 
 `node .verify/panel-fill.mjs` is the browser script this lane has: the wired panel and the rail button
-against the dev client, with `/api/accounts` and `/api/usage` answered by `page.route`, and the real
-Set up sign-in window. Its scenarios, stubs and last run are MAN-8847 §"Proving a state". No door
+against the production client, with `/api/accounts` and `/api/usage` answered by `page.route`, and the real
+Set up sign-in window. Its scenarios, stubs and last run are MAN-9479 §"Proving a state". No door
 write is ever sent, so the operator's live login and account choice are never touched; a gate for a
 write stubs it the way that script does.
 
@@ -336,20 +338,26 @@ stub can reach. See MAN-670.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs
 
-## MAN-9033 — The usage rings on the views rail — UsageRings, Meter's ring face, ringTone, .verify/probe-usage-rings.mjs
+## MAN-9033 — The usage rings — UsageRing on the views rail and in the account rows, Meter's ring face, ringTone, .verify/probe-usage-rings.mjs
 section: accounts/010 The usage rings on the views rail
 
-Two rings at the foot of the views rail, directly above the companion dock, which stands above Inbox (`CompanionDock`, committed since 2026-10-27) — the 5-hour over the week, each labelled with the time left until its window resets ("2h", "4d"). `UsageRings` (accounts module, exported through its barrel, mounted by `WorkspaceRail`'s foot: MAN-9005) draws them with the library's `Meter` in `variant="ring"`. They stand wherever the rail does: docked on a desktop, inside the drawer on a phone (one tree across 768px).
+Two rings at the foot of the views rail, directly above the companion dock, which stands above Inbox (`CompanionDock`, committed since 2026-10-27) — the 5-hour over the week, each labelled with the time left until its window resets ("2h", "4d"). `UsageRings` (accounts module, exported through its barrel, mounted by `WorkspaceRail`'s foot: MAN-9005) draws them with `UsageRing` (`UsageRing.tsx`), the module's one ring, on the library's `Meter` in `variant="ring"`. They stand wherever the rail does: docked on a desktop, inside the drawer on a phone (one tree across 768px).
+
+## `UsageRing` — one ring for the rail and the account rows
+- One piece, two forms, so the rail and the rows never hold a second band rule, countdown or set of words. The rail draws it bare; each account row draws it `captioned` (MAN-8847).
+- **Bare (the rail):** a 32px cell (`size-8`) carrying `data-tone` and `data-usage-ring="<key>"`; the middle holds the countdown, or the window's name ("5h", "wk") when there is none; the hover opens to the right.
+- **Captioned (the rows):** a 48px column (`w-12`, `data-usage-ring="<key>"`) — the same 32px ring cell, then a caption (`data-ring-caption`, 10px, `text-muted-foreground`) naming the window and its countdown: `wk · 3d`, `5h · 40m`, `5h` alone when there is no countdown. The middle holds the figure instead (`92`, `0`; `—` for no figure) — the one visible mark that tells a window at 0% from one nobody measured, on a phone with no hover. The hover opens to the ring's left (a row ring stands at the panel's right edge, where a phone has no room to its right) and wraps inside 11rem (`max-w-44 whitespace-normal` on the bubble): the popover is docked at the window's left edge, and on a 320px phone the 5-hour ring has under 200px to its left, where a one-line bubble (about 290px) ran off the screen. `owner` (the row's slug) opens the ring's accessible name — `sdjesus89: This week. …` — so the rows' rings are told apart by ear; the rail passes none.
+- Which rings an account draws, in order, is `ringWindowKeys(hasFiveHour(row))` (`utils/usageWindows.ts`): the 5-hour then the week, the week alone for a `no_five` account. The rail asks it for the account in use, the rows for each account.
 
 ## What they read
 - `accountInUseUsage(usage, accounts, now)` (MAN-8862) — the SAME reading the panel's top meters draw, so a ring and its meter always show one figure. Never the raw `useAccountsContext().usage`: `GET /api/usage` measures the box's live login, which is not always the account in use, and a ring on it would read under the wrong owner. `now` is `useMinuteTick()`. No fetch, no poll.
 - The figure is `windowPercent(window)` — the integer the meter prints. The colour is judged on that integer, so the tooltip never says 75% beside a green ring.
 - The label is `resetCountdown(resetsAt, now)` (`utils/usageWindows.ts`): ONE unit, rounded up — whole days while a day or more is left, then hours, then minutes ("5d", "4h", "45m"), and "0m" once the reset has passed; a figure that rounds up into the next unit is said in it ("1h", never "60m"; "1d", never "24h"). `now` is the rings' minute tick, so the label moves on once a minute. A ring with no figure keeps its name, "5h" or "wk".
-- The hover words, also the ring's `aria-label` (joined with ". "): `WINDOW_NAMES[key]` ("Current 5-hour window" / "This week"), `windowValue` ("42% used", "was 42% used" for a rolled window), `resetsLine(resetsAt)`. All three helpers are the meters' own (`utils/usageWindows.ts`, `UsageMeters.tsx`).
+- The hover words, also the ring's `aria-label` (joined with ". "): `WINDOW_NAMES[key]` ("Current 5-hour window" / "This week"), `windowValue` ("42% used"), `resetsLine(resetsAt)`. All three helpers are the meters' own (`utils/usageWindows.ts`, `UsageMeters.tsx`).
 - No reading — `usage` null, unreachable with no filed reading under it, a body with no `windows` array, the window absent from `windows`, or a window whose `percent` is absent or not finite (`windowPercent` answers `null`, never `NaN`) — draws the track only: no arc element, no `data-tone`, no `aria-valuenow`, and the words say *No reading yet*. The two cells never go away, so the foot never jumps.
-- A degraded reading and a rolled window dim to `opacity-60`, as the panel's bars do: a red ring on a window that has already reset would be a false alarm.
-- Not a button, no tab stop. The `Tooltip` is the rail's (`position="right"`), on hover and a phone's long press.
-- AN ACCOUNT WITH NO 5-HOUR WINDOW DRAWS THE WEEKLY RING ALONE. The account in use's row carries the door's `no_five` (`claude-account status --json`, MAN-8843): `hasFiveHour(accountInUse(accounts))` is false and the `five_hour` cell is not drawn — no track, no "No reading yet" — and `accountInUseUsage` drops the 5-hour window from the reading the panel's meters draw, so the figures above stay one reading. The flag is the pacer's derivation from the account's stored readings; a window missing from one usage reply (the gap between 5-hour blocks, or a lagging reading that still carries one) does NOT move it: an account without the flag keeps its bare track and an account with the flag draws no 5-hour ring whatever the reply carries. A picture without the key reads as "has a 5-hour window". `.verify/probe-usage-rings.mjs` (c) proves all three with the picture and the reply replaced in the browser only (`noFiveRoutes(state, app)` in `.verify/lib/no-five-routes.mjs`, shared with the Accounts widget probe: MAN-9021).
+- A degraded reading dims to `opacity-60`, as the panel's bars do. A window past its reset never reaches a ring as its old figure: `accountInUseUsage` has already carried it to the 0% window that began at the reset (`windowPastReset`, MAN-8862), so the ring reads 0% at full strength, its label counts down to the stepped weekly reset, and a carried 5-hour ring names no reset and keeps its `5h` label.
+- Not a button, no tab stop. The `Tooltip` opens on hover and on a phone's long press.
+- AN ACCOUNT WITH NO 5-HOUR WINDOW DRAWS THE WEEKLY RING ALONE. The account in use's row carries the door's `no_five` (`claude-account status --json`, MAN-8843): `hasFiveHour(accountInUse(accounts))` is false, `ringWindowKeys` answers the week alone and the `five_hour` cell is not drawn — no track, no "No reading yet" — and `accountInUseUsage` drops the 5-hour window from the reading the panel's meters draw, so the figures above stay one reading. The flag is the pacer's derivation from the account's stored readings; a window missing from one usage reply (the gap between 5-hour blocks, or a lagging reading that still carries one) does NOT move it: an account without the flag keeps its bare track and an account with the flag draws no 5-hour ring whatever the reply carries. A picture without the key reads as "has a 5-hour window". `.verify/probe-usage-rings.mjs` (c) proves all three with the picture and the reply replaced in the browser only (`noFiveRoutes(state, app)` in `.verify/lib/no-five-routes.mjs`, shared with the Accounts widget probe: MAN-9021).
 
 ## The bands — `ringTone(key, percent)` in `utils/usageWindows.ts`, the only place a threshold is written
 It returns the Verve tone the ring's cell carries as `data-tone` (README rule 4); `null` for no figure.
@@ -369,15 +377,17 @@ A figure on a boundary takes the higher colour. The 5-hour yellow comes later be
 
 ## Proof
 `node .verify/probe-usage-rings.mjs before|after`, against the production client (:5184; `scripts/prod-client-build.sh` between the two runs). Logs in as the dev account, drops every preference write and refuses every account write.
-- (a) desktop and phone, light and dark: two rings directly above the rail item under them (the companion dock, else Inbox), the 5-hour over the week, each labelled with a countdown (the 5-hour's in hours or minutes), centred, 28px, 4.5px arc; each figure equals its meter's printed figure (the open Accounts widget, else the account popover); each tone is the band rule's and the arc is painted in that tone's colour; no tab stop; the hover words are in the accessible name; the panel's stacked meters keep their markup; a 560px phone keeps the foot whole while the runs scroll; reduced motion stills the arc; console errors 0.
-- (b) the usage reply replaced in the browser only (`page.route`): the week at 74/75/89/90 → green/yellow/yellow/red, the 5-hour at 79/80/89/90 likewise, resets 2½ hours and 2½ days ahead labelled "3h" and "3d", a reply without the weekly window (its ring keeps its name "wk"), and an unreachable reply.
-- 2026-10-26, with the countdown labels: 73 PASS, 0 FAIL, exit 0.
+- The panel's stacked-meter markup check reads `.vv-meter:not(.vv-meter--ring)`: the rows' rings are another register.
+- (a) desktop and phone, light and dark: the rings the live account in use owes (two, the 5-hour over the week; the weekly alone when the door marks it `no_five`) directly above the rail item under them (the companion dock, else Inbox), each labelled with a countdown (the 5-hour's in hours or minutes), centred, 28px, 4.5px arc; each figure equals its meter's printed figure (the open Accounts widget, else the account popover); each tone is the band rule's and the arc is painted in that tone's colour; no tab stop; the hover words are in the accessible name; the panel's stacked meters keep their markup; a 560px phone keeps the foot whole while the runs scroll; reduced motion stills the arc; console errors 0.
+- (b) the usage reply replaced in the browser only (`page.route`), and the in-use row given a 5-hour window (`no_five: false`) so both rings stand: the week at 74/75/89/90 → green/yellow/yellow/red, the 5-hour at 79/80/89/90 likewise, resets 2½ hours and 2½ days ahead labelled "3h" and "3d", a reply without the weekly window (its ring keeps its name "wk"), and an unreachable reply.
+- The app's anonymous `api.github.com` calls (the star count, the release check) are answered by the harness's `STUBBED_REQUESTS`, as in every probe that builds its own page: GitHub allows 60 an hour per IP and a page past it logs `403 Failed to load resource`, which the console gate would charge to the app.
+- 2026-11-03, prod client build 20261103-142520, the live account in use with no 5-hour window: 69 PASS, 0 FAIL, exit 0. With the door's flag inverted the ring-count check fails, so (a) follows the account's own `no_five`.
 
 ## Traps
 - To fake "no reading" the probe must also blank the in-use row's filed `reading`: with an account in use, an unreachable `/api/usage` still draws that row's reading (MAN-8862), in the meters and the rings alike. A faked healthy reply must carry the in-use account's `digest` for the same reason.
 - `Date.now()` in `UsageRings` is a lint failure (`react/purity`); the clock is `useMinuteTick`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRing.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
 
 ## MAN-469 — The API tab
 section: api-tab/000
@@ -2518,6 +2528,17 @@ own body would have carried. All three paths exist because of what sits in front
 `authenticateToken` answers an expired session with a JSON error, and a proxy answers a bad gateway
 in JSON too.
 
+A body that IS the contract's shape but carries a hole is not thrown away, and it is not judged at the door either: the
+guards live at the readout's read sites (`moneyInWords`, `readAtInWords`), after the usage readings' own rule. An amount
+that is not a string or is no number (`NaN`, `n/a`, `Infinity`), or a currency that is not a non-blank string, is no figure — the row draws `—` over "Balance unknown
+— DeepSeek answered with something this app could not read", never `$0.00` and never a throw (`undefined.trim()` in render
+took the whole app down through the popover). Only an `available` of exactly `false` is the vendor saying the account
+cannot serve requests; an absent one says nothing. A `checkedAt` that names no instant reads "Read at an unknown time".
+Each field is judged on its own, so one missing figure never blanks the rest. The Jev balance beside it
+(`useJevBalance`) follows the same rule where the wire becomes the readout's shape: each of `credit_usd`, `spent_usd` and
+`left_usd` is a finite number or `null`, `balance: null` is still "No credit seeded", and a `balance` that is absent or not an
+object reads "Balance unknown" rather than an absence.
+
 `AccountsProvider` owns the ONE instance and hands the reading to `AccountPanelBody`, which draws it
 between the meters and the account rows — in the popover and in the Accounts widget alike: label, figure, and the line under it. Opening either
 starts no second poller. The panel draws the reading's age as that faint line where the figure has
@@ -2526,7 +2547,7 @@ frozen tab would otherwise hold a five-minute-old number that looks fresh.
 `DeepseekBalanceReadout` is deliberately not a `Meter` — a balance has no limit to be a share of —
 and it is the one component this feature added rather than composed from what was there.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useDeepseekBalance.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/DeepseekBalanceReadout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useDeepseekBalance.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useJevBalance.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/JevBalanceReadout.tsx
 
 ## MAN-514 — The balance log
 section: deepseek-balance/003 The balance log
@@ -3236,9 +3257,10 @@ and the frame the first landing broadcasts fills the tab a moment later. The tic
 store, 2026-10-14: a 5 MB document, 1.4–1.9 s wall (3.2 s before the `stages_by_phase`, `events_by_phase` and
 `events_by_plan` indexes, MAN-1444): 70–95% of the 2 s interval, and a read that runs past it skips the next
 tick; the roadmap's read is 0.3 s. A read that throws leaves the LAST good picture on the tab with one line in the
-journal per distinct message. Each CHANGED picture (and the first after a boot) first settles the follow-ups that name a
-feature or task it shows finished (`closeFollowupsForCompletions`, MAN-9003), then runs the endings and the prompts, then
-broadcasts; a failure of any step costs the tabs nothing.
+journal per distinct message. Each read of the store is first handed WHOLE to the follow-ups lane (`dispatcher-followups.module.ts`
+`settle`, MAN-9144), before the lane's picture is cut from it (`lanePictureOf`): it settles the follow-ups that name a feature, task
+or epic the store shows finished, whatever its age, and files the build gaps of a feature that just finished. Each CHANGED picture
+(and the first after a boot) then runs the endings and the prompts, then broadcasts; a failure of any step costs the tabs nothing.
 
 The keys of that picture this lane treats as a clock rather than as content are `generated_at` and,
 on every plan and every arc, `runtime_s`: the dispatcher derives the first at second resolution on
@@ -3278,13 +3300,16 @@ ONE: the values read through the transport's `…Since` readers (a count, a text
 shape's own empty when the key is missing, so a frame from a dispatcher build that predates a field
 still loads and the control that field would draw is simply not offered. `arc.queue`, `plan.queue_hold`, `plan.model_own` and `route.epics` read `null` when absent (`route.waiting` reads `undefined` and no Start is drawn; `arc.midwalk` reads `false`), and `arc.queue` and `route.epics` read an explicit `null` the same way; one that IS there and does not read is refused by name — `arc.queue.position` must be a whole count from 1 (`isWholeFrom`), `turn` one of `now`, `waiting`, `paused`, `hidden`; `paused` a flag; `running` a whole count from 0. That strictness is measured, not stylistic: the document is
 printed whole by a process that has already exited, so a body that does not match is a DIFFERENT BUILD
-of the dispatcher, never a torn write. This server's three acts on it, and the only three: each plan's
+of the dispatcher, never a torn write. `readDispatcherState` is two steps, each exported: `readDispatcherStore` (the document validated
+WHOLE — every plan and epic of the store, nothing dropped) and `lanePictureOf` (the lane's window onto it). This server's three acts on
+the store, all in `lanePictureOf`, and the only three: each plan's
 `session` is resolved to an app session id (`sessionsDb.resolveAppSessionId`; `null` when the plan names none, and the document's own `session`
 travels beside it), a plan whose `completed_at` is older than 24 h (`ENDED_KEEP_S`) is dropped, and an ARC with no plan left on the lane after that filter is dropped
 with it (`arcsOnLane`): a header standing over nothing is the one shape no later frame would ever
 clear. An arc's plans live on the same urgency-ordered list as every other plan (the header is not a
 grouping), so the drop is asked against the names the LANE kept, and the client joins `plan.arc`
-against the same list from the other side.
+against the same list from the other side. The store, before those acts, is what the follow-ups lane reads (MAN-9144): a plan older
+than 24 h is gone from the picture and still in the store.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-epics.reader.ts
 
@@ -3311,7 +3336,7 @@ section: dispatcher/000/004 The verbs. `POST /plans/:name/stop|resume|park|unpar
 (`ok` is exit 0). **The dispatcher refuses on STDOUT** — `REFUSED <verb> <name>: <reason>` exit 2, a not-found line exit 1 — `no plan <name>` from `drop` and `planner-resume` (`park` and `unpark` word it `REFUSED <verb> <name>: no plan <name>`), `no plan or arc <name>` from the six verbs an arc's own name also reaches (`model`, `stop`, `resume`, `schedule`, `arm-accept`, `disarm-accept`), `no arc <name>` from `queue` — so `stdout` is the field a reader reads first, and `stdout` is also where
 this lane's own sentence goes when the command never answered (`reason` is `timeout` or
 `spawn-failed`). Status: 200 the verb's own answer, 409 a refusal with the result whole (never a
-paraphrase of it), 504 `timeout`, 503 `spawn-failed`; 400 for a name that cannot be one, refused BEFORE any process starts. `PLAN_NAME` is the dispatcher's own name rule (`store.py:NAME_RE`, `^[a-z0-9][a-z0-9-]{0,99}$` — bare, lowercase, hyphenated, no dot), and the name travels on exactly as the URL spelled it: this route refuses what cannot be a name and never rewrites one.
+paraphrase of it), 504 `timeout`, 503 `spawn-failed`; 400 for a name that cannot be one, refused BEFORE any process starts. `PLAN_NAME` is the dispatcher's own name rule (`store.py:NAME_RE` — bare, lowercase, hyphenated, no dot, and none of the three reserved shapes, MAN-1445), and the name travels on exactly as the URL spelled it: this route refuses what cannot be a name and never rewrites one.
 
 **A board verb has no name.** `POST /start` (no body: any key is a 400 `the board's Start takes no body`) relays `dispatcher start` (MAN-8441) — every plan held for its first Start let go at once — and answers `STARTED <k> plan(s)`, or a 409 carrying `REFUSED start: nothing is waiting for its first Start`. `POST /epics { word }` relays `dispatcher epics <word>` (MAN-8425), the epic dial's one word: `1`–`5`, `pause` or `resume`. `runDispatcherVerb('epics', '', [word])` leaves the empty name out of the argv — exactly `["epics", word]` — and the answer carries `plan: ""`. The body is EXACTLY `{ "word": <one of the seven> }`: any other body, a second key included, is a 400 `word must be one of 1, 2, 3, 4, 5, pause or resume`, refused before any process starts. Statuses as every verb: 200, 409 a refusal whole, 504, 503. `POST /hide` and `POST /unhide` (MAN-8492) are the board pair that carry NAMES: the body is EXACTLY `{ "names": [<plan or epic name>, …] }`, one to 200 names each through the arc fence, any other body a 400 `body must be exactly { "names": … }` before any process starts; the argv is `["hide", name, …]` / `["unhide", name, …]`, the answer `HIDDEN <name>` / `SHOWN <name>` per name (an epic's name acts on every open, or every hidden, plan of it) or a 409 carrying the dispatcher's `REFUSED hide|unhide …` whole.
 
@@ -4882,7 +4907,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md,
 section: hosting/002 Rules that bite/001 A client edit is instant (HMR over the page's own host); a server edit hands the API
 
 - **A client edit is instant** (HMR over the page's own host); **a server edit hands the API
-  over.** The supervisor boots the edited server *beside* the running one and retires the old one
+  over, two minutes after the last save under `server/`.** The supervisor waits until no save has landed for two minutes (`DEBOUNCE_MS`), then boots the edited server *beside* the running one and retires the old one
   only once the new one reports READY, so `:3011` is never unanswered: the journal reads
   `[supervisor] change:` → `boot:` → `handover:` → `retired` → `handover complete — serving pid
   <n>`. A broken edit never reaches READY, so the previous server goes on serving and the whole
@@ -6664,7 +6689,8 @@ The events raised today:
 **A failed result raises one event, not two.** A `result` message with `is_error` goes out as
 `run.failed` (or `run.limit`), and the Claude runtime suppresses the `run.stopped` /
 `run.background_completed` it would otherwise have sent beside it: "finished" is not true of a
-turn that crashed.
+turn that crashed. The page is told as well, by the same result handler: an `error` row with the
+cause, then the turn's `complete` with exit 1 (INV-10705).
 
 **A silent run is noticed from outside, because no runtime reports its own hang.**
 `session.stuck` comes from the stall watchdog (`websocket/services/run-stall-watchdog.service.ts`),
@@ -6698,7 +6724,7 @@ reads, and the rules that keep one piece of bad news to one push:
 | `system` / `api_retry` | nothing. The attempt is *recorded*, so the `api.error` that follows can say "overloaded after 3 retries" instead of one push per retry |
 | `assistant` with an `error` | `api.error`; `authentication_failed` and `oauth_org_not_allowed` become `login.expired` instead, `billing_error` becomes `limit.out_of_credits`, and `max_output_tokens` is the model's business and says nothing |
 | `auth_status` with an error, or mid-sign-in | `login.expired`, once per run |
-| `result` that is not `success` | `run.limit` for a max-turns or max-budget ceiling, else `run.failed` — whose body is the cause, with the CLI's own `[ede_diagnostic]` instrumentation line stripped out |
+| `result` that is not `success` | `run.limit` for a max-turns or max-budget ceiling, else `run.failed` — whose body is the cause, with the CLI's own `[ede_diagnostic]` instrumentation line stripped out. Nothing for a result that ended in an interrupt (`terminal_reason` `aborted_streaming` or `aborted_tools`): the person's own Stop is not a crash |
 
 Two memories, different in lifetime. **Per run**: the last retry, and whether this run has
 already said "sign in again". **Per account, one record per rate-limit window, on disk**
@@ -7002,10 +7028,12 @@ also exported from the module's `index.ts` for any caller that has to show an ev
 - `compaction.failed` (an automatic custom compaction that did not take, MAN-8065) reads `Compaction failed`, body `The idle|end-of-turn compaction did not take: <meta.reason>. The chat stays on its current session.` (`meta.trigger` `idle` picks the first word; the `: <reason>` part drops when `meta.reason` is empty).
 - The body is cut at 1,000 characters (`bodyLimit`, default `MAX_BODY_CHARS`): web push refuses a payload over about 4 KB, and the
   orchestrator settles that refusal silently. `bodyLimit` `null` keeps the whole body and the caller owns the bound; the one caller
-  that passes it is the companion's alert for a question card (`AskUserQuestion`, MAN-9069).
+  that passes it is the companion's alert, for the kinds `wholeBodyKind` names: a question card (`AskUserQuestion`, MAN-9069), a plan
+  awaiting approval (`ExitPlanMode`) and a tool permission shown as its JSON input. `null` also lifts the 300- and 600-character
+  excerpts below, which only the push keeps.
 - A tool approval's body is the thing being approved: the Bash command, the path for a file tool,
-  otherwise the tool input as JSON (cut at 300 characters). A question lists its options numbered
-  from 1 in their own order. A plan ready for approval carries its first 600 characters.
+  otherwise the tool input as JSON (cut at 300 characters for the push). A question lists its options numbered
+  from 1 in their own order. A plan ready for approval carries its first 600 characters on the push.
 
 ## MAN-623 — Gotchas
 section: notifications/013 Gotchas
@@ -8362,7 +8390,7 @@ conversations are created — a real `POST /api/providers/sessions`, a real row 
 `chat.edit-send`, `chat.abort` and `chat.subscribe` swallowed inside the page and the seal
 re-proven two-sided right after the reload that turns simple mode on, so a regression that let a
 send slip through would be caught before anything is pressed. Because Phase 2 made the server
-default `true`, `openConsole` itself now PATCHes `simpleChatList: false` right after sign-in and
+default `true`, `openConsole` itself pins `simpleChatList: false` for its own page and
 reloads before it waits for `PROJECT_ROW`, so every earlier phase keeps opening on the project
 tree it always has; `phase-17.mjs` is one of the harnesses that flips the preference to `true`
 itself and back in its own `finally`. `probe-simple-settings.mjs` and `probe-simple-view.mjs` are
@@ -9810,11 +9838,16 @@ Each case prints one `CASE <name> key=value …` line last, under the same rule:
 accepts. Nothing defaults to `true`, and a failed probe is never read as a measured `false` — so a
 case that dies halfway cannot print a passing line.
 
+Every wait that spans a handover is the supervisor's `DEBOUNCE_MS` (two minutes, `deploy/dev-supervisor/watch.mjs`) plus the
+allowance a boot and a retirement need, read from that module so the cases follow it when it moves. A case therefore takes
+minutes: every save waits out the debounce before anything happens, GOOD, BROKEN and READOPT wait it out twice (putting the
+file back is the second save), COALESCE three times. A runner that bounds a case allows ten minutes.
+
 | Case | What it edits | What has to hold |
 |---|---|---|
-| **GOOD** | one newline appended to `server/index.ts` | The successor binds before the predecessor is retired: `old_pid_gone=true new_pid_bound=true single_child=true main_pid_same=true handover_lines=2 index_restored=true`, with `canary_misses` 0 or 1. Two completed handovers, because putting the file back is the second one. `handover_s` is reported, not asserted — about a second here. |
-| **BROKEN** | `export { doesNotExist };` + a call to it | The API never stops answering: `canary_samples_ge80=true canary_misses=0 boot_failed_lines=1 names_error=true old_pid_kept=true recovered_new_pid=true index_restored=true`. The call is what breaks the boot — esbuild elides a bare unresolved export from a `.ts` file, so the export alone boots cleanly. |
-| **COALESCE** | two newlines, a second apart | However the supervisor splits them, one server is left: `surviving_children=1 zombies=0 old_pid_gone=true single_bound=true index_restored=true`, `canary_misses` 0 or 1. One boot or two handovers is not a distinction the CASE line makes — the journal's `change during boot` line does. |
+| **GOOD** | one newline appended to `server/index.ts` | The successor binds before the predecessor is retired: `old_pid_gone=true new_pid_bound=true single_child=true main_pid_same=true handover_lines=2 index_restored=true`, with `canary_misses` 0 or 1. Two completed handovers, because putting the file back is the second one. `handover_s` is reported, not asserted — the debounce plus about a second here. |
+| **BROKEN** | `export { doesNotExist };` + a call to it | The API never stops answering: `canary_samples_ge80pct=true canary_misses=0 boot_failed_lines=1 names_error=true old_pid_kept=true recovered_new_pid=true index_restored=true`. The call is what breaks the boot — esbuild elides a bare unresolved export from a `.ts` file, so the export alone boots cleanly. |
+| **COALESCE** | two newlines, a second apart | However the supervisor splits them, one server is left: `surviving_children=1 zombies=0 old_pid_gone=true single_bound=true index_restored=true`, `canary_misses` 0 or 1. Two saves a second apart are one boot by the debounce, and the case waits one more debounce after the handover for a second cycle to show itself. One boot or two handovers is not a distinction the CASE line makes — the supervisor's `boot:` lines, which `COALESCE.json` carries, do. The supervisor's `change during boot` restart is out of this case's reach, and out of any save's: a second change fires a debounce after a save made once the first had fired, and a boot (30 s at most) and a retirement (10 s at most) end inside that. Only a `reboot` request from the serving API lands on a pending boot, and no case provokes one. |
 | **READOPT** | one newline, under a live session whose background work has not finished | The successor re-adopts only once the predecessor is *gone*: `complete_count=1 handover_ok=true readopted_ge1=true readopt_from_new_pid=true readopt_after_retire=true bg_completed_lines=1 host_gone=true index_restored=true`. Adopting sooner would SIGHUP the very host it inherited; the journal's own ordering against `retired pid <old>` is what proves it did not. |
 | **RESTART** | nothing — `sudo -n systemctl restart cloudcli-server-dev` | The unit still lands the supervisor as MainPID with one child under it: `canary_back_within_5s=true supervisor_is_main=true single_child=true watchdog_sha_same=true`. This one is a real outage, unlike a handover, and it is timed from *before* the command is issued. |
 | `restore` | nothing — it puts the file back | The escape hatch, not a case: prints `RESTORED changed` or `RESTORED unchanged`, waits out the handover a real restore provokes, and measures nothing. |
@@ -9826,13 +9859,15 @@ Four things to know before running one:
   line prints. `^C` and `SIGTERM` restore it on the way out too. A run killed harder than that
   leaves the live file edited — that is what the `restore` verb is for, and it is the first thing
   to run after any interrupted sweep.
-- **`BROKEN` leaves that file unbootable for a full 20 s on purpose.** The previous server answers
-  throughout, and watching it do so *is* the measurement — a window cut short would not have
-  watched it. Its canary samples every 200 ms rather than the default 250, so 80 samples of the
-  window carry slack instead of sitting on the arithmetic maximum.
+- **`BROKEN` leaves that file unbootable for the debounce plus a full 20 s on purpose** — the failing
+  boot itself comes after the debounce. The previous server answers throughout, and watching it do
+  so *is* the measurement — a window cut short would not have watched it. Its canary samples every
+  200 ms rather than the default 250 and asks for 80% of the window's samples, so a sampler slowed
+  by the failing boot has slack.
 - **`READOPT` spends one real Claude turn** on the operator's own credentials and default model,
-  the same cost the keepalive cases carry, and holds its probe session open for about two minutes
-  waiting on background work. It creates and deletes that session however it ends.
+  the same cost the keepalive cases carry, and holds its probe session open for up to 270 s (`--timeout`,
+  the debounce plus 150 s; `--linger` the debounce plus 70 s) waiting on background work that outlasts the handover. It creates and
+  deletes that session however it ends.
 - **`RESTART` needs passwordless sudo** (`sudo -n systemctl …`) and takes the API down for real.
   Run the whole matrix solo, when nobody is in the app — the keepalive cases' rule, for the same
   reason.
@@ -10119,7 +10154,7 @@ section: verification/009 What bites people
 |---|---|
 | **Dev account** | `verve` / `verve-dev-2026`, created through the real setup form on the first run. To start over, delete `~/.cloudcli/auth.db` (an operator act) and run the harness again. |
 | **One dev user, so two runs collide** | Every phase signs in as that one account, and `phase-4.mjs` changes its *server-side* preferences mid-run — hiding and revealing the Shell tab, toggling `tasksEnabled` — then restores them inline and asserts it did. Two `all.mjs` runs at once therefore read and overwrite each other's half-done state, which surfaces as a regression rather than as the collision it is: run the harness solo. The restore being inline rather than in a `finally` also means a run that dies part-way leaves the dev user non-default — re-run the phase, or put the switches back by hand. |
-| **Every probe that calls `openConsole` writes the dev account's preferences** | Two writes, both against the dev account `verve`, before any probe's first gate. `parkOnProjectTree` (`.verify/lib/console.mjs`) PATCHes `/api/user/preferences` with `simpleChatList: false` through the page's own token, because that view hides the `PROJECT_ROW` every probe waits on. `ensureTheme` drives Settings → **Appearance** → **Dark Mode** whenever the stored theme disagrees with the run's, which rewrites the stored theme — so each run leaves the dev user on whichever mode ran last. No other account is touched: no probe signs in as anything but `verve`. A preference read back after a probe signs in is therefore a value the harness itself set, and a probe that asserts a default it never set is reading the harness's write as the app's. Other stored preferences the harness leans on are **pinned, not written**: `openConsole` lays `userLanguage: 'en'`, `uiPreferences.sidebarVisible: true` and `uiPreferences.hideFilesTab` / `hideGitTab` / `hideBrowserTab` as `false` over the account's own preference read for its own pages (`.verify/lib/prefs-pin.mjs`, `openConsole({ preferences })`; `null` opts out), so a probe that died mid-collapse, a session that flipped the language or an account left hiding a rail button cannot leave the next run without a Settings button, a project row or a `railButton('Git')`; a probe whose subject is a Hide switch lays its own value over the pin (MAN-674). A third, the composer's provider (`selectedProvider`), is rewritten by opening any conversation and is not pinned by default: INV-7428. |
+| **`openConsole` writes the dev account's theme, and nothing else** | One write, against the dev account `verve`, before any probe's first gate: `ensureTheme` drives Settings → **Appearance** → **Dark Mode** whenever the stored theme disagrees with the run's, which rewrites the stored theme — so each run leaves the dev user on whichever mode ran last. No other account is touched: no probe signs in as anything but `verve`. A theme read back after a probe signs in is therefore a value the harness itself set, and a probe that asserts a default theme it never set is reading the harness's write as the app's. Every other stored preference the harness leans on is **pinned, not written**: `openConsole` lays `userLanguage: 'en'`, `uiPreferences.sidebarVisible: true`, `uiPreferences.hideFilesTab` / `hideGitTab` / `hideBrowserTab` as `false` and, when it selects a project, `simpleChatList: false` (the simple list hides the `PROJECT_ROW` every probe waits on; a caller's own `simpleChatList` wins; `project: false` lays none; a probe whose SUBJECT is the stored `simpleChatList` calls `await session.releaseProjectTree()`, which lets go of the key and answers the `putBack()` that restores the account's value in its `finally`; the put-back PATCHes the live `API_URL` whatever `appUrl` says, so a probe on a scratch stack never calls it) over the account's own preference read for its own pages, in the context's BASE pin (`pinPreferences(…, { base: true })` in `.verify/lib/prefs-pin.mjs`: a pin a probe lays on that context later answers with the base underneath its own values, later wins per key, so a probe's own pin names only what it changes and the project tree survives it; `.verify/lib/prefs-pin.mjs`, `withProjectTree` in `.verify/lib/console.mjs`, `openConsole({ preferences })`; `null` opts out of all but the `simpleChatList` key), so a probe that died mid-collapse, a session that flipped the language or an account left hiding a rail button or on the simple list cannot leave the next run without a Settings button, a project row or a `railButton('Git')`, and the account's stored sidebar mode stays its owner's; a probe whose subject is a Hide switch lays its own value over the pin (MAN-674). The composer's provider (`selectedProvider`) is rewritten by opening any conversation and is not pinned by default: INV-7428. |
 | **Headless Chromium paints no scrollbars** | `chromium.launch()` passes `--hide-scrollbars`, so a probe that measures a scrollbar gutter reads zero and one that photographs a scroll pane shows none. `openConsole({ launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } })` launches without it (`probe-widget-scrollbars.mjs`). The harness's own init script is guarded for the same family of surprise: it runs in every frame, and a sandboxed widget frame's `localStorage` read throws. |
 | **A tall screenshot turns a phone's pointer into a mouse** | In a context made with `isMobile` and `hasTouch`, a screenshot that does not fit the viewport (an element taller than it, `fullPage: true`, or any shot of a page with no viewport meta, whose layout is 980 px wide) leaves the page reading `(pointer: coarse)` false and `(hover: hover)` true for the rest of its life; a shot that fits the viewport, a tap and `page.mouse.move` do not (measured 2026-10-17, Playwright's Chromium). A phone probe that photographs a tall host and then measures touch geometry or hover paint therefore reads the desktop rules, as the proving tables' phone proofs did. Measure before the first tall shot, or after it send `Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 1 })` through `context.newCDPSession(page)`, which puts both back. |
 | **A route handler that awaits `route.fetch()` ends the probe when the browser closes under it** | `route.fetch` rejects (`route.fetch: Request context disposed.`) and nobody awaits the handler's promise, so Node 24 crashes a probe that had printed every reading: `Exit code 1` with a stack, after the work was done. Of the five such ledger rows of 10-06 to 10-09 one came from a lib and four from throwaway scripts, so there are two doors. A LIB or phase wraps the handler in `guardRoute(label, handler, { fault })` (`.verify/lib/guard-route.mjs`): a teardown race (Playwright's own `Request context disposed` / `Target … closed` wording, never a `TypeError` that merely names a property `closed`) is silent; any other throw is said once, sets exit code 1, and the request is aborted (`fault: 'abort'`, the default, for a fixture the page must never replace with the real reply) or answered with the real reply, the fetched one when it fetched, never sent twice (`'passthrough'`). `ask-lane.mjs`, `settings-rows-walk.mjs` (abort) and `prefs-pin.mjs`, `update-run-kit.mjs`, `phase-18.mjs` (passthrough) use it. A SCRIPT that routes without it closes with `await closeBrowser(browser)` from the same file, not `browser.close()`: it calls `context.unrouteAll({ behavior: 'ignoreErrors' })` first, and the same bare handler exits 0 with it and 1 without. A handler that answers at once with a constant has no window and needs none. |
@@ -10453,6 +10488,7 @@ section: The dispatcher lane — the prompts a plan owes the operator, raised fo
 A BOOK of what THIS process has put up, kept off every picture's `asking` keys. Records are `{ promptKey, ask, input, session: AskSession | null, receivedAt }`. Each distinct open ask is raised exactly once, whatever session it names.
 - A raise is two things: the book's record, and — unless the durable record holds the name (below) — one `permission.required` push (`AskPush`) with the runtime's own meta — `toolName: 'AskUserQuestion'`, `toolInput`, `promptKey`, `sessionName` — plus `plan` and `askKind`, so the phone gets its buttons (MAN-618). `meta` carries no `requestId`; `provider` is `session?.provider ?? 'system'`, `sessionId` `session?.sessionId ?? null`.
 - Nothing is sent to a chat: no `permission_request` frame, no place in `chat_subscribed`'s `pendingPermissions`, no sidebar mark. A prompt retracts silently: `retract` drops the book's record and the phone's buttons (`forgetButtons`); the durable record is not its business.
+- `isOpen(promptKey)` is a synchronous read of the book: `raised.has(promptKey)`. The book retracts an ask the moment an answer is carried (`carryEntry` retracts before the verb runs) and when a picture shows it closed, so it is false for an ask answered a moment ago even while the next picture still carries it. Read through the house (`CompanionHouse.askOpen`, MAN-9142) by Kaylee's alert feed, which drops an Accept's alert that was answered before she could say it (MAN-9069).
 - THREE ENTRIES ANSWER A BOOK RECORD, one per door: the phone's tap (`answer`, through the gateway), the card's `answerFromCard` and Kaylee's `answerOnHisWord(ask, reply, press)` (returned beside `observe`, `show`, `gateway` and `answer`). The third looks the ask up by `keyOf(ask)` exactly as the card's does (`catchUp` for a key the book does not hold), carries the BOOK's record through `carryEntry` with door `kaylee` and the press, and answers the `CarriedAnswer { outcome, said }`; no HTTP shape. A key being carried, answered, known closed or absent after the read, or a reply that does not fit the prompt, is `refused` "that prompt changed since you read it back; read it again". MAN-8494 holds the door's rules; the press's record: MAN-9152.
 - Gateway: `registerPermissionGateway(asks.gateway)` (provider registry) with `{ resolve, recall }` only. `resolve` answers the phone's tap; `recall` reads the prompt a token names. `listPending` and `listPendingSessions` are OPTIONAL on `ProviderRuntimePermissionGateway` (`server/shared/types.ts`) and the dispatcher's declares neither; the registry's readers call them optionally (`gateway.listPending?.(sessionId) ?? []`) because a plan's prompt is pending in no chat.
 - THE NAME IS THE ASK (`keyOf`, `isAskKey`, `dispatcher-ask-names.service.ts`): `dispatcher:lock:<token>:<id>-<stamp>` for an Accept (the id its LEAD plan's) and `dispatcher:questions:<plan>:<id>-<stamp>` for a questions round. Derived from the store's record of the `asked` event, never minted: identical in every process. The book, the push and its buttons, the card's door and the lane's bell all key on it.
@@ -11078,11 +11114,24 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/planner-
 | `id` | TEXT PK | `randomUUID()`, minted by the repository |
 | `user_id` | INTEGER NOT NULL | FK `users(id)` `ON DELETE CASCADE` |
 | `title`, `description` | TEXT NOT NULL | |
+| `client_key` | TEXT | the `Idempotency-Key` of the create that made the row; NULL for a row made without one (the notes command, and every row from before the column) |
 | `created_at` | TEXT NOT NULL | ISO-8601 UTC with ms; orders the list; never moves |
 | `updated_at` | TEXT NOT NULL | ISO-8601 UTC with ms; last save; equals `created_at` on a fresh row |
 
 Index: `ix_notes_user_created` on `(user_id, created_at)` — the one read, an account's notes newest first.
+Index: `ux_notes_user_client_key`, UNIQUE on `(user_id, client_key) WHERE client_key IS NOT NULL` — one row per key per account, so a repeated create key cannot make a second note. Partial, so NULL keys never collide. Its SQL is `NOTES_CLIENT_KEY_INDEX_SQL`, NOT part of `NOTES_SCHEMA_SQL`: that script runs before the column exists on a database that already had the table, and `addNotesClientKeyColumn` (`migrations.ts`) adds the column and then runs the index, every boot.
 References `users` only: no `board_id`, not a kanban table, not a preference document.
+
+`note_save_orders` — the newest save order each writer has had applied to a note, in the same script (`NOTES_SCHEMA_SQL`; a new table, so `IF NOT EXISTS` makes it live on a database that already holds `notes` and no migration step is needed):
+
+| Column | Type | Rule |
+|---|---|---|
+| `note_id` | TEXT NOT NULL | FK `notes(id)` `ON DELETE CASCADE` — the marks leave with the note |
+| `writer` | TEXT NOT NULL | one open tab (`SAVE_WRITER` in `useNoteSaver.ts`); PK with `note_id` |
+| `seq` | INTEGER NOT NULL | the highest `seq` of that writer applied to the note |
+| `applied_at` | TEXT NOT NULL | ISO-8601 UTC with ms; a mark older than a day is dropped by the next claim on the same note (`ORDER_MEMORY_MS`) |
+
+The compare and the remember are one statement (`claimOrder`: `INSERT … ON CONFLICT (note_id, writer) DO UPDATE … WHERE excluded.seq > note_save_orders.seq`), true when a row changed; an older `seq` changes none. The wire side is MAN-7517 § Save order.
 
 ## `notes` — changing a column
 
@@ -11092,22 +11141,23 @@ References `users` only: no `board_id`, not a kanban table, not a preference doc
   in `migrations.ts`.
 - `why:` a scratch database is created empty and builds the new shape, so a bare edit passes every
   scratch check and fails only on a real database that has the old one.
-- `NOTE_COLUMNS` in `notes.db.ts` is the one column spelling every `SELECT` and `RETURNING` uses; re-spell it with the column.
+- `NOTE_COLUMNS` in `notes.db.ts` is the one column spelling every `SELECT` and `RETURNING` uses; re-spell it with the column. `client_key` is deliberately NOT in it: it is a write-side key, `NoteRow` and the wire never carry it.
 
 ## `notesDb` — `repositories/notes.db.ts`
 
 Exported with `NoteRow` from `@/modules/database/index.js`. Each method takes `getConnection()` inside
-itself, opens no transaction, is parameterized, and is scoped to the account.
+itself, is parameterized, and is scoped to the account. `create` and `update` run in one `immediate` transaction, so an order's claim and the write it allows are one: a refused write leaves no mark and a failed one no claim. The others open none.
 
 | Method | Answers | Account binding |
 |---|---|---|
 | `listForUser(userId)` | `NoteRow[]`, `created_at DESC, rowid DESC` | `WHERE user_id = ?` |
-| `create({ userId, title, description })` | the row as stored | `user_id` in `VALUES` |
-| `update(userId, id, { title, description })` | `NoteRow` read back, or `null` | `WHERE id = ? AND user_id = ?` |
+| `get(userId, id)` | `NoteRow` or `null` — the one note, no write | `WHERE id = ? AND user_id = ?` |
+| `create({ userId, clientKey, title, description, order? })` | `{ row, created, applied }` — the row as stored; with a `clientKey` the account has used, no insert, `created: false`, and the row that key made: unchanged when `order` is absent, not newer than the writer's last, or the same text (`applied: false`), rewritten with this text when `order` is newer (`applied: true`). An inserted row remembers its `order` | `user_id` in `VALUES` and in the conflict target |
+| `update(userId, id, { title, description }, order?)` | `{ row, applied }` — the row read back, `applied: false` and the row as it stands when `order` is not newer than the writer's last — or `null` | `WHERE id = ? AND user_id = ?` |
 | `remove(userId, id)` | `true` if a row of that account was deleted, else `false` | `WHERE id = ? AND user_id = ?` |
 
 - An id of another account reads as no row: `update` answers `null`, `remove` answers `false`.
-- `update` answers exactly `NoteRow | null`; never `undefined` (a row deleted between write and read-back is `null`).
+- `update` answers exactly `NoteWrite | null`; never `undefined` (a row deleted between write and read-back is `null`).
 - `rowid DESC` in `listForUser` keeps two notes made in one millisecond in a stable order.
 - `NoteRow` is the stored shape, `user_id` included; camelCase mapping is the caller's.
 
@@ -11189,7 +11239,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/de/side
 
 ## MAN-7513 — Notes — the wire shapes and the locale keys
 
-## `Note`, `NoteInput` — one text in two files
+## `Note`, `NoteInput`, `SaveOrder` — one text in two files
 
 Declared in the NOTES block of `src/shared/types.ts` and `server/shared/types.ts`, member for member.
 A change to either shape belongs in both files at once. Field detail lives in the declarations' comments.
@@ -11198,6 +11248,7 @@ A change to either shape belongs in both files at once. Field detail lives in th
 |---|---|---|
 | `Note` | `id`, `title`, `description`, `createdAt`, `updatedAt` (all `string`) | `createdAt` orders the list and never moves; `updatedAt` is the last save; both ISO-8601 UTC with ms |
 | `NoteInput` | `title`, `description` | the whole of both fields on both writes, never a patch; also the shape of a draft |
+| `SaveOrder` | `writer`, `seq` (`string`, `number`) | the order a save carries as the `Save-Order` header, `<writer>:<seq>`: `writer` names one open tab, `seq` counts its sends from 1; the server writes no save whose `seq` is not above the writer's last applied one for that note (MAN-7517). Not a body field |
 | `NoteSaveStatus` | `'saving' \| 'saved' \| 'titleNeeded'` | client only: a card's quiet saving line (`src/shared/types.ts`, not mirrored in `server/shared/types.ts`) |
 | `NoteSaveOutcome` | `'saved' \| 'blocked' \| 'failed'` | client only: how one card's autosave ended (MAN-8998) |
 
@@ -11336,7 +11387,7 @@ A second door sits beside it for the `notes` command a chat runs: `app.use('/api
 
 | File | Owns |
 |---|---|
-| `notes.routes.ts` | `createNotesRoutes(service: NotesService): Router` — transport shape only: the caller is an account, `title` and a present `description` are strings, `:id` is a path parameter |
+| `notes.routes.ts` | `createNotesRoutes(service: NotesService): Router` — transport shape only: the caller is an account, `title` and a present `description` are strings, `:id` is a path parameter, the `Idempotency-Key` and `Save-Order` headers are shaped like what they are |
 | `notes.command-routes.ts` | `createNotesCommandRoutes(service)` — the command door (MAN-8993) |
 | `notes.service.ts` | `notesService` (`list`, `get`, `create`, `update`, `remove`) and `NotesService = typeof notesService` — normalise, then judge, then write; module-private `toNote` and `broadcastNotesChanged`. The barrel exports `notesService` to Kaylee's `read_notes`, which calls `list` and `get` only (MAN-9160) |
 | `notes.module.ts` | `createNotesModule(): { userRouter, commandRouter }` — one `notesService` instance handed to both route files; links `~/.local/bin/notes` |
@@ -11351,16 +11402,21 @@ Success: `{ success: true, data }`. Failure: `{ success: false, error: { code, m
 | Route | Body | Answers |
 |---|---|---|
 | `GET /api/notes` | — | 200 `Note[]`, newest first |
-| `POST /api/notes` | `NoteInput`; `description` optional, absent is `''` | 201 `Note`, `createdAt === updatedAt` |
-| `PUT /api/notes/:id` | `NoteInput`, whole, never a patch | 200 `Note` as saved |
+| `POST /api/notes` | `NoteInput`; `description` optional, absent is `''`. Optional headers `Idempotency-Key` and `Save-Order` (below) | 201 `Note`, `createdAt === updatedAt` — for a repeated key, 201 and the note that key made, as it stands |
+| `PUT /api/notes/:id` | `NoteInput`, whole, never a patch. Optional header `Save-Order` (below) | 200 `Note` as saved — for a save refused by its order, 200 and the note as it stands |
 | `DELETE /api/notes/:id` | — | 200 `{ deleted: true }` |
 
-## Refusals
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.command-routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts
+
+## MAN-9501 — Notes — the API at /api/notes and the notes_changed frame — Refusals
+section: Notes — the API at /api/notes and the notes_changed frame/001 Refusals
 
 | Code | Status | Raised in | When | `message` |
 |---|---|---|---|---|
 | `USER_REQUIRED` | 401 | routes | `request.user.id` is not an integer above 0 | Authenticated user is required. |
 | `INVALID_REQUEST_BODY` | 400 | routes | `title` not a string; `description` present and not a string (`null` included) | `title must be a string.` / `description must be a string.` |
+| `INVALID_IDEMPOTENCY_KEY` | 400 | routes | `POST` carries an `Idempotency-Key` that is not 16 to 128 letters, digits, `_` or `-` (two such headers fold into one value and fail the same way) | `Idempotency-Key must be 16 to 128 letters, digits, "_" or "-".` |
+| `INVALID_SAVE_ORDER` | 400 | routes | `POST`/`PUT` carries a `Save-Order` that is not `<writer>:<seq>` — a writer of 16 to 128 letters, digits, `_` or `-`, a seq that is a whole number from 1 to 15 digits | `Save-Order must be "<writer>:<seq>": a writer of 16 to 128 letters, digits, "_" or "-", and a whole number from 1.` |
 | `TITLE_REQUIRED` | 400 | service | the normalised title holds nothing the eye can see — empty, or nothing left once whitespace, format and control characters are stripped | A note needs a title. |
 | `TITLE_TOO_LONG` | 400 | service | normalised title over 200 characters | A title can be 200 characters at most. |
 | `DESCRIPTION_TOO_LONG` | 400 | service | normalised description over 20,000 characters | A description can be 20,000 characters at most. |
@@ -11368,6 +11424,26 @@ Success: `{ success: true, data }`. Failure: `{ success: false, error: { code, m
 
 - `why:` the routes judge whether a field is text; the service judges whether the text is usable, so every caller gets the same refusal.
 - A `null` description is refused, not coerced to `''`; only an absent key is the empty string.
+
+## Idempotent create — `Idempotency-Key`
+
+- `POST /api/notes` may carry `Idempotency-Key`. The key is stored on the row (`client_key`, MAN-7510); a `POST` whose key the account has already used inserts nothing and answers 201 with the note that key made, as it stands now. The repeat's own text is judged (a refused repeat is refused); whether it is WRITTEN is the `Save-Order`'s to say (next section) — with no order it never is, and no `notes_changed` frame is sent, because the original create already sent it. No header is a plain create, which is what the notes command's door (`add`) does.
+- `why:` a create whose answer never arrives (the connection dropped, an unreadable body, a proxy's 504) may have landed, and the card that sent it is not bound to a note it was never told about; its retry without a key made a second note.
+- The tab's blank card (`useNoteSaver.ts`, MAN-8998) mints one key (`randomHexId`, 32 hex characters) at its first create and sends the same key on every retry of that create; the key is dropped once a create lands, and a note deleted elsewhere is recreated under a NEW key. The retry carries the newest text and an order newer than the first attempt's, so the server writes it to the note the first attempt made (next section). A card cleared of every word lets go of the key: the next text is a new note, never a rewrite of the first.
+- Measured 2026-11-03 on the live app as the dev account, Playwright `route.fetch()` then `route.abort()` on the first create: one row in `notes` after the drop, still one row after the retry (same key on both `POST`s; the retry carries the newest text and the server writes it to that row, so no `PUT` follows); the same flow with the header removed leaves two rows.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.command-routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts
+
+## MAN-9502 — Notes — the API at /api/notes and the notes_changed frame — Save order — `Save-Order`
+section: Notes — the API at /api/notes and the notes_changed frame/002 Save order — `Save-Order`
+
+- `POST /api/notes` and `PUT /api/notes/:id` may carry `Save-Order: <writer>:<seq>`. `writer` names one open tab (the tab mints 32 hex characters per page load), `seq` counts that tab's sends from 1, across every card, and rises with the age of the text sent. The server keeps, per note and writer, the highest `seq` it applied (`note_save_orders`, MAN-7510) and WRITES NO SAVE whose `seq` is not above it: an older text arriving late. Such a save is answered as if it had landed — 200 (201 for a create) and the note as it stands — and sends no `notes_changed` frame; the tab reads a save that landed, and its newer text, already applied, is what the note holds. The writer is minted per page load, so this covers one page load: a request a page left in the network and then reloaded is the old writer's and is never compared with the new page's saves.
+- `why:` a tab sends one request at a time, except when the page is going away: the newest text goes out beside the one in the air, and the older request can reach the server last. Without an order it wrote the older text over the newer one and a closed page never repaired it.
+- A create under a key the account has used before, with an order newer than the writer's last applied one, REWRITES that note with its text (a retry carries what was typed after a lost first attempt) and sends the frame; with a text the note already holds it writes nothing. A create that inserts remembers its order, so the first attempt arriving after its own retry writes nothing.
+- Orders of two writers are never compared. Two devices on one note stay last-arrival-wins as they always were, and the second-device rule (a clean open card follows the other device's save, MAN-8998) is the client's and unchanged. The one thing the order adds across devices: a writer's old save arriving after ANOTHER device wrote is still refused when that writer's own newer save was applied, because its mark outlives the other device's write.
+- A write with no `Save-Order` always writes (the notes command's door, a script, a tab from before the header). A header that is there and malformed is refused 400 `INVALID_SAVE_ORDER`, never ignored. A refused order claims nothing, and a note that is not there is 404 whether or not an order came.
+- A writer's mark is dropped a day after its last save of the note and with the note itself (`ON DELETE CASCADE`): no request is in the air that long.
+- Measured 2026-11-03 on the live API as the dev account: update `W1:5` applies, `W1:4` after it answers the note as stored and writes nothing, `W2:1` (a lower seq, another writer) lands, `W1:3` after that is still refused, `W1:6` lands; create `W1:11` then the first attempt `W1:10` makes one note holding the newer text; create `W1:20` then its retry `W1:21` leaves one note holding the retry's text; a malformed header is 400; marks 4 → 0 after the notes were deleted.
 
 ## Normalisation
 
@@ -11379,7 +11455,10 @@ Success: `{ success: true, data }`. Failure: `{ success: false, error: { code, m
 - `TITLE_MAX` and `DESCRIPTION_MAX` are mirrored by `TITLE_MAX_LENGTH` and `DESCRIPTION_MAX_LENGTH` in `NoteForm.tsx` (MAN-7518); the client build cannot import from `server/`. Change one, change both.
 - A title of only characters that draw as nothing — whitespace, format characters (U+200B ZERO WIDTH SPACE and its family, which `\s` misses; U+200C/U+200D included), control characters — answers 400 `TITLE_REQUIRED`: the check strips those classes and refuses when nothing is left. The stored text is never rewritten, so a ZWJ inside an emoji and the ZWNJ of Persian, Arabic and Indic text survive it; `DRAWS_AS_NOTHING` in `useNoteSaver.ts`, which keeps such a title from being sent, is the mirror (MAN-7521).
 
-## `readAuthenticatedUserId` — the account reader
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.command-routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts
+
+## MAN-9503 — Notes — the API at /api/notes and the notes_changed frame — `readAuthenticatedUserId` — the account reader
+section: Notes — the API at /api/notes and the notes_changed frame/003 `readAuthenticatedUserId` — the account reader
 
 - `server/shared/utils.ts`, used by `notes.routes.ts` and `followups.routes.ts` (MAN-9003): same shape and same 401 `USER_REQUIRED` as `readUserId` in `scheduled-messages.routes.ts`, but it REFUSES where that one coerces.
 - Accepts a `number` that `Number.isInteger` and is above 0. Refused: `'1'`, `null`, `true`, `[]`, `1.5`, `0`, no `user`.
@@ -11391,7 +11470,7 @@ Success: `{ success: true, data }`. Failure: `{ success: false, error: { code, m
 
 - Shape: `NotesChangedEvent` = `{ kind: 'notes_changed'; at: number }`, `at` epoch ms; declared in `server/shared/types.ts` and a member of `GatewayEventKind`.
 - No `seq`, no `sessionId`: it never becomes a transcript row, so `useChatRealtimeHandlers` needs no edit.
-- Sent once per write that landed — create, update, delete — after the write. A refused write (400, 404) and a read send none. Every autosave of a card is one update (`updated_at` moves, `created_at` and the order never do), so typing in an open note sends one frame per pause, not one per keystroke.
+- Sent once per write that landed — create, update, delete — after the write. A refused write (400, 404), a save its order refused, and a read send none. Every autosave of a card is one update (`updated_at` moves, `created_at` and the order never do), so typing in an open note sends one frame per pause, not one per keystroke.
 - Goes to every client in `connectedClients` whose `readyState` is `WS_OPEN_STATE`; `JSON.stringify` once, a catch per client. It copies `broadcastKanbanEvent`.
 - No per-account filter: the frame names no note and no account. A client that hears it reads its own list again.
 - `broadcastNotesChanged` and `toNote` are module-private; export one at its declaration when a second file needs it.
@@ -11609,7 +11688,7 @@ Two contexts. `why:` the list changes when a read lands, a draft on every keystr
 |---|---|
 | `composer: NoteInput` | the blank card's draft; never replaced by what the server answered |
 | `composerNoteId: string \| null` | the note the blank card has become, from the landing of its first save until `finishComposer`; `NotesList` leaves that note out of the wall while it is set |
-| `createBaseline: ReadonlySet<string> \| null` | the ids the wall held when the blank card's first save left, until its answer (or failure) arrives; `NotesList` hides every note outside it, because the server's frame can bring the new note into the list before the answer names it |
+| `createBaseline: ReadonlySet<string> \| null` | the ids the wall held when the blank card's first save left, until its answer arrives, and past a failure that may still have made the note (a lost answer) until a retry lands or the card is cleared of every word; `NotesList` hides every note outside it, because the server's frame can bring the new note into the list before the answer names it |
 | `edits: Record<string, NoteInput>` | drafts over notes by id; a card is in edit mode exactly while it has an entry |
 | `writing: Record<string, true>` | note ids with a delete in flight |
 | `saveStates: Record<string, NoteSaveStatus>` | each card's quiet saving line, by `COMPOSER_TARGET` (`'composer'`) or note id: `saving`, `saved`, `titleNeeded`; no entry says nothing |
@@ -11649,18 +11728,20 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude
 ## MAN-8998 — Notes — the client provider: contexts, reads, writes, drafts — Notes provider — the autosave (`hooks/useNoteSaver.ts`)
 section: Notes — the client provider: contexts, reads, writes, drafts/003 Notes provider — the autosave (`hooks/useNoteSaver.ts`)
 
-A LANE is one open card's writer: the blank card's (`COMPOSER_TARGET`) or a note's (its id). It keeps the newest typed text (`latest`), the text the server is known to hold (`saved`, as typed — never what the server answered), a quiet-period timer, at most one flight, and the note it writes to (`noteId`; null until the blank card's first save creates one). A lane lives exactly while its card is open: `openEdit` makes a note's, the first keystroke makes the blank card's, and the provider ends a lane when its `edits` entry leaves (`saver.retain`), on `finishEdit` / `finishComposer` and on `remove`.
+A LANE is one open card's writer: the blank card's (`COMPOSER_TARGET`) or a note's (its id). It keeps the newest typed text (`latest`), the text the server is known to hold (`saved`, as typed — never what the server answered; `null` before the first save), a quiet-period timer, at most one flight, and the note it writes to (`noteId`; null until the blank card's first save creates one). A lane lives exactly while its card is open: `openEdit` makes a note's, the first keystroke makes the blank card's, and the provider ends a lane when its `edits` entry leaves (`saver.retain`), on `finishEdit` / `finishComposer` and on `remove`.
 
 | Fact | Value |
 |---|---|
 | quiet period | `AUTOSAVE_DELAY_MS = 1000`: every keystroke resets the timer |
 | at once | `saveComposerNow`, `saveEditNow`, `finishComposer`, `finishEdit`; the card's `onLeave` (focus off, unmount) and `onSaveNow` (window blur); `saver.leave()` on `visibilitychange` to hidden and on `pagehide` |
-| a save | `api.notes.create(draft)` for a lane with no `noteId`, else `api.notes.update(noteId, draft)`; both `keepalive: true` while the JSON body of the draft is at most `KEEPALIVE_BODY_MAX_BYTES = 60_000` bytes (browsers refuse a keepalive body over 64 KiB; a longer note saves the ordinary way and does not outlive a closing page) |
+| a save | `api.notes.create(draft, key, order)` for a lane with no `noteId` (`key` and `order`: the next two rows), else `api.notes.update(noteId, draft, order)`; both `keepalive: true` while the JSON body of the draft is at most `KEEPALIVE_BODY_MAX_BYTES = 60_000` bytes (browsers refuse a keepalive body over 64 KiB; a longer note saves the ordinary way and does not outlive a closing page) |
 | title that draws as nothing | never sent: `blocked`, line `titleNeeded` (a blank card with nothing typed says nothing); `DRAWS_AS_NOTHING` mirrors the service's class |
-| order | a lane's `drain` is one loop: send the newest text, and when it lands read `latest` again, until `saved` equals `latest`; typing during a flight therefore costs one more save after it, carrying the newest text, and a `flush` while a flight is up is handed that same flight. There is never a second request in the air to overtake the first — except when the page is going away (next row) |
-| the page going away | `saver.leave()`: a lane with nothing in the air flushes at once; a note's lane with a save in the air also sends its newest text as one more `update` with `keepalive` (the loop's next request would go out only after an answer the closing page may never see), unless the request in the air or the last leave already carries that text and unless its title draws as nothing. The two events of one close (`visibilitychange`, `pagehide`) send it once. A blank card whose create is still in the air has no id to update, so what was typed after the create left is not sent. The in-flight save left first, so the server normally has it first; a request that overtook it would be written over by it only on a page that is still alive, and there the loop then sends the newest text again |
+| order | a lane's `drain` is one loop: send the newest text, and when it lands read `latest` again, until `saved` equals `latest`; typing during a flight therefore costs one more save after it, carrying the newest text, and a `flush` while a flight is up is handed that same flight. There is never a second request in the air to overtake the first — except when the page is going away (the row after next), and there the server keeps the order (next row) |
+| the save order | every create and update, the leave's included, carries `Save-Order: <writer>:<seq>`, built by `nextSaveOrder()` at the moment the request is made: `writer` is `SAVE_WRITER`, one `randomHexId()` per page load, and `seq` counts that page's sends from 1 across every lane, so it rises with the age of the text sent (each send takes the lane's newest text). The server keeps, per note and writer, the highest `seq` it applied and writes no save whose `seq` is not above it: that save is answered 200 with the note as it stands, the page reads it as landed, and the text already applied stands (MAN-7517). Two pages are two writers and are never compared — nor is a page and the reload that replaced it, so a request the old page left in the network can still land over the new page's save; another device's save still lands on arrival and a clean card still follows it (`rebase`). The order is not a lock — a live page's later save of its newest text still writes over another device's, as it always did |
+| the page going away | `saver.leave()`: a lane with nothing in the air flushes at once; a note's lane with a save in the air also sends its newest text as one more `update` with `keepalive` (the loop's next request would go out only after an answer the closing page may never see), unless the request in the air or the last leave already carries that text and unless its title draws as nothing. The two events of one close (`visibilitychange`, `pagehide`) send it once. A blank card whose create is still in the air has no id to update, so it sends the create again under the same key (`createKey`) with the newest text: the server writes that text to the note the first create made, or makes the note with it if the first never arrived. After a lost first save nothing is in the air, and the leave's flush is that retry. The in-flight save left first, so the server normally has it first; if it arrives after the leave's save instead, its lower order makes the server write nothing, so the newer text stands whether or not the page outlives it |
 | the list | one `refresh()` per drain, after its last landed save (and before `blocked` or `failed` when something landed); an open card draws its draft, never the server's answer, so a re-read cannot move the caret or eat a letter |
-| a create's answer | the body's `data.id` is read (the one write body this module reads): `onBound` sets `composerNoteId`, and every later save of that card is an update of that note. The answers' `updatedAt` is also read: it is the lane's base for `rebase`. A create that landed but named no note is reported as a failure. A create in the air raises `onCreating`, which snapshots the wall's ids (`createBaseline`). An update of the blank card's note that answers 404 `NOTE_NOT_FOUND` (deleted on another device) is no failure: the lane lets go of the id (`onBound(target, null)`) and the loop creates a new note from the text; an open note's lane keeps the ordinary failure and its entry goes when a re-read no longer holds the note |
+| the first save's key | `lane.createKey`, minted by `randomHexId()` at the lane's first create and sent as `Idempotency-Key` on every retry of that create; cleared when a create lands (`onBound`). A create that failed, or landed without naming a note, sets `lane.createUnsure`: the server may hold the note, and the retry, ordered after the first attempt, writes its text to that note, so its answer is the retry's own text and `saved` is the draft as for any save; what `createUnsure` still holds is the wall's hiding (next row). A note deleted elsewhere is a new note under a new key. A card cleared of every word (an unbound lane whose title and description draw as nothing) lets go of the key and the unsure mark in `type()`: what is typed next is another note, never a rewrite of the first, which then stands on the wall as a note of its own |
+| a create's answer | the body's `data.id` is read (the one write body this module reads): `onBound` sets `composerNoteId`, and every later save of that card is an update of that note. The answers' `updatedAt` is also read: it is the lane's base for `rebase`. A create that landed but named no note is reported as a failure; the next save is a create under the same key, which the server answers with the note that create made, rewritten with that save's text. A create in the air raises `onCreating`, which snapshots the wall's ids (`createBaseline`); a create that failed unsure keeps that baseline up — the wall keeps hiding the note it may have made, and a retry keeps the first attempt's snapshot — until a create lands or the card is cleared (`onCreating(false)`). An update of the blank card's note that answers 404 `NOTE_NOT_FOUND` (deleted on another device) is no failure: the lane lets go of the id (`onBound(target, null)`) and the loop creates a new note from the text; an open note's lane keeps the ordinary failure and its entry goes when a re-read no longer holds the note |
 | status | `saving` from the keystroke (or the flush) until the newest text has landed; `saved` after the last landing; `titleNeeded`; typed back to the saved text clears it |
 | a save that did not land | `failed`: one `warn` toast, `title` = `t('notes.toast.saveFailed')`, `message` = the server's own sentence (`attemptWrite` in `src/shared/api.ts` → `refusalSentence`), omitted when none; the lane keeps its text, says nothing inline, and retries on the next change or flush. It stays quiet (`complained`) until a save has landed again, so a server that is down raises one toast, not one per pause |
 | a lane closed mid-flight | the drain stops writing for it |
@@ -11669,8 +11750,9 @@ A LANE is one open card's writer: the blank card's (`COMPOSER_TARGET`) or a note
 
 - A write that landed is silent; the quiet line is the only sign. The provider raises toasts only while mounted (`mountedRef`).
 - Dev only: React StrictMode's simulated unmount calls each form's `onLeave` once on a fresh mount, where no lane exists, so it saves and releases nothing.
+- The standing checks, run on the real app (the production client on :5184 and the live API, as the dev user) and nowhere else: `.verify/notes-autosave-m1.mjs` (what a leaving page sends: `synthetic`, `hidden`, `goto`, `close`, `overtake`, `blank`, `idle`, `idleblank`), `-m2` (a cleared title), `-m3` (two devices), `-l1` (a note deleted elsewhere), `-l2` (the wall during a slow or lost create), `-l4` (the keepalive edge and the cost of one save), `-key` (the key after the card is cleared), `-order` (a lost reply, or a first create held before the server, then a close: one note holding the newest text), `-count` (the dev user's note count), all over `.verify/lib/notes-autosave-kit.mjs`. Each makes and sweeps every note titled `nsv `, so run them one after another, never side by side. `NSV_VIEW=desktop|phone` and `NSV_THEME=dark|light` pick the configuration; exit 3 with a `RERUN` line means the run overlapped an API restart.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/notes-autosave-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notes-autosave-count.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notes-autosave-key.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notes-autosave-l1.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notes-autosave-l2.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notes-autosave-l4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notes-autosave-m1.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notes-autosave-m2.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notes-autosave-m3.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/notes-autosave-order.mjs
 
 ## MAN-7527 — Notes
 
@@ -11704,13 +11786,13 @@ The **Notes** tab in the workspace: one account's cards — a sticky note each, 
 
 ## The drafts and the autosave
 - `NotesProvider` holds the drafts on the second context (`NoteDraftsContext`): `composer`, what is typed in the blank card; `composerNoteId`, the note the blank card has become; `edits` by note id — a card is in edit mode exactly while it has an entry; and `saveStates`, each card's quiet saving line.
-- **Nothing is pressed to save.** An open card saves itself about a second after typing stops (`AUTOSAVE_DELAY_MS`, `hooks/useNoteSaver.ts`) and at once when it is left: Done, focus leaving the card, its tab or the gutter widget going away, or the page being hidden or closed (`visibilitychange`, `pagehide`). Saves carry `keepalive` while the body is at most 60,000 bytes, so a save on the way out outlives the page; a hidden page also sends the newest text of a note beside a save still in the air, and a blank card whose first save has not been answered cannot (no id yet), so what was typed after that save left stays in the card. The blank card saves itself as a NEW note once it has a title and typing pauses, and stays open on that note — text, focus and caret where they were, Done drawn — until it is left, when a fresh blank card takes its place. A description with no title, and a saved note whose title was cleared, send nothing: the card says a title is needed and the last saved version stands. A failed save raises one toast with the server's sentence and keeps the text. The writer: MAN-7521; the card: MAN-7518.
+- **Nothing is pressed to save.** An open card saves itself about a second after typing stops (`AUTOSAVE_DELAY_MS`, `hooks/useNoteSaver.ts`) and at once when it is left: Done, focus leaving the card, its tab or the gutter widget going away, or the page being hidden or closed (`visibilitychange`, `pagehide`). Saves carry `keepalive` while the body is at most 60,000 bytes, so a save on the way out outlives the page; a hidden page also sends the newest text beside a save still in the air (a note's update; for a blank card whose first save has not been answered, the create again under its key). Every save carries a save order the server checks, so an older text arriving late writes nothing and the newest text stands (MAN-7517). A blank card's create carries an idempotency key and every retry of it carries the same one, so a first save whose answer was lost never becomes a second note, and its retry writes the newest text to the note the first made (MAN-7517). The blank card saves itself as a NEW note once it has a title and typing pauses, and stays open on that note — text, focus and caret where they were, Done drawn — until it is left, when a fresh blank card takes its place. A description with no title, and a saved note whose title was cleared, send nothing: the card says a title is needed and the last saved version stands. A failed save raises one toast with the server's sentence and keeps the text. The writer: MAN-7521; the card: MAN-7518.
 - The drafts outlive the pane and a folded widget: the provider is mounted once above both homes. They end at sign-out — the provider unmounts with the auth gate — and on a reload; a draft reaches the server only through the autosave.
 - `App.tsx` mounts `NotesProvider` inside the auth gate and below `WebSocketProvider`, the socket that carries the frame re-reading the list.
 
 ## The table, the routes and the frame
 - Table `notes` (`server/modules/database/notes-schema.ts`; `notesDb` in `repositories/notes.db.ts` — MAN-7510): per account, newest first (`created_at DESC`, then `rowid DESC`), and an edit never moves a card (`created_at` never moves, `updated_at` is the last save). Every statement carries `user_id = ?`, so an id of another account reads as no row.
-- Four routes on one mount, `/api/notes` (`server/index.ts`, behind `authenticateToken`; MAN-7517): `GET` → 200 `Note[]`; `POST` → 201 `Note`; `PUT /:id` → 200 `Note`; `DELETE /:id` → 200 `{ deleted: true }`.
+- Four routes on one mount, `/api/notes` (`server/index.ts`, behind `authenticateToken`; MAN-7517): `GET` → 200 `Note[]`; `POST` → 201 `Note` (a repeated `Idempotency-Key` answers the note it already made); `PUT /:id` → 200 `Note`; `DELETE /:id` → 200 `{ deleted: true }`.
 - A second door beside it, `/api/notes-cmd`, for the `notes` command a chat runs and Claude's `notes` skill: behind the chat's own credential and no login, list, show and add only, over the same `notesService` (MAN-8993). `/api/notes` still refuses that credential.
 - Refusals: 401 `USER_REQUIRED` (the account is not an integer above 0); 400 `INVALID_REQUEST_BODY` (`title`, or a present `description`, is not a string); after normalising, 400 `TITLE_REQUIRED` (empty title — nothing the eye can see), `TITLE_TOO_LONG` (over 200), `DESCRIPTION_TOO_LONG` (over 20,000); 404 `NOTE_NOT_FOUND` for an id no row of the account carries.
 - `notes_changed` — `{ kind: 'notes_changed', at }` — goes to every open `/ws` socket after each write that landed, through `connectedClients` (MAN-315). It names no note and no account, so the only answer to it is "read this account's own list again".
@@ -11724,8 +11806,8 @@ The **Notes** tab in the workspace: one account's cards — a sticky note each, 
 | `server/modules/notes/notes.command-routes.ts` | the `notes` command's door, `POST /api/notes-cmd`: list, show, add (MAN-8993) |
 | `server/modules/notes/notes.module.ts` | `createNotesModule`: the tab's router (`/api/notes`) and the command's (`/api/notes-cmd`); links `~/.local/bin/notes` |
 | `server/modules/notes/index.ts` | the barrel: `createNotesModule` |
-| `server/modules/database/notes-schema.ts` | `NOTES_SCHEMA_SQL`: the table and its one index |
-| `server/modules/database/repositories/notes.db.ts` | `notesDb` and `NoteRow` |
+| `server/modules/database/notes-schema.ts` | `NOTES_SCHEMA_SQL`: the table, the list's index and `note_save_orders`; `NOTES_CLIENT_KEY_INDEX_SQL`: the idempotency-key index, run by `addNotesClientKeyColumn` after the column exists (MAN-7510) |
+| `server/modules/database/repositories/notes.db.ts` | `notesDb` (`create` answers `{ row, created, applied }`, `update` `{ row, applied }`) and `NoteRow` |
 | `src/modules/notes/context/NotesContext.ts` | the two contexts, `NotesValue` and `NoteDraftsValue`, `useNotes` and `useNoteDrafts` |
 | `src/modules/notes/context/NotesProvider.tsx` | the reads, the drafts, the saving lines, the delete |
 | `src/modules/notes/hooks/useNoteSaver.ts` | the autosave: one writer per open card |
@@ -13863,6 +13945,7 @@ Reference: door face MAN-8843 (`claude-account status --json`); the routes MAN-8
 |---|---|
 | `ClaudeAccountRows.tsx` | `ClaudeAccountRows`: header, rows, candidates, auto switch, last switch, closing sentence |
 | `ClaudeAccountRowViews.tsx` | `AccountRowView` (one account the store holds), `CandidateRow` (one live identity the store lacks) |
+| `UsageRing.tsx` | `UsageRing`: the one usage ring, drawn by the rows (`captioned`) and by the rail's `UsageRings` (MAN-9033) |
 | `claude-accounts-fake.ts` | `claudeAccountFakes(nowMs)`: 18 whole-value states, one per `FakeClaudeAccountsState`; nothing in `src/` imports it |
 | `AccountPanelBody.tsx` | mounts `<ClaudeAccountRows picture={accounts} …/>` after the meters and balances, above `↻ Re-login`, the panel's one sign-in door; drawn by the popover and by the Accounts widget alike |
 | `AccountPopover.tsx` | the popover's `Card` chrome around the body |
@@ -13879,7 +13962,18 @@ Reference: door face MAN-8843 (`claude-account status --json`); the routes MAN-8
 - `closeSetup` clears `setup` and calls `announceAccountsChanged()` (`cloudcli:accounts-changed`); the provider's ONE poller re-reads at once. A second read loop is never started.
 - While the Set up window is open (`setup !== null`, so `signInOpen`) the popover's outside-pointer and Escape dismissal is suspended, as for the Re-login window; a press in the row menu is not outside (MAN-466 rule 7).
 - The rail button names the account in use as `Account <email>`, its `slug` when that is null, else `—`; its avatar's initials come from the slug. The panel's meters draw the two windows of that account from `accountInUseUsage` (MAN-8862).
-- Every row and candidate names its account by `email`, the `slug` standing in when it is null. The name keeps its line whole: a cue that does not fit beside it (*✓ in use now*, *Use*) wraps under it, and only a name wider than the row alone ends in an ellipsis (the full name rides `title`). Acts, aria-labels, data attributes, initials and the door's `why` keep the slug.
+- Every row and candidate names its account by `email`, the `slug` standing in when it is null. Acts, aria-labels, data attributes, initials and the door's `why` keep the slug.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useAccountSetup.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts
+
+## MAN-9477 — The account section — ClaudeAccountRows over the door's picture — The row — `AccountRowView`
+section: The account section — ClaudeAccountRows over the door's picture/001 The row — `AccountRowView`
+
+- **Line 1:** the avatar, the name (truncates with an ellipsis only when wider than the row; the full name rides `title`) and the row's `⋯` menu. The menu's 28px trigger sits 10px in from the row's edge, centred over the weekly ring's column.
+- **Line 2:** on the left the state and the one act, level with the rings' middles — `✓ In use`; or `Use` (`Use anyway` on a full account); or `Set up`; or `checking sign-in`. On the right the rings, weekly last.
+- **Under it, only when something needs the reader:** one short line each, in the warn tone (`data-tone="warn"` + `text-tone-ink`): `sign-in token refused`; `sign-in token expires <date>` / `sign-in token expired <date>`; `no room now — <why>`; `stays chosen until it has room again`.
+- **The rings** are `UsageRing` with `captioned` (MAN-9033), one per window the account has: `ringWindowKeys(hasFiveHour(account))` — the 5-hour then the week, the week alone for a `no_five` account, with no ring, track or empty place where the 5-hour one would be. Each stands in a 48px cell, so on every row the weekly ring stands in one column and the 5-hour ring in the column beside it: the accounts compare in one look. The middle holds the figure (`92`, `0`; `—` for no figure); under the ring a caption names the window and its countdown (`wk · 3d`, `5h · 40m`; `5h` alone for a 5-hour window with no reset; no countdown on a window with no figure). The full words ride the ring's accessible name, opened by the account's slug (`owner`: "sdjesus89: This week. …", so three rows' rings are told apart by ear), and its hover, which opens to the ring's left and wraps inside 11rem so it fits between the ring and the window's left edge at 320px.
+- **The act is its own small button, never the whole row.** The rings stand outside every press: a long press on a ring is a phone's way to read its words, and must never switch the account. `Use` and `Set up` share one paint (`ROW_ACT_CLASS`: the accent word, a 32px-tall press, the accent wash under the pointer).
 
 ## `ClaudeAccountRows` props (all optional)
 | prop | meaning |
@@ -13889,21 +13983,29 @@ Reference: door face MAN-8843 (`claude-account status --json`); the routes MAN-8
 | `nowMs` | the caller's clock, epoch ms; omitted, the section ticks its own minute (`useMinuteTick`) |
 | `onUse(slug)` `onSetAuto(on)` `onRemove(slug)` `onSetup(slug)` | the four acts; each defaults to `NO_ACT` (the fakes' fixture), so a press with no handler does nothing |
 
-## Rules an editor must not break
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useAccountSetup.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts
+
+## MAN-9478 — The account section — ClaudeAccountRows over the door's picture — Rules an editor must not break
+section: The account section — ClaudeAccountRows over the door's picture/002 Rules an editor must not break
+
 1. **`why` is the door's sentence.** Drawn as it arrives (INV-76: slugs, never digests). The one edit: the no-room caveat drops a leading `<slug>'s ` / `<slug> ` (`withoutOwnName`) because the row already names the account; a `why` without that lead is untouched.
-2. **A refused token draws the wall and no date.** `wall.kind === "refused"` → `sign-in token refused — set it up again` (`data-tone="warn"`), no `valid until`. The door still relays `expires_at` for it; the suppression is in the view. `checking` keeps its date.
-3. **A full account with a checked token stays pressable.** A hand pick that is held is legal; the cue reads `Use anyway` and the caveat `no room now — …`. The in-use row never draws the caveat while `held`: it says `stays chosen until it has room again`.
-4. **`Use` needs `token === 'saved'`, not refused, not in use.** `none` or refused → `Set up`; `checking` → the word `checking`, no press.
-5. **Points, never dollars; unknown is `—`, never 0% and never `NaN%`.** `5h N% · wk N%` is the fraction ×100 rounded (`figureInPoints`); `reading === null` → `5h — · wk —`; an account the door marks `no_five` (no 5-hour window at all, `hasFiveHour`) states `wk N%` alone — no `5h` figure, not even an em-dash; a `five` / `week` that is null, absent or non-finite → `—` for that window; `as of <relative>` only past `READING_STALE_MS` (3 min), and only when `reading.at` names an instant (`readingAgeInWords` returns `null` otherwise).
-6. **The in-use row carries the record's why.** `chosen.by === "auto"` and `chosen.slug` the row's slug → `chosen.why` verbatim under the row.
-7. **The last-switch line is the why's headline.** `whyHeadline` cuts at the first `;` or ` (`; the whole sentence stays in the `title`; two-line clamp.
-8. **The auto switch's label and `aria` label are both `Switch automatically when the account in use fills`.** Off-state line follows it. The closing `SWITCHING_IN_WORDS` sentence draws only with at least one account.
+2. **A refused token draws the wall and no date.** `wall.kind === "refused"` → the act is `Set up` and the warn line `sign-in token refused`; no token date. The door still relays `expires_at` for it; the suppression is in the view.
+3. **A full account with a checked token stays pressable.** A hand pick that is held is legal; the act reads `Use anyway` (aria `Use <slug> anyway`) and the warn line `no room now — <why>`. The in-use row never draws that line while `held`: it says `stays chosen until it has room again`.
+4. **`Use` needs `token === 'saved'`, not refused, not in use.** `none` or refused → `Set up`; `checking` → the words `checking sign-in`, no press.
+5. **Points, never dollars; unknown is `—`, never 0% and never `NaN%`.** Each ring draws the window `rowWindows(account, nowMs)` gives (`utils/accountInUseUsage.ts`: the door's fraction ×100 rounded, a window past its reset carried to 0% — MAN-8862), through `windowPercent`. `reading === null`, or a `five` / `week` that is null, absent or non-finite → that ring has no arc, no tone, no `aria-valuenow`, `—` in its middle and no countdown in its caption. A carried window is a real `0`. A row never says how old its reading is: a figure moves only when something uses the account, so an old reading is still the current figure.
+6. **The last switch's reason is stated once, whole, under its date.** The note's lead is `Switched to <slug> · <date>, <time>` (`· <time>` alone when the switch was today), in `text-muted-foreground`; `last_switch.why` follows verbatim under it: no headline cut, no line clamp, no `title`. No row repeats it — the reason's figures are that day's, and a row would present them as current.
+7. **Each ring states its own reset, as a countdown.** The caption's countdown is `resetCountdown` (one unit, rounded up), so a row's week turning over reads `wk · 3d`; the full `Resets <weekday> <time> · about N days left` rides the ring's words. A weekly window past its reset counts down to its NEXT reset (`windowPastReset`, MAN-8862), so a ring never shows a closed week's figure; a 5-hour window past its reset, or with no readable reset, states none (`5h`). The minute tick moves every caption on and flips a carried ring at its reset, with no reload.
+8. **The auto switch reads `Auto-switch when full`; its accessible name is the whole sentence, `Switch automatically when the account in use fills` (`AUTO_SWITCH_WORDS`).** With it off, `Off: the account in use stays chosen even when full.` follows. The closing `SWITCHING_IN_WORDS` sentence — `Switching sets where new chats and plan runs start. Running work stays on its account; an open chat moves at its next message.` — draws only with at least one account.
 9. **`Remove` lives in the row's `ActionMenu`** (`isDanger`), with no confirm.
 10. **The Set up window mounts only with a slug.** A bare `setup-token` is a usage error.
-11. **A token date needs a readable `expires_at`.** `tokenDateInWords` returns `null` for a null, absent or non-finite expiry: `new Date(NaN).toISOString()` throws in render and takes the whole app to the error screen, not one row. A past expiry says `expired <date>`.
+11. **A token date is said only when someone has to act on it, and only from a readable `expires_at`.** `tokenNoticeInWords` answers within 30 days of the expiry (`TOKEN_NOTICE_MS`) — `sign-in token expires <date>` — or after it — `sign-in token expired <date>` — in the warn tone, and `null` further out. It returns `null` for a null, absent or non-finite expiry: `new Date(NaN).toISOString()` throws in render and takes the whole app to the error screen, not one row.
 12. **Closing the Set up window writes nothing.** The door saves only a token the window captured; a window closed without signing in leaves the store untouched. Close → `announceAccountsChanged()` → one re-read.
 
-## Fakes — `claude-accounts-fake.ts`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useAccountSetup.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts
+
+## MAN-9479 — The account section — ClaudeAccountRows over the door's picture — Fakes — `claude-accounts-fake.ts`
+section: The account section — ClaudeAccountRows over the door's picture/003 Fakes — `claude-accounts-fake.ts`
+
 - Each state is the whole value the route will relay, never a prop-shaped sketch.
 - `picture()` derives each row's `chosen` from `chosen.digest`, and fills an empty `why` on a room row with `roomWords`.
 - A full row passes its own sentence built by `ceilingWords` / `roomWords` / `points`, which reproduce `room.py`'s `_ceiling_words` / `_room_words` / `_points` (fake ceiling 95%). A hand-typed sentence the door cannot send is a defect.
@@ -13911,8 +14013,10 @@ Reference: door face MAN-8843 (`claude-account status --json`); the routes MAN-8
 
 ## Proving a state
 - Mount the section with a fake over the live Vite app's token layer (`.verify/lib/mountReact.mjs`); photograph each state at 1440×900, 390×844, 320×800, light and dark.
-- The wired panel: `node .verify/panel-fill.mjs` (dev client `:5183`, API `:3011`). `/api/accounts` and `/api/usage` are stubbed, no door write is sent, the Set up window is real (`claude-account setup-token scottdejesus` reaches the sign-in screen; closed with ✕ without a code). Shots `panel-fill-{desktop,phone}-{top,rows,foot,row}-{light,dark}.png`.
+- The wired panel: `node .verify/panel-fill.mjs` (production client `:5184`, `PANEL_FILL_APP` to point elsewhere; API `:3011`). `/api/accounts` and `/api/usage` are stubbed, no door write is sent, the Set up window is real (`claude-account setup-token scottdejesus` reaches the sign-in screen; closed with ✕ without a code). Shots `panel-fill-{desktop,phone}-{top,rows,foot,row}-{light,dark}.png`.
 - 2026-10-21: 90 ok, 0 failed. Later runs failed one check each on the app-wide console gate (`TypeError: Failed to fetch` from `useSlashCommands` / `useFileMentions` at mount) — chat boot fetches, not account code.
+- The three `fallback/*` frames file the account in use's reading 1 minute, 2 hours and 5 days old while `/api/usage` names another login. The meters draw the door's reading at full strength with no "As of" line and no "was N%", a window past its reset as 0% — a closed 5-hour window names no reset, a closed weekly one the next whole 7-day step (the oracle is written in the script, independent of `windowPastReset`).
+- 2026-11-03, production client `:5184` (build 20261103-142520): 96 ok, 0 skipped, 0 failed, the Set up window real. The probe ends its own terminal pids; none left.
 - The server keeps a sign-in window's pty alive up to 30 minutes after the socket closes; end a probe's own `claude setup-token` and `plan_runner.claude_account setup-token` pids by exact verified pid.
 - Not pressed by the suite: the row menu (`Remove`).
 - 2026-10-21: 19 states × 3 widths × 2 themes = 114 readings, 0 page errors, 0 horizontal overflow; frame 294 px inside 320.
@@ -13928,9 +14032,9 @@ Reference: the meters' states MAN-464; the door's picture MAN-8843 and its relay
 
 | `accountInUseUsage(usage, picture, nowMs)` when | returns |
 |---|---|
-| no account in use (no picture, door unreachable) | `usage` untouched — what the panel drew before the file existed |
-| `usage` reachable, not `degraded`, and `usage.account === row.digest` | `usage` — a measurement taken now beats anything filed |
-| anything else | `pictureReading(row, usage, nowMs)` — the row's newest reading as a `ClaudeUsage` |
+| no account in use (no picture, door unreachable) | `usage` with its windows past their reset carried — otherwise as the panel drew it before the file existed |
+| `usage` reachable, not `degraded`, and `usage.account === row.digest` | `usage`, its windows past their reset carried — a measurement taken now beats anything filed |
+| anything else | `pictureReading(row, nowMs)` — the row's newest reading as a `ClaudeUsage` |
 
 - The route's body is never drawn under another account's name: identity match plus health is the test. `GET /api/usage` measures the box's live login (`account` = its digest, MAN-464); once the store chooses another account those figures belong to the outgoing login.
 - Callers: `AccountPanelBody` (`UsageMeters`) — drawn by the popover and by the Accounts widget alike — and `UsageRings` (the two rings on the views rail, MAN-9033). Both read it so a ring and its meter show the same figure.
@@ -13940,22 +14044,42 @@ Reference: the meters' states MAN-464; the door's picture MAN-8843 and its relay
 |---|---|
 | `reading === null` | both windows `percent: null`, `resetsAt: null`; `degraded: false`; `checkedAt` = now (seconds) |
 | `reading.five` / `.week` (fraction 0..1) | `percent` = `Math.round(fraction × 100)` on `five_hour` ("Current 5-hour window") and `seven_day` ("This week") |
-| `reading.five_resets` / `.week_resets` (epoch seconds) | `resetsAt` ISO-8601 |
-| `reading.at` (epoch seconds) older than 3 min (`PICTURE_READING_STALE_MS`) | `degraded: true`, `staleSince: at`; the meters dim to 60% under *As of \<local time\> — \<why\>* |
+| `reading.five_resets` / `.week_resets` (epoch seconds) | `resetsAt` ISO-8601; a window whose reset has passed is carried (below) |
+| `reading.at` (epoch seconds) | `checkedAt` = `at`; `degraded: false`, `reason: ''`, `staleSince: null` at every age, so the meters and the rings draw it at full strength with no *As of* line. The account in use is read only through the rate-limit reports of the chats and jobs that run on it, and its figures move a whole percent at a time, so an `at` hours old is still the current figure while nothing has moved it (operator, 2026-11-02) |
 | `row.pace` | `ClaudeUsage.pace` in percent: `projected5` / `ceiling5` / `projected7` / `ceiling7` = `points(fraction)`; `used5` / `used7` = the reading's own percent; `words: ''`. Key ABSENT when `row.pace === null`; a null `pace.five` / `.week` is a null pair |
-| `reason` | the usage route's `reason` only when the route body is itself degraded AND the reading is stale; else `''` (the meters word that as "the provider gave no figures") |
 
-## Rules an editor must not break
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts
+
+## MAN-9484 — The meters follow the account in use — accountInUseUsage.ts — A window past its reset — `windowPastReset`
+section: The meters follow the account in use — accountInUseUsage.ts/001 A window past its reset — `windowPastReset`
+
+THE ONE RULE (`utils/usageWindows.ts`), applied to every window any surface draws. A window whose reset has passed with no reading since is the window that began at that reset: **0% used**. A figure moves only when something uses the account, a whole percent at a time, so the old figure describes a closed window and "was N%" would put last week's number on this week.
+- **The reset it names is the next one.** A weekly window (`seven_day*`, `weekly_scoped:*`) steps its reset by whole 7-day steps (604800 s, epoch-exact, so the local clock can move an hour across a DST change) to the first one ahead of now — a reset three weeks back lands on stored + 28 days, not stored + 7. Any other window (`five_hour`, `limit:*`) states NO reset (`resetsAt: null`): a 5-hour window starts at first use, so after its reset there is no running window and no reset to count to. The meter then draws no reset line and the ring keeps its `5h` name label.
+- **When a window is past its reset.** The server marked it `rolled` (`usage-windows.ts` `markRolled`, which stays the fact it is), or its reset is at or before now and fell AFTER the reading was taken: `staleSince ?? checkedAt` for the route's body, the row's filed-at (`reading.at`) for a door row. A reading taken at or after the instant is the provider's word for that moment and is never zeroed (clock skew must not draw a false-safe 0%); a reset that names no instant (null, unreadable) carries nothing, and neither does a window with NO figure (`windowPercent` answers `null`): there is no closed window's number to protect, and a carried 0% would draw a window nobody measured as "nothing used" — it stays unknown, with its stamp as it came.
+- **What a carried window drops.** The old figure, the vendor's `severity` flag (it flagged the closed window; it would keep a 0% bar amber) and the `rolled` mark. The pacer's marks on it go with the figure they were projected from: `used` becomes 0, the projected end and the 5-hour caption are dropped, the ceiling — a setting — stays.
+- **Where it is applied.** `withCarriedWindows` runs at the end of `pictureReading` (a door row) and in `accountInUseUsage` on the route's body, on the pass-through when no account is in use included. `rowWindows(row, nowMs)` hands the account rows the same windows, so the rows, the meters and the rings never disagree. `UsageMeters` and `UsageRings` carry no `rolled` presentation of their own: no dim, no "was".
+- **Drawn, never filed.** The carried 0% is presentation. `pacer-door.ts` keeps refusing a `rolled` window; nothing here files anything.
+- **Judged on the browser's clock.** The carry reads `nowMs`, the minute tick, not the server's time: a door row carries no server time, and the server's `rolled` mark reaches only the route's body. A browser clock AHEAD of the server's therefore carries a window early — it draws 0% for as long as the skew (seconds when the clock is NTP-synced), ending at the real reset. The `readAt < reset` guard keeps a figure read at or after its reset. A server-time anchor (the accounts read's `Date` header) would remove the window; it is not built.
+- **A `null` or absent `pace` is no pace.** A carried window drops the pacer's marks only when a pace is there (`!pace`); the key is absent on a reading with none, and a `null` on the wire is read the same way.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts
+
+## MAN-9485 — The meters follow the account in use — accountInUseUsage.ts — Rules an editor must not break
+section: The meters follow the account in use — accountInUseUsage.ts/002 Rules an editor must not break
+
 1. **`accountInUseUsage.ts` is the one place the door's fractions become the meters' percent.** Any new window or pacer figure is converted here; no renderer multiplies.
 2. **Unknown is `null`, never `0` and never `NaN`.** `points(fraction)` returns `null` for `null`, absent or non-finite input (`Math.round(undefined*100)` is `NaN`, which `Meter` draws as a live bar with `aria-valuenow="NaN"`). `ClaudeAccountRow.reading.five` / `.week` are `number | null` (INV-9252): the pacer files one-window readings.
-3. **Every wire stamp is read through a finite check.** `resetStamp` returns `null` for null, absent or non-finite seconds (`new Date(undefined).toISOString()` throws in render and takes the whole app down). `reading.at` is normalised once into `filedAt`: unreadable → the conversion moment, never stale, and `checkedAt` stays a number.
-4. **The reading's age is judged from the picture's own clock.** `nowMs` is a minute tick (`useMinuteTick`: `AccountPanelBody`'s `now`, the row's `nowTick`, `UsageRings`' own), not a fresh `Date.now()`.
-5. **Row-side figures obey the same rules.** `ClaudeAccountRowViews.tsx` applies the null / non-finite / unreadable-instant guard at its own read sites (`figureInPoints`, `readingAgeInWords`, `tokenDateInWords`; MAN-8847); a guard added to one file is added to the other.
+3. **Every wire stamp is read through a finite check.** `resetStamp` returns `null` for null, absent or non-finite seconds, and for finite seconds past the Date range (`1e20`: an invalid Date) — `toISOString()` on an invalid Date throws in render and takes the whole app down, and every row's windows are built here. `reading.at` is normalised once into `filedAt`: unreadable → the conversion moment, so `checkedAt` stays a number.
+4. **`nowMs` is the callers' minute tick** (`useMinuteTick`: `AccountPanelBody`'s `now`, the row's `nowTick`, `UsageRings`' own), not a fresh `Date.now()`. This file reads it to stamp `checkedAt` when there is no reading or its `at` is unreadable, and to judge whether a reset has passed — so a popover left open flips a window at the first tick after its reset, with no reload.
+5. **Row-side figures obey the same rules.** `ClaudeAccountRowViews.tsx` reads each row's windows through `rowWindows` (this file) and draws them with `UsageRing`, the rail's own ring (`windowPercent`, `resetCountdown`), so a row, the meters and the rings agree; it applies the null / non-finite / unreadable-instant guard at its own read site for the token's expiry (`tokenNoticeInWords`; MAN-8847); a guard added to one file is added to the other.
 6. **No whole-object validator at the door boundary.** The edge guards live at each read site, after the `resetStamp` precedent.
 
 ## Measured
-- 2026-10-21, `.verify/panel-fill.mjs` against dev client `:5183` / API `:3011`, `/api/accounts` and `/api/usage` stubbed: 90 ok, 0 failed (fallback panel: the door's 27% / 83% drawn, the route's other login's 5% / 6% not drawn; stale panel: same figures at 60% under *As of …*).
+- 2026-10-21, `.verify/panel-fill.mjs` against dev client `:5183` / API `:3011`, `/api/accounts` and `/api/usage` stubbed: 90 ok, 0 failed (fallback panel: the door's 27% / 83% drawn, the route's other login's 5% / 6% not drawn).
 - 2026-10-21, before the guards: a reading with no `five` drew `5h NaN% · wk 60%` and `aria-valuenow="NaN"`; one with no `at`, or an account with no `expires_at`, threw `RangeError: Invalid time value` and took the app to the error screen.
+- 2026-11-02, prod client `:5184` (build 20261102-171146) against the live `/api/accounts`, the in-use account's `reading.at` set 20 min back: the weekly ring at opacity 1, no meter dimmed, no *As of* line, 0 page errors.
+- 2026-11-03, prod client `:5184` (build 20261103-074819), `~/.claude/state/inline-briefs/account-resets-countdown.after.mjs` against the live app: the in-use row's week reset stubbed 10 min back → the weekly meter and ring `0% used`, no *was*, no dim, reset line the stubbed reset + 7 days; a 5-hour window past its reset `0% used` with no reset line and the ring labelled `5h`; the live body's `rolled` weekly window carried the same; a reset three weeks back stepped to stored + 28 days; a reading filed after its reset, an absent or unreadable reset and a reading-less row left alone; the minute tick flipped meter, ring and row 80 s after the stubbed reset on an open popover; 0 page errors.
+- 2026-11-03, prod client `:5184` (build 20261103-093509), `~/.claude/state/inline-briefs/account-rows-rings.shots.mjs` against the live app: the real scottdejesus@gmail.com row's rings `0` captioned `5h` (its 5-hour window carried, no reset) and `0` captioned `wk · 7d` (stored week reset 11-02 23:00 + 7 days); a reading-less row two `—` rings with no tone and no countdown; a filed-at and a week reset that name no instant, an absent 5-hour reset and an unreadable expiry drew the `92` ring with no countdown and no date; the minute tick flipped the in-use row's weekly ring from `66` / `wk · 2m` to `0` / `wk · 7d` 132 s after it opened, on the same page; 0 page errors.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts
 
@@ -13973,7 +14097,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-s
 
 ## MAN-8966 — Gemini budget per plan — the Settings row and its hook: files, handle, strings, states
 
-`RunnerGeminiBudgetRow.tsx` (Settings → Agents → Claude → Account) is the operator's view of the Gemini plan cap: ONE dollar amount that binds every plan's and every ownerless chain's Gemini spend. The server half (file, GET/PUT `/api/settings/gemini-plan-cap`): MAN-8963. The gate that enforces it: MAN-8959.
+`RunnerGeminiBudgetRow.tsx` (Settings → Agents → Claude → Account) is the operator's view of the Gemini plan cap: ONE dollar amount that binds every plan's, every ownerless chain's and every chat's Gemini spend. The server half (file, GET/PUT `/api/settings/gemini-plan-cap`): MAN-8963. The gate that enforces it: MAN-8959.
 
 ## Status
 - 2026-10-23: LIVE. `RunnerModelContent.tsx` draws `<RunnerGeminiBudgetRow />` directly under `<RunnerParkAtPeakRow />`, and its docstring names the row among its siblings. The row reads and writes through `useGeminiPlanCap`, the one reader and writer of the cap in `src/`.
@@ -14009,7 +14133,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-s
 - `$0.00` is a real cap every call has met, not "unlimited"; the row says so while the file holds 0.
 
 ## Strings
-`agents.runnerGeminiBudget` in `src/modules/i18n/locales/en/settings.json`, directly after `runnerParkAtPeak`: `label`, `description`, `field`, `zero`, `unreadable`. Every call carries a `defaultValue`; `buttons.retry` and `status.loading` come from `common`. The row's `buttons.retry` fallback is `'Try again'`, the card's other rows' fallback; the key shows `Retry`.
+`agents.runnerGeminiBudget` in `src/modules/i18n/locales/en/settings.json`, directly after `runnerParkAtPeak`: `label`, `description`, `field`, `zero`, `unreadable`. `description` names the three budget kinds the cap binds (a plan, "an /inline chain is a budget of its own", "and so is a chat with the souls it launches by hand"); `zero` says "plan’s, chain’s and chat’s". Every call carries a `defaultValue`; `buttons.retry` and `status.loading` come from `common`. The row's `buttons.retry` fallback is `'Try again'`, the card's other rows' fallback; the key shows `Retry`.
 
 ## Measured
 - 2026-10-23, the served app (:5184, `.verify/gemini-budget-cap-row.mjs`; `.verify/` is gitignored): with no cap file the row reads `5.00` at 1440×900 and 390×844, light and dark. Typing `5` and leaving the field PUTs once, the file then holds `5\n`, and the field draws the read-back. `-1` and a blank each snap back to `5.00` with no PUT in the page's network log and the file's bytes and mtime unchanged. A PUT answered 500 inside the page snaps the field back to `5.00` after a re-read GET, the file untouched. `PUT {"usd": -1}` on :3011 answers 400 `INVALID_GEMINI_PLAN_CAP`. The probe refuses to start (exit 2) when a cap file exists, types the amount the row reads, and removes the file it created, so the host is left with none and an operator's own cap is never typed over.
@@ -14077,7 +14201,7 @@ The credential, the guard, the account of a chat and the link: MAN-8992. The gut
 | `server/modules/followups/followups-completion-rule.service.ts` | `closuresForPlan`, `closuresForArc`, `epicFinishedAt`: the pure rule that says which open items a finished feature, task or epic settles; `CompletionClosure` |
 | `server/modules/followups/followups.routes.ts` | the widget's door (`/api/followups`), `readFollowupId` |
 | `server/modules/followups/followups.command-routes.ts` | the command's door (`/api/followups-cmd`) |
-| `server/modules/followups/followups.module.ts`, `index.ts` | `createFollowupsModule()`: both routers over one service; links `~/.local/bin/followups`. The barrel also exports `listOpenFollowups`, `listOpenFollowupGroups` and `findFollowupForAccount`, the companion's reads, and `closeFollowupsForCompletions`, the dispatcher watcher's call |
+| `server/modules/followups/followups.module.ts`, `index.ts` | `createFollowupsModule()`: both routers over one service; links `~/.local/bin/followups`. The barrel also exports `listOpenFollowups`, `listCompletionClosedFollowups`, `listOpenFollowupGroups` and `findFollowupForAccount`, the companion's reads, and `closeFollowupsForCompletions` and `fileFollowupGapsForChat` (with `FOLLOWUP_TEXT_MAX`), the dispatcher module's calls |
 | `bin/followups.mjs` | the command |
 | `server/modules/providers/list/claude/surface-signal.ts` | `FOLLOWUPS_SIGNAL`, the standing instruction |
 | `src/modules/followups/` | `useFollowups` (hooks/), `FollowupsContext` (context/), `FollowupsWidgetBody`, `FollowupRow`, barrel |
@@ -14112,7 +14236,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followup
 ## MAN-9144 — Next steps — the followups lane: the table, every session-row removal, the — The house closes items — `closeForCompletions`
 section: Next steps — the followups lane: the table, every session-row removal, the service rules, both doors and the frame/002 The house closes items — `closeForCompletions`
 
-Nothing in a follow-up's text is a pointer, so "points at a feature" can only mean "names it". The dispatcher module's watcher calls `closeFollowupsForCompletions(frame.plans, frame.arcs)` FIRST in its callback on every changed picture (and on the first picture after a boot), in its own try/catch (`[Dispatcher] could not close follow-ups for a completion: …`), BEFORE `endings.observe`, so the "feature finished" alert no longer lists the items the completion settled. It reads stamps and nothing else, so it is idempotent: no watermark, no "already swept" mark, and a feature that finished while the server was down is caught on the first picture while the lane still holds it (`ENDED_KEEP_S`, 24 h after `completed_at`). The plan's `FollowupCompletionPlan` shape is deliberately narrow (`name`, `completed_at`, each phase's `key`, `status`, `done_at`); a `DispatcherPlan[]` is assignable. The epic's `FollowupCompletionArc` is as narrow (`name`, `status`, `completed_at`, `plans`: the names of its plans); a `DispatcherArc[]` is assignable. `closeForCompletions(plans, arcs)` takes both, required: the plans run FIRST and write their closures, then each epic reads its candidates from the database, so a feature or task claims an item before an epic can. A plan with nothing finished, and an epic whose `epicFinishedAt` is `null`, cost no query; otherwise one `listOpenNaming(name)` (open rows of ANY account and chat whose text contains the name, case-insensitive) and the rule decides.
+Nothing in a follow-up's text is a pointer, so "points at a feature" can only mean "names it". The dispatcher module's followups composition (`dispatcher-followups.module.ts`, `settle`) calls `closeFollowupsForCompletions(store.plans, store.arcs)` from the watcher's SNAPSHOT with the dispatcher's store WHOLE (`readDispatcherStore`), before the lane cuts its picture from it (`lanePictureOf`) and so before `endings.observe`, in its own try/catch (`[Dispatcher] could not close follow-ups for a completion: …`), so the "feature finished" alert no longer lists the items the completion settled. It runs on the first read after a boot and after that only when a stamp of the store differs (a sweep that throws is not remembered, so the next read tries again), and writes one journal line for the first sweep after a boot and for any sweep that closed something (`[Dispatcher] swept the follow-ups over 173 plans and 63 epics: closed 0`). It reads stamps and nothing else, so it is idempotent: no watermark, no "already swept" mark in the database, and NO AGE — a feature that finished while the server was down is settled however long ago it finished. The lane's picture, which forgets a plan 24 h after `completed_at` (`ENDED_KEEP_S`) and an epic with no plan left, is never what the sweep reads. The plan's `FollowupCompletionPlan` shape is deliberately narrow (`name`, `completed_at`, each phase's `key`, `status`, `done_at`); a `DispatcherPlan[]` is assignable. The epic's `FollowupCompletionArc` is as narrow (`name`, `status`, `completed_at`, `plans`: the names of its plans); a `DispatcherArc[]` is assignable. `closeForCompletions(plans, arcs)` takes both, required: the plans run FIRST and write their closures, then each epic reads its candidates from the database, so a feature or task claims an item before an epic can. A plan with nothing finished, and an epic whose `epicFinishedAt` is `null`, cost no query; otherwise one `listOpenNaming(name)` (open rows of ANY account and chat whose text contains the name, case-insensitive) and the rule decides.
 
 The rule (`followups-completion-rule.service.ts`), stamps compared with `Date.parse` (the dispatcher's stamps carry no milliseconds, `created_at` does):
 
@@ -14129,14 +14253,39 @@ The rule (`followups-completion-rule.service.ts`), stamps compared with `Date.pa
 | hyphenated (`drying-report-direct-readers`) | it is a bare whole token: not touching `[A-Za-z0-9_-]`, so `…-v2` does not match |
 | no hyphen (`kaylee`, `dactyls`: an ordinary word) | a cue stands with it: `feature <name>` / `<name> feature` (`epic` for an epic), or the name between matching `'`, `"` or backticks, the opening quote not touching a word on its outer side (the apostrophe of `Kaylee's` opens none). Curly quotes are no cue |
 
-`epicFinishedAt(arc, plans)`: `null` unless `arc.status` is `complete`; otherwise the LATEST readable stamp among the arc's `completed_at` and the `completed_at` of each of its plans found by name in `plans` (`null` when none is readable). The epic's own stamp is not the finish: it is written once and never moved, so an epic judged after its last feature, an epic that completed and took on new plans (it reads `live` with the old stamp) and a roadmap-made epic (never stamped) would each be judged against the wrong time. A plan the picture no longer carries adds no stamp.
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-build-flags.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-build-gaps.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-followups.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/
 
-"Untouched" is `updated_at`, not `created_at`: an open item's `updated_at` is its `created_at` until a person unticks it in the widget, which sets it to now, later than every stamp the lane holds. So an item filed after a stamp is never touched, and an item a person REOPENED stays open for good — compared on `created_at` the next picture (seconds later, while any plan is live, and for 24 h after a feature finishes) would have closed it again. An item filed AFTER a stamp is never touched; a plan whose `completed_at` is null closes nothing at the plan level; for one item a feature closure wins over a task closure, and either wins over an epic closure. The write sets `state = 'done'`, `done_at` = the stamp as ISO-8601 UTC with milliseconds, `closed_by = NULL`, `closed_for`, `updated_at` = now, and only where `state = 'open'`, so a row a person or a chat settled in between keeps its stamps. One log line per item (`[Followups] closed #244 for drying-report-direct-readers`; `… for epic:<epic>` for an epic) and ONE `followups_changed` per affected chat; both run in a `finally`, so a throw part-way (a locked database) still announces the rows already closed. On the wire `closedBy` reads `completion` and `closedFor` names what finished; unticking in the widget clears both (`setStateForUser`) and the item stays open. The widget draws "Done <when> when feature <name> finished" / "Done <when> when task <key> of feature <name> finished" / "Done <when> when epic <name> finished"; `followups list --all` prints `[done: feature <name> finished]` / `[done: task <key> of feature <name> finished]` / `[done: epic <name> finished]`. The companion's reads list OPEN items only, so a settled one stops being read to him. Measured 2026-10-28 on the live server: the first picture after the restart closed exactly one row, #244 (Photo Evidence Cooberator's "Feature 'drying-report-direct-readers' is being designed…", for the feature finished on the 27th/28th), `done_at` `2026-10-28T02:34:45.000Z`, and no other. 2026-10-28, epic rule live: no open item names a finished epic, no row carries `epic:%`, and the first picture after the restart closed nothing.
+## MAN-9496 — Next steps — the followups lane: the table, every session-row removal, the — `epicFinishedAt(arc, plans)`: `null` unless `arc.status` is `complete`; otherwise the LATEST
+section: Next steps — the followups lane: the table, every session-row removal, the service rules, both doors and the frame/003 `epicFinishedAt(arc, plans)`: `null` unless `arc.status` is `complete`; otherwise the LATEST
+
+`epicFinishedAt(arc, plans)`: `null` unless `arc.status` is `complete`; otherwise the LATEST readable stamp among the arc's `completed_at` and the `completed_at` of each of its plans found by name in `plans` (`null` when none is readable). The epic's own stamp is not the finish: it is written once and never moved, so an epic judged after its last feature, an epic that completed and took on new plans (it reads `live` with the old stamp) and a roadmap-made epic (never stamped) would each be judged against the wrong time. A plan the store does not hold adds no stamp.
+
+"Untouched" is `updated_at`, not `created_at`: an open item's `updated_at` is its `created_at` until a person unticks it in the widget, which sets it to now, later than every stamp the store holds. So an item filed after a stamp is never touched, and an item a person REOPENED stays open for good — compared on `created_at` the next sweep (any stamp that moves runs one) would have closed it again. An item filed AFTER a stamp is never touched; a plan whose `completed_at` is null closes nothing at the plan level; for one item a feature closure wins over a task closure, and either wins over an epic closure. The write sets `state = 'done'`, `done_at` = the stamp as ISO-8601 UTC with milliseconds, `closed_by = NULL`, `closed_for`, `updated_at` = now, and only where `state = 'open'`, so a row a person or a chat settled in between keeps its stamps. One log line per item (`[Followups] closed #244 for drying-report-direct-readers`; `… for epic:<epic>` for an epic) and ONE `followups_changed` per affected chat; both run in a `finally`, so a throw part-way (a locked database) still announces the rows already closed. On the wire `closedBy` reads `completion` and `closedFor` names what finished; unticking in the widget clears both (`setStateForUser`) and the item stays open. The widget draws "Done <when> when feature <name> finished" / "Done <when> when task <key> of feature <name> finished" / "Done <when> when epic <name> finished"; `followups list --all` prints `[done: feature <name> finished]` / `[done: task <key> of feature <name> finished]` / `[done: epic <name> finished]`. The companion's reads list OPEN items only, so a settled one stops being read to him. Measured 2026-10-28 on the live server: the first picture after the restart closed exactly one row, #244 (Photo Evidence Cooberator's "Feature 'drying-report-direct-readers' is being designed…", for the feature finished on the 27th/28th), `done_at` `2026-10-28T02:34:45.000Z`, and no other. 2026-10-28, epic rule live: no open item names a finished epic, no row carries `epic:%`, and the first picture after the restart closed nothing.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/
+
+## MAN-9497 — Next steps — the followups lane: the table, every session-row removal, the — The house files too — `fileGapsForChat`, and the build gaps of a finished feature.
+section: Next steps — the followups lane: the table, every session-row removal, the service rules, both doors and the frame/004 The house files too — `fileGapsForChat`, and the build gaps of a finished feature.
+
+**The house files too — `fileGapsForChat`, and the build gaps of a finished feature.** A builder has no `followups` door, so what it saw and did not change stays in its report in the chain (`~/.claude/state/dispatch-souls/<launch id>/result.md`). When a feature finishes, `dispatcher-followups.module.ts` hands each plan of the store to `createBuildGapsFiler` (`dispatcher-build-gaps.service.ts`), which files those lines as GAPS on the feature's chat:
+
+- WHEN: a plan's `complete` event is the finish. The filer keeps the highest event id handled in `app_config` (`dispatcher_build_gaps_through`, durable, written after the feature was handled); the first time it sees the store it writes the highest id the store holds and files NOTHING, so the features that finished before this are never filed (no backfill), and a throw leaves that feature due on the next read.
+- WHICH CHAT: the plan's `session` (`plans.session`: the session that owns the plan's rows — the design outing's chat, or the tell outing's when a tell made the plan; the document's planner entries carry no session), resolved to an app session id. A chat this house no longer holds files nothing and writes one journal line (`[Dispatcher] <plan> finished, but its chat (<id>) is not in this house: its build flags were not filed`).
+- WHICH LINES (`dispatcher-build-flags.reader.ts`): in the reports of the builder seats (stages `builder`, `fix-pass`, `fix-pass-r<N>`; never a reviewer's or a docs pass's), every TOP-LEVEL list item of a flags section, as its first sentence. A section opens on a heading with `flag` in it (`## Flags`, `## Flags for the caller`, `## Decisions and flags`) or on a LABEL LINE (`**Flags**`, `**Flags:**`, `**Flags and follow-ups** (named, not done)`, a plain `Flags:`; most recent builders write the label, and a quarter of the real flag lines sit under one); a heading's section runs to the next heading of its level or above, a label's to the next heading or bold label line, both to the `RESULT:` line. A report whose flags sections hold no bullet at all is read by their paragraphs. A bold label (`**Row split.** …`) stays and the sentence after it is the one taken; a list that only introduces a list (`Docs rows not updated:`) gives its bullets, each filed as `<introduction>: <bullet>`; a trailing `;` or `,` is taken off; a `none`, a "no Gemini" or "no follow-ups" line and a `CLOSED: 8 of 8` tally are no flags; each line once per plan. Each line is `[build] <feature>: <sentence>`, kind `gap`, cut at a word end with a `…` to fit `FOLLOWUP_TEXT_MAX` (240). The `[build]` marker is the smallest thing that tells a reader the gap came from a build.
+- NEVER TWICE: `fileGapsForChat` files only the lines the chat does not already hold in ANY state (`followupsDb.addUnheldMany`: same kind and text, open, ticked or closed by a completion; the check and the inserts are one `immediate` transaction, so the dev API's two servers side by side write a line once). A second pass over the same finish, a restart that lost the mark and a plan that finishes again file nothing new.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/
+
+## MAN-9498 — Next steps — the followups lane: the table, every session-row removal, the — WHOSE: `accountOfChat` (the chat's run), else the one account that already filed an item on the chat
+section: Next steps — the followups lane: the table, every session-row removal, the service rules, both doors and the frame/005 WHOSE: `accountOfChat` (the chat's run), else the one account that already filed an item on the chat
+
+- WHOSE: `accountOfChat` (the chat's run), else the one account that already filed an item on the chat (`followupsDb.accountsOfChat`); two accounts or none answer `null`, nothing is written and one journal line says so (INV-9605: an account is never guessed). COVERAGE IS THE EXCEPTION for an idle chat: a design chat is usually idle when its feature finishes, and many never filed an item, so a finish files only where the chat has a live run or CLI host, or already holds an item. Measured 2026-11-03 on the real store: 172 finished features; 138 name a session this house holds no row for (the no-chat case); 34 name a chat that exists, and 26 of those hold no item at all (the Roadmap chat, Scheduling, bug fixes: none a live host), so a finish of any of them is journaled as unfileable. The data holds no other recorded owner (the transcript path, `scheduled_messages` and the notification history all fail to name one account for such a chat: the dispatcher's own notices go to every active account), and the lane does not guess.
+- Proof: `.verify/followups-build-gaps.mjs` (a copy of auth.db: first sight files nothing, a staged finish of `kaylee--before-compaction` files its lines on its chat, a second pass files none, a gone chat and an unnamable account each write one line) and `.verify/followups-sweep-age-free.mjs` (the sweep, dry run on the live data and a copy).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/
 
 ## MAN-9145 — Next steps — the followups lane: the table, every session-row removal, the — The two doors
-section: Next steps — the followups lane: the table, every session-row removal, the service rules, both doors and the frame/003 The two doors
+section: Next steps — the followups lane: the table, every session-row removal, the service rules, both doors and the frame/006 The two doors
 
 | door | mount | guard | verbs |
 | --- | --- | --- | --- |
@@ -14147,7 +14296,7 @@ There is no delete and no reopen on the chat's door: an item leaves only with it
 
 ## The companion's read
 
-`listOpenFollowups(userId, appSessionId | null, limit = 20)` (barrel; `followupsService.listOpenForAccount`) answers `Array<{ sessionId, followup }>`: that account's OPEN items, newest first, for one chat or, with `null`, for every chat, each mapped by the same `toFollowup` the widget's read uses, so a line reads exactly as the Next steps widget shows it. `limit` is held to 1-200 (a non-finite one is 20): the answer lands in a model's context. One chat's read is `listForChatOfUser` (the account's rows only, so a chat of another account reads none); the account-wide read is `followupsDb.listOpenOfUser(userId, limit)`, `ORDER BY id DESC`. Its consumer is the companion's `list_followups(session)` tool, which `companion-prompt.ts` names; it is also called by the companion's alert (`alert-block.ts`, the up-to-five open items an `<alert>` names). Shown by `.verify/probe-companion-reads.mjs` step 7: two items filed through the command door read back field for field as `GET /api/followups?session=` answers them.
+`listOpenFollowups(userId, appSessionId | null, limit = 20)` (barrel; `followupsService.listOpenForAccount`) answers `Array<{ sessionId, followup }>`: that account's OPEN items, newest first, for one chat or, with `null`, for every chat, each mapped by the same `toFollowup` the widget's read uses, so a line reads exactly as the Next steps widget shows it. `limit` is held to 1-200 (a non-finite one is 20): the answer lands in a model's context. One chat's read is `listForChatOfUser` (the account's rows only, so a chat of another account reads none); the account-wide read is `followupsDb.listOpenOfUser(userId, limit)`, `ORDER BY id DESC`. Its consumer is `followupsOpenFirst` (`companion/tools/followup-list.ts`), which the companion's `list_followups(session)` tool (named in `companion-prompt.ts`) and its alert (`alert-block.ts`, the up-to-five open items an `<alert>` names) both read; that function puts the settled items under the open ones. `listCompletionClosedFollowups(userId, appSessionId | null, limit = 20)` (barrel; `followupsService.listSettledByCompletionForAccount`, over `followupsDb.listSettledByCompletionOfUser` for every chat, `listForChatOfUser` for one) answers `{ items: Array<{ sessionId, followup, mark }>, leftOut }`: the account's items the house closed by completion (`state` done, `closed_for` set; an untick clears it, so a reopened item is never among them), newest first (`ORDER BY id DESC`, the order `listOpenFollowups` reads), each with its `mark` (`completionMark` in `followups-completion-rule.service.ts`: `done: feature <name> finished`, `done: task <key> of feature <name> finished`, `done: epic <name> finished`, the words `followups --all` prints). `limit` is held as above; `leftOut` is whether more items exist than `limit` took (the service reads one row past the held limit to know, so a list cut at the ceiling of 200 still says so). Shown by `.verify/probe-companion-reads.mjs` step 7: two items filed through the command door read back field for field as `GET /api/followups?session=` answers them.
 
 `listOpenFollowupGroups(userId)` (barrel; `followupsService.listOpenGroupsForAccount`, over `followupsDb.listOpenGroupsOfUser`) answers `Array<{ sessionId, count, newest: Followup }>`: one group per chat that holds an open item, the chat with the newest item first. `count` is the chat's whole open count and `newest` its newest open item, mapped by `toFollowup`. One SQL statement groups and counts over every open row of the account: no ceiling, unlike `listOpenFollowups` (1-200), whose cut would under-read a count. Its consumer is the station's follow-ups reader, `followupNeeds` in `station/need-readers.ts` (MAN-9273).
 
@@ -14314,13 +14463,13 @@ Headless Playwright against the running client; no model call, no chat turn, no 
 
 | Id | Check |
 |---|---|
-| a | the widget's place in the operator's stored arrangement (right side, directly behind Next steps) and the order inside it: meters, DeepSeek and Jev balances, rows; every account row in view without scrolling the widget, light and dark (2026-10-31: FAILs with three accounts — widget frame ends at 794, rows at 878) |
+| a | the widget's place in the operator's stored arrangement (right side, directly behind Next steps) and the order inside it: meters, the account rows, DeepSeek and Jev balances; every account row in view without scrolling the widget, light and dark (2026-11-03, three accounts: rows end at 668 of the widget frame's 794) |
 | b | the widget's text equals the popover's text, read in one evaluate, both themes |
-| c | a tap on another account's row sends `POST /api/accounts/use {"slug":…}` from the widget and from the popover; fulfilled by `page.route`, never sent |
+| c | a press on another account's `Use` sends `POST /api/accounts/use {"slug":…}` from the widget and from the popover; fulfilled by `page.route`, never sent |
 | d | requests to `/api/accounts`, usage and both balance routes land at the same times with the widget open as folded; mounting the widget adds none |
 | e | phone: no gutter, no widget, popover unchanged; desktop popover unchanged |
 | f | the account in use, the account picture and the operator's stored gutter arrangement equal their start values |
-| g | an account in use with NO 5-hour window (the door's `no_five`, MAN-8843): the widget and the popover draw no "Current 5-hour window" meter, "This week" is unchanged, the in-use row says `wk N%` with no `5h`, every other row keeps `5h · wk`; console errors 0, failed responses 0, account writes 0 |
+| g | an account in use with NO 5-hour window (the door's `no_five`, MAN-8843): the widget and the popover draw no "Current 5-hour window" meter, "This week" is unchanged, the in-use row draws its weekly ring alone, with no 5-hour ring, every other row keeps the rings it had (a row's figures are read off its rings, `[data-usage-ring]`, and written `5h N% · wk N%`); console errors 0, failed responses 0, account writes 0 |
 
 ## The no-5-hour replies — `.verify/lib/no-five-routes.mjs`
 
@@ -14340,8 +14489,13 @@ Headless Playwright against the running client; no model call, no chat turn, no 
 - Page is the dev account's; preference reads are pinned (`lib/prefs-pin.mjs`), every preference write is dropped.
 - Every non-GET to `/api/accounts/**` is answered in the probe and never sent.
 - Never presses Re-login, Set up, Remove or the automatic-switch toggle.
-- Every desktop page logs one aborted `GET …/file-tree/…/files` (`net::ERR_ABORTED`) on the pre-change build too; the probe counts it aborted, not failed.
-- The meters' "As of …, the provider gave no figures" line appears whenever the in-use account's filed reading is over 3 minutes old; the probe masks it in the before/after comparison.
+- Every desktop page logs one aborted `GET …/file-tree/…/files` (`net::ERR_ABORTED`) on a project pick, on the pre-change build too. The abort check is scoped to the widget's own routes; the file-tree abort is reported, not judged.
+- The app's anonymous `api.github.com` calls (the star count, the release check) are answered by the harness's `STUBBED_REQUESTS`: GitHub allows 60 an hour per IP, and an unstubbed page past it logs `403 GET /repos/siteboon/claudecodeui/releases/latest`, which the console gate charges to the app.
+- Pages load with `waitUntil: 'load'`, never `networkidle`: the signed-in app polls without end and never goes network-idle.
+- The console and failed-response gates take any page's error, so a FAIL naming another route is the app's: 2026-11-03 `GET /api/cerberus/catalog|wardens` 500.
+- (d) prints each page's request times beside its counts. The two pages load in parallel and each counts over its own load time, so a second probe running beside it moves the count (2026-11-03: open 4/5/3/5 vs folded 4/4/2/4 with two probes at once; three solo runs passed).
+- 2026-11-03, prod client: 45 PASS, 0 FAIL, exit 0, with GitHub itself answering 403; the in-use account has no 5-hour window, so (a) reads the weekly alone and (g) reads "wk 33%" with no "5h".
+- The meters' "As of …, the provider gave no figures" line comes only from a degraded live reading with no account in use (an in-use account's filed reading is never degraded at any age: MAN-8862); the probe masks it in the before/after comparison.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/no-five-routes.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs
 
@@ -14349,7 +14503,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/no-five-routes.mjs, 
 
 `.verify/lib/app-load.mjs` is how the cloudcli verify kit moves a page onto the live app (`:5183`). `gotoApp(page, url)` and `reloadApp(page)` resolve at `domcontentloaded`, then let the network settle for at most 15 s and say nothing if it does not. The caller then waits for the ELEMENT it is about to use, for `APP_BOOT_MS` (90 s, exported). `networkidle` is advisory, never the gate. `.verify/` is git-ignored; the files below are the whole change.
 
-**Why (measured 2026-10-28, heal `heal-tool-result-20261028-030229-5827`).** `parkOnProjectTree` (the step of `openConsole` that PATCHes `simpleChatList:false` and reloads) reloaded with `waitUntil:'networkidle'` and Playwright's 30 s navigation budget, then `selectFirstProject` waited for the project row for 90 s. Two budgets for one readiness, the short one first: the signed-in app's boot fans out to ~40 endpoints and `networkidle` wants all of them answered plus 500 ms of quiet, which on this box (12 CPUs shared with every soul's builds, load 12 to 50, seven probe browsers at once) takes longer than 30 s, and the throw lands before the wait that was always the gate. Heal ledger, 14 days to 2026-10-28: 12 `page.reload: Timeout 30000ms exceeded` whose stack names `parkOnProjectTree`, 5 more with its page text and no frames ("Loading projects… Fetching your Claude projects and sessions", or a page already drawn that never went idle: rows 55690, 54785), and two `frame.goto … /session/<id> … networkidle` out of `openScratchChatOnHaiku` ("Loading projects… 2/11 projects"). On a quiet box the same reload reaches idle in 6-7 s (measured at load 12), so the kit passed whenever nothing else was running.
+**Why (measured 2026-10-28, heal `heal-tool-result-20261028-030229-5827`).** `parkOnProjectTree` (the step of `openConsole` that reloads the page onto the project tree) reloaded with `waitUntil:'networkidle'` and Playwright's 30 s navigation budget, then `selectFirstProject` waited for the project row for 90 s. Two budgets for one readiness, the short one first: the signed-in app's boot fans out to ~40 endpoints and `networkidle` wants all of them answered plus 500 ms of quiet, which on this box (12 CPUs shared with every soul's builds, load 12 to 50, seven probe browsers at once) takes longer than 30 s, and the throw lands before the wait that was always the gate. Heal ledger, 14 days to 2026-10-28: 12 `page.reload: Timeout 30000ms exceeded` whose stack names `parkOnProjectTree`, 5 more with its page text and no frames ("Loading projects… Fetching your Claude projects and sessions", or a page already drawn that never went idle: rows 55690, 54785), and two `frame.goto … /session/<id> … networkidle` out of `openScratchChatOnHaiku` ("Loading projects… 2/11 projects"). On a quiet box the same reload reaches idle in 6-7 s (measured at load 12), so the kit passed whenever nothing else was running.
 
 | site | what changed |
 |---|---|

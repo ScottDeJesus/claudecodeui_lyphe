@@ -1,4 +1,4 @@
-import { WINDOW_NAMES } from '@/modules/accounts/utils/usageWindows';
+import { WINDOW_NAMES, windowPastReset } from '@/modules/accounts/utils/usageWindows';
 import type { ClaudeAccountRow, ClaudeAccounts, ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types';
 
 /**
@@ -22,12 +22,14 @@ import type { ClaudeAccountRow, ClaudeAccounts, ClaudeUsage, ClaudeUsagePace, Cl
  * also happens between 5-hour blocks on an account that has the limit, and that account keeps its
  * "No reading yet" ring and its blank bar. `hasFiveHour` is the rule, `withoutFiveHour` applies it to
  * the reading the meters draw, and the rings and the account rows ask `hasFiveHour` themselves.
+ *
+ * A WINDOW PAST ITS RESET IS DRAWN AS THE WINDOW THAT BEGAN THERE (`windowPastReset`, the one rule). Every
+ * reading this file hands out — a row's (`pictureReading`, which the account rows draw through `rowWindows`) and the
+ * live route's — has the rule applied before it leaves, so no surface draws a closed window's figure and none carries
+ * a rule of its own.
  */
 
-/** Three minutes: the age past which a reading from the picture is drawn as old rather than current. */
-const PICTURE_READING_STALE_MS = 3 * 60_000;
-
-/** The two windows every account row states, and the labels the meters already give them. */
+/** The two windows every account row draws, and the labels the meters already give them. */
 const FIVE_HOUR = { key: 'five_hour', label: WINDOW_NAMES.five_hour } as const;
 const WEEKLY = { key: 'seven_day', label: WINDOW_NAMES.seven_day } as const;
 
@@ -45,11 +47,14 @@ function points(fraction: number | null): number | null {
 
 /**
  * Epoch SECONDS → the ISO-8601 stamp `ClaudeUsageWindow.resetsAt` carries; no readable stamp
- * (null, absent, or not a finite number) stays `null` — `new Date(undefined)` throws in render.
+ * (null, absent, not a finite number, or a number past the Date range) stays `null` —
+ * `toISOString` throws in render on an invalid Date, and every row's windows are built here.
  */
 function resetStamp(seconds: number | null | undefined): string | null {
   if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return null;
-  return new Date(seconds * 1000).toISOString();
+  // Finite is not enough: `1e20` seconds is past the ±8.64e15 ms a Date can hold, and is an invalid Date.
+  const instant = new Date(seconds * 1000);
+  return Number.isNaN(instant.getTime()) ? null : instant.toISOString();
 }
 
 /** A window nobody has measured reads as an em-dash over an empty track, never as zero used. */
@@ -93,8 +98,8 @@ export function accountInUse(picture: ClaudeAccounts | null | undefined): Claude
 /**
  * Whether an account has a 5-hour window. A picture that carries no `no_five` key — an older door — and an
  * absent account both read as "has one", which is what the app drew before the door said otherwise.
- * Used by this module's `accountInUseUsage` and by the accounts module's UsageRings and ClaudeAccountRowViews,
- * so the default lives in one place.
+ * Used by this module's `accountInUseUsage` and by the accounts module's UsageRings and ClaudeAccountRowViews (each
+ * through `ringWindowKeys`), so the default lives in one place.
  */
 export function hasFiveHour(row: ClaudeAccountRow | null | undefined): boolean {
   return row?.no_five !== true;
@@ -109,16 +114,51 @@ function withoutFiveHour(usage: ClaudeUsage): ClaudeUsage {
   return { ...usage, windows: usage.windows.filter((window) => window.key !== FIVE_HOUR.key) };
 }
 
+/** A reading the route could take: the `reachable: true` arm of `ClaudeUsage`. */
+type ReachableUsage = Extract<ClaudeUsage, { reachable: true }>;
+
 /**
- * The account in use's newest reading and pace, as the two-window `ClaudeUsage` the meters draw.
+ * A reading with every window past its reset carried to the window that began there (`windowPastReset`), and
+ * the pacer's marks on a carried window dropped with the figure they were projected from: the projected end
+ * and the 5-hour caption describe the closed window, so only the ceiling — a setting, not a reading — stays on
+ * it. Returned untouched when no window is past its reset.
  *
- * `degraded: true` and `staleSince` — the reading's own filed-at stamp, epoch seconds — appear only
- * once the reading is older than three minutes, so the meters dim the bars and say "as of" instead
- * of presenting a filed figure as a fresh measurement. The reason is the usage route's own when that
- * body is degraded (it is the live attempt that failed); otherwise empty, which the meters word as
- * "the provider gave no figures" — true of the last three minutes even when older ones are drawn.
+ * `staleSince ?? checkedAt` is when the figures were READ, the instant a reset must follow to be one the
+ * reading has not seen (a row's `checkedAt` is its filed-at): a figure read at or after its own reset is the
+ * provider's word for that moment and is never zeroed.
  */
-function pictureReading(row: ClaudeAccountRow, usage: ClaudeUsage | null, nowMs: number): ClaudeUsage {
+function withCarriedWindows(usage: ReachableUsage, nowMs: number): ReachableUsage {
+  if (!Array.isArray(usage.windows)) return usage;
+  const readAtMs = (usage.staleSince ?? usage.checkedAt) * 1000;
+  const windows = usage.windows.map((usageWindow) => windowPastReset(usageWindow, readAtMs, nowMs));
+  const carriedKeys = new Set(windows.filter((usageWindow, index) => usageWindow !== usage.windows[index]).map((usageWindow) => usageWindow.key));
+  if (carriedKeys.size === 0) return usage;
+
+  const pace = usage.pace;
+  // `!pace`, not `=== undefined`: the wire is untrusted, and a `null` pace spread below would invent a partial one
+  // with no `words` for the 5-hour caption to trim.
+  if (!pace) return { ...usage, windows };
+  return {
+    ...usage,
+    windows,
+    pace: {
+      ...pace,
+      ...(carriedKeys.has(FIVE_HOUR.key) ? { used5: 0, projected5: null, words: '' } : {}),
+      ...(carriedKeys.has(WEEKLY.key) ? { used7: 0, projected7: null } : {}),
+    },
+  };
+}
+
+/**
+ * A row's newest reading and pace, as the two-window `ClaudeUsage` the meters draw, with a window past its
+ * reset carried to the window that began there.
+ *
+ * Drawn at full strength whatever its age: never `degraded`, never an "as of" line. An account is read only
+ * through the rate-limit reports of the chats and jobs that run on it, and its figures move a whole percent
+ * at a time, so a filed-at stamp hours old is still the current figure while nothing has moved it — and a
+ * reset that has passed since is a window nothing has used.
+ */
+function pictureReading(row: ClaudeAccountRow, nowMs: number): ReachableUsage {
   const reading = row.reading;
   if (reading === null) {
     return {
@@ -134,27 +174,40 @@ function pictureReading(row: ClaudeAccountRow, usage: ClaudeUsage | null, nowMs:
 
   const five = points(reading.five);
   const week = points(reading.week);
-  // The row's filed-at is wire input as much as its figures are: a stamp naming no instant cannot
-  // establish an age, and `checkedAt` must stay a number. The moment this picture was read is the
-  // only time we can vouch for, so such a reading is stamped with it and never shown as stale.
+  // The row's filed-at is wire input as much as its figures are, and `checkedAt` must stay a number:
+  // a stamp naming no instant is replaced by the moment this picture was read, the only time we can
+  // vouch for.
   const filedAt = Number.isFinite(reading.at) ? reading.at : Math.floor(nowMs / 1000);
-  const stale = nowMs - filedAt * 1000 > PICTURE_READING_STALE_MS;
-  const usageExplains = usage !== null && usage.reachable && usage.degraded ? usage.reason : '';
   const pace = paceInPercent(row, five, week);
 
-  return {
+  return withCarriedWindows({
     reachable: true,
     account: row.digest,
     windows: [
       { key: FIVE_HOUR.key, label: FIVE_HOUR.label, percent: five, resetsAt: resetStamp(reading.five_resets) },
       { key: WEEKLY.key, label: WEEKLY.label, percent: week, resetsAt: resetStamp(reading.week_resets) },
     ],
-    degraded: stale,
-    reason: stale ? usageExplains : '',
-    staleSince: stale ? filedAt : null,
+    degraded: false,
+    reason: '',
+    staleSince: null,
     checkedAt: filedAt,
     // The key stays absent, not null, when the pacer could weigh neither window.
     ...(pace === undefined ? {} : { pace }),
+  }, nowMs);
+}
+
+/**
+ * One account row's two windows as every surface draws them: its newest reading, a window past its reset
+ * carried (`pictureReading`), so a row, the meters and the rings never disagree about it. A row with no reading
+ * has two unmeasured windows (`percent: null`, no reset).
+ *
+ * Used by the accounts module's ClaudeAccountRowViews, for each row's rings.
+ */
+export function rowWindows(row: ClaudeAccountRow, nowMs: number): { five: ClaudeUsageWindow; week: ClaudeUsageWindow } {
+  const { windows } = pictureReading(row, nowMs);
+  return {
+    five: windows.find((usageWindow) => usageWindow.key === FIVE_HOUR.key) ?? unmeasuredWindow(FIVE_HOUR),
+    week: windows.find((usageWindow) => usageWindow.key === WEEKLY.key) ?? unmeasuredWindow(WEEKLY),
   };
 }
 
@@ -166,8 +219,9 @@ function pictureReading(row: ClaudeAccountRow, usage: ClaudeUsage | null, nowMs:
  * The route's body wins when it belongs to the account in use and is healthy — it is a measurement
  * taken now, fresher than anything filed. Every other case falls back to the account in use's newest
  * reading from the door's picture. With no account in use to name (no picture yet, or a door that
- * could not answer) the route's body is passed through untouched, which is exactly what the panel
- * drew before this file existed.
+ * could not answer) the route's body is drawn as it is. Whichever reading wins, a window past its reset
+ * is carried (`windowPastReset`) — a route window the server marked `rolled`, and one whose reset passed
+ * since the body was read.
  */
 export function accountInUseUsage(
   usage: ClaudeUsage | null,
@@ -175,9 +229,9 @@ export function accountInUseUsage(
   nowMs: number,
 ): ClaudeUsage | null {
   const row = accountInUse(picture);
-  if (row === null) return usage;
+  if (row === null) return usage !== null && usage.reachable ? withCarriedWindows(usage, nowMs) : usage;
   const reading = usage !== null && usage.reachable && !usage.degraded && usage.account === row.digest
-    ? usage
-    : pictureReading(row, usage, nowMs);
+    ? withCarriedWindows(usage, nowMs)
+    : pictureReading(row, nowMs);
   return hasFiveHour(row) ? reading : withoutFiveHour(reading);
 }

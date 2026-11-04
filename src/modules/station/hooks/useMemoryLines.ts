@@ -7,12 +7,18 @@ import { useWebSocket } from '@/shared/context/WebSocketContext';
 /** Whether `value` is text or null: the shape of the fields a memory may not record. */
 const isTextOrNull = (value: unknown): value is string | null => value === null || typeof value === 'string';
 
-/** Whether `value` is a memory this page can draw: a token, a title and a kind, and the three fields a row may not record. */
+/** Whether `value` is a channel a quote can come by (`spoken`, `typed`) or null for a memory that quotes no one. */
+const isChannelOrNull = (value: unknown): value is CompanionMemoryLine['via'] => value === null || value === 'spoken' || value === 'typed';
+
+/**
+ * Whether `value` is a memory this page can draw: a token, a title and a kind, and the four fields a row may not record. A `via`
+ * that is missing (a server of an older build) or is neither channel fails the read: the corner never guesses "said" for a line.
+ */
 function isMemoryLine(value: unknown): value is CompanionMemoryLine {
   if (typeof value !== 'object' || value === null) return false;
   const row = value as Record<string, unknown>;
   return typeof row.token === 'string' && typeof row.title === 'string' && typeof row.kind === 'string'
-    && isTextOrNull(row.saidAt) && isTextOrNull(row.account) && isTextOrNull(row.quote);
+    && isChannelOrNull(row.via) && isTextOrNull(row.saidAt) && isTextOrNull(row.account) && isTextOrNull(row.quote);
 }
 
 /**

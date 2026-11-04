@@ -46,7 +46,15 @@
     "showOlder_one": "↳ Показать ещё {{count}} разговор",
     "showOlder_few": "↳ Показать ещё {{count}} разговора",
     "showOlder_many": "↳ Показать ещё {{count}} разговоров",
-    "showOlder_other": "↳ Показать ещё {{count}} разговора"
+    "showOlder_other": "↳ Показать ещё {{count}} разговора",
+    "select": "Выбрать",
+    "selectAll": "Выбрать все",
+    "selectAllLoaded": "Выбрать загруженные",
+    "clearSelection": "Снять выделение",
+    "deleteSelected_few": "Удалить {{count}} сеанса",
+    "deleteSelected_many": "Удалить {{count}} сеансов",
+    "deleteSelected_one": "Удалить {{count}} сеанс",
+    "deleteSelected_other": "Удалить {{count}} сеансов"
   },
   "tooltips": {
     "viewEnvironments": "Просмотр окружений",
@@ -123,7 +131,11 @@
     "restoreProjectError": "Ошибка при восстановлении проекта. Попробуйте снова.",
     "reopenSessionFailed": "Не удалось снова открыть сеанс. Попробуйте снова.",
     "reopenSessionError": "Ошибка при повторном открытии сеанса. Попробуйте снова.",
-    "forkSessionError": "Не удалось создать ветку сессии. Попробуйте ещё раз."
+    "forkSessionError": "Не удалось создать ветку сессии. Попробуйте ещё раз.",
+    "deleteSessionsPartialFailure_few": "Не удалось удалить {{count}} сеанса из {{total}}. Попробуйте снова.",
+    "deleteSessionsPartialFailure_many": "Не удалось удалить {{count}} сеансов из {{total}}. Попробуйте снова.",
+    "deleteSessionsPartialFailure_one": "Не удалось удалить {{count}} сеанс из {{total}}. Попробуйте снова.",
+    "deleteSessionsPartialFailure_other": "Не удалось удалить {{count}} сеансов из {{total}}. Попробуйте снова."
   },
   "version": {
     "updateAvailable": "Доступно обновление",
@@ -167,7 +179,24 @@
     "deleteSessionPermanently": "Удалить навсегда",
     "deleteAllData": "Удалить все данные навсегда",
     "allConversationsDeleted": "Проект будет убран из боковой панели. Ваши файлы, воспоминания и данные сеансов сохранятся.",
-    "cannotUndo": "Вы сможете добавить проект позже."
+    "cannotUndo": "Вы сможете добавить проект позже.",
+    "confirmDeleteSessions": "Что вы хотите сделать с",
+    "deleteSessions_few": "Удалить {{count}} сеанса",
+    "deleteSessions_many": "Удалить {{count}} сеансов",
+    "deleteSessions_one": "Удалить {{count}} сеанс",
+    "deleteSessions_other": "Удалить {{count}} сеансов",
+    "selectedSessions_few": "{{count}} выбранными сеансами",
+    "selectedSessions_many": "{{count}} выбранными сеансами",
+    "selectedSessions_one": "{{count}} выбранным сеансом",
+    "selectedSessions_other": "{{count}} выбранными сеансами",
+    "closeSessions_few": "Закрыть {{count}} сеанса",
+    "closeSessions_many": "Закрыть {{count}} сеансов",
+    "closeSessions_one": "Закрыть {{count}} сеанс",
+    "closeSessions_other": "Закрыть {{count}} сеансов",
+    "closeSessionsNotice_few": "Закрытие убирает сеансы из активного списка, сохраняя их историю.",
+    "closeSessionsNotice_many": "Закрытие убирает сеансы из активного списка, сохраняя их историю.",
+    "closeSessionsNotice_one": "Закрытие убирает сеанс из активного списка, сохраняя его историю.",
+    "closeSessionsNotice_other": "Закрытие убирает сеансы из активного списка, сохраняя их историю."
   },
   "simpleList": {
     "newChat": "Новый чат",

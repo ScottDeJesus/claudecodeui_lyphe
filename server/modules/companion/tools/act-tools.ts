@@ -1,6 +1,7 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 
+import { sessionsDb } from '@/modules/database/index.js';
 import { sessionsService, sessionUserStateService } from '@/modules/providers/index.js';
 import { abortChatRun, answerChatPermission, broadcastSessionUpserted } from '@/modules/websocket/index.js';
 import type { CompanionSessionRef } from '@/shared/companion-types.js';
@@ -10,22 +11,28 @@ import { toolLine } from '../session/companion-prompt.js';
 
 import { answerFor, oldestPendingAsk, rememberAllowedTool } from './ask-decision.js';
 import type { CompanionToolDeps } from './companion-tools.js';
-import { listHisChats, resolveChat } from './house-reads.js';
+import { chatState, listHisChats, resolveChat, resolveClosedChat, type ChatResolution } from './house-reads.js';
 
 /**
- * The four tools that ACT on a chat: `stop_session`, `rename_session`, `pin_session` and `answer_session`. Each does what its
+ * The six tools that ACT on a chat: `stop_session`, `rename_session`, `pin_session`, `close_session`, `reopen_session` and `answer_session`. Each does what its
  * page door does, through the house's own verb, so a stop, a name or an answer from her is the same act as from
  * his hand and leaves the same marks:
  *   - `stop_session` is the page's `chat.abort` (`abortChatRun`). The turn ends aborted and the sidebar's
- *     spinner drops; the chat itself stays alive, and "was not running" is an answer, not a failure;
+ *     spinner drops. A Stop that ends the chat's process is a sleep, so an unpinned chat of the list closes itself a moment
+ *     later (MAN-9467) and a pinned one stays; "was not running" is an answer, not a failure;
  *   - `rename_session` is the sidebar's rename (`sessionsService.renameSessionById`, the door that marks a name as
  *     given by a person, so the namer never replaces it) plus the `session_upserted` delta the sidebar draws the
  *     new name from without a reload;
  *   - `pin_session` is the sidebar's Pin and Unpin (`sessionUserStateService.setPinnedById`, the write behind
  *     `PUT /sessions/:id/pinned`), which broadcasts the `session_upserted` delta itself. A pinned chat sorts first
  *     everywhere and is never closed when it falls asleep, so "keep this one" is a pin; her roster and `list_sessions`
- *     show the pin, so what she did reads back. She holds no close and no reopen: a reopen would need a resolver for
- *     the archived chats `resolveChat` leaves out, and a close she could not undo is one the sidebar's menu already offers;
+ *     show the pin, so what she did reads back;
+ *   - `close_session` and `reopen_session` are the chat list's Close and Reopen (`sessionsService.deleteOrArchiveSessionById`
+ *     without `force`, and `restoreSessionById`: the archive, and the restore), each of which broadcasts `session_archive_changed`
+ *     — and a reopen also `session_upserted` — itself, so every open list follows. A close takes the chat out of the list and
+ *     deletes nothing; a pinned chat can be closed by hand and keeps its pin, as in the sidebar. The chat a close names is found
+ *     by `resolveChat`, and the one a reopen names by `resolveClosedChat` (`house-reads.ts`), the same matching over the closed
+ *     chats `resolveChat` leaves out — so a chat that closed itself when it fell asleep is one she can name and bring back;
  *   - `answer_session` answers the OLDEST ask the chat is waiting on through the runtime's own resolver
  *     (`answerChatPermission`); what an answer means to each kind of ask is `ask-decision.ts`'s. Only the "always"
  *     answer does more: it writes the rule into his `claudePermissions` preference first (`rememberAllowedTool`, `ask-decision.ts`),
@@ -39,7 +46,7 @@ import { listHisChats, resolveChat } from './house-reads.js';
  *
  * Each description is her prompt's own line for the tool (`toolLine`).
  *
- * Consumer: `tools/companion-tools.ts`, which adds these four to the tools it builds.
+ * Consumer: `tools/companion-tools.ts`, which adds these six to the tools it builds.
  */
 
 /** The longest name she may give a chat: the sidebar shows a title, not a sentence. */
@@ -52,18 +59,20 @@ const ANSWER_MAX = 2_000;
 type Acted = { result: ToolTextResult; chat?: CompanionSessionRef };
 
 /**
- * The common course of the three: resolve the chat she named, do `act` on it, and make it her focus. A name that
- * fits no chat (or several) is the resolver's own sentence.
+ * The common course of every tool here: resolve the chat she named (`resolve`: the open chats unless a
+ * tool names from another pool), do `act` on it, and make it her focus. A name that fits no chat (or several) is the
+ * resolver's own sentence.
  */
 function onNamedChat(
   deps: CompanionToolDeps,
   toolName: string,
   doing: string,
   session: string,
-  act: (chat: CompanionSessionRef) => Promise<Acted>
+  act: (chat: CompanionSessionRef) => Promise<Acted>,
+  resolve: (ref: string) => ChatResolution = resolveChat
 ): Promise<ToolTextResult> {
   return guardedToolResult(toolName, doing, async () => {
-    const found = resolveChat(session);
+    const found = resolve(session);
     if (!found.ok) return deps.refuse(found.sentence);
     const acted = await act(found.chat);
     deps.setFocus(acted.chat ?? found.chat);
@@ -71,11 +80,22 @@ function onNamedChat(
   });
 }
 
-/** `stop_session`: the page's stop, now, on the chat she names. */
+/**
+ * `stop_session`: the page's stop, now, on the chat she names. The answer says what a Stop does to the chat's place in the list, because
+ * a Stop that ends its process is a sleep: an unpinned chat of the list then closes itself, so "it stays" is true only of a pinned one.
+ */
 function stopSession(deps: CompanionToolDeps, args: { session: string }): Promise<ToolTextResult> {
   return onNamedChat(deps, 'stop_session', 'stop the chat', args.session, async (chat) => {
     const outcome = await abortChatRun(chat.sessionId, { runtime: deps.runtime });
-    return { result: textResult(outcome === 'stopped' ? `Stopped ${chat.name}; it is still there.` : `${chat.name} was not running.`) };
+    if (outcome !== 'stopped') return { result: textResult(`${chat.name} was not running.`) };
+    const pinned = sessionsDb.getSessionById(chat.sessionId)?.pinned === 1;
+    return {
+      result: textResult(
+        pinned
+          ? `Stopped ${chat.name}; it is pinned, so it stays in the list.`
+          : `Stopped ${chat.name}. It is not pinned, so once the Stop ends its process it closes itself, as a chat does when it falls asleep: reopen_session brings it back, and pin_session keeps it.`
+      ),
+    };
   });
 }
 
@@ -125,6 +145,33 @@ function pinSession(deps: CompanionToolDeps, args: { session: string; pinned: bo
   });
 }
 
+/**
+ * `close_session`: the chat list's Close, through the service the sidebar's `DELETE /sessions/:id` calls, which broadcasts
+ * `session_archive_changed` so every open list drops the chat at once. Nothing is deleted. A pin is left as it was (a closed chat
+ * he reopens still wears it), and a chat that is working or waiting goes on: a close takes it off the list and ends nothing.
+ */
+function closeSession(deps: CompanionToolDeps, args: { session: string }): Promise<ToolTextResult> {
+  return onNamedChat(deps, 'close_session', 'close the chat', args.session, async (chat) => {
+    const state = chatState(chat.sessionId);
+    const pinned = sessionsDb.getSessionById(chat.sessionId)?.pinned === 1;
+    await sessionsService.deleteOrArchiveSessionById(chat.sessionId);
+    const goingOn = state === 'working' || state === 'waiting'
+      ? ` It is still ${state === 'working' ? 'working' : 'waiting on him'}: closing only takes it off the list, so stop_session is what ends the turn.`
+      : '';
+    return {
+      result: textResult(`Closed ${chat.name}: it left the chat list and waits under Closed${pinned ? ', still pinned' : ''}; reopen_session brings it back.${goingOn}`),
+    };
+  });
+}
+
+/** `reopen_session`: the chat list's Reopen on a closed chat, through `restoreSessionById` — both `session_archive_changed` and `session_upserted` go out, so every list and project tree puts the chat back. */
+function reopenSession(deps: CompanionToolDeps, args: { session: string }): Promise<ToolTextResult> {
+  return onNamedChat(deps, 'reopen_session', 'reopen the chat', args.session, async (chat) => {
+    sessionsService.restoreSessionById(chat.sessionId);
+    return { result: textResult(`Reopened ${chat.name}: it is back in the chat list.`) };
+  }, resolveClosedChat);
+}
+
 /** `answer_session`: the oldest ask of the chat, answered through the runtime's own resolver. */
 function answerSession(deps: CompanionToolDeps, args: { session: string; answer: string }): Promise<ToolTextResult> {
   return onNamedChat(deps, 'answer_session', 'answer the chat', args.session, async (chat) => {
@@ -142,7 +189,7 @@ function answerSession(deps: CompanionToolDeps, args: { session: string; answer:
   });
 }
 
-/** One chat, by its name or id: the argument all four tools open with. */
+/** One chat, by its name or id: the argument every tool of the file opens with. */
 const sessionArgument = z
   .string()
   .trim()
@@ -151,7 +198,7 @@ const sessionArgument = z
   .describe('The chat, by its id or its whole name as he says it. When he says "it" or "that one", it is the focus chat: never ask him which.');
 
 /**
- * The definitions of `stop_session`, `rename_session`, `pin_session` and `answer_session` (the order her prompt lists them), built
+ * The definitions of `stop_session`, `rename_session`, `pin_session`, `close_session`, `reopen_session` and `answer_session` (the order her prompt lists them), built
  * with the SDK's `tool()` and zod. None is read-only: each changes a chat, so none carries `readOnlyHint`; the CLI
  * asks no permission for them regardless, because `allowedTools` names every tool of hers.
  * Consumed by `tools/companion-tools.ts` (`buildCompanionTools`), once per account.
@@ -183,6 +230,8 @@ export function actTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<an
       },
       (args) => pinSession(deps, args)
     ),
+    tool('close_session', toolLine('close_session'), { session: sessionArgument }, (args) => closeSession(deps, args)),
+    tool('reopen_session', toolLine('reopen_session'), { session: sessionArgument }, (args) => reopenSession(deps, args)),
     tool(
       'answer_session',
       toolLine('answer_session'),

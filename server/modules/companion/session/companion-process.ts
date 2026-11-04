@@ -15,8 +15,10 @@ import { companionQueryOptions } from './companion-launch.js';
  *     asks `isBusy` first: a turn in flight is never closed under;
  *   - the CLI is given a grace to answer an interrupt or to exit after the end of its input, and killed
  *     when it does not — a process that ignores a Stop would ignore the next message too.
- * Once we have ended it (`close`, `kill`, the idle closer) it reports NOTHING more: its messages are
- * drained unheard and its ending is not an event. `onEnded` fires only when the loop ended by itself.
+ * Once we have ended it (`close`, `kill`, the idle closer) it reports nothing more but RESULTS: its other messages are
+ * drained unheard and its ending is not an event. A result is still reported, because a turn that finished as the input
+ * ended is how its owner learns the turn was answered and not stopped (the session reads it only from a launch it is
+ * closing). `onEnded` fires only when the loop ended by itself.
  *
  * Consumers: `session/companion-session.ts`, one launch at a time per account.
  */
@@ -44,7 +46,7 @@ export async function answeredWithin<T>(work: Promise<T>, ms: number): Promise<T
  * launch begins (the model), `tools` are the definitions her MCP server carries, `systemPrompt` the
  * prompt the session's plan was hashed over (her soul read once for the plan, never again here) and `resume`
  * the CLI session to continue (`null` for a fresh conversation). `onMessage` hears
- * every message of the loop, `onEnded` the way a loop that ended BY ITSELF ended (`null` for a clean
+ * every message of the loop (after we ended it, only its results), `onEnded` the way a loop that ended BY ITSELF ended (`null` for a clean
  * end, else what it threw) and `onIdleClose` the idle closer's decision, which the owner carries out.
  * Consumed by `companion-session-types.ts`, whose `launch` dep is a function of it (a stand-in launcher replaces the real one).
  */
@@ -150,7 +152,8 @@ export function launchCompanionCli(input: CompanionCliLaunch): CompanionCli {
         });
       }
       for await (const message of started) {
-        if (!queue.ended) input.onMessage(message);
+        // Ended by us, the loop's words are nobody's turn; its result is still the owner's to read.
+        if (!queue.ended || message.type === 'result') input.onMessage(message);
       }
     } catch (error) {
       thrown = error;

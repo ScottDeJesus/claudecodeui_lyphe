@@ -1,6 +1,6 @@
 import { notesDb, type NoteRow } from '@/modules/database/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
-import type { Note, NoteInput, NotesChangedEvent } from '@/shared/types.js';
+import type { Note, NoteInput, NotesChangedEvent, SaveOrder } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
 /**
@@ -162,27 +162,41 @@ export const notesService = {
     return toNote(row);
   },
 
-  /** Creates one note from a whole draft and answers it as stored, `createdAt === updatedAt`. */
-  create(userId: number, input: NoteInput): Note {
+  /**
+   * Creates one note from a whole draft and answers it as stored, `createdAt === updatedAt`.
+   *
+   * `clientKey` makes the create IDEMPOTENT: the tab's blank card mints one key for its first save and sends
+   * it on every retry, because a save whose answer never arrived may have landed, and a retry without the key
+   * would make a second note. A key this account has already used answers with the note it made and makes no
+   * second one. What the repeat does with its text is the `order`'s to say: a repeat newer than the writer's
+   * last applied save REWRITES the note (the retry carries what was typed since the lost attempt), and an
+   * older one — the first attempt arriving after its retry — writes nothing; with no `order` (the notes command,
+   * a script) a repeat never writes. The text is judged first either way, so a repeat that is itself refused is
+   * refused. A create or a repeat that wrote sends the frame; one that did not has nothing to announce.
+   */
+  create(userId: number, input: NoteInput, clientKey: string | null = null, order: SaveOrder | null = null): Note {
     const { title, description } = validate(normaliseTitle(input.title), normaliseDescription(input.description));
-    const note = toNote(notesDb.create({ userId, title, description }));
-    broadcastNotesChanged();
-    return note;
+    const { row, applied } = notesDb.create({ userId, clientKey, title, description, order });
+    if (applied) broadcastNotesChanged();
+    return toNote(row);
   },
 
   /**
    * Replaces the title and the description of one of the account's notes and answers it as saved.
    *
    * The not-found answer is the repository's: `null` from `update` means no row of THIS account
-   * carries the id — a note of another account is, from here, a note that is not there.
+   * carries the id — a note of another account is, from here, a note that is not there. A save whose
+   * `order` is not newer than its writer's last applied one is an older text arriving late: it is answered
+   * with the note as it stands, writes nothing and sends no frame. An answer is never a refusal for it, so the
+   * tab that sent it sees a save that landed, and its newer text — already applied — is what the note holds.
    */
-  update(userId: number, id: string, input: NoteInput): Note {
+  update(userId: number, id: string, input: NoteInput, order: SaveOrder | null = null): Note {
     const { title, description } = validate(normaliseTitle(input.title), normaliseDescription(input.description));
-    const row = notesDb.update(userId, id, { title, description });
-    if (row === null) throw noteNotFound();
+    const write = notesDb.update(userId, id, { title, description }, order);
+    if (write === null) throw noteNotFound();
 
-    broadcastNotesChanged();
-    return toNote(row);
+    if (write.applied) broadcastNotesChanged();
+    return toNote(write.row);
   },
 
   /** Deletes one of the account's notes; a delete that landed is what sends the frame. */

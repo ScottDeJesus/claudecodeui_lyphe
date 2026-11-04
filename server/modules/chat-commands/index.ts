@@ -10,7 +10,9 @@ export { chatCredential } from './chat-commands.credential.js';
 // middleware of their command routers and the read of who passed it.
 export { chatAppSessionOf, chatCredentialGuard } from './chat-commands.guard.js';
 
-// accountOfChat: used by the notes and followups modules' command doors, to learn whose rows a chat may reach.
+// accountOfChat: used by the notes and followups modules' command doors, to learn whose rows a chat may reach, and by the followups
+// service's `fileGapsForChat` (the house filing a finished feature's build gaps on a chat that did not ask), which asks the same
+// question and, on a null, falls back to the one account already holding an item on the chat.
 export { accountOfChat } from './chat-commands.account.js';
 
 // ensureChatCommandLink: used by the toolsets, notes and followups modules at creation, one call per command.

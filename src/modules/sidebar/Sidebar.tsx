@@ -102,7 +102,7 @@ function Sidebar({
 
   const {
     isSidebarCollapsed,
-    expandedProjects,
+    isProjectExpanded,
     activeRename,
     showNewProject,
     initialSessionsLoaded,
@@ -146,6 +146,12 @@ function Sidebar({
     saveProjectName,
     showDeleteSessionConfirmation,
     confirmDeleteSession,
+    sessionSelection,
+    setProjectSessionSelection,
+    toggleSessionSelected,
+    cancelSessionSelection,
+    showDeleteSelectedSessionsConfirmation,
+    confirmDeleteSessions,
     requestProjectDelete,
     confirmDeleteProject,
     handleProjectSelect,
@@ -179,6 +185,7 @@ function Sidebar({
     setCurrentProject,
     setSidebarVisible,
     sidebarVisible,
+    keepProjectsExpanded: preferences.keepProjectsExpanded,
   });
 
   // The `pwa-mode` class the workspace's frame keys on (src/index.css); this stays mounted under Kaylee Station, so the station's frame has it too.
@@ -208,7 +215,7 @@ function Sidebar({
     selectedSession,
     isLoading,
     loadingProgress,
-    expandedProjects,
+    isProjectExpanded,
     activeRename,
     initialSessionsLoaded,
     currentTime,
@@ -219,7 +226,6 @@ function Sidebar({
     loadingMoreProjects,
     activeSessions,
     attentionSessionIds,
-    forceExpanded: searchMode === 'running',
     isProjectStarred,
     onRenameDraftChange: updateRenameDraft,
     onToggleProject: toggleProject,
@@ -237,6 +243,11 @@ function Sidebar({
     onStartEditingSession: startEditingSession,
     onCancelEditingSession: cancelRename,
     onSaveEditingSession: handleSaveSessionName,
+    sessionSelection,
+    onSetSessionSelection: setProjectSessionSelection,
+    onToggleSessionSelected: toggleSessionSelected,
+    onCancelSessionSelection: cancelSessionSelection,
+    onDeleteSelectedSessions: showDeleteSelectedSessionsConfirmation,
     t,
   };
 
@@ -254,6 +265,7 @@ function Sidebar({
         onCancelDeletion={() => setPendingDeletion(null)}
         onConfirmDeleteProject={confirmDeleteProject}
         onConfirmDeleteSession={confirmDeleteSession}
+        onConfirmDeleteSessions={confirmDeleteSessions}
         showVersionModal={showVersionModal}
         onCloseVersionModal={() => setShowVersionModal(false)}
         releaseInfo={releaseInfo}

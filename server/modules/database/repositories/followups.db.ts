@@ -14,10 +14,10 @@ import { getConnection } from '@/modules/database/connection.js';
  * merged away (`moveToSession`).
  *
  * Consumers: `server/modules/followups/followups.service.ts` — the lane's only reader and writer; the
- * companion reads through the followups barrel's `listOpenFollowups` and `listOpenFollowupGroups`, never this file — and `sessions.db.ts`,
+ * companion reads through the followups barrel's `listOpenFollowups`, `listCompletionClosedFollowups` and `listOpenFollowupGroups`, never this file — and `sessions.db.ts`,
  * which calls `moveToSession` inside its merge transactions. Reach it through
- * `@/modules/database/index.js`. Every statement runs on the caller's connection; only `addMany`
- * opens a transaction of its own, so a batch lands whole or not at all.
+ * `@/modules/database/index.js`. Every statement runs on the caller's connection; the batch writes
+ * (`addMany`, `addUnheldMany`, `closeInChat`, `closeForCompletion`) each open a transaction of their own, so a batch lands whole or not at all.
  */
 
 /** The two kinds of item a chat files. */
@@ -64,6 +64,17 @@ export const followupsDb = {
   listOpenOfUser(userId: number, limit: number): FollowupRow[] {
     return getConnection()
       .prepare(`SELECT ${FOLLOWUP_COLUMNS} FROM followups WHERE user_id = ? AND state = 'open' ORDER BY id DESC LIMIT ?`)
+      .all(userId, limit) as FollowupRow[];
+  },
+
+  /**
+   * The account's items the house closed because the feature, task or epic they named finished, across every chat, newest first
+   * (`id` is the order they were filed in, the order `listOpenOfUser` reads), at most `limit` of them. A person's untick clears
+   * `closed_for`, so a reopened item is never among them. `limit` is a whole number of 1 or more; the service holds it there.
+   */
+  listSettledByCompletionOfUser(userId: number, limit: number): FollowupRow[] {
+    return getConnection()
+      .prepare(`SELECT ${FOLLOWUP_COLUMNS} FROM followups WHERE user_id = ? AND state = 'done' AND closed_for IS NOT NULL ORDER BY id DESC LIMIT ?`)
       .all(userId, limit) as FollowupRow[];
   },
 
@@ -122,6 +133,41 @@ export const followupsDb = {
         return row;
       }),
     )();
+  },
+
+  /**
+   * Inserts the items of `input` the chat does not already hold — same kind and same text, in ANY state, so a line the person
+   * ticked or the house closed is not filed again — and answers the rows it wrote, in the order given. The check and the
+   * inserts are ONE write transaction (`immediate`), so two servers filing the same line at the same moment (the dev API's
+   * handover runs the old and the new side by side) write it once. A line repeated inside `input` lands once.
+   * The house's own filing, in `followups.service.ts` (`fileGapsForChat`).
+   */
+  addUnheldMany(input: { sessionId: string; userId: number; items: Array<{ kind: FollowupKind; text: string }> }): FollowupRow[] {
+    const db = getConnection();
+    const now = new Date().toISOString();
+    const held = db.prepare('SELECT 1 FROM followups WHERE session_id = ? AND kind = ? AND text = ? LIMIT 1');
+    const insert = db.prepare(
+      `INSERT INTO followups (session_id, user_id, kind, text, state, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'open', ?, ?)
+       RETURNING ${FOLLOWUP_COLUMNS}`,
+    );
+
+    return db
+      .transaction(() =>
+        input.items.flatMap((item) => {
+          if (held.get(input.sessionId, item.kind, item.text) !== undefined) return [];
+          const row = insert.get(input.sessionId, input.userId, item.kind, item.text, now, now) as FollowupRow | undefined;
+          if (!row) throw new Error(`Could not insert followup "${item.text}".`);
+          return [row];
+        }),
+      )
+      .immediate();
+  },
+
+  /** The ids of the accounts that own at least one item of the chat, in any state — the chat's own record of whose it is. */
+  accountsOfChat(sessionId: string): number[] {
+    const rows = getConnection().prepare('SELECT DISTINCT user_id FROM followups WHERE session_id = ?').all(sessionId) as Array<{ user_id: number }>;
+    return rows.map((row) => row.user_id);
   },
 
   /**

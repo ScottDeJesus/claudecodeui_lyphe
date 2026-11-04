@@ -10,7 +10,10 @@ import { runDispatcherCommand, type DispatcherCommandDependencies } from '@/shar
  * Nothing here writes the store: `show` is a read.
  */
 
-/** A plan's or an arc's name, with or without `.arc` — the shape `dispatcher.routes.ts` fences every name with. */
+/**
+ * A plan's or an arc's name, with or without `.arc` — the shape `dispatcher.routes.ts` fences every name with, WITHOUT its
+ * reservation of `production`, `chain-…` and `session-…`: `show` is a read, and the dispatcher answers a reserved name "no plan".
+ */
 const CARD_NAME = /^[a-z0-9][a-z0-9-]{0,99}(\.arc)?$/;
 
 /** How much of the dispatcher's own line a refusal carries: one line names the cause, and the rest is a traceback's body. */

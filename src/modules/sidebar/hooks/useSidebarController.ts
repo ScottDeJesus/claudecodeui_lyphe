@@ -7,6 +7,8 @@ import { useWebSocket } from '@/shared/context/WebSocketContext';
 import { subscribeToUserPreferences } from '@/shared/userSettings';
 import { usePaletteOps } from '@/modules/command-palette';
 import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationProjectResult, ConversationSearchResults, LLMProvider, Project, ProjectSession, ProjectSortOrder, RecentConversationListItem, RunningSessionListItem, SearchProgress, ActiveSidebarRename, PendingSidebarDeletion, SessionTitleSearchResult, SessionWithProvider, SidebarSearchMode } from '@/shared/types';
+import { useExpandedProjects } from '@/modules/sidebar/hooks/useExpandedProjects';
+import { useSessionSelection } from '@/modules/sidebar/hooks/useSessionSelection';
 import {
   reconcileProjectStarOverrides,
   setProjectStarOverride,
@@ -67,8 +69,11 @@ type UseSidebarControllerArgs = {
   setCurrentProject: (project: Project) => void;
   setSidebarVisible: (visible: boolean) => void;
   sidebarVisible: boolean;
+  /** Lets several project groups stay open at once and remembers them across reloads. */
+  keepProjectsExpanded?: boolean;
 };
 
+/** Used by Sidebar to coordinate project navigation, expansion and session actions. */
 export function useSidebarController({
   projects,
   selectedProject,
@@ -87,9 +92,12 @@ export function useSidebarController({
   setCurrentProject,
   setSidebarVisible,
   sidebarVisible,
+  keepProjectsExpanded = false,
 }: UseSidebarControllerArgs) {
   const paletteOps = usePaletteOps();
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [expandedProjects, setExpandedProjects] = useExpandedProjects(selectedProject?.projectId, keepProjectsExpanded);
+  // Running groups start expanded and remember manual collapses independently of Projects.
+  const [collapsedRunningProjects, setCollapsedRunningProjects] = useState<Set<string>>(new Set());
   // The one rename the sidebar has open, as a single value so a project and a
   // session cannot both be mid-rename. See ActiveSidebarRename.
   const [activeRename, setActiveRename] = useState<ActiveSidebarRename | null>(null);
@@ -148,25 +156,6 @@ export function useSidebarController({
   useEffect(() => {
     setInitialSessionsLoaded(new Set());
   }, [projects]);
-
-  useEffect(() => {
-    // Auto-expand only when the selected project identity changes.
-    // Depending on the full `selectedProject` object (or `selectedSession`) causes
-    // websocket-driven list refreshes to re-open projects users manually collapsed.
-    const selectedProjectId = selectedProject?.projectId;
-    if (!selectedProjectId) {
-      return;
-    }
-
-    setExpandedProjects((prev) => {
-      if (prev.has(selectedProjectId)) {
-        return prev;
-      }
-      const next = new Set(prev);
-      next.add(selectedProjectId);
-      return next;
-    });
-  }, [selectedProject?.projectId]);
 
   useEffect(() => {
     if (projects.length > 0 && !isLoading) {
@@ -229,6 +218,23 @@ export function useSidebarController({
       setIsArchivedSessionsLoading(false);
     }
   }, []);
+
+  const {
+    sessionSelection,
+    setProjectSessionSelection,
+    toggleSessionSelected,
+    cancelSessionSelection,
+    showDeleteSelectedSessionsConfirmation,
+    confirmDeleteSessions,
+  } = useSessionSelection({
+    pendingDeletion,
+    setPendingDeletion,
+    setActiveRename,
+    activeSessions,
+    onSessionDelete,
+    fetchArchivedSessions,
+    t,
+  });
 
   const fetchRecentConversationsPage = useCallback(async (offset: number, append: boolean) => {
     const requestSequence = ++recentConversationsSeqRef.current;
@@ -495,15 +501,43 @@ export function useSidebarController({
 
   // All sidebar state keys (expanded, starred, loading, etc.) use the DB
   // `projectId` as their identifier after the migration.
-  const toggleProject = useCallback((projectId: string) => {
-    setExpandedProjects((prev) => {
-      const next = new Set<string>();
-      if (!prev.has(projectId)) {
-        next.add(projectId);
+  const toggleProject = useCallback(
+    (projectId: string) => {
+      // Collapsing or expanding takes the ticked rows off screen, so the
+      // selection they belong to is dropped with them.
+      cancelSessionSelection();
+
+      if (searchMode === 'running') {
+        setCollapsedRunningProjects((prev) => {
+          const next = new Set(prev);
+          if (!next.delete(projectId)) {
+            next.add(projectId);
+          }
+          return next;
+        });
+        return;
       }
-      return next;
-    });
-  }, []);
+
+      setExpandedProjects((prev) => {
+        const next = keepProjectsExpanded ? new Set(prev) : new Set<string>();
+        if (prev.has(projectId)) {
+          next.delete(projectId);
+        } else {
+          next.add(projectId);
+        }
+        return next;
+      });
+    },
+    [cancelSessionSelection, keepProjectsExpanded, searchMode, setExpandedProjects],
+  );
+
+  const isProjectExpanded = useCallback(
+    (projectId: string) =>
+      searchMode === 'running'
+        ? !collapsedRunningProjects.has(projectId)
+        : expandedProjects.has(projectId),
+    [collapsedRunningProjects, expandedProjects, searchMode],
+  );
 
   const handleSessionClick = useCallback(
     (session: SessionWithProvider, projectId: string) => {
@@ -1073,9 +1107,16 @@ export function useSidebarController({
     setSidebarVisible(true);
   }, [setSidebarVisible]);
 
+  // Wrapped rather than reset from an effect: leaving the Projects tab hides the
+  // ticked rows, and a selection left behind would come back with the tab.
+  const changeSearchMode = useCallback((mode: SidebarSearchMode) => {
+    cancelSessionSelection();
+    setSearchMode(mode);
+  }, [cancelSessionSelection]);
+
   return {
     isSidebarCollapsed,
-    expandedProjects,
+    isProjectExpanded,
     activeRename,
     showNewProject,
     initialSessionsLoaded,
@@ -1114,6 +1155,12 @@ export function useSidebarController({
     saveProjectName,
     showDeleteSessionConfirmation,
     confirmDeleteSession,
+    sessionSelection,
+    setProjectSessionSelection,
+    toggleSessionSelected,
+    cancelSessionSelection,
+    showDeleteSelectedSessionsConfirmation,
+    confirmDeleteSessions,
     requestProjectDelete,
     confirmDeleteProject,
     handleProjectSelect,
@@ -1126,7 +1173,7 @@ export function useSidebarController({
     expandSidebar,
     setShowNewProject,
     searchMode,
-    setSearchMode,
+    setSearchMode: changeSearchMode,
     conversationResults,
     isSearching,
     searchProgress,

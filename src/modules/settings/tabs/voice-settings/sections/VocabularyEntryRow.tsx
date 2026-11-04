@@ -8,10 +8,13 @@ import { Button, Chip, ConfirmDialog, Input } from '@/shared/ui';
 
 type VocabularyEntryRowProps = {
   entry: VocabularyEntry;
-  /** A save is out: every press waits for it, because the next list is made from the one drawn. */
+  /** A save is out or waiting its turn: every press waits for it. His typing never does. */
   saving: boolean;
-  /** Hands on the whole entry as it would now read. For a saved row the section saves the list with it; for the draft it keeps it. */
-  onChange: (next: VocabularyEntry) => void;
+  /**
+   * Hands on what he changed, as a function of the entry: the section applies it to the entry as it stands when it acts, so a
+   * change made while a save is out is made on top of that save. For a saved row the section saves the list with it; for the draft it keeps it.
+   */
+  onChange: (change: (entry: VocabularyEntry) => VocabularyEntry) => void;
   /** Deletes this saved entry (asked first). Absent on the draft. */
   onDelete?: () => void;
   /**
@@ -44,6 +47,7 @@ type CommitFieldProps = {
   /** The server's value for the field: what it shows until he types. */
   value: string;
   placeholder?: string;
+  /** A save is out or waiting: when none is left, the commit's `sent` text settles. */
   saving: boolean;
   /** A change of the tidied text. `allowEmpty` fields send an empty one too (a blank pronunciation means "as written"). */
   onCommit: (text: string) => void;
@@ -54,29 +58,33 @@ type CommitFieldProps = {
 /**
  * One text field of a row that is saved as he leaves it (Tab, a click away, or Enter) and never per keystroke, because a save
  * replaces the whole list. Escape puts the server's value back. He sees his text until the save settles; a refused one then
- * snaps back to the server's value, and the sentence in the row says why. The field is read-only while any save is out: an edit
- * made then would be built from the list as drawn, which is the one from before that save, and would replace it.
+ * snaps back to the server's value, and the sentence in the row says why. Whatever he types while a save is out is kept (it is
+ * a new edit, committed in its turn, and the section builds that save on top of the one in flight), so he can type on through
+ * Enter or Tab without losing a key, and the field keeps the focus through every save.
  */
 function CommitField({ label, value, placeholder, saving, onCommit, allowEmpty = false, hook }: CommitFieldProps) {
-  // What he has typed and not yet committed; null while the field shows the server's value.
+  // What he has typed and not yet settled; null while the field shows the server's value.
   const [typed, setTyped] = useState<string | null>(null);
-  // The commit is out: the typed text stays until the answer settles, so the field never flips back for the moment the save is in flight.
-  const [sent, setSent] = useState(false);
+  // The last commit, until the saves settle: `raw` is the text exactly as typed, `text` its tidied form, which is what the server will hold. The typed text stays until the answer, so the field never flips back for the moment the save is in flight; `raw` tells the commit's own text from anything typed after it, and only the exact text can: a space typed after Enter tidies to nothing, so comparing the tidied forms would throw it away.
+  const [sent, setSent] = useState<{ raw: string; text: string } | null>(null);
 
   // Set while rendering, which React re-runs at once: no frame draws the typed text past the answer.
-  if (sent && !saving) {
-    setSent(false);
-    setTyped(null);
+  if (sent !== null && !saving) {
+    setSent(null);
+    // Only the text the commit sent goes back to the server's value; what he typed after the commit, a space included, stays, still his.
+    if (typed === sent.raw) setTyped(null);
   }
 
   const commit = () => {
     if (typed === null) return;
     const text = tidied(typed);
-    if (text === value || (text === '' && !allowEmpty)) {
-      setTyped(null);
+    // What the server will hold once the saves out settle: the text sent, else what it holds now.
+    const standing = sent?.text ?? value;
+    if (text === standing || (text === '' && !allowEmpty)) {
+      if (sent === null) setTyped(null);
       return;
     }
-    setSent(true);
+    setSent({ raw: typed, text });
     onCommit(text);
   };
 
@@ -89,7 +97,6 @@ function CommitField({ label, value, placeholder, saving, onCommit, allowEmpty =
         autoComplete="off"
         spellCheck={false}
         data-vocabulary-field={hook}
-        readOnly={saving}
         onChange={(event) => setTyped(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {
@@ -112,8 +119,9 @@ function CommitField({ label, value, placeholder, saving, onCommit, allowEmpty =
  * and one more, with `draft`, while a new word is being composed.
  *
  * A saved row saves as he changes it: a field when he leaves it, a form when it is added or removed. Nothing is optimistic; while
- * any save is out every press waits (`busy`, which keeps focus where a disabled button would drop it) and every field is
- * read-only. A save the server refuses is explained in the row it was made from (`refusal`), under the fields it touched.
+ * any save is out every press waits (`busy`, which keeps focus where a disabled button would drop it), but the fields stay
+ * writable and what he types meanwhile is kept for its own turn. A save the server refuses is explained in the row it was made
+ * from (`refusal`), under the fields it touched.
  * Deleting a word asks first, because it takes its misheard forms with it.
  */
 export function VocabularyEntryRow({ entry, saving, onChange, onDelete, draft, refusal = null }: VocabularyEntryRowProps) {
@@ -139,7 +147,7 @@ export function VocabularyEntryRow({ entry, saving, onChange, onDelete, draft, r
       return;
     }
     setSentForms(fresh);
-    onChange({ ...entry, misheard: [...entry.misheard, ...fresh] });
+    onChange((current) => ({ ...current, misheard: [...current.misheard, ...fresh] }));
   };
 
   const saveDraft = () => {
@@ -150,7 +158,7 @@ export function VocabularyEntryRow({ entry, saving, onChange, onDelete, draft, r
 
   const removeForm = (gone: string) => {
     if (saving) return;
-    onChange({ ...entry, misheard: entry.misheard.filter((form) => form !== gone) });
+    onChange((current) => ({ ...current, misheard: current.misheard.filter((form) => form !== gone) }));
   };
 
   const name = entry.spelling || t('voiceSettings.vocabulary.newWord', { defaultValue: 'new word' });
@@ -164,7 +172,7 @@ export function VocabularyEntryRow({ entry, saving, onChange, onDelete, draft, r
           placeholder={t('voiceSettings.vocabulary.spellingPlaceholder', { defaultValue: 'lypheCli' })}
           saving={saving}
           hook="spelling"
-          onCommit={(spelling) => onChange({ ...entry, spelling })}
+          onCommit={(spelling) => onChange((current) => ({ ...current, spelling }))}
         />
         <CommitField
           label={t('voiceSettings.vocabulary.pronunciation', { defaultValue: 'Sounds like' })}
@@ -173,7 +181,7 @@ export function VocabularyEntryRow({ entry, saving, onChange, onDelete, draft, r
           saving={saving}
           allowEmpty
           hook="pronunciation"
-          onCommit={(pronunciation) => onChange({ ...entry, pronunciation })}
+          onCommit={(pronunciation) => onChange((current) => ({ ...current, pronunciation }))}
         />
         {onDelete && (
           <Button

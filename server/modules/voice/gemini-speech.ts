@@ -7,7 +7,11 @@ import { respellForSpeech } from './vocabulary-match.js';
 import { readVoiceSettings } from './voice-settings.js';
 
 const INTERACTIONS_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
-/** The whole call, from the ask to the last byte. A sentence is at most 300 characters, so a stream still open after this is stuck. */
+/**
+ * The whole call, from the ask to the last byte. A sentence of hers is at most 300 characters and a piece of the chat's read-aloud at most
+ * 700 (`gemini-read-aloud.ts`); the journal holds a 91-character sentence that took 31 s under load, so a stream still open after this is
+ * given up on as stuck, not proven so.
+ */
 const CALL_TIMEOUT_MS = 60_000;
 const RETRY_DELAY_MS = 1_000;
 
@@ -271,7 +275,8 @@ async function* nothing(): AsyncGenerator<SpeechChunk> {}
  * NOT COUNTED against any Gemini budget (the operator's ruling, 2026-10-26, "Kaylee doesn't count for the budget"): no
  * admit before, no record after. One log line per call, never the key. The sentence is sent with the account's house words
  * respelled to their pronunciation (`respellForSpeech`).
- * Consumed through the voice barrel by the companion's speech door (`companion-speech.ts`).
+ * Consumed through the voice barrel by the companion's speech door (`companion-speech.ts`), and inside the module by `gemini-read-aloud.ts`,
+ * which speaks the chat's read-aloud through it piece by piece.
  */
 export async function synthesizeSentence(userId: number, input: { text: string; style: string; signal: AbortSignal }): Promise<SpeechAnswer> {
   const { speechModel, voice } = readVoiceSettings(userId).gemini;

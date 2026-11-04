@@ -4,14 +4,15 @@ import { BANK_PAGE_ID, bankDoor, type BankRow } from './bank-door.js';
 import { firstQuote, quotesOf } from './memory-words.js';
 
 /**
- * HER MEMORY AS THE STATION'S CORNER DRAWS IT: each memory's kind, title, the moment he said it and his first words. It is read through
+ * HER MEMORY AS THE STATION'S CORNER DRAWS IT: each memory's kind, title, whether he said or typed it, the moment and his first words. It is read through
  * her door and through her words and nowhere else: `bankDoor.list` and `bankDoor.get` (MAN-9191) for the rows, `quotesOf` and `firstQuote`
  * (`memory-words.ts`) for what a body quotes. The page has no door to the docstore and parses no body, so this is the one place a body is
  * read for the corner.
  *
- * NOTHING OF HERS STANDS AS A QUOTE OF HIS (INV-10122). The moment (`saidAt`), the account and his words (`quote`) come from the body's
- * first `He said (<account>, <at>): “…”` line (`He typed (…)` when he typed it), parsed by `quotesOf`, and from nowhere else: her context line and her reason line are
- * not quotes and never reach a line. A memory whose body quotes no one has `null` for all three, and the view says so.
+ * NOTHING OF HERS STANDS AS A QUOTE OF HIS (INV-10122). The channel (`via`: `spoken` for `He said (…)`, `typed` for `He typed (…)`), the
+ * moment (`saidAt`), the account and his words (`quote`) come from the body's first `He said (<account>, <at>): “…”` line (`He typed (…)`
+ * when he typed it), parsed by `quotesOf`, and from nowhere else: her context line and her reason line are not quotes and never reach a
+ * line. A memory whose body quotes no one has `null` for all four, and the view says so.
  *
  * ONE UNREADABLE MEMORY MAKES THE READING FAIL, WITH ITS SENTENCE. A list with a hole would show seven as six; so a `list` or a `get`
  * that is refused answers `count: null` and the door's own sentence as `reason`, as the full page does, and the view draws "—" with that
@@ -24,14 +25,18 @@ const QUOTE_CUT = 200;
 /** A moment in a body is the log row's ISO time. A moment that does not parse (a row edited by hand) is no moment, so the contract's "ISO or `null`" holds. */
 const parseableMoment = (at: string): boolean => Number.isFinite(Date.parse(at));
 
-/** One memory as a line: its row's own title and kind, then the moment, the account and the words of its first quote, or `null` for all three when it quotes no one. */
+/**
+ * One memory as a line: its row's own title and kind, then the channel, the moment, the account and the words of its first quote, or `null` for all four
+ * when it quotes no one. The channel (`via`) is the verb of that quote line, which the corner turns into "said" or "typed".
+ */
 function lineOf(row: BankRow): CompanionMemoryLine {
   const first = quotesOf(row.body)[0];
-  if (first === undefined) return { token: row.token, title: row.title, kind: row.kind, saidAt: null, account: null, quote: null };
+  if (first === undefined) return { token: row.token, title: row.title, kind: row.kind, via: null, saidAt: null, account: null, quote: null };
   return {
     token: row.token,
     title: row.title,
     kind: row.kind,
+    via: first.via,
     saidAt: parseableMoment(first.at) ? first.at : null,
     account: first.account,
     quote: firstQuote(row.body, QUOTE_CUT),

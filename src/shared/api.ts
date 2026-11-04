@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult, VocabularyEntry, VoiceProvider, VoiceSettingsPatch, WriteAttempt } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SaveOrder, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult, VocabularyEntry, VoiceProvider, VoiceSettingsPatch, WriteAttempt } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
@@ -249,6 +249,9 @@ export async function refusalCode(response: Response): Promise<string | null> {
     return null;
   }
 }
+
+/** A note save's `Save-Order` header value: `<writer>:<seq>`. The server's route reads exactly this shape. */
+const formatSaveOrder = (order: SaveOrder): string => `${order.writer}:${order.seq}`;
 
 const get = (url: string, options: ApiRequestOptions = {}) => authenticatedFetch(url, options);
 
@@ -946,7 +949,7 @@ export const api = {
     // sentence as `reason` when the bank cannot be read (still a 200), and the id of her DocSpace page. `clear` is his act in Settings: it retires
     // every memory and answers `{ forgotten }`; a door that stops it is a 502 `COMPANION_MEMORY_UNREACHABLE` carrying the sentence, and some may
     // have been forgotten before it, so a caller reads again either way. The retires run one by one, so it gets the same ceiling as `clear`.
-    // `lines` is the same reading with each memory as a line (`CompanionMemoryLines`: kind, title, the moment he said it and his first words),
+    // `lines` is the same reading with each memory as a line (`CompanionMemoryLines`: kind, title, whether he said or typed it, the moment and his first words),
     // for the station's "What I'm keeping" corner, which reads it at mount, on each `companion_memory` frame and on reconnect. It is still a 200
     // when the bank cannot be read (`count: null` with the sentence as `reason`); a refusal of the route itself carries the app's envelope.
     memory: {
@@ -1069,8 +1072,20 @@ export const api = {
   // outlives the page.
   notes: {
     list: () => get('/api/notes'),
-    create: (input: NoteInput, options?: ApiRequestOptions) => post('/api/notes', input, options),
-    update: (id: string, input: NoteInput, options?: ApiRequestOptions) => put(`/api/notes/${encodeURIComponent(id)}`, input, options),
+    // `idempotencyKey` is the blank card's one key for its first save: a retry of a create whose answer
+    // never arrived sends the same key, and the server answers it with the note the first one made.
+    // `order` is the save's place in this tab's sends (the `Save-Order` header): a save the server has already
+    // seen a newer one from this tab for is answered with the note as it stands and writes nothing.
+    create: (input: NoteInput, idempotencyKey: string, order: SaveOrder, options?: ApiRequestOptions) =>
+      post('/api/notes', input, {
+        ...options,
+        headers: { ...options?.headers, 'Idempotency-Key': idempotencyKey, 'Save-Order': formatSaveOrder(order) },
+      }),
+    update: (id: string, input: NoteInput, order: SaveOrder, options?: ApiRequestOptions) =>
+      put(`/api/notes/${encodeURIComponent(id)}`, input, {
+        ...options,
+        headers: { ...options?.headers, 'Save-Order': formatSaveOrder(order) },
+      }),
     remove: (id: string) => del(`/api/notes/${encodeURIComponent(id)}`),
   },
 
@@ -1630,22 +1645,24 @@ export async function uploadAttachmentFiles(files: File[]): Promise<unknown[]> {
 //----------------- VOICE TRANSCRIPTION AND SPEECH ------------
 
 /**
- * Serializes the active voice configuration so callers can detect a settings change and
- * drop cached synthesized audio.
+ * Serializes what decides the synthesized audio on the client's side, so callers can detect a change and drop cached audio:
+ * the provider, and for 'openai' the browser's own OpenAI-compatible configuration. On 'gemini' the browser's configuration is
+ * never reached, so editing it changes nothing; the account's Gemini speech model and voice live on the server and are not part
+ * of it (a message read before changing them replays its old audio until the page reloads).
  */
-export function voiceConfigSignature(): string {
-  return JSON.stringify(readVoiceConfig());
+export function voiceConfigSignature(provider: VoiceProvider): string {
+  return JSON.stringify({ provider, config: provider === 'gemini' ? null : readVoiceConfig() });
 }
 
 /**
- * Transcribes recorded audio. With the 'openai' provider (the default), it posts directly to the user's configured
- * OpenAI-compatible endpoint when one is set (the account's vocabulary prompt and cleanup applied through the server's
- * engine: `transcribeOnOwnEndpoint`, `src/shared/voiceDirect.ts`) and otherwise goes through the CloudCLI voice proxy, which
- * applies them itself. With 'gemini' it always goes through the proxy, which transcribes on the server's Gemini key: the
- * browser's own endpoint is never reached and none of its `x-voice-*` headers (its OpenAI-compatible key and model) ride
- * along. Callers pass the account's provider from the chat module's `useVoiceProvider`.
+ * Transcribes recorded audio. With the 'gemini' provider (the default) it always goes through the CloudCLI voice proxy, which
+ * transcribes on the server's Gemini key: the browser's own endpoint is never reached and none of its `x-voice-*` headers (its
+ * OpenAI-compatible key and model) ride along. With 'openai' it posts directly to the user's configured OpenAI-compatible
+ * endpoint when one is set (the account's vocabulary prompt and cleanup applied through the server's engine:
+ * `transcribeOnOwnEndpoint`, `src/shared/voiceDirect.ts`) and otherwise goes through the proxy, which applies them itself.
+ * Callers pass the account's provider from the chat module's `useVoiceProvider`.
  */
-export function transcribeVoice(blob: Blob, filename: string, provider: VoiceProvider = 'openai'): Promise<Response> {
+export function transcribeVoice(blob: Blob, filename: string, provider: VoiceProvider = 'gemini'): Promise<Response> {
   const body = new FormData();
 
   if (provider === 'gemini') {
@@ -1663,11 +1680,18 @@ export function transcribeVoice(blob: Blob, filename: string, provider: VoicePro
 }
 
 /**
- * Synthesizes speech for the given text, using the user's configured OpenAI-compatible endpoint when one is set (the text
- * respelled first by the server's engine: `synthesizeOnOwnEndpoint`, `src/shared/voiceDirect.ts`) and otherwise the CloudCLI
- * voice proxy, which respells it itself.
+ * Synthesizes speech for the given text. With the 'gemini' provider it always goes through the CloudCLI voice proxy, which
+ * speaks it on the server's Gemini key in the account's speech model and voice, the text respelled there, and answers one
+ * `audio/wav`: the browser's own endpoint is never reached and none of its `x-voice-*` headers ride along. With 'openai' it
+ * uses the user's configured OpenAI-compatible endpoint when one is set (the text respelled first by the server's engine:
+ * `synthesizeOnOwnEndpoint`, `src/shared/voiceDirect.ts`) and otherwise the proxy, which respells it itself. Callers pass the
+ * account's provider from the chat module's `currentVoiceProvider`; used by the chat's read-aloud player (`voicePlayer`).
  */
-export function synthesizeVoice(text: string, signal: AbortSignal): Promise<Response> {
+export function synthesizeVoice(text: string, signal: AbortSignal, provider: VoiceProvider): Promise<Response> {
+  if (provider === 'gemini') {
+    return api.voice.tts(text, { signal });
+  }
+
   const config = readVoiceConfig();
 
   if (config.baseUrl.trim()) {

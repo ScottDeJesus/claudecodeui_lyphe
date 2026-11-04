@@ -40,7 +40,13 @@
     "messageCount_one": "{{count}} mesaj",
     "messageCount_other": "{{count}} mesaj",
     "showOlder_one": "↳ {{count}} eski konuşmayı göster",
-    "showOlder_other": "↳ {{count}} eski konuşmayı göster"
+    "showOlder_other": "↳ {{count}} eski konuşmayı göster",
+    "select": "Seç",
+    "selectAll": "Tümünü seç",
+    "selectAllLoaded": "Yüklenenleri seç",
+    "clearSelection": "Seçimi kaldır",
+    "deleteSelected_one": "{{count}} oturumu sil",
+    "deleteSelected_other": "{{count}} oturumu sil"
   },
   "tooltips": {
     "viewEnvironments": "Ortamları Görüntüle",
@@ -117,7 +123,9 @@
     "restoreProjectError": "Proje geri yüklenirken hata oluştu. Lütfen tekrar dene.",
     "reopenSessionFailed": "Oturum yeniden açılamadı. Lütfen tekrar dene.",
     "reopenSessionError": "Oturum yeniden açılırken hata oluştu. Lütfen tekrar dene.",
-    "forkSessionError": "Bu oturum çatallanamadı. Lütfen tekrar deneyin."
+    "forkSessionError": "Bu oturum çatallanamadı. Lütfen tekrar deneyin.",
+    "deleteSessionsPartialFailure_one": "{{total}} oturumdan {{count}} tanesi silinemedi. Lütfen tekrar dene.",
+    "deleteSessionsPartialFailure_other": "{{total}} oturumdan {{count}} tanesi silinemedi. Lütfen tekrar dene."
   },
   "version": {
     "updateAvailable": "Güncelleme mevcut",
@@ -155,7 +163,16 @@
     "deleteSessionPermanently": "Kalıcı olarak sil",
     "deleteAllData": "Tüm veriyi kalıcı olarak sil",
     "allConversationsDeleted": "Proje kenar çubuğundan kaldırılacak. Dosyaların, bellek verilerin ve oturum verilerin korunacak.",
-    "cannotUndo": "Projeyi sonra tekrar ekleyebilirsin."
+    "cannotUndo": "Projeyi sonra tekrar ekleyebilirsin.",
+    "confirmDeleteSessions": "Ne yapmak istersin:",
+    "deleteSessions_one": "{{count}} Oturumu Sil",
+    "deleteSessions_other": "{{count}} Oturumu Sil",
+    "selectedSessions_one": "seçili {{count}} oturum",
+    "selectedSessions_other": "seçili {{count}} oturum",
+    "closeSessions_one": "{{count}} oturumu kapat",
+    "closeSessions_other": "{{count}} oturumu kapat",
+    "closeSessionsNotice_one": "Kapatma, oturumu etkin listeden çıkarır ancak geçmişini korur.",
+    "closeSessionsNotice_other": "Kapatma, oturumları etkin listeden çıkarır ancak geçmişlerini korur."
   },
   "simpleList": {
     "newChat": "Yeni sohbet",

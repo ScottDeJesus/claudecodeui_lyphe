@@ -10,7 +10,8 @@ type PictureRead = { image: ChatImage; at: number };
 /**
  * What a chat's own transcript holds for the pictures its words name by a path outside the project.
  *
- * `byPath` maps the `file_path` of every `Read` that returned a raster picture to those reads, oldest first. Each
+ * `byPath` maps the `file_path` of every `Read` that returned a raster picture, with its `.` / `..` / `//` folded away
+ * (`resolveDots`, the fold the lookup applies to the path a reply names), to those reads, oldest first. Each
  * picture is the copy the agent saw (`ChatImage`: an inline data URL on a live frame, or a path into the global chat
  * assets on a history load, which stores each tool-result picture there by the hash of its bytes). A reply that says
  * `![shot](/tmp/shot.png)` or `` `/tmp/shot.png` `` is drawn from that copy: the file itself lives where the file tree
@@ -75,10 +76,12 @@ const readFilePath = (message: ChatMessage): string | null => {
 };
 
 /**
- * The `Read` pictures of a transcript, by the exact path each was called with, each path's reads oldest first.
+ * The `Read` pictures of a transcript, by the folded path each was called with, each path's reads oldest first.
  *
- * A `Read` that errored carries no picture and is skipped; so is one whose picture is not a raster type. Only
- * this chat's own messages are read, never another chat's.
+ * The key is folded because the lookup folds: a `Read` of `/opt/x/e4.png` and a reply naming `/opt/x/./sub/../e4.png`
+ * are one file. A `Read` that errored carries no picture and is skipped; so is one whose picture is not a raster type,
+ * and one called with a relative path, which is never asked about (`useOutsideImage` answers only absolute paths).
+ * Only this chat's own messages are read, never another chat's.
  */
 function indexReadPictures(messages: readonly ChatMessage[]): Map<string, PictureRead[]> {
   const byPath = new Map<string, PictureRead[]>();
@@ -86,11 +89,12 @@ function indexReadPictures(messages: readonly ChatMessage[]): Map<string, Pictur
     if (message.toolName !== 'Read' || message.toolResult?.isError) continue;
     const image = message.toolResult?.images?.find(isRasterPicture);
     const filePath = image ? readFilePath(message) : null;
-    if (!image || !filePath) continue;
+    if (!image || !filePath?.startsWith('/')) continue;
+    const foldedPath = resolveDots(filePath);
     const at = new Date(message.timestamp).getTime();
-    const reads = byPath.get(filePath) ?? [];
+    const reads = byPath.get(foldedPath) ?? [];
     reads.push({ image, at: Number.isNaN(at) ? Number.POSITIVE_INFINITY : at });
-    byPath.set(filePath, reads);
+    byPath.set(foldedPath, reads);
   }
   return byPath;
 }
@@ -202,7 +206,7 @@ export function useOutsideImage(path: string | null): OutsideImage {
     const { projectRoot, workspaceRoot, complete, byPath } = pictures;
     const resolved = resolveDots(path);
     if (projectRoot && isUnder(resolved, resolveDots(projectRoot))) return LOCAL;
-    const reads = byPath.get(path);
+    const reads = byPath.get(resolved);
     if (reads) return { ...LOCAL, picture: pictureFor(reads, at) };
     if (workspaceRoot === null) return NOT_OUTSIDE;
     if (workspaceRoot !== undefined && isUnder(resolved, workspaceRoot)) return LOCAL;

@@ -50,8 +50,9 @@ does.
 4. **The client is trusted for the session id and the prompt. Nothing else.** Provider,
    working directory and the provider-native resume id come from the `sessions` row.
    Attachment paths are re-validated against the upload store before any runtime sees them.
-5. **A run belongs to the server, not to a socket.** It can start with no audience, it
-   keeps running when every viewer disconnects, and it can have several viewers at once.
+5. **A run belongs to the server, not to a socket.** It can start with no socket of its own (the tabs that have its session open join at
+   its first event, MAN-311), it keeps running when every viewer disconnects, and it
+   can have several viewers at once.
    Closing a tab detaches a listener; it does not cancel anything.
 6. **Every live frame gets a per-run `seq` and is buffered.** Catching up is always the
    same move: send `chat.subscribe` with the highest `seq` you saw, get an authoritative
@@ -82,6 +83,7 @@ section: 01-websocket-transport/003 The pieces
 | `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the seven inbound handlers, `protocol_error`, the call to the attachment trust boundary (`filterAttachmentsToUploadStore`, MAN-9407), `runDetachedChatTurn`, and the one `session_host_liveness` snapshot a connecting socket is sent (MAN-8122) |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | `chatRunRegistry` — one run per session, `seq` stamping, the replay buffer, the exactly-one-`complete` contract |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter` — the object runtimes write into; swallows `session_created`, fans out to every attached socket |
+| `server/modules/websocket/services/chat-session-audience.service.ts` | Which sockets have a session open, and the join of every one of them to a run nobody asked for from a browser (MAN-311) |
 | `server/modules/websocket/services/session-upsert-broadcast.service.ts` | The only builder of `session_upserted`, the batched broadcast helper, and `onSessionUpserted(listener)`: a listener set called with the app session id of each event that goes out (consumed by the station hint, MAN-9257) |
 | `server/modules/projects/services/projects-with-sessions-fetch.service.ts` | `broadcastProgress` — the `loading_progress` frames |
 | `server/modules/taskmaster/taskmaster.routes.ts` | `broadcastTaskMasterUpdate` — the `type`-keyed exception |
@@ -95,7 +97,7 @@ section: 01-websocket-transport/003 The pieces
 | `src/modules/chat/hooks/useChatComposerState.ts` | Builds `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response`; takes its files through `useAttachmentIntake` and uploads them with `uploadAttachmentFiles` (`src/shared`, MAN-9406) |
 | `src/modules/chat/hooks/useSessionPresence.ts` | Builds `chat.presence` — the one place, called once from `ChatInterface.tsx`. Also exports `useIsLookingAtSession(isActive)`, the same pair (chat on screen, document visible) as a boolean (MAN-7575) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/websocket/desktop-notifications-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/projects-with-sessions-fetch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/taskmaster/taskmaster.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/plugin-websocket-proxy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/session-upsert-broadcast.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/shell-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-auth.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-server.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/websocket/desktop-notifications-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/projects-with-sessions-fetch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/taskmaster/taskmaster.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-audience.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/plugin-websocket-proxy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/session-upsert-broadcast.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/shell-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-auth.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-server.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx
 
 ## MAN-295 — Routing: pathname, not namespace
 section: 01-websocket-transport/004 Routing: pathname, not namespace
@@ -222,9 +224,9 @@ throws is answered with `INTERNAL_ERROR`.**
 | `chat.send` | `sessionId`, `content`, `options` | Resolves the session row, registers the run, dispatches to the provider runtime (`:146-158`) |
 | `chat.edit-send` | as above plus `anchorId` | Announces `history_truncated`, rewinds or resumes the provider transcript at the anchor, then dispatches (`:314-408`) |
 | `chat.abort` | `sessionId` | Aborts the runtime and emits the terminal `complete` on its behalf (`:415-438`) |
-| `chat.subscribe` | `sessions: [{ sessionId, lastSeq }]` | Acks with `chat_subscribed`, attaches this socket to a running run, replays what was missed (`:448-504`) |
+| `chat.subscribe` | `sessions: [{ sessionId, lastSeq }]` | Records each session as open on this socket (a run that starts later joins it at its first event), acks with `chat_subscribed`, attaches this socket to a running run, replays what was missed |
 | `chat.permission-response` | `requestId`, `allow`, `updatedInput?`, `message?`, `rememberEntry?` | Resolves one pending tool approval (`:511-522`) |
-| `chat.presence` | `sessionId`, `visible`, `clientId?`, `focused?`, `view?` | Records which session this socket is showing, for the notification channels' watched-session check (`handleChatPresence` in `chat-websocket.service.ts`), and what is on his screen for Kaylee's `<view>`: `clientId` (1 to 200 characters) names the page, `focused` says its window has the keyboard, `view` is the station's `StationFocus`, kept only when whole (MAN-9057) |
+| `chat.presence` | `sessionId`, `visible`, `clientId?`, `focused?`, `view?` | Records which session this socket is showing, for the notification channels' watched-session check (`handleChatPresence` in `chat-websocket.service.ts`), and what is on his screen for Kaylee's `<view>`: `clientId` (1 to 200 characters) names the page, `focused` says its window has the keyboard, `view` is the station's `StationFocus`, kept only when whole (MAN-9057). A report with a session and no `view` (the chat view's own) also makes that the ONE session this socket has open for run audiences (`markSocketShowing`, MAN-311) |
 | `chat.ping` | — | Answers `pong`. The browser's liveness probe; `WebSocketContext.tsx` swallows the answer, so no feature ever sees it |
 
 Five of the first six are built in exactly two client files: the composer builds sends, aborts and
@@ -488,9 +490,54 @@ sockets, and everything written to it is translated before it goes anywhere.**
   nothing needs to.
 
 A run started with `connection: null` — a scheduled message firing with no browser attached
-(`chat-run-registry.service.ts:171-177`, `runDetachedChatTurn` at
-`chat-websocket.service.ts:550-581`) — still records everything into the buffer, so whoever
-subscribes later replays it from `seq` 1.
+(`startRun`, `runDetachedChatTurn` in `chat-websocket.service.ts`) — still records everything
+into the buffer, so whoever subscribes later replays it from `seq` 1.
+
+**Every tab that already has the session open is joined to a run nobody asked for from a
+browser, at its start.** `dispatchRun` calls `chatRunRegistry.joinOpenTabs(run)` for a run with
+no socket, after its `beforeRun` hook and before the provider is asked, and only while the run is
+still running. That is `joinOpenTabsToRun` (`chat-session-audience.service.ts`): each open socket
+whose set of open sessions holds this one (below) is sent the `chat_subscribed` ack with
+`isProcessing: true` and no `pendingPermissions` — the frame the tab would have got by subscribing
+a moment later, which is what marks the session busy in its busy map — then the events the run has
+written so far (the echo below among them), and is added to the writer's audience for the rest. It
+is added only after its ack went out. The tab then streams the run live with no round trip. This is
+the one door for every run with no socket: a scheduled message, a queued follow-up, the companion's
+send, a compaction, a re-adoption. A re-adopted host whose turn had already ended closes its run in
+its own hook, so it joins and tells no tab. A turn typed in a tab is not joined: the typing tab is on
+it already, and another tab on that session gets it when it subscribes or reads the history.
+
+**Which sockets "have the session open"** is `sessionsOpenBySocket`, a `WeakMap` of socket to
+a set of session ids (at most 64 per socket, the oldest let go): `chat.subscribe` adds the
+session whether or not a run is going; a chat view's `chat.presence` report (no `view`)
+REPLACES the set with that one session, which is how a tab that switched chats stops hearing
+the old one; a report naming no session, and a station's report (it carries a `view`), change
+nothing, so a chat tab behind Files keeps its session and a station covering the chat does
+not drop it. A closed socket leaves with its entry. A socket that subscribes while a
+run is going is attached and replayed as before (`handleChatSubscribe`).
+
+**A scheduled message's words reach the open tabs too.** The stream carries what the model
+says, not the user's prompt, so `runDetachedChatTurn` takes `echoUserMessage`: the words are
+written onto the run's stream as a `local_detached_<uuid>` user `text` row (the companion's
+send writes the same kind of echo), and the persisted row retires it when the history is read
+(`removeOptimisticUserEchoes`, which matches `local_` rows by their words). The scheduled-message
+dispatcher sets it for a scheduled message and for a queued follow-up without attachments (the
+retirement matches images and files too, and the server holds descriptors, not the page's rows).
+A turn typed in a tab is never echoed: that tab drew the message itself, and a second row would
+never retire.
+
+**Probes** (the live gateway, Haiku, scratch chats under /tmp):
+`.verify/scheduled-run-live-tab.mjs [--rounds 3]` leaves one signed-in page open and idle on a
+chat, schedules a message about 20 s ahead through `POST /api/scheduled-messages`, never reloads,
+and passes a round when the page drew the user's message before the run's `complete` and the
+reply with it, from the run's own frames: the run-start ack with `isProcessing: true` came, and
+the page sent no `chat.subscribe` of its own before the run ended (a round where it did is a
+FAIL, caught up by the old route and not joined);
+`.verify/chat-audience-sockets.mjs` holds raw sockets in the states a tab passes through (idle,
+switched away, inactive, a station report, two subscriptions, closed, never opened), schedules two
+messages, and checks who heard each run from its start: the ack, the echo, the reply and the `complete`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-audience.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-audience-sockets.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/scheduled-run-live-tab.mjs
 
 ## MAN-312 — Drop, reconnect, replay
 section: 01-websocket-transport/016 Drop, reconnect, replay
@@ -517,9 +564,10 @@ sequenceDiagram
   B->>GW: bounded REST tail refresh, in parallel
 ```
 
-`handleChatSubscribe` (`:448-504`) walks each requested session and, in this order: reads
-the run and `isProcessing`; attaches this socket if the run is live (`:477-479`); collects
-pending approvals; sends the ack (`:485-492`); and only then replays (`:498-502`). The two
+`handleChatSubscribe` walks each requested session and, in this order: records the session
+as open on this socket (`markSocketSubscribed`, so a run that starts LATER with no socket joins
+this socket at its first event — MAN-311); reads the run and `isProcessing`; attaches this socket if the
+run is live; collects pending approvals; sends the ack; and only then replays. The two
 orderings that carry weight:
 
 - **Ack before replay**, so the client has authoritative processing state before any event
@@ -1531,6 +1579,7 @@ section: 03-conversation-handoff/002 The pieces
 | `server/modules/compaction/` (`compaction-runtime.ts`, `compaction-procedure.ts`, `auto-trigger.ts`, `compaction-seed.ts`) | A decorator over the runtime gateway (`withChatCompaction`, wired in `server/index.ts`): while Custom compaction is on, a Claude chat's `/compact` and its turn-end and idle triggers run the summarizer verb and move the chat to a seeded new session; on any Claude run it also removes the options only it may set, and a start-over (an edit of the first message after a compaction) in a chat with a stored seed appends that seed again (MAN-8067, MAN-8065, MAN-8066) |
 | `server/modules/database/repositories/session-compactions.db.ts` | `sessionCompactionsDb`: the compaction record and the one mover of a chat between provider sessions for a compaction — `swapToCompactedSession`, `unswapCompactedSession` (MAN-8046) |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter`: swallows `session_created`, captures the native id, fans out to every attached socket |
+| `server/modules/websocket/services/chat-session-audience.service.ts` | Which sockets have a session open (`chat.subscribe` adds, a chat view's `chat.presence` replaces); `dispatchRun` joins every one of them to a run with no socket at its first event (`chatRunRegistry.joinOpenTabs`, which calls `joinOpenTabsToRun`), and `echoUserMessageOnRun` writes a detached turn's user words onto its stream |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | `startRun`, `attachConnection`, `replayEvents`, `completeRun`, `completeRunIfCurrent`; internally `decorateAndRecordEvent` and `recordProviderSessionId` (it marks the provider session a chat leaves superseded before the mapping moves) |
 | `server/modules/websocket/services/chat-websocket.service.ts` | `handleChatSend`, `handleChatEditSend`, `handleChatSubscribe`, `handleChatAbort`, `dispatchRun`, `runDetachedChatTurn` |
 | `server/modules/websocket/services/chat-run-verbs.service.ts` | `abortChatRun` — stops the session's running turn and settles the run it stopped with `completeRunIfCurrent`; `chat.abort` and a detached turn that interrupts the run in its way both call it |
@@ -1551,7 +1600,7 @@ section: 03-conversation-handoff/002 The pieces
 | `src/shared/context/SessionProtectionContext.tsx`, `src/shared/hooks/useSessionProtection.ts` | The busy map: which sessions are producing a response |
 | `src/modules/project-workspace/hooks/useProjectsState.ts` | `registerOptimisticSession`, `upsertSessionIntoProject`, `handleNewSession` |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-fork.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/codex/codex-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/provider.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions-watcher.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-synchronizer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/session-upsert-broadcast.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionStore.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/messageHistoryRefreshCoordinator.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/messageKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/sessionMessageReconciliation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/SessionProtectionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSessionProtection.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-fork.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/codex/codex-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/provider.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions-watcher.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-synchronizer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-audience.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/session-upsert-broadcast.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionStore.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/messageHistoryRefreshCoordinator.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/messageKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/sessionMessageReconciliation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/SessionProtectionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSessionProtection.ts
 
 ## MAN-339 — The two ids and where they meet
 section: 03-conversation-handoff/003 The two ids and where they meet
@@ -1595,7 +1644,10 @@ Reading in the other direction, runtimes receive the **app** id and translate it
 `provider-runtime.service.ts` injects `context.resolveProviderSessionId`, which is
 `sessionsService.resolveProviderSessionId`:
 
-- a row with a mapping returns its `provider_session_id`;
+- a row with a mapping returns its `provider_session_id` — and the Claude runtime then confirms the
+  transcript is on disk before it resumes (`claude-resumable-session.ts`): a mapping with no
+  conversation behind it is detached and the turn starts one, instead of resuming a dead id on every
+  later turn;
 - a row without one returns `null`, which every runtime reads as "start fresh";
 - an id with no row at all is returned unchanged, on the assumption that a direct API caller
   passed a provider-native id the watcher has not indexed yet.
@@ -1631,17 +1683,34 @@ stateDiagram-v2
   Pending --> Mapped : a run announces a native id and assignProviderSessionId records it
   Mapped --> Mapped : a Codex edit rewind repoints the row to the forked thread
   Mapped --> Pending : a Codex edit of the first prompt detaches the row
+  Mapped --> Pending : the Claude runtime finds no transcript behind the id and detaches the row
   Mapped --> [*] : the session is deleted
 ```
+
+No boot writes the column once the column exists, so a chat created into the app and not yet
+sent on keeps its NULL (`Pending`) across every server boot. What writes it: a run's announcement, a
+detach (Codex's edit above, the Claude runtime's check below), a compaction's swap or an edit's repoint
+(`repointSessionToProviderSession`), and a fork's insert (`createForkedSession`).
+`addProviderSessionIdMapping` (`migrations.ts`) backfills `provider_session_id =
+session_id` ONCE, with the column's own absence as the gate (the same shape as `addSessionPinnedColumn`);
+run at every boot it stamped the app id onto every waiting chat — the supervisor boots a candidate on each
+`server/` save — and that chat's first turn resumed a conversation that did not exist ("No conversation
+found with session ID", no reply on the page, the same failure on every later turn).
+
+The Claude runtime also checks before it resumes (`claude-resumable-session.ts`, asked by `spawnProcess`
+once per process start): a provider id whose transcript is on no project folder of
+`~/.claude/projects` is a conversation that was never written, so the row is detached
+(`detachProviderSession`, back to `Pending`) and the turn starts the conversation. Skipped for a re-adopted
+host and for a Cerberus node's project, whose transcript is not on this disk.
 
 `Draft` is a UI state only — no row exists yet. In `Pending`,
 `GET /api/providers/sessions/:id/messages` returns an empty page by design, because
 `sessionsService.fetchHistory` short-circuits on a NULL `provider_session_id`. So during the
 very first turn the transcript on screen is entirely realtime rows.
 
-Only a provider that rewinds by branching reaches `Pending` again:
+An EDIT reaches `Pending` again only for a provider that rewinds by branching:
 `CodexSessionsProvider.rewindSession` calls `markProviderSessionSuperseded` and then
-`detachProviderSession` when nothing survives the cut. Claude never detaches — it re-runs
+`detachProviderSession` when nothing survives the cut. Claude never detaches for an edit — it re-runs
 with `resumeFromScratch` and the row is remapped when the SDK announces its new id; the session
 the row leaves is marked superseded first (`recordProviderSessionId`), so the abandoned original
 stays on disk, goes with the chat and is never indexed as a second sidebar chat.
@@ -2000,8 +2069,9 @@ which is why neither caller — `ChatInterface.handleForkFromMessage` and the si
 
 Resuming needs no special path. Opening an old session and sending is an ordinary
 `chat.send`: the gateway reads provider, `cwd` and `provider_session_id` from the row, the
-runtime resolves the native id through `resolveProviderSessionId`, and the SDK resumes. A
-`null` there means "start a new provider session", which is the same code path a brand-new
+runtime resolves the native id through `resolveProviderSessionId`, and the SDK resumes. The Claude
+runtime first confirms the id's transcript is on disk (MAN-339); one with none is detached and starts
+over. A `null` there means "start a new provider session", which is the same code path a brand-new
 conversation takes.
 
 The client drives one of those resumes itself. When a live run's `cliVersion` differs from the
@@ -2490,10 +2560,10 @@ stateDiagram-v2
     [*] --> Placeholder: first commit, row older than the newest 30
     [*] --> Mounted: first commit, row inside the newest 30
     Placeholder: no children, fixed 100px estimate, timestamp still addressable
-    MeasuredPlaceholder: no children, fixed height equal to the last measured offsetHeight
+    MeasuredPlaceholder: no children, fixed height equal to the last measured rendered height
     Mounted: real markdown or tool subtree, no inline height
     Placeholder --> Mounted: entered the band around the viewport
-    Mounted --> MeasuredPlaceholder: left the band, offsetHeight recorded first
+    Mounted --> MeasuredPlaceholder: left the band, rendered height recorded first
     MeasuredPlaceholder --> Mounted: entered the band again
     note right of Mounted
       A hidden tab reports a zero sized rect for every row.
@@ -2505,10 +2575,14 @@ stateDiagram-v2
 Three details make this safe rather than jumpy:
 
 - **Measure on the way out, not the way in.** `handleNearViewportChange` reads
-  `elementRef.current.offsetHeight` while the content is still in the DOM, then flips to the
-  placeholder. The placeholder occupies exactly the space the content did, so scrolling back
-  through seen content changes no scroll geometry at all. A measurement of 0 is discarded, so
-  a row that unmounts while it has no box keeps whatever height it had before.
+  `elementRef.current.getBoundingClientRect()` while the content is still in the DOM, then flips
+  to the placeholder. The placeholder occupies exactly the space the content did, so scrolling
+  back through seen content changes no scroll geometry at all. The exact height is recorded,
+  0px (a hidden thinking row renders nothing) and fractions of a pixel included: a placeholder
+  taller than the content it replaces, on a row just past the band's edge, reaches back into the
+  band, remounts the content, drops out again and repeats forever wherever no scroll anchoring
+  absorbs the shift (Safari). Only a 0x0 box means the row is not rendered at all, and it keeps
+  whatever height it had before.
 - **The tail starts mounted.** `initiallyNearViewport` is
   `index >= rowCount - INITIAL_MOUNTED_TAIL_ROWS`, so the initial scroll-to-bottom measures
   real heights instead of estimates.
@@ -3333,9 +3407,10 @@ panel, whose half-made choices live in component state and would not survive the
 
 Three details exist purely to protect the scroll position:
 
-1. **Measure before unmount.** `handleNearViewportChange` reads `offsetHeight` *while the
-   content is still in the DOM*, then renders the placeholder at exactly that height. A row
-   you have already seen costs nothing in geometry to scroll back through.
+1. **Measure before unmount.** `handleNearViewportChange` reads the row's rendered height
+   (`getBoundingClientRect`, 0px and fractions included) *while the content is still in the
+   DOM*, then renders the placeholder at exactly that height. A row you have already seen costs
+   nothing in geometry to scroll back through.
 2. **The wrapper stays addressable.** The search jump queries `[data-message-timestamp]`,
    which the wrapper carries whether or not its content is mounted. **This does not extend
    to the prepend anchor:** `captureScrollRestoreState` queries `.chat-message`, and that
@@ -5510,7 +5585,7 @@ section: 08-rendered-shapes/002 The pieces/002 `shapes/useFilePreview.ts`
 | `shapes/useFilePreview.ts` | `useFilePreview` — a file chip's preview: reads a picture's or a PDF's bytes through the workspace's `readFileReference` palette op, shared within the reply, and keeps its fold in the shapes' own fold memory. Nothing while loading, when unreadable or mistyped, in an export, where chips are suppressed, in a reply still streaming, or for a PDF unless `navigator.pdfViewerEnabled` is true and the pointer is fine (a phone gets none). A picture outside the project is not read from where it is named: the bytes are the copy a `Read` in this chat returned (`transcript/transcriptPictures.ts`), and a path outside the project and the workspace root with no copy is not requested (`outsideImage`: once every page of the chat is loaded the chip draws a muted "Image outside the project: <path>" line; before that, and while the root is being read, it draws the bare chip). An SVG is shown from a `data:` URL, never a `blob:` one a new tab would run in this origin |
 | `shapes/previewScope.ts` | `PreviewScopeContext` — the row a preview belongs to: `MessageComponent` provides a tool row's `toolId`, or a finished reply's trimmed text hashed with its turn anchor — the last tool call before it in its turn, else the prompt, read by `ChatMessagesPane` from the full message order (never an id, which changes as a reply finalises, and never the rows on screen, which "Show work" changes), `false` while a reply streams, and `null` — this mount alone — where neither exists |
 | `shapes/FilePreview.tsx` | `FilePreviewFrame` — the preview under a chip: the picture (a click opens `ImageLightbox`, square as well) or the PDF in an `iframe` at most 32rem or 60vh tall, in a square-cornered hairline frame with nothing drawn over it, so a screenshot's corners and edges all show. The chip beside it carries the open-in-Files button. A preview that loads late grows its row like any other growth: `useFollowGlide`'s observer on the transcript's content box sees it and glides a chat left at its bottom down to the new foot (MAN-7574) |
-| `transcript/transcriptPictures.ts` | `TranscriptPicturesContext`, provided by `ChatMessagesPane` from the whole loaded transcript: every raster picture of a `Read` that did not error, by its exact `file_path`, oldest first (a live frame's data URL, or the stored asset a history load left), the project's folder, the server's workspace root (read once per page from `browse-filesystem`, whose `path` for no folder is the root; `undefined` while reading, `null` if unreadable, which decides nothing) and `complete` (no older page remains). `MessageTimeContext`, provided by `MessageComponent`, is the time of the message being drawn: a reply is drawn from the newest `Read` of its path at or before it, else the oldest after. `useOutsideImage(path)` answers, for an absolute path outside the project: `picture` (that copy), `local` (under the project or the root, or a copy: a file on this disk, served by the file tree), or `refused` (outside project and root with no copy, or the root not read yet: ask for nothing; `certain` once the root is known), and `captioned` (certain, and `complete`: only then is "no copy" a fact, since a `Read` on a page not loaded yet is not seen). The file tree serves a path under the project or the root and refuses every other (`validateWorkspacePath`), so the root, not a list of folders, is the rule; paths are compared with `.`, `..` and `//` folded. `readTranscriptPicture` decodes a data URL or reads the stored asset by name (a name the assets route did not have is remembered for the page), never the named path. Outside a chat the context is `null` and nothing changes. `ChatMessageImages` also skips its file-tree fallback for a certain refusal. Proven by `node .verify/chat-outside-images.mjs <label> <appUrl> [sessionId] [--measure]` on the "Station portrait mode" chat (`--measure` prints and exits 0, for a build before the change), with its reply stubbed in the browser for the unread paths, a workspace file outside the project (still read) and `/logo-64.png` (still native) |
+| `transcript/transcriptPictures.ts` | `TranscriptPicturesContext`, provided by `ChatMessagesPane` from the whole loaded transcript: every raster picture of a `Read` that did not error and named an absolute path, by that `file_path` with `.`, `..` and `//` folded (the lookup folds the path a reply names the same way, so `/opt/x/./sub/../e4.png` finds a `Read` of `/opt/x/e4.png`), oldest first (a live frame's data URL, or the stored asset a history load left), the project's folder, the server's workspace root (read once per page from `browse-filesystem`, whose `path` for no folder is the root; `undefined` while reading, `null` if unreadable, which decides nothing) and `complete` (no older page remains; a chat reopened from the store's cache starts from its slot's own `hasMore` while the refetch is out, so rows drawn from a partly loaded cache are not called complete in between, and a chat with no cached slot starts at false as ever). `MessageTimeContext`, provided by `MessageComponent`, is the time of the message being drawn: a reply is drawn from the newest `Read` of its path at or before it, else the oldest after. `useOutsideImage(path)` answers, for an absolute path outside the project: `picture` (that copy), `local` (under the project or the root, or a copy: a file on this disk, served by the file tree), or `refused` (outside project and root with no copy, or the root not read yet: ask for nothing; `certain` once the root is known), and `captioned` (certain, and `complete`: only then is "no copy" a fact, since a `Read` on a page not loaded yet is not seen). The file tree serves a path under the project or the root and refuses every other (`validateWorkspacePath`), so the root, not a list of folders, is the rule; paths are compared with `.`, `..` and `//` folded. `readTranscriptPicture` decodes a data URL or reads the stored asset by name (a name the assets route did not have is remembered for the page), never the named path. Outside a chat the context is `null` and nothing changes. `ChatMessageImages` also skips its file-tree fallback for a certain refusal. Proven by `node .verify/chat-outside-images.mjs <label> <appUrl> [sessionId] [--measure]` on the "Station portrait mode" chat (`--measure` prints and exits 0, for a build before the change), with its reply stubbed in the browser for the unread paths, a workspace file outside the project (still read) and `/logo-64.png` (still native) |
 | `shapes/MarkdownImage.tsx` | `MarkdownImage`, the `img` override in both maps: a relative `src` with a picture's extension is drawn as that file's chip (labelled with the alt text), which previews it; a root-relative one (`/tmp/shot.png`) in a chat is that chip too when `useOutsideImage` says it is a path on this machine (local, or refused) and it has more than one segment; any other `src` (a one-segment `/favicon.ico` included) is react-markdown's own `<img>` with the props it was given |
 | `shapes/DataTable.tsx` | Every table that is not a matrix or a before/after pair: three-state sort, CSV copy, and a `Meter` bar down the one numeric column |
 | `shapes/DecisionMatrix.tsx` | `Option \| Pros \| Cons [\| Verdict]` as one `Card` per option, verdict as a `Badge` toned by its glyph |
@@ -6683,11 +6758,29 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `session_upserted` | gateway | Sidebar delta. Owned by the projects state, not by chat. |
 | `loading_progress` | gateway | Project scan progress. |
 | `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)). |
+| `kanban_metis_state` | gateway | The board's Metis sessions, the whole picture, pushed on change: `sessions` oldest first, each with its `pid` and its `child.log`'s last activity; `at` is epoch milliseconds. |
+| `kanban_event` | gateway | The board frame: one Kanban write has committed, and this is what it left behind — the event, the card (null for a board-level write) and the board's lane totals after it. Built only by `writeKanban` (`modules/kanban/kanban-write.service.ts`), after the transaction commits. `boardId` is null for a write against the estate (a lesson staged with no card), and every consumer tests it first. |
+| `notes_changed` | gateway | A note was created, replaced or deleted. `{ kind, at }` only: it names no note and no account, so a client that hears it reads its own list again. No `seq` and no `sessionId`, so it never becomes a transcript row. |
+| `followups_changed` | gateway | A chat's follow-up was filed, closed or reopened. Names the chat by its app session id under `appSessionId` — deliberately not `sessionId`, which would set the workspace's unread mark (`useProjectsState`). A widget re-reads when the id is its own chat's and ignores the frame otherwise. No `seq`. |
+| `scheduled_messages_changed` | gateway | A chat's scheduled messages changed: one was scheduled, cancelled or dismissed, claimed by the dispatcher as its turn starts, or failed to send. Names the chat by its app session id under `sessionId` and nothing else, so a composer showing that chat re-reads the list through the authenticated per-user GET and every other composer ignores it. The unread mark (`useProjectsState`) and the transcript handler (`useChatRealtimeHandlers`) each name this kind and leave it alone. No `seq`. |
+| `cerberus_changed` | gateway | A hint from the Cerberus center to read again: what moved (`nodes`, and `checks` as `<node>/<key>`, split at the first `/`), never the result itself. Coalesced to at most one a second, except a warden update's moments, sent at once with `updates: true`. Also marks a fix run's or a diagnosis's start and end. |
+| `cerberus_run_output` | gateway | A running fix's newly stored output lines for one `runId`, in order — a picture, not a hint, never coalesced with another run's. A sheet open on the run appends them by `n`; the Needs-you card shows the newest line. `GET /api/cerberus/runs/:id` answers whatever a client missed. |
+| `cerberus_diag_step` | gateway | One step a running diagnosis just said, for one `diagId`, never coalesced. A sheet open on the diagnosis appends it by `step.n`; every other screen ignores it. `GET /api/cerberus/diagnoses/:id` answers whatever a client missed. |
 | `simple_list_changed` | gateway | The simple chat list's shape changed: a folder was made, renamed, folded or deleted, or a chat changed place or folder. `{ kind, at }` only; names nothing, so a client that hears it re-reads the feed. Never a transcript row (MAN-7519). |
+| `session_archive_changed` | gateway | Chats were closed or reopened (`isArchived`): the rows stay, with their transcripts and follow-ups, but the lists of chats gain or lose them. Built only by `session-archive-broadcast.service.ts`, which the close, the reopen and the sleep-time auto-close all go through. The ids ride the `sessionIds` array, not a `sessionId` key, so the unread mark ignores the frame; a reopen reaches the project tree as the `session_upserted` the same door sends. |
+| `session_toolsets_changed` | gateway | The toolsets switched on for a chat changed after a switch. Sent by the toolsets service; the composer's hook reads the view again. |
 | `session_host_liveness` | gateway | Which chats have a live session host (the CLI's tmux session). One shape, `{ kind, change: 'snapshot' \| 'live' \| 'asleep', sessionIds, at }`: a `snapshot` is sent once per connection, held until the keepalive hosts are re-adopted, then a `live` or `asleep` names the chats that gained their first or lost their last host. The ids ride an array, never a `sessionId` key, so the workspace's attention rule cannot mark the chat; no `seq`, so never a transcript row. Read by `SessionHostLivenessContext`, which grays the simple list's asleep rows (session-host, MAN-695). |
 | `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `soul_launch_state`. |
 | `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [docs/architecture/MANUAL.md (01-websocket-transport)](MANUAL.md) §"Fan-out: who receives what". |
+| `dispatcher_state` | lane | The dispatcher's status document, key for key, pushed on change by the dispatcher lane, with the frame's clock added as `at` (epoch milliseconds). Typed `DispatcherStateEvent`. |
+| `roadmap_state` | lane | The roadmap's whole picture, pushed on change by the roadmap lane and stamped `at` (epoch milliseconds) the moment it was cut; the roadmap screen's feed reads it. Typed `RoadmapStateEvent`. |
+| `companion_*` | lane | The companion's own frames — every kind of `CompanionFrame` (`companion_turn`, `companion_log`, `companion_face`, `companion_memory` and the rest) — carried to the account's pages on this socket. Listed whole, with their shapes, in MAN-9243. |
+| `station_sessions_changed` | lane | A chat changed, for the companion's station: the page reads its sessions again. `states` is `true` when a chat's state moved (starting, waiting, ending) and `false` when only its activity did, which the page may fold more slowly. Sent by `station-hint.ts`, at most one a second. |
+| `station_landed` | lane | One new `entry` of what has landed (a feature shipped, an epic finished, a build landed, a chain recovered). Sent by `station-landed-feed.ts`. |
+| `pong` | gateway | The answer to `chat.ping`. The browser cannot see protocol-level pings, so it proves a socket alive with this round trip before trusting it with a send (`WebSocketContext.tsx`). |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |
+
+The `lane` rows ride the same socket but sit outside `ServerEventKind`: each is typed beside its own lane (`DispatcherStateEvent`, `RoadmapStateEvent`, `CompanionFrame`, and the station's frame union in `server/shared/station-types.ts`), so a switch over `ServerEventKind` never sees them.
 
 One more kind never crosses the wire: **`websocket_reconnected`** is synthesized inside
 `src/shared/context/WebSocketContext.tsx` when the socket re-opens, so features can catch
@@ -6705,7 +6798,7 @@ Handled by `server/modules/websocket/services/chat-websocket.service.ts`.
 | `chat.send` | Start a run for a session. |
 | `chat.edit-send` | Replace an already-sent message and re-run from that anchor. |
 | `chat.abort` | Stop the running run. |
-| `chat.subscribe` | Watch one or more sessions, replaying from `lastSeq`. |
+| `chat.subscribe` | Watch one or more sessions, replaying from `lastSeq`; each is also recorded as open on this socket, so a run that starts later with no socket joins it (MAN-311). |
 | `chat.permission-response` | Answer a `permission_request`. |
 | `chat.presence` | Which session this socket is watching, whether its tab is visible, which page it is (`clientId`), whether its window has the keyboard (`focused`) and, from the station, what its stage holds (`view`). |
 

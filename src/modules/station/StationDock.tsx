@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import type { ComponentProps, MouseEvent } from 'react';
+import type { ComponentProps, MouseEvent, PointerEvent, SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionDraftCard, useCompanion } from '@/modules/companion';
@@ -8,7 +8,7 @@ import { useStationSessions } from '@/modules/station/context/StationSessionsCon
 import { useDockFloor } from '@/modules/station/hooks/useDockFloor';
 import type { CompanionDraft } from '@/shared/companion-types';
 import type { StationDensity, StationRegionProps, StationTier } from '@/shared/types';
-import { EmptyState } from '@/shared/ui';
+import { EmptyState, keepFieldFocus, keepFieldFocusWhileDisabled } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /** The card's own verbs, as it types them: the dock hands them through untouched. */
@@ -61,17 +61,39 @@ const NARROW_FRAME_HOLD = 'max-h-[calc((100dvh-var(--keyboard-height,0px))*0.6)]
  */
 const DOCK_CAP: Record<StationTier, string> = { wide: 'max-h-[45cqh]', laptop: 'max-h-[40cqh]', narrow: NARROW_FRAME_HOLD };
 
+/** The kit's cure (a press never takes the focus from the field), read on the dock's section: the dock only decides where it applies. */
+const keepFocusThroughPress = keepFieldFocus<HTMLElement>();
+
 /**
- * Keeps the field's focus through a press on one of the card's buttons, so the on-screen keyboard stays up and the dock keeps
- * the room the section lifted its cap to (`has-[textarea:focus]`) until the press lands. WebKit gives a tapped button no focus
- * and blurs the field on the tap's mousedown: the dock fell back to its cap mid-tap, and the release went to whatever stood
- * there next, so his first Send on an iPhone was lost. A press that takes the focus itself
- * (Clear's question) still takes it; the send still saves his edit first.
+ * The dock's scope test for the kit's keepers: the card's buttons are the companion module's own, so the dock decides on its section
+ * which presses the cure covers, a press on a button while the card's own field holds the focus. Answers that button, or null for a
+ * press the cure leaves alone.
  */
-function keepFieldFocus(event: MouseEvent<HTMLElement>) {
+function buttonPressedWhileFieldFocused(event: SyntheticEvent<HTMLElement>): HTMLButtonElement | null {
   const focused = event.currentTarget.ownerDocument.activeElement;
   const pressed = (event.target as Element).closest('button');
-  if (pressed !== null && focused?.tagName === 'TEXTAREA' && event.currentTarget.contains(focused)) event.preventDefault();
+  return pressed !== null && focused?.tagName === 'TEXTAREA' && event.currentTarget.contains(focused) ? pressed : null;
+}
+
+/**
+ * The dock's `onMouseDown`, an ENABLED press of the card: the press keeps the field's focus, so the on-screen keyboard stays up and
+ * the dock keeps the room the section lifted its cap to (`has-[textarea:focus]`) until the press lands. WebKit gives a tapped button
+ * no focus and blurs the field on the tap's mousedown: the dock fell back to its cap mid-tap, and the release went to whatever stood
+ * there next, so his first Send on an iPhone was lost. A press that takes the focus itself (Clear's question) still takes it; the send
+ * still saves his edit first.
+ */
+function keepFieldFocusInDock(event: MouseEvent<HTMLElement>) {
+  if (buttonPressedWhileFieldFocused(event) !== null) keepFocusThroughPress(event);
+}
+
+/**
+ * The dock's `onPointerDown`, a DISABLED press of the card (Send with his brief emptied, or the other mode's Send while one is out): a
+ * disabled button is dispatched no `mousedown`, so `keepFieldFocusInDock` never runs for it and the tap still moved the focus off the
+ * field. The kit's keeper for that state default-prevents the `pointerdown`; here it is given the pressed button's own `disabled`, so an
+ * enabled press is untouched.
+ */
+function keepFieldFocusInDockWhileDisabled(event: PointerEvent<HTMLElement>) {
+  keepFieldFocusWhileDisabled<HTMLElement>(buttonPressedWhileFieldFocused(event)?.disabled)(event);
 }
 
 /**
@@ -97,7 +119,7 @@ function keepFieldFocus(event: MouseEvent<HTMLElement>) {
  * up it draws its head line alone (`StationSections`). Under a finger every
  * press of the card is a 44px catch (the card's own: its sends, Clear and the target's press), the words stay in the field,
  * never behind a hover, and while he edits the brief the dock stands whole in the frame above the keyboard
- * (`NARROW_FRAME_HOLD`, the section's lifted cap, and `keepFieldFocus` holding that through a press).
+ * (`NARROW_FRAME_HOLD`, the section's lifted cap, and `keepFieldFocusInDock` and `keepFieldFocusInDockWhileDisabled` holding that through a press, a disabled Send's included).
  *
  * `data-station-dock` reads the state: `empty`, `session` or `new`. A pure view: `StationDock` below binds it, and
  * `.verify/kaylee-station-shots.mjs` draws it on the fixtures' pictures (`fake/dock.ts`).
@@ -118,7 +140,8 @@ export function StationDockView({ tier, draft, name, targetWorking, onEdit, onSe
       ref={bindSection}
       aria-label={t('station.dock.label', { name, defaultValue: '{{name}}’s draft' })}
       data-station-dock={draft === null ? 'empty' : draft.target.kind}
-      onMouseDown={keepFieldFocus}
+      onMouseDown={keepFieldFocusInDock}
+      onPointerDown={keepFieldFocusInDockWhileDisabled}
       className={cn('flex min-h-0 min-w-0 flex-[0_1_auto] flex-col overflow-y-auto bg-background px-4 py-3', DOCK_CAP[tier])}
     >
       {draft === null ? (

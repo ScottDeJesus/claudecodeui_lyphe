@@ -1,5 +1,6 @@
 import { api, attemptWrite } from '@/shared/api';
 import type { QueuedSendOptions } from '@/shared/types';
+import { randomHexId } from '@/shared/utils';
 
 /**
  * Unsent composer text and queued messages, stored in `auth.db` rather than in
@@ -38,14 +39,9 @@ export type StoredQueuedMessage = {
   attachments?: unknown[];
 };
 
-/**
- * A fresh queued-message id. `crypto.getRandomValues`, not `randomUUID`: the app is reached over
- * plain HTTP on a tailnet address, which is not a secure context, and `randomUUID` does not exist
- * there.
- */
+/** A fresh queued-message id (`randomHexId`: it must work on plain HTTP, where `randomUUID` does not exist). */
 export function createQueuedMessageId(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return randomHexId();
 }
 
 /**

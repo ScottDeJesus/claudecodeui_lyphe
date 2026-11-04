@@ -84,8 +84,15 @@ export { sessionHostLivenessSnapshot } from './host-liveness.js';
 /**
  * A chat gaining or losing its last live host, as it happens — `live` or `asleep`, never the snapshot. The push to the pages
  * is the same file's; this is the seam a listener of the server's own hears it through.
- * Each call also carries which way it went and, for `asleep`, how the last host ended (`HostEnd`: its exit code and signal).
+ * Each call also carries which way it went and, for `asleep`, how the last host ended (`HostEnd`: its exit code and signal, and whether this server retired it).
  * consumer: the companion module's station hint and the providers module's sleep-time auto-close, through the providers barrel
  */
 export { onHostLivenessChanged } from './host-liveness.js';
 export type { HostEnd } from './host-liveness.js';
+
+/**
+ * True from the moment this process is told to stop (SIGTERM, SIGINT) or is exiting — the server's own shutdown and the drain window of a restart,
+ * in which a host that loses its socket was detached, not ended (D-10).
+ * consumer: the providers module's sleep-time auto-close, through its own import of this barrel
+ */
+export { isApiExiting } from './facade.js';

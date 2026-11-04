@@ -99,7 +99,7 @@ type MemoryCornerViewProps = {
  *   nothing while the first read is out) and the chevron. It is a disclosure `button` with `aria-expanded`. It NEVER OPENS
  *   BY ITSELF: a memory she keeps or forgets moves the count and nothing else, and the count is no live region.
  * - OPEN (kit `Collapsible`, its folded body inert so its presses leave the tab order): her lines, each its kind's glyph
- *   and word, its title and the moment he said it, a press opening his first words under it (`MemoryLine`), one line at a
+ *   and word, its title, whether he said or typed it and the moment, a press opening his first words under it (`MemoryLine`), one line at a
  *   time; then "Open the full page", her memory's DocSpace page in a new tab, the memory whole.
  * - "Reading her memory…" while the first read is out; "Nothing kept yet" (kit `EmptyState`) when she keeps nothing; and
  *   when her memory can't be read, a warn `Banner`: "Her memory can't be read just now", the door's own sentence and Try

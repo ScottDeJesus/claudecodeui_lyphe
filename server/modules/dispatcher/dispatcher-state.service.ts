@@ -15,7 +15,7 @@ import { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOr
  * ONE READ, ONE PICTURE. The dispatcher keeps its plans in a SQLite store of its own, so this lane
  * has nothing of its own to derive: `report.py::snapshot` derived the route, the daemon, each plan's word, its
  * phases and their stages at the instant it ran, and nothing of it is stored (INV-172). The server
- * carries that document with exactly three acts of its own, all named in {@link readDispatcherState}.
+ * carries that document with exactly three acts of its own, all named in {@link lanePictureOf}.
  *
  * A BODY THAT DOES NOT READ IS NOT A PICTURE, and the strictness is measured rather than stylistic:
  * those run files are written by a process that may be killed mid-write (`state_lock.atomic_write`'s
@@ -78,8 +78,13 @@ export type DispatcherStateDependencies = {
   env: NodeJS.ProcessEnv;
 };
 
-/** The document as it validates — the picture before this server's two acts on it. */
-type DocumentPicture = Omit<DispatcherPicture, 'plans'> & { plans: DocumentPlan[] };
+/**
+ * The dispatcher's STORE as the document gives it, every plan and every epic of it, validated and nothing dropped — the picture before
+ * this server's acts on it. The lane's picture is a window onto it (`lanePictureOf`); what the lane forgets (a plan completed more
+ * than `ENDED_KEEP_S` ago, an epic with no plan left on the lane) is still here, which is why the follow-ups lane reads THIS: a feature
+ * that finished a week ago still settles the items that name it. Consumed by `dispatcher-followups.module.ts` and `dispatcher.module.ts`.
+ */
+export type DispatcherStore = Omit<DispatcherPicture, 'plans'> & { plans: DocumentPlan[] };
 
 /**
  * The planner lane's dial and its census (`route.planners`, `planner_lanes.census`): the width the
@@ -141,7 +146,7 @@ function daemonOf(raw: unknown): DispatcherDaemon {
 }
 
 /** The document, field by field, or a throw naming the field this build could not read. */
-function pictureOf(body: unknown): DocumentPicture {
+function storeOf(body: unknown): DispatcherStore {
   const document = need(body, isRecord, 'document');
   return {
     plans: each(field(document, 'plans'), 'plans', planOf),
@@ -201,29 +206,42 @@ function arcsOnLane(arcs: DispatcherArc[], plans: DispatcherPlan[]): DispatcherA
 }
 
 /**
- * One read of the dispatcher's document, as the picture this lane serves.
- *
- * Called every two seconds by the watcher and, through it, by `GET /plans`. It THROWS on anything it
- * cannot read — this file's head says why that is the honest answer — and the lane keeps the last
- * good picture when it does.
+ * One read of the dispatcher's document, whole: every plan and epic of the store, validated. It THROWS on anything it cannot read —
+ * this file's head says why that is the honest answer. Called every two seconds by the watcher (`dispatcher.module.ts`), which hands
+ * the follow-ups lane the store and the lane's picture the window `lanePictureOf` cuts from it, and by `readDispatcherState`.
+ */
+export async function readDispatcherStore(dependencies: DispatcherStateDependencies): Promise<DispatcherStore> {
+  return storeOf(await readDispatcherDocument(dependencies.bin, dependencies.timeoutMs, dependencies.env));
+}
+
+/**
+ * The picture this lane serves, cut from the store.
  *
  * This server's three acts on the document, and the only three: a plan completed more than
  * `ENDED_KEEP_S` ago is dropped, each remaining plan's `session` is resolved to an app id, and an arc
  * with no plan left on the lane is dropped with them. Every other key travels exactly as `report.py`
- * printed it.
+ * printed it. Consumed by `dispatcher.module.ts`'s snapshot and by `readDispatcherState`.
  */
-export async function readDispatcherState(dependencies: DispatcherStateDependencies): Promise<DispatcherPicture> {
-  const document = pictureOf(await readDispatcherDocument(dependencies.bin, dependencies.timeoutMs, dependencies.env));
+export function lanePictureOf(store: DispatcherStore): DispatcherPicture {
   const nowS = Date.now() / 1000;
-  const plans = document.plans.filter((plan) => isRecent(plan, nowS)).map(withAppSession);
+  const plans = store.plans.filter((plan) => isRecent(plan, nowS)).map(withAppSession);
   return {
     plans,
-    arcs: arcsOnLane(document.arcs, plans),
-    planners: document.planners,
-    route: document.route,
-    daemon: document.daemon,
-    offpeak_at: document.offpeak_at,
-    home: document.home,
-    generated_at: document.generated_at,
+    arcs: arcsOnLane(store.arcs, plans),
+    planners: store.planners,
+    route: store.route,
+    daemon: store.daemon,
+    offpeak_at: store.offpeak_at,
+    home: store.home,
+    generated_at: store.generated_at,
   };
+}
+
+/**
+ * One read of the dispatcher's document, as the picture this lane serves — `readDispatcherStore` and `lanePictureOf` together,
+ * for the callers that want the picture and nothing of the store (`GET /plans`' own read, the prompts' fresh read of an ask).
+ * It THROWS on anything it cannot read, and the lane keeps the last good picture when it does.
+ */
+export async function readDispatcherState(dependencies: DispatcherStateDependencies): Promise<DispatcherPicture> {
+  return lanePictureOf(await readDispatcherStore(dependencies));
 }

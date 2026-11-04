@@ -37,7 +37,13 @@
     "showMore": "显示更多会话",
     "showOlderUnknown": "↳ 显示更早的对话",
     "messageCount_other": "{{count}} 条消息",
-    "showOlder_other": "↳ 显示 {{count}} 个更早的对话"
+    "showOlder_other": "↳ 显示 {{count}} 个更早的对话",
+    "select": "选择",
+    "selectAll": "全选",
+    "selectAllLoaded": "全选已加载",
+    "clearSelection": "清除选择",
+    "deleteSelected_one": "删除 {{count}} 个会话",
+    "deleteSelected_other": "删除 {{count}} 个会话"
   },
   "tooltips": {
     "viewEnvironments": "查看环境",
@@ -114,7 +120,9 @@
     "restoreProjectError": "恢复项目时出错，请重试。",
     "reopenSessionFailed": "重新打开会话失败，请重试。",
     "reopenSessionError": "重新打开会话时出错，请重试。",
-    "forkSessionError": "无法派生该会话，请重试。"
+    "forkSessionError": "无法派生该会话，请重试。",
+    "deleteSessionsPartialFailure_one": "{{total}} 个会话中有 {{count}} 个删除失败，请重试。",
+    "deleteSessionsPartialFailure_other": "{{total}} 个会话中有 {{count}} 个删除失败，请重试。"
   },
   "version": {
     "updateAvailable": "有可用更新",
@@ -152,7 +160,16 @@
     "deleteSessionPermanently": "永久删除",
     "deleteAllData": "永久删除所有数据",
     "allConversationsDeleted": "项目将从侧边栏中移除。您的文件、记忆和会话数据将会保留。",
-    "cannotUndo": "您可以稍后重新添加此项目。"
+    "cannotUndo": "您可以稍后重新添加此项目。",
+    "confirmDeleteSessions": "您想如何处理",
+    "deleteSessions_one": "删除 {{count}} 个会话",
+    "deleteSessions_other": "删除 {{count}} 个会话",
+    "selectedSessions_one": "选中的 {{count}} 个会话",
+    "selectedSessions_other": "选中的 {{count}} 个会话",
+    "closeSessions_one": "关闭 {{count}} 个会话",
+    "closeSessions_other": "关闭 {{count}} 个会话",
+    "closeSessionsNotice_one": "关闭会将会话移出活动列表，但保留其历史记录。",
+    "closeSessionsNotice_other": "关闭会将会话移出活动列表，但保留其历史记录。"
   },
   "simpleList": {
     "newChat": "新建对话",

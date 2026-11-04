@@ -2,6 +2,7 @@ import { sessionUserStateDb, sessionsDb } from '@/modules/database/index.js';
 // Whether the finishing chat is on screen decides if its completion is stamped
 // as read; presence has one store, and it lives in the notifications module.
 import { isSessionOnScreen } from '@/modules/notifications/index.js';
+import { joinOpenTabsToRun } from '@/modules/websocket/services/chat-session-audience.service.js';
 import { ChatSessionWriter } from '@/modules/websocket/services/chat-session-writer.service.js';
 import { broadcastSessionUpserted } from '@/modules/websocket/services/session-upsert-broadcast.service.js';
 import type {
@@ -355,10 +356,11 @@ export const chatRunRegistry = {
     provider: LLMProvider;
     providerSessionId: string | null;
     /**
-     * The socket that asked for this run, or `null` for one nobody is watching
-     * — a scheduled message fires with no browser attached. The writer's event
-     * buffer still records everything, so a client that subscribes later
-     * replays the run from its start.
+     * The socket that asked for this run, or `null` for one nobody asked for
+     * — a scheduled message fires with no browser attached. A run with no
+     * socket gets the tabs that have its session open through `joinOpenTabs`
+     * once its `beforeRun` hook has run; a client that subscribes later
+     * replays the run from the writer's buffer.
      */
     connection: RealtimeClientConnection | null;
     userId: string | number | null;
@@ -455,6 +457,22 @@ export const chatRunRegistry = {
 
     run.writer.updateWebSocket(connection);
     return true;
+  },
+
+  /**
+   * Joins the tabs that already have the run's session open to a run no socket asked for (see `joinOpenTabsToRun`): each
+   * is told the session is processing, replayed what the run has written so far and added to its audience.
+   *
+   * Called by `dispatchRun` once the run's `beforeRun` hook has run and before the provider is asked, so a tab hears the
+   * run from its first event. A run that is no longer running joins nobody: a re-adopted host whose turn had already ended
+   * closes its run in that hook.
+   */
+  joinOpenTabs(run: ChatRun): void {
+    if (run.status !== 'running') {
+      return;
+    }
+
+    joinOpenTabsToRun(run.writer, run.appSessionId, run.events);
   },
 
   /**

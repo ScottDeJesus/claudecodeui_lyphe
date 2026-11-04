@@ -7,8 +7,8 @@ import { VOICE_CONFIG_SYNC_EVENT } from '@/shared/voiceConfig';
 
 // The account's provider as the server last answered it, shared by every caller on the page. A module value rather than
 // per-caller state because each message row mounts a caller and they must all agree on one answer from one request.
-// 'openai' (today's behavior) until a read answers; a read that fails leaves the last answer as it was.
-let currentProvider: VoiceProvider = 'openai';
+// 'gemini' (the house's default, the server's own until the account chooses) until a read answers; a read that fails leaves the last answer as it was.
+let currentProvider: VoiceProvider = 'gemini';
 // Set by the first caller to subscribe, never cleared: the page asks once on its own, then on the sync event and when it is returned to.
 let firstReadStarted = false;
 // True while a GET is on the wire, so reads run one at a time and never answer out of order.
@@ -151,26 +151,26 @@ const subscribeToNothing = (): (() => void) => () => {};
 const readCurrentProvider = (): VoiceProvider => currentProvider;
 
 /**
- * Which speech-to-text backend the account's chat mic uses: the server-side setting behind Settings > Voice's picker.
- * Used by the chat module's `useVoiceAvailable`, which draws the composer's mic whenever voice input is on when it says
- * 'gemini'.
+ * Which backend the account's chat uses for the mic and for read-aloud: the server-side setting behind Settings > Voice's
+ * picker. Used by the chat module's `useVoiceAvailable`, which draws the composer's mic whenever voice input is on when it says
+ * 'gemini' and asks the server's `/health` for read-aloud.
  *
  * `active` says whether this caller needs the answer. One `GET /api/voice/settings` per page serves every active
  * caller, made by the first to mount and asked again when `VOICE_CONFIG_SYNC_EVENT` fires (Settings does after a
  * provider change, so an open composer follows the picker in the same tab) and when the page is returned to: it
- * becomes visible, takes focus, comes back online or signs in (`onPageReturn`). An inactive caller (voice off, or
- * read-aloud, which stays on the OpenAI-compatible backend whatever the provider) subscribes to nothing, so a page with
- * no use for the answer never asks for it. The answer is 'openai' until the server has answered; a read that fails
- * leaves the last answer, and the next return reads again.
+ * becomes visible, takes focus, comes back online or signs in (`onPageReturn`). An inactive caller (voice off) subscribes
+ * to nothing, so a page with no use for the answer never asks for it. The answer is 'gemini' until the server has
+ * answered; a read that fails leaves the last answer, and the next return reads again.
  */
 export function useVoiceProvider(active: boolean): VoiceProvider {
-  return useSyncExternalStore(active ? subscribe : subscribeToNothing, readCurrentProvider, () => 'openai');
+  return useSyncExternalStore(active ? subscribe : subscribeToNothing, readCurrentProvider, () => 'gemini');
 }
 
 /**
  * The provider as last read, for code that acts on it at one moment and draws nothing from it: `useVoiceInput`, which
- * sends a clip down the matching path when the recording ends. The composer's `useVoiceAvailable('dictate')` keeps the
- * answer fresh for as long as the mic is drawn.
+ * sends a clip down the matching path when the recording ends, and the read-aloud player (`voicePlayer`), which speaks a
+ * message down the matching path. The composer's `useVoiceAvailable('dictate')` and each message's `useVoiceAvailable('speak')`
+ * keep the answer fresh for as long as a voice control is drawn.
  */
 export function currentVoiceProvider(): VoiceProvider {
   return currentProvider;

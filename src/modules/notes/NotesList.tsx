@@ -130,7 +130,7 @@ export function NotesList() {
           </Card>
         </li>
         {/* The note the blank card has become is drawn by that card, not here — and while its create's
-            answer is still on the way, so is every note the wall did not hold when the create left. */}
+            answer is still on the way or was lost, so is every note the wall did not hold when the create left. */}
         {notes.filter((note) => note.id !== composerNoteId && (createBaseline === null || createBaseline.has(note.id))).map((note) => (
           <li key={note.id} data-note-id={note.id} className="min-w-0">
             <NoteCard note={note} onDelete={onAskDelete} />
