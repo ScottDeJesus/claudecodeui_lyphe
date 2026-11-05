@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { createStableContext } from '@/shared/context/stableContext';
 
 /**
  * One completion worth celebrating, at one of the four sizes (a task, a feature, an epic or a
@@ -39,7 +39,7 @@ export type CelebrationActive = {
  * `RoadmapTreeFace` from its own `useCelebrations`; read by the tree's nodes (`tree/TreeGoal`'s
  * connectors, `tree/TreeMilestoneNode` and `tree/TreeEpicNode`).
  */
-export const CelebrationContext = createContext<CelebrationActive>({
+export const CelebrationContext = createStableContext<CelebrationActive>(import.meta.hot, 'CelebrationContext', {
   tasks: new Set(),
   features: new Set(),
   epics: new Set(),

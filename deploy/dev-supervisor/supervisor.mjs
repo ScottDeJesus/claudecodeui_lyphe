@@ -1,11 +1,14 @@
 // The dev API's supervisor: it boots the edited server BESIDE the running one and retires the old
 // one only once the new one is listening, so a save under server/ never leaves :3011 unanswered.
 // The watcher this replaces killed first and booted after, which made every edit a gap and every
-// broken edit an outage. Mechanism, log lines and failure table: ./README.md.
+// broken edit an outage. A save is HELD while the serving API reports itself busy (Kaylee in a turn, his press,
+// her voice, his last words, a chat run), so no builder's edit cuts him off mid-sentence; his own restart and a
+// requested reboot are never held. Mechanism, log lines and failure table: ./README.md.
 import path from 'node:path';
 import process from 'node:process';
 
 import { BOOT_TIMEOUT_MS, spawnServer } from './child.mjs';
+import { blockersOf, createSaveHold, describe, parseHoldReport } from './hold.mjs';
 import { watchServerDir } from './watch.mjs';
 
 const REPO = path.resolve(import.meta.dirname, '../..');
@@ -17,11 +20,23 @@ let serving = null;  // the child that answered READY and holds the port
 // fails. Set by its `reboot`, cleared either by that answer or by the handover it asked for.
 let rebootRequester = null;
 let pending = null;  // a child still booting; nothing is listening on its behalf yet
-let queued = false;  // an edit arrived while a boot or a retirement was in flight
+let queued = false;  // a reboot request arrived while a boot or a retirement was in flight
 let busy = false;    // a cycle owns the children right now
 let stopping = false;
+let carrying = null;  // the saves the running cycle was released for: how many, and when the first settled (the ceiling's clock)
+const reportedReasons = new WeakMap();  // child → the reasons it last reported; absent until it reports
 
 const log = (message) => console.log(`[supervisor] ${message}`);
+
+// The settled saves waiting for the serving API to be quiet (./hold.mjs). A save is released into a cycle whose
+// successor is stopped, and the saves put back, if the server went busy again while it booted.
+const saves = createSaveHold({
+    log,
+    readReasons: () => (serving === null ? null : reportedReasons.get(serving)),
+    // A running cycle owns the children and asks again when it ends.
+    canRelease: () => !stopping && !busy,
+    release: (carried) => { carrying = carried; requestCycle('save'); },
+});
 
 /** Node's own record of how a child ended — no second copy of that fact is kept here. */
 const exitReason = (child) => child.signalCode ?? String(child.exitCode);
@@ -53,6 +68,8 @@ function watchForCrash(attempt, pid) {
         // No restart here on purpose: a server that crashes after READY crashes again on the same
         // code, and a crash loop is exactly what the watchdog's three-heal rule exists to catch.
         log(`server pid ${pid} exited (${exitReason(attempt.child)}) — waiting for the next change`);
+        // Nothing is serving, so nothing is left to protect: a save held for it goes now.
+        saves.ask();
     });
 }
 
@@ -87,13 +104,46 @@ async function retire(previous, next, pid) {
     handOver(next, pid);
 }
 
-async function bootOnce() {
+/** A child's message: its restart-hold report, or (from the serving one only) a request for its own handover. */
+function onChildMessage(attempt, message) {
+    const reasons = parseHoldReport(message);
+    if (reasons !== null) {
+        reportedReasons.set(attempt, reasons);
+        if (serving === attempt) saves.ask();
+        return;
+    }
+    // A `reboot` from the serving child is the API asking for its own handover, and it is honoured only while the
+    // sender still holds the port: a predecessor winding down would otherwise start a cycle nobody asked for,
+    // whose answer would land on a dying process.
+    if (serving !== attempt || message?.type !== 'reboot') return;
+    // The reason is free text on its way into this process's own journal, which is the only
+    // receipt this protocol has: a reason that is not a string is not this shape and is ignored
+    // whole, and line breaks are flattened so that no reason can ever write a second, forged
+    // `[supervisor]` line beneath the request that carried it.
+    if (typeof message.reason !== 'string') return;
+    log(`reboot requested by pid ${attempt.child.pid}: ${message.reason.replace(/[\r\n]+/g, ' ')}`);
+    rebootRequester = attempt;
+    requestCycle('immediate');
+}
+
+/**
+ * A boot of the edited server. `kind` is why: a settled `save` is released only when the serving API is quiet, and
+ * its successor is stopped if that API went busy again while it booted; an `immediate` one (the first boot, a
+ * requested reboot) never waits.
+ */
+async function bootOnce(kind) {
     // Read once, at spawn: this is what the child was TOLD, and the child holds its duties on that
     // word alone. The serving slot can empty underneath a boot (see the crash path below).
     const deferred = serving !== null;
     const attempt = spawnServer({ repo: REPO, handover: deferred });
     children.add(attempt);
+    // The code on disk, loaded now, already holds every save settled so far: they wait no more, whichever kind of boot
+    // this is. (A reboot request's boot carries the saves held when it was asked for; without this the cycle's end would
+    // release them into a second restart straight after the takeover.)
+    saves.carry();
     attempt.child.once('exit', () => children.delete(attempt));
+    // From spawn, not from READY: the first report a child makes lands right behind its `ready`.
+    attempt.child.on('message', (message) => onChildMessage(attempt, message));
     pending = attempt;
     log(`boot: pid ${attempt.child.pid}`);
 
@@ -129,22 +179,21 @@ async function bootOnce() {
         return;
     }
 
+    // A save's successor is READY, but the serving server may have gone busy while it booted. Two servers must not
+    // share the port for as long as that lasts (a conversation can run for an hour), and the successor's duties wait
+    // for a takeover that only a retirement sends: so it is stopped and the saves wait again, at their old clock.
+    // One more boot, a few seconds, once the server is quiet.
+    if (kind === 'save' && serving !== null) {
+        const blockers = blockersOf(reportedReasons.get(serving), Date.now() - carrying.since);
+        if (blockers.length > 0) {
+            log(`pid ${pid} is ready, but the server went busy while it booted — stopping it; the saves wait again on: ${describe(blockers)}`);
+            saves.putBack(carrying);
+            await attempt.stop();
+            return;
+        }
+    }
     const previous = serving;
     serving = attempt;
-    // The serving child's channel. A `reboot` from it is the API asking for its own handover, and
-    // it is honoured only while the sender still holds the port: a predecessor winding down would
-    // otherwise start a cycle nobody asked for, whose answer would land on a dying process.
-    attempt.child.on('message', (message) => {
-        if (serving !== attempt || message?.type !== 'reboot') return;
-        // The reason is free text on its way into this process's own journal, which is the only
-        // receipt this protocol has: a reason that is not a string is not this shape and is ignored
-        // whole, and line breaks are flattened so that no reason can ever write a second, forged
-        // `[supervisor]` line beneath the request that carried it.
-        if (typeof message.reason !== 'string') return;
-        log(`reboot requested by pid ${pid}: ${message.reason.replace(/[\r\n]+/g, ' ')}`);
-        rebootRequester = attempt;
-        requestCycle();
-    });
     watchForCrash(attempt, pid);
     if (previous) {
         log(`handover: pid ${pid} ready — retiring pid ${previous.child.pid}`);
@@ -163,14 +212,14 @@ async function bootOnce() {
     log(`serving pid ${pid}`);
 }
 
-async function cycle() {
+async function cycle(kind) {
     if (busy) return;
     busy = true;
     try {
         do {
             queued = false;
             try {
-                await bootOnce();
+                await bootOnce(kind);
             } catch (error) {
                 // Defect insurance: this process must outlive anything one boot can do to it — and
                 // must not leave its child behind. A leaked one still binds the port with
@@ -178,24 +227,31 @@ async function cycle() {
                 if (pending) { void pending.stop(); pending = null; }
                 log(`boot aborted: ${error.message}`);
             }
+            // Only a reboot request re-queues a cycle, and a reboot request is never held.
+            kind = 'immediate';
         } while (queued && !stopping);
     } finally {
         busy = false;
+        carrying = null;
+        // Saves that settled while this cycle ran have not been asked about yet.
+        saves.ask();
     }
 }
 
+/** A save settled (the watcher's trailing debounce has passed): it joins the saves waiting for a quiet server. */
 function onChange(relativePath) {
     if (stopping) return;
     log(`change: ${relativePath}`);
-    requestCycle();
+    saves.add();
 }
 
 /**
- * Starts a cycle: the edited server booted beside this one. An edit and a serving child's reboot
- * request want the same thing of this process — the code on disk put on the port — so they share
- * these rules rather than each keeping a copy of them.
+ * Starts a cycle: the edited server booted beside this one. A released save and a serving child's reboot
+ * request want the same thing of this process — the code on disk put on the port — so they share these
+ * rules rather than each keeping a copy of them. `kind` is `save` for a release (its successor is stopped if the
+ * server went busy again while it booted) and `immediate` for a request, which waits for nothing.
  */
-function requestCycle() {
+function requestCycle(kind) {
     if (stopping) return;
 
     if (pending) {
@@ -208,9 +264,9 @@ function requestCycle() {
         void superseded.stop();
         return;
     }
-    // A retirement is finishing; the running cycle picks the queued edit up when it lands.
+    // A retirement is finishing: the running cycle picks it up.
     if (busy) { queued = true; return; }
-    void cycle();
+    void cycle(kind);
 }
 
 async function shutdown(signal) {
@@ -218,6 +274,7 @@ async function shutdown(signal) {
     stopping = true;
     log(`stopping (${signal})`);
     closeWatcher();
+    saves.close();
     // Every live child, not just the two the state machine names: one may be mid-retirement and
     // reachable only from retire()'s own frame. Awaited, never fired and forgotten — exiting first
     // would orphan a server on the port with its own SIGKILL timer dead alongside this process.
@@ -228,4 +285,4 @@ async function shutdown(signal) {
 log(`watching ${WATCH_DIR}`);
 const closeWatcher = watchServerDir(WATCH_DIR, onChange);
 for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => { void shutdown(signal); });
-void cycle();
+void cycle('immediate');

@@ -22,13 +22,13 @@ import {
     startSessionAutoClose,
     whenNodeSessionsReadopted,
 } from '@/modules/providers/index.js';
-import { createWebSocketServer, startRunStallWatchdog } from '@/modules/websocket/index.js';
+import { chatRunRegistry, createWebSocketServer, startRunStallWatchdog } from '@/modules/websocket/index.js';
 import { stopChatCompaction, withChatCompaction } from '@/modules/compaction/index.js';
 
 import { getConnectableHost } from '../shared/networkHosts.js';
 
-import { armHttpDrain } from './http-drain.js';
-import { handover, onRebootFailed, onTakeover, requestReboot, signalReady, supervised } from './supervised-boot.js';
+import { armHttpDrain, HTTP_DRAIN_BOUND_MS } from './http-drain.js';
+import { handover, onRebootFailed, onTakeover, reportHold, requestReboot, signalReady, supervised } from './supervised-boot.js';
 import { createGitModule } from './modules/git/index.js';
 import {
     authenticateToken,
@@ -63,6 +63,7 @@ import { assetsRoutes } from './modules/assets/index.js';
 import { createAccountsModule } from './modules/accounts/index.js';
 import { readClaudeActivity } from './modules/claude-activity/index.js';
 import { createClaudeUpdatesModule } from './modules/claude-updates/index.js';
+import { createRestartHoldRoutes, followChatRuns, restartHold } from './modules/restart-hold/index.js';
 import { createCliVersionModule } from './modules/cli-version/index.js';
 import { createDeepseekModule } from './modules/deepseek/index.js';
 import { createKanbanModule } from './modules/kanban/index.js';
@@ -234,6 +235,11 @@ const claudeUpdates = createClaudeUpdatesModule({
 });
 app.use('/api/system', authenticateToken, systemRoutes);
 app.use('/api/claude-updates', authenticateToken, claudeUpdates.router);
+
+// What the dev supervisor is told the server is busy with: a save under server/ waits for none (deploy/dev-supervisor/README.md).
+// The chat runs feed it from the registry; Kaylee's turns, his words and the panel's press and voice tell it themselves.
+app.use('/api/restart-hold', authenticateToken, createRestartHoldRoutes());
+followChatRuns(chatRunRegistry);
 
 // The Claude account lane and its usage meter (protected), mounted at `/api` so its paths land at
 // `/api/accounts`, `/api/usage` and the door's `/api/accounts/use`, `/api/accounts/auto` and
@@ -420,6 +426,8 @@ const companion = createCompanionModule({
     relay: dispatcher.relay,
     resumeRun: dispatchSouls.resumeRun,
   },
+  // A handover boot's sessions hold every push until the takeover: the retiring server may still be finishing her turn on the one conversation.
+  awaitingTakeover: handover,
 });
 app.use('/api/companion', authenticateToken, companion.router);
 
@@ -459,10 +467,18 @@ const whenRunsReadopted = new Promise<void>((resolve) => { markRunsReadopted = r
 // holder's link-up re-adoption (or at once when there is none to do).
 let hostsReadopted = false;
 void Promise.all([whenRunsReadopted, whenNodeSessionsReadopted()]).then(() => { hostsReadopted = true; });
-// The supervisor SIGKILLs a predecessor 10 s after its SIGTERM, which follows this process's READY at
-// once, and the re-adoption after the takeover measured under 0.4 s: past this, no takeover is coming.
+// How long a retiring server lets a turn of Kaylee's finish before it stops her (operator ruling 2026-11-04: a restart that must happen
+// mid-turn does not cut her off), and how long its exit may wait for her wind-down in all: the turn, the sentence still streaming when it ends
+// (the HTTP drain's own bound), then her CLI's grace (5 s) with a second to spare.
+// The supervisor's SIGKILL (`STOP_TIMEOUT_MS`, deploy/dev-supervisor/child.mjs, 75 s) covers COMPANION_STOP_BOUND_MS and the rest of the shutdown beside it.
+const COMPANION_TURN_BOUND_MS = 60_000;
+const COMPANION_STOP_BOUND_MS = COMPANION_TURN_BOUND_MS + HTTP_DRAIN_BOUND_MS + 6_000;
+// The supervisor SIGKILLs a predecessor 75 s after its SIGTERM (`STOP_TIMEOUT_MS`, deploy/dev-supervisor/child.mjs), which
+// follows this process's READY at once, and the re-adoption after the takeover measured under 0.4 s: past this, no takeover is
+// coming. The window is that long because a predecessor lets a turn of Kaylee's finish before it exits (`COMPANION_TURN_BOUND_MS`),
+// so the takeover can come up to ~70 s after READY; with no turn in flight it comes in about a second and the hold ends on it.
 // A warden that has not linked by then is not coming soon either.
-const RUNS_READOPTED_WAIT_MS = 11_000;
+const RUNS_READOPTED_WAIT_MS = 76_000;
 // A handover boot serves before its takeover — for as long as the predecessor drains (http-drain.ts) —
 // and until then its run registry holds none of the keepalive runs (D-11): this read would tell every
 // tab its live runs are idle, and the tab would drop their spinners and waiting marks. It waits for
@@ -770,6 +786,8 @@ async function startServer() {
             // nothing cuts it, so a store that blocks there holds READY for as long as it blocks.
             await Promise.race([cerberus.start(), delay(3_000)]);
             signalReady();
+            // The picture is told right after READY and on every change: the supervisor holds a save while it is busy.
+            if (supervised) restartHold.tell(reportHold);
             const appInstallPath = APP_ROOT;
             await writeLocalServerMarker().catch((error) => {
                 console.warn('[WARN] Could not write local server marker:', error.message);
@@ -820,15 +838,25 @@ async function startServer() {
             // sockets this server is only now able to accept.
             chatNamer.start();
         });
-        if (handover) onTakeover(soleServerDuties);
+        if (handover) {
+            // Busy from READY until its duties are done: until they re-adopt the chat runs and re-say Kaylee's words this boot's
+            // picture is empty, and a save asked about at that empty instant would restart it straight after its takeover.
+            restartHold.takingOver(true);
+            onTakeover(async () => {
+                try { await soleServerDuties(); } finally { restartHold.takingOver(false); }
+            });
+        }
 
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
-            // Her conversations wind down before anything else: each is a CLI process on the subscription, and
-            // a message that lands once this has run is refused (a 503) rather than waking one nothing would end.
-            // The wait is bounded: a CLI that answers nothing is ended by its own grace (5 s), which keeps running,
-            // and the rest of the shutdown must not sit behind it inside the supervisor's window.
-            await Promise.race([companion.stop(), delay(3_000, undefined, { ref: false })]);
+            // Her conversations are told first: each is a CLI process on the subscription, and a message that lands once
+            // this has run is refused (a 503) rather than waking one nothing would end. A turn of hers in flight is let to
+            // finish (COMPANION_TURN_BOUND_MS), and the sentences it speaks keep reaching the page over its open socket; the one
+            // still streaming when the turn ends is let to finish too (HTTP_DRAIN_BOUND_MS). The rest of the shutdown runs BESIDE
+            // that wait and not behind it; only the exit below waits for her (bounded).
+            const herWindDown = companion.stop(COMPANION_TURN_BOUND_MS, HTTP_DRAIN_BOUND_MS).catch((err: unknown) => {
+                console.error('[Companion] Error winding her conversations down during shutdown:', getErrorMessage(err));
+            });
             // The auto-run rule, the running diagnoses, the self-checks, the prune and the gateway's
             // accepting stop before anything else: a tick, a fix or a new warden link on a process that
             // is leaving would only meet its successor's.
@@ -868,6 +896,9 @@ async function startServer() {
             } catch (err) {
                 console.error('[Plugins] Error stopping plugins during shutdown:', getErrorMessage(err));
             }
+            // Everything else is stopped: only her turn, when one is still running, keeps this process (and so the successor's
+            // takeover) waiting. Bounded: her turn bound, the sentence still streaming, then the CLI's grace (5 s) to end the process it was left with.
+            await Promise.race([herWindDown, delay(COMPANION_STOP_BOUND_MS, undefined, { ref: false })]);
             try {
                 releaseKeepaliveOwnership();
                 await removeLocalServerMarker();

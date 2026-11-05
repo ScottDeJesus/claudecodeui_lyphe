@@ -1,6 +1,7 @@
-import { createContext, useContext } from 'react';
+import { useContext } from 'react';
 
 import type { useFollowups } from '@/modules/followups/hooks/useFollowups';
+import { createStableContext } from '@/shared/context/stableContext';
 
 /**
  * What the Next steps widget's body reads: the one reading its host makes of a chat's followups (`useFollowups`) —
@@ -14,7 +15,7 @@ export type FollowupsValue = ReturnType<typeof useFollowups>;
  * Provided by `ChatGutterLayout` around the gutters and by the station's `FollowupsStage` around its body; read by
  * `FollowupsWidgetBody` through `useFollowupsContext`.
  */
-export const FollowupsContext = createContext<FollowupsValue | null>(null);
+export const FollowupsContext = createStableContext<FollowupsValue | null>(import.meta.hot, 'FollowupsContext', null);
 
 /** The reading the host provides, or a loud error when the body is mounted without one. */
 export function useFollowupsContext(): FollowupsValue {

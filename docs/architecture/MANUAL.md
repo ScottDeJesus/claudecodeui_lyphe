@@ -1819,7 +1819,7 @@ What remains is a `Map<sessionId, SessionActivity>` of `{ statusText, canInterru
 | `markSessionIdle` | `complete`; `protocol_error`; a `chat_subscribed` ack with `isProcessing: false` |
 | `syncProcessingSessions` | Every 5 s, and when the tab becomes visible again, from `GET /api/providers/sessions/running`, which returns `chatRunRegistry.listRunningRuns()` beside `subagentSessionIds` — the conversations a subagent is still running in, live run or not — and `awaitingInputSessionIds`, the conversations a question is waiting in, live run or not |
 
-Two guards make it stable:
+Three guards make it stable:
 
 - **Stale idle acks.** `markSessionIdle(id, { ifStartedBefore })` keeps an entry whose
   `startedAt` is at or after the moment that session's `chat.subscribe` was sent
@@ -1828,6 +1828,16 @@ Two guards make it stable:
 - **A 10 s local grace.** `syncProcessingSessions` keeps entries the server did not report
   if they are younger than `LOCAL_ACTIVITY_GRACE_MS = 10_000`, so the poll cannot race a
   send that has not reached the registry yet.
+- **One read in flight.** `refreshRunningSessions` skips a tick while its previous read is out
+  (`refreshingRef`, which keeps when the read began); a read older than `RUNNING_READ_GUARD_MS`
+  (35 s: the api's 30 s `REQUEST_TIMEOUT_MS` and a tick) no longer blocks the next tick, and only the
+  read that owns the entry frees it. The server holds this read up to `RUNS_READOPTED_WAIT_MS` (76 s)
+  while a successor waits for its predecessor to drain; a held read added every tick fills the
+  browser's six HTTP/1.1 connections to the origin, and every other request of the tab (her speech,
+  her picture) waits behind them. Measured 2026-11-04 against a proxy holding the read 70 s: 6 reads held
+  and `GET /api/companion` 4.5–5.0 s; with one in flight, 1 held and 7–30 ms. A read that reaches the
+  ceiling logs `[SessionProtection] Failed to sync running sessions: TimeoutError` once per 30 s and
+  the map keeps its last-known list; a tab opened inside the hold shows no running chats until the takeover.
 
 Consumers: `useProcessingSessions` (chat — the activity line and the abort button),
 `useBusySessionIdSet` (sidebar — membership only, derived by `useSessionIdSet` from a sorted

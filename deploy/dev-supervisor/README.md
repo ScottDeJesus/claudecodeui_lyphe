@@ -5,6 +5,14 @@ boots the edited server **beside** the running one, then retires the old one onl
 is listening. A save under `server/` therefore never leaves `:3011` unanswered, and a save that
 does not compile leaves the previous server serving.
 
+A builder's save is also **held while the running server is busy**. Kaylee in a turn, a chat run
+streaming, his press open or her voice sounding on her panel, and the quiet tail after anything said or
+typed to her: a swap in the middle of any of those cuts him off mid-sentence, so the server tells the
+supervisor when it turns busy and when it turns quiet, and a save waits for the quiet. Every save made
+meanwhile joins the same wait, so one restart carries every change since the last. His own **Restart
+server** press, the update pipeline's reboot, `systemctl restart` and a deploy are never held — only
+saves are. What counts as busy, and why each part does, is [`server/modules/restart-hold`](../../server/modules/restart-hold/restart-hold.service.ts).
+
 This replaces `tsx watch`, which killed first and booted after. Two costs came out of that order:
 
 - every edit was a gap on the port — one to two seconds in which the browser's WebSocket dropped
@@ -16,39 +24,64 @@ Both are properties of the ORDER, not of the watcher, so the fix is the order: b
 
 ## The state machine
 
-Four variables in `supervisor.mjs` hold everything:
+Six variables in `supervisor.mjs` hold everything (the save queue is `createSaveHold` in `hold.mjs`):
 
 | Variable          | Meaning |
 | ----------------- | ------- |
 | `serving`         | the child that answered READY and holds the port |
 | `pending`         | a child still booting; nothing listens on its behalf yet |
-| `queued`          | an edit arrived while a boot or a retirement was in flight |
+| `queued`          | a reboot request arrived while a boot or a retirement was in flight |
 | `rebootRequester` | the serving child that asked for the cycle now running; it is owed an answer if that cycle's boot fails |
+| `reportedReasons` | per child, what it last said it is busy with (`busy` reasons, or `[]` for `quiet`); absent until it reports, and absent counts as quiet |
+| `saves`           | the settled saves waiting for a quiet server: how many, when the first settled (the ceiling's clock), and whether the journal has said what they wait on |
 
 ```
-       ┌──────────────────────── change (debounced) ────────────────────────┐
-       │                                                                    │
-       ▼                                                                    │
-  spawn child ──► READY? ──yes──► predecessor? ──no──► serving pid ─────────┤
-  (pending)         │                   │                                   │
-                    │                   └──yes──► SIGTERM old               │
-                    │                              └─ old exit ──► takeover ┤
-                    │                                              (serving)│
-                    └──no (exit / 30 s)──► keep the old, log, wait ──────────┘
+   save (debounced) ──► saves ──serving quiet?──yes──┐         reboot request ─────────┐
+                          ▲            │no           │                                 │
+                          │     "change held" ◄──── a report / a cycle's end / ceiling│
+                          │                          ▼                                 ▼
+  spawn child ──► READY? ──yes──► [save: serving busy again? stop it, saves wait] ─► predecessor? ──no──► serving pid
+  (pending)         │              (a boot carries the saves settled before it)         │
+                    │                                                                   └──yes──► SIGTERM old
+                    │                                                                          └─ old exit ──► takeover
+                    └──no (exit / 30 s)──► keep the old, log, wait
 ```
 
-- **on change** — if a child is already booting, that child is stopped and the boot restarts (it
-  loaded the previous version of the edited file, so there is nothing to salvage). If a retirement
-  is finishing, the edit is queued and the running cycle picks it up. Otherwise a boot starts.
-- **on a serving child's `reboot`** — the same cycle, asked for over IPC instead of by the watcher:
-  it enters at the same point and follows the same three rules. This is how the update pipeline
-  restarts the API, and the one case where the requester is owed an answer (see the four messages
-  below).
+- **on a settled save** — the watcher's trailing debounce has passed. The save joins `saves`. If the
+  serving child reports quiet, never reported, or none is serving, the saves go at once: a boot
+  starts. Otherwise the journal says what they wait on (`change held`), once per wait, and they stay
+  until the serving child reports quiet. Nothing polls: the question is asked again on a save, on
+  every report from the serving child, when a cycle ends and when the serving child dies; the one
+  timer is the ceiling below.
+- **a boot carries the saves settled before its spawn** — it loads the code on disk, which already holds
+  them, so they wait no more, whichever kind of boot it is: a reboot request's boot (his **Restart
+  server** press) carries the held saves and the cycle's end does not release them into a second
+  restart. A save that settles while a cycle runs waits for the cycle to end and is then asked about
+  again; the server it is asked of is the new serving child, which says it is busy until its takeover
+  duties are done (below), so the cycle's end never reads a false quiet.
+- **a boot for a save** — when its successor is READY the serving child is asked again. If it went
+  busy during those few seconds, the successor is **stopped** and the saves wait again, on their old
+  clock (`pid <new> is ready, but the server went busy while it booted — stopping it`): two servers
+  never share the port for as long as a conversation lasts, and the successor's duties wait for a
+  takeover that only a retirement sends. The cost is one more boot, a few seconds, when it is quiet.
+- **the ceiling** — chat runs survive a handover on their keepalive hosts, so they are the one reason a
+  child marks `yields`: once a save has been held `CEILING_MS` (30 minutes) they stop counting, and the
+  save goes as soon as nothing else is busy. Kaylee's turn, his press, her voice and the quiet tail
+  never stop counting. Measured over the last day: chat runs alone would have held 11 of 23 saves
+  past 30 minutes, the longest 128 (`.verify/restart-hold-waits.mjs`).
+- **on a serving child's `reboot`** — a boot started at once, asked for over IPC instead of by the
+  watcher, and never held: it enters at the same point and follows the same three rules. If a boot
+  is already pending that child is stopped and the boot restarts (it loaded code from before the
+  request). This is how the update pipeline and the **Restart server** press restart the API, and
+  the one case where the requester is owed an answer (see the messages below).
 - **on READY with a predecessor** — the old child gets SIGTERM. In **its exit handler**, and only
   there, the new child is sent `takeover`. Not one moment earlier: until the old process is gone
   its keepalive hosts are live, and the successor's re-adoption would end those sessions with
   SIGHUP (`attach` in `session-host/host.js` ends the older socket; the socket `close` handler in
-  `session-host/spawner.ts` settles that turn with `SIGHUP`).
+  `session-host/spawner.ts` settles that turn with `SIGHUP`). The old child does not exit at once
+  when Kaylee is mid-turn: it lets that turn finish (60 s at most) and only then exits, so the
+  `takeover` can come that much later. The successor serves meanwhile and holds Kaylee's pushes
+  until it (see the failure table).
 - **on READY with no predecessor left** — what the child was TOLD at spawn decides this, never the
   supervisor's state at READY. A first boot was told nothing and ran its duties before it listened,
   so nothing is sent. A child spawned *beside* a predecessor that then died on its own mid-boot is
@@ -56,7 +89,10 @@ Four variables in `supervisor.mjs` hold everything:
   rule was only ever "after the old process is gone", and it is gone.
 - **on exit-before-READY or timeout** — the old server is untouched and keeps serving. One line.
 - **on a serving child's exit** — one line, then wait for the next change. No automatic restart.
-- **on SIGTERM / SIGINT** — close the watcher, stop every child, *await* their exits, exit 0.
+- **on SIGTERM / SIGINT** — close the watcher, stop every child, *await* their exits, exit 0. A
+  serving child gets `STOP_TIMEOUT_MS` (75 s: a turn of Kaylee's in flight is let to finish first)
+  before SIGKILL, inside systemd's own 90 s stop window; a child that never became ready gets the
+  short `BOOT_STOP_TIMEOUT_MS` (10 s).
 
 Readiness is the child's own word over IPC and nothing else. With two servers sharing the port an
 HTTP probe cannot say **which** of them answered, so a probe can never be the retirement trigger.
@@ -70,7 +106,7 @@ a by-hand `npm run server:dev`, must never make a plain boot share `:3011` with 
 | Bit | Set on | Effect in the child |
 | --- | ------ | ------------------- |
 | `CLOUDCLI_SUPERVISED=1` | every child | listens with `reusePort: true`, and sends `ready` from the listen callback once `cerberus.start()` has bound the warden gateway (waited for at most 3 s; MAN-7804) |
-| `CLOUDCLI_HANDOVER=1` | only a child spawned beside a serving one | defers `soleServerDuties` (`server/index.ts`) until `takeover`: re-adoption, the sleep-time auto-close of unpinned chats, the scheduled-message dispatcher, plugin startup, the update reconciler, Center's own checks and red watch and Kaylee's re-send of the words her last process never answered |
+| `CLOUDCLI_HANDOVER=1` | only a child spawned beside a serving one | defers `soleServerDuties` (`server/index.ts`) until `takeover`: re-adoption, the sleep-time auto-close of unpinned chats, the scheduled-message dispatcher, plugin startup, the update reconciler, Center's own checks and red watch and Kaylee's re-send of the words her last process never answered. Until `takeover` Kaylee's sessions also launch nothing (a second CLI on the conversation the retiring child is still finishing would fork it): what he says meanwhile is kept on disk and said by the takeover, in order |
 
 `child.mjs` **deletes** the handover bit when it does not apply rather than leaving it unset: a
 stray one in the unit's environment would park every first boot forever, waiting on a takeover no
@@ -79,7 +115,7 @@ predecessor exists to trigger.
 `TSX_TSCONFIG_PATH=<repo>/server/tsconfig.json` is set on every child too — that is how tsx's
 loader resolves the `@/*` alias. `--tsconfig` is a flag of the tsx *CLI*, which is not in play here.
 
-## The four IPC messages
+## The six IPC messages
 
 `stdio: ['ignore', 'inherit', 'pipe', 'ipc']`.
 
@@ -97,6 +133,19 @@ loader resolves the `@/*` alias. `--tsconfig` is a flag of the tsx *CLI*, which 
   `boot timed out after 30 s` when it hung. The requester keeps serving throughout. A request whose
   boot succeeds is answered by the handover instead — retire, `takeover`, `handover complete`.
 
+- child → supervisor: `{ type: 'busy', reasons: [{ why, yields }] }` and `{ type: 'quiet' }` — what the
+  child is busy with, told at once when it turns busy and (after 3 s of staying empty, so work that
+  hands on to more work is not read as a quiet instant) when it turns quiet, and **once right after
+  `ready`** with the current picture, quiet included. `why` is a plain sentence the journal prints
+  as given (bounded, line breaks flattened); `yields` is the ceiling's flag. Read from any child,
+  acted on only for the serving one, and a `busy` that names nothing valid is ignored whole, never
+  read as quiet. A child that never sends one (an older build) counts as quiet. A handover child
+  says `busy` (`this server is still taking over from the previous one`) from `ready` until its
+  `takeover` duties — re-adopting the chat runs, saying Kaylee's unanswered words again — are done,
+  and quiet after the usual settle. The server's picture
+  is also readable at any moment as `GET /api/restart-hold` → `{ busy, reasons }` (authenticated), which
+  is how a restart of the whole unit picks a quiet moment.
+
 Any other shape is ignored on both sides. stdout stays **inherited** so the child's own pid remains
 on its journal entries (`_PID`); only stderr is piped, so a failed boot can be explained in one
 line, and it is relayed unedited.
@@ -108,10 +157,16 @@ All on stdout, all prefixed `[supervisor] `:
 ```
 watching <abs dir>
 watching <n> directories under <dir>             the watches the watcher holds open
-change: <rel path>
+change: <rel path>                               a save settled (the debounce passed)
+change held — waiting on: <reasons>              the serving child is busy; once per wait
+held 30 min — chat runs no longer hold the restart   the ceiling passed and something else still holds
+quiet — restarting for <n> held saves after <s> s    the serving child reported quiet; the cycle follows
+nothing is serving — restarting for <n> held saves after <s> s   the serving child died; nothing is left to protect
+this boot carries the <n> held saves             a reboot request's boot was spawned while they waited
 reboot requested by pid <n>: <reason>            the serving child asked for this cycle
 boot: pid <n>
 serving pid <n>                                  first boot ready — it holds the port
+pid <new> is ready, but the server went busy while it booted — stopping it; the saves wait again on: <reasons>
 handover: pid <new> ready — retiring pid <old>
 retired pid <old> (<exit code|signal>)
 handover complete — serving pid <new>            only once the takeover has landed
@@ -155,37 +210,47 @@ channel closed between the connected check and the send — the request is dropp
 because a child that has just lost its channel is on its way out and there is nothing left to
 answer). Everything the children themselves write is relayed untouched.
 
-## The three constants
+## The constants
 
 | Constant | Value | Home | Why |
 | -------- | ----- | ---- | --- |
 | `DEBOUNCE_MS` | 120000 | `watch.mjs` | two quiet minutes: a builder's burst of saves, or a checkout's hundreds of events, becomes one boot (operator, 2026-11-03) |
+| `CEILING_MS` | 1 800 000 | `hold.mjs` | a save held this long stops counting the reasons marked `yields` (chat runs). Measured, not guessed: over the last day chat runs alone would have held 11 of 23 saves past it |
+| `QUIET_TAIL_MS` | 90 000 | `server/modules/restart-hold` | the child's: how long after anything said or typed to Kaylee the server still counts as busy. Measured from her transcripts (`.verify/restart-hold-tail.mjs`): 85.4% of his returns to an idle her come within 90 s, half within 9 s |
 | `BOOT_TIMEOUT_MS` | 30 000 | `child.mjs` | a healthy boot is ~1-4 s here; this only has to outlast the slowest honest one |
-| `STOP_TIMEOUT_MS` | 10 000 | `child.mjs` | SIGTERM, then SIGKILL — a server that will not close its sockets still has to go |
+| `STOP_TIMEOUT_MS` | 75 000 | `child.mjs` | SIGTERM, then SIGKILL, for a SERVING child. Most of it is Kaylee's: the child lets her turn in flight finish before it exits (`COMPANION_TURN_BOUND_MS` 60 s, then her CLI's 5 s grace; `server/index.ts`), and the rest of its shutdown runs beside that wait. Inside systemd's 90 s stop window. With no turn in flight the exit takes 1-2 s. **Read once, at unit start**: a change here is live after `sudo systemctl restart cloudcli-server-dev` |
+| `BOOT_STOP_TIMEOUT_MS` | 10 000 | `child.mjs` | the same for a child that never became ready (a failed or superseded boot): it holds no conversation, so a boot that ignores SIGTERM still goes quickly |
 
 Each lives in the module that consumes it, because `watchServerDir(dir, onChange)` and
-`spawnServer({ repo, handover })` take no tuning arguments. One line each to change.
+`spawnServer({ repo, handover })` take no tuning arguments. One line each to change. The child's 3 s
+settle before it tells `quiet` (`QUIET_SETTLE_MS`) is the only other number in the protocol.
 
 ## When things go wrong
 
 | Situation | What happens |
 | --------- | ------------ |
 | **Broken edit** (syntax error) | the child exits before READY; `boot failed — previous server kept: Error: Transform failed with 1 error:`; the old server keeps serving; the next save boots again (measured) |
-| **Coalesced edits** (save, save, save) | the two-minute trailing debounce makes one boot once no save has landed for two minutes. A save restarts that wait, and a boot (30 s at most) and a retirement (10 s at most) both end inside it, so a save never lands mid-boot; `change during boot` is reached only by a `reboot` request from the serving API while a boot is pending |
+| **Coalesced edits** (save, save, save) | the two-minute trailing debounce makes one settled save once no save has landed for two minutes. A save restarts that wait, and a boot (30 s at most) and a retirement (75 s at most: 1-2 s unless a turn of Kaylee's is finishing) both end inside it, so a save rarely settles mid-cycle; one that does waits for the cycle to end and is asked about again. `change during boot` is reached only by a `reboot` request from the serving API while a boot is pending |
+| **Save while the server is busy** | `change: <path>`, then `change held — waiting on: <reasons>` (once). More saves add `change:` lines and nothing else. When the serving child reports quiet: `quiet — restarting for <n> held saves after <s> s`, then one ordinary cycle that carries every change since the last. Nothing restarts, and nothing is stopped or cut, while it waits |
+| **Server goes busy while the successor boots** | the successor is stopped and the old server keeps serving alone: `pid <new> is ready, but the server went busy while it booted — stopping it; the saves wait again on: …`. The saves keep their clock (so the 30-minute ceiling still counts from the first), and the next quiet boots again. Nothing ever waits with two servers on the port |
+| **Held more than 30 minutes** | chat runs stop counting (`held 30 min — chat runs no longer hold the restart` if anything else still holds); the save goes as soon as Kaylee's turn, his press, her voice and the tail are all clear |
+| **A child that never reports** (an older build, or one that crashed before its first report) | counts as quiet: the save restarts it at once, which is how every save behaved before the hold |
 | **Boot timeout** | after 30 s the pending child is stopped and the old one kept; `boot timed out after 30 s` |
 | **Crash after READY** | one line, then the supervisor waits for the next change. It never auto-restarts — a server that crashes on this code crashes again on it, and a crash loop is what the watchdog's three-heal rule exists to catch |
 | **First boot fails** (nothing serving) | `boot failed — no previous server: …`. The supervisor stays alive, so `Restart=always` does not turn a broken edit into a 5-second crash loop. Nothing is listening, so the API canary fails and `/usr/local/bin/cloudcli-dev-watchdog.sh` heals the unit on its own 60 s timer — that script is never edited by this package |
 | **Predecessor crashes mid-boot** | its exit line prints, then the booting child — which deferred its duties on the word it was given at spawn — is released the moment it is READY (`handover complete — serving pid <n>`, then `[keepalive] taking over`). Measured against a stand-in: without that release the API serves with its keepalive hosts unadopted for good |
-| **Requested reboot** (a serving child asking for its own handover, as the update pipeline's restart does) | the edit cycle exactly: boot beside, READY, retire the requester, `handover complete — serving pid <new>`. Honoured only while the requester is still the `serving` child, so an answer can never land on a child that has already been replaced |
+| **Requested reboot** (a serving child asking for its own handover: the update pipeline's restart, and his **Restart server** press) | never held. The cycle exactly: boot beside, READY, retire the requester, `handover complete — serving pid <new>`. Honoured only while the requester is still the `serving` child, so an answer can never land on a child that has already been replaced. With a save held, the cycle runs anyway and its boot carries the held save (`this boot carries the <n> held saves`): one restart, not two |
 | **Requested reboot that fails to boot** | the requester is still serving, so it is told: `reboot-failed` carrying the boot's first error line (or `boot timed out after 30 s`), and the journal says `reboot failed — told pid <n>`. Nothing was retired and `:3011` keeps its server. What the requester does with that answer is its own affair — the update pipeline rolls the Agent SDK back from its `restarting` state; nothing in this package rolls anything back |
-| **`systemctl restart`** | `KillMode=control-group` (the default) ends the supervisor and both children together. Accepted: a restart is a restart, and chat sessions survive it through the tmux keepalive |
+| **`systemctl restart`** and a deploy | never held. `KillMode=control-group` (the default) ends the supervisor and both children together; the supervisor's hold state goes with it. Accepted: a restart is a restart, and chat sessions survive it through the tmux keepalive |
+| **Retiring server with Kaylee mid-turn** (his **Restart server** press, the update pipeline's restart, or a save whose quiet verdict was overtaken by a turn) | the old child lets her turn finish instead of cutting it: its journal says `the server is stopping; her turn in flight is let to finish (at most 60 s)`, then `her turn finished before her process closed`, and it exits; `retired pid <old> (0)` and `handover complete` follow, up to ~70 s after `handover: pid <new> ready`. Her sentences keep reaching the page over its socket (websockets close at the exit), the page's speech pulls are answered by the successor (the old listener is closed), and what he says meanwhile is kept and said by the successor at the takeover. A turn that does not end in 60 s is interrupted as before and his words are said again. Her own compaction turn is not waited for. The successor holds `GET /api/providers/sessions/running` for the whole window (`RUNS_READOPTED_WAIT_MS`, 76 s). Measured 2026-11-04 (`.verify/kaylee-restart-turn.mjs`). With an older supervisor process still holding the 10 s bound, the old child is `retired pid <old> (SIGKILL)` at 10 s and the turn is replayed |
 | **Supervisor dies mid-boot** | the child's `signalReady()` finds the channel gone, logs once and serves anyway; a deferred child logs `supervisor channel closed before takeover` and stays deferred rather than stealing the predecessor's hosts |
 
 At rest there is exactly one child: `ps -o pid= --ppid $(systemctl show -p MainPID --value
 cloudcli-server-dev)` prints one line. Two is the handover window: near-instant with nothing in
 flight on the retiring child, stretching up to its own drain bound (`HTTP_DRAIN_BOUND_MS`,
 [`server/http-drain.ts`](../../server/http-drain.ts)) while an HTTP request it already accepted is
-still finishing.
+still finishing, and up to ~70 s while a turn of Kaylee's is finishing (the exit waits for her; the
+rest of its shutdown does not).
 
 ## SO_REUSEPORT
 
@@ -243,7 +308,7 @@ systemctl status cloudcli-server-dev            # → active
 journalctl -u cloudcli-server-dev -f            # → [supervisor] serving pid <n>
 ```
 
-Prove a handover: `bash .verify/handover/smoke.sh` → `HANDOVER old=<pid> new=<pid> seconds=<n>`. It reads `DEBOUNCE_MS` from `watch.mjs` and waits that plus 30 s, so `<n>` is at least the debounce (120 on the two-minute setting).
+Prove a handover: `bash .verify/handover/smoke.sh` → `HANDOVER old=<pid> new=<pid> seconds=<n>`. It reads `DEBOUNCE_MS` from `watch.mjs` and waits that plus 30 s, so `<n>` is at least the debounce (120 on the two-minute setting). It saves a file, so it is a save like any other and waits for a quiet server: run it when `GET /api/restart-hold` (authenticated) says `busy: false`, or its window is too short.
 
 ## See also
 

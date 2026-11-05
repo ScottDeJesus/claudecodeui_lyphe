@@ -46,8 +46,14 @@ export type CompanionSessionDeps = MessageReaders &
     readUnanswered(): UnansweredMessage[];
     writeUnanswered(unanswered: UnansweredMessage[]): void;
     launch?(input: CompanionCliLaunch): CompanionCli;
+    /** True for a session born beside a predecessor that still answers (a handover boot): every push is held until the takeover's `resendUnanswered` (`companion-restart.ts`). Absent is false. */
+    awaitingTakeover?: boolean;
     onProcess(process: CompanionProcess): void;
     onSystemLine(text: string): void;
+    /** A turn of hers is in flight or is not, her last turn included (which `onTurnStarted` and `onTurnEnded` keep from the page). The house holds a dev-server restart while one runs. A stand-in may leave it out. */
+    onTurnInFlight?(inFlight: boolean): void;
+    /** Words of his reached her — typed, spoken, or a press that carried none: the house holds a dev-server restart for a while after. A stand-in may leave it out. */
+    onHisWords?(): void;
   };
 
 /**
@@ -91,6 +97,8 @@ export type CompanionSession = {
   pushFocusNews(envelope: string): void;
   warm(): void;
   resendUnanswered(): Promise<void>;
+  /** The server is stopping: resolves when the turn in flight has ended, at `boundMs`, or at once when there is none (or it is her last turn). Closes nothing; `interrupt` and `close` follow. */
+  finishTurn(boundMs: number): Promise<void>;
   oweCut(heard: string | null, interrupted: string | null): void;
   interrupt(by?: StopSource): Promise<void>;
   setModel(model: CompanionModel): Promise<void>;

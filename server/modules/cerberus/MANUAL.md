@@ -550,7 +550,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/cerberus
 
 ## MAN-7806 — The Cerberus repositories — the `cerberus*Db` objects over `cerberus.db`
 
-Connection and schema: MAN-7805. Reach every repository through `@/modules/database/index.js`. `cerberusCatalogDb` and `cerberusRunsDb`: MAN-7896. `cerberusDiagnosesDb`: MAN-7927. `cerberusAutoDiagnosisDb`: MAN-9532. `cerberusResultsDb` and its `lastOkAt` (where a red's trouble begins): MAN-7965.
+Connection and schema: MAN-7805. Reach every repository through `@/modules/database/index.js`. `cerberusCatalogDb` and `cerberusRunsDb`: MAN-7896. `cerberusDiagnosesDb`: MAN-7927. `cerberusAutoDiagnosisDb`: MAN-9532. `cerberusResultsDb` and its `lastOkAt` and `redStartAt` (where a red's trouble begins): MAN-7965.
 
 ## Contract (all of them)
 - A repository takes `getCerberusConnection()` inside every method and opens no transaction (but `cerberusUpdatesDb.rolledBackAfterUpdated`, MAN-7957); a multi-statement unit (enrollment, ingest, a definitions write) is the caller's own transaction on that connection.
@@ -613,7 +613,8 @@ section: The Cerberus repositories — the `cerberus*Db` objects over `cerberus.
 | `latestPerCheck(node?)` | each check's last row plus `since` (the `at` of the newest row whose `prev_status` differs from its status, else the first row); with `node`, that node's checks alone (the same statement, its `k` subquery limited to the node). The boot's seed reads all; `ingest.reseedNode` reads one node at each hello |
 | `rowsInWindow(node, keys, from, to)` | per key: rows with `from <= at <= to`, plus the last row before `from` and the first row after `to`; ordered `check_key, at`; `[]` for no keys or `from > to`; a repeated key is read once |
 | `recentChanges(node, key, since, limit, until?)` | `change` rows with `since <= at <= until` (`until` unbounded by default), newest first |
-| `lastOkAt(node, key)` | the `at` of the check's newest `ok` row (a keep-alive counts: it repeats an `ok`), or `null` when never ok; on the WARDEN's clock, the caller adds the node's clock offset; the primary key serves it (`SEARCH results USING INDEX sqlite_autoindex_results_1 (node=? AND check_key=?)`); the daily prune deletes keep-alives past 90 days, so for a check red longer than that it is the last ok that survives; its one reader is `check-trouble.ts` (MAN-9533) |
+| `lastOkAt(node, key)` | the `at` of the check's newest `ok` row (a keep-alive counts: it repeats an `ok`), or `null` when never ok; on the WARDEN's clock, the caller adds the node's clock offset; the primary key serves it (`SEARCH results USING INDEX sqlite_autoindex_results_1 (node=? AND check_key=?)`); the daily prune deletes keep-alives past 90 days, so for a check red longer than that it is the last ok that survives; its readers are `check-trouble.ts`, which hands it to `redStartAt` (MAN-9533), and `auto-diagnosis.service.ts`, whose "failed 3 times" line keys on it (MAN-9545) |
+| `redStartAt(node, key, after)` | the `at` of the check's first row stored after `after` (`at > after`), of any status and any kind; for `after` null, the check's first row ever; `null` when no row follows. On the WARDEN's clock, the caller adds the node's clock offset. Handed `lastOkAt`, it is where a red began: the newest `ok` row is the last thing the check said while green, so the row after it is by construction not ok, and it is the same row for as long as the check stays red (a keep-alive repeating the red, or a change of word, is a later row); `null` then means the newest row is the ok itself, the check is ok now. The row is a `change`, which the daily prune never deletes, so the answer holds at any age of the red. The primary key serves it (measured on the live store: `SEARCH results USING COVERING INDEX sqlite_autoindex_results_1 (node=? AND check_key=? AND at>?)`); its reader is `check-trouble.ts` (MAN-9533) |
 | `transitionsSince({ node?, check?, since }, limit)` | STATUS MOVES with `at >= since`, newest first, across every node or narrowed to a node and/or a check key: a `change` row whose status differs from the one stored before it, or a check's first row. A value that merely changed is not one — rows stored before 2026-10-07 hold a `change` for every value move (a check saying "last sweep failed 17.6h ago" stored a row every half-minute), and a window of those never reaches the moment it went red (measured 2026-10-07: `servpro_kpm_reference`, 1 341 change rows in 14 h, 1 of them a status move); the rule now stores no such row (MAN-7801). The WHERE comes from `historyConditions` (`cerberus-history-filter.ts`, the one filter the three history statements share); only a diagnosis's `history_read` calls it |
 | `transitions(before, limit)` | `change` rows with `at < before` whose status differs from `prev_status`, newest first, in WHOLE `at` instants |
 | `pruneKeepalivesBefore(at)` | deletes `keepalive` rows with `at < at`; the only delete on `results` |
@@ -1076,7 +1077,7 @@ Design: `design/cerberus/Cerberus Spec.dc.html`. Time is epoch milliseconds on e
 | the auto-diagnosis plan: `planAutoDiagnosis`, the restart sentence | MAN-9542 (rules INV-10805) | `auto-diagnosis-plan.ts`, `diagnosis/diagnosis-endings.ts` |
 | the auto-diagnosis trigger: `startAutoDiagnosis`, `stopAutoDiagnosis`, the hints, the one deadline | MAN-9545 (rules INV-10818) | `auto-diagnosis.service.ts`, `cerberus-broadcast.ts` |
 | the auto-diagnosis switch: `setAutoDiagnosis`, its `PUT` route, `CerberusCheckDetail.autoDiagnosis` | MAN-9534 (rules INV-10797) | `auto-diagnosis.service.ts`, `read-model/check-detail.ts` |
-| a red's trouble (`lastOkAt`, `troubleDiagnoses`) and the `auto_diagnosis` repository | MAN-9533, MAN-9532 (rules INV-10787) | `check-trouble.ts`, `repositories/cerberus-auto-diagnosis.db.ts` |
+| a red's trouble (`troubleDiagnoses`, bounded by the red's start) and the `auto_diagnosis` repository | MAN-9533, MAN-9532 (rules INV-10787) | `check-trouble.ts`, `repositories/cerberus-auto-diagnosis.db.ts` |
 | the diagnosis a red-watch page carries | MAN-9541 (rules INV-10804) | `red-watch-diagnosis.ts`, `notifications/services/cerberus-red-cause.ts` |
 | the catalog service: entries, versioned signed sets, acks, the auto switch | MAN-7900 | `catalog.service.ts`, `catalog-entry-input.ts`, `read-model/catalog-views.ts`, `.verify/cerberus-catalog.sh` |
 | runs: `startRun`, the `run.*` frames, the recheck, the reconciliation on `hello`, the auto-run rule | MAN-7904 | `runs.service.ts`, `run-frames.ts`, `run-reconcile.ts`, `run-ending.ts`, `catalog-ack.ts`, `auto-run.ts`, `read-model/run-views.ts`, `.verify/cerberus-runs.sh` |
@@ -1770,25 +1771,27 @@ Contract (statements only, no transaction, rows as stored) and row types: MAN-78
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-auto-diagnosis.db.ts
 
-## MAN-9533 — A red check's trouble — `check-trouble.ts`: `lastOkAt`, `troubleDiagnoses`
+## MAN-9533 — A red check's trouble — `check-trouble.ts`: `troubleDiagnoses`, bounded by the red's own start
 
-Statements it reads: `cerberusResultsDb.lastOkAt` (MAN-7965), `cerberusDiagnosesDb.startedSince` (MAN-7927). Node clock offset: `wardenLinks.clockOffsetMs` (`warden-links.ts`).
+Statements it reads: `cerberusResultsDb.lastOkAt` and `cerberusResultsDb.redStartAt` (MAN-7965), `cerberusDiagnosesDb.startedSince` (MAN-7927). Node clock offset: `wardenLinks.clockOffsetMs` (`warden-links.ts`).
 
 ## `server/modules/cerberus/check-trouble.ts`
 | Export | Does |
 |---|---|
-| `lastOkAt(node, key)` | center's-clock moment of the check's last ok (the warden's `at` + `wardenLinks.clockOffsetMs(node)`, 0 for a node never heard), or `null` when never ok |
-| `troubleDiagnoses(node, key)` | every diagnosis of the check with `started_at >= lastOkAt ?? 0`, whoever asked, however it ended, newest first, the WHOLE trouble (no row limit: a restart storm adds one restart-cut row per cut diagnosis, and a window would push a `done` row or a third counted failure out of sight) — empty when the trouble has not been diagnosed |
+| `troubleDiagnoses(node, key)` | every diagnosis of the check with `started_at >=` the red's start, whoever asked, however it ended, newest first, the WHOLE trouble (no row limit: a restart storm adds one restart-cut row per cut diagnosis, and a window would push a `done` row or a third counted failure out of sight) — empty when the trouble has not been diagnosed, and when the check is ok now |
+
+The red's start is private to the module: `cerberusResultsDb.redStartAt(node, key, cerberusResultsDb.lastOkAt(node, key))`, the warden's `at` of the first row after the check's last ok, plus `wardenLinks.clockOffsetMs(node)` (0 for a node never heard). `null` when no row follows the last ok: the newest row is the ok itself, the check has no trouble, and `troubleDiagnoses` answers `[]`.
 
 ## What a trouble is
 | Rule | Detail |
 |---|---|
-| Span | from the check's LAST OK until it is ok again; a trouble ends only in a recovery |
-| Never ok | no last ok: `since` 0, every diagnosis the store holds for the check |
-| Bound | the last ok, never the check's `since` (its status last changed): failing → warn → failing, or failing → denied, moves `since` without a recovery, and a bound on `since` reads one trouble twice |
-| Keep-alive | counts as ok; a check ok all night answers a keep-alive of minutes ago |
-| Prune | "last ok" is the last ok that survives the daily prune (`KEEPALIVE_RETENTION_MS`, 90 days): a red older than 90 days falls back to its last ok `change` row, possibly months earlier; no red is older until 2027-01-04 (store began 2026-10-06). One gap at any age: a Diagnose pressed on a still-green check in the up-to-5 minutes between the last keep-alive ok and the row that turns it red starts after the last ok and reads as inside the trouble (the trigger drops the red as already read); the cure, a bound by the red's own start, needs a results statement that does not exist yet |
-| Clocks | a result's `at` is the warden's, a diagnosis's `started_at` is center's; `lastOkAt` converts before the bound is used |
+| Span | from the red's own start, the first row stored after the check's last ok (by construction the first row that was not ok), until the check is ok again; a trouble ends only in a recovery |
+| Never ok | no last ok: the trouble counts from the check's first row |
+| Ok now | no row after the last ok: no trouble, `[]` |
+| Bound | the red's start, never the check's `since` (its status last changed) and never the last ok itself. `since` moves at every change of word: failing → warn → failing, or failing → denied, moves it without a recovery, and a bound on `since` reads one trouble twice; the red's start does not move until the check is ok again. The last ok is a keep-alive up to 5 minutes before the red turns, so a Diagnose pressed on the still-green check in that time starts after it: bounded by the last ok it would read as inside the trouble, the trigger would drop the red as already read, and the page would name a diagnosis that read a green check |
+| Keep-alive | an ok keep-alive is the last ok (a check ok all night answers a keep-alive of minutes ago); a red's own keep-alives come after its start and never move it |
+| Prune | the daily prune (`KEEPALIVE_RETENTION_MS`, 90 days) deletes keep-alives, so for a red older than 90 days the last ok falls back to its last ok `change` row, possibly months earlier; the row after THAT is still the red's own `change` row, which the prune never deletes, so the start is the same at any age |
+| Clocks | a result's `at` is the warden's, a diagnosis's `started_at` is center's; the module adds the node's offset to the red's start before the bound is used |
 | One bound | read by the auto-diagnosis trigger through `planAutoDiagnosis` (`troubleDiagnoses`, MAN-9542; its "failed 3 times" line keys on the warden-clock last ok instead, MAN-9545) and by the red-watch push (`red-watch-diagnosis.ts`, names the diagnosis the trigger counted); the Needs-you card keeps its own bound, the check's `since` (`read-model/diagnosis-views.ts`), and differs only after a failing → warn → failing change of word |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/check-trouble.ts
@@ -1840,7 +1843,7 @@ A red-watch page carries its trouble's finished diagnosis: a `Likely cause:` lin
 | the trouble's newest `done` diagnosis (`troubleDiagnoses`, `check-trouble.ts`) has a summary | `summary`; `fix` from its stored proposal JSON, `null` when it has no proposal |
 | no `done` row, or the newest `done` row's summary is `null` | `undefined` |
 | the read or the proposal parse throws | `undefined` and one log line `[red-watch] <node>/<key> goes out without its diagnosis, which could not be read: <message>` |
-- The bound is the trouble's (a diagnosis started since the check was last ok, whoever asked for it): a diagnosis a person asked for counts.
+- The bound is the trouble's (a diagnosis started since the red began, whoever asked for it): a diagnosis a person asked for counts.
 - A running or failed diagnosis is not read.
 
 ## Where the lookup sits
@@ -1985,7 +1988,7 @@ Every Cerberus writer hints after its write commits (a stored status move, a lin
 
 ## The "failed 3 times" memory — `saidExhausted`
 - `Map<slot, last ok>`, slot `<node>/<key>`; the line is said when the slot is absent or its last ok moved: once per trouble.
-- The key is `cerberusResultsDb.lastOkAt(node, key)` on the WARDEN's clock, not `check-trouble.ts` `lastOkAt`: that one adds the node's clock offset, which drifts with each heartbeat, and a drifting key reads as a new trouble.
+- The key is `cerberusResultsDb.lastOkAt(node, key)` on the WARDEN's clock, not `check-trouble.ts`'s bound: that one adds the node's clock offset to the red's start, and the offset drifts with each heartbeat, so a drifting key reads as a new trouble. The last ok does not move until the check is ok again, as the red's start does not.
 - A failing → warn → failing flip and a node link flap say it once; a trouble that began after the check was ok says it afresh.
 - Never forgotten on leaving `exhausted`. This process's memory only: a boot says it once more for a check still exhausted; across boots needs a store column. `stopAutoDiagnosis` clears it.
 - Cost: one indexed read per exhausted slot per plan.
@@ -2031,7 +2034,7 @@ A check is diagnosed when all of these hold:
 ## A trouble, a counted failure
 | term | meaning |
 |---|---|
-| trouble | everything since the check was last ok: `check-trouble.ts` `lastOkAt` (the warden's `at` + `wardenLinks.clockOffsetMs`; never ok = 0). Read WHOLE, every asker. One bound for the trigger and the push; never the check's `since` |
+| trouble | everything since the red began, the first row after the check's last ok (never ok: its first row; ok now: no trouble, `[]`): `check-trouble.ts` (the warden's `at` + `wardenLinks.clockOffsetMs`). Read WHOLE, every asker. One bound for the trigger and the push; never the check's `since`, never the last ok itself |
 | counted failure | `by` `auto`, `status` `failed`, not `endedByRestart` |
 | restart's ending | `RESTART_SENTENCE` (`diagnosis/diagnosis-endings.ts`) counts for nothing: the check is diagnosed again |
 | retry | a counted failure is tried again 15 min after it ended; a third ends the trouble's tries until a press of Diagnose or a recovery |

@@ -31,7 +31,7 @@ import { companionQueryOptions } from './companion-launch.js';
  */
 export const CLI_GRACE_MS = 5_000;
 
-/** What `work` answers, or `undefined` once `ms` have passed; the timer never outlives the wait. Consumed here and by `companion-session.ts` (the wait for a stopped turn's result). */
+/** What `work` answers, or `undefined` once `ms` have passed; the timer never outlives the wait. Consumed here, by `companion-session.ts` (the wait for a stopped turn's result), by `companion-restart.ts` (the wait for her turn to end) and by `companion-speech-cache.ts` (the wait for the sentences still streaming at a stop). */
 export async function answeredWithin<T>(work: Promise<T>, ms: number): Promise<T | undefined> {
   let timer: NodeJS.Timeout | undefined;
   try {

@@ -5,7 +5,7 @@ import { troubleDiagnoses } from './check-trouble.js';
 /**
  * What a page says its check's trouble was found to be: the red watch's one lookup of a finished diagnosis.
  *
- * It reads the TROUBLE'S own bound (`check-trouble.ts`, a diagnosis started since the check was last ok, whoever
+ * It reads the TROUBLE'S own bound (`check-trouble.ts`, a diagnosis started since the red began, whoever
  * asked for it), the bound the auto-diagnosis trigger counts by, so the phone names the diagnosis the trigger
  * counted — one a person asked for with Diagnose included. The newest `done` row wins; a trouble with only a running
  * or a failed diagnosis, or none, has nothing to say, and the page goes out as it always did.

@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import type { HealScreenState, HealSummary } from '@/modules/heal/healTypes';
 import { api, readApiJson } from '@/shared/api';
+import { createStableContext } from '@/shared/context/stableContext';
 
 /**
  * How often the reflex's summary is re-read. The same floor the memory poller keeps, and for the same
@@ -68,7 +69,7 @@ type HealContextValue = {
  * `null` on purpose, not a filled-in default: a default object makes the hook's guard below
  * unreachable and lets a consumer mounted outside the provider read a summary nobody polls.
  */
-const HealContext = createContext<HealContextValue | null>(null);
+const HealContext = createStableContext<HealContextValue | null>(import.meta.hot, 'HealContext', null);
 
 /**
  * The app's ONE heal poller — above the Router, so the panel and the Inbox's waiting count read the

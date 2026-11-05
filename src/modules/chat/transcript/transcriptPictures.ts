@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 
 import { api } from '@/shared/api';
+import { createStableContext } from '@/shared/context/stableContext';
 import type { ChatImage, ChatMessage } from '@/shared/types';
 import { parseToolPayload } from '@/modules/chat/utils/messageTransforms';
 
@@ -36,14 +37,14 @@ type TranscriptPictures = {
  * `null` everywhere else (an export, a fixture, another surface's markdown), where an image keeps the
  * way it was always drawn.
  */
-export const TranscriptPicturesContext = createContext<TranscriptPictures | null>(null);
+export const TranscriptPicturesContext = createStableContext<TranscriptPictures | null>(import.meta.hot, 'TranscriptPicturesContext', null);
 
 /**
  * When the message being drawn was written (ms), provided by `MessageComponent`. A reply is drawn from the
  * newest `Read` of its path at or before this time, so a screenshot overwritten and read again later does not
  * change what an earlier reply showed. `null` outside a message: the newest read stands.
  */
-export const MessageTimeContext = createContext<number | null>(null);
+export const MessageTimeContext = createStableContext<number | null>(import.meta.hot, 'MessageTimeContext', null);
 
 /** A data URL of a raster type a browser draws safely. SVG is a document that can run script: never one of these. */
 const RASTER_DATA_URL = /^data:image\/(?:png|jpeg|gif|webp);base64,/;

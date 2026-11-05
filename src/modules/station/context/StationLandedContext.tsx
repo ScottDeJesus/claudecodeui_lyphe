@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 
 import { api, refusalSentence } from '@/shared/api';
+import { createStableContext } from '@/shared/context/stableContext';
 import { useStationDoors, useStationShowing } from '@/shared/context/StationLayerContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { StationLanded, StationLandedKind } from '@/shared/station-types';
@@ -31,7 +32,7 @@ type StationLandedContextValue = {
   reread: () => void;
 };
 
-const StationLandedContext = createContext<StationLandedContextValue | null>(null);
+const StationLandedContext = createStableContext<StationLandedContextValue | null>(import.meta.hot, 'StationLandedContext', null);
 
 /** The most landings the page holds: what the read answers (`stationLanded`'s cap, 300, the most a strip draws), so folded frames never grow the list past it and a busy week stays whole. */
 const LANDED_HELD = 300;

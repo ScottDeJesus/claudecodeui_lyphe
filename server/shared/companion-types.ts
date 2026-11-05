@@ -409,6 +409,8 @@ export type CompanionPicture = {
  * carry the new value of the matching picture field (`null` clears the focus, draft, pending action or
  * walk); `companion_note` adds a card, `companion_note_removed` withdraws one by `id` and `companion_note_pinned` says whether
  * the card with that `id` is pinned now; `companion_memory` says her memory changed, and a page that shows it reads it again;
+ * `companion_resync` says a server just took over from the one that was serving (a restart's successor, at its takeover): the frames the
+ * predecessor sent went to sockets that are gone, so a page that was already on this server reads her picture again;
  * `companion_settings` carries the new settings; `companion_open` tells the page whose client id equals
  * `floor` to bring `target` up (a chat, a roadmap card, a DocSpace page or a service check), for every open she makes,
  * the open of the chat a send went to included (`target.kind === 'chat'`), with `label` the spoken name the door resolved for it (the
@@ -440,7 +442,8 @@ export type CompanionFrame =
   | { kind: 'companion_face'; face: CompanionFace }
   | { kind: 'companion_mouth'; turnId: string; index: number; piece: CompanionMouthPiece }
   | { kind: 'companion_cleared' }
-  | { kind: 'companion_memory' };
+  | { kind: 'companion_memory' }
+  | { kind: 'companion_resync' };
 
 /** Her memory as Settings reads it: how many memories it holds (null when the bank cannot be read, `reason` saying why) and the DocSpace page that shows it. */
 export type CompanionMemoryReading = { count: number | null; pageId: string; reason: string | null };

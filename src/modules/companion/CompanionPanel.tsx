@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { CompanionActionCard } from '@/modules/companion/CompanionActionCard';
 import { CompanionComposer } from '@/modules/companion/CompanionComposer';
 import { CompanionDraftCard } from '@/modules/companion/CompanionDraftCard';
+import { CompanionDraftNoneLine } from '@/modules/companion/CompanionDraftFoldLine';
 import { CompanionHeader } from '@/modules/companion/CompanionHeader';
 import { CompanionLog } from '@/modules/companion/CompanionLog';
 import { CompanionNotes } from '@/modules/companion/CompanionNotes';
@@ -13,6 +14,7 @@ import { CompanionWalkStrip } from '@/modules/companion/CompanionWalkStrip';
 import { useCompanion } from '@/modules/companion/context/CompanionContext';
 import { useCompanionPanelPlace } from '@/modules/companion/hooks/useCompanionPanelPlace';
 import { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
+import { useDraftFold } from '@/modules/companion/hooks/useDraftFold';
 import { useNotesFold } from '@/modules/companion/hooks/useNotesFold';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
 import { openStation } from '@/shared/cloudcliDoors';
@@ -115,9 +117,11 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  * waiting for his word, whole (it is what will happen: its prompt scrolls inside a cap that is a share of the panel's
  * height, and his lines, which travel word for word, stand whole at any length); and so do the draft's target, its notice
  * and its sends: the draft is the one thing ever sent. The notes give way first, down to a floor that keeps the first
- * note's title and its ✕ (with their count line), then the draft's field, down to its 88px floor, scrolling inside. Folded
- * (`useNotesFold`, his press on their count line, kept in this browser), the notes are that one line, which stands, and the
- * room they leave goes to the rest of the dock and then to the log, in the same order.
+ * note's title and its ✕ (with their count line), then the draft's field, down to its 88px floor, scrolling inside. EACH
+ * FOLDS to one line that stands, at his press, kept in this browser, the two apart (`usePanelFold`): the notes to their
+ * count line (`useNotesFold`), the draft to its head row — "DRAFT", the target and the brief's opening words
+ * (`useDraftFold`), drawn while folded whether or not there is a draft ("No draft"). The room a fold leaves goes to the
+ * rest of the dock and then to the log, in the same order; both folded, the dock is the walkthrough and the two lines.
  * Where those floors fit — a phone held upright, a laptop — the dock never scrolls. On a shorter panel (the keyboard up, a
  * phone turned sideways), with an action and a draft docked together, or with his lines at their longest, the dock scrolls
  * as the last resort, each card whole within it and the action's foot (sticky) in sight: the draft card holds a floor of
@@ -138,9 +142,12 @@ export function CompanionPanelView({
   const panelRef = useRef<HTMLDivElement>(null);
   const place = useCompanionPanelPlace(panelRef, open);
   const notesFold = useNotesFold(picture?.notes ?? null);
+  const draftFold = useDraftFold(picture === null ? undefined : picture.draft);
   const name = picture?.settings.name ?? t('companion.defaultName');
   const failed = picture?.process.state === 'failed';
-  const docked = picture !== null && (picture.walk !== null || picture.notes.length > 0 || picture.pending !== null || picture.draft !== null);
+  // The draft's place: its card while there is a draft, and its folded line while he keeps it folded with none.
+  const draftPlace = picture !== null && (picture.draft !== null || draftFold.folded);
+  const docked = picture !== null && (picture.walk !== null || picture.notes.length > 0 || picture.pending !== null || draftPlace);
 
   // Closing from inside the panel hands focus to the door, so the keyboard is not dropped on the page's body.
   const close = useCallback(() => {
@@ -267,19 +274,27 @@ export function CompanionPanelView({
             // Keyed by the action, so a new one is a new card: nothing of the last one's Withdraw or lapse is carried over.
             <CompanionActionCard key={picture.pending.id} pending={picture.pending} name={name} onWithdraw={onWithdraw} />
           )}
-          {picture.draft && (
+          {draftPlace && (
             // A flex column with no automatic minimum (which would count the field's whole basis), so the card it holds
             // gives way with the dock: inside the card only the field shrinks, and its own 88px floor is what stops it.
-            <div className="flex min-h-0 flex-col">
-              <CompanionDraftCard
-                draft={picture.draft}
-                name={name}
-                targetWorking={targetWorking}
-                visible={open}
-                onEdit={onEditDraft}
-                onSend={onSendDraft}
-                onClear={onClearDraft}
-              />
+            // Folded, the card's floor is its one line (`useCardFloor`), written at the press, so it stands and her panel's
+            // floor drops with it at once; the line with no draft has no floor of its own, and stands (`shrink-0`).
+            <div className={cn('flex flex-col', picture.draft ? 'min-h-0' : 'shrink-0')}>
+              {picture.draft ? (
+                <CompanionDraftCard
+                  draft={picture.draft}
+                  name={name}
+                  targetWorking={targetWorking}
+                  visible={open}
+                  fold={draftFold}
+                  // Every save of his passes the fold first: his own words coming back are never news on the folded line.
+                  onEdit={(text) => { draftFold.onOwnSave(text); return onEditDraft(text); }}
+                  onSend={onSendDraft}
+                  onClear={onClearDraft}
+                />
+              ) : (
+                <CompanionDraftNoneLine fold={draftFold} />
+              )}
             </div>
           )}
         </div>

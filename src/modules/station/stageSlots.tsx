@@ -1,6 +1,8 @@
-import { createContext, useContext, useMemo } from 'react';
+import { useContext, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+
+import { createStableContext } from '@/shared/context/stableContext';
 
 /** The stage frame's two boxes a kind's view draws into, each null until the frame has mounted it. */
 type StageSlotNodes = {
@@ -10,7 +12,7 @@ type StageSlotNodes = {
   foot: HTMLElement | null;
 };
 
-const StageSlotsContext = createContext<StageSlotNodes>({ actions: null, foot: null });
+const StageSlotsContext = createStableContext<StageSlotNodes>(import.meta.hot, 'StageSlotsContext', { actions: null, foot: null });
 
 /**
  * THE STAGE'S TWO SLOTS, handed by the frame (`StationStageView`) to the kind's view it draws in its body. The frame owns

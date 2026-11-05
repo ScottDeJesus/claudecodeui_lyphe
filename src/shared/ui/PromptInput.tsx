@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { SendHorizonalIcon, SquareIcon } from 'lucide-react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import { cn } from '@/shared/utils';
 import { Button } from '@/shared/ui/Button';
 import { Tooltip } from '@/shared/ui/Tooltip';
@@ -13,7 +14,7 @@ type PromptInputContextValue = {
   status: PromptInputStatus;
 };
 
-const PromptInputContext = React.createContext<PromptInputContextValue | null>(null);
+const PromptInputContext = createStableContext<PromptInputContextValue | null>(import.meta.hot, 'PromptInputContext', null);
 
 /** Read by PromptInputSubmit, which is only ever rendered inside PromptInput. */
 const usePromptInput = () => {

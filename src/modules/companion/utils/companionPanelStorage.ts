@@ -1,20 +1,22 @@
-import type { CompanionPanelRect } from '@/shared/types';
+import type { CompanionFoldSection, CompanionPanelRect } from '@/shared/types';
 
 /**
  * Her panel's furniture, kept per browser in `localStorage` as her disc's place is (`companionFabStorage.ts`): it
  * describes a window — where he left the panel in THIS browser — and a server-side row would push one machine's
- * furniture onto another's. Two records, one key each:
+ * furniture onto another's. Three records, one key each:
  *
  * - `companion-panel`: where her floating panel stands and how big it is, `{ left, top, width, height }`
  *   (`CompanionPanelRect`), written once at the release of each move or resize. Absent means her default stance.
- * - `companion-notes-fold`: `'folded'` while he keeps her notes folded to their count line, removed when he opens them
- *   again. Absent means open — the safe direction, since a lost record shows more, never less.
+ * - `companion-notes-fold` and `companion-draft-fold`: `'folded'` while he keeps that section of her dock folded to its one
+ *   line (her notes to their count line, her draft to its head row), removed when he opens it again; the two are
+ *   independent. Absent means open — the safe direction, since a lost record shows more, never less.
  *
  * Plain functions in a plain module: the records are data, read once when her panel mounts and written back on his
- * press. Used by this module's `useCompanionPanelPlace` and `useNotesFold`.
+ * press. Used by this module's `useCompanionPanelPlace` and `usePanelFold`.
  */
 const PANEL_KEY = 'companion-panel';
-const NOTES_FOLD_KEY = 'companion-notes-fold';
+/** Each folding section's record. */
+const FOLD_KEYS: Record<CompanionFoldSection, string> = { notes: 'companion-notes-fold', draft: 'companion-draft-fold' };
 const FOLDED = 'folded';
 
 /**
@@ -59,20 +61,20 @@ export function writePanelRect(rect: CompanionPanelRect): void {
   }
 }
 
-/** Whether he left her notes folded in this browser. Never throws: storage that cannot be read is notes left open. */
-export function readNotesFolded(): boolean {
+/** Whether he left that section of her dock folded in this browser. Never throws: storage that cannot be read is a section left open. */
+export function readFolded(section: CompanionFoldSection): boolean {
   try {
-    return window.localStorage.getItem(NOTES_FOLD_KEY) === FOLDED;
+    return window.localStorage.getItem(FOLD_KEYS[section]) === FOLDED;
   } catch {
     return false;
   }
 }
 
 /** Writes his fold back, on the press: folded is the one value kept, open removes the record. A refusal is swallowed, as above. */
-export function writeNotesFolded(folded: boolean): void {
+export function writeFolded(section: CompanionFoldSection, folded: boolean): void {
   try {
-    if (folded) window.localStorage.setItem(NOTES_FOLD_KEY, FOLDED);
-    else window.localStorage.removeItem(NOTES_FOLD_KEY);
+    if (folded) window.localStorage.setItem(FOLD_KEYS[section], FOLDED);
+    else window.localStorage.removeItem(FOLD_KEYS[section]);
   } catch {
     // The fold the panel holds is kept for the page's life.
   }

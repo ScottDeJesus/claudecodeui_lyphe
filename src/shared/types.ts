@@ -1199,6 +1199,22 @@ export type CompanionPanelRect = { left: number; top: number; width: number; hei
  */
 export type CompanionPanelHandle = 'top' | 'right' | 'bottom' | 'left' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
+/**
+ * The sections of her panel's dock that fold to one line at his press: her notes (to their count line) and her draft (to its
+ * head row). Each names its own per-browser record (`companion-notes-fold`, `companion-draft-fold`, in
+ * `companionPanelStorage.ts`), read and written by the companion module's `usePanelFold`; the two folds are independent.
+ */
+export type CompanionFoldSection = 'notes' | 'draft';
+
+/**
+ * Her draft's fold as her panel draws it: whether he keeps it folded to its head row, his press on its chevron, and the
+ * mark the folded line wears — `new` for a draft that arrived, or changed its target, while it was folded; `edited` for one
+ * whose words alone changed; null for none (and always null while it is open). Made by the companion module's
+ * `useDraftFold` and handed to `CompanionDraftCard` (absent in the station's dock, which never folds) and to the folded
+ * line that stands while there is no draft (`CompanionDraftNoneLine`).
+ */
+export type CompanionDraftFold = { folded: boolean; onFoldChange: (folded: boolean) => void; mark: 'new' | 'edited' | null };
+
 // ---------------------------
 
 //----------------- CHAT STREAM FLUSH ------------

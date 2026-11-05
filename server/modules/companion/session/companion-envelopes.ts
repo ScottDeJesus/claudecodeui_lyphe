@@ -2,6 +2,8 @@ import type { CompanionAttachment, CompanionDraft, CompanionSessionRef, Companio
 import type { StationFocus } from '@/shared/station-types.js';
 import { oneLine } from '@/shared/tool-call-hint.js';
 
+import type { UnansweredMessage } from '../companion-unanswered.js';
+
 /**
  * Every envelope pushed to her: one builder per kind, each answering the string that is handed to her
  * conversation as it stands. The system prompt teaches her to read exactly these tags (`<operator>`,
@@ -234,6 +236,17 @@ export function attachmentsEnvelope(attachments: readonly CompanionAttachment[])
   const lines = attachments.map((attachment, index) => `${index + 1}. "${escapeAttribute(oneLine(attachment.name))}", ${attachmentFate(attachment)}`);
   return lineEnvelope('attachments', [['count', String(attachments.length)]], lines);
 }
+
+/**
+ * His words as an envelope: the empty press is its own tag, and so is a call by name (`heard: 'name'`), which a replay must not read as the empty
+ * one. A typed line is always an `<operator via="typed">`, empty or not (its `via` decides, never the empty press's tag), and the files it carries
+ * follow it as `<attachments>`. Consumed by the session, for each message of his it says again or hands on.
+ */
+export const wordsEnvelope = (words: Pick<UnansweredMessage, 'body' | 'via' | 'heard' | 'attachments'>): string => {
+  if (words.body === '' && words.via === 'spoken') return words.heard === 'name' ? calledEnvelope() : emptyPressEnvelope();
+  const line = operatorEnvelope(words.body, words.via);
+  return words.attachments === undefined || words.attachments.length === 0 ? line : `${line}\n${attachmentsEnvelope(words.attachments)}`;
+};
 
 /**
  * `<alert kind="…" session="…" sessionId="…" project="…">`: one house notification, as the title and

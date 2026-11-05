@@ -1,7 +1,8 @@
-import { Component, createContext, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { FileDown, FileX } from 'lucide-react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import { EmptyState, Spinner } from '@/shared/ui';
 import { formatBytes } from '@/shared/utils';
 import type { DocumentPreviewKind, TextRenderingKind } from '@/shared/types';
@@ -49,7 +50,7 @@ type FrameRead = { phase: 'ready'; blob: Blob } | { phase: 'failed'; message: st
  * A view speaks a failure up the same way, which is how a file its own library cannot read reaches
  * the frame's `failed` state without being thrown to the browser on the way.
  */
-export const DocumentFrameContext = createContext<DocumentFrame>({ reportPdfPages: () => undefined });
+export const DocumentFrameContext = createStableContext<DocumentFrame>(import.meta.hot, 'DocumentFrameContext', { reportPdfPages: () => undefined });
 
 /** The library's own words for a failure, whatever it threw. A library that throws a string has said enough. */
 function failureText(cause: unknown): string {

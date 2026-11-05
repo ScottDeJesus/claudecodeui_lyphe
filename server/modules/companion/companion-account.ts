@@ -1,4 +1,5 @@
 import { viewTargetOf } from '@/modules/notifications/index.js';
+import { restartHold } from '@/modules/restart-hold/index.js';
 import { readVoiceSettings } from '@/modules/voice/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import type { CompanionActivity, CompanionWalk } from '@/shared/companion-types.js';
@@ -94,9 +95,10 @@ function viewShown(userId: number, store: CompanionStore): ViewShown | null {
 
 /**
  * Consumed by `companion.service.ts`: one call per account, on the account's first use. Nothing is launched: she is asleep until a message is pushed.
- * `runtime` and `house` are the entrypoint's, passed through to the tools (`CompanionToolDeps.runtime` and `.house`).
+ * `runtime` and `house` are the entrypoint's, passed through to the tools (`CompanionToolDeps.runtime` and `.house`). `awaitingTakeover` is true on a
+ * handover boot until its takeover: the session holds every push until then (`session/companion-restart.ts`).
  */
-export function createCompanionAccount(userId: number, runtime: ProviderRuntimeGateway, house: CompanionHouse): CompanionAccount {
+export function createCompanionAccount(userId: number, runtime: ProviderRuntimeGateway, house: CompanionHouse, awaitingTakeover: boolean): CompanionAccount {
   const store = createCompanionStore(userId);
   const speechCache = createSpeechCache();
   let activity: CompanionActivity = IDLE_ACTIVITY;
@@ -119,6 +121,7 @@ export function createCompanionAccount(userId: number, runtime: ProviderRuntimeG
 
   session = createCompanionSession({
     userId,
+    awaitingTakeover,
     tools: buildCompanionTools(toolDeps),
     readSettings: () => readCompanionSettings(userId),
     readState: () => store.readState(),
@@ -150,6 +153,8 @@ export function createCompanionAccount(userId: number, runtime: ProviderRuntimeG
     },
     onTurnEnded: (turnId, outcome, error) => store.emit({ kind: 'companion_turn', turnId, state: 'ended', outcome, error }),
     onActivity: setActivity,
+    onTurnInFlight: (inFlight) => restartHold.kayleeTurn(userId, inFlight),
+    onHisWords: () => restartHold.spokenToKaylee(),
     onProcess: (process) => store.emit({ kind: 'companion_process', process }),
     onSystemLine: (text) => {
       store.appendLog({ role: 'system', text });

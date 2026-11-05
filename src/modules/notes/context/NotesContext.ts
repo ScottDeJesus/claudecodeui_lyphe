@@ -1,5 +1,6 @@
-import { createContext, useContext } from 'react';
+import { useContext } from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import type { Note, NoteInput, NoteSaveStatus } from '@/shared/types';
 
 /**
@@ -94,9 +95,9 @@ export type NoteDraftsValue = {
   saveStates: Record<string, NoteSaveStatus>;
 };
 
-export const NotesContext = createContext<NotesValue | null>(null);
+export const NotesContext = createStableContext<NotesValue | null>(import.meta.hot, 'NotesContext', null);
 
-export const NoteDraftsContext = createContext<NoteDraftsValue | null>(null);
+export const NoteDraftsContext = createStableContext<NoteDraftsValue | null>(import.meta.hot, 'NoteDraftsContext', null);
 
 /**
  * The list and its verbs. Read by the module's own `NotesList`, `NoteCard` and `NotesPanel`, and —

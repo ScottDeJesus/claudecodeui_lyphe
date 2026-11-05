@@ -1,13 +1,14 @@
 import {
-  createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import {
   useSessionProtection,
 } from '@/shared/hooks/useSessionProtection';
@@ -57,16 +58,19 @@ type SessionProtectionActions = {
 const NO_RUNNING_SESSIONS: readonly RunningSessionListItem[] = [];
 const NO_SESSION_IDS: readonly string[] = [];
 
+/** How long a read of the running list that has not settled blocks the next poll tick: the api's 30 s request ceiling (`REQUEST_TIMEOUT_MS`) and a tick. */
+const RUNNING_READ_GUARD_MS = 35_000;
+
 /** Whether two id lists name the same sessions, so the poll can keep the previous array. */
 const sessionIdListsMatch = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((id, index) => id === right[index]);
 
-const SessionProtectionStateContext = createContext<SessionActivityMap | null>(null);
-const SessionProtectionActionsContext = createContext<SessionProtectionActions | null>(null);
-const BusySessionIdsContext = createContext<ReadonlySet<string> | null>(null);
-const RunningSessionsContext = createContext<readonly RunningSessionListItem[]>(NO_RUNNING_SESSIONS);
-const SubagentRunningSessionIdsContext = createContext<ReadonlySet<string> | null>(null);
-const AwaitingInputSessionIdsContext = createContext<ReadonlySet<string> | null>(null);
+const SessionProtectionStateContext = createStableContext<SessionActivityMap | null>(import.meta.hot, 'SessionProtectionStateContext', null);
+const SessionProtectionActionsContext = createStableContext<SessionProtectionActions | null>(import.meta.hot, 'SessionProtectionActionsContext', null);
+const BusySessionIdsContext = createStableContext<ReadonlySet<string> | null>(import.meta.hot, 'BusySessionIdsContext', null);
+const RunningSessionsContext = createStableContext<readonly RunningSessionListItem[]>(import.meta.hot, 'RunningSessionsContext', NO_RUNNING_SESSIONS);
+const SubagentRunningSessionIdsContext = createStableContext<ReadonlySet<string> | null>(import.meta.hot, 'SubagentRunningSessionIdsContext', null);
+const AwaitingInputSessionIdsContext = createStableContext<ReadonlySet<string> | null>(import.meta.hot, 'AwaitingInputSessionIdsContext', null);
 
 const asOptionalString = (value: unknown): string | null =>
   typeof value === 'string' && value.length > 0 ? value : null;
@@ -151,7 +155,20 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
   // becoming a second send the server would refuse.
   const { hasQueuedSend } = useWebSocket();
 
+  // The read of the running list that is out, if any, and when it began. The server holds this read for as long as 76 s while a successor
+  // waits for its predecessor to drain (`RUNS_READOPTED_WAIT_MS`, server/index.ts), and the five-second poll below would otherwise add a
+  // held read every tick: six of them fill the browser's six connections to this origin, and every other request of the page (her speech,
+  // her picture) waits behind them. One read at a time. A read older than the 30 s ceiling plus a tick no longer blocks the next one:
+  // the ceiling ends it, and on a browser with no `AbortSignal.timeout` (iOS 15) a read that never settles has no ceiling at all.
+  const refreshingRef = useRef<{ startedAt: number } | null>(null);
+
   const refreshRunningSessions = useCallback(async () => {
+    const inFlight = refreshingRef.current;
+    if (inFlight !== null && Date.now() - inFlight.startedAt < RUNNING_READ_GUARD_MS) {
+      return;
+    }
+    const mine = { startedAt: Date.now() };
+    refreshingRef.current = mine;
     try {
       const response = await api.runningSessions();
       if (!response.ok) {
@@ -224,6 +241,11 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
       );
     } catch (error) {
       console.error('[SessionProtection] Failed to sync running sessions:', error);
+    } finally {
+      // A read the guard let past may have replaced this one's entry; only the read that owns it frees it.
+      if (refreshingRef.current === mine) {
+        refreshingRef.current = null;
+      }
     }
   }, [hasQueuedSend, syncProcessingSessions]);
 

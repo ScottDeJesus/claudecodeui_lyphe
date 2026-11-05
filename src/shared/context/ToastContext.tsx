@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import type { ToastRecord, ToastRequest } from '@/shared/types';
 
 /** How long a toast stands before its exit begins. */
@@ -14,8 +15,8 @@ const MAX_TOASTS = 4;
  * (every screen) must not re-render each time one arrives or leaves. Only ToastStack reads
  * the list.
  */
-const ToastListContext = createContext<ToastRecord[] | null>(null);
-const ToastPushContext = createContext<((request: ToastRequest) => void) | null>(null);
+const ToastListContext = createStableContext<ToastRecord[] | null>(import.meta.hot, 'ToastListContext', null);
+const ToastPushContext = createStableContext<((request: ToastRequest) => void) | null>(import.meta.hot, 'ToastPushContext', null);
 
 /** Mounted once by App inside ThemeProvider; ToastStack is its last child. */
 export function ToastProvider({ children }: { children: ReactNode }) {

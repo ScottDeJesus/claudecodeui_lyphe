@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { createStableContext } from '@/shared/context/stableContext';
 
 /**
  * True inside anything that is already a control, or already a label — where a file chip, itself a
@@ -21,4 +21,4 @@ import { createContext } from 'react';
  * own module because `InlineMarks.tsx` exports components, and a context beside them would cost the
  * file its Fast Refresh.
  */
-export const ChipsSuppressedContext = createContext(false);
+export const ChipsSuppressedContext = createStableContext(import.meta.hot, 'ChipsSuppressedContext', false);

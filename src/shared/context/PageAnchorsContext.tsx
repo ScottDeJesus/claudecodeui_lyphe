@@ -1,5 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useRef } from 'react';
+import { useCallback, useContext, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
+
+import { createStableContext } from '@/shared/context/stableContext';
 
 /** What the provider holds and hands out. One object for the provider's whole life, so no consumer is woken by it. */
 type PageAnchors = {
@@ -16,7 +18,7 @@ type PageAnchors = {
  * `null` on purpose, not a filled-in default: the reader below throws outside a provider, so a button that
  * could never hear a registration is a loud mistake and not a guide that silently never moves.
  */
-const PageAnchorsContext = createContext<PageAnchors | null>(null);
+const PageAnchorsContext = createStableContext<PageAnchors | null>(import.meta.hot, 'PageAnchorsContext', null);
 
 /** The attribute the provider stamps on every element it holds, so a probe or a console finds the anchors with one selector. */
 const ANCHOR_ATTRIBUTE = 'data-page-anchor';

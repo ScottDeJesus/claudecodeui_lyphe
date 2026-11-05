@@ -1,6 +1,8 @@
 import type { CompanionMouthPiece } from '@/shared/companion-types.js';
 import type { AppError } from '@/shared/utils.js';
 
+import { answeredWithin } from './session/companion-process.js';
+
 /**
  * One account's speech cache: the PCM of each sentence of her CURRENT turn, kept so a page that asks again (a reconnect
  * mid-turn, a second request for the sentence being spoken) is served with no second Gemini call.
@@ -31,8 +33,11 @@ import type { AppError } from '@/shared/utils.js';
  * An entry also keeps `mouth`, the timed shapes announced for its audio so far, so a sentence served from the cache can
  * announce them again; they are the speech door's to fill and are freed with the audio.
  *
+ * `settled(boundMs)` is the server stopping's wait for the sentences still being synthesized: they finish for the page that holds them, at most
+ * `boundMs`, and only then does `end` cut what is left. Without it `end` would cut the sentence being heard the instant her turn ends.
+ *
  * Consumers: `companion-speech.ts` (fills and follows entries), `companion-account.ts` (one cache per account; tells it
- * when a turn starts) and `companion.service.ts` (ends it on Clear and on shutdown).
+ * when a turn starts) and `companion.service.ts` (waits for it and ends it on Clear and on shutdown).
  */
 
 /** The most audio one account's cache holds, in bytes. */
@@ -73,6 +78,8 @@ export type SpeechCache = {
   trim(): void;
   /** The cut: stops every synthesis of `turnId` still in flight, those of a superseded turn included, so nothing more is spent; finished sentences stay. Answers how many it stopped. */
   abortTurn(turnId: string): number;
+  /** Resolves when every sentence still being synthesized, orphans included, has no more audio to come, or after `boundMs`; at once when none is running. Cuts nothing: the server stopping calls it before `end`. */
+  settled(boundMs: number): Promise<void>;
   /** Stops every synthesis, orphans included, and forgets everything, the current turn too: Clear, and the server stopping. */
   end(): void;
   /** True the first time it is asked for `turnId`: the turn's one "I could not speak" line is written then and not again. */
@@ -154,6 +161,17 @@ export async function* followEntry(entry: SpeechEntry, signal: AbortSignal, leav
   } finally {
     leave();
   }
+}
+
+/** Resolves when `entry` is done, on its wakes and never a poll (`finishEntry` wakes whoever waits). */
+function whenDone(entry: SpeechEntry): Promise<void> {
+  return new Promise((resolve) => {
+    const check = (): void => {
+      if (entry.done) resolve();
+      else entry.wakes.add(check);
+    };
+    check();
+  });
 }
 
 /** Consumed by `companion-account.ts`: one cache per account, made with the account and ended with it. */
@@ -247,6 +265,10 @@ export function createSpeechCache(): SpeechCache {
         stopped += 1;
       }
       return stopped;
+    },
+    async settled(boundMs) {
+      const running = [...[...turns.values()].flatMap((entries) => [...entries.values()]), ...orphans.keys()].filter((entry) => !entry.done);
+      if (running.length > 0) await answeredWithin(Promise.all(running.map(whenDone)), boundMs);
     },
     end() {
       for (const entries of turns.values()) abortUnfinished(entries.values());

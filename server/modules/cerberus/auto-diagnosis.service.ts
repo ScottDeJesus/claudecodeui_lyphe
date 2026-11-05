@@ -125,9 +125,10 @@ function redSpan(ms: number): string {
 }
 
 /**
- * The "failed 3 times" line, once per trouble. A trouble is everything since the check was last ok
- * (`check-trouble.ts`), so the memory is that moment, read on the warden's clock: `lastOkAt` of the trouble
- * module adds the node's clock offset, which drifts with each heartbeat and would read as a new trouble.
+ * The "failed 3 times" line, once per trouble. A trouble is everything since the red began, the first row
+ * after the check's last ok (`check-trouble.ts`), so the memory is that last ok, which does not move until the
+ * check is ok again, read on the warden's clock: the trouble module adds the node's clock offset to the red's
+ * start, and the offset drifts with each heartbeat and would read as a new trouble.
  */
 function sayExhausted(exhausted: AutoDiagnosisStart[]): void {
   for (const { node, key } of exhausted) {

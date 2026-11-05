@@ -1,5 +1,6 @@
-import { createContext, useContext } from 'react';
+import { useContext } from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import type { ProjectChoice } from '@/shared/types';
 
 /**
@@ -13,7 +14,7 @@ import type { ProjectChoice } from '@/shared/types';
  *
  * `null` is "no workspace has said": a section drawn outside a panel offers nothing and waits.
  */
-export const ProjectChoicesContext = createContext<ProjectChoice[] | null>(null);
+export const ProjectChoicesContext = createStableContext<ProjectChoice[] | null>(import.meta.hot, 'ProjectChoicesContext', null);
 
 /** The workspace's projects as the panel was last handed them, or `null` outside a panel. Read by `NodeProjects` for its "Run a project here" menu. */
 export function useProjectChoices(): ProjectChoice[] | null {

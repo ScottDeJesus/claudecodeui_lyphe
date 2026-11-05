@@ -13,7 +13,8 @@ Behaviour of each: MAN-7805 (connection, steps), MAN-7806 (repositories, updates
 | Change `transitions`' whole-instant return or the activity cursor (`before = last.at`, strict `<`) without the other | rows sharing one `at` are skipped at a page boundary | a health document stamps every component with one `at` |
 | Edit `transitions`' CTE WHERE (`kind = 'change' AND prev_status IS NOT NULL AND ${statusDiffers()}`) or `pruneKeepalivesBefore`'s (`kind = 'keepalive'`) so it no longer carries its partial index's terms, or edit `ix_results_moves` / `ix_results_keepalives` in step 4 | What happened walks every row of `results` again, and the 04:10 prune scans the table to find keep-alives | SQLite uses a partial index only when the query states the index's WHERE, so the two sides are spelled to match word for word (`statusDiffers()` spells the third term); step 4 has run on the live store, so a changed index is a new step appended at the end |
 | Start the prune at `start()` or on a timer measured from the last run, instead of at the next 04:10 (`nextPruneAt`) | every handover pays a full `DELETE` (the server hands over about 170 times a day: 56 runs measured 2026-10-06), and a daylight-saving change moves the hour | an hour of the day is a fixed point, not a wait a restart resets; each run arms the next from the clock |
-| Narrow `cerberusResultsDb.lastOkAt` to `change` rows, or read the check's `since` instead of its newest `ok` row | a check ok all night reads a last ok of days ago, so a diagnosis started while it was green counts as inside a red's trouble; a failing → warn → failing check reads as a second trouble | a keep-alive repeats an `ok` and is the newest evidence of green; `since` moves at every change of word and a trouble ends only in a recovery (MAN-9533) |
+| Narrow `cerberusResultsDb.lastOkAt` to `change` rows, or read the check's `since` instead of its newest `ok` row | a check ok all night reads a last ok of days ago, so its red is read as beginning at the first keep-alive after it, days early, and a diagnosis started while it was green counts as inside the trouble; a failing → warn → failing check reads as a second trouble | a keep-alive repeats an `ok` and is the newest evidence of green; `since` moves at every change of word and a trouble ends only in a recovery (MAN-9533) |
+| Narrow `cerberusResultsDb.redStartAt` to a status, or turn its `at > ?` into `at >= ?` | a status filter moves the start of a warn → failing trouble to its failing, so a diagnosis started during the warn reads as outside it; `>=` hands back the last ok itself, so a Diagnose pressed on the still-green check counts as inside the trouble | the row after the last ok is by construction not ok, a `change` the prune never deletes, and it is the red's start whatever it says (MAN-9533, INV-10787) |
 | Pass an unclamped `limit` to SQL | `LIMIT -1` dumps the table | SQLite reads a negative limit as no limit |
 | Let a new `results.at` be a string or fraction | that row is the check's latest for ever | TEXT sorts above every number; the column's affinity cannot refuse it |
 | Drop the JS line check or the run-exists read in `cerberusRunsDb.insertOutput` | a malformed line answers as a resend; output filed under no `runs` row is kept for ever | `INSERT OR IGNORE` swallows a NOT NULL / CHECK violation; the prune reaches output only through `runs.requested_at` |
@@ -948,9 +949,13 @@ Behaviour: MAN-9532 (`cerberusAutoDiagnosisDb`, step 7's tables), MAN-9533 (`che
 
 | Edit | Breaks | Why |
 |---|---|---|
-| Bound a trouble (`troubleDiagnoses`, the trigger, the push) by the check's `since` instead of `lastOkAt` | a failing → warn → failing check, or failing → denied, is diagnosed or pushed a second time for one trouble | `since` moves at every change of word; a trouble ends only in a recovery |
+| Bound a trouble (`troubleDiagnoses`, the trigger, the push) by the check's `since` | a failing → warn → failing check, or failing → denied, is diagnosed or pushed a second time for one trouble | `since` moves at every change of word; a trouble ends only in a recovery |
+| Bound a trouble by the check's last ok itself (`cerberusResultsDb.lastOkAt`) instead of the red's start (`redStartAt` handed the last ok) | a Diagnose pressed on a still-green check in the up-to-5 minutes between its last keep-alive and the row that turns it red counts as inside the trouble: the trigger drops the red as already read, and the page names a diagnosis that read a green check | the last ok is the newest ok row, a keep-alive every 5 minutes; the red begins at the first row after it |
+| Read a null red start (no row after the last ok: the check is ok now) as 0, or let `troubleDiagnoses` answer anything but `[]` for it | a recovered check reads every diagnosis it ever had as its trouble | no row after the last ok is no trouble |
+| Make the red's start follow the check's `since` | a failing → warn → failing check starts a second trouble at the second failing, and the diagnosis of the first reads as outside it | the red's start is the first row after the last ok, and does not move until the check is ok again |
+| Narrow `redStartAt` to a status (only `failing`, only a non-`ok`) | a warn-then-failing trouble starts at its failing, so a diagnosis started during the warn reads as outside it | the red's start is the first row after the last ok, whatever it says |
 | Give the trigger and the red-watch push each their own bound | the phone names a diagnosis the trigger did not count | one bound, `check-trouble.ts`, for both |
-| Compare a result's `at` with a diagnosis's `started_at` without the node's clock offset, or add the offset a second time to `lastOkAt`'s answer | a diagnosis is read as inside or outside a trouble by the node's clock skew | a result's `at` is the warden's clock, `started_at` center's; `check-trouble.ts`'s `lastOkAt` converts once |
+| Compare a result's `at` with a diagnosis's `started_at` without the node's clock offset, or add the offset a second time to the red's start | a diagnosis is read as inside or outside a trouble by the node's clock skew | a result's `at` is the warden's clock, `started_at` center's; `check-trouble.ts` converts once |
 | Bound `troubleDiagnoses` by a row limit (a window of the newest rows) | a restart storm (one restart-cut row per cut diagnosis, unbounded: the dev server restarts on every save) pushes a `done` row out of sight, so the trigger starts the check again and the page goes out without its diagnosis, or a third counted failure, so the guard against a loop sees two | the trouble is read WHOLE (`WHOLE_TROUBLE`); any later bound must keep every running or done row and every counted failure (INV-10805) |
 | Edit step 7's seed (the eleven poller keys) or `diagnoses.by`'s DEFAULT in place | the live store keeps the old seed, every scratch store builds the new one | step 7 has run on the live store (INV-7004); a change of seed is a NEW step, or a `set` through the switch |
 | Write an `auto_diagnosis` row for a check nobody switched, or read a check with no row as on | Cerberus diagnoses by itself a check nobody switched on | no row = off; a row is a check ever switched |
@@ -1027,7 +1032,7 @@ Behaviour: MAN-9545. The plan's own rules: INV-10805. The red watch's: INV-10187
 | Swallow every error of a start, or let an `AppError` end the plan | a bug hides as a refusal; or one 409 stops every later check of the plan | `AppError` is that start's alone; anything else reaches the plan's catch |
 | Start with a `by` other than `'auto'`, an `askedBy` other than `'cerberus'`, or a model | a failed try is not counted toward the three, so a failing check is read every 15 minutes forever; or the model is not the operator's pick | the plan counts `by: 'auto'` failures only (INV-10805); `resolveDiagnosisModel` picks the model |
 | End, cancel or re-score a diagnosis from the trigger | a run the operator pressed or watched is cut by a timer | the trigger starts and never ends; the lifecycle is INV-7177's |
-| Key `saidExhausted` by `check-trouble.ts` `lastOkAt`, or forget a slot when it leaves `exhausted` | the line repeats on every heartbeat (the offset drifts) or on every failing → warn → failing flip | the key is `cerberusResultsDb.lastOkAt`, the warden's own clock: one per trouble |
+| Key `saidExhausted` by `check-trouble.ts`'s bound (the red's start plus the node's offset), or forget a slot when it leaves `exhausted` | the line repeats on every heartbeat (the offset drifts) or on every failing → warn → failing flip | the key is `cerberusResultsDb.lastOkAt`, the warden's own clock: one per trouble |
 | Let a second `startAutoDiagnosis` subscribe again | every hint plans twice | `if (unsubscribe) return` |
 | Leave `settled`, `throwsInARow` or `saidExhausted` out of `stopAutoDiagnosis` | a re-armed trigger plans at once on a hint before its settle minute, or inherits the old process's counts | stop returns every piece of state to its start |
 
@@ -1127,59 +1132,6 @@ probe-key: f218688c0951333d2cf6bb3de100d6c2efcb7439
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-diagnosis.service.ts
 
-## INV-10821 — probe — the "failed 3 times" line is said again inside one trouble when the check flips failing ↔ warn
-
-the "failed 3 times" line is said again inside one trouble when the check flips failing ↔ warn
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-#!/bin/bash
-# F3: the "failed 3 times" line, said once, is said again after the check flips failing -> warn -> failing (the same trouble: never ok in between). Settle scaled to 0.3 s.
-cd /tmp || exit 1
-sqlite3 ~/.cloudcli/cerberus.db ".backup /tmp/athena-probe-f3.db" || exit 1
-cat > /tmp/athena-probe-f3.mts <<'TS'
-const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
-const realSetTimeout = globalThis.setTimeout;
-(globalThis as any).setTimeout = (fn: any, ms?: number, ...rest: any[]) => realSetTimeout(fn, ms === 60000 ? 300 : ms, ...rest);
-let said = 0;
-for (const m of ['log', 'error'] as const) { const o = console[m].bind(console); (console as any)[m] = (...a: unknown[]) => { if (String(a[0]).includes('failed 3 times')) said++; o(...a); }; }
-const { getCerberusConnection, cerberusAutoDiagnosisDb } = await import(`${R}/database/index.js`) as any;
-const { ingest } = await import(`${R}/cerberus/ingest.service.js`) as any;
-const { wardenLinks } = await import(`${R}/cerberus/warden-links.js`) as any;
-const { buildOverview } = await import(`${R}/cerberus/read-model/overview.js`) as any;
-const bc = await import(`${R}/cerberus/cerberus-broadcast.js`) as any;
-const svc = await import(`${R}/cerberus/auto-diagnosis.service.js`) as any;
-const conn = getCerberusConnection();
-const inputs = () => { ingest.seedMemory(); return { now: Date.now(), links: wardenLinks.states(), gateway: { listen: null, address: null, error: null }, memory: (n: string, k: string) => ingest.memory(n, k) } as any; };
-const key = 'cerberus/wardens.fresh';
-cerberusAutoDiagnosisDb.set('center', key, true, Date.now(), 'probe');
-for (let i = 0; i < 3; i++) conn.prepare("insert into diagnoses (id,node,check_key,asked_by,by,model,started_at,status,ended_at,error) values (?,?,?,?,?,?,?,'failed',?,'probe failure.')").run(`f3f3f3f3f3f3f3f${i}`, 'center', key, 'cerberus', 'auto', 'seed', Date.now() + i, Date.now() + i + 1);
-let status = 'failing'; const t0 = Date.now();
-const base = buildOverview(inputs());
-const overview = () => ({ ...base, now: Date.now(), needsYou: [{ check: { node: 'center', key, service: 'cerberus', id: 'wardens.fresh', label: 'w', serviceLabel: 'w', status, stored: status, value: null, at: t0, since: t0 - 3600_000, every: 10, staleAfter: 60, origin: 'self', kind: 'self', mute: null }, fix: null, run: null, diagnosis: null }], muted: [] });
-svc.startAutoDiagnosis({ overview, readInputs: inputs });
-setInterval(() => {}, 50);
-const sleep = (ms: number) => new Promise((r) => realSetTimeout(r, ms));
-await sleep(1500); const first = said;
-for (let i = 0; i < 3; i++) { bc.hintChanged({ nodes: ['center'] }); await sleep(1300); }
-const afterHints = said;
-status = 'warn'; bc.hintChanged({ nodes: ['center'] }); await sleep(1500);
-status = 'failing'; bc.hintChanged({ nodes: ['center'] }); await sleep(1500);
-console.log(`PROBE said=${first} after3hints=${afterHints} afterFailing->warn->failing=${said}`);
-process.exit(0);
-TS
-CERBERUS_DB_PATH=/tmp/athena-probe-f3.db DATABASE_PATH=/tmp/athena-probe-f3.app.db CERBERUS_DIAG_MODEL=athena-no-such-model timeout 150 cloudcli-tsx /tmp/athena-probe-f3.mts 2>&1 | grep -E "^PROBE" || echo "PROBE did not answer"
-rm -f /tmp/athena-probe-f3.db /tmp/athena-probe-f3.db-wal /tmp/athena-probe-f3.db-shm /tmp/athena-probe-f3.app.db /tmp/athena-probe-f3.app.db-wal /tmp/athena-probe-f3.app.db-shm /tmp/athena-probe-f3.mts
-EOF
-bash "$D/p.sh"
-```
-
-measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--trigger-20261104-110515-7df3, finding L2, LOW
-probe-key: 48114310210caaa41f078eb6c89e5d099d4d42c3
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-diagnosis.service.ts
-
 ## INV-10822 — The auto-diagnosis — edits that break it
 
 Behaviour of each: MAN-9546. The detail rows keep each edit's measurement: the plan INV-10805, the trigger INV-10818, the switch INV-10797, the store and the trouble INV-10787.
@@ -1191,7 +1143,7 @@ Behaviour of each: MAN-9546. The detail rows keep each edit's measurement: the p
 | Run a plan inside the hint listener, a writer's call or the window's timer, or one plan per hint | a burst of hints plans a burst of times inside a writer's window | one plan per loop turn: one pending `setImmediate` |
 | Arm the trigger outside `armSoleDuties` | two API processes start the same diagnoses from their own memory | one process's duty (INV-10187) |
 | Call `stopAutoDiagnosis` after `stopDiagnoses` | the ends a shutdown stores and hints start a diagnosis again | the stop comes first |
-| Bound a trouble by the check's `since`, or bound it one way for the trigger and another for the push | a failing → warn → failing check is read twice; the phone names a diagnosis the trigger did not count | a trouble runs from the last ok; `check-trouble.ts` is the one bound (INV-10787) |
+| Bound a trouble by the check's `since`, or bound it one way for the trigger and another for the push | a failing → warn → failing check is read twice; the phone names a diagnosis the trigger did not count | a trouble runs from the red's start, the first row after the last ok; `check-trouble.ts` is the one bound (INV-10787) |
 | Count a restart's ending (`endedByRestart`) as a failed try | each save of the dev server spends a try; the check lands in `exhausted` and is never read | a restart is neither a reading nor a failure: 135 handover boots in 24 hours, 2026-11-04 (INV-10805) |
 | Pass a model from the trigger | the row says one model and the run used another | `resolveDiagnosisModel` is the one place a model is picked (INV-7153) |
 | Diagnose a check under its mute (take `mute.until` out of `readyAt`), or leave `overview.muted` out of the candidates | a silenced page is diagnosed; or a mute that ends by itself, which no event announces, leaves a ready red waiting for an unrelated hint | the diagnosis rides the page, and the mute's end is the clock moment the one deadline holds |

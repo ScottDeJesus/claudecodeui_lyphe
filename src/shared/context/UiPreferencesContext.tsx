@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import {
   readStoredUiPreferences,
   uiPreferencesReducer,
@@ -23,8 +24,8 @@ type UiPreferenceActions = {
  */
 type UiPreferencesView = UiPreferences & { settled: boolean };
 
-const UiPreferencesStateContext = createContext<UiPreferencesView | null>(null);
-const UiPreferencesActionsContext = createContext<UiPreferenceActions | null>(null);
+const UiPreferencesStateContext = createStableContext<UiPreferencesView | null>(import.meta.hot, 'UiPreferencesStateContext', null);
+const UiPreferencesActionsContext = createStableContext<UiPreferenceActions | null>(import.meta.hot, 'UiPreferencesActionsContext', null);
 
 /**
  * Mounted once by App; owns the boolean UI preferences that the sidebar, quick

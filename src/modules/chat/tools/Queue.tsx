@@ -1,5 +1,6 @@
 import * as React from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import { cn } from '@/shared/utils';
 import type { QueueItemStatus } from '@/shared/types';
 
@@ -9,7 +10,7 @@ type QueueItemContextValue = {
   status: QueueItemStatus;
 };
 
-const QueueItemContext = React.createContext<QueueItemContextValue | null>(null);
+const QueueItemContext = createStableContext<QueueItemContextValue | null>(import.meta.hot, 'QueueItemContext', null);
 
 function useQueueItem() {
   const ctx = React.useContext(QueueItemContext);

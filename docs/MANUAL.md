@@ -1737,13 +1737,13 @@ Depth: MAN-7403.
 
 ## The reboot request over the supervisor channel
 
-Protocol home: `deploy/dev-supervisor/README.md` §"The four IPC messages". Not restated here.
+Protocol home: `deploy/dev-supervisor/README.md` §"The six IPC messages". Not restated here.
 
 | side | what | file |
 | --- | --- | --- |
 | child | `requestReboot(reason): boolean`: false and nothing sent unless `supervised && process.connected`; else sends `{ type: 'reboot', reason }` and returns true | `server/supervised-boot.ts` |
 | child | `onRebootFailed(listener)`: its own `process.on('message')` handler for `{ type: 'reboot-failed', detail }` | `server/supervised-boot.ts` |
-| supervisor | honours `reboot` only from the child that is `serving`; logs `reboot requested by pid <n>: <reason>`; sets `rebootRequester`; runs `requestCycle()`, the edit cycle | `deploy/dev-supervisor/supervisor.mjs` |
+| supervisor | honours `reboot` only from the child that is `serving`; logs `reboot requested by pid <n>: <reason>`; sets `rebootRequester`; runs `requestCycle('immediate')`, the edit cycle, never held for a busy server | `deploy/dev-supervisor/supervisor.mjs` |
 | supervisor | boot failed and the requester is still `serving` and connected: sends `{ type: 'reboot-failed', detail }`, logs `reboot failed — told pid <n>`, clears `rebootRequester` | `deploy/dev-supervisor/supervisor.mjs` |
 
 - `detail` is the text `reportFailedBoot` logs for that boot: the first error line, or `boot timed out after 30 s`.
@@ -4138,7 +4138,7 @@ The outer fold of a lane card: the head stays, the whole body goes. Both kinds d
 | export | what it is |
 | --- | --- |
 | `FoldChevron` | the glyph alone; `aria-hidden`, sized in `em`, turns instead of swapping icons. `ShapeFrame` draws it too: one sign for every fold in the app |
-| `CardFoldToggle` | the header's button: `data-card-fold`, label `runner.collapse` / `runner.expand`, `aria-expanded` from the `Collapsible` around it. 44px under a finger (`finger:`: a touch screen, or a window under 768 px), 28px at a desk. Drawn INSIDE a `Collapsible` |
+| `CardFoldToggle` | the header's button: `data-card-fold`, label `runner.collapse` / `runner.expand` unless the caller hands `labels` (`{ collapse, expand }`, already translated: the name, and the tooltip, for each state), `aria-expanded` from the `Collapsible` around it. Two folds in one place each pass `labels` naming what they fold, or a reader hears "Collapse, button, expanded" twice: her panel's notes ("Collapse notes" / "Expand notes") and draft ("Collapse draft" / "Expand draft"). A lane card's head passes none. 44px under a finger (`finger:`: a touch screen, or a window under 768 px), 28px at a desk. Drawn INSIDE a `Collapsible` |
 | `CardFoldBody` | the body slot: `CollapsibleContent` plus `inert` + `aria-hidden` while closed |
 
 Wiring on every card: `Collapsible open={!collapsed} onOpenChange={toggle}` around the header and a `CardFoldBody`; `data-collapsed="true|false"` on the ROOT.
@@ -4858,7 +4858,7 @@ section: hosting/001 What runs
 
 | Unit | What it is | Bind |
 |---|---|---|
-| `cloudcli-server-dev.service` | `/usr/bin/node deploy/dev-supervisor/supervisor.mjs` — the handover supervisor: it boots each edited server beside the running one and retires the old one only when the new one reports READY; the API process — the HTTP API, the browser's WebSocket gateway and the warden gateway — is its child | `127.0.0.1:3011` (the API, loopback only) and `100.103.222.79:3012` (`CERBERUS_LISTEN`, tailnet-bound: the warden gateway — see below) |
+| `cloudcli-server-dev.service` | `/usr/bin/node deploy/dev-supervisor/supervisor.mjs` — the handover supervisor: it boots each edited server beside the running one and retires the old one only when the new one reports READY, and a builder's save waits until the running server says it is quiet (MAN-9553; his **Restart server** press, a reboot request and `systemctl restart` are never held); the API process — the HTTP API, the browser's WebSocket gateway and the warden gateway — is its child | `127.0.0.1:3011` (the API, loopback only) and `100.103.222.79:3012` (`CERBERUS_LISTEN`, tailnet-bound: the warden gateway — see below) |
 | `cloudcli-client-dev.service` | `node_modules/.bin/vite --host 0.0.0.0 --port 5183 --strictPort` — the client with HMR, its responses compressed by `vite-plugins/compressResponses.js` (see Rules) | `0.0.0.0:5183`, minus the Docker bridges (see below) |
 | `cloudcli-client-prod.service` | `vite preview --host 0.0.0.0 --port 5184 --strictPort --outDir .prod-client/current` — the BUILT client: ~50 requests on a fresh load instead of ~700 unbundled modules, Brotli-precompressed at build time (the page document included), every `/assets/*` file cached for a year and everything else revalidated by ETag, by `vite-plugins/precompressedAssets.js`. Same `.env`, so it proxies `/api`, `/ws`, `/shell` and `/plugin-ws` to :3011 exactly as :5183 does. No HMR: an edit reaches it through the rebuild below | `0.0.0.0:5184`, minus the Docker bridges |
 | `cloudcli-client-prod-build.timer` → `.service` | every 2 min, `scripts/prod-client-build.sh`: builds only when a build input (`src`, `public`, `shared`, `index.html`, `vite.config.js`, `vite-plugins`, `tailwind.config.js`, `postcss.config.js`, `tsconfig.json`, `.env`, `package.json`, `package-lock.json`) changed since the last build's START (~30 s, `Nice=10`; one build at a time under `flock`, a failed build leaves nothing behind), into `.prod-client/builds/<id>`, then re-points the `.prod-client/current` symlink in one rename. The previous build's hashed assets are carried forward for two days, so a tab opened before a swap can still load its lazy chunks. `--force` builds regardless | — |
@@ -4949,12 +4949,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md,
 section: hosting/002 Rules that bite/001 A client edit is instant (HMR over the page's own host); a server edit hands the API
 
 - **A client edit is instant** (HMR over the page's own host); **a server edit hands the API
-  over, two minutes after the last save under `server/`.** The supervisor waits until no save has landed for two minutes (`DEBOUNCE_MS`), then boots the edited server *beside* the running one and retires the old one
+  over, two minutes after the last save under `server/` and once the server is quiet.** The supervisor waits until no save has landed for two minutes (`DEBOUNCE_MS`), then holds the save while Kaylee is in a turn, a chat run is streaming, his press is open or her voice is sounding on her panel, or he said or typed anything to her in the last 90 s (`[supervisor] change held — waiting on: …`, then `quiet — restarting for <n> held saves after <s> s`; a chat run stops counting after 30 minutes, and his **Restart server** press, a reboot request, `systemctl restart` and a deploy are never held), then boots the edited server *beside* the running one and retires the old one
   only once the new one reports READY, so `:3011` is never unanswered: the journal reads
   `[supervisor] change:` → `boot:` → `handover:` → `retired` → `handover complete — serving pid
   <n>`. A broken edit never reaches READY, so the previous server goes on serving and the whole
   event is one line — `[supervisor] boot failed — previous server kept: <first error line>` — with
-  the next save booting again. The retired process still takes its WebSocket connections with it,
+  the next save booting again. The retired process exits only after a turn of Kaylee's in flight has finished (at most ~70 s, INV-10856) and still takes its WebSocket connections with it,
   so the browser drops and reconnects in about 3 s — onto a port that is already answering — and
   the git-delegation run store re-subscribes on `websocket_reconnected` (see `docs/MANUAL.md (git-panel)`). The
   state machine, every log line, the two environment bits and the failure table are in
@@ -9883,7 +9883,7 @@ case that dies halfway cannot print a passing line.
 Every wait that spans a handover is the supervisor's `DEBOUNCE_MS` (two minutes, `deploy/dev-supervisor/watch.mjs`) plus the
 allowance a boot and a retirement need, read from that module so the cases follow it when it moves. A case therefore takes
 minutes: every save waits out the debounce before anything happens, GOOD, BROKEN and READOPT wait it out twice (putting the
-file back is the second save), COALESCE three times. A runner that bounds a case allows ten minutes.
+file back is the second save), COALESCE three times. A runner that bounds a case allows ten minutes, and runs it on a quiet server: the save a case makes is held like any builder's save while Kaylee is in a turn, a chat run is streaming or he spoke to her in the last 90 s (`GET /api/restart-hold` says), and a held save lands outside the case's window.
 
 | Case | What it edits | What has to hold |
 |---|---|---|

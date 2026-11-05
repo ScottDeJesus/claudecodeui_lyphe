@@ -5,10 +5,12 @@
 // the unit's child, nor park it waiting for a takeover that nobody can send.
 import process from 'node:process';
 
-// The supervisor's own stop bound is SIGKILL at 10 s, so silence past this is its defect, and this
-// warning is the only breadcrumb a parked-looking session leaves behind. The override is a probe
+import type { RestartHoldReason } from './shared/restart-hold-types.js';
+
+// The supervisor's own stop bound is SIGKILL at 75 s (a retiring server lets Kaylee's turn in flight finish first), so silence past
+// this is its defect, and this warning is the only breadcrumb a parked-looking session leaves behind. The override is a probe
 // knob, NOT a third member of the supervisor<->child contract: nothing in production ever sets it.
-const TAKEOVER_WARN_MS = Number(process.env.CLOUDCLI_TAKEOVER_WARN_MS) || 30_000;
+const TAKEOVER_WARN_MS = Number(process.env.CLOUDCLI_TAKEOVER_WARN_MS) || 80_000;
 
 export const supervised =
     process.env.CLOUDCLI_SUPERVISED === '1' && typeof process.send === 'function';
@@ -35,6 +37,23 @@ export function signalReady(): void {
     process.send?.({ type: 'ready', pid: process.pid }, (error: Error | null) => {
         if (error) console.warn('[keepalive] supervisor left before READY was sent — serving anyway');
     });
+}
+
+/**
+ * Tells the supervisor what this server is busy with — the other half of the restart hold: a save under `server/`
+ * waits for the serving child to say it is quiet before it boots a successor and retires this one. `busy` carries the
+ * reasons (plain sentences, each saying whether the supervisor may stop counting it after its ceiling); `quiet`
+ * carries none. Sent right after `ready` with the current picture, then on every change of it. `modules/restart-hold`
+ * decides WHEN; this only carries it.
+ *
+ * Guarded on `process.connected`, NEVER on `process.send`, for the reason above `signalReady`.
+ */
+export function reportHold(reasons: readonly RestartHoldReason[]): void {
+  if (!supervised || !process.connected) return;
+  const message = reasons.length === 0 ? { type: 'quiet' } : { type: 'busy', reasons };
+  process.send?.(message, (error: Error | null) => {
+    if (error) console.warn('[keepalive] supervisor left before the restart-hold report was sent');
+  });
 }
 
 /**

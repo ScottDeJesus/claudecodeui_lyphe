@@ -1,5 +1,7 @@
-import { createContext, useContext, useLayoutEffect, useMemo, useRef } from 'react';
+import { useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import type { MutableRefObject, ReactNode } from 'react';
+
+import { createStableContext } from '@/shared/context/stableContext';
 
 export type PaletteOps = {
   openFile: (path: string) => void;
@@ -20,7 +22,7 @@ export type PaletteOps = {
 
 type Registry = MutableRefObject<Partial<PaletteOps>>;
 
-const PaletteOpsContext = createContext<Registry | null>(null);
+const PaletteOpsContext = createStableContext<Registry | null>(import.meta.hot, 'PaletteOpsContext', null);
 
 const defaultOps: PaletteOps = {
   openFile: () => undefined,

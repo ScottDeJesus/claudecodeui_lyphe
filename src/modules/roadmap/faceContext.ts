@@ -1,5 +1,5 @@
-import { createContext } from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import type { Roadmap, RoadmapEpic, RoadmapFeature, RoadmapKind, RoadmapMilestone } from '@/shared/roadmap-types';
 
 /** What an edit opens on: the item as the picture draws it. */
@@ -39,6 +39,6 @@ export type RoadmapFace = {
  * `FeaturePanel`) for `openDialog`. A press with no face or host above it says so in the console rather than do
  * nothing in silence.
  */
-export const RoadmapFaceContext = createContext<RoadmapFace>({
+export const RoadmapFaceContext = createStableContext<RoadmapFace>(import.meta.hot, 'RoadmapFaceContext', {
   openDialog: (dialog) => console.warn(`[roadmap] a press opened the ${dialog.dialog} dialog with no dialog host above it`),
 });

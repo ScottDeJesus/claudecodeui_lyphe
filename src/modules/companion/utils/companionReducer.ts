@@ -231,7 +231,7 @@ export function reduceCompanion(picture: CompanionPicture, frame: CompanionFrame
         activity: { phase: 'idle', session: null, files: null, walk: null },
       };
     default:
-      // `companion_open` and `companion_mouth` (both are for the page's doors, not its picture), and any kind a newer server sends.
+      // `companion_open` and `companion_mouth` (both are for the page's doors, not its picture), `companion_resync` (the provider reads the picture again on it), and any kind a newer server sends.
       return picture;
   }
 }

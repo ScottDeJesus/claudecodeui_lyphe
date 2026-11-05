@@ -12,8 +12,8 @@ type CollapsibleProps = {
 /**
  * The disclosure every fold in the app is built on: the chat's tool output and transcript shapes, the dispatcher's lane
  * cards and their phase rows, the Claude updates panel, the heal lists, Kanban's Metis panel, the follow-ups widget,
- * Cerberus's diagnosis, and the companion's action card and notes. A fold whose hidden body must also leave the tab order
- * wraps it in `CardFoldBody`.
+ * Cerberus's diagnosis, and the companion's action card, notes and draft. A fold whose hidden body must also leave the
+ * tab order wraps it in `CardFoldBody`.
  */
 export const Collapsible = React.forwardRef<HTMLDivElement, CollapsibleProps>(
   ({ defaultOpen = false, open: controlledOpen, onOpenChange: controlledOnOpenChange, className, children, ...props }, ref) => {

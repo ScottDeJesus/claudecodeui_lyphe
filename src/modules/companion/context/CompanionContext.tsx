@@ -1,9 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { useCompanionFab } from '@/modules/companion/hooks/useCompanionFab';
 import { useCompanionVoice } from '@/modules/companion/hooks/useCompanionVoice';
 import { useEars } from '@/modules/companion/hooks/useEars';
+import { useCompanionSounding } from '@/modules/companion/hooks/useCompanionSounding';
 import { useTalkBinding } from '@/modules/companion/hooks/useTalkBinding';
 import { useTalkPress } from '@/modules/companion/hooks/useTalkPress';
 import { isCompanionPicture, isOpenTarget, reduceCompanion } from '@/modules/companion/utils/companionReducer';
@@ -11,6 +12,7 @@ import { isMouthFrame } from '@/modules/companion/utils/mouthPieces';
 import type { PcmPlayer } from '@/modules/companion/utils/pcmPlayer';
 import { api, refusalSentence, ServerSentenceError, uploadAttachmentFiles } from '@/shared/api';
 import type { CompanionFrame, CompanionOpenTarget, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
+import { createStableContext } from '@/shared/context/stableContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { CompanionEars, CompanionFaceVoice, CompanionVoice, TalkPress } from '@/shared/types';
 import type { DockableFabPosition } from '@/shared/ui';
@@ -130,7 +132,7 @@ type CompanionContextValue = {
   mouth: CompanionFaceVoice['mouth'];
 };
 
-const CompanionContext = createContext<CompanionContextValue | null>(null);
+const CompanionContext = createStableContext<CompanionContextValue | null>(import.meta.hot, 'CompanionContext', null);
 
 /**
  * Used by this module's panel, dock, disc and `useAvatarTarget`, and through the barrel by the project-workspace module's command
@@ -165,7 +167,8 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  *
  * THE PICTURE IS SEEDED, THEN KEPT. It is read once with `GET /api/companion` and from then on folded, frame by frame, from
  * the one socket (`companion_*` frames) through the pure reducer. It is read again whenever the frames can no longer be
- * trusted to have told the whole story: after the socket reconnects (frames were missed while it was down), after a
+ * trusted to have told the whole story: after the socket reconnects (frames were missed while it was down), when the server
+ * announces it just took over from its predecessor (`companion_resync`), after a
  * clear (the server's own word on what is left), and when the panel opens on a page whose first read failed. Every one of
  * those is an event; nothing here polls. A read that failed while the page holds no picture is `readFailure`, which the panel
  * shows with a Try again (`reread`); the picture stays null until a read lands.
@@ -232,6 +235,8 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
   }, [finishEars]);
   // What consumers read of the press: its state, its toggle and its error. The door and the recorder's state are the ears' business.
   const { state: talkState, toggle: talkToggle, error: talkError } = press;
+  // The server holds a dev restart for a builder's save while his press is open or her voice sounds on this page (`useCompanionSounding`).
+  useCompanionSounding({ press: talkState !== 'idle', voice: speech.voice.speaking !== null });
   const talk = useMemo<TalkPress>(() => ({ state: talkState, toggle: talkToggle, error: talkError }), [talkState, talkToggle, talkError]);
   useTalkBinding(picture?.settings.talkBinding ?? null, talk.toggle);
 
@@ -331,7 +336,9 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
   useEffect(() => () => window.clearTimeout(recentSendTimerRef.current), []);
 
   useEffect(() => subscribe((event) => {
-    if (event.kind === 'websocket_reconnected') {
+    // A reconnect missed frames while the socket was down; a resync says the server just took over from the one that was serving,
+    // whose frames went to sockets that are gone (a page that opened while it drained has none of what it said since).
+    if (event.kind === 'websocket_reconnected' || event.kind === 'companion_resync') {
       void seed();
       return;
     }

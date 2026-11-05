@@ -2,15 +2,15 @@ import { randomUUID } from 'node:crypto';
 
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
-import type { CompanionAttachment, CompanionProcess } from '@/shared/companion-types.js';
-import { claudeImageBlocks, type ClaudeImageBlock } from '@/shared/image-attachments.js';
+import type { CompanionProcess } from '@/shared/companion-types.js';
+import type { ClaudeImageBlock } from '@/shared/image-attachments.js';
 
 import type { UnansweredMessage } from '../companion-unanswered.js';
 
 import { createAlertHold, type LateBody } from './companion-alert-hold.js';
-import { createReplayHold, messageContent } from './companion-content.js';
+import { createReplayHold, messageContent, readPictures } from './companion-content.js';
 import { createClosing } from './companion-closing.js';
-import { attachmentsEnvelope, calledEnvelope, emptyPressEnvelope, operatorEnvelope } from './companion-envelopes.js';
+import { wordsEnvelope } from './companion-envelopes.js';
 import { failureSentence, readLoopEvent, type CompanionLoopEvent } from './companion-events.js';
 import { resumableSessionId, unexpectedTools } from './companion-launch.js';
 import { createHandoverGate } from './companion-handover-gate.js';
@@ -20,6 +20,7 @@ import { createMessageAssembler } from './companion-message.js';
 import { answeredWithin, CLI_GRACE_MS, launchCompanionCli, type CompanionCli } from './companion-process.js';
 import { fillSystemPrompt } from './companion-prompt.js';
 import { createRefusal } from './companion-refusal.js';
+import { createTakeoverHold, createTurnDrain } from './companion-restart.js';
 import type { CompanionSession, CompanionSessionDeps } from './companion-session-types.js';
 import { sessionShapeOf } from './companion-shape.js';
 import { readSoul } from './companion-soul.js';
@@ -53,6 +54,10 @@ import { guarded } from './guarded-callback.js';
  * may be answering the same words, and two processes must not both say them to her. What a closing process hands on is a guess until its CLI
  * has said its last word: a turn that finished as the stop landed is reported while it winds down, and its words leave the list (`hearLateResult`).
  *
+ * A SERVER STOP LETS HER TURN FINISH, AND THE SUCCESSOR WAITS FOR IT (`companion-restart.ts`). `finishTurn(boundMs)` lets the turn in flight end by itself before the
+ * caller closes her process; one that does not end in the bound is stopped and its words are said again (the ledger, above). A session born beside a predecessor
+ * that still answers holds every push until the takeover's `resendUnanswered`: his words are kept on disk and said then, in order, so two CLIs never share one conversation.
+ *
  * HIS PICTURES SURVIVE IT TOO, AS RECORDS. The stored entry keeps the attachment records and never a byte; the image blocks ride in memory
  * beside the message (`Sent.images`) and a message said again within a process keeps them. A replay after a restart reads them again from the
  * upload store before it pushes anything, and while it reads, a push that arrives is parked and goes after it (`companion-content.ts`), so his
@@ -81,17 +86,6 @@ type Launch = { cli: CompanionCli; shape: string; initSeen: boolean; resumeRefus
 /** A stop whose turn has not yet reported its result: the launch concerned, a promise that settles when the wait is over and the way to settle it. */
 type Stop = { launch: Launch; over: Promise<void>; end(): void };
 
-/**
- * His words as an envelope: the empty press is its own tag, and so is a call by name (`heard: 'name'`), which a replay must not read as the empty
- * one. A typed line is always an `<operator via="typed">`, empty or not (its `via` decides, never the empty press's tag), and the files it carries
- * follow it as `<attachments>`.
- */
-const wordsEnvelope = (words: Pick<UnansweredMessage, 'body' | 'via' | 'heard' | 'attachments'>): string => {
-  if (words.body === '' && words.via === 'spoken') return words.heard === 'name' ? calledEnvelope() : emptyPressEnvelope();
-  const line = operatorEnvelope(words.body, words.via);
-  return words.attachments === undefined || words.attachments.length === 0 ? line : `${line}\n${attachmentsEnvelope(words.attachments)}`;
-};
-
 /** Consumed by `companion-account.ts`: one call per account, made lazily on the account's first use. */
 export function createCompanionSession(deps: CompanionSessionDeps): CompanionSession {
   const { userId } = deps;
@@ -100,6 +94,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   const onSystemLine = guarded('system line', userId, deps.onSystemLine);
   const writeProviderSession = guarded('session writer', userId, deps.writeProviderSession);
   const dropHandover = guarded('handover drop', userId, deps.dropHandover);
+  const turnInFlight = guarded('turn in flight', userId, (inFlight: boolean) => deps.onTurnInFlight?.(inFlight));
   const restoreHandover = guarded('handover restore', userId, deps.writeHandover);
   // Her last turn is quiet to the page: no sentence, no turn frame, no speech-cache move. Her activity still passes, so she reads thinking.
   const unlessLastTurn =
@@ -110,11 +105,12 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   const turns = createTurnTracker(
     {
       onSentence: unlessLastTurn(guarded('sentence', userId, deps.onSentence)),
-      onTurnStarted: unlessLastTurn(guarded('turn start', userId, deps.onTurnStarted)),
+      onTurnStarted: (...started) => { turnInFlight(true); unlessLastTurn(guarded('turn start', userId, deps.onTurnStarted))(...started); },
       onTurnEnded: (...ended) => {
+        turnInFlight(false);
         unlessLastTurn(guarded('turn end', userId, deps.onTurnEnded))(...ended);
         // A microtask away, so the alerts kept for this turn are given after the tracker has finished with it (giving starts a turn), whatever ended it.
-        queueMicrotask(guarded('held alerts', userId, () => alertHold.turnEnded()));
+        queueMicrotask(guarded('held alerts', userId, () => { alertHold.turnEnded(); drain.settled(); }));
       },
       onActivity: guarded('activity', userId, deps.onActivity),
     },
@@ -126,6 +122,9 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   // Alerts are read at the last moment and never said once answered (`companion-alert-hold.ts`); one that can be answered waits here while a turn is in flight.
   const alertHold = createAlertHold({ userId, busy: () => turns.turnId !== null, parks: () => closing.holding(), give: (body) => push(body, null, []) });
 
+  // A server stop lets her turn finish (`finishTurn`); a session born beside a predecessor still answering holds every push until the takeover (`companion-restart.ts`).
+  const drain = createTurnDrain(userId, { turnInFlight: () => turns.turnId !== null || stopping !== null, inLastTurn: () => closing.inLastTurn, dropAlerts: () => alertHold.abandon() });
+  const takeover = createTakeoverHold(deps.awaitingTakeover === true);
   let live: Launch | null = null;
   let condition: CompanionProcess = { state: 'asleep', error: null };
   // Set from the moment a stop starts until its turn's result is in: a push is held while it stands.
@@ -145,6 +144,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     const ended = stopping;
     stopping = null;
     ended?.end();
+    drain.settled();
   }
 
   /** Ends this launch for good: the CLI is killed, whatever it was doing, and `live` is no longer it. */
@@ -284,7 +284,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     }
     finishStop(aborted ? listed.filter((sent) => sent.stoppedBy !== 'operator').map(restate) : []);
     // A turn ended with her process still up: the reading that may begin her closing.
-    if (ended === 'live' && live === launch) closing.afterTurn(launch);
+    if (ended === 'live' && live === launch && !drain.draining) closing.afterTurn(launch);
   }
 
   /**
@@ -535,61 +535,51 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   }
 
   /**
-   * The pictures of one entry's files, each read on its own by the chat's own reader from the upload store, so the one it cannot read (skipped, with the reader's
-   * warning) is known: the message goes without it, and its record is set `unopened` in the files told to her. Her `restate`s and the next boot read those records, so they never announce it either.
-   */
-  async function readPictures(entry: UnansweredMessage): Promise<{ images: ClaudeImageBlock[]; attachments: UnansweredMessage['attachments'] }> {
-    const files = entry.attachments ?? [];
-    let read: ClaudeImageBlock[][];
-    try {
-      read = await Promise.all(files.map((file) => (file.opens === 'shown' ? claudeImageBlocks([file]) : [])));
-    } catch (error) {
-      console.error(`[Companion] account ${userId}: the pictures of a message her last process never answered could not be read; it is sent without them`, error);
-      read = files.map(() => []);
-    }
-    const attachments = files.map((file, index): CompanionAttachment => (file.opens === 'shown' && read[index].length === 0 ? { ...file, opens: 'unopened' } : file));
-    return { images: read.flat(), attachments: entry.attachments === undefined ? undefined : attachments };
-  }
-
-  /**
    * Close and Clear end a replay that is still reading: it says nothing afterwards, and what was parked behind it does not run, as `gate.abandon` leaves a handover's parked
    * words. His words stay in the ledger for the next process (a close) or are gone (Clear), and the hold is never released: nothing waits on it any more.
+   * The same for what a takeover hold parked (`companion-restart.ts`); the hold itself stands until the takeover, so a push after Clear still waits for it.
    */
   function abandonReplay(): void {
     replay = null;
+    takeover.abandon();
   }
 
   /**
    * Says to her again what her last process was given and never answered, each as a fresh message that replaces its entry: a restart storm leaves one entry and gets one answer.
    * Synchronous when no entry carries a picture. Otherwise the pictures are read first, and a new push is parked behind the replay meanwhile (`replay`): the hold ends when the reads settle,
    * after the replay's own messages are pushed, in order, past it. One replay at a time: a call made while another reads has nothing to add (the entries are the one's).
+   * This call is the takeover: the entries include the words he said while the predecessor still answered (kept on disk by `push`), and whatever else waited is let go after them.
    */
   async function resendUnanswered(): Promise<void> {
     // The ledger was made when the account was first touched, which on a handover boot is before the predecessor stopped answering: it looks at the row again.
     ledger.reconcile();
     const entries = [...ledger.inherited()];
-    if (entries.length === 0 || replay !== null) return;
-    console.log(`[Companion] account ${userId}: re-sending ${entries.length} message(s) her last process never answered`);
-    if (!entries.some((entry) => entry.attachments?.some((attachment) => attachment.opens === 'shown'))) {
-      for (const entry of entries) resend(entry, []);
-      return;
-    }
-    const hold = createReplayHold();
-    replay = hold;
     try {
-      const pictures = await Promise.all(entries.map(readPictures));
-      // Abandoned meanwhile (a close, Clear): whoever abandoned it owns what follows.
-      if (replay !== hold) return;
-      // A push that replaced an entry may have taken one out while the reads ran: what is no longer owed is not said.
-      const owed = new Set(ledger.inherited());
-      entries.forEach((entry, index) => {
-        if (owed.has(entry)) resend(entry, pictures[index].images, pictures[index].attachments);
-      });
-    } finally {
-      if (replay === hold) {
-        replay = null;
-        hold.release();
+      if (entries.length === 0 || replay !== null) return;
+      console.log(`[Companion] account ${userId}: re-sending ${entries.length} message(s) her last process never answered`);
+      if (!entries.some((entry) => entry.attachments?.some((attachment) => attachment.opens === 'shown'))) {
+        for (const entry of entries) resend(entry, []);
+        return;
       }
+      const hold = createReplayHold();
+      replay = hold;
+      try {
+        const pictures = await Promise.all(entries.map((entry) => readPictures(userId, entry)));
+        // Abandoned meanwhile (a close, Clear): whoever abandoned it owns what follows.
+        if (replay !== hold) return;
+        // A push that replaced an entry may have taken one out while the reads ran: what is no longer owed is not said.
+        const owed = new Set(ledger.inherited());
+        entries.forEach((entry, index) => {
+          if (owed.has(entry)) resend(entry, pictures[index].images, pictures[index].attachments);
+        });
+      } finally {
+        if (replay === hold) {
+          replay = null;
+          hold.release();
+        }
+      }
+    } finally {
+      takeover.lift();
     }
   }
 
@@ -602,6 +592,12 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     if (replay?.holding()) {
       const kept = keptWhileWaiting(words, replacing);
       replay.park(guarded('push held behind the replay', userId, () => deliver(body, words, images, kept)));
+      return;
+    }
+    // Born beside a predecessor that still answers: his words are on disk and the takeover's resend says them, in order; anything else waits for the lift.
+    if (takeover.standing()) {
+      const kept = keptWhileWaiting(words, replacing);
+      if (words === null) takeover.park(guarded('push held for the takeover', userId, () => deliver(body, words, images, kept)));
       return;
     }
     deliver(body, words, images, replacing);
@@ -672,6 +668,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
    * A typed line's `attached` files ride in his words as records (the ledger writes those to disk) and their pictures as image blocks beside them (memory only).
    */
   function pushHis(body: string, via: 'typed' | 'spoken', heard?: 'name', attached?: Parameters<CompanionSession['pushOperator']>[2]): void {
+    guarded('his words', userId, () => deps.onHisWords?.())();
     const attachments = attached?.attachments ?? [];
     const words = { body, via, at: new Date().toISOString(), ...(heard === undefined ? {} : { heard }), ...(attachments.length === 0 ? {} : { attachments }) };
     push(wordsEnvelope(words), words, attached?.images ?? []);
@@ -679,7 +676,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
 
   /** Starts her process if it is closed, with nothing in it: the idle closer is armed with the launch, so a message that never comes costs a process until the window ends. */
   function warm(): void {
-    if (live !== null || closing.holding()) return;
+    if (live !== null || closing.holding() || takeover.standing()) return;
     if (gate.holding()) gate.park(warm);
     else live = open([], planLaunch());
   }
@@ -749,6 +746,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     },
     warm,
     resendUnanswered,
+    finishTurn: drain.finishTurn,
     oweCut(heard, interrupted) {
       assembler.oweCut(heard, interrupted);
     },

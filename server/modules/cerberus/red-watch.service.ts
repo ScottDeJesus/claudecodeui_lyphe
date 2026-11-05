@@ -35,7 +35,7 @@ import { wardenLinks } from './warden-links.js';
  *
  * A PAGE CARRIES ITS TROUBLE'S FINISHED DIAGNOSIS. After the incident's transaction and before the event is handed
  * over, each newly red and each reminded check is looked up (`red-watch-diagnosis.ts`): the newest `done`
- * diagnosis since the check was last ok, whoever asked for it, becomes the page's Likely cause and Proposed fix
+ * diagnosis since the red began, whoever asked for it, becomes the page's Likely cause and Proposed fix
  * (`cerberus-red-copy.service.ts`). The page keeps its own clock and never waits on a diagnosis: a red whose trouble
  * has none yet, one still running or one that failed pages on time without a cause, no second push follows
  * when a diagnosis finishes, and the next reminder carries it — a trouble already paged included. A lookup that

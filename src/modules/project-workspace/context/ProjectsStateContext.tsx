@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
@@ -6,6 +6,7 @@ import { useFilesRoots } from '@/modules/project-workspace/hooks/useFilesRoots';
 import { useOpenProjectChat } from '@/modules/project-workspace/hooks/useOpenProjectChat';
 import { useProjectsState } from '@/modules/project-workspace/hooks/useProjectsState';
 import { GIT_REPO_PATHS } from '@/shared/constants';
+import { createStableContext } from '@/shared/context/stableContext';
 import { projectNameHints } from '@/shared/projectNameHints';
 import type { FilesRoot, GitRepository, IsSessionProcessing, Project, ProjectChoice, ServerEvent } from '@/shared/types';
 
@@ -85,15 +86,15 @@ function projectChoiceRows(projects: Project[]): [string, string, string, string
     ]);
 }
 
-const ProjectSidebarContext = createContext<ProjectSidebarState | null>(null);
-const ProjectMainContext = createContext<ProjectMainState | null>(null);
-const ProjectCommandContext = createContext<ProjectCommandState | null>(null);
-const ProjectEffectsContext = createContext<ProjectEffectsState | null>(null);
-const ProjectActiveSessionContext = createContext<ProjectActiveSessionState | null>(null);
+const ProjectSidebarContext = createStableContext<ProjectSidebarState | null>(import.meta.hot, 'ProjectSidebarContext', null);
+const ProjectMainContext = createStableContext<ProjectMainState | null>(import.meta.hot, 'ProjectMainContext', null);
+const ProjectCommandContext = createStableContext<ProjectCommandState | null>(import.meta.hot, 'ProjectCommandContext', null);
+const ProjectEffectsContext = createStableContext<ProjectEffectsState | null>(import.meta.hot, 'ProjectEffectsContext', null);
+const ProjectActiveSessionContext = createStableContext<ProjectActiveSessionState | null>(import.meta.hot, 'ProjectActiveSessionContext', null);
 // Its own context, apart from `ProjectMainContext`: the choices and the door into a project move
 // far less often than the selection does, so a reader of only those two is not woken by every pick
 // (see `useProjectChatState`).
-const ProjectChatContext = createContext<ProjectChatState | null>(null);
+const ProjectChatContext = createStableContext<ProjectChatState | null>(import.meta.hot, 'ProjectChatContext', null);
 
 /** Rendered by ProjectWorkspaceRoute to own the workspace's project and session state and expose it through this module's context hooks. */
 export function ProjectsStateProvider({

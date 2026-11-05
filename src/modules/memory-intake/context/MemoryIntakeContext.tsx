@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { api } from '@/shared/api';
+import { createStableContext } from '@/shared/context/stableContext';
 import type { MemoryPending } from '@/shared/types';
 
 /**
@@ -29,7 +30,7 @@ type MemoryIntakeValue = {
  * unreachable and lets a consumer mounted outside the provider read a picture nobody polls
  * for (TasksSettingsContext.tsx:37-53 is the shape to avoid).
  */
-const MemoryIntakeContext = createContext<MemoryIntakeValue | null>(null);
+const MemoryIntakeContext = createStableContext<MemoryIntakeValue | null>(import.meta.hot, 'MemoryIntakeContext', null);
 
 /**
  * The app's ONE memory-intake poller, mounted inside the auth gate so it never asks against

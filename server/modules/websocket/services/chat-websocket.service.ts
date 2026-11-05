@@ -5,6 +5,7 @@ import { projectsDb, sessionUserStateDb, sessionsDb } from '@/modules/database/i
 // never sent about the session the user is looking at right now.
 import { clearPresence, markPresence } from '@/modules/notifications/index.js';
 import { providerModelsService, sessionHostLivenessSnapshot, sessionsService } from '@/modules/providers/index.js';
+import { restartHold } from '@/modules/restart-hold/index.js';
 import { chatRunRegistry } from '@/modules/websocket/services/chat-run-registry.service.js';
 import { abortChatRun, answerChatPermission } from '@/modules/websocket/services/chat-run-verbs.service.js';
 import {
@@ -590,6 +591,7 @@ function markReadIfCompleted(sessionId: string): void {
  * - `chat.subscribe`           { sessions: [{ sessionId, lastSeq? }] }
  * - `chat.permission-response` { requestId, allow, updatedInput?, message?, rememberEntry? }
  * - `chat.presence`            { sessionId, visible, clientId?, focused?, view? }
+ * - `companion.sounding`       { press, voice } — her panel's press is open / her voice is sounding (restart hold)
  *
  * Outbound protocol (server to client): every frame is `kind`-based — either
  * a provider `NormalizedMessage` (with `seq`) or a gateway event
@@ -729,6 +731,10 @@ export function handleChatConnection(
         case 'chat.presence':
           handleChatPresence(ws, userId, data);
           return;
+        case 'companion.sounding':
+          // Her panel says its press is open or her voice is sounding; the dev supervisor holds a restart while either is.
+          restartHold.panelSounding(ws, { press: data.press === true, voice: data.voice === true });
+          return;
         case 'chat.ping':
           // The browser cannot see protocol-level pings, so it proves a socket alive with this
           // frame before trusting it with a send (`WebSocketContext.tsx`).
@@ -749,5 +755,6 @@ export function handleChatConnection(
     console.log('[INFO] Chat client disconnected');
     connectedClients.delete(ws);
     clearPresence(ws);
+    restartHold.panelGone(ws);
   });
 }

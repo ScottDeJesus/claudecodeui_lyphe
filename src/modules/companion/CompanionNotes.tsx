@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CompanionFoldMark } from '@/modules/companion/CompanionFoldMark';
 import { errorMessage } from '@/shared/api';
 import type { CompanionNote } from '@/shared/companion-types';
 import { useToast } from '@/shared/context/ToastContext';
@@ -37,12 +38,13 @@ const isPreformatted = (text: string): boolean => LIST_LINE.test(text) || PATH.t
  * draft, so a long note never pushes the draft or the composer off the panel and never nests a scroller in a scroller.
  *
  * THE COUNT LINE stands over them whenever there is one — "3 notes", sticky as they scroll — with the section's one fold
- * control at its end (the kit's `CardFoldToggle`, its chevron the house's `FoldChevron`). Squeezed to the panel's floor
+ * control at its end (the kit's `CardFoldToggle`, its chevron the house's `FoldChevron`), named "Collapse notes" / "Expand
+ * notes" so a reader tells it from the draft's chevron in the same dock. Squeezed to the panel's floor
  * for them, the line and the first title with its ✕ still say what is there, so a note never disappears without a trace.
  * FOLDED (his press, kept in this browser), the section is that one line: the cards stay mounted in the kit's
  * `CardFoldBody`, which clips them to nothing and takes them out of the tab order and the accessibility tree, and the
  * dock's other cards take the room. A note that arrives while they are folded moves the count and is marked on the line —
- * "1 new", in her accent, popping in once (`animate-mark-in`, none under `prefers-reduced-motion`) — and the notes stay
+ * "1 new", in her accent, popping in once (`CompanionFoldMark`, the draft's fold wears the same) — and the notes stay
  * folded: the mark stays until he opens them. Dismissing the last note takes the section away, the fold kept for the next.
  *
  * A dismissal is gone at once: the card hides as it is pressed and stays hidden once the press lands, until the note
@@ -86,13 +88,13 @@ export function CompanionNotes({ notes, name, folded, onFoldChange, fresh, onDis
           <p className="flex min-w-0 flex-1 items-center gap-2 text-xs uppercase leading-4 tracking-[0.14em] text-ink-faint">
             <span>{t('companion.notes.count', { count: shown.length })}</span>
             {newestFresh !== null && (
-              <span key={newestFresh} data-companion-notes-new="" className="rounded-full bg-accent-soft px-1.5 font-medium text-accent-ink motion-safe:animate-mark-in">
+              <CompanionFoldMark key={newestFresh} data-companion-notes-new="">
                 {t('companion.notes.new', { count: freshCount })}
-              </span>
+              </CompanionFoldMark>
             )}
           </p>
           {/* Its chevron in line with the cards' ✕ below it (their 6px inset and their border). */}
-          <CardFoldToggle className="mr-[7px]" />
+          <CardFoldToggle className="mr-[7px]" labels={{ collapse: t('companion.notes.collapse'), expand: t('companion.notes.expand') }} />
         </div>
         {/* Out to the scroller's own inset and back in, so the clip the fold draws keeps the cards' edges and shadows. */}
         <CardFoldBody className="-mx-3">

@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
 import { useAuth } from '@/modules/auth';
+import { createStableContext } from '@/shared/context/stableContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { Project, ServerEvent, TaskMasterProject, TaskMasterProjectInfo, TaskMasterTask } from '@/shared/types';
 
@@ -54,7 +55,7 @@ type TaskMasterContextValue = {
   clearError: () => void;
 };
 
-const TaskMasterContext = createContext<TaskMasterContextValue | null>(null);
+const TaskMasterContext = createStableContext<TaskMasterContextValue | null>(import.meta.hot, 'TaskMasterContext', null);
 
 function createTaskMasterError(context: string, error: unknown): TaskMasterContextError {
   const message = error instanceof Error ? error.message : `Failed to ${context}`;

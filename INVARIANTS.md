@@ -13606,27 +13606,6 @@ probe-key: e493938a11612bf5d9b43453cfb22a8b8ae75cc9
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-join.mjs
 
-## INV-9807 — probe — LOW — `await companion.stop()` first costs the supervisor's whole window when her CLI does not answer (wiring in `server/index.ts`, outside the five target files)
-
-LOW — `await companion.stop()` first costs the supervisor's whole window when her CLI does not answer (wiring in `server/index.ts`, outside the five target files)
-
-```probe
-D=$(mktemp -d /tmp/athena-p5.XXXXXX)
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe
-echo "shutdown order (line: call):"; awk '/const shutdownRuntimeServices/{f=1} f && /await companion\.stop\(\)|cerberus\.stop\(\)|drainHttpServer\(\)/{print NR": "$0} /^\s*};\s*$/ && f && NR>800{exit}' server/index.ts | head -6
-echo "her wind-down bounds:"; grep -n "const CLI_GRACE_MS" server/modules/companion/session/companion-process.ts
-grep -n "async stopAll" -A8 server/modules/companion/companion.service.ts | grep -E "interrupt\(\)|close\("
-EOF
-bash "$D/p.sh"
-# expect: companion.stop() on a line before cerberus.stop() and drainHttpServer(); CLI_GRACE_MS = 5_000; both interrupt() and close() awaited in stopAll (two 5 s bounds back to back, 10 s against the supervisor's 10 s SIGKILL)
-```
-
-measured 2026-10-27 by chain chain-kaylee--companion--panel-fill-20261027-035941-15be, finding L3, LOW
-probe-key: f899846af40571068162f915898752f4d0a05410
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
-
 ## INV-9808 — probe — LOW — `companion-lands-page.mjs` says it proves the Voice section renders with voice off, and never reads the voice switch
 
 LOW — `companion-lands-page.mjs` says it proves the Voice section renders with voice off, and never reads the voice switch
@@ -14986,7 +14965,7 @@ The door: MAN-9110. The cache and the cut: MAN-9111.
 | `speechCache.startTurn(turnId)` runs BEFORE the `companion_turn` frame is sent | a page pulls sentence 0 the moment its frame arrives |
 | A sentence of a turn that is not `speechCache.isCurrent` answers 404 once its row is over `SENTENCE_SPEAKABLE_MS` (5 min) old; the current turn has no window | a turn that begins while she is heard leaves the rest of that reply speakable; the window bounds what a page can spend |
 | `cut` aborts the turn's syntheses, THEN owes the cut, THEN awaits the interrupt | the press's own message can arrive while she is stopping and must carry the cut |
-| `end()` runs on Clear and on `stopAll` | a sentence streaming to a page would hold the HTTP drain open |
+| `end()` runs on Clear and on `stopAll`, once her turn in flight has finished or its bound has passed and the sentences still streaming have finished (`settled`, at most the HTTP drain's 4 s) | a sentence streaming to a page would hold the HTTP drain open; one cut at the stop would cut her off mid-sentence (INV-10856) |
 | The ten-minute expiry frees audio and never the current turn | a long turn is not made unspeakable under the page still listening |
 | Her sentence is rebuilt from its log row (`readSentence`), never held in memory | the cache holds audio and its timed mouth shapes only |
 
@@ -15012,6 +14991,8 @@ The page's side: MAN-9113 (pull, switch, cut), MAN-9134 (state), MAN-9112 (playe
 | The mouth's pieces are kept in one store (`createMouthPieces`, `utils/mouthPieces.ts`), made once per page by `useCompanionVoice`, holding no React state; `mouth` is one function for the page's life and a piece landing redraws nothing | her face reads it every animation frame while she speaks |
 | A `companion_mouth` frame goes to `hearMouth` and no further, and only when `isMouthFrame` passes it; it is never folded into her picture | a malformed shape on her face is worse than none, and the picture's identity must not change per piece |
 | `silence()` (Stop, the cut) leaves the pieces; `companion_cleared` forgets them (`forgetMouth`). The store keeps her three most recent turns | a Clear wipes the log the pieces belong to; a sentence is looked up only while it sounds |
+| A turn whose sentences a picture holds and the page's previous picture held no row of is OWED and spoken (`owedTurns` → `owe`), in the order she said them, once each; so is the rest of a turn the pull moved on from before it was finished (`resumable`: the index still owed, kept until that turn is followed again, and emptied with the queue), from that index; a turn whose newest owed sentence is over 60 s old by the PAGE's clock against the server's stamp is not (a page clock more than 60 s ahead of the server drops an owed turn); the pull never hops off the turn it follows because a picture says no turn runs | a restart's successor answers inside the socket's reconnect window, and a socket that moves to the successor mid-drain loses the turn's frames and gets the turn with the re-seed; the successor's picture says nothing runs while the retiring server still finishes her turn |
+| `companion_resync` makes the provider read the picture again, and is never folded into it | the server took over from the one that was serving, whose frames went to sockets that are gone |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/mouthPieces.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/pcmPlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/speechPull.ts
 
@@ -24779,41 +24760,6 @@ probe-key: c389d7181ed470a73080fedd1438be044e981f96
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/check-trouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/cerberus-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-auto-diagnosis.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-diagnoses.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-results.db.ts
 
-## INV-10794 — probe — a trouble older than 90 days reaches back to a stale ok row; neither the header nor the report names the prune (latent until 2027-01-04)
-
-a trouble older than 90 days reaches back to a stale ok row; neither the header nor the report names the prune (latent until 2027-01-04)
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-s25.XXXXXX) || exit 1
-case "$D" in /tmp/athena-probe-s25.*) ;; *) exit 1;; esac
-cat > "$D/q.mjs" <<'JS'
-const P = '/home/lyphe/.claude/claudecodeui_lyphe';
-const m = await import(P + '/server/modules/database/index.ts');
-const { lastOkAt, troubleDiagnoses } = await import(P + '/server/modules/cerberus/check-trouble.ts');
-const R = m.cerberusResultsDb, D = m.cerberusDiagnosesDb;
-const DAY = 864e5, now = Date.now(), K = 'scratch/long';
-const row = (at, status, prev, kind) => ({ node: 'eis1', check_key: K, at, source: null, seq: null, fetched_at: null, status, doc_status: null, value: null, data: null, took_ms: null, prev_at: null, prev_status: prev, kind });
-R.insert(row(now - 200 * DAY, 'ok', null, 'change'));
-for (let d = 199; d >= 101; d--) R.insert(row(now - d * DAY, 'ok', 'ok', 'keepalive'));
-R.insert(row(now - 100 * DAY, 'failing', 'ok', 'change'));
-D.insert({ id: 'press', node: 'eis1', check_key: K, asked_by: 'op', by: 'you', model: 'haiku', started_at: now - 150 * DAY });
-D.end('press', 'done', { endedAt: now - 150 * DAY + 10, summary: 's', evidence: '[]' });
-const age = () => ((now - lastOkAt('eis1', K)) / DAY).toFixed(0);
-console.log('before the daily prune: last ok', age(), 'days ago; trouble holds', JSON.stringify(troubleDiagnoses('eis1', K).map((r) => r.id)));
-R.pruneKeepalivesBefore(now - 90 * DAY);
-console.log('after the daily prune:  last ok', age(), 'days ago; trouble holds', JSON.stringify(troubleDiagnoses('eis1', K).map((r) => r.id)));
-JS
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-CERBERUS_DB_PATH="$D/c.db" DATABASE_PATH="$D/a.db" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/q.mjs" 2>&1 | grep -v '^Cerberus store'
-cd /tmp && rm -rf "$D"
-# expect: `before the daily prune: last ok 101 days ago; trouble holds []` then `after the daily prune:  last ok 200 days ago; trouble holds ["press"]` while it stands; cured, the second line reads `101 days ago` and `[]`
-```
-
-measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--store-20261104-101030-d060, finding L2, LOW
-probe-key: 4474aa8121fec47f00eb8e3ccd65d055268933db
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/check-trouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/cerberus-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-auto-diagnosis.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-diagnoses.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-results.db.ts
-
 ## INV-10817 — probe — LOW — the live-tab script presses a real ON on a check it never reads the status of, and its `finally` does not put the switch back
 
 LOW — the live-tab script presses a real ON on a check it never reads the status of, and its `finally` does not put the switch back
@@ -25078,35 +25024,534 @@ probe-key: 8b3bcf176ce2ea50efe239327c066345eecea502
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-auto-diagnosis-whole-live.mjs
 
-## INV-10836 — probe — a press on a still-green check, minutes before it goes red, spares the trigger from reading the red (`check-trouble.ts`, an earlier phase's file the whole exercises)
+## INV-10840 — probe — LOW — INV-10821's pinned probe can no longer answer: its fixture is red-over-a-green-store, which the new bound reads as "no trouble"
 
-a press on a still-green check, minutes before it goes red, spares the trigger from reading the red (`check-trouble.ts`, an earlier phase's file the whole exercises)
+LOW — INV-10821's pinned probe can no longer answer: its fixture is red-over-a-green-store, which the new bound reads as "no trouble"
 
 ```probe
 D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/g.mts" <<'EOF'
-import { cerberusDiagnosesDb, cerberusResultsDb } from '@/modules/database/index.js';
-import { troubleDiagnoses } from '@/modules/cerberus/check-trouble.js';
-const K = 'scratch/green-press', T = Date.now() - 60 * 60_000;
-const row = (at: number, status: string, prev: string | null, kind: string) => ({ node: 'eis1', check_key: K, at, source: null, seq: null, fetched_at: null, status, doc_status: null, value: null, data: null, took_ms: null, prev_at: null, prev_status: prev, kind }) as any;
-cerberusResultsDb.insert(row(T, 'ok', null, 'change')); cerberusResultsDb.insert(row(T + 300_000, 'ok', 'ok', 'keepalive'));
-cerberusDiagnosesDb.insert({ id: 'greenpress000001', node: 'eis1', check_key: K, asked_by: 'scott', by: 'you', model: 'sonnet', started_at: T + 420_000 });
-cerberusDiagnosesDb.end('greenpress000001', 'done', { endedAt: T + 450_000, summary: 'the check reads ok', evidence: '[]' });
-cerberusResultsDb.insert(row(T + 540_000, 'failing', 'ok', 'change'));
-console.log('trouble holds the green-check press:', JSON.stringify(troubleDiagnoses('eis1', K).map((r) => r.id + ':' + r.status)));
-process.exit(0);
-EOF
 cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe
-D="$1"
-CERBERUS_DB_PATH="$D/c.db" DATABASE_PATH="$D/a.db" cloudcli-tsx "$D/g.mts" 2>&1 | grep 'trouble holds' || echo "trouble holds the green-check press: (no line)"
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+~/.claude/scripts/docstore get INV-10821 --probe 2>&1 | timeout 150 bash 2>&1 | grep -E '^PROBE' || echo "PROBE row retired or did not answer"
 EOF
-bash "$D/p.sh" "$D"
+bash "$D/p.sh"
 cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: trouble holds the green-check press: ["greenpress000001:done"]   (cured: [])
+echo "[probe exit $?]"
+# expect: `PROBE said=0 after3hints=0 afterFailing->warn->failing=0` while the fixture contradicts the store (it can show neither the defect nor its cure); `PROBE row retired or did not answer` once retired; a rewritten fixture prints said=1 at every step
 ```
 
-measured 2026-11-04 by chain chain-dark-poller-auto-diagnosis--whole-20261104-115437-97c3, finding L6, LOW
-probe-key: c7a8d076fddefbb922a4cf2a36dc0dd59b4fbf85
+measured 2026-11-04 by chain chain-trouble-bound-red-start-20261104-142956-0a84, finding L1, LOW
+probe-key: cb3e01b9e3316822abfb0b8b3d4a3b302e468711
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-auto-diagnosis-whole-live.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-results.db.ts
+
+## INV-10841 — probe — LOW — the repository header's Consumers line still names one reader of `lastOkAt`; two read it
+
+LOW — the repository header's Consumers line still names one reader of `lastOkAt`; two read it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "readers of cerberusResultsDb.lastOkAt in server/: $(grep -rl 'cerberusResultsDb.lastOkAt(' server --include=*.ts | tr '\n' ' ')"
+echo "the repository header's Consumers lines name auto-diagnosis: $(sed -n 30,42p server/modules/database/repositories/cerberus-results.db.ts | grep -c 'auto-diagnosis')"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: two readers (auto-diagnosis.service.ts, check-trouble.ts) and `... name auto-diagnosis: 0` while the header omits it; cured: `1`
+```
+
+measured 2026-11-04 by chain chain-trouble-bound-red-start-20261104-142956-0a84, finding L2, LOW
+probe-key: 1ae234167ecbffe5ffc9769a83f0e86654f66cbd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-results.db.ts
+
+## INV-10845 — probe — on a short floating panel the draft's fold leaves the panel's floor stale: folding GROWS the panel, reopening leaves Send out of sight
+
+on a short floating panel the draft's fold leaves the panel's floor stale: folding GROWS the panel, reopening leaves Send out of sight
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
+const FOLD = '[data-companion-panel] [data-companion-draft] [data-card-fold]';
+try {
+  await installCompanionKit(page);
+  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
+  await page.evaluate(() => { for (const k of ['companion-notes-fold', 'companion-draft-fold']) localStorage.removeItem(k); localStorage.setItem('companion-panel', JSON.stringify({ left: 700, top: 20, width: 400, height: 520 })); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
+  await page.waitForTimeout(600);
+  const read = () => page.evaluate(() => { const p = document.querySelector('[data-companion-panel]'); const d = p.querySelector('[data-companion-dock]'); const s = p.querySelector('[data-companion-draft] [data-companion-send]')?.getBoundingClientRect(); const db = d.getBoundingClientRect(); return `panel ${Math.round(p.getBoundingClientRect().height)}px, dock scrolls ${d.scrollHeight - d.clientHeight}px, Send in sight: ${s ? s.top >= db.top && s.bottom <= db.bottom + 1 : 'folded'}`; });
+  const open = await read();
+  await page.locator(FOLD).click(); await page.waitForTimeout(600); const folded = await read();
+  await page.locator(FOLD).click(); await page.waitForTimeout(600); const reopened = await read();
+  await page.evaluate(() => localStorage.removeItem('companion-panel'));
+  console.log(`draft open   : ${open}\ndraft folded : ${folded}\ndraft reopened: ${reopened}`);
+} finally { await browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 120 node "$1/p.mjs" 2>&1 | tail -4
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: cured when the folded panel is no taller than the open one and the reopened one reads `dock scrolls 0px, Send in sight: true`; today `draft open   : panel 637px, dock scrolls 0px, Send in sight: true`, `draft folded : panel 701px, …` and `draft reopened: panel 520px, dock scrolls 112px, Send in sight: false`
+```
+
+measured 2026-11-04 by chain chain-kaylee-panel-draft-fold-20261104-143026-0f02, finding M1, MEDIUM
+probe-key: 0e23bf7c8e17a8db43267f50d8bdaf11a2c8048d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFoldMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDraftFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/usePanelFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
+
+## INV-10846 — probe — a keyboard fold of the draft drops the focus to the page's body; the notes' chevron keeps it
+
+a keyboard fold of the draft drops the focus to the page's body; the notes' chevron keeps it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
+const DRAFT = '[data-companion-panel] [data-companion-draft] [data-card-fold]';
+const NOTES = '[data-companion-panel] [data-companion-notes-count] [data-card-fold]';
+try {
+  await installCompanionKit(page);
+  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
+  await page.evaluate(() => { for (const k of ['companion-panel', 'companion-notes-fold', 'companion-draft-fold']) localStorage.removeItem(k); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
+  await page.waitForTimeout(600);
+  const focus = () => page.evaluate(() => { const a = document.activeElement; return a === document.body ? 'BODY' : `${a.tagName} "${a.getAttribute('aria-label')}"`; });
+  for (const [name, sel] of [['notes', NOTES], ['draft', DRAFT]]) {
+    await page.locator(sel).focus(); await page.keyboard.press('Enter'); await page.waitForTimeout(450);
+    const folded = await focus();
+    await page.keyboard.press('Enter'); await page.waitForTimeout(450);
+    console.log(`${name} chevron, Enter to fold -> focus on ${folded}; Enter again -> focus on ${await focus()}`);
+  }
+} finally { await browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 120 node "$1/p.mjs" 2>&1 | tail -3
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: cured when the draft line reads like the notes line (`BUTTON "Expand draft"` then `BUTTON "Collapse draft"`, as the notes' `BUTTON "Expand notes"` then `BUTTON "Collapse notes"`); today `draft chevron, Enter to fold -> focus on BODY; Enter again -> focus on BODY` (the second Enter presses nothing) while the notes line keeps its chevron focused
+```
+
+measured 2026-11-04 by chain chain-kaylee-panel-draft-fold-20261104-143026-0f02, finding M2, MEDIUM
+probe-key: 5ace777a8d32e440616b2b4ac982f29feb1cf1e8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFoldMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDraftFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/usePanelFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
+
+## INV-10848 — probe — a save the server refused is invisible while the draft is folded, and the folded line presents the unsaved words as the draft
+
+a save the server refused is invisible while the draft is folded, and the folded line presents the unsaved words as the draft
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { installCompanionKit, SHELL } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
+try {
+  await installCompanionKit(page);
+  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
+  // The panel's own view on the dense fixture, with a draft verb the server refuses (the kit's verbs never refuse a save).
+  await page.evaluate(async (shell) => {
+    for (const k of ['companion-panel', 'companion-notes-fold', 'companion-draft-fold']) localStorage.removeItem(k);
+    window.__companionKit.unmountAll();
+    const { h, importModule, readSpecifier, mount } = window.__mountReact;
+    const { CompanionPanelView } = await importModule('/src/modules/companion/CompanionPanel.tsx');
+    const { presenceOf } = await importModule('/src/modules/companion/hooks/useCompanionPresence.ts');
+    const { FAKE_PANEL } = await importModule('/src/modules/companion/companion-fake.ts');
+    const { ToastProvider } = await importModule(await readSpecifier('/src/modules/companion/CompanionControls.tsx', /from "([^"]*\/ToastContext[^"]*)"/));
+    const fake = FAKE_PANEL.dense; const noop = async () => {};
+    const verbs = { onClose: () => {}, onSendText: noop, onModelChange: noop, onLiveChange: noop, onInterrupt: noop, onClear: noop, onEditDraft: async () => { throw new Error('the server is down'); }, onSendDraft: noop, onClearDraft: noop, onDismissNote: noop, onWithdraw: noop };
+    const { root, host } = await mount('companion-panel', null, 'display:contents');
+    document.querySelector(shell).appendChild(host);
+    root.render(h(ToastProvider, null, h(CompanionPanelView, { ...fake, ...verbs, presence: presenceOf(fake.picture, 'idle', false, false) })));
+    await window.__mountReact.settle();
+  }, SHELL);
+  await page.waitForTimeout(500);
+  await page.locator('[data-companion-panel] [data-companion-draft] textarea').click();
+  await page.keyboard.press('Control+End'); await page.keyboard.type(' UNSAVED');
+  await page.keyboard.press('Shift+Tab'); await page.waitForTimeout(300);   // the chevron; the blur's save is refused
+  await page.keyboard.press('Enter'); await page.waitForTimeout(500);       // fold
+  console.log(await page.evaluate(() => {
+    const card = document.querySelector('[data-companion-draft]'); const alert = card.querySelector('[role="alert"]');
+    return `fold: ${card.getAttribute('data-companion-draft-fold')} | line ends: "${card.querySelector('[data-companion-draft-line]')?.textContent.replace(/\s+/g, ' ').slice(-24)}" | refusal: ${alert ? `"${alert.textContent.trim()}" ${alert.closest('[inert]') ? 'INSIDE the folded body (inert, unheard)' : 'in sight'}` : 'none'} | mark: ${card.querySelector('[data-companion-draft-mark]')?.textContent ?? 'none'}`;
+  }));
+} finally { await browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 120 node "$1/p.mjs" 2>&1 | tail -3
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: cured when a refused save is not hidden by the fold (the line or a mark says it, or the refusal is in sight); today `fold: folded | line ends: "…UNSAVED" | refusal: "▲Your edit wasn't saved: the server is down" INSIDE the folded body (inert, unheard) | mark: none`
+```
+
+measured 2026-11-04 by chain chain-kaylee-panel-draft-fold-20261104-143026-0f02, finding L2, LOW
+probe-key: 6ad45992e8837cc4bb6e039ef3fb227c46f00957
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFoldMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDraftFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/usePanelFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
+
+## INV-10849 — probe — `useDraftFold`'s `ownWords` never expires, so words he once saved can come back from her unmarked
+
+`useDraftFold`'s `ownWords` never expires, so words he once saved can come back from her unmarked
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
+try {
+  await installCompanionKit(page);
+  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
+  await page.evaluate(() => { for (const k of ['companion-panel', 'companion-notes-fold', 'companion-draft-fold']) localStorage.removeItem(k); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
+  await page.waitForTimeout(600);
+  const setText = (t) => page.evaluate((t) => window.__companionKit.updatePanel((p) => ({ draft: { ...p.draft, text: t, updatedAt: new Date().toISOString() } })), t);
+  const line = () => page.evaluate(() => `${document.querySelector('[data-companion-draft-brief]')?.textContent} | mark: ${document.querySelector('[data-companion-draft-mark]')?.textContent ?? 'none'}`);
+  // He writes his brief and it is saved (a Tab blurs the field), and the save comes back.
+  await page.locator('[data-companion-panel] [data-companion-draft] textarea').click();
+  await page.keyboard.press('Control+A'); await page.keyboard.type('HIS BRIEF X'); await page.keyboard.press('Tab'); await page.waitForTimeout(200);
+  await setText('HIS BRIEF X'); await page.waitForTimeout(200);
+  // She rewrites it to Y; he reads Y and folds the draft.
+  await setText('HER BRIEF Y'); await page.waitForTimeout(200);
+  await page.locator('[data-companion-panel] [data-companion-draft] [data-card-fold]').click(); await page.waitForTimeout(400);
+  console.log('folded on her words      :', await line());
+  await setText('HIS BRIEF X'); await page.waitForTimeout(250);   // while folded she puts back the very words he saved
+  console.log('she restores his words   :', await line());
+} finally { await browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 120 node "$1/p.mjs" 2>&1 | tail -3
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: cured when the last line ends `mark: Edited`; today `she restores his words   : · HIS BRIEF X | mark: none` (the words on the line changed from Y to X and nothing says so)
+```
+
+measured 2026-11-04 by chain chain-kaylee-panel-draft-fold-20261104-143026-0f02, finding L3, LOW
+probe-key: 42c8befed6e355102000a88f948dbdc2af10fc2d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFoldMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDraftFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/usePanelFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
+
+## INV-10853 — probe — LOW — no standing proof fails if a toggle loses its name; the one check on it was retired with the cure
+
+LOW — no standing proof fails if a toggle loses its name; the one check on it was retired with the cure
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+printf 'lines of the standing proof that read the draft chevron name beyond collecting it: '; grep -rn 'toggleLabel' .verify --include=*.mjs | grep -vc 'toggleLabel: toggle' || true
+printf 'lines of the two proof files naming the new words: '; cat .verify/kaylee-panel-move-fold.mjs .verify/lib/kaylee-draft-fold-legs.mjs | grep -c 'Collapse notes\|Expand notes\|Collapse draft\|Expand draft' || true
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `0` and `0` while nothing asserts the two names; cured when either count is above 0
+```
+
+measured 2026-11-04 by chain chain-kaylee-fold-toggle-names-20261104-155809-0f36, finding L1, LOW
+probe-key: da04be768e9647e9169f90fe47fbdce3ad0bacec
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/CardFold.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
+
+## INV-10854 — probe — LOW — INV-10846's `expect:` line quotes the names this build replaced; the builder saw it and left it
+
+LOW — INV-10846's `expect:` line quotes the names this build replaced; the builder saw it and left it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+docstore get INV-10846 --text 2>/dev/null | grep -c 'BUTTON "Expand"' || true
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `1` while the expect line quotes the bare names; `0` once it quotes "Expand draft" / "Collapse draft" or the row is retired
+```
+
+measured 2026-11-04 by chain chain-kaylee-fold-toggle-names-20261104-155809-0f36, finding L2, LOW
+probe-key: d78bff865772e7fe8d248838ea2730398691fa37
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/CardFold.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
+
+## INV-10855 — createStableContext — every React context keeps one identity across hot reloads; a bare createContext is a lint error
+
+Every React context under `src/` is made with `createStableContext(import.meta.hot, '<Name>', default)` from `src/shared/context/stableContext.ts`. A bare `createContext` (named import, alias, re-export, `React.createContext`, destructured from the React namespace) is a lint error: `stable-context/no-bare-create-context`, the rule in `lint-plugins/stable-context.js`, wired in `.oxlintrc.json` with the helper's own file exempt. A second rule, `stable-context/no-duplicate-context-key`, refuses two `createStableContext` calls in one module that share a key: the helper keeps one object per key, so a repeat is ONE context in dev and two in a production build.
+
+why: in dev, Vite stamps a module with a fresh `?t=` whenever anything in its import graph changes, and a hot update then loads that module a second time beside the first. A bare `createContext` is then two objects: React Refresh gives the mounted provider the second copy's component, which provides the second object, while a consumer still on the first copy reads the first and finds no provider ("useWebSocket must be used within a WebSocketProvider", 2026-11-04, a long-open dev page after a draft-fold save stamped `WebSocketContext.tsx` through the `shared/ui` barrel). Every copy of a module path shares that module's `import.meta.hot.data`, so the helper keeps the context object there, one key per context (the variable's name; a module with two contexts has two keys), and the second copy gets the first's object back. A production build has no `import.meta.hot` (Vite replaces it with `undefined`), so there it is a plain `createContext`, byte for byte as before.
+
+cost: a kept context also keeps the default value it was first made with, so editing a context's default takes a page reload in dev. The provider, the hooks and the value's type hot-update as always.
+
+scope: contexts only. A module-level store, bus or cache has the same exposure when its module gets a second copy; none of the 47 context modules holds one that its provider and consumers must share (`transcriptPictures.ts` holds three memo caches, where a second copy costs a repeat fetch). Pass `import.meta.hot` literally from the declaring module: Vite injects the hot context only into a module whose own text mentions it.
+
+proof: `.verify/ws-context-identity-replay.mjs` replays the saves on a private copy of the client under `/tmp` with its own Vite (it refuses a root whose `realpathSync` is outside `/tmp`, so `/tmp/../…` and a symlink into the live repo fail; a save in the live repo hot-updates every open page). A `panel` or `contexts` run that loads no second copy of any context module exits 1: the saves never reached the page, so nothing was proven.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/lint-plugins/stable-context.js, /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/stableContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ws-context-identity-replay.mjs
+
+## INV-10857 — probe — the replay can pass without a single hot update reaching the page
+
+the replay can pass without a single hot update reaching the page
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "process.exit\|const copiesMade" .verify/ws-context-identity-replay.mjs | cut -c1-120
+echo "[probe exit $?]"
+# expect: `process.exit(crashes ? 1 : 0)` with no use of copiesMade or hotSteps in it while a run with 0 second copies exits 0; cured when the exit line also fails a run that loaded no second copy
+```
+
+measured 2026-11-04 by chain chain-hmr-stable-contexts-20261104-155730-1972, finding L1, LOW
+probe-key: 8b8264bbf4d8c57b2d7f729546ea0e732475d708
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/lint-plugins/stable-context.js, /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/stableContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ws-context-identity-replay.mjs
+
+## INV-10858 — probe — the "copy must live under /tmp" guard is a string prefix test
+
+the "copy must live under /tmp" guard is a string prefix test
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 120 node .verify/ws-context-identity-replay.mjs http://127.0.0.1:1 /tmp/../home/lyphe/.claude/claudecodeui_lyphe desktop panel 2>&1 | grep -E "usage|ERR_" | head -2 | cut -c1-120
+echo "[probe exit $?]"
+# expect: `page.goto: net::ERR_UNSAFE_PORT at http://127.0.0.1:1/` while the guard is a string prefix (it let a root that resolves into the live repo through); the `usage: … the copy must live under /tmp` sentence once cured
+```
+
+measured 2026-11-04 by chain chain-hmr-stable-contexts-20261104-155730-1972, finding L2, LOW
+probe-key: 2dc7866e3ccb3132908227f1bc14921be51ec1d7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/lint-plugins/stable-context.js, /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/stableContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ws-context-identity-replay.mjs
+
+## INV-10859 — probe — nothing guards the key: a duplicate key silently makes one context of two, in dev only
+
+nothing guards the key: a duplicate key silently makes one context of two, in dev only
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+R=/home/lyphe/.claude/claudecodeui_lyphe
+W=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+mkdir -p "$W/app/src/modules/x" || exit 1
+cp "$R/.oxlintrc.json" "$W/app/" && cp -r "$R/lint-plugins" "$W/app/" && ln -s "$R/node_modules" "$W/app/node_modules"
+printf '{"name":"scratch","version":"0.0.0","type":"module"}\n' > "$W/app/package.json"
+cat > "$W/app/src/modules/x/dup.ts" <<'TS'
+import { createStableContext } from '@/shared/context/stableContext';
+export const A = createStableContext<number>(import.meta.hot, 'Same', 1);
+export const B = createStableContext<string>(import.meta.hot, 'Same', 'x');
+TS
+( cd "$W/app" && timeout 100 node_modules/.bin/oxlint -c .oxlintrc.json --format=json src > "$W/lint.json" 2>/dev/null; python3 -I -c "
+import json,sys
+j=json.load(open(sys.argv[1]))
+print('lint reports on a module whose two contexts share one key:', sum(1 for d in j['diagnostics'] if 'stable-context' in d.get('code','') or 'Same' in d['message']))" "$W/lint.json" )
+( cd "$R" && node --import tsx --input-type=module -e "
+import { createStableContext } from './src/shared/context/stableContext.ts';
+const hot = { data: {} };
+const a = createStableContext(hot, 'Same', 1), b = createStableContext(hot, 'Same', 'x');
+console.log('in dev the two contexts are one object:', a === b, '| the second one\'s default is', JSON.stringify(b._currentValue))" 2>&1 | tail -1 )
+cd /tmp; case "$W" in /tmp/athena-probe.??????) rm -r "$W" ;; esac
+EOF
+bash "$D/p.sh"; cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D" ;; esac
+echo "[probe exit $?]"
+# expect: `lint reports on a module whose two contexts share one key: 0` and `in dev the two contexts are one object: true | the second one's default is 1` while the defect stands; a nonzero lint count once the rule reports a repeated key
+```
+
+measured 2026-11-04 by chain chain-hmr-stable-contexts-20261104-155730-1972, finding L3, LOW
+probe-key: 6fadaca203b4cfbc3e207439c9cd37be9f191b4d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/lint-plugins/stable-context.js, /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/stableContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ws-context-identity-replay.mjs
+
+## INV-10860 — probe — `stopAll` aborts the sentence still streaming the instant her turn ends, so a short turn is cut on its first sentence
+
+`stopAll` aborts the sentence still streaming the instant her turn ends, so a short turn is cut on its first sentence
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+set -u
+F=/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts
+sed -n '/async stopAll(/,/^    },/p' "$F" | grep -n -E 'finishTurn|speechCache\.end\(\)|interrupt\(|close\(|\.done|unfinished|settled' || echo none
+EOF
+bash "$D/p.sh"
+# expect: `speechCache.end()` is listed directly after `finishTurn(` with no wait on unfinished entries (`.done` / `unfinished` / `settled`) between them while the defect stands; cured when such a wait sits between the two lines, or `speechCache.end()` is gone from `stopAll`.
+```
+
+measured 2026-11-04 by chain chain-dev-restart-turn-survives-20261104-161217-2c88, finding H1, HIGH
+probe-key: 8ca1d07cdd42948c5be430cc16d14f3af2d123d3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/child.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/server/http-drain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-restart-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-restart-turn.mjs
+
+## INV-10861 — probe — a second `finishTurn` overwrites the first waiter's wake-up, and the first prints a false "did not finish" line
+
+a second `finishTurn` overwrites the first waiter's wake-up, and the first prints a false "did not finish" line
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX)
+cat > "$D/p2.mts" <<'EOF'
+const { createTurnDrain } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-restart.ts');
+let inFlight = true;
+const drain = createTurnDrain(1, { turnInFlight: () => inFlight, inLastTurn: () => false, dropAlerts: () => undefined });
+const t0 = Date.now(); const at: Record<string, number> = {};
+const a = drain.finishTurn(1500).then(() => { at.first = Date.now() - t0; });
+const b = drain.finishTurn(1500).then(() => { at.second = Date.now() - t0; });
+await new Promise((r) => setTimeout(r, 100));
+inFlight = false; drain.settled();
+await Promise.all([a, b]);
+console.log(JSON.stringify({ turnEndedAtMs: 100, firstWaiterResolvedAtMs: at.first, secondWaiterResolvedAtMs: at.second }));
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<EOF
+cd /tmp && cloudcli-tsx "$D/p2.mts" 2>&1 | tail -1
+EOF
+bash "$D/p.sh"
+# expect: firstWaiterResolvedAtMs is near 1500 (its bound) while secondWaiterResolvedAtMs is near 100 while the defect stands; both near 100 once cured.
+```
+
+measured 2026-11-04 by chain chain-dev-restart-turn-survives-20261104-161217-2c88, finding L1, LOW
+probe-key: 79794bb297690cfabbc7378da6b9c055296e8bee
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/child.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/server/http-drain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-restart-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-restart-turn.mjs
+
+## INV-10862 — probe — Clear on a held session ends the takeover hold, so a push after it launches a CLI beside the predecessor
+
+Clear on a held session ends the takeover hold, so a push after it launches a CLI beside the predecessor
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-XXXXXX)
+cat > "$D/p3.mts" <<'EOF'
+const { createTakeoverHold } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-restart.ts');
+const hold = createTakeoverHold(true);
+let ran = 0; hold.park(() => { ran += 1; });
+const before = hold.standing();
+hold.abandon();
+console.log(JSON.stringify({ standingBeforeClear: before, standingAfterClear: hold.standing(), parkedRanAtClear: ran }));
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<EOF
+cd /tmp && cloudcli-tsx "$D/p3.mts" 2>&1 | tail -1
+EOF
+bash "$D/p.sh"
+# expect: standingAfterClear is false (the hold ended by Clear) while the defect stands; true once cured, with parkedRanAtClear still 0.
+```
+
+measured 2026-11-04 by chain chain-dev-restart-turn-survives-20261104-161217-2c88, finding L2, LOW
+probe-key: 5df23041910b97c38f628d9d82c35a6f34c5d103
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/child.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/server/http-drain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-restart-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-restart-turn.mjs
+
+## INV-10863 — probe — the bound's own comment says the supervisor stops children "one by one"; it stops them together
+
+the bound's own comment says the supervisor stops children "one by one"; it stops them together
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && { grep -n "Promise.all(\[...children\]" deploy/dev-supervisor/supervisor.mjs || echo none; grep -n -E "child by child|one by one" deploy/dev-supervisor/child.mjs server/modules/companion/session/INVARIANTS.md | cut -c1-120 || echo none; }
+# expect: the first line shows the supervisor stopping its children in one Promise.all; the next lines show the "child by child" / "one by one" wording while the defect stands; no such lines once cured.
+```
+
+measured 2026-11-04 by chain chain-dev-restart-turn-survives-20261104-161217-2c88, finding L3, LOW
+probe-key: 2b4b4dea77e7e7ed0f82ff7d6e0e0b79df2a764d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/child.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/server/http-drain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-restart-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-restart-turn.mjs
+
+## INV-10864 — probe — MEDIUM — a held save is not cleared by a cycle that already carried it: a reboot request while a save is held restarts the server a second time, straight after the takeover, at the new server's false "quiet"
+
+MEDIUM — a held save is not cleared by a cycle that already carried it: a reboot request while a save is held restarts the server a second time, straight after the takeover, at the new server's false "quiet"
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/dev-restart-quiet-hold/athena-probes/rig.sh rebootWhileHeldRealistic | grep -E "PROBE|quiet —|handover held"
+echo "[probe exit $?]"
+# expect: `quiet — restarting for 1 held save after 3 s`, `handover held — …waiting on: a chat run is streaming` and `PROBE boots=3 handovers=2 held-handovers=1` while the defect stands; cured: no `quiet —` line, `PROBE boots=2 handovers=1 held-handovers=0`
+```
+
+measured 2026-11-04 by chain chain-dev-restart-quiet-hold-20261104-161216-ce01, finding M1, MEDIUM
+probe-key: eb3acb0db05bd6fa4c7974db11fcbd61f11ee18c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/hold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/restart-hold/restart-hold.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/restart-hold-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSounding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-tail.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-waits.mjs
+
+## INV-10865 — probe — MEDIUM — a held retirement leaves a second, non-serving API listening on the shared port for as long as the server stays busy; the docs call it "a few seconds"
+
+MEDIUM — a held retirement leaves a second, non-serving API listening on the shared port for as long as the server stays busy; the docs call it "a few seconds"
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/dev-restart-quiet-hold/athena-probes/rig.sh busyDuringBoot | grep -E "PROBE|handover held"
+echo "[probe exit $?]"
+# expect: `handover held — pid … went busy while pid … booted, waiting on: Kaylee in a turn` and `PROBE live children while the retirement is held: 2` while a second server stays up beside the busy one; cured: 1 (or no held handover)
+```
+
+measured 2026-11-04 by chain chain-dev-restart-quiet-hold-20261104-161216-ce01, finding M2, MEDIUM
+probe-key: ddb73c3e005609c30409d78b56c845d354cf20a0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/hold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/restart-hold/restart-hold.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/restart-hold-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSounding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-tail.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-waits.mjs
+
+## INV-10866 — probe — LOW — a docstore row points at a README section this phase renamed
+
+LOW — a docstore row points at a README section this phase renamed
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && echo "MAN-7412 names the old heading: $(docstore get MAN-7412 --text | grep -c 'The four IPC messages') | README still has it: $(grep -c '^## The four IPC messages' deploy/dev-supervisor/README.md)"
+echo "[probe exit $?]"
+# expect: `MAN-7412 names the old heading: 1 | README still has it: 0` while it stands; `0 | 0` (or `1 | 1`) once the row and the heading agree
+```
+
+measured 2026-11-04 by chain chain-dev-restart-quiet-hold-20261104-161216-ce01, finding L1, LOW
+probe-key: a354c9bd571165a1fca4b538efe3c5b0e80f5397
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/hold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/restart-hold/restart-hold.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/restart-hold-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSounding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-tail.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-waits.mjs
+
+## INV-10867 — probe — LOW — the page's hook and the supervisor's editors are not shown the row that says what landed
+
+LOW — the page's hook and the supervisor's editors are not shown the row that says what landed
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && for f in src/modules/companion/hooks/useCompanionSounding.ts deploy/dev-supervisor/supervisor.mjs; do echo "$f: $(docstore govern /home/lyphe/.claude/claudecodeui_lyphe/$f --touch write --limit 4 --text | cut -d' ' -f1 | tr '\n' ' ')"; done
+echo "[probe exit $?]"
+# expect: the hook prints `(no …` (no row) and supervisor.mjs prints `MAN-553 MAN-7413 MAN-7412` while the gap stands; cured when MAN-9553 is among the tokens for both
+```
+
+measured 2026-11-04 by chain chain-dev-restart-quiet-hold-20261104-161216-ce01, finding L2, LOW
+probe-key: 79121083d8e2f22bf42f102958dafd75b496ef64
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/hold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/restart-hold/restart-hold.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/restart-hold-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSounding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-tail.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-waits.mjs
+
+## INV-10868 — probe — LOW — the journal says "quiet" when the serving child crashed
+
+LOW — the journal says "quiet" when the serving child crashed
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/dev-restart-quiet-hold/athena-probes/rig.sh servingDiesWhileHeld | grep -E "exited|quiet —"
+echo "[probe exit $?]"
+# expect: `server pid … exited (SIGKILL) — waiting for the next change` followed by `quiet — restarting for 1 held save after 0 s` while the wording stands
+```
+
+measured 2026-11-04 by chain chain-dev-restart-quiet-hold-20261104-161216-ce01, finding L3, LOW
+probe-key: 03c57a015040184ed68b5658f722b872ac7bb394
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/hold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/restart-hold/restart-hold.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/restart-hold-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSounding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-tail.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-waits.mjs
+
+## INV-10869 — probe — LOW (builder-acknowledged, left undone) — the handover verification cases now run against a hold they do not wait for
+
+LOW (builder-acknowledged, left undone) — the handover verification cases now run against a hold they do not wait for
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -c "restart-hold" .verify/handover/handover-cases.mjs .verify/handover/handover-lib.mjs .verify/handover/smoke.sh
+echo "[probe exit $?]"
+# expect: three lines each ending `:0` while the cases do not wait for the quiet; cured when the runner waits on `/api/restart-hold` before it saves
+```
+
+measured 2026-11-04 by chain chain-dev-restart-quiet-hold-20261104-161216-ce01, finding L4, LOW
+probe-key: 0b51ec53f68c2030426bc43b1f5344be1e5d0378
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/hold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/restart-hold/restart-hold.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/restart-hold-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSounding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-tail.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-waits.mjs

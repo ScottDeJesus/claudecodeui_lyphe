@@ -3312,7 +3312,9 @@
       "new_one": "{{count}} new",
       "new_other": "{{count}} new",
       "dismiss": "Dismiss “{{title}}”",
-      "dismissRefused": "“{{title}}” wasn't dismissed"
+      "dismissRefused": "“{{title}}” wasn't dismissed",
+      "collapse": "Collapse notes",
+      "expand": "Expand notes"
     },
     "draft": {
       "title": "Draft",
@@ -3320,6 +3322,11 @@
       "forChatPress": "For <chat/>",
       "showOnStage": "Show {{chat}} on the stage",
       "newChat": "New chat in {{project}}",
+      "none": "No draft",
+      "markNew": "New",
+      "markEdited": "Edited",
+      "collapse": "Collapse draft",
+      "expand": "Expand draft",
       "updated": "Updated {{when}}",
       "working": "Working now",
       "aboutChat": "for {{chat}}",

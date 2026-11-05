@@ -1,4 +1,6 @@
-import { createContext, useContext } from 'react';
+import { useContext } from 'react';
+
+import { createStableContext } from '@/shared/context/stableContext';
 
 /**
  * Marks a transcript render that is being turned into a document rather than
@@ -10,7 +12,7 @@ import { createContext, useContext } from 'react';
  * subagent panels would come out empty, and their activity caps would truncate
  * for a viewport that does not exist. This flag tells them to render whole.
  */
-export const TranscriptRenderContext = createContext<{ isExporting: boolean }>({ isExporting: false });
+export const TranscriptRenderContext = createStableContext<{ isExporting: boolean }>(import.meta.hot, 'TranscriptRenderContext', { isExporting: false });
 
 /** True only while the transcript is being rendered into an exported document. */
 export function useIsExportingTranscript(): boolean {

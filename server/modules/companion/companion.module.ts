@@ -36,10 +36,15 @@ import { startStationLandedFeed } from './station/station-landed-feed.js';
  * is gone): the words her last process was given and never answered are said to her again, and she answers them with nobody
  * speaking.
  *
- * `stop()` unsubscribes the feeds, the station's hint and its landed feed FIRST, so nothing new is pushed to a conversation
- * that is winding down, then runs the service's `stopAll` — each running conversation is interrupted and its input ended, and
- * a message that arrives after it is refused with a 503 — beside the face service's `stop`, which aborts the running face
- * bake; the entrypoint's shutdown awaits both before it stops anything else.
+ * `stop(turnBoundMs, sentenceBoundMs)` unsubscribes the feeds, the station's hint and its landed feed FIRST, so nothing new is pushed to a conversation
+ * that is winding down, then runs the service's `stopAll` — a turn in flight is let to finish, at most `turnBoundMs`, then each running
+ * conversation is interrupted and its input ended (after the sentences still streaming have finished, at most `sentenceBoundMs`), and a message that arrives after it is refused with a 503 — beside the face
+ * service's `stop`, which aborts the running face bake. The entrypoint starts it FIRST (the refusal is in force before anything else
+ * stops) and awaits it LAST, so the rest of the shutdown does not sit behind her turn; only the process's exit does.
+ *
+ * ON A HANDOVER BOOT (`awaitingTakeover`) her sessions hold every push until `resendUnanswered`, the takeover: the retiring server still
+ * has her CLI, and a second one on the same conversation would fork it. The hold ends at the takeover, or at `TAKEOVER_HOLD_MAX_MS` if no takeover
+ * ever comes (the supervisor is gone): by then the supervisor has killed the predecessor, so nothing is answering any more.
  *
  * The face service starts here too (`faceService.start()`): it registers the house's avatars, queues the bake of each whose face
  * is not made, resumes every account's pending bake and prunes (`face/face.service.ts`). Its work runs in the background and
@@ -47,11 +52,27 @@ import { startStationLandedFeed } from './station/station-landed-feed.js';
  */
 
 /** What the entrypoint holds: the router to mount, `resendUnanswered` for its sole-server duties and the stop for shutdown. The return type of `createCompanionModule`, which the entrypoint receives as a value and never names. */
-type CompanionModule = { router: Router; resendUnanswered(): void; stop(): Promise<void> };
+type CompanionModule = { router: Router; resendUnanswered(): void; stop(turnBoundMs: number, sentenceBoundMs: number): Promise<void> };
 
-/** Consumed by `server/index.ts` (through the barrel), once at boot. */
-export function createCompanionModule({ runtime, house }: { runtime: ProviderRuntimeGateway; house: CompanionHouse }): CompanionModule {
-  companionService.attachRuntime(runtime, house);
+/**
+ * The longest a handover boot holds her pushes waiting for a takeover that never comes: a boot (30 s at most, `BOOT_TIMEOUT_MS`) and then the
+ * SIGKILL the supervisor sends a retiring server 75 s after its SIGTERM (`STOP_TIMEOUT_MS`, `deploy/dev-supervisor/child.mjs`), which follows this
+ * boot's READY at once; past this the predecessor is gone, whatever became of the supervisor.
+ */
+const TAKEOVER_HOLD_MAX_MS = 110_000;
+
+/** Consumed by `server/index.ts` (through the barrel), once at boot. `awaitingTakeover` is the entrypoint's `handover` bit. */
+export function createCompanionModule({ runtime, house, awaitingTakeover }: { runtime: ProviderRuntimeGateway; house: CompanionHouse; awaitingTakeover: boolean }): CompanionModule {
+  companionService.attachRuntime(runtime, house, awaitingTakeover);
+  const takeover = (): void => companionService.resendUnanswered();
+  // One timer, armed once and only on a handover boot, for the case where the event never comes; it never keeps the process alive.
+  const holdLimit = awaitingTakeover
+    ? setTimeout(() => {
+        console.warn(`[Companion] no takeover after ${TAKEOVER_HOLD_MAX_MS / 1000} s; her held pushes are let go`);
+        takeover();
+      }, TAKEOVER_HOLD_MAX_MS)
+    : null;
+  holdLimit?.unref();
   const stopAlertFeed = startAlertFeed(companionService, house);
   const stopFocusFeed = startFocusFeed(companionService);
   const stopDeletedChatFeed = startDeletedChatFeed(companionService);
@@ -60,15 +81,18 @@ export function createCompanionModule({ runtime, house }: { runtime: ProviderRun
   faceService.start();
   return {
     router: createCompanionRoutes(companionService),
-    resendUnanswered: () => companionService.resendUnanswered(),
-    stop: () => {
+    resendUnanswered: () => {
+      if (holdLimit !== null) clearTimeout(holdLimit);
+      takeover();
+    },
+    stop: (turnBoundMs, sentenceBoundMs) => {
       stopAlertFeed();
       stopFocusFeed();
       stopDeletedChatFeed();
       stopStationHint();
       stopStationLandedFeed();
       // The running bake is aborted beside the sessions' wind-down, so ComfyUI and the bake lock are gone before the process is.
-      return Promise.all([companionService.stopAll(), faceService.stop()]).then(() => undefined);
+      return Promise.all([companionService.stopAll(turnBoundMs, sentenceBoundMs), faceService.stop()]).then(() => undefined);
     },
   };
 }

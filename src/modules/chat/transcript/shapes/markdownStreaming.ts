@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { createStableContext } from '@/shared/context/stableContext';
 
 /**
  * True while this markdown is the still-growing half of a streamed reply.
@@ -16,4 +16,4 @@ import { createContext } from 'react';
  * It lives in its own module for one reason: `Markdown.tsx` imports `CodeBlock` and `CodeBlock`
  * needs the context, so leaving it in `Markdown.tsx` would be an import cycle.
  */
-export const MarkdownStreamingContext = createContext(false);
+export const MarkdownStreamingContext = createStableContext(import.meta.hot, 'MarkdownStreamingContext', false);

@@ -1,6 +1,7 @@
-import { createContext, useContext } from 'react';
+import { useContext } from 'react';
 
 import type { CerberusCatalogEntryView, CerberusNeed, CerberusNodeProject, CerberusOverview, CerberusStartedBatch, CerberusWardens } from '@/shared/cerberus-types';
+import { createStableContext } from '@/shared/context/stableContext';
 import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove, CerberusPromoteInput } from '@/shared/types';
 
 /**
@@ -101,7 +102,7 @@ export type CerberusValue = {
   promote: (id: string, input: CerberusPromoteInput) => Promise<boolean>;
 };
 
-export const CerberusContext = createContext<CerberusValue | null>(null);
+export const CerberusContext = createStableContext<CerberusValue | null>(import.meta.hot, 'CerberusContext', null);
 
 /** The overview and its verbs. Read by the module's own views, its sheet and its dialogs. */
 export function useCerberus(): CerberusValue {

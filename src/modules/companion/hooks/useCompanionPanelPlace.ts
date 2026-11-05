@@ -122,9 +122,11 @@ function draw(panel: HTMLElement, rect: CompanionPanelRect): void {
  * before. The first move or resize starts from that box as it is drawn (`boxOf`).
  *
  * THE BOX DRAWN is the stored one held inside the shell (`clampPanelRect`) at every render, against the room and the
- * content's floor as last measured — at open, after every render of the panel, and on every resize of the shell or of a
- * row of the panel (a ResizeObserver: the window's resizes, his message growing, a header row wrapping; events, never a
- * poll). A box stored on a bigger window shrinks to fit a smaller one and grows back with it. The stored box changes only
+ * content's floor as last measured — at open, after every render of the panel, on every resize of the shell or of a
+ * row of the panel (a ResizeObserver: the window's resizes, his message growing, a header row wrapping), and at the end of a
+ * fold's motion in the dock (`transitionend` of a clip's grid rows: a card states its floor when its fold stops moving, in a
+ * dock held at its cap that no row's size reports); events, never a poll. A box stored on a bigger window shrinks to fit a
+ * smaller one and grows back with it. The stored box changes only
  * at the release of his move or resize, written once (`writePanelRect`).
  *
  * A DRAG IS DRAWN STRAIGHT ONTO THE PANEL (`draw`), every move clamped live, and put in state once at its release: the
@@ -174,7 +176,8 @@ export function useCompanionPanelPlace(panelRef: RefObject<HTMLElement>, open: b
     if (active) measure();
   });
 
-  // Between renders: the shell's own resizes (the window's) and each row's (his message growing, a header row wrapping).
+  // Between renders: the shell's own resizes (the window's) and each row's (his message growing, a header row wrapping), and
+  // a dock fold done moving: the draft card writes its floor then (its own listener, first), which a capped dock never reports.
   useEffect(() => {
     const panel = panelRef.current;
     const shell = panel?.offsetParent;
@@ -182,7 +185,12 @@ export function useCompanionPanelPlace(panelRef: RefObject<HTMLElement>, open: b
     const observer = resizeObserverIn(hostWindow, measure);
     observer?.observe(shell);
     for (const row of Array.from(panel.children)) observer?.observe(row);
-    return () => observer?.disconnect();
+    const foldSettled = (event: TransitionEvent) => { if (event.propertyName === 'grid-template-rows') measure(); };
+    panel.addEventListener('transitionend', foldSettled);
+    return () => {
+      observer?.disconnect();
+      panel.removeEventListener('transitionend', foldSettled);
+    };
   }, [active, panelRef, hostWindow, measure]);
 
   /** Draws the box `compute` gives for the room and floor as they are now, and keeps it as the drag's latest box. */

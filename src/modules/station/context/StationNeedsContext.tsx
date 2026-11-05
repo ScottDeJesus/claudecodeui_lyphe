@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { useCompanion } from '@/modules/companion';
@@ -6,6 +6,7 @@ import { useDispatcherPlans } from '@/modules/dispatcher';
 import { useLivePending } from '@/modules/station/hooks/useLivePending';
 import { needsCountOf } from '@/modules/station/needsCount';
 import { api, refusalSentence } from '@/shared/api';
+import { createStableContext } from '@/shared/context/stableContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { StationNeed } from '@/shared/station-types';
 
@@ -23,7 +24,7 @@ type StationNeedsContextValue = {
   reread: () => void;
 };
 
-const StationNeedsContext = createContext<StationNeedsContextValue | null>(null);
+const StationNeedsContext = createStableContext<StationNeedsContextValue | null>(import.meta.hot, 'StationNeedsContext', null);
 
 /** The five kinds the rail has an item for: an item of any other (a server newer than this page's bundle) cannot be drawn, so it is left out of the list and the rest is drawn. */
 const NEED_KINDS: ReadonlySet<StationNeed['kind']> = new Set(['accept', 'questions', 'ask', 'followups', 'check']);

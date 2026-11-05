@@ -27,8 +27,8 @@ import { PAGING_STATUSES } from './red-watch-plan.js';
  *     returned as `exhausted`, so the trigger can say "failed 3 times" once per trouble with no read of
  *     its own.
  *
- * A TROUBLE IS READ ONCE, WHOEVER ASKED. It is everything since the check was last ok
- * (`check-trouble.ts`): a diagnosis the trouble already holds, from the operator or from this trigger,
+ * A TROUBLE IS READ ONCE, WHOEVER ASKED. It is everything since the red began, the first row after the
+ * check's last ok (`check-trouble.ts`): a diagnosis the trouble already holds, from the operator or from this trigger,
  * spares the trigger. The operator, 2026-11-04: "once it goes red, check the reason why, and there's no
  * reason to check unless it's been fixed and cleared". A press of Diagnose at minute 5 therefore spares
  * the trigger its read at minute 10, and a check that was ok and went red again is a new trouble.
@@ -73,7 +73,7 @@ export type AutoDiagnosisInputs = {
   overview: CerberusOverview;
   /** The `<node>/<check_key>` of every check switched on: `cerberusAutoDiagnosisDb.enabledSlots()`. */
   enabled: ReadonlySet<string>;
-  /** `check-trouble.ts`: the diagnoses since the check was last ok, newest first, whoever asked. */
+  /** `check-trouble.ts`: the diagnoses since the red began, newest first, whoever asked. */
   troubleDiagnoses: (node: string, key: string) => CerberusDiagnosisRow[];
   /** The nodes of `cerberusDiagnosesDb.running()`. */
   busyNodes: ReadonlySet<string>;
