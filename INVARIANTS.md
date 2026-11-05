@@ -1028,32 +1028,6 @@ probe-key: 44e21d54a9185ed78094e1ebb08b12ce9801a104
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
 
-## INV-6327 — probe — MEDIUM — `blocked` is a `--resume` case in one rule and a `file_issue` case in another, inside her one prompt
-
-MEDIUM — `blocked` is a `--resume` case in one rule and a `file_issue` case in another, inside her one prompt
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief && grep -c '`dead` or `blocked`' chapters/recovery.md; grep -c '\*\*`nothing-changed`\*\* or \*\*`blocked`\*\* → `file_issue`' METIS.md
-```
-
-measured 2026-10-01 by chain chain-metis-foreground-wait-20261001-165407-e80a, finding M2, MEDIUM
-probe-key: 140b2e8b70c77888e713f170dea02952fe789488
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/recovery.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/METIS.md, /home/lyphe/.claude/hooks/plan_runner/solo/chain_adopt.py, /home/lyphe/.claude/scripts/soul-back, /home/lyphe/.claude/skills/inline/SKILL.md
-
-## INV-6328 — probe — LOW — claims this diff made false, left in place (healed means deleted)
-
-LOW — claims this diff made false, left in place (healed means deleted)
-
-```probe
-cd /home/lyphe/.claude && grep -c 'imports no `plan_runner`' hooks/plan_runner/solo/chain_adopt.py hooks/INVARIANTS.md; scripts/docstore get INV-40 | python3 -c "import json,sys; b=json.load(sys.stdin)['row']['body']; print('10800' in b, '#29 holds' in b)"
-```
-
-measured 2026-10-01 by chain chain-metis-foreground-wait-20261001-165407-e80a, finding L2, LOW
-probe-key: 883e8e89df2f74eaeb5d571680ac69ed8e156a37
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/recovery.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/METIS.md, /home/lyphe/.claude/hooks/plan_runner/solo/chain_adopt.py, /home/lyphe/.claude/scripts/soul-back, /home/lyphe/.claude/skills/inline/SKILL.md
-
 ## INV-6329 — probe — INV-4355 and a `store_arcs.py` docstring still say a fenced typo becomes `deepseek`
 
 INV-4355 and a `store_arcs.py` docstring still say a fenced typo becomes `deepseek`
@@ -1140,20 +1114,6 @@ expect: `id length 127: launcher walker_alive=True | dot reader counts it=false`
 
 measured 2026-10-02 by chain chain-purple-dot-souls-20261002-043723-dbad, finding L2, LOW
 probe-key: 9686bb9886de60f111e500376e0adfb69f7376ff
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
-
-## INV-6339 — probe — three exports lack the consumer comment the backend standards ask for
-
-three exports lack the consumer comment the backend standards ask for
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -rn "ChainRecord\b" server --include=*.ts | grep -v "chain-record.transport.ts"; echo "[probe exit $?]"
-expect: no lines and `[probe exit 1]` — no importer of the exported type
-```
-
-measured 2026-10-02 by chain chain-purple-dot-souls-20261002-043723-dbad, finding L4, LOW
-probe-key: 6f13394c38a4241eed44f442e0fe08293b18f959
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
 
