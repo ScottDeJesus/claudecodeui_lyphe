@@ -3,6 +3,7 @@ import type { Router } from 'express';
 import { getCerberusConnection } from '@/modules/database/index.js';
 import type { CerberusGatewayState, CerberusOverview, CerberusReadInputs } from '@/shared/cerberus-types.js';
 
+import { startAutoDiagnosis, stopAutoDiagnosis } from './auto-diagnosis.service.js';
 import { startAutoRun } from './auto-run.js';
 import { registerCatalogHandlers } from './catalog.service.js';
 import { createCerberusRouter } from './cerberus.routes.js';
@@ -22,8 +23,8 @@ import { wardenLinks } from './warden-links.js';
 
 /**
  * The Cerberus composition root: the router for `/api/cerberus`, and the three things that are ARMED
- * rather than called — the store and the gateway (`start`), the self-checks, the red watch and the prune
- * (`soleDuties`), and their shutdown (`stop`).
+ * rather than called — the store and the gateway (`start`), the self-checks, the red watch, the
+ * auto-diagnosis and the prune (`soleDuties`), and their shutdown (`stop`).
  *
  * `start()` runs in the entrypoint's `listen` callback BEFORE it signals READY (the entrypoint waits
  * for the gateway's bind, at most 3 s; every step before the bind is synchronous): the supervisor
@@ -46,9 +47,10 @@ import { wardenLinks } from './warden-links.js';
  * to be down.
  *
  * `soleDuties()` is the entrypoint's `soleServerDuties` calling in, and it arms the self-checks, the red
- * watch (`red-watch.service.ts`: a check red for an hour pages the operator's phone) and the prune only in
- * the process that holds the port: a second API process on the same store would write a second set of hub
- * rows, and page the same incident from its own memory. It can run BEFORE `start()` (a plain boot runs its sole duties
+ * watch (`red-watch.service.ts`: a check red for an hour pages the operator's phone), the auto-diagnosis
+ * (`auto-diagnosis.service.ts`: a switched-on check red for ten minutes is read once, by itself) and the prune
+ * only in the process that holds the port: a second API process on the same store would write a second set of
+ * hub rows, page the same incident from its own memory and start the same diagnoses from its own. It can run BEFORE `start()` (a plain boot runs its sole duties
  * before it listens) or after it (a handover boot runs them at takeover), so each call only
  * records its half and the duties start when both have happened — never against a store that
  * `start()` has not yet opened and seeded.
@@ -120,6 +122,8 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
     startSelfChecks(() => gatewayState);
     // Its first tick is one interval away (`startRedWatch`), after the server has finished starting.
     startRedWatch(overview);
+    // Hears the module's own hints; its first plan is one settle minute away (`auto-diagnosis.service.ts`).
+    startAutoDiagnosis({ overview, readInputs });
     startDailyPrune();
   }
 
@@ -166,6 +170,8 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
     stop: () => {
       stopped = true;
       stopAutoRun();
+      // Before the diagnoses end: the ends a shutdown stores and hints start nothing.
+      stopAutoDiagnosis();
       stopDiagnoses();
       stopSelfChecks();
       stopRedWatch();

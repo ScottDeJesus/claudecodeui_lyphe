@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { createStableContext } from '@/shared/context/stableContext';
 
 /**
  * Which reply a file preview belongs to — the scope its bytes are shared within, and its fold.
@@ -25,4 +25,4 @@ import { createContext } from 'react';
  * fixture): a preview then scopes to its own mount and shares nothing. Never a hash of empty text,
  * which every tool row would share.
  */
-export const PreviewScopeContext = createContext<string | false | null>(null);
+export const PreviewScopeContext = createStableContext<string | false | null>(import.meta.hot, 'PreviewScopeContext', null);

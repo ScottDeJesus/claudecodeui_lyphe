@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
 import { useStationWindow } from '@/modules/station/hooks/useStationWindow';
@@ -11,6 +11,7 @@ import {
   writeStationRecord,
 } from '@/modules/station/stationMemory';
 import type { StationRecord } from '@/modules/station/stationMemory';
+import { createStableContext } from '@/shared/context/stableContext';
 import type { StationFocus } from '@/shared/station-types';
 import type { StationPrefKey, StationRegion, StationTier } from '@/shared/types';
 
@@ -70,9 +71,9 @@ type StationTalkText = {
   setFiles: Dispatch<SetStateAction<File[]>>;
 };
 
-const StationContext = createContext<StationContextValue | null>(null);
-const StationPrefsContext = createContext<StationPrefs | null>(null);
-const StationTalkTextContext = createContext<StationTalkText | null>(null);
+const StationContext = createStableContext<StationContextValue | null>(import.meta.hot, 'StationContext', null);
+const StationPrefsContext = createStableContext<StationPrefs | null>(import.meta.hot, 'StationPrefsContext', null);
+const StationTalkTextContext = createStableContext<StationTalkText | null>(import.meta.hot, 'StationTalkTextContext', null);
 
 /**
  * The station's context: the focus and its back-stack, the tier and whether the window is a phone's (and on its side), the scroll memory.

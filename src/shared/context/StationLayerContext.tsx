@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import type { CompanionOpenTarget } from '@/shared/companion-types';
+import { createStableContext } from '@/shared/context/stableContext';
 
 /** What puts a thing she opened on the station's stage: the station's `openOnStage`, handed to the workspace's host by `registerStageOpen`. */
 type StageOpen = (target: CompanionOpenTarget, label: string) => void;
@@ -42,8 +43,8 @@ type StationDoors = {
   openOnStage: (target: CompanionOpenTarget, label: string) => boolean;
 };
 
-const StationShowingContext = createContext(false);
-const StationDoorsContext = createContext<StationDoors | null>(null);
+const StationShowingContext = createStableContext(import.meta.hot, 'StationShowingContext', false);
+const StationDoorsContext = createStableContext<StationDoors | null>(import.meta.hot, 'StationDoorsContext', null);
 
 /**
  * Whether the station is the page on screen, i.e. the router stands at `/station`. Its own context, apart from the doors: a switch re-renders

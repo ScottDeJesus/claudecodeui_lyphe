@@ -706,20 +706,20 @@ flowchart TD
 
 There are twelve broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, the board's `kanban_event`, the notes lane's `notes_changed` (MAN-7517), the simple-list lane's `simple_list_changed` (MAN-7519), the session host's `session_host_liveness` (`host-liveness.ts`, session-host MAN-695: pushed the moment a chat gains its first or loses its last host, and sent once to each socket, held until the hosts are re-adopted), and FIVE STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, the roadmap (`server/modules/roadmap/`, the `roadmap_state` frame, MAN-7631) over its `roadmap show --json` document, and the universe lane
 (`server/modules/universe/`), which watches the registered repos' `.git` HEADs and reads two live
-feeds of the estate, the systemd journal and the Claude transcripts. The four polled lanes — the launcher-souls lane, a board's own Metis sessions, the dispatcher's plans and the roadmap — tick every two seconds and put a frame on the wire only when the picture actually changed, and the universe lane is the exception, below. `notes_changed` and `simple_list_changed` go out once per write that landed and name no row and no account: a client that hears one reads its own list again. The dedup records a picture as
+feeds of the estate, the systemd journal and the Claude transcripts. The four polled lanes — the launcher-souls lane, a board's own Metis sessions, the dispatcher's plans and the roadmap — read and put a frame on the wire only when the picture actually changed — the first two on a two-second tick, the dispatcher's and the roadmap on a write to the files they read (MAN-9543), and the universe lane is the exception, below. `notes_changed` and `simple_list_changed` go out once per write that landed and name no row and no account: a client that hears one reads its own list again. The dedup records a picture as
 sent only AFTER the send returns, so a broadcast that throws part-way is re-sent on the next tick
 instead of being suppressed as unchanged — the frame carries the whole picture, so a client
 receiving it twice receives it once. All of them reach `connectedClients` through the websocket
 module's own barrel, never a deep import.
 
 That loop is written once, in `server/shared/polled-lane.service.ts` (`createPolledLane`); each lane
-supplies only its own `snapshot` and `frame`. The universe lane is the one STATE LANE that runs through NEITHER that shape NOR a single
+supplies only its own `snapshot` and `frame`, and which clock makes it read (a `pollMs` interval, or `backstopMs` and a poke). The universe lane is the one STATE LANE that runs through NEITHER that shape NOR a single
 kind — it sends `universe_map`
 and `universe_activity`, and the reason differs for each.
 
 `universe_map` is the HEAD watcher. Reconciling a HEAD change means shelling a crawler child and
 awaiting it, and `createPolledLane`'s contract is a `snapshot()` that is cheap — the dispatcher lane's subprocess
-read is ~170 ms, and a tick that finds it still out is skipped — and a snapshot that launched a
+read is seconds, and a tick that finds it still out is skipped — and a snapshot that launched a
 crawler would fire on a cadence nobody chose and let crawls stack. So
 `universe.module.ts` writes its own thirty-second interval, reads every registered repo's `.git/HEAD`
 directly off disk (never a `git rev-parse` subprocess), and broadcasts only when a rebuilt map
@@ -737,8 +737,8 @@ than a picture of state that persists between ticks, so there is nothing cheap o
 against a previous snapshot — an empty window is silence, not an unchanged picture, and a lane that sent
 it anyway would be ten frames a second saying nothing.
 
-Reasoning that belongs to polling-rather-than-watching for the four polled lanes lives at
-`polled-lane.service.ts`, not in any lane. The launcher lane's own half — what it reads off a launch
+Reasoning that belongs to the four lanes' shared mechanism — why two of them poll and two are poked by a watch, and what the backstop
+is for — lives at `polled-lane.service.ts`, not in any lane. The launcher lane's own half — what it reads off a launch
 directory, how it classifies a soul and which provider its pin paints — is
 [docs/MANUAL.md (dispatch-souls)](../MANUAL.md). A board's own Metis lane has no write-up of its own yet.
 
@@ -1819,7 +1819,7 @@ What remains is a `Map<sessionId, SessionActivity>` of `{ statusText, canInterru
 | `markSessionIdle` | `complete`; `protocol_error`; a `chat_subscribed` ack with `isProcessing: false` |
 | `syncProcessingSessions` | Every 5 s, and when the tab becomes visible again, from `GET /api/providers/sessions/running`, which returns `chatRunRegistry.listRunningRuns()` beside `subagentSessionIds` — the conversations a subagent is still running in, live run or not — and `awaitingInputSessionIds`, the conversations a question is waiting in, live run or not |
 
-Two guards make it stable:
+Three guards make it stable:
 
 - **Stale idle acks.** `markSessionIdle(id, { ifStartedBefore })` keeps an entry whose
   `startedAt` is at or after the moment that session's `chat.subscribe` was sent
@@ -1828,6 +1828,16 @@ Two guards make it stable:
 - **A 10 s local grace.** `syncProcessingSessions` keeps entries the server did not report
   if they are younger than `LOCAL_ACTIVITY_GRACE_MS = 10_000`, so the poll cannot race a
   send that has not reached the registry yet.
+- **One read in flight.** `refreshRunningSessions` skips a tick while its previous read is out
+  (`refreshingRef`, which keeps when the read began); a read older than `RUNNING_READ_GUARD_MS`
+  (35 s: the api's 30 s `REQUEST_TIMEOUT_MS` and a tick) no longer blocks the next tick, and only the
+  read that owns the entry frees it. The server holds this read up to `RUNS_READOPTED_WAIT_MS` (76 s)
+  while a successor waits for its predecessor to drain; a held read added every tick fills the
+  browser's six HTTP/1.1 connections to the origin, and every other request of the tab (her speech,
+  her picture) waits behind them. Measured 2026-11-04 against a proxy holding the read 70 s: 6 reads held
+  and `GET /api/companion` 4.5–5.0 s; with one in flight, 1 held and 7–30 ms. A read that reaches the
+  ceiling logs `[SessionProtection] Failed to sync running sessions: TimeoutError` once per 30 s and
+  the map keeps its last-known list; a tab opened inside the hold shows no running chats until the takeover.
 
 Consumers: `useProcessingSessions` (chat — the activity line and the abort button),
 `useBusySessionIdSet` (sidebar — membership only, derived by `useSessionIdSet` from a sorted

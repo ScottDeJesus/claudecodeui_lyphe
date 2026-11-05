@@ -3,13 +3,16 @@ import { useId, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
+import { CompanionDraftFoldLine, CompanionDraftHead } from '@/modules/companion/CompanionDraftFoldLine';
 import { useCardFloor } from '@/modules/companion/hooks/useCardFloor';
 import { useFieldRoom } from '@/modules/companion/hooks/useFieldRoom';
 import { useGrowingField } from '@/modules/companion/hooks/useGrowingField';
 import { errorMessage } from '@/shared/api';
 import type { CompanionDraft } from '@/shared/companion-types';
+import { COMPANION_DRAFT_EYEBROW } from '@/shared/constants';
 import { useToast } from '@/shared/context/ToastContext';
-import { Button, Card, ConfirmDialog, TextArea, Tooltip } from '@/shared/ui';
+import type { CompanionDraftFold } from '@/shared/types';
+import { Button, Card, CardFoldBody, Collapsible, ConfirmDialog, TextArea, Tooltip } from '@/shared/ui';
 import { cn, formatRelativeTime } from '@/shared/utils';
 
 type SendMode = 'turn' | 'steer';
@@ -34,10 +37,9 @@ type CompanionDraftCardProps = {
    * under it, and the field under all of it, giving way down to nothing. Absent (her panel), the card draws as it always has.
    */
   headLine?: boolean;
+  /** Her panel's fold (`useDraftFold`): a chevron on the head row folds the card to that one row. Absent (the station), it never folds. */
+  fold?: CompanionDraftFold;
 };
-
-/** The house's eyebrow (MAN-742): it names the card, and states nothing on its own. */
-const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
 
 /**
  * THE DRAFT: the one thing ever sent to a chat, so its target and its words are always on screen and his to edit.
@@ -49,8 +51,13 @@ const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
  * chat's name keeps its room and the project gives way first; under it "Working now" while that chat runs a turn, and when
  * she last changed the draft. Given `onTargetPress` (the station), a chat's name is a link-styled press named "Show Kanban
  * lanes on the stage", a 44px catch under a finger (a touch screen, or a window under 768px: the touch law, INV-10275); a new
- * chat has no session to show, so its target stays words, as the panel's always does. BODY: the words, in a field he can edit
- * that grows with them into whatever room the dock leaves — the notes give way first, down to their floor — and scrolls
+ * chat has no session to show, so its target stays words, as the panel's always does. FOLDED (`fold`, her panel alone: his
+ * press on the chevron at the head row's end, kept in this browser), the card is that row as one line
+ * (`CompanionDraftFoldLine`: "DRAFT", the target, the brief's opening words, and her accent's mark for a draft that arrived
+ * or changed while folded); all under it stays mounted in the kit's `CardFoldBody`, clipped to nothing and out of the tab
+ * order and the accessibility tree, so an edit not yet saved survives a fold and an open, all but a refusal, which stands
+ * under the line and is heard, so words the server did not take never read as the draft. BODY: the words, in a field he can
+ * edit that grows with them into whatever room the dock leaves — the notes give way first, down to their floor — and scrolls
  * inside past that, never below its 88px floor, so a brief built over a walkthrough is read as whole as the screen allows.
  * Only the field gives way inside the card: the
  * target, the notice and the sends always stand. FOOT: the sends and Clear. While the target is working, Send steer leads
@@ -75,7 +82,7 @@ const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
  * with Use hers, never silently kept or dropped — and his own save coming back while he types on is his, never hers.
  * A refused send or save leaves everything on screen and says why.
  */
-export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit, onSend, onClear, onTargetPress, headLine = false }: CompanionDraftCardProps) {
+export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit, onSend, onClear, onTargetPress, headLine = false, fold }: CompanionDraftCardProps) {
   const { t } = useTranslation();
   const pushToast = useToast();
   const fieldId = useId();
@@ -83,6 +90,9 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
   // The head line's box round the field, which clips it as it gives way to nothing: the floor counts it at nothing.
   const fieldBoxRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  // Her panel's body, the rows the fold clips: the floor reads through the clip to them (its height is the fold's motion).
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const folded = fold?.folded ?? false;
   // His edit while it differs from the draft: unsaved, or saving. Null when the field simply shows her draft.
   const [edit, setEdit] = useState<string | null>(null);
   // The draft text his edit started from: a draft that moves off it (and not onto his own words) is her rewrite.
@@ -116,8 +126,8 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
   useGrowingField(fieldRef, edit ?? draft.text, visible, 'flexBasis');
 
   // The card's own floor (all of it but the field, plus the field's 88px; in the head line, the field's box at nothing), so the
-  // dock scrolls it whole, never folds it.
-  useCardFloor(cardRef, headLine ? fieldBoxRef : fieldRef, visible);
+  // dock scrolls it whole, never folds it. In her panel it is read through the fold's clip, and folded it is its line's.
+  useCardFloor(cardRef, headLine ? fieldBoxRef : fieldRef, visible, headLine ? undefined : { bodyRef, folded });
   // In the head line, the field steps aside whole while it would show less than one line.
   useFieldRoom(fieldBoxRef, fieldRef, headLine && visible);
 
@@ -214,7 +224,7 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
   // "DRAFT" and the target: the chat's name keeps its room and the project gives way first.
   const targetWords = (
     <>
-      <span className={cn(EYEBROW, 'shrink-0')}>{t('companion.draft.title')}</span>
+      <span className={cn(COMPANION_DRAFT_EYEBROW, 'shrink-0')}>{t('companion.draft.title')}</span>
       {draft.target.kind === 'new' && <MessageSquarePlus aria-hidden="true" className="size-3.5 shrink-0 self-center text-muted-foreground" />}
       {draft.target.kind === 'session' && onTargetPress !== undefined ? (
         // "For" stays words and the chat's name is the press, so its name ("Show Kanban lanes on the stage") holds the
@@ -379,22 +389,42 @@ export function CompanionDraftCard({ draft, name, targetWorking, visible, onEdit
     );
   }
 
+  // The fold's pieces stand round the card whether or not it folds: with no `fold` the body is simply always open.
   return (
-    <Card ref={cardRef} data-companion-draft={draft.target.kind} className="flex min-h-0 flex-col gap-2 border-input p-3">
-      <div className="flex shrink-0 flex-col gap-0.5">
-        <div className="flex min-w-0 items-baseline gap-2 text-sm">{targetWords}</div>
-        <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-          {working}
-          {working && <span aria-hidden="true">·</span>}
-          {stamp}
-        </p>
-      </div>
-      {field}
-      {notice}
-      <div className="flex shrink-0 flex-wrap items-center gap-2">{sends}</div>
-      {steerWords}
-      {refusalLine}
-      {clearQuestion}
-    </Card>
+    <Collapsible open={!folded} onOpenChange={(open) => fold?.onFoldChange(!open)} className="flex min-h-0 flex-col">
+      <Card
+        ref={cardRef}
+        data-companion-draft={draft.target.kind}
+        data-companion-draft-fold={fold === undefined ? undefined : folded ? 'folded' : 'open'}
+        className="flex min-h-0 flex-col border-input p-3"
+      >
+        <CompanionDraftHead foldable={fold !== undefined}>
+          {folded ? (
+            <CompanionDraftFoldLine draft={draft} words={shown} mark={fold?.mark ?? null} />
+          ) : (
+            <div className="flex min-w-0 flex-1 items-baseline gap-2 text-sm">{targetWords}</div>
+          )}
+        </CompanionDraftHead>
+        {/* Out to the card's padding and back in, so the clip keeps the field's and the sends' focus rings (4px); its 4px
+            under the rows are taken back while open, so the card's foot is today's. The body is a column the clip's height
+            sizes, so the field gives way inside it as it did in the card. */}
+        <CardFoldBody className={cn('-mx-3 min-h-0', !folded && '-mb-1')}>
+          <div ref={bodyRef} className="flex h-full flex-col gap-2 px-3 pb-1 pt-0.5">
+            <p className="flex min-w-0 shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+              {working}
+              {working && <span aria-hidden="true">·</span>}
+              {stamp}
+            </p>
+            {field}
+            {notice}
+            <div className="flex shrink-0 flex-wrap items-center gap-2">{sends}</div>
+            {steerWords}
+          </div>
+        </CardFoldBody>
+        {/* A refusal stands under the fold, never in it: folded, it says the line's words were not taken, and is heard. */}
+        {refusalLine && <div className="shrink-0 pt-2">{refusalLine}</div>}
+        {clearQuestion}
+      </Card>
+    </Collapsible>
   );
 }

@@ -464,8 +464,8 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
     },
   ), [writeOnce, settleWrite, refresh]);
 
-  // The diagnosis's three writes, riding the same guards and the same toast as the verbs above.
-  const { diagnose, runProposal, promote } = useDiagnosisVerbs({ writeOnce, settleWrite, toast, tRef, mountedRef });
+  // The diagnosis's four writes, riding the same guards and the same toast as the verbs above.
+  const { diagnose, setAutoDiagnosis, runProposal, promote } = useDiagnosisVerbs({ writeOnce, settleWrite, toast, tRef, mountedRef });
 
   useEffect(() => {
     mountedRef.current = true;
@@ -550,9 +550,10 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
     wardens,
     startUpdate,
     diagnose,
+    setAutoDiagnosis,
     runProposal,
     promote,
-  }), [overview, unreachable, stale, catalog, catalogFailed, refresh, mute, liftMute, setLabel, setProjectNode, starting, runEntry, setAuto, wardens, startUpdate, diagnose, runProposal, promote]);
+  }), [overview, unreachable, stale, catalog, catalogFailed, refresh, mute, liftMute, setLabel, setProjectNode, starting, runEntry, setAuto, wardens, startUpdate, diagnose, setAutoDiagnosis, runProposal, promote]);
 
   return <CerberusContext.Provider value={value}>{children}</CerberusContext.Provider>;
 }

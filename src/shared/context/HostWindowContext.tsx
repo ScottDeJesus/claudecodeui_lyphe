@@ -1,6 +1,7 @@
-import { createContext, useContext, useLayoutEffect, useRef } from 'react';
+import { useContext, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import type { HostMove, HostWindowValue } from '@/shared/types';
 
 /**
@@ -17,7 +18,7 @@ import type { HostMove, HostWindowValue } from '@/shared/types';
  * from one host to another. One place moves the chat, so taking the seam back out means changing
  * that one function and nothing else.
  */
-const HostWindowContext = createContext<HostWindowValue | null>(null);
+const HostWindowContext = createStableContext<HostWindowValue | null>(import.meta.hot, 'HostWindowContext', null);
 
 /** Used by chat-host's `ChatHostSlot` (around the live chat's portal) and `ChatHostWindow` (around a floating host's header), which build the value from the window the chat is standing in. */
 export function HostWindowProvider({ value, children }: { value: HostWindowValue; children: ReactNode }) {

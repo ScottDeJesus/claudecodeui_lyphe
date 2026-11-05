@@ -267,6 +267,9 @@ export default {
         'roadmap-burst': 'roadmap-burst 1.1s ease-out forwards',
         // A ring's or a dot's swell.
         'roadmap-bloom': 'roadmap-bloom 900ms var(--ease-spring)',
+        // A small mark of state appearing where it stands, once: the kit's `vv-fab-dot-in` (`surfaces.css`), the pop the
+        // FAB's dot arrives with, on the spring curve. Worn by Kaylee's "1 new" on her folded notes, under `motion-safe:`.
+        'mark-in': 'vv-fab-dot-in 0.25s var(--ease-spring) both',
       },
     },
   },

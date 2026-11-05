@@ -10,8 +10,16 @@ import { pathToFileURL } from 'node:url';
 // every second of it is a second the supervisor holds an edit back from the port.
 export const BOOT_TIMEOUT_MS = 30_000;
 
-// How long a retiring server may take to close its sockets before it is killed outright.
-export const STOP_TIMEOUT_MS = 10_000;
+// How long a SERVING server may take to exit after SIGTERM before it is killed outright. Most of it is Kaylee's: a turn of hers in flight is
+// let to finish before the server exits (server/index.ts COMPANION_TURN_BOUND_MS, 60 s, then her CLI's 5 s grace), and the rest of the
+// shutdown runs beside that wait. 75 s covers it with margin and stays under systemd's 90 s stop window (TimeoutStopUSec): the
+// supervisor's own shutdown stops its children together (one `Promise.all`), so the unit stop costs the longest child, not the sum.
+// With no turn in flight the exit takes ~1-2 s.
+export const STOP_TIMEOUT_MS = 75_000;
+
+// The same bound for a child that never became ready (a failed or superseded boot): it has no conversation to wait for, so a boot that
+// ignores SIGTERM is killed as soon as it always was and a stalled restart does not wait out a turn that does not exist.
+export const BOOT_STOP_TIMEOUT_MS = 10_000;
 
 // `SyntaxError: ...`, `TypeError: ...` — the one line a human needs out of a failed boot, which
 // otherwise opens with a loader banner or a bare stack frame.
@@ -54,6 +62,8 @@ export function spawnServer({ repo, handover }) {
 
     let exited = false;
     let settled = false;
+    // Set by the child's READY: from then on it may hold a turn of Kaylee's, and `stop` gives it the long bound.
+    let served = false;
     let stopping = null;
     let firstError = null;
     let firstLine = null;
@@ -84,6 +94,7 @@ export function spawnServer({ repo, handover }) {
     // port, an HTTP probe cannot say WHICH of them answered.
     function onMessage(message) {
         if (settled || message?.type !== 'ready') return;
+        served = true;
         settle();
         resolveReady(message.pid ?? child.pid);
     }
@@ -146,7 +157,7 @@ export function spawnServer({ repo, handover }) {
         if (stopping) return stopping;
         stopping = new Promise((resolve) => {
             if (exited) return resolve();
-            const kill = setTimeout(() => child.kill('SIGKILL'), STOP_TIMEOUT_MS);
+            const kill = setTimeout(() => child.kill('SIGKILL'), served ? STOP_TIMEOUT_MS : BOOT_STOP_TIMEOUT_MS);
             kill.unref();
             child.once('exit', () => { clearTimeout(kill); resolve(); });
             child.kill('SIGTERM');

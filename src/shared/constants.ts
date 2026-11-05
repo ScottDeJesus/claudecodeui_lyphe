@@ -660,6 +660,17 @@ export const COMPANION_NOTE_KIND_GLYPHS: Record<CompanionNoteKind, { icon: Lucid
 
 // ---------------------------
 
+//----------------- COMPANION DRAFT EYEBROW ------------
+
+/**
+ * The house's eyebrow (MAN-742) as her draft wears it: "DRAFT", the word that names the card and states nothing on its own.
+ * Used by the companion module's draft card (`CompanionDraftCard`, both homes) and its folded line (`CompanionDraftFoldLine`),
+ * so the word is one look open and folded.
+ */
+export const COMPANION_DRAFT_EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
+
+// ---------------------------
+
 //----------------- STATION FOCUS KINDS ------------
 
 /**

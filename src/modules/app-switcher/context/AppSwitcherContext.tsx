@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { useAppRegistry } from '@/modules/app-switcher/hooks/useAppRegistry';
@@ -11,6 +11,7 @@ import {
 } from '@/modules/app-switcher/utils/appSwitcherStorage';
 import { EMPTY_SLOT, loneAppOnTheLeft, placeApplication } from '@/modules/app-switcher/utils/paneSlots';
 import type { AppEntry, RegistryRow } from '@/shared/app-types';
+import { createStableContext } from '@/shared/context/stableContext';
 import type { DockPress, PaneSide, PaneSlot, ProjectChoice } from '@/shared/types';
 import type { DockableFabPosition } from '@/shared/ui';
 import { dockableRect, sameRect } from '@/shared/utils';
@@ -94,7 +95,7 @@ type AppSwitcherValue = {
   setDrawerOpen: (open: boolean) => void;
 };
 
-const AppSwitcherContext = createContext<AppSwitcherValue | null>(null);
+const AppSwitcherContext = createStableContext<AppSwitcherValue | null>(import.meta.hot, 'AppSwitcherContext', null);
 
 /**
  * How long the record waits, after the divider stops moving, before it is written.

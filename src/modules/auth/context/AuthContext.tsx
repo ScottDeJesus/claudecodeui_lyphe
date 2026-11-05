@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import { IS_PLATFORM } from '@/shared/utils';
 import { api, BOOT_REQUEST_FLOOR_MS, BOOT_REQUEST_TIMEOUTS_MS, BOOT_TOTAL_BUDGET_MS } from '@/shared/api';
 import { AUTH_SESSION_EXPIRED_EVENT, AUTH_TOKEN_KEY, AUTH_TOKEN_REFRESHED_EVENT, getAuthTokenRefreshDelay, isValidRefreshedToken, storeAuthToken, storeSignedInToken, traceAuthDecision, traceUnrecordedSignOut } from '@/shared/authToken';
@@ -110,7 +111,7 @@ function resolveApiErrorMessage(payload: ApiErrorPayload | null, fallback: strin
   return payload.message ?? fallback;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+const AuthContext = createStableContext<AuthContextValue | null>(import.meta.hot, 'AuthContext', null);
 
 const readStoredToken = (): string | null => localStorage.getItem(AUTH_TOKEN_KEY);
 

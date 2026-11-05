@@ -1231,6 +1231,8 @@ export type CerberusDiagnosisView = {
   node: string;
   check: string;
   askedBy: string;
+  /** Who started it: `auto` when Cerberus did on its own, `you` for a press of Diagnose (and for every diagnosis before the field existed). */
+  by: 'auto' | 'you';
   model: string;
   startedAt: number;
   endedAt: number | null;
@@ -1330,6 +1332,8 @@ export type CerberusActivity =
       check: string;
       label: string | null;
       diagId: string;
+      /** Who started the diagnosis: `auto` when Cerberus did on its own, else `you`. */
+      by: 'auto' | 'you';
       event: 'asked' | 'ready' | 'failed';
       summary: string | null;
     };
@@ -1404,7 +1408,11 @@ export type CerberusLookup = {
  * therefore be older than the incident its card is about: a check red for 2 hours whose newest
  * diagnosis is 10 hours old (an earlier incident) reads "Diagnose" on its card, and its sheet shows
  * that older diagnosis with the time it was asked (`startedAt`), "Diagnose again" and "Add to
- * catalog" — and "Run it once" only while its `oneOffExpiresAt` is still ahead.
+ * catalog" — and "Run it once" only while its `oneOffExpiresAt` is still ahead. `autoDiagnosis` is the
+ * check's own "Diagnose on its own" switch as of now: `on` says whether Cerberus reads the check by
+ * itself once it has stayed red, `setAt` (epoch ms, center's clock) and `setBy` say who last wrote it
+ * (`seed` for the eleven pollers the store switched on) — both null for a check never switched, which
+ * reads off.
  */
 export type CerberusCheckDetail = {
   check: CerberusCheckView;
@@ -1415,6 +1423,7 @@ export type CerberusCheckDetail = {
   fixes: CerberusCatalogEntryView[];
   run: CerberusRunView | null;
   diagnosis: CerberusDiagnosisView | null;
+  autoDiagnosis: { on: boolean; setAt: number | null; setBy: string | null };
 };
 
 /**

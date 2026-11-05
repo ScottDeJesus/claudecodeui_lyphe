@@ -94,8 +94,9 @@ function queueClause(hold: string): string {
  *
  * `HELD BY PACE` IS THE PACER'S, IN THE SAME ROW AND THE SAME WORDS' RULE (`plan.pace_hold`): the clause the
  * pacer's gate returned — `no room on the 5-hour window — …`, or `<plan> <phase> goes first` — with the
- * `pace:` lead stripped, because the card says "Held by pace" itself. The gate sends one of the two holds at
- * a time; a frame without the key (an older dispatcher) draws no line.
+ * `pace:` lead stripped, because the card says "Held by pace" itself. The two holds never describe one ask (a phase the
+ * queue holds is not in the pacer's demand), so a plan the queue holds draws a pace clause only for a planner outing aimed
+ * at it, beside the queue's line; a frame without the key (an older dispatcher) draws no line.
  *
  * A STALLED PLAN SAYS WHY (`plan.stalled`, the dispatcher's own cause word — `report_stall`): the head's
  * second row carries one line, `data-plan-stalled`, naming whether the dispatcher is down or the run
@@ -141,9 +142,9 @@ export function PlanCard({
   // question, and the dialog is mounted only while it is asked.
   const [deleting, setDeleting] = useState(false);
   const { planners } = useDispatcherPlans();
-  // The pacer's clause for this plan (`plan.pace_hold`, `pace_report.hold`, else that of a queued planner
-  // outing aimed at it or its epic): the gate sends it in the same row as `queue_hold`, one at a time. Absent on a dispatcher
-  // older than the key reads.
+  // The pacer's clause for this plan (`plan.pace_hold`, `pace_report.plan_hold`: the first of its own asks the pacer holds — any
+  // ready phase, else a queued planner outing aimed at the plan; one aimed at its epic is the arc deck's): the gate sends it in the
+  // same row as `queue_hold`, beside it when both are set. Absent on a dispatcher older than the key reads.
   const paceHold = plan.pace_hold ?? '';
   const menuItems: ActionMenuItem[] = planDroppable(plan, planners)
     ? [{ key: 'delete', label: t('dispatcher.delete.menu'), icon: Trash2, isDanger: true, onSelect: () => setDeleting(true) }]

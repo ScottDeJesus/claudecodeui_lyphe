@@ -14,10 +14,11 @@
 import type { Server, ServerResponse } from 'node:http';
 
 // How long requests already running get once shutdown begins. Three facts set it:
-//  - the dev supervisor SIGKILLs a retiring child STOP_TIMEOUT_MS (10 s) after its SIGTERM
-//    (deploy/dev-supervisor/child.mjs), and the teardown after the drain can itself take 5 s (a
-//    plugin that ignores SIGTERM is force-killed only then, plugin-process.service.ts), so the drain
-//    can never have more than ~4 s — this bound is that ceiling;
+//  - the teardown after the drain can itself take 5 s (a plugin that ignores SIGTERM is
+//    force-killed only then, plugin-process.service.ts), and a server whose Kaylee has no turn
+//    in flight exits right after it — the supervisor's SIGKILL (STOP_TIMEOUT_MS,
+//    deploy/dev-supervisor/child.mjs) is sized for her turn, which the exit waits for, not for this
+//    drain, so this bound is the drain's own ceiling;
 //  - the app's own polled reads run up to 2.5 s end to end under load (measured 2026-09-28: GET
 //    /api/heal/summary p90 2.2 s, GET /api/projects max 2.5 s), longer while a successor boots beside
 //    them;
@@ -27,7 +28,8 @@ import type { Server, ServerResponse } from 'node:http';
 //    last request finishes — the bound binds only a request slower than the app's own reads (a
 //    search stream, an agent run), which is cut at the exit exactly as before and named in the
 //    journal.
-const HTTP_DRAIN_BOUND_MS = 4_000;
+// Exported for `server/index.ts`, which gives the same bound to the sentence of Kaylee's that is still streaming when her turn ends at a stop.
+export const HTTP_DRAIN_BOUND_MS = 4_000;
 
 /**
  * Starts tracking `server`'s in-flight requests and returns the drain its shutdown path awaits.

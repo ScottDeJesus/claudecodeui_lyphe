@@ -1,9 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { useUnreadReply } from '@/modules/chat-host/hooks/useUnreadReply';
 import { createAnchorStore } from '@/modules/chat-host/utils/anchorStore';
 import { placeNode } from '@/modules/chat-host/utils/placeNode';
+import { createStableContext } from '@/shared/context/stableContext';
 import type { AnchorStore, ChatPlacement, HostMove, HostWindowValue } from '@/shared/types';
 
 /** What the rest of the app may ask of the chat's host: where the chat is drawn, whether a reply is waiting out of sight, and the verbs that move it and tell it what the FAB and the main region are doing. */
@@ -61,8 +62,8 @@ function documentPictureInPictureApi() {
   return 'documentPictureInPicture' in window ? window.documentPictureInPicture : undefined;
 }
 
-const ChatHostContext = createContext<ChatHostValue | null>(null);
-const ChatHostMechanicsContext = createContext<ChatHostMechanics | null>(null);
+const ChatHostContext = createStableContext<ChatHostValue | null>(import.meta.hot, 'ChatHostContext', null);
+const ChatHostMechanicsContext = createStableContext<ChatHostMechanics | null>(import.meta.hot, 'ChatHostMechanicsContext', null);
 
 /** Runs one listener without letting it stop the move: a throwing listener costs its own window-bound line, never the chat's carriage between hosts. */
 function tellListener(listener: (move: HostMove) => void, move: HostMove): void {

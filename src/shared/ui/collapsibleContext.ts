@@ -1,12 +1,14 @@
 import * as React from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
+
 type CollapsibleContextValue = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
 /** What a `Collapsible` hands its trigger and content: whether it is open and how to change that. Provided by `Collapsible`. */
-export const CollapsibleContext = React.createContext<CollapsibleContextValue | null>(null);
+export const CollapsibleContext = createStableContext<CollapsibleContextValue | null>(import.meta.hot, 'CollapsibleContext', null);
 
 /** Used by `Collapsible`'s own trigger and content, by the kit's `CardFold`, and by the claude-updates module's patch notes and job panel, which fold on the same state. */
 export function useCollapsible() {

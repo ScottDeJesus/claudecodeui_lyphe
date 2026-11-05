@@ -1,5 +1,6 @@
-import { createContext } from 'react';
 import type { ReactNode } from 'react';
+
+import { createStableContext } from '@/shared/context/stableContext';
 
 /**
  * The line above a list or a table, on its way to the frame that will wear it as its title.
@@ -34,4 +35,4 @@ export type LeadInTitle = {
   hasLink: boolean;
 };
 
-export const LeadInTitleContext = createContext<LeadInTitle | null>(null);
+export const LeadInTitleContext = createStableContext<LeadInTitle | null>(import.meta.hot, 'LeadInTitleContext', null);

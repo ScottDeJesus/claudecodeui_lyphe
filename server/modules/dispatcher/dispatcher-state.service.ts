@@ -207,8 +207,9 @@ function arcsOnLane(arcs: DispatcherArc[], plans: DispatcherPlan[]): DispatcherA
 
 /**
  * One read of the dispatcher's document, whole: every plan and epic of the store, validated. It THROWS on anything it cannot read —
- * this file's head says why that is the honest answer. Called every two seconds by the watcher (`dispatcher.module.ts`), which hands
- * the follow-ups lane the store and the lane's picture the window `lanePictureOf` cuts from it, and by `readDispatcherState`.
+ * this file's head says why that is the honest answer. Called by the watcher (`dispatcher.module.ts`) on every reading — a poke from
+ * the store watch, or its backstop — which hands the follow-ups lane the store and the lane's picture the window `lanePictureOf` cuts
+ * from it, and by `readDispatcherState`.
  */
 export async function readDispatcherStore(dependencies: DispatcherStateDependencies): Promise<DispatcherStore> {
   return storeOf(await readDispatcherDocument(dependencies.bin, dependencies.timeoutMs, dependencies.env));

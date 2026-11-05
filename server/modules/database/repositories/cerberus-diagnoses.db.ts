@@ -40,9 +40,10 @@ import {
  * for a restart's orphans), `diagnosis/diagnosis-steps.ts` (`insertStep`), `diagnosis/diagnosis-proposal.ts`
  * and `read-model/run-views.ts` (`get`), the catalog service (`openOneOffs` for the catalog it publishes),
  * the read model's `diagnosis-views.ts` (`get`, `latestForCheck` for a need's diagnosis, `steps` for the
- * sheet, `recent` for What happened) and `diagnosis/diagnosis-history.ts` (`startedSince` for the agent's
- * `history_read`). Reach it through `@/modules/database/index.js`. Every statement runs on the caller's
- * connection and opens no transaction of its own.
+ * sheet, `recent` for What happened), `diagnosis/diagnosis-history.ts` (`startedSince` for the agent's
+ * `history_read`) and `check-trouble.ts` (`startedSince` for a red's trouble), and the auto-diagnosis
+ * trigger (`running` for the nodes that are busy). Reach it through `@/modules/database/index.js`. Every
+ * statement runs on the caller's connection and opens no transaction of its own.
  */
 
 /**
@@ -55,13 +56,18 @@ export const CERBERUS_ONE_OFF_TTL_MS = 3_600_000;
 /** Where a diagnosis is: `running` until it ends as `done` (a conclusion) or `failed` (a reason). */
 export type CerberusDiagnosisStatus = 'running' | 'done' | 'failed';
 
+/** Who started a diagnosis: `auto` when Cerberus did on its own, `you` for a press of Diagnose — mirrors `runs.by`. */
+export type CerberusDiagnosisBy = 'auto' | 'you';
+
 /** One `diagnoses` row, exactly as the table stores it. */
 export type CerberusDiagnosisRow = {
   id: string;
   node: string;
   check_key: string;
-  /** Who pressed Diagnose. */
+  /** Who pressed Diagnose, or `cerberus` when it started on its own. */
   asked_by: string;
+  /** `auto` when Cerberus started it on its own, `you` for a press and for every row written before the column. */
+  by: CerberusDiagnosisBy;
   /** The model that read, as asked for (`haiku`, a full model id). */
   model: string;
   /** On the center's clock. */
@@ -80,7 +86,7 @@ export type CerberusDiagnosisRow = {
 };
 
 /** The columns `insert` writes; `end` fills the rest. */
-export type CerberusDiagnosisInsert = Pick<CerberusDiagnosisRow, 'id' | 'node' | 'check_key' | 'asked_by' | 'model' | 'started_at'>;
+export type CerberusDiagnosisInsert = Pick<CerberusDiagnosisRow, 'id' | 'node' | 'check_key' | 'asked_by' | 'by' | 'model' | 'started_at'>;
 
 /** What `end` records beside the status; an absent field is stored NULL, `evidence` and `proposal` as JSON text. */
 export type CerberusDiagnosisEndFields = {
@@ -98,8 +104,10 @@ export type CerberusDiagnosisStepRow = {
   text: string;
 };
 
+// `by` is a keyword; SQLite tolerates it as a column name, and quoting keeps every statement that
+// names it unambiguous.
 const DIAGNOSIS_COLUMNS =
-  'id, node, check_key, asked_by, model, started_at, ended_at, status, summary, evidence, proposal, error';
+  'id, node, check_key, asked_by, "by", model, started_at, ended_at, status, summary, evidence, proposal, error';
 
 /** A time column takes epoch milliseconds only: SQLite's INTEGER affinity would keep text as text, which sorts above every number. */
 function assertEpochMs(what: string, value: number): void {
@@ -147,8 +155,8 @@ export const cerberusDiagnosesDb = {
     return (
       getCerberusConnection()
         .prepare(
-          `INSERT INTO diagnoses (id, node, check_key, asked_by, model, started_at, status)
-           SELECT @id, @node, @check_key, @asked_by, @model, @started_at, 'running'
+          `INSERT INTO diagnoses (id, node, check_key, asked_by, "by", model, started_at, status)
+           SELECT @id, @node, @check_key, @asked_by, @by, @model, @started_at, 'running'
             WHERE NOT EXISTS (SELECT 1 FROM diagnoses
                                WHERE node = @node AND check_key = @check_key AND status = 'running')`
         )

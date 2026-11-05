@@ -11,7 +11,9 @@
   "jsPlugins": [
     { "name": "importx", "specifier": "eslint-plugin-import-x" },
     { "name": "tailwind", "specifier": "eslint-plugin-tailwindcss" },
-    { "name": "boundaries", "specifier": "eslint-plugin-boundaries" }
+    { "name": "boundaries", "specifier": "eslint-plugin-boundaries" },
+    // This repo's own rule: contexts are made with createStableContext, never a bare createContext.
+    { "name": "stable-context", "specifier": "./lint-plugins/stable-context.js" }
   ],
 
   // oxlint's closest analogue to js.configs.recommended + tseslint.configs.recommended.
@@ -79,11 +81,14 @@
           "server/shared/hidden-project-paths.ts",
           "server/shared/mcp-command.ts",
           "server/shared/polled-lane.service.ts",
+          "server/shared/directory-watch.service.ts",
+          "server/shared/dispatcher-store-watch.service.ts",
           "server/shared/kanban-types.ts",
           "server/shared/app-types.ts",
           "server/shared/toolset-types.ts",
           "server/shared/claude-update-types.ts",
           "server/shared/claude-activity-types.ts",
+          "server/shared/restart-hold-types.ts",
           "server/shared/roadmap-types.ts",
           "server/shared/version-order.ts",
           "server/shared/dispatcher-command.ts",
@@ -227,6 +232,11 @@
         // imports only: a loop closed through a dynamic `import()` passes this rule and still
         // breaks HMR the same way.
         "import/no-cycle": "error",
+        // The other way a hot update splits a context: a bare `createContext` is a new object in every
+        // copy of its module. `createStableContext` (src/shared/context/stableContext.ts) keeps the first.
+        "stable-context/no-bare-create-context": "error",
+        // And the key it is given: one object is kept per key, so a repeated key is one context in dev and two in production.
+        "stable-context/no-duplicate-context-key": "error",
 
         // --- Import ordering & hygiene ---
         "import/no-duplicates": "warn",
@@ -243,6 +253,11 @@
         "tailwind/no-contradicting-classname": "warn",
         "tailwind/no-unnecessary-arbitrary-value": "warn"
       }
+    },
+    {
+      // The one place a bare createContext belongs: the helper that wraps it.
+      "files": ["src/shared/context/stableContext.ts"],
+      "rules": { "stable-context/no-bare-create-context": "off" }
     },
     {
       // Strict architecture rules start applying as legacy frontend code moves into

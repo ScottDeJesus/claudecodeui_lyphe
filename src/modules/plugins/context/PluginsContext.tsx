@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { api } from '@/shared/api';
 import { useAuth } from '@/modules/auth';
+import { createStableContext } from '@/shared/context/stableContext';
 import type { Plugin } from '@/shared/types';
 
 
@@ -17,7 +18,7 @@ type PluginsContextValue = {
   togglePlugin: (name: string, enabled: boolean) => Promise<{ success: boolean; error: string | null }>;
 };
 
-const PluginsContext = createContext<PluginsContextValue | null>(null);
+const PluginsContext = createStableContext<PluginsContextValue | null>(import.meta.hot, 'PluginsContext', null);
 
 export function usePlugins() {
   const context = useContext(PluginsContext);

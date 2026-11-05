@@ -10,7 +10,7 @@ import { MemoryRefusal } from './memory-assert.js';
 import { memoryNotFound, type MemoryIntakeService } from './memory.service.js';
 
 /**
- * The memory-intake lane's four routes: the two reads the Memory tab polls, and the two writes a
+ * The memory-intake lane's four routes: the two reads Inbox → Memory polls, and the two writes a
  * person's click performs.
  *
  * THE `{ reachable }` ENVELOPE IS KEPT because the client is built on it — the same ruling the

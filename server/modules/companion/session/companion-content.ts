@@ -1,6 +1,9 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
-import type { ClaudeImageBlock } from '@/shared/image-attachments.js';
+import type { CompanionAttachment } from '@/shared/companion-types.js';
+import { claudeImageBlocks, type ClaudeImageBlock } from '@/shared/image-attachments.js';
+
+import type { UnansweredMessage } from '../companion-unanswered.js';
 
 /**
  * What a message to her CLI is made of, apart from the words: the pictures that ride with it, and the hold the boot replay puts on new
@@ -15,7 +18,7 @@ import type { ClaudeImageBlock } from '@/shared/image-attachments.js';
  * (async). While it reads, a push that arrives is parked and goes after the replay's own messages, so his words keep their order. The
  * hold ends when the reads settle: the replay releases it, an event, never a timer, and nothing here polls.
  *
- * Consumers: `companion-session.ts` (both).
+ * Consumers: `companion-session.ts` (all three).
  */
 
 /** The SDK's image block types `media_type` as the four Claude image types; `claudeImageBlocks` emits no other (its `CLAUDE_IMAGE_MEDIA_TYPES` gate). */
@@ -58,4 +61,22 @@ export function createReplayHold(): ReplayHold {
       for (const push of waiting) push();
     },
   };
+}
+
+/**
+ * The pictures of one entry's files, each read on its own by the chat's own reader from the upload store, so the one it cannot read (skipped, with the reader's
+ * warning) is known: the message goes without it, and its record is set `unopened` in the files told to her. Her `restate`s and the next boot read those records, so they never announce it either.
+ * Consumed by `companion-session.ts`'s `resendUnanswered`, for the account `userId` (named in the journal line of a read that failed whole).
+ */
+export async function readPictures(userId: number, entry: UnansweredMessage): Promise<{ images: ClaudeImageBlock[]; attachments: UnansweredMessage['attachments'] }> {
+  const files = entry.attachments ?? [];
+  let read: ClaudeImageBlock[][];
+  try {
+    read = await Promise.all(files.map((file) => (file.opens === 'shown' ? claudeImageBlocks([file]) : [])));
+  } catch (error) {
+    console.error(`[Companion] account ${userId}: the pictures of a message her last process never answered could not be read; it is sent without them`, error);
+    read = files.map(() => []);
+  }
+  const attachments = files.map((file, index): CompanionAttachment => (file.opens === 'shown' && read[index].length === 0 ? { ...file, opens: 'unopened' } : file));
+  return { images: read.flat(), attachments: entry.attachments === undefined ? undefined : attachments };
 }

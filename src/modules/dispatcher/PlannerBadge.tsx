@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import { epochOf, plannerStatusTone } from '@/modules/dispatcher/dispatcherState';
 import { operatorWords } from '@/modules/dispatcher/operatorWords';
+import { PaceOverride } from '@/modules/dispatcher/PaceOverride';
 import { useElapsed } from '@/shared/hooks/useElapsed';
 import { Badge } from '@/shared/ui';
 import type { DispatcherPlanner } from '@/shared/types';
@@ -118,6 +119,13 @@ export function PlannerBadge({ planner }: { planner: DispatcherPlanner }) {
  * is being designed, so the tab and the gutter draw it above the decks rather than nowhere
  * (`useDispatcherPlans` answers which entries those are).
  *
+ * THE PACER'S HOLD ON SUCH AN OUTING IS DRAWN HERE, because here is its only card: with no plan card and no
+ * deck, nothing else could carry the Override of a design the pacer has not let out. The row's own clause and
+ * override state ride on it (`planner.pace_hold`, `planner.overridden`, the dispatcher's readings off the one
+ * walk), and the press is the dispatcher's `override <name>`, which resolves the name — an epic's, or a plan's
+ * whose card is put away — so the epic's door relays both. An outing with a card or a deck is held on THAT
+ * card and never here, so each hold has one press.
+ *
  * IT DRAWS NOTHING AT ALL WHEN THERE ARE NONE, and returns `null` rather than an empty row: an
  * operator who was never in this state sees the pane exactly as it was before badges existed.
  *
@@ -136,8 +144,11 @@ export function LoosePlannerBadges({
     // do for the decks under it, so a badge stands over the decks it belongs to.
     <ul data-loose-planners className="flex min-w-0 flex-wrap items-center gap-2">
       {planners.map((planner) => (
-        <li key={planner.id} className="min-w-0">
+        <li key={planner.id} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <PlannerBadge planner={planner} />
+          {(planner.pace_hold || planner.overridden) && (
+            <PaceOverride name={planner.target} hold={planner.pace_hold} overridden={planner.overridden} scope="arc" />
+          )}
         </li>
       ))}
     </ul>

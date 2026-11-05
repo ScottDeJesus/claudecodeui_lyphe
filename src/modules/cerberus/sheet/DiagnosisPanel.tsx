@@ -209,6 +209,8 @@ export function DiagnosisPanel({ diagnosisId, held, onPromote }: DiagnosisPanelP
       <div className="flex flex-col gap-3 px-3.5 pb-3.5 pt-3">
         {/* A diagnosis that was not given the node's reads says so: its answer rests on Cerberus's record alone. */}
         <p className="text-[12.5px] text-muted-foreground">
+          {/* A view with no `by` (an older server's) is `'you'`'s: only an `'auto'` one says it started on its own. */}
+          {diagnosis.by === 'auto' ? `${t('cerberus.diagnosis.startedAuto')} ` : null}
           {diagnosis.scope === 'history'
             ? t('cerberus.diagnosis.scopeHistory', { node: diagnosis.node })
             : t('cerberus.diagnosis.scope', { node: diagnosis.node })}

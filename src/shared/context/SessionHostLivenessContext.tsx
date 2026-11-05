@@ -1,10 +1,11 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 
 /** `undefined` outside the provider so the hook can refuse; `null` inside it until the first snapshot lands. */
-const SessionHostLivenessContext = createContext<ReadonlySet<string> | null | undefined>(undefined);
+const SessionHostLivenessContext = createStableContext<ReadonlySet<string> | null | undefined>(import.meta.hot, 'SessionHostLivenessContext', undefined);
 
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { useAccountSetup } from '@/modules/accounts/hooks/useAccountSetup';
@@ -9,6 +9,7 @@ import { useJevBalance } from '@/modules/accounts/hooks/useJevBalance';
 import type { JevBalance } from '@/modules/accounts/hooks/useJevBalance';
 import { accountInUse } from '@/modules/accounts/utils/accountInUseUsage';
 import { ProviderLoginModal } from '@/modules/provider-auth';
+import { createStableContext } from '@/shared/context/stableContext';
 import type { ClaudeAccounts, ClaudeUsage, DeepseekBalance } from '@/shared/types';
 
 /**
@@ -50,7 +51,7 @@ type AccountsValue = {
   refreshStaleReadings: () => void;
 };
 
-const AccountsContext = createContext<AccountsValue | null>(null);
+const AccountsContext = createStableContext<AccountsValue | null>(import.meta.hot, 'AccountsContext', null);
 
 /**
  * The account panel's one source: the four hooks that read the door's accounts, the provider's usage and the two

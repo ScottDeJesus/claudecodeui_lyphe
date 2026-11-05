@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAuth } from '@/modules/auth';
+import { createStableContext } from '@/shared/context/stableContext';
 import { IS_PLATFORM } from '@/shared/utils';
 import { expireAuthSession, isAuthTokenExpired } from '@/shared/authToken';
 import type { ServerEvent } from '@/shared/types';
@@ -59,7 +60,7 @@ type WebSocketContextType = {
   isConnected: boolean;
 };
 
-const WebSocketContext = createContext<WebSocketContextType | null>(null);
+const WebSocketContext = createStableContext<WebSocketContextType | null>(import.meta.hot, 'WebSocketContext', null);
 
 export const useWebSocket = () => {
   const context = useContext(WebSocketContext);

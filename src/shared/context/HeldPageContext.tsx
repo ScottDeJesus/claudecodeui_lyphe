@@ -1,10 +1,12 @@
-import { createContext, useCallback, useContext, useLayoutEffect, useRef } from 'react';
+import { useCallback, useContext, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
+
+import { createStableContext } from '@/shared/context/stableContext';
 
 /** Answers whether the page the reader sits in is held right now. Outside any `HeldPage` nothing is held. */
 type IsPageHeld = () => boolean;
 
-const HeldPageContext = createContext<IsPageHeld>(() => false);
+const HeldPageContext = createStableContext<IsPageHeld>(import.meta.hot, 'HeldPageContext', () => false);
 
 /**
  * Whether the page this component belongs to (the workspace, or Kaylee Station) is the one held out of reach, as a FUNCTION to call when a key

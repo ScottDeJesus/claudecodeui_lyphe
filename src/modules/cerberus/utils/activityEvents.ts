@@ -181,7 +181,8 @@ function wardenEvent(activity: WardenActivity, t: TFunction, when: string): Time
 
 /**
  * A diagnosis, at its moments. As it is asked: "You asked for a diagnosis" in a going run's info tone, with
- * "<label> · read-only" under it. As it ends: "Diagnosis ready" with its summary under it (neutral: a diagnosis is
+ * "<label> · read-only" under it; "Diagnosed on its own" instead when Cerberus started it itself (`by: 'auto'`), and
+ * an older server's line, which has no `by`, reads as yours. As it ends: "Diagnosis ready" with its summary under it (neutral: a diagnosis is
  * a document, not a health signal, as its pill in the sheet is), or "Diagnosis failed" with the sentence that
  * says why under it (the warn of a failed run). A check with no label is named by its key.
  */
@@ -195,7 +196,8 @@ function diagnosisEvent(activity: DiagnosisActivity, t: TFunction, when: string)
     return {
       ...base,
       tone: RUN_LOOK.going.tone,
-      title: t('cerberus.activity.diagnosis.asked'),
+      // An older server's line has no `by`, and reads as `'you'`'s.
+      title: t(activity.by === 'auto' ? 'cerberus.activity.diagnosis.askedAuto' : 'cerberus.activity.diagnosis.asked'),
       summary: t('cerberus.activity.diagnosis.askedSummary', { label: activity.label ?? activity.check }),
     };
   }

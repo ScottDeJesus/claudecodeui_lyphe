@@ -12,8 +12,10 @@ import type { CerberusCheckView, CerberusDiagnosisSubmission } from '@/shared/ce
 
 import { fixesOfCheck } from '../read-model/catalog-views.js';
 
+import { leadLines } from './diagnosis-leads.js';
 import { describeMeasurement } from './diagnosis-measurement.js';
 import { buildDiagnosisSystemPrompt } from './diagnosis-prompt.js';
+import { reportedLines } from './diagnosis-reported.js';
 import {
   DIAGNOSIS_MCP_SERVER_NAME,
   DIAGNOSIS_NODE_TOOL_NAMES,
@@ -136,13 +138,46 @@ function captureSubmission(
 }
 
 /**
- * Runs one diagnosis of `check` on `node` and answers what the agent submitted. `tools` come from
+ * The system prompt of one diagnosis of `check` on `node`, the one place its facts are gathered: the check's last stored changes,
+ * what it measures, the fixes the catalog holds for it, what it last reported (the fields of its newest stored result at or before
+ * `now`, so a result the clock has not reached is never read) and where to look for its service (`siblings` are the service's other
+ * checks on the node, as the sheet reads them now). A probe that shows a prompt calls this, so what it prints is what the agent is told.
+ */
+export function diagnosisPromptOf(input: {
+  check: CerberusCheckView;
+  siblings: CerberusCheckView[];
+  node: string;
+  nodeToolsOpen: boolean;
+  now: number;
+}): string {
+  const { check, siblings, node, nodeToolsOpen, now } = input;
+  // `rowsInWindow` also answers the row before and the row after the window; the newest at or before `now` is the check's reading.
+  const newest = cerberusResultsDb.rowsInWindow(check.node, [check.key], now, now).filter((row) => row.at <= now).at(-1);
+  return buildDiagnosisSystemPrompt({
+    check,
+    node,
+    nodeToolsOpen,
+    changes: cerberusResultsDb.recentChanges(check.node, check.key, 0, PROMPT_CHANGE_COUNT),
+    measures: describeMeasurement(check),
+    reported: newest === undefined ? null : { at: newest.at, lines: reportedLines(newest.data) },
+    leads: leadLines(check, siblings, nodeToolsOpen),
+    fixes: fixesOfCheck(check.node, check.key),
+    now,
+    maxTurns: DIAGNOSIS_MAX_TURNS,
+    readBudget: DIAGNOSIS_READ_BUDGET,
+  });
+}
+
+/**
+ * Runs one diagnosis of `check` on `node` and answers what the agent submitted. `siblings` are the check's service's other
+ * checks on the node, as the sheet reads them now (the prompt's leads name the ones a service leans on). `tools` come from
  * `buildDiagnosisTools` (without the node's three reads when the warden is not connected); `model`
  * defaults per `resolveDiagnosisModel`; `signal` ends it. Rejects with a `DiagnosisAgentFailure`
  * when the agent submits nothing, reaches the turn ceiling, is aborted or cannot run.
  */
 export async function runDiagnosisAgent(input: {
   check: CerberusCheckView;
+  siblings: CerberusCheckView[];
   node: string;
   model?: string | null;
   tools: Array<SdkMcpToolDefinition<any>>;
@@ -150,7 +185,7 @@ export async function runDiagnosisAgent(input: {
   /** Handed the system prompt once it is built, before the model sees a turn: what the agent may quote besides its reads. */
   onPrompt?: (systemPrompt: string) => void;
 }): Promise<CerberusDiagnosisSubmission> {
-  const { check, node, signal } = input;
+  const { check, siblings, node, signal } = input;
   // A signal that has already fired spawns nothing: no CLI process, no model request.
   if (signal.aborted) throw new DiagnosisAgentFailure('aborted', STOPPED_SENTENCE);
   const model = resolveDiagnosisModel(input.model);
@@ -162,16 +197,12 @@ export async function runDiagnosisAgent(input: {
   });
   const mcpToolNames = tools.map((definition) => `mcp__${DIAGNOSIS_MCP_SERVER_NAME}__${definition.name}`);
 
-  const systemPrompt = buildDiagnosisSystemPrompt({
+  const systemPrompt = diagnosisPromptOf({
     check,
+    siblings,
     node,
     nodeToolsOpen: tools.some((definition) => DIAGNOSIS_NODE_TOOL_NAMES.includes(definition.name)),
-    changes: cerberusResultsDb.recentChanges(check.node, check.key, 0, PROMPT_CHANGE_COUNT),
-    measures: describeMeasurement(check),
-    fixes: fixesOfCheck(check.node, check.key),
     now: Date.now(),
-    maxTurns: DIAGNOSIS_MAX_TURNS,
-    readBudget: DIAGNOSIS_READ_BUDGET,
   });
   input.onPrompt?.(systemPrompt);
 

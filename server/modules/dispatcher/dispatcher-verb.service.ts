@@ -17,11 +17,12 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * epic's open plans, paused and held out of the queue until shown — a walk in flight stops once its task
  * in flight finishes) and `unhide` (Show: each hidden plan takes its turn in the queue). Hide and Show take
  * plan or epic names, any number of them, and are BOARD verbs for the relay: the names are the argv.
- * `override` is the card's lift of the usage pacer's hold for one plan (`--by app:card`, and `--off` for its
- * undo), the pacer's gate and no other.
+ * `override` is the card's lift of the usage pacer's hold for one plan or one epic (`--by app:card`, and `--off`
+ * for its undo), the pacer's gate and no other.
  *
- * FIVE OF THE SIXTEEN NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `model`, and the
- * `arm-accept` / `disarm-accept` pair (every designed, or every armed, plan of it), each
+ * SIX OF THE SIXTEEN NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `model`, the
+ * `arm-accept` / `disarm-accept` pair (every designed, or every armed, plan of it) and `override` (the epic's OWN
+ * queued outings, none of its plans' phases), each
  * resolved by the dispatcher's own door and by nothing on this side (`schedule <arc>` is the terminal's
  * alone: the deck has no Schedule start). An arc has no walk of its own:
  * `stop <arc>` is this same verb over the arc's LIVE plans — what is walking and what is approved,

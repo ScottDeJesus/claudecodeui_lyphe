@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useContext, useMemo, useRef, type ReactNode } from 'react';
 
 import { isAllowedTopic } from '@/modules/live-bus/topics';
+import { createStableContext } from '@/shared/context/stableContext';
 import type { LiveBus, LiveTopic, LiveValue } from '@/shared/types';
 
 /** What a subscriber is handed. Internally untyped; the generic signatures below narrow it per call. */
@@ -20,7 +21,7 @@ type Retained = { value: LiveValue; json: string | null };
  * `null` on purpose, not a filled-in default: a default object would make the hook's guard below
  * unreachable and let a consumer mounted outside the provider publish into a bus nobody reads.
  */
-const LiveBusContext = createContext<LiveBus | null>(null);
+const LiveBusContext = createStableContext<LiveBus | null>(import.meta.hot, 'LiveBusContext', null);
 
 /** Stringify for comparison only. A payload that cannot be serialised compares as always-different. */
 function comparableJson(payload: unknown): string | null {

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 
 import { FOCUSABLE_SELECTOR } from '@/shared/constants';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { createStableContext } from '@/shared/context/stableContext';
 import { overlayInFrontHoldsEscape } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
@@ -12,7 +13,7 @@ type DialogContextValue = {
   triggerRef: React.MutableRefObject<HTMLElement | null>;
 };
 
-const DialogContext = React.createContext<DialogContextValue | null>(null);
+const DialogContext = createStableContext<DialogContextValue | null>(import.meta.hot, 'DialogContext', null);
 
 function useDialog() {
   const ctx = React.useContext(DialogContext);

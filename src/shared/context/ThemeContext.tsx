@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import {
   readUserPreference,
   subscribeToUserPreferences,
@@ -18,7 +19,7 @@ type ThemeContextValue = {
   setFollowsSun: (next: boolean) => void;
 };
 
-const ThemeContext = createContext<ThemeContextValue | null>(null);
+const ThemeContext = createStableContext<ThemeContextValue | null>(import.meta.hot, 'ThemeContext', null);
 
 /**
  * The longest the sun-follower will sleep before re-reading the phase (30 min).

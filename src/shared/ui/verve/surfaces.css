@@ -304,6 +304,10 @@ body.vv-drag-split { cursor: col-resize; }
  * on screen that says a card is in it. */
 body.vv-drag-sort,
 body.vv-drag-sort * { cursor: grabbing; }
+/* A panel moved by its header (kind `move`: Kaylee's floating panel) is held the same way, wherever the pointer is: the
+ * header's own `cursor: grab` and the buttons in it would otherwise show through the whole drag. */
+body.vv-drag-move,
+body.vv-drag-move * { cursor: grabbing; }
 /* A resize shows the corner the reader took hold of for its whole length, even once the pointer has
  * left the grip: the body's cursor is what the pointer wears over the frames (inert, so they no longer
  * set their own) and over the app around it. The grip carries its corner and its drag on its own
@@ -313,6 +317,8 @@ body.vv-drag-resize:has(.vv-resize-grip[data-dragging][data-corner='top-left']),
 body.vv-drag-resize:has(.vv-resize-grip[data-dragging][data-corner='bottom-right']) { cursor: nwse-resize; }
 body.vv-drag-resize:has(.vv-resize-grip[data-dragging][data-corner='top-right']),
 body.vv-drag-resize:has(.vv-resize-grip[data-dragging][data-corner='bottom-left']) { cursor: nesw-resize; }
+body.vv-drag-resize:has(.vv-resize-grip[data-dragging]:is([data-edge='top'], [data-edge='bottom'])) { cursor: ns-resize; }
+body.vv-drag-resize:has(.vv-resize-grip[data-dragging]:is([data-edge='left'], [data-edge='right'])) { cursor: ew-resize; }
 
 /* ---------------------------------------------------------------- ResizeGrip */
 /* The grip PAINTS and never places: the caller stands it at its corner (a component paints, a layout
@@ -388,6 +394,36 @@ body.vv-drag-resize:has(.vv-resize-grip[data-dragging][data-corner='bottom-left'
 /* Forced colours drops the washes and flattens `color`, so the held grip takes the system's highlight. */
 @media (forced-colors: active) {
   .vv-resize-grip[data-dragging] { color: Highlight; }
+}
+/* A POINTER-ONLY grip — every edge, and a corner kept off the keyboard — is a zone, not a mark: it fills the box its
+ * caller stands it in and paints nothing at rest, so a panel framed in eight of them looks as it did with none. A
+ * corner's sign is its cursor alone. An EDGE strip is the kit's thickness across (6px under a mouse, 12px under a
+ * finger) and its caller's box along; under the pointer, and for as long as it is held, it draws a 2px line of the
+ * accent along its own side — the seam's cue (SplitPane's divider), so the side that is about to move says so. The
+ * line is an inset shadow, inside the strip, where a clipped and rounded panel never cuts it off. */
+.vv-resize-grip[data-pointer-only] { width: 100%; height: 100%; border-radius: 0; }
+.vv-resize-grip[data-pointer-only]:hover,
+.vv-resize-grip[data-pointer-only][data-dragging] { background: transparent; }
+.vv-resize-grip[data-edge] { --vv-grip-edge: 6px; transition: box-shadow var(--dur-quick); }
+@media (pointer: coarse) {
+  .vv-resize-grip[data-edge] { --vv-grip-edge: 12px; }
+}
+.vv-resize-grip:is([data-edge='left'], [data-edge='right']) { width: var(--vv-grip-edge); cursor: ew-resize; }
+.vv-resize-grip:is([data-edge='top'], [data-edge='bottom']) { height: var(--vv-grip-edge); cursor: ns-resize; }
+.vv-resize-grip[data-edge][data-dragging] { --vv-grip-line: var(--accent); }
+@media (hover: hover) {
+  .vv-resize-grip[data-edge]:hover { --vv-grip-line: var(--accent); }
+}
+.vv-resize-grip[data-edge='left'] { box-shadow: inset 2px 0 0 var(--vv-grip-line, transparent); }
+.vv-resize-grip[data-edge='right'] { box-shadow: inset -2px 0 0 var(--vv-grip-line, transparent); }
+.vv-resize-grip[data-edge='top'] { box-shadow: inset 0 2px 0 var(--vv-grip-line, transparent); }
+.vv-resize-grip[data-edge='bottom'] { box-shadow: inset 0 -2px 0 var(--vv-grip-line, transparent); }
+/* Forced colours drops every shadow, so a lit edge paints its whole strip in the system's highlight instead. */
+@media (forced-colors: active) {
+  .vv-resize-grip[data-edge][data-dragging] { forced-color-adjust: none; background: Highlight; }
+}
+@media (forced-colors: active) and (hover: hover) {
+  .vv-resize-grip[data-edge]:hover { forced-color-adjust: none; background: Highlight; }
 }
 @media (prefers-reduced-motion: reduce) {
   .vv-resize-grip { transition: none; }

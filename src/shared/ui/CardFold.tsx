@@ -28,8 +28,9 @@ import { cn } from '@/shared/utils';
  * a touch screen, or a window under 768 px) and the card's own tight 28px at a desk — the desktop header is a row of
  * 20px text and does not want a 44px button in it. The glyph stays small either way; only the pressable box changes.
  *
- * The toggle is drawn by the dispatcher's `LaneCardHead` — the one head of the plan card and the arc deck — and
- * the glyph alone by the chat's `ShapeFrame`.
+ * The toggle is drawn by the dispatcher's `LaneCardHead` — the one head of the plan card and the arc deck — and by the
+ * companion's `CompanionNotes`, at the end of her notes' count line, and `CompanionDraftHead`, at the end of her
+ * draft's head row; the glyph alone by the chat's `ShapeFrame`.
  */
 export function FoldChevron({ collapsed, className }: { collapsed: boolean; className?: string }) {
   return (
@@ -44,11 +45,22 @@ export function FoldChevron({ collapsed, className }: { collapsed: boolean; clas
   );
 }
 
-/** The chevron button a foldable card's header wears, in its top-right corner. Inside a `Collapsible`. */
-export function CardFoldToggle({ className }: { className?: string }) {
+/** The toggle's name in each state, already in the reader's language: `collapse` while open, `expand` while folded. */
+type CardFoldLabels = { collapse: string; expand: string };
+
+/**
+ * The chevron button a foldable card's header wears, in its top-right corner. Inside a `Collapsible`.
+ *
+ * ITS NAME, which is its tooltip too, is the kit's "Collapse" / "Expand" (`runner.collapse` / `runner.expand`) unless the
+ * caller hands `labels`, the pair that names WHAT it folds. A surface that draws two folds in one place names both: unnamed,
+ * a screen reader hears "Collapse, button, expanded" twice and cannot tell them apart. The dispatcher's `LaneCardHead` passes
+ * none (one fold per card, under the card's own title); the companion's `CompanionNotes` and `CompanionDraftHead`, two folds
+ * in her one dock, pass "Collapse notes" / "Expand notes" and "Collapse draft" / "Expand draft".
+ */
+export function CardFoldToggle({ className, labels }: { className?: string; labels?: CardFoldLabels }) {
   const { t } = useTranslation();
   const { open } = useCollapsible();
-  const label = t(open ? 'runner.collapse' : 'runner.expand');
+  const label = labels ? (open ? labels.collapse : labels.expand) : t(open ? 'runner.collapse' : 'runner.expand');
   return (
     <CollapsibleTrigger
       data-card-fold
@@ -97,7 +109,8 @@ const INERT_WHILE_CLOSED = { inert: '', 'aria-hidden': true } as unknown as HTML
  *
  * Used by every fold whose hidden body holds words or controls: the dispatcher's `PlanCard`, `DeckFrame` and
  * `OverrideFold`, the Cerberus sheet's `DiagnosisPanel`, and the companion's `CompanionActionCard` (a round's
- * questions, folded behind one press).
+ * questions, folded behind one press), `CompanionNotes` (her notes' cards, folded to their count line) and
+ * `CompanionDraftCard` (her draft's field and sends, folded to its head row).
  */
 export function CardFoldBody({ children, className }: { children: ReactNode; className?: string }) {
   const { open } = useCollapsible();

@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
 import { api } from '@/shared/api';
 import { useAuth } from '@/modules/auth';
+import { createStableContext } from '@/shared/context/stableContext';
 import {
   readUserPreference,
   subscribeToUserPreferences,
@@ -35,7 +36,7 @@ type TasksSettingsContextValue = {
  */
 const TASKS_ENABLED_DEFAULT = false;
 
-const TasksSettingsContext = createContext<TasksSettingsContextValue>({
+const TasksSettingsContext = createStableContext<TasksSettingsContextValue>(import.meta.hot, 'TasksSettingsContext', {
   tasksEnabled: TASKS_ENABLED_DEFAULT,
   setTasksEnabled: () => {},
   toggleTasksEnabled: () => {},

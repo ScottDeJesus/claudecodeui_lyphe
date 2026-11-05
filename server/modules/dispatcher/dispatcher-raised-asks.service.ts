@@ -6,8 +6,8 @@
  *
  * EVERY CALL READS THE ROW FRESH AND WRITES IT WHOLE. The dev server's handover runs two processes over
  * one database for a moment, and a copy held in memory would write the other's names away. The row is a
- * handful of names (the asks open right now), so the read costs nothing next to the two-second poll that
- * drives it.
+ * handful of names (the asks open right now), so the read costs nothing next to the status read of the
+ * lane reading that drives it.
  *
  * IT NEVER THROWS. A row that cannot be read or parsed is an empty record — the old behaviour, one push
  * more and never one less — and a write that fails is one journal line (the name is then simply not

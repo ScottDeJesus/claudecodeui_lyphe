@@ -33,10 +33,11 @@ import {
  * Consumers: `server/modules/cerberus/` — ingest (`insert`, and `latestPerCheck` to seed its memory at
  * start and to re-read one node's at its hello), the read model (`rowsInWindow` for cells and
  * lookups, `recentChanges` for a check's detail, `transitions` for What happened), the diagnosis
- * agent (`recentChanges` for its prompt, `transitionsSince` for its `history_read`) and the daily
- * prune (`pruneKeepalivesBefore`). Reach it through `@/modules/database/index.js`. Every statement
- * runs on the caller's connection and opens no transaction of its own — ingest's "one transaction
- * per frame" is its own.
+ * agent (`recentChanges` for its prompt, `transitionsSince` for its `history_read`), `check-trouble.ts`
+ * (`lastOkAt` and `redStartAt`, where a red's trouble begins), `auto-diagnosis.service.ts` (`lastOkAt`, the key of its
+ * "failed 3 times" memory) and the daily prune (`pruneKeepalivesBefore`). Reach it
+ * through `@/modules/database/index.js`. Every statement runs on the caller's connection and opens no
+ * transaction of its own — ingest's "one transaction per frame" is its own.
  *
  * Two reads are served by PARTIAL indexes (`cerberus-schema.ts`, step 4), which SQLite uses only when
  * the query carries the index's own terms: `transitions` spells `ix_results_moves`'s WHERE out and
@@ -234,6 +235,45 @@ export const cerberusResultsDb = {
           ORDER BY at DESC LIMIT ?`
       )
       .all(node, key, since, until, Math.max(0, Math.trunc(limit))) as CerberusStoredResultRow[];
+  },
+
+  /**
+   * The `at` of a check's newest `ok` row, or `null` when it has never been ok. It answers on the
+   * WARDEN's clock, like every `at` here: the caller adds the node's clock offset. A keep-alive counts —
+   * it repeats an `ok` — so a check ok all night answers the keep-alive of a few minutes ago; the daily
+   * prune deletes keep-alives past 90 days, so for a check red longer than that it is the last ok that
+   * survives. Its readers are `check-trouble.ts`, which hands it to `redStartAt` to find where a red's
+   * trouble begins, and `auto-diagnosis.service.ts`, whose "failed 3 times" line keys on it. Served by the
+   * primary key, walked back from the check's newest row
+   * (`SEARCH results USING INDEX sqlite_autoindex_results_1 (node=? AND check_key=?)`).
+   */
+  lastOkAt(node: string, key: string): number | null {
+    const row = getCerberusConnection()
+      .prepare("SELECT at FROM results WHERE node = ? AND check_key = ? AND status = 'ok' ORDER BY at DESC LIMIT 1")
+      .get(node, key) as { at: number } | undefined;
+    return row?.at ?? null;
+  },
+
+  /**
+   * The `at` of the first row of a check stored after `after`, of any status and any kind — or, with
+   * `after` null, of the check's first row ever. On the WARDEN's clock, like every `at` here: the caller adds
+   * the node's clock offset. It answers `null` when no row follows `after`.
+   *
+   * Handed `lastOkAt`, this is the moment a red began: the newest `ok` row is the last thing the check said
+   * while green, so the row after it is by construction not ok, and it stays the same row for as long as the
+   * check stays red — a keep-alive repeating `failing` is a later row, and a change of word (failing → warn →
+   * failing) a later row too. `null` then means the newest row is the ok itself: the check is ok now and has
+   * no red. The row is a `change` (a status move is always one), which the daily prune never deletes, so
+   * the answer holds at any age of the red. Its reader is `check-trouble.ts`, which bounds a trouble by it.
+   * Served by the primary key from the first row past `after`, measured on the live store
+   * (`SEARCH results USING COVERING INDEX sqlite_autoindex_results_1 (node=? AND check_key=? AND at>?)`).
+   */
+  redStartAt(node: string, key: string, after: number | null): number | null {
+    const row = getCerberusConnection()
+      .prepare('SELECT at FROM results WHERE node = ? AND check_key = ? AND at > ? ORDER BY at ASC LIMIT 1')
+      // Every `at` is a positive epoch ms; the safe-integer floor stands for "no row before it".
+      .get(node, key, after ?? Number.MIN_SAFE_INTEGER) as { at: number } | undefined;
+    return row?.at ?? null;
   },
 
   /**

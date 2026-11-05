@@ -51,6 +51,9 @@ export type DispatcherPlanVerbs = ArmAcceptPlanVerbs & {
 export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
   stop(): Promise<void>;
   resume(): Promise<void>;
+  /** The operator's lift of the pacer's hold for the epic's OWN queued outings, and its undo — none of its plans' phases. */
+  override(): Promise<void>;
+  overrideOff(): Promise<void>;
   /** `default` hands the epic's model back to the top; a word is its own override and goes to every plan of it. */
   setModel(choice: DispatcherModelChoice): Promise<void>;
   busy: DispatcherPress | null;
@@ -112,6 +115,7 @@ export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
  */
 export function useDispatcherVerbs(name: string, scope?: 'plan', resumeWord?: string): DispatcherPlanVerbs;
 export function useDispatcherVerbs(name: string, scope: 'arc', resumeWord?: string): DispatcherArcVerbs;
+export function useDispatcherVerbs(name: string, scope: DispatcherVerbScope, resumeWord?: string): DispatcherPlanVerbs | DispatcherArcVerbs;
 export function useDispatcherVerbs(
   name: string,
   scope: DispatcherVerbScope = 'plan',
@@ -159,7 +163,7 @@ export function useDispatcherVerbs(
   // would race two dispatcher processes at the same store; the answer rides the same flag, its form
   // disables while `answer` is out, so the card cannot carry one word twice — and the toast. `drop` alone
   // still speaks after its card is gone: its card leaving IS what a drop that worked does, and the
-  // 2-second poll can deliver that frame before the answer arrives.
+  // store watch's reading can deliver that frame before the answer arrives.
   const { busy, send } = useVerbSend<DispatcherPress>({
     keep: [name],
     titles: { refused: word, done: doneWord },
@@ -206,9 +210,15 @@ export function useDispatcherVerbs(
     async () => { await send('planner-resume', () => api.dispatcher.plannerResume(name)); },
     [name, send],
   );
-  // The pacer's hold lifted for this plan, and put back: two doors of one dispatcher verb, so one `busy`.
-  const override = useCallback(async () => { await send('override', () => api.dispatcher.override(name)); }, [name, send]);
-  const overrideOff = useCallback(async () => { await send('override-off', () => api.dispatcher.overrideOff(name)); }, [name, send]);
+  // The pacer's hold lifted for this plan or epic, and put back: two doors of one dispatcher verb, so one `busy`.
+  const override = useCallback(
+    async () => { await send('override', () => (scope === 'arc' ? api.dispatcher.arcOverride(name) : api.dispatcher.override(name))); },
+    [name, scope, send],
+  );
+  const overrideOff = useCallback(
+    async () => { await send('override-off', () => (scope === 'arc' ? api.dispatcher.arcOverrideOff(name) : api.dispatcher.overrideOff(name))); },
+    [name, scope, send],
+  );
 
   // The card's own press: the operator's word on the prompt it is drawing, relayed to the lane's
   // answer door rather than a verb route — and handed on, because the card draws its answered
@@ -222,6 +232,6 @@ export function useDispatcherVerbs(
   // "Accept when cut" and its Cancel: this hook's `send` carries them (`useArmAcceptVerbs`), both doors.
   const armVerbs = useArmAcceptVerbs(name, scope, send);
 
-  if (scope === 'arc') return { stop, resume, setModel, ...armVerbs, busy };
+  if (scope === 'arc') return { stop, resume, override, overrideOff, setModel, ...armVerbs, busy };
   return { stop, resume, schedule, park, unpark, drop, plannerResume, override, overrideOff, setModel, answer, ...armVerbs, busy };
 }

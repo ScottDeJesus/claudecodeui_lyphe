@@ -17,12 +17,13 @@ type DiagnosisWriteTools = {
 };
 
 /**
- * THE DIAGNOSIS'S THREE WRITES, for `CerberusProvider` to put on its value. Each rides the provider's
+ * THE DIAGNOSIS'S FOUR WRITES, for `CerberusProvider` to put on its value. Each rides the provider's
  * `settleWrite`: a landed write has re-read the fleet before it answers, and a refused one (a diagnosis already going
  * on the check, a one-off that ran out, a limit not offered) has raised the write's own toast with the server's sentence.
  *
  * - `diagnose` starts a read-only diagnosis of one check. It sends no model: center picks its own. Silent when it
  *   lands, since the card says "Diagnosing…" and the sheet's panel says "Reading…".
+ * - `setAutoDiagnosis` switches "Diagnose on its own" for one check. Silent when it lands: the switch is its own proof.
  * - `runProposal` runs a diagnosis's proposal once, by you. Silent when it lands: the panel's "Running now" line and
  *   the output under it are the proof. It never touches the catalog.
  * - `promote` turns the proposal into a catalog entry, the one write here that changes the catalog. It speaks when it
@@ -30,10 +31,15 @@ type DiagnosisWriteTools = {
  *
  * A second press on the same target answers the first's verdict, so a double click starts one diagnosis, one run, one entry.
  */
-export function useDiagnosisVerbs({ writeOnce, settleWrite, toast, tRef, mountedRef }: DiagnosisWriteTools): Pick<CerberusValue, 'diagnose' | 'runProposal' | 'promote'> {
+export function useDiagnosisVerbs({ writeOnce, settleWrite, toast, tRef, mountedRef }: DiagnosisWriteTools): Pick<CerberusValue, 'diagnose' | 'setAutoDiagnosis' | 'runProposal' | 'promote'> {
   const diagnose = useCallback((node: string, key: string): Promise<boolean> => writeOnce(
     `diagnose:${node}/${key}`,
     async () => (await settleWrite(() => api.cerberus.diagnose({ node, check: key }))) === 'landed',
+  ), [writeOnce, settleWrite]);
+
+  const setAutoDiagnosis = useCallback(({ node, service, id, on }: { node: string; service: string; id: string; on: boolean }): Promise<boolean> => writeOnce(
+    `autodiag:${node}/${service}/${id}`,
+    async () => (await settleWrite(() => api.cerberus.setAutoDiagnosis(node, service, id, on))) === 'landed',
   ), [writeOnce, settleWrite]);
 
   const runProposal = useCallback((id: string): Promise<boolean> => writeOnce(
@@ -70,5 +76,5 @@ export function useDiagnosisVerbs({ writeOnce, settleWrite, toast, tRef, mounted
     },
   ), [writeOnce, settleWrite, toast, tRef, mountedRef]);
 
-  return { diagnose, runProposal, promote };
+  return { diagnose, setAutoDiagnosis, runProposal, promote };
 }

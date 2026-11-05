@@ -1,5 +1,6 @@
-import { createContext, useContext } from 'react';
+import { useContext } from 'react';
 
+import { createStableContext } from '@/shared/context/stableContext';
 import type { PendingPermissionRequest } from '@/shared/types';
 
 export type PermissionContextValue = {
@@ -12,7 +13,7 @@ export type PermissionContextValue = {
   ) => void;
 };
 
-const PermissionContext = createContext<PermissionContextValue | null>(null);
+const PermissionContext = createStableContext<PermissionContextValue | null>(import.meta.hot, 'PermissionContext', null);
 
 export function usePermission(): PermissionContextValue | null {
   return useContext(PermissionContext);

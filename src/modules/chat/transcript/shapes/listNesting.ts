@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { createStableContext } from '@/shared/context/stableContext';
 
 /**
  * Whether a list is already being drawn above this one.
@@ -25,4 +25,4 @@ import { createContext } from 'react';
  *
  * Used by `elements/list.tsx` and by nothing else.
  */
-export const InsideListContext = createContext(false);
+export const InsideListContext = createStableContext(import.meta.hot, 'InsideListContext', false);

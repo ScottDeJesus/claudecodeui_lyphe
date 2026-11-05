@@ -64,7 +64,8 @@ type CompanionVoiceHook = {
  * and a 502 are skipped; a 409 (refused, or not the floor) and a 404 end the pull for the turn. A turn that begins while
  * another is being heard (an alert) is queued and spoken from its first sentence after the heard one's last; only a cut,
  * Stop, Clear, the floor moving or the switch going off empties the queue. A socket reconnect re-seeds the picture and
- * leaves the pull where it was. A page that stops holding the floor, or turns
+ * leaves the pull where it was; a turn the re-seeded picture holds sentences of that the page never saw begin (the successor of a
+ * restart answers inside the reconnect) is owed and spoken in the order she said it, never twice (see `createSpeechPull().see`). A page that stops holding the floor, or turns
  * its switch off, stops its player at once. Nothing polls: the pull moves on a frame, an answer, or the player's start.
  *
  * THE MOUTH'S PIECES are kept here too, beside the player whose clock they are read against: the server announces the timed mouth shapes of

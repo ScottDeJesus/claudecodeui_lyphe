@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { api, refusalSentence } from '@/shared/api';
+import { createStableContext } from '@/shared/context/stableContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { StationSession, StationSessionState } from '@/shared/station-types';
 
@@ -17,7 +18,7 @@ type StationSessionsContextValue = {
   reread: () => void;
 };
 
-const StationSessionsContext = createContext<StationSessionsContextValue | null>(null);
+const StationSessionsContext = createStableContext<StationSessionsContextValue | null>(import.meta.hot, 'StationSessionsContext', null);
 
 /** The four states the rail has a chip for: a row in any other would have the rail draw nothing for its state, so the read is refused instead. */
 const SESSION_STATES: ReadonlySet<StationSessionState> = new Set(['working', 'waiting', 'live', 'asleep']);

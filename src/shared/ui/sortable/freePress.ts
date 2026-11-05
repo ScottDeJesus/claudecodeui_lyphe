@@ -23,6 +23,10 @@
  * and then the card's. Each item carries `SORTABLE_ITEM_ATTRIBUTE`, and a press whose nearest marked
  * ancestor is not this item belongs to the list inside it: the outer list refuses it. The test is on the
  * DOM, like the rest, so any nesting works with no code in the screens that nest.
+ *
+ * The test of a press against the controls and the sideways tracks is `isPlainPress`, exported on its own for a handle that
+ * is a whole region rather than a sortable item: Kaylee's floating panel moves by a press on its header's empty space
+ * (`useCompanionPanelPlace`), and a press on any of the header's buttons, switches or rows stays that control's.
  */
 
 /** Everything a press on which is the control's own, never a carry's. */
@@ -42,14 +46,24 @@ function scrollsSideways(node: Element): boolean {
 /** The attribute `useSortable` puts on every item it carries, which `isFreePress` reads to tell a nested list's item from this one. Used by `useSortable`. */
 export const SORTABLE_ITEM_ATTRIBUTE = 'data-sortable-item';
 
-/** Used by `useSortable` as the press filter of every item it carries. */
-export function isFreePress(target: EventTarget | null, item: Element): boolean {
-  if (!(target instanceof Element) || !item.contains(target)) return false;
-  if (target.closest(`[${SORTABLE_ITEM_ATTRIBUTE}]`) !== item) return false;
+/**
+ * Whether a press on `target` landed inside `root` on nothing between them that has a meaning of its own: no control, no
+ * field, no track that scrolls sideways. Used by `isFreePress` and by the companion module's `useCompanionPanelPlace`,
+ * whose handle is her panel's header.
+ */
+export function isPlainPress(target: EventTarget | null, root: Element): boolean {
+  if (!(target instanceof Element) || !root.contains(target)) return false;
   const control = target.closest(INTERACTIVE);
-  if (control !== null && item.contains(control)) return false;
-  for (let node: Element | null = target; node !== null && node !== item; node = node.parentElement) {
+  if (control !== null && root.contains(control)) return false;
+  for (let node: Element | null = target; node !== null && node !== root; node = node.parentElement) {
     if (scrollsSideways(node)) return false;
   }
   return true;
+}
+
+/** Used by `useSortable` as the press filter of every item it carries. */
+export function isFreePress(target: EventTarget | null, item: Element): boolean {
+  if (!isPlainPress(target, item)) return false;
+  // A press on a nested list's item is that list's (`isPlainPress` has already proved `target` an Element inside `item`).
+  return (target as Element).closest(`[${SORTABLE_ITEM_ATTRIBUTE}]`) === item;
 }

@@ -10,6 +10,7 @@ import { prepareTypedAttachments } from './attachments/typed-attachments.js';
 import { createCompanionAccount, type CompanionAccount } from './companion-account.js';
 import { inputInvalid } from './companion-input.js';
 import { createPress } from './companion-press.js';
+import { announceCompanionResync } from './companion-resync.js';
 import { createSpeech } from './companion-speech.js';
 import { stopMouth } from './mouth/mouth-follow.js';
 import type { DraftSendOutcome } from './companion-send.js';
@@ -48,8 +49,10 @@ import { stationLanded } from './station/station-landed.js';
  *   - `clear` wipes her: process, CLI conversation, log, unpinned cards (a pinned card is his keep), draft, pending action, walk, focus and the turn's audio.
  *     What chats were sent through her (`relayed_sends`) stays, because those rows belong to the chats, and so does her
  *     record of actions (`companion_actions`), a fact about the house: a pending action Clear finds standing ends `cancelled`, unless a take is carrying it out;
- *   - `stopAll` winds every conversation and every synthesis down for shutdown and from then on refuses a message with a
- *     503: the HTTP drain comes after it, and a process woken then would have nothing left to end it;
+ *   - `stopAll(turnBoundMs, sentenceBoundMs)` winds every conversation and every synthesis down for shutdown and from then on refuses a message with a
+ *     503: the HTTP drain comes after it, and a process woken then would have nothing left to end it. A turn in flight is let to
+ *     finish first, at most `turnBoundMs` (`session/companion-restart.ts`), and the sentences it speaks meanwhile keep streaming;
+ *   - `resendUnanswered` is the takeover: it lifts the hold of a session born beside a predecessor and says again what was never answered;
  *   - `landed` is the station strip's read: the account's landings of the last seven days. Like `stationNeeds` it hands the
  *     house to a station reader, so the route stays transport and the house stays private here;
  *   - `alert`, `runFailed`, `runCompleted` and `chatDeleted` are the verbs the house's feeds call (each is explained at its verb);
@@ -89,6 +92,8 @@ function createCompanionService() {
   let house: CompanionHouse | null = null;
   // Set by `stopAll`: from then on a message is refused, because `stopAll` has already run and nothing would end the process it woke.
   let stopped = false;
+  // True on a handover boot until its takeover (`resendUnanswered`): an account made meanwhile holds every push, so two servers never drive one conversation.
+  let awaitingTakeover = false;
   // Chat id → when the alert feed heard its run fail; read and cleared by `runCompleted`, so a failed run is not also told as finished.
   const failedRuns = new Map<string, number>();
   const press = createPress({ accountOf, refuseWhileStopping: () => { if (stopped) throw stopping(); } });
@@ -138,17 +143,18 @@ function createCompanionService() {
     const held = accounts.get(userId);
     if (held) return held;
     const attachedTo = attached();
-    const made = createCompanionAccount(userId, attachedTo.runtime, attachedTo.house);
+    const made = createCompanionAccount(userId, attachedTo.runtime, attachedTo.house, awaitingTakeover);
     accounts.set(userId, made);
     return made;
   }
 
   return {
     /** The gateway her tools act through and the house they read the panels through; a module built is a service that takes messages again. Called once by `createCompanionModule`. */
-    attachRuntime(gateway: ProviderRuntimeGateway, handedHouse: CompanionHouse): void {
+    attachRuntime(gateway: ProviderRuntimeGateway, handedHouse: CompanionHouse, awaiting = false): void {
       runtime = gateway;
       house = handedHouse;
       stopped = false;
+      awaitingTakeover = awaiting;
     },
 
     /** The whole of her for a page: `GET /api/companion`. */
@@ -296,9 +302,15 @@ function createCompanionService() {
      * which the entrypoint runs once the predecessor of a handover is gone (`soleServerDuties`) — a predecessor still serving may
      * be answering the same words. One account's failure, a throw or a rejection (a line with a picture reads it first, so its replay is
      * a promise), is logged naming the account and is that account's alone. The entrypoint does not wait on the replays.
+     * It is also the TAKEOVER of a session held beside its predecessor: every account made meanwhile is asked, whether or not it has words
+     * to say again, because its held pushes are let go by the same call (`session/companion-restart.ts`). Pages already connected are told
+     * to read her picture again FIRST (`companion-resync.ts`): the predecessor's frames went to its own sockets, so a page that opened on
+     * this server while the predecessor drained has none of what it said since.
      */
     resendUnanswered(): void {
-      for (const userId of companionDb.userIdsWithUnanswered()) {
+      awaitingTakeover = false;
+      announceCompanionResync();
+      for (const userId of new Set([...accounts.keys(), ...companionDb.userIdsWithUnanswered()])) {
         const failed = (error: unknown): void => console.error(`[Companion] account ${userId}: her unanswered messages could not be sent again`, error);
         try {
           accountOf(userId).session.resendUnanswered().catch(failed);
@@ -428,17 +440,24 @@ function createCompanionService() {
 
     /**
      * Winds down each running session for the server's shutdown, and refuses every message after it (the HTTP
-     * drain comes later, so one can still arrive). A session's interrupt and its close run TOGETHER: the interrupt
-     * stops a turn in flight and the close ends the input and, past its grace, the process, so a CLI that answers
-     * neither costs one grace (5 s) and not two. One session that fails to wind down is logged and does not hold the rest.
+     * drain comes later, so one can still arrive). A turn in flight is let to end by itself first, at most `turnBoundMs`
+     * (`session/companion-restart.ts`), and the sentences it speaks meanwhile keep streaming and being synthesized: a restart
+     * no longer cuts her off. The sentences still streaming when the turn ends are then let to finish, at most `sentenceBoundMs`
+     * (the HTTP drain's own bound), before `speechCache.end()` cuts whatever is left. Then a session's interrupt and its close run TOGETHER: the interrupt stops a turn that did not
+     * end in the bound and the close ends the input and, past its grace, the process, so a CLI that answers neither costs one
+     * grace (5 s) and not two. One session that fails to wind down is logged and does not hold the rest.
      */
-    async stopAll(): Promise<void> {
+    async stopAll(turnBoundMs = 0, sentenceBoundMs = 0): Promise<void> {
       stopped = true;
-      // Every Rhubarb run of every sentence, waiting or running: the sentences' own aborts (below) end their streams, not these.
-      stopMouth();
       await Promise.all(
         [...accounts.values()].map(async ({ userId, session, speechCache }) => {
-          // A sentence streaming to a page would hold the HTTP drain open for as long as Gemini kept speaking.
+          try {
+            await session.finishTurn(turnBoundMs);
+          } catch (error) {
+            console.error(`[Companion] account ${userId}: her turn in flight could not be waited for`, error);
+          }
+          // A sentence still streaming to the page finishes first (it is the one he is hearing); what is left after the bound would hold the HTTP drain open for as long as Gemini kept speaking.
+          await speechCache.settled(sentenceBoundMs);
           speechCache.end();
           try {
             // The server's stop is no word of his: what she was answering stays stored for the next process to answer.
@@ -448,6 +467,8 @@ function createCompanionService() {
           }
         }),
       );
+      // Every Rhubarb run of every sentence, waiting or running: the sentences' own aborts (above) end their streams, not these. After the turns, which were still speaking.
+      stopMouth();
     },
   };
 }

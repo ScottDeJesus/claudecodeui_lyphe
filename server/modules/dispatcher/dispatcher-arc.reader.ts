@@ -88,6 +88,13 @@ export function arcOf(raw: unknown): DispatcherArc {
     // (`report_planners.of_arc`). A row naming one of the arc's plans is that PLAN's and rides
     // `plan.planner` instead, so the header and the cards under it never state one outing twice.
     planner: plannerSince(field(arc, 'planner'), `arc.planner of ${name}`),
+    // The pacer's clause on the epic's OWN queued outings (`report_arcs.arc_dict.pace_hold`, `pace_report.arc_hold`) — its
+    // design before any plan exists, its whole-arc cut, a tell, its judgment — with its `pace:` lead, or `""`, and whether
+    // the operator has let them go past it (`dispatcher override <arc>`). Both are the dispatcher's own readings, never
+    // derived here. ABSENT reads `""` and `false` (a build older than the keys, which held nothing for an epic), so the
+    // deck then draws no Override.
+    pace_hold: textSince(field(arc, 'pace_hold'), `arc.pace_hold of ${name}`) ?? '',
+    overridden: flagSince(field(arc, 'overridden'), `arc.overridden of ${name}`),
     created_at: need(field(arc, 'created_at'), isText, 'arc.created_at'),
     completed_at: need(field(arc, 'completed_at'), isTextOrNull, 'arc.completed_at'),
     // The arc's books are its plans' sums cut at the moment each feature joined the epic

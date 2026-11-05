@@ -19,6 +19,7 @@ import {
   optionalBoolean,
   optionalText,
   readBody,
+  readCheckKey,
   readUsername,
   requiredNumber,
   requiredObject,
@@ -27,8 +28,8 @@ import {
 import { createUpdatesRouter } from './updates.routes.js';
 
 /**
- * Cerberus's twenty-six routes, created by `cerberus.module.ts` for the server entrypoint's one mount
- * at `/api/cerberus` — nineteen here, the three of a warden update in `updates.routes.ts` and the four
+ * Cerberus's twenty-seven routes, created by `cerberus.module.ts` for the server entrypoint's one mount
+ * at `/api/cerberus` — nineteen here, the three of a warden update in `updates.routes.ts` and the five
  * of a diagnosis in `diagnosis/diagnosis.routes.ts`, both mounted at the end of this router.
  *
  * WHAT A ROUTE DECIDES HERE. Transport SHAPE only: that a field is the kind of value the verb takes
@@ -65,11 +66,6 @@ function optionalWholeNumber(request: Request, name: string): number | undefined
   if (value === undefined) return undefined;
   if (typeof value !== 'string' || !/^-?\d{1,16}$/.test(value)) throw badRequest(`${name} must be a whole number.`);
   return Number(value);
-}
-
-/** The key of a check named by the three path parts `:service/:check` — `<service>/<id>`. */
-function readCheckKey(request: Request): string {
-  return `${readPathParam(request.params.service, 'service')}/${readPathParam(request.params.check, 'check')}`;
 }
 
 /** Creates the router for `cerberus.module.ts`. Each handler is one verb and its shape. */
