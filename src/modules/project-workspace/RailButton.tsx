@@ -31,12 +31,17 @@ type RailButtonProps = {
  * screen reader all name, and "2 need you" is said after it. The name rides the kit Tooltip on hover and on keyboard
  * focus; no native `title`, which would stack a second tooltip on the first.
  *
- * THE BADGE stands on the glyph's top-right shoulder, centred on the glyph's top edge and 2px past its right one. It
- * is an amber pill with a figure, never a bare dot — colour is never the whole signal — and the warn tone's ink edge
- * keeps the fill, 2.07:1 on the rail's canvas, readable as a mark. The figure's line is pinned at `leading-normal`,
- * which centres its digits in the pill to within half a pixel at the ink; a tighter 14px line rides them above the
- * centre. It grows leftward over the glyph as the figure widens, so "99+" stays inside the rail where the scroll region
- * would clip it. Its 2px ring is the button's own ground in each state, which parts it from the glyph it overlaps.
+ * THE BADGE rests on the glyph's top-right corner: its right edge level with the button's, its bottom edge 1px inside the
+ * glyph's top edge, where the glyphs' strokes have barely begun. A "99+" pill is wider than the 14px of rail beside the
+ * glyph, so it can only keep off the glyph by standing above it: it grows leftward along the strip over the glyph as the
+ * figure widens, which keeps "99+" inside the rail where the scroll region would clip it. Measured on the live rail at
+ * "99+", it hides none of the Inbox's tray and under 1% of Cerberus's radar. It rises 5px above a 40px button (3px above
+ * a 44px one), into the foot of the button above: the Inbox's neighbour, the companion's disc, ends 6px above it, so a
+ * taller or a higher pill would touch the disc.
+ * It is an amber pill with a figure, never a bare dot — colour is never the whole signal — and the warn tone's ink edge
+ * keeps the fill, 2.07:1 on the rail's canvas, readable as a mark, with no ring to part it from a glyph it barely
+ * touches. The figure's line is pinned at `leading-normal`, which centres its digits in the pill to within half a pixel
+ * at the ink; a tighter 14px line rides them above the centre.
  *
  * On a phone the focus ring sits on the button's edge (offset 0): a 44px button at the house ring's 2px offset is 52px
  * of ring in a 48px rail, and the scroll region clips what passes its sides. A focused button stands above its
@@ -85,10 +90,8 @@ export default function RailButton({ label, viewId, anchorKey, icon: Icon, lit =
             <span
               aria-hidden="true"
               data-tone="warn"
-              className={cn(
-                'pointer-events-none absolute right-[calc(50%-20px)] top-[calc(50%-18px)] h-4 min-w-4 rounded-full border border-tone-ink bg-tone-dot px-1 text-center text-[10.5px] font-bold leading-normal tabular-nums text-foreground ring-2 dark:text-background',
-                lit ? 'ring-accent-soft group-hover/rail-button:ring-accent-soft-hover' : 'ring-background group-hover/rail-button:ring-secondary',
-              )}
+              // 25px above the centre: the pill's own 16px, less the 1px it stands inside the glyph's top edge (10px above the centre).
+              className="pointer-events-none absolute right-[calc(50%-20px)] top-[calc(50%-25px)] h-4 min-w-4 rounded-full border border-tone-ink bg-tone-dot px-1 text-center text-[10.5px] font-bold tabular-nums leading-normal text-foreground dark:text-background"
             >
               {figure}
             </span>
