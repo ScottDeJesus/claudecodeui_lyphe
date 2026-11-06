@@ -1,4 +1,5 @@
 import type { DispatcherEvent } from '@/shared/types.js';
+import { acceptAnswerOf } from '@/shared/utils.js';
 
 import { characterCount } from '../companion-input.js';
 import { NOTE_TEXT_MAX } from '../tools/draft-tools.js';
@@ -103,20 +104,21 @@ function approvalLine(card: Card, book: CardBook): string {
 }
 
 /**
- * `prompt`: the open Accept prompt as the card draws it (`header`, `question`, the three answers' labels), else "No Accept
+ * `prompt`: the open Accept prompt as the card draws it (`header`, `question`, the labels of the answers she can carry:
+ * Queue, Hide and Rework — Hold is answered on the card, her hands have no word for it), else "No Accept
  * prompt is open on <card>." with its approval line. A census past 2,000 characters carries the brief a dactyl digests it under.
  * Consumed by `read_card`.
  */
 export function promptReading(card: Card, book: CardBook): Reading {
   const ask = openAsk(card, book);
   if (ask?.kind === 'accept') {
-    const answers = `Answers: ${ask.options.map((option) => option.label).join(' / ')}`;
+    const answers = `Answers: ${ask.options.filter((option) => acceptAnswerOf(option.label) !== 'hold').map((option) => option.label).join(' / ')}`;
     const title = `${card.spoken}: the Accept prompt`;
     const intro = `The Accept prompt on ${card.spoken}:`;
     if (characterCount(ask.question) <= INLINE_MAX_CHARACTERS) {
       return { title, intro, text: [ask.header, ask.question, answers].filter((part) => part !== '').join('\n'), label: 'card-prompt', brief: null };
     }
-    // A long census is digested ALONE: the card's header and its three answers stay in the answer, not inside the file a dactyl may quote or drop.
+    // A long census is digested ALONE: the card's header and its answers stay in the answer, not inside the file a dactyl may quote or drop.
     return { title, intro: [intro, ask.header, answers, 'Its census:'].filter((part) => part !== '').join('\n'), text: ask.question, label: 'card-prompt', brief: PROMPT_BRIEF };
   }
   const other = ask === null ? '' : ' Its questions are open instead; read_card with scope questions shows them.';

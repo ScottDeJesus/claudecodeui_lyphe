@@ -32,6 +32,34 @@ export type SubagentSummary = {
   usage: SubagentUsage | null;
 };
 
+/**
+ * The model tag a recorded dispatch description may end in: `[opus]`, `[sonnet]`, `[haiku]`,
+ * `[<alias> via shim]`, `[<id> via env]` and `[inherit: session model]`. A row names the model from
+ * the agent's own record, so a description is drawn without the tag and no row says the model twice.
+ * Only those shapes, and only at the very end, so a description of the agent's own that happens to
+ * end in brackets is left alone.
+ */
+const MODEL_TAG = '\\[(?:opus|sonnet|haiku|\\S+ via (?:shim|env)|inherit: session model)\\]';
+const RECORDED_MODEL_TAG = new RegExp(`(?:^|\\s+)${MODEL_TAG}\\s*$`);
+
+/** The tag inside an agent's completion notice, where it sits just before the closing quote of the quoted description. */
+const NOTICE_MODEL_TAG = new RegExp(`\\s+${MODEL_TAG}(?=")`);
+
+/** A dispatch description as the reader should see it: without the recorded model tag (see {@link RECORDED_MODEL_TAG}). */
+export function stripRecordedModelTag(description: string): string {
+  return description.replace(RECORDED_MODEL_TAG, '');
+}
+
+/**
+ * A task-notification summary as the reader should see it. An agent's completion notice quotes its
+ * description (`Agent "Blank-initial attach waits [opus]" finished`), so the tag sits before the closing
+ * quote rather than at the end. Only a summary that opens `Agent "` is read that way: a background
+ * command's notice quotes shell text, where `[opus]` is a character class and not a tag.
+ */
+export function stripRecordedModelTagFromNotice(summary: string): string {
+  return summary.startsWith('Agent "') ? summary.replace(NOTICE_MODEL_TAG, '') : summary;
+}
+
 export function parseSubagentToolInput(toolInput: unknown): Record<string, unknown> {
   if (typeof toolInput !== 'string') {
     return (toolInput as Record<string, unknown>) || {};
@@ -126,7 +154,7 @@ export function readSubagentSummary({
   return {
     status,
     label: subagent?.type ?? String(parsedInput.subagent_type ?? ''),
-    description: subagent?.description ?? String(parsedInput.description ?? ''),
+    description: stripRecordedModelTag(subagent?.description ?? String(parsedInput.description ?? '')),
     nickname: subagent?.name && subagent.name !== subagent.type ? subagent.name : '',
     toolCount: entries.filter((entry) => entry.kind === 'tool').length,
     finishedAt,

@@ -1,4 +1,5 @@
 import type { DispatcherAsk } from '@/shared/types.js';
+import { acceptAnswerOf, DISPATCHER_ACCEPT_ANSWERS } from '@/shared/utils.js';
 
 import { each, field, isCount, isRecord, isText, names, need, oneOf } from './dispatcher-state.transport.js';
 
@@ -21,7 +22,7 @@ import { each, field, isCount, isRecord, isText, names, need, oneOf } from './di
 /** The two kinds the app raises (`ask.KINDS`) — anything else is a build whose prompt this lane cannot answer. */
 const ASK_KINDS: readonly DispatcherAsk['kind'][] = ['accept', 'questions'];
 
-/** One of the Accept prompt's three answers, in its contract order (`intent_lock.OPTIONS`). */
+/** One of the Accept prompt's answers, in its contract order (`intent_lock.OPTIONS`). */
 function optionOf(raw: unknown): { label: string; description: string } {
   const option = need(raw, isRecord, 'asking.options[]');
   return {
@@ -54,10 +55,13 @@ function askOf(raw: unknown, where: string): DispatcherAsk {
   };
   if (kind === 'accept') {
     const options = each(field(ask, 'options'), `${where}.options`, optionOf);
-    // THE THREE, OR NOTHING: an answer is read by its option's POSITION (Queue, Hide, Rework —
-    // `intent_lock.OPTIONS`' order is the contract), so a build that offered a different count is a
-    // prompt whose answers this lane would misread.
-    if (options.length !== 3) throw new Error(`${where}.options: expected the three Accept answers, read ${options.length}`);
+    // EACH ANSWER ONCE, OR NOTHING: an answer is read by its option's LABEL (`acceptAnswerOf`), so a build whose
+    // prompt lacks one of the answers, offers one twice or offers another is a prompt this lane would misread.
+    const offered = options.map((option) => acceptAnswerOf(option.label));
+    const missing = DISPATCHER_ACCEPT_ANSWERS.filter((answer) => offered.filter((word) => word === answer).length !== 1);
+    if (missing.length > 0 || offered.length !== DISPATCHER_ACCEPT_ANSWERS.length) {
+      throw new Error(`${where}.options: expected each Accept answer (${DISPATCHER_ACCEPT_ANSWERS.join(', ')}) once, read ${options.map((option) => option.label).join(' | ')}`);
+    }
     return {
       ...common,
       kind,

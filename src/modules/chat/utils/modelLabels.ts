@@ -97,7 +97,8 @@ function aliasMatching(
  * carried, and it is what lets a caller decide whether to show the provider's name (a transcript
  * caption) or the id itself (the composer's own chip, where the id is the thing the user typed in).
  *
- * Used by chat's ChatMessagesPane (transcript captions and exports) and ComposerModelMenu (the chip).
+ * Used by chat's `useModelLabelResolver` (transcript captions and exports, the agent rows in the transcript and
+ * in the pinned strip and the gutter widget) and by ComposerModelMenu (the chip).
  */
 export function resolveModelLabel(
   options: ProviderModelOption[],

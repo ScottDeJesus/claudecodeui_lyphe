@@ -178,7 +178,7 @@ export function useDispatcherPlans(): {
  * - Held, an UNFINISHED plan is HIDDEN, because unfinished work must stay reachable. A done plan that is
  *   re-cut and walking again is unfinished: its dismissal no longer holds it, and its card is back.
  *   News on a HIDDEN plan draws its card again, and the card reads HIDDEN with a Show: the dispatcher
- *   still holds the plan, and it does not start until the operator Shows it.
+ *   still holds the plan, and nothing starts it until the operator Shows it and then Releases or Starts it.
  *
  * - A press an ARC's corner made reads the arc's news instead of its own plan's: the newest creation,
  *   ending or ask across every plan of that arc the lane carries (`arcNewsOf`), so an arc pressed away

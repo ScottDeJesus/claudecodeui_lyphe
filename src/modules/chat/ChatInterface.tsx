@@ -28,6 +28,7 @@ import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState'
 import { useIsLookingAtSession, useSessionPresence } from '@/modules/chat/hooks/useSessionPresence';
 import { useSessionStore } from '@/modules/chat/hooks/useSessionStore';
 import { useCliSessionId } from '@/modules/chat/hooks/useCliSessionId';
+import { useModelLabelResolver } from '@/modules/chat/hooks/useModelLabelResolver';
 import { useSessionToolsets } from '@/modules/chat/hooks/useSessionToolsets';
 import { clearStreamFlush } from '@/modules/chat/utils/streamFlushTimer';
 import {
@@ -232,14 +233,18 @@ function ChatInterface({
   // by it (`readStampedLaunchIds`), so a new stage shows the moment the lane carries it.
   const cliSessionId = useCliSessionId(selectedSession?.id ?? null);
 
+  // What a pinned agent or soul runs on, in the words the transcript's headers use. Held here, beside
+  // the catalog, and published with the rows so the gutter widget names a model exactly as the strip does.
+  const resolveModelLabel = useModelLabelResolver(provider, providerModelCatalog);
+
   // The gutters cannot see this chat's own store — `useSessionStore` is a ref private to this
   // component — so the rows they draw are published here, tagged with the id they are handed.
   useEffect(() => {
     const sessionId = selectedSession?.id;
     if (typeof sessionId !== 'string') { publishSubagentSource(null); return; }
-    publishSubagentSource({ sessionId, cliSessionId, agentMessages, soulLaunchIds });
+    publishSubagentSource({ sessionId, cliSessionId, agentMessages, soulLaunchIds, resolveModelLabel });
     return () => publishSubagentSource(null);
-  }, [selectedSession?.id, cliSessionId, agentMessages, soulLaunchIds]);
+  }, [selectedSession?.id, cliSessionId, agentMessages, soulLaunchIds, resolveModelLabel]);
 
   // The addresses this chat has declared in embed fences, for the Embed widget in the gutter. Read
   // off the MESSAGES rather than off the rendered transcript, because the transcript unmounts rows
@@ -674,7 +679,7 @@ function ChatInterface({
           <ChatComposer
             sessionId={openSessionId}
             exportSurface={exportSurface}
-          pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} cliSessionId={cliSessionId} />}
+          pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} cliSessionId={cliSessionId} resolveModelLabel={resolveModelLabel} />}
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
           handleGrantToolPermission={handleGrantToolPermission}

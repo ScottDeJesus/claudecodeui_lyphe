@@ -15,14 +15,17 @@ export type DispatcherVerbScope = 'plan' | 'arc';
  * stays LOCAL to this hook — `DispatcherVerb` remains exactly the set the server spawns, so no
  * route or service is ever read against a word the dispatcher's binary does not know. `override-off` is
  * the card's Turn off: the same dispatcher verb as `override` through its own route, named apart so a
- * refusal of Turn off is headed in Turn off's word.
+ * refusal of Turn off is headed in Turn off's word. `release` is the card's Release of a held plan: `dispatcher resume
+ * <plan> --by release` through its own route, named apart so a refusal of Release is headed in Release's word.
  */
-type DispatcherPress = DispatcherVerb | 'answer' | 'override-off';
+type DispatcherPress = DispatcherVerb | 'answer' | 'override-off' | 'release';
 
 /** What a plan card may press. */
 export type DispatcherPlanVerbs = ArmAcceptPlanVerbs & {
   stop(): Promise<void>;
   resume(): Promise<void>;
+  /** A held plan put back on its turn in the queue — `resume` with the dispatcher's release word, which overrides nothing. */
+  release(): Promise<void>;
   schedule(when: string): Promise<void>;
   park(): Promise<void>;
   unpark(): Promise<void>;
@@ -60,7 +63,7 @@ export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
 };
 
 /**
- * Stop, Resume, Schedule, Park, Unpark, Model, Drop, Resume planner, Override (and its undo) and Answer for one plan — or Stop, Resume
+ * Stop, Resume, Release, Schedule, Park, Unpark, Model, Drop, Resume planner, Override (and its undo) and Answer for one plan — or Stop, Resume
  * and Model for one dispatch ARC — and what to say about each.
  *
  * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same verbs:
@@ -129,6 +132,7 @@ export function useDispatcherVerbs(
   const word = useCallback(
     (verb: DispatcherPress): string => {
       if (verb === 'stop') return t('runner.stop');
+      if (verb === 'release') return t('runner.release');
       if (verb === 'park') return t('dispatcher.park');
       if (verb === 'unpark') return t('dispatcher.unpark');
       if (verb === 'drop') return t('dispatcher.delete.word');
@@ -186,6 +190,11 @@ export function useDispatcherVerbs(
     },
     [name, scope, send],
   );
+  // The plan card's Release of a held plan: no arc deck draws it, since an epic's Start is the board's one Start.
+  const release = useCallback(
+    async () => { await send('release', () => api.dispatcher.release(name)); },
+    [name, send],
+  );
   // A plan's Resume at a time: the one schedule press left (the arc's `Schedule start` is gone).
   const schedule = useCallback(
     async (when: string) => {
@@ -233,5 +242,5 @@ export function useDispatcherVerbs(
   const armVerbs = useArmAcceptVerbs(name, scope, send);
 
   if (scope === 'arc') return { stop, resume, override, overrideOff, setModel, ...armVerbs, busy };
-  return { stop, resume, schedule, park, unpark, drop, plannerResume, override, overrideOff, setModel, answer, ...armVerbs, busy };
+  return { stop, resume, release, schedule, park, unpark, drop, plannerResume, override, overrideOff, setModel, answer, ...armVerbs, busy };
 }

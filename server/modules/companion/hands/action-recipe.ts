@@ -110,7 +110,7 @@ function prepareShow(found: CardFound): Preparation {
   const { target } = found;
   if (!dispatcherHolds(found)) return refuse(`The dispatcher does not hold ${target.spoken} now, so there is nothing to show.`);
   if (!isHidden(found)) return refuse(`${target.spoken} is not hidden, so there is nothing to show.`);
-  return ready('show', target, { readBack: `${sayOf('show', target.spoken)}: it is hidden now, and this puts it back in the queue.` });
+  return ready('show', target, { readBack: `${sayOf('show', target.spoken)}: it is hidden now, and this brings it back paused; it does not start.` });
 }
 
 function prepareRework(deps: CompanionToolDeps, input: PrepareInput, found: CardFound): Preparation {

@@ -4034,15 +4034,42 @@ The panel is a tool row (`toolRow.ts`'s frame, no caret, no stripe): the mark of
 agent ran on (`subagentMarkProvider` — DeepSeek's whale when the agent's own model is a DeepSeek
 one, else the session's provider; the robot only when none is known; Claude's
 `ClaudeCodeMark` mascot rather than the starburst, as every chat and subagent row draws it, through
-`LLMProviderLogo`'s `claudeMark="mascot"`), the agent type, `/`, the
+`LLMProviderLogo`'s `claudeMark="mascot"`), the agent type, the model it ran on (`· Opus 5.5`), `/`, the
 description, the nickname, then its figures (`N tools`, tokens, finish time — hidden when the row
 itself is under 480px, a container query in `index.css`, so a phone or a narrow chat column keeps
 the description and the outcome) and the outcome pill — `Finished`, `Failed` or
-`Stopped`, or a spinner and `running` while it works. The model behind the mark is
+`Stopped`, or a spinner and `running` while it works (the word `running` is hidden in that same
+container query, `.subagent-row__running-word`: the spinner, labelled `running` for a screen reader,
+says it). The header wraps rather than clips the description:
+the description keeps a 10rem floor (`basis-40`), so when the name, the model and the outcome leave it
+less it takes a line of its own beside the outcome and reads in full; a wide row stays one line, and
+the pinned card's and the soul row's headers do the same, and the `/` is part of the description's own
+flex item, so it wraps with the description instead of hanging at the end of the line above. ON A PHONE (window under 640px, Tailwind's `max-sm`/`sm:`
+— the pinned rows are drawn in the desktop gutters too, which this leaves as they were) a RUNNING
+pinned card's `● running · N tools` chip leaves the header altogether, so the description keeps the
+room it took and a lone dot never wraps onto a line of its own: the pulsing dot leads the second
+line instead, and `N tools` joins the figures on its right (`pinned-subagent-tool-count`). A running
+soul's row (`SoulLaunchPinRow`) does the same with its clock (`pinned-soul-elapsed`). A finished row keeps
+its chip, which takes a line of its own on a phone whenever the description's floor leaves it no room.
+The model behind the mark is
 `ChatMessage.subagentModel`: the history record's `subagent.model`, else the newest model the
 agent's live turns named (`useChatMessages` folds it from the rows streamed with its
-`parentToolUseId`), so a DeepSeek agent wears the whale while it runs, not only after a reload. While open it
-shows the model, the task prompt, the timeline, and the agent's markdown result. A timeline
+`parentToolUseId`), so a DeepSeek agent wears the whale while it runs, not only after a reload.
+
+THE MODEL LABEL is that same `subagentModel`, named by the chat's own catalog (`useModelLabelResolver`,
+the resolver the message headers and the composer chip read: the family from the catalog, the
+generation from the id on the record), so a new generation shows its own number with no code change.
+No record yet, or an id the catalog does not carry, draws no label — never a guess. The pinned rows
+(`PinnedAgentRow`, `SoulLaunchPinRow`) draw the same label after the name; `usePinnedSubagentRows`
+resolves it through the resolver the chat publishes with its rows (`ChatSubagentSource.resolveModelLabel`),
+so the gutter widget names a model as the strip does. A soul's model is `SoulLaunchSnapshot.model`:
+`result.json`'s id once the receipt landed, else `spec.json`'s word (`modelOf`). A description recorded
+with a trailing model tag (`[opus]`, `[sonnet via shim]`, `[inherit: session model]`) is drawn without it
+(`stripRecordedModelTag`), as is the description an agent's completion notice quotes
+(`stripRecordedModelTagFromNotice`, for a summary that opens `Agent "`), so nothing says the model twice.
+
+While open the row shows the task prompt, the timeline, and the agent's markdown result, and the raw
+model id only where the catalog names no label for it. A timeline
 entry of `kind: 'tool'` goes through `ToolRenderer` with `mode="input"` — the same router
 the main thread uses — so a subagent's shell command looks identical to the parent's.
 Entries of kind `text` and `thinking` render as notes.
@@ -4053,7 +4080,7 @@ the "show N more" button raises the limit by four times that. Separately,
 included", because the backend truncates long timelines for transport; that line appears
 only once nothing is left to expand locally.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/SubagentPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedAgentRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedSubagents.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
 
 ## MAN-6221 — Subagents — Live nesting. A running subagent's rows arrive stamped with `parentToolUseId` — Claude's
 section: 06-tool-view/012 Subagents/001 Live nesting. A running subagent's rows arrive stamped with `parentToolUseId` — Claude's

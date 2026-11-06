@@ -17,7 +17,8 @@ import { cn } from '@/shared/utils';
  *   of what `dispatcher start` reaches): an approval joins the queue by itself, so what waits is what the operator
  *   held back with a Stop on a feature that was waiting its turn. It lets every one of them go at once, and the
  *   queue's order and Pause all then decide what runs. A HIDDEN plan is never counted or reached — Show is its
- *   press. A feature's own Start (on its card) is the override that skips both.
+ *   press, and it brings the plan back held, so the next Start reaches it. A feature's own Start (on its card) is
+ *   the override that skips both.
  * - **Pause all** / **Resume all** and the running readout. The queue runs top down with no limit above it: an
  *   epic not started starts when every epic above it has started or cannot start.
  * - **The pacer's line** — the dispatcher's own sentence (`route.pace.words`) beside them, one unbreakable piece in

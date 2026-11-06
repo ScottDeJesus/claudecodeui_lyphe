@@ -87,6 +87,20 @@ function providerOf(spec: unknown, result: unknown, ended: boolean): 'deepseek' 
 }
 
 /**
+ * The model a launch ran on, for the pin to name.
+ *
+ * The receipt outranks the pin here too: `result.json` records the id the child was actually served
+ * (`claude-sonnet-5-5`), while `spec.json` holds only the word the launcher was asked for (`opus`, or
+ * nothing at all for a soul that took the session's default). So the receipt answers once it has
+ * landed, the spec before then, and `''` when neither names one — the pin then draws no model rather
+ * than a guess.
+ */
+function modelOf(spec: unknown, result: unknown, ended: boolean): string {
+  const receipt = ended ? readString(field(result, 'model')) : '';
+  return receipt !== '' ? receipt : readString(field(spec, 'model'));
+}
+
+/**
  * The receipt's PAID dollars: its own `cost_usd`, and 0 where the receipt NAMES the operator's
  * Claude subscription.
  *
@@ -204,6 +218,7 @@ export function classifyLaunch(
     // absent is honest, and the row simply carries no description.
     brief: files.briefLine,
     provider,
+    model: modelOf(spec, result, ended),
     // DeepSeek refused this soul or never answered it: the receipt says why, and nothing ran on
     // Claude instead (the launcher never re-routes a soul).
     blocked: readString(field(result, 'provider_blocked')) !== '',

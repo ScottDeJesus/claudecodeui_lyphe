@@ -121,20 +121,6 @@ probe-key: 8fa53d1bac9f9cec9c9d2c27e055571fbe5bc7a7
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-names.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
-## INV-5727 — probe — HIGH — the chat door arms the park-at-peak hour BEFORE the store refuses, so a refused second Accept still schedules a Start for the plan the operator Queued
-
-HIGH — the chat door arms the park-at-peak hour BEFORE the store refuses, so a refused second Accept still schedules a Start for the plan the operator already answered
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/accept-once/athena-probes/hold_then_refuse.sh
-expect: `hour armed on the answered plan: None` (today: `2026-09-29T10:00:00Z`, with the second answer's text still reading "This answer recorded nothing")
-```
-
-measured 2026-09-28 by chain chain-accept-once-20260928-214132-9473, finding H1, HIGH
-probe-key: c6944f8dd646713cca7f890fbc04d9ba0f7f59c5
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/hooks/dispatcher/accept.py, /home/lyphe/.claude/hooks/dispatcher/cmd/run.py, /home/lyphe/.claude/hooks/dispatcher/judgment_accept.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/hooks/dispatcher/store_write.py, /home/lyphe/.claude/hooks/intent_lock.py
-
 ## INV-5729 — probe — LOW — a repeated name in one Accept now fails the whole Accept with a false "already approved"
 
 LOW — a repeated name in one Accept now fails the whole Accept with a false "already approved"
@@ -1028,32 +1014,6 @@ probe-key: 44e21d54a9185ed78094e1ebb08b12ce9801a104
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
 
-## INV-6327 — probe — MEDIUM — `blocked` is a `--resume` case in one rule and a `file_issue` case in another, inside her one prompt
-
-MEDIUM — `blocked` is a `--resume` case in one rule and a `file_issue` case in another, inside her one prompt
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief && grep -c '`dead` or `blocked`' chapters/recovery.md; grep -c '\*\*`nothing-changed`\*\* or \*\*`blocked`\*\* → `file_issue`' METIS.md
-```
-
-measured 2026-10-01 by chain chain-metis-foreground-wait-20261001-165407-e80a, finding M2, MEDIUM
-probe-key: 140b2e8b70c77888e713f170dea02952fe789488
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/recovery.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/METIS.md, /home/lyphe/.claude/hooks/plan_runner/solo/chain_adopt.py, /home/lyphe/.claude/scripts/soul-back, /home/lyphe/.claude/skills/inline/SKILL.md
-
-## INV-6328 — probe — LOW — claims this diff made false, left in place (healed means deleted)
-
-LOW — claims this diff made false, left in place (healed means deleted)
-
-```probe
-cd /home/lyphe/.claude && grep -c 'imports no `plan_runner`' hooks/plan_runner/solo/chain_adopt.py hooks/INVARIANTS.md; scripts/docstore get INV-40 | python3 -c "import json,sys; b=json.load(sys.stdin)['row']['body']; print('10800' in b, '#29 holds' in b)"
-```
-
-measured 2026-10-01 by chain chain-metis-foreground-wait-20261001-165407-e80a, finding L2, LOW
-probe-key: 883e8e89df2f74eaeb5d571680ac69ed8e156a37
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/recovery.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/METIS.md, /home/lyphe/.claude/hooks/plan_runner/solo/chain_adopt.py, /home/lyphe/.claude/scripts/soul-back, /home/lyphe/.claude/skills/inline/SKILL.md
-
 ## INV-6329 — probe — INV-4355 and a `store_arcs.py` docstring still say a fenced typo becomes `deepseek`
 
 INV-4355 and a `store_arcs.py` docstring still say a fenced typo becomes `deepseek`
@@ -1140,20 +1100,6 @@ expect: `id length 127: launcher walker_alive=True | dot reader counts it=false`
 
 measured 2026-10-02 by chain chain-purple-dot-souls-20261002-043723-dbad, finding L2, LOW
 probe-key: 9686bb9886de60f111e500376e0adfb69f7376ff
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
-
-## INV-6339 — probe — three exports lack the consumer comment the backend standards ask for
-
-three exports lack the consumer comment the backend standards ask for
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -rn "ChainRecord\b" server --include=*.ts | grep -v "chain-record.transport.ts"; echo "[probe exit $?]"
-expect: no lines and `[probe exit 1]` — no importer of the exported type
-```
-
-measured 2026-10-02 by chain chain-purple-dot-souls-20261002-043723-dbad, finding L4, LOW
-probe-key: 6f13394c38a4241eed44f442e0fe08293b18f959
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
 
@@ -7338,26 +7284,6 @@ probe-key: 76f8639a8315ad3934e306bfa88f8208f5594039
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
-## INV-7574 — probe — `compaction-runtime.ts:69` still points at the retired "reply to the seed"; the row that governs it dropped the same sentence
-
-`compaction-runtime.ts:69` still points at the retired "reply to the seed"; the row that governs it dropped the same sentence
-
-```probe
-D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-grep -n "reply to the seed" server/modules/compaction/compaction-runtime.ts || echo none
-EOF
-bash "$D/p.sh"
-cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
-expect: `69: * reply to the seed, so it never starts over.` while it stands; `none` once the comment and MAN-8067 say the same thing about a record with no stored seed
-```
-
-measured 2026-10-09 by chain chain-compaction-handover--docs-20261009-165748-35f0, finding L3, LOW
-probe-key: 933db6d0dd228f1703edca566df2af9f9a029a6d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
-
 ## INV-7576 — probe — two same-named projects in the same parent folder get the SAME hint
 
 two same-named projects in the same parent folder get the SAME hint
@@ -8004,56 +7930,6 @@ probe-key: 36eafe5a038bf5f5bb8fde98d4ebeffd15f55d80
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
 
-## INV-8359 — probe — LOW — at his text scale a header list leaves the viewport 5 px before the builder's "under about 340 px"
-
-LOW — at his text scale a header list leaves the viewport 5 px before the builder's "under about 340 px"
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-narrow.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-// READ-ONLY: every non-GET to /api is aborted; a dropdown is opened and closed with Escape, never chosen.
-import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
-import { DEV_USER } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { pinPreferences } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-import { answerThirdParties } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/wip-stub.mjs';
-const API = 'http://127.0.0.1:3011', APP = 'http://127.0.0.1:5183';
-const call = async (token, path, init = {}) => (await fetch(API + path, { ...init, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) } })).json();
-const token = (await call(null, '/api/auth/login', { method: 'POST', body: JSON.stringify(DEV_USER) })).token;
-const project = (await call(token, '/api/projects')).find((p) => String(p.fullPath ?? p.path ?? '').endsWith('claudecodeui_lyphe'));
-const chat = (await call(token, `/api/projects/${encodeURIComponent(project.projectId)}/sessions?limit=8`)).sessions.at(-1).id;
-const browser = await pw.chromium.launch();
-for (const [width, scale] of [[360, 1.072], [344, 1], [344, 1.072]]) {
-  const ctx = await browser.newContext({ viewport: { width, height: 800 }, colorScheme: 'light', locale: 'en-US', serviceWorkers: 'block' });
-  await ctx.addInitScript(([v]) => { localStorage.setItem('auth-token', v); localStorage.setItem('activeTab', 'runner'); }, [token]);
-  await pinPreferences(ctx, { theme: 'light' }, { writes: 'drop' }); await answerThirdParties(ctx);
-  await ctx.route(/\/api\//, (r) => (['GET', 'HEAD'].includes(r.request().method()) || /\/api\/(auth\/refresh|commands\/list)/.test(r.request().url()) ? r.fallback() : r.abort()));
-  const page = await ctx.newPage();
-  await page.goto(`${APP}/session/${chat}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('[data-master-controller]', { timeout: 30000 });
-  await page.evaluate((s) => { document.documentElement.style.fontSize = `${16 * s}px`; }, scale); await page.waitForTimeout(900);
-  const out = [];
-  for (const h of ['data-master-epics']) {
-    await page.locator(`[${h}] button[aria-haspopup="listbox"]`).click(); await page.waitForTimeout(300);
-    out.push(`${h.replace('data-master-', '')}: ${await page.evaluate(() => { const r = document.querySelector('[role="listbox"]').getBoundingClientRect(); return `${Math.round(r.left)}..${Math.round(r.right)}`; })}`);
-    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
-  }
-  console.log(`viewport ${width}px, text x${scale}: list spans ${out.join(' · ')}  (clipped when a span leaves 0..${width})`);
-  await ctx.close();
-}
-await browser.close();
-EOF
-printf 'cd /tmp && timeout 150 node "$1/p.mjs"\n' > "$D/p.sh"
-bash "$D/p.sh" "$D"
-cd /tmp; case "$D" in /tmp/athena-probe-narrow.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-expect: every line's span inside `0..<width>` — the 344 px line at text ×1.072 is the narrowest; a span outside it means the list is clipped
-```
-
-measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding L4, LOW
-probe-key: 92c34bda5fd69485ede6e4b9d762f71d8c27fd7f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
-
 ## INV-8360 — probe — MEDIUM — the gate's last check, "the live box is as found", fails whenever the dispatcher writes one event during the run
 
 MEDIUM — the gate's last check, "the live box is as found", fails whenever the dispatcher writes one event during the run
@@ -8521,27 +8397,13 @@ probe-key: e2b4820ffa01388a3f5c7ef7dc25286fa874110f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerToolsetSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionToolsets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
-## INV-8463 — probe — LOW — an epic deck of finished plans and one parked plan cannot be put away from its corner
-
-LOW — an epic deck of finished plans and one parked plan cannot be put away from its corner
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/parked_deck.sh
-expect: `hide ez.arc -> exit 2 | REFUSED hide ez.arc: every plan of it is finished or set aside …` while it stands; cured, exit 0 (or the board offers Dismiss for such a deck)
-```
-
-measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding L2, LOW
-probe-key: e5b3e69b031c00a62d68078d266a51687b64141b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
-
 ## INV-8464 — probe — LOW — a typed "do not queue it" now approves the plan into the queue and starts it
 
 LOW — a typed "do not queue it" now approves the plan into the queue and starts it
 
 ```probe
 bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/typed_not_queue.sh
-expect: `'do not queue it' -> hide=False (Queue: approved into the queue)` while it stands; cured, `hide=None` (Rework) or `hide=True`
+expect: `'do not queue it' -> placing=QUEUE (Queue: approved)` while it stands; cured, `placing=None` (Rework: nothing approved)
 ```
 
 measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding L3, LOW
@@ -9209,41 +9071,6 @@ measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-2
 probe-key: cdf71bac1fe2ac9e8487ccdf2fa460c333543a66
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useProving.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingDetail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/TablesScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ThresholdControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/provingModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
-
-## INV-8734 — probe — before the pano answers, `faceCounts` (listing branch) calls every area of a pano that has none standing "proposed", including areas the operator set aside; the tile and the tour line read "N found" for the same pano.
-
-before the pano answers, `faceCounts` (listing branch) calls every area of a pano that has none standing "proposed", including areas the operator set aside; the tile and the tour line read "N found" for the same pano.
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'INNER'
-D="$1"; SRC=/home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils
-cp "$SRC/tourModel.ts" "$SRC/regionLook.ts" "$D/"
-sed -i "s#'@/modules/affected-areas/utils/regionLook'#'./regionLook.ts'#; s#'@/shared/utils'#'./stubutils.ts'#" "$D/tourModel.ts"
-sed -i "s#from '@/shared/types'#from './stubutils.ts'#" "$D/regionLook.ts"
-cat > "$D/stubutils.ts" <<'EOF'
-export const formatRelativeTime = (x: any) => 'ago';
-export const formatShortDate = (x: any) => (x === null ? null : 'Oct 12');
-export type Tone = any;
-EOF
-cat > "$D/run.mts" <<'EOF'
-import { faceCounts } from './tourModel.ts';
-const away = (id: string) => ({ regionId: id, source: 'model', mark: { verdict: 'not_a_change', newClass: null }, standing: false, threshold: null }) as any;
-const read = { status: 'read', regionsCount: 2, standingCount: 0 };
-console.log('pano listing, both areas marked not-a-change:', JSON.stringify(faceCounts({ read } as any)));
-console.log('pano answered, same two areas              :', JSON.stringify(faceCounts({ read, regions: [away('a'), away('b')] } as any)));
-EOF
-node "$D/run.mts" 2>&1 | head -5
-INNER
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D";; esac
-expect: the listing line {"areas":0,"setAside":0,"proposed":2} and the answered line {"areas":0,"setAside":2,"proposed":0} while the listing cannot tell the two apart
-```
-
-measured 2026-10-18 by chain chain-tour-affected-areas--judgment--lines-20261017-234250-2ce4, finding L2, LOW
-probe-key: ab9ae2bf6636232439977e37a278f13eafee898f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
 ## INV-8752 — probe — LOW — the served regions array is not in badge order once a drawn area's served number passes a model region's
 
@@ -14871,26 +14698,6 @@ case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D" ;; esac
 
 measured 2026-10-27 by chain chain-kaylee--talk--docs-20261027-130001-122c, finding L4, LOW
 probe-key: 61c1bf4ed0810727cab68518e008e4695d4b0988
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
-
-## INV-9920 — probe — LOW — the page's key pattern is still looser than the server's; the row documents the gap, nothing tracks it once INV-9866 is retired
-
-LOW — the page's key pattern is still looser than the server's; the row documents the gap, nothing tracks it once INV-9866 is retired
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-grep -n 'KEY_SHAPE =' src/modules/settings/tabs/voice-settings/sections/GeminiVoiceSection.tsx | cut -c1-120
-grep -n 'KEY_PATTERN = new' server/modules/voice/gemini-key.ts | cut -c1-140
-EOF
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D" ;; esac
-```
-
-measured 2026-10-27 by chain chain-kaylee--talk--docs-20261027-130001-122c, finding L5, LOW
-probe-key: a11d243ace7bd71595524be4d7d30a3ea6ca2248
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
@@ -22199,21 +22006,6 @@ probe-key: 12676eb2945aca8188b792ba7f9f5c013b7f704d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-attachments-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-attachments-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/attach-whole-kit.mjs
 
-## INV-10576 — probe — an Escape pressed on the station aborts the chat that is running, unseen, in the held workspace
-
-an Escape pressed on the station aborts the chat that is running, unseen, in the held workspace
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/station-inside-cloudcli/athena-probes/esc-aborts-held-chat.mjs
-echo "[probe exit $?]"
-# expect: `on /station | abort frames sent after one Escape on the station: ["{\"type\":\"chat.abort\",\"sessionId\":\"…\"}"]` while the defect stands (one Haiku turn in /tmp/cloudcli-probe-chat, the scratch chat deleted afterwards); cured, `[]`
-```
-
-measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa, finding H1, HIGH
-probe-key: d55c226128680ee0365299779f1ac2f821a892d7
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs
-
 ## INV-10577 — probe — the station's chunk failing to load now replaces the whole app, workspace included; before, only the station's own window died
 
 the station's chunk failing to load now replaces the whole app, workspace included; before, only the station's own window died
@@ -22226,66 +22018,6 @@ echo "[probe exit $?]"
 
 measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa, finding M1, MEDIUM
 probe-key: a325e7a8db467ae6687003ee1dd9abb0c99ebb4f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs
-
-## INV-10578 — probe — the held station is never at rest: its CSS animations run under `visibility:hidden`, 1.8 % → 8 % main-thread time for the whole app after the first visit
-
-the held station is never at rest: its CSS animations run under `visibility:hidden`, 1.8 % → 8 % main-thread time for the whole app after the first visit
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/station-inside-cloudcli/athena-probes/held-station-animates.mjs
-echo "[probe exit $?]"
-# expect: `main-thread busy: workspace never visited station ~1.8% | station held ~8% | animations running inside the held station: ["kaylee-breath","kaylee-sway","kaylee-breath","kaylee-sway"]` while the defect stands; cured, the held figure near the first and the list `[]` (the probe prints in both states; run it alone — two browser probes at once collide on the harness login)
-```
-
-measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa, finding M2, MEDIUM
-probe-key: 540e6ae6c68f3a64c46d71af2ea9b298b439ca47
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs
-
-## INV-10579 — probe — React Router warns twice on every switch, because the three child routes of the one layout have no element
-
-React Router warns twice on every switch, because the three child routes of the one layout have no element
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/station-inside-cloudcli/athena-probes/router-warning.mjs
-echo "[probe exit $?]"
-# expect: `… warnings for one switch each way: 4` while the defect stands; cured, 0
-```
-
-measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa, finding L1, LOW
-probe-key: 531cee5912a267c0e124afe26f5d78f2eb25a3ba
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs
-
-## INV-10580 — probe — healed means deleted, left undone in four places
-
-healed means deleted, left undone in four places
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/station-inside-cloudcli/athena-probes/stale-names.sh
-echo "[probe exit $?]"
-# expect: four lines each ending `: 1` while the staleness stands; cured, every count is 0
-```
-
-measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa, finding L2, LOW
-probe-key: e0ffbe155eda27a53df70c10f08d3decbe56fc4d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs
-
-## INV-10581 — probe — two station probes still assert the window that is gone (the brief: "update any probe that relies on the separate window")
-
-two station probes still assert the window that is gone (the brief: "update any probe that relies on the separate window")
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -c "waitForEvent('page'" .verify/kaylee-station-whole.mjs .verify/station-needs-live.mjs; grep -c "window.name).catch(() => '')) === 'kaylee-station'" .verify/kaylee-station-whole.mjs
-echo "[probe exit $?]"
-# expect: `…whole.mjs:1`, `…needs-live.mjs:1` and `1` while they assert a window; cured, 0 / 0 / 0
-```
-
-measured 2026-10-31 by chain chain-station-inside-cloudcli-20261031-101513-64fa, finding L3, LOW
-probe-key: 961d86f3c6bb0bb72e0221a86b18e354a78142a1
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useHeldWorkspace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/StationRoute.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cloudcliDoors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/StationLayerContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/HeldPage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-inside-cloudcli.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/station-theme-shots.mjs
 
@@ -25555,3 +25287,136 @@ measured 2026-11-04 by chain chain-dev-restart-quiet-hold-20261104-161216-ce01, 
 probe-key: 0b51ec53f68c2030426bc43b1f5344be1e5d0378
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/hold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/restart-hold/restart-hold.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/restart-hold-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSounding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-tail.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-waits.mjs
+
+## INV-10957 — probe — MEDIUM — a Release that reaches a plan already started by his own Start silently takes the override back
+
+MEDIUM — a Release that reaches a plan already started by his own Start silently takes the override back
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/usr/bin/env bash
+R=$1
+mkdir -p "$R/state/dispatcher" || exit 1
+export DISPATCHER_HOME="$R/state/dispatcher" DISPATCHER_WIP_FLAG_PATH="$R/wip.flag" DISPATCHER_EPICS_FLAG_PATH="$R/epics.flag" PLAN_RUNNER_DEEPSEEK_FLAG_PATH="$R/ds.flag" DISPATCHER_PEAK_FLAG_PATH="$R/peak.flag"
+unset CLAUDE_CODE_SESSION_ID PLAN_RUNNER_DEEPSEEK DISPATCHER_SCRATCH_DAEMON
+python3 -I - "$R" <<'PY'
+import json, subprocess, sys
+sys.path.insert(0, "/home/lyphe/.claude/hooks")
+from dispatcher import store, store_write
+R = sys.argv[1]
+BIN = "/home/lyphe/.claude/scripts/dispatcher"
+def cli(*a): return subprocess.run([BIN, *a], capture_output=True, text=True, timeout=120)
+def card(n): return next(p for p in json.loads(cli("status", "--json").stdout)["plans"] if p["name"] == n)
+c = store.connect()
+with c: store_write.open_plan(c, "athena-rel", repo=R, session=None)
+with c:
+    store_write.put_design(c, "athena-rel", {"repo": R, "goal": "g", "delivers": "d", "architecture": "a", "interfaces": "i", "constraints": "c", "waits_on": [], "questions": [], "source_path": "athena"})
+    store_write.put_phases(c, "athena-rel", [{"key": "p1", "title": "T", "goal": "g", "assignee": "hephaestus", "waits_on": [], "start_here": []}], "athena")
+c.close()
+cli("accept", "athena-rel", "--held"); cli("epics", "pause")
+start = cli("resume", "athena-rel"); print("Start under Pause all:", (start.stdout.splitlines() or ["(no output)"])[0], "| queue_hold:", card("athena-rel")["queue_hold"])
+rel = cli("resume", "athena-rel", "--by", "release"); print("Release on the plan that is already running: exit", rel.returncode, "|", (rel.stdout.splitlines() or ["(no output)"])[0])
+print("queue_hold after:", card("athena-rel")["queue_hold"])
+PY
+EOF
+bash "$D/p.sh" "$D" 2>&1 | cut -c1-200
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today `Release on the plan that is already running: exit 0 | RESUMED athena-rel` and `queue_hold after: queue: Pause all is on`; cured: the Release is refused (exit 2) and `queue_hold after: None`
+```
+
+measured 2026-11-05 by chain chain-plan-hold-20261105-154133-b881, finding M1, MEDIUM
+probe-key: 51c3f154c9005863ba4671f71d0b72c4aaf1c9d4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-scratch.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-wire.ts, /home/lyphe/.claude/hooks/intent_lock.py
+
+## INV-10958 — probe — LOW — the board's one Start releases every deliberately Held plan, and the docs still say it reaches only a Stop's plans
+
+LOW — the board's one Start releases every deliberately Held plan, and the docs still say it reaches only a Stop's plans
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/usr/bin/env bash
+R=$1
+mkdir -p "$R/state/dispatcher" || exit 1
+export DISPATCHER_HOME="$R/state/dispatcher" DISPATCHER_WIP_FLAG_PATH="$R/wip.flag" DISPATCHER_EPICS_FLAG_PATH="$R/epics.flag" PLAN_RUNNER_DEEPSEEK_FLAG_PATH="$R/ds.flag" DISPATCHER_PEAK_FLAG_PATH="$R/peak.flag"
+unset CLAUDE_CODE_SESSION_ID PLAN_RUNNER_DEEPSEEK DISPATCHER_SCRATCH_DAEMON
+python3 -I - "$R" <<'PY'
+import json, subprocess, sys
+sys.path.insert(0, "/home/lyphe/.claude/hooks")
+from dispatcher import store, store_write
+R = sys.argv[1]
+BIN = "/home/lyphe/.claude/scripts/dispatcher"
+def cli(*a): return subprocess.run([BIN, *a], capture_output=True, text=True, timeout=120)
+def doc(): return json.loads(cli("status", "--json").stdout)
+c = store.connect()
+name = "athena-held-on-purpose"
+with c: store_write.open_plan(c, name, repo=R, session=None)
+with c:
+    store_write.put_design(c, name, {"repo": R, "goal": "g", "delivers": "d", "architecture": "a", "interfaces": "i", "constraints": "c", "waits_on": [], "questions": [], "source_path": "athena"})
+    store_write.put_phases(c, name, [{"key": "p1", "title": "T", "goal": "g", "assignee": "hephaestus", "waits_on": [], "start_here": []}], "athena")
+c.close()
+print("Hold:", cli("accept", name, "--held").stdout.strip())
+print("board's Start counts it (route.waiting):", doc()["route"]["waiting"])
+print("board's one Start:", (cli("start").stdout.splitlines() or ["(no output)"])[0])
+print("the Held plan now reads:", next(p for p in doc()["plans"] if p["name"] == name)["status"])
+PY
+EOF
+bash "$D/p.sh" "$D" 2>&1 | cut -c1-200
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today `route.waiting: 1`, `STARTED 1 plan(s)` and `the Held plan now reads: live`; cured (if the operator rules Hold's plans out of the board's Start): `route.waiting: 0`, no plan started, and the plan still `queued`
+```
+
+measured 2026-11-05 by chain chain-plan-hold-20261105-154133-b881, finding L1, LOW
+probe-key: 71560dec9e0c4657af100673dc8872c608211d00
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-scratch.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-wire.ts, /home/lyphe/.claude/hooks/intent_lock.py
+
+## INV-10960 — probe — LOW — "no index can drift again" holds in the product code, not in the proofs and probes that still read the three by position or by count
+
+LOW — "no index can drift again" holds in the product code, not in the proofs and probes that still read the three by position or by count
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 200 node .verify/probe-card-ask-machinery.mjs 2>&1 | grep -E "FAIL|PASS every|FAILED"
+bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/parked_deck.sh 2>&1 | tail -1
+echo "[probe exit $?]"
+# expect: today `[FAIL] lockOptions reads Queue, Hide and Rework by position 0, 1 and 2…`, `1 FAILED …` and `ValueError: too many values to unpack (expected 3)`; cured: neither line, and parked_deck.sh printing its own `hide ez.arc -> …` answer
+```
+
+measured 2026-11-05 by chain chain-plan-hold-20261105-154133-b881, finding L3, LOW
+probe-key: caa221732618b9d0a926c1bae37776eb8fb602cd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-scratch.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-wire.ts, /home/lyphe/.claude/hooks/intent_lock.py
+
+## INV-10961 — probe — LOW — MAN-1466 still tells the reader the Stop hold spells three options
+
+LOW — MAN-1466 still tells the reader the Stop hold spells three options
+
+```probe
+cd /home/lyphe/.claude && printf 'MAN-1466 lines spelling the three options: '; docstore get MAN-1466 --text | grep -c "'Hide — held until shown' · 'Rework'"
+echo "[probe exit $?]"
+# expect: `1` today; `0` once the row names the four (or only `OPTIONS_PHRASE`)
+```
+
+measured 2026-11-05 by chain chain-plan-hold-20261105-154133-b881, finding L4, LOW
+probe-key: cb8d45650c0335c7b57d25bc808f7cf177cdaaae
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-scratch.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-wire.ts, /home/lyphe/.claude/hooks/intent_lock.py
+
+## INV-10962 — probe — LOW — the three new standing proofs are governed by no row and named by none
+
+LOW — the three new standing proofs are governed by no row and named by none
+
+```probe
+cd /home/lyphe/.claude && for f in hold-release-scratch.py hold-release-board.mjs hold-release-wire.ts; do printf "$f: "; docstore govern /home/lyphe/.claude/claudecodeui_lyphe/.verify/$f --touch write --limit 3 --text | head -1 | cut -c1-60; done
+echo "[probe exit $?]"
+# expect: three `(no rows)` lines today; a token on each once a row governs the file
+```
+
+measured 2026-11-05 by chain chain-plan-hold-20261105-154133-b881, finding L5, LOW
+probe-key: 80f7ee59a1ca40721b767e5a4e8252378e1061e0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-scratch.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-wire.ts, /home/lyphe/.claude/hooks/intent_lock.py

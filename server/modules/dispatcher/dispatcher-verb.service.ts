@@ -15,7 +15,8 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * `--last`, or `--at` a place), `epics` (the epic dial's word: `1` to `5`, `pause` or `resume`),
  * `start` (the board's one Start: every plan held for its first Start let go at once), `hide` (plans, or an
  * epic's open plans, paused and held out of the queue until shown — a walk in flight stops once its task
- * in flight finishes) and `unhide` (Show: each hidden plan takes its turn in the queue). Hide and Show take
+ * in flight finishes) and `unhide` (Show: each hidden plan comes back held, or paused if it had walked,
+ * and starts by its own Release or Start). Hide and Show take
  * plan or epic names, any number of them, and are BOARD verbs for the relay: the names are the argv.
  * `override` is the card's lift of the usage pacer's hold for one plan or one epic (`--by app:card`, and `--off`
  * for its undo), the pacer's gate and no other.

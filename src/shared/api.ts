@@ -1262,6 +1262,9 @@ export const api = {
     plan: (name: string) => get(`/api/dispatcher/plans/${encodeURIComponent(name)}`),
     stop: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/stop`, {}),
     resume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/resume`, {}),
+    // The card's Release on a plan held at the gate (`dispatcher resume <plan> --by release`): the plan takes its turn in
+    // the queue, where `resume` (Start) is the override that goes past it.
+    release: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/release`, {}),
     park: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/park`, {}),
     unpark: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/unpark`, {}),
     // A plan out of the store for good (`dispatcher drop <plan>`): `DROPPED <name>`, or the

@@ -15,11 +15,11 @@ type LockAsk = Extract<DispatcherAsk, { kind: 'accept' }>;
 /** Every press of the form: 32 px at a desk, a 44 px catch under a finger (`finger:` — a touch screen, or a window under 768 px; the touch law). */
 const PRESS = 'h-8 finger:h-11';
 
-/** A lock with nothing typed: the three answers showing, no notes. */
+/** A lock with nothing typed: the answers showing, no notes. */
 const BLANK_LOCK: LockCompose = { rework: false, notes: '' };
 
 /**
- * A LOCK'S ANSWER FORM — the census a plan's Accept prompt prints, whole, and the three words under it.
+ * A LOCK'S ANSWER FORM — the census a plan's Accept prompt prints, whole, and the four words under it.
  *
  * THE CENSUS IS DRAWN WHOLE, EVERY TIME, IN ONE BOUNDED REGION. `ask.question` is what
  * `dispatcher question <plan>` printed, and its last line pins it (`Run it? · lock:<digest>`): the
@@ -30,22 +30,23 @@ const BLANK_LOCK: LockCompose = { rework: false, notes: '' };
  * (`tabIndex={0}`) so the whole of it can be read from the keyboard, and a `region` named for the
  * lock's own header, so a screen reader hears which prompt it is inside before the words.
  *
- * THE THREE TAKE ONE PRESS EACH, AND THEIR LABELS ARE VERBATIM. `lockOptions(ask)` is
- * `intent_lock.OPTIONS`' three, in contract order, and the label IS the word sent back as the answer
+ * THE FOUR TAKE ONE PRESS EACH, AND THEIR LABELS ARE VERBATIM. `lockOptions(ask)` is
+ * `intent_lock.OPTIONS`' four, found by their labels, and the label IS the word sent back as the answer
  * — a prettified one would be an answer the prompt never offered. Each button carries its own
  * description as its `title`, so what a press does is readable before it is made: Queue records the
- * verdict and puts the run in the queue, where it starts when its turn comes; Hide records it and keeps
- * the run hidden and not started until he Shows it; Rework sends the operator's notes to the plan's
+ * verdict and puts the run in the queue, where it starts when its turn comes; Hold records it and keeps
+ * the run in the queue, visible on this card and not started until he Releases it; Hide records it and keeps
+ * the run hidden and not started until he Shows it, which brings it back held; Rework sends the operator's notes to the plan's
  * designer and launches nothing. They are one row of one weight in three variants — primary,
- * secondary, outline — so the press that starts work reads strongest and the one that sends words
- * back reads quietest.
+ * secondary, outline — so the press that starts work reads strongest (Queue), the two that approve and
+ * hold read as one family (secondary: Hold, Hide), and the one that sends words back reads quietest.
  *
  * WHERE NOTHING HOVERS, THE DESCRIPTIONS STAND IN WORDS (`[@media(hover:none)]`, the touch law: nothing is said
- * only on hover). Under the three, inside the same group, one muted line per answer is led by its label and says what
+ * only on hover). Under the answers, inside the same group, one muted line per answer is led by its label and says what
  * the press does; a pointer sees none of them and keeps the `title`. The lines are `aria-hidden`: the `title` is
  * already each button's description for a screen reader, which would otherwise hear every answer twice.
  *
- * THE THREE ARE A GROUP THE KEYBOARD CAN LAND ON (`data-ask-answers`, `tabIndex={-1}`, `role="group"`, named by the
+ * THE ANSWERS ARE A GROUP THE KEYBOARD CAN LAND ON (`data-ask-answers`, `tabIndex={-1}`, `role="group"`, named by the
  * census region above it). The station's Accept lands the keyboard there and never on Queue itself, so a second
  * Enter after the one that opened the card presses nothing and approves nothing: Queue is one Tab away, and the
  * press that approves is one he chose after the census was in front of him (the lock law).
@@ -53,9 +54,9 @@ const BLANK_LOCK: LockCompose = { rework: false, notes: '' };
  * UNDER A FINGER every press is 44 px (`finger:h-11`: a touch screen, or a window under 768 px), the notes'
  * Send and Cancel with them; at a desk with a mouse they keep their 32 px.
  *
- * REWORK IS A FIELD, NOT A PRESS. It swaps the three for a notes textarea — the one answer that
+ * REWORK IS A FIELD, NOT A PRESS. It swaps the answers for a notes textarea — the one answer that
  * carries words — and `Send notes` stays disabled until those words exist, so no Rework is ever sent
- * empty. `Cancel` gives the three back with the notes still in them: a reader who cancelled to
+ * empty. `Cancel` gives the answers back with the notes still in them: a reader who cancelled to
  * re-read the census has not untyped what he wrote, and the form is kept mounted across a fold for
  * that same reason (`PlanAsk` hides it rather than unmounting it).
  *
@@ -63,9 +64,9 @@ const BLANK_LOCK: LockCompose = { rework: false, notes: '' };
  * notes field is open and what is in it are a draft in the `dispatcher` preference (`askDrafts.ts`,
  * through `useAskDraft`), so a reload, the other surface or an unmounted widget gives the field back
  * open, with the notes in it, and nothing focused. A draft is never sent by itself: every send is the
- * operator's press, and a TAKEN answer — any of the three — clears it.
+ * operator's press, and a TAKEN answer — any of them — clears it.
  *
- * `busy` IS READ, NEVER GUESSED: every control THAT LEADS TO A SEND — Queue, Hide, Rework and
+ * `busy` IS READ, NEVER GUESSED: every control THAT LEADS TO A SEND — Queue, Hold, Hide, Rework and
  * Send notes — refuses a press while the lane is carrying one, because a lock is ONE word, and two
  * presses racing at the same store is how a plan is approved twice. The two compose-only controls,
  * the notes field and Cancel, stay live on purpose: neither puts anything on the wire, and gating
@@ -81,11 +82,11 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
   const { answer, busy: carrying } = useDispatcherVerbs(ask.plan);
 
   // Whether the lane is carrying this plan's answer right now. Essential: a lock is ONE word, and the
-  // four controls below that lead to it being sent (Queue, Hide, Rework, Send notes) each read it,
+  // five controls below that lead to it being sent (Queue, Hold, Hide, Rework, Send notes) each read it,
   // so two presses racing at the same store cannot approve the plan twice.
   const busy = carrying === 'answer';
 
-  // Whether the three answers have given way to the notes field, and the notes exactly as typed. Essential: a Rework is the one answer that cannot be sent without words, `rework` is the whole of what swaps the controls, and the notes are its payload — sent to the plan's designer word for word. They live above the swap, so Cancel and a fold of the card both leave them where the operator wrote them, and they are a draft in the preference too (`useAskDraft`), which is why they come back after a reload.
+  // Whether the answers have given way to the notes field, and the notes exactly as typed. Essential: a Rework is the one answer that cannot be sent without words, `rework` is the whole of what swaps the controls, and the notes are its payload — sent to the plan's designer word for word. They live above the swap, so Cancel and a fold of the card both leave them where the operator wrote them, and they are a draft in the preference too (`useAskDraft`), which is why they come back after a reload.
   const { state: compose, edit, clear: clearDraft, scopeRef } = useAskDraft(askIdentity(ask), BLANK_LOCK, LOCK_DRAFT);
   const { rework, notes } = compose;
 
@@ -103,6 +104,11 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
   // recorded and the run joins the queue, starting when its turn comes.
   const pressQueue = () => {
     void answer(ask, { [ask.question]: options.queue.label }).then(settle);
+  };
+
+  // Hold: the same press with the hold label — the verdict is recorded and the run waits in the queue, visible, for his Release.
+  const pressHold = () => {
+    void answer(ask, { [ask.question]: options.hold.label }).then(settle);
   };
 
   // Hide: the same press with the hide label — the verdict is recorded and the run is held hidden.
@@ -181,6 +187,18 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
               {options.queue.label}
             </Button>
             <Button
+              data-ask-hold
+              type="button"
+              variant="secondary"
+              size="sm"
+              className={PRESS}
+              title={options.hold.description}
+              disabled={busy}
+              onClick={pressHold}
+            >
+              {options.hold.label}
+            </Button>
+            <Button
               data-ask-hide
               type="button"
               variant="secondary"
@@ -206,7 +224,7 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
             </Button>
           </div>
           <div aria-hidden="true" data-ask-answer-words className="hidden min-w-0 flex-col gap-1 [@media(hover:none)]:flex">
-            {[options.queue, options.hide, options.rework].map((option) => (
+            {[options.queue, options.hold, options.hide, options.rework].map((option) => (
               <p key={option.label} className="text-xs leading-snug text-muted-foreground">
                 <span className="font-medium text-foreground">{option.label}</span>{' · '}{option.description}
               </p>
