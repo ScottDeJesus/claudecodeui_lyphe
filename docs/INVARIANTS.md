@@ -140,20 +140,6 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-run-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-stuck-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-run-merge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-side-widgets.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/stale-chat/asclepius-stale-proof.mjs
 
-## INV-4650 — probe — MAN-373 and ScrollArea's comment say "a focus" scrolled the outer box; measured, a focus does not
-
-MAN-373 and ScrollArea's comment say "a focus" scrolled the outer box; measured, a focus does not
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/runner-card-makeover--whole/athena-probes/focusescape.mjs
-expect: `before (static):` prints "outerScrollTop":0 with "innerScrollTop" equal to "innerMax" — a focus never reaches the escaped range
-```
-
-measured 2026-09-26 by chain chain-runner-card-makeover--whole-20260926-210824-bf49, finding L2, LOW
-probe-key: 5ba30369542f5607a441e4f2004ee7f839d99d20
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanPhaseRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
-
 ## INV-6114 — probe — the ask and landing probes answer api.github.com in the page
 
 `.verify/probe-card-ask.mjs`, `.verify/probe-runner-widget-list.mjs` and `.verify/probe-runner-landing.mjs` each answer `api.github.com` with an empty release (`context.route(GITHUB, …)`), 200 `{}`, registered before the page is created.

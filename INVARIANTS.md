@@ -107,20 +107,6 @@ probe-key: fe6d7103d88f1c1ee9fa2ec5dd75af2c64bd3197
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raise.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/ask.py, /home/lyphe/.claude/hooks/dispatcher/cmd/ask.py, /home/lyphe/.claude/hooks/dispatcher/owed.py, /home/lyphe/.claude/hooks/dispatcher_stop_planners.py, /home/lyphe/.claude/hooks/dispatcher_stop.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/epic/SKILL.md, /home/lyphe/.claude/skills/feature/SKILL.md
 
-## INV-5712 — probe — The durable ask name is unique per record, not per ask over time
-
-The durable ask name is unique per record, not per ask over time
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/plan-ask-survives-restart/athena-probes/id_reuse.sh
-expect: `two different asks share one key (phone push memory and tab bell key on it): false` (today: true)
-```
-
-measured 2026-09-28 by chain chain-plan-ask-survives-restart-20260928-202000-d5a0, finding L3, LOW
-probe-key: 8fa53d1bac9f9cec9c9d2c27e055571fbe5bc7a7
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-names.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
-
 ## INV-5729 — probe — LOW — a repeated name in one Accept now fails the whole Accept with a false "already approved"
 
 LOW — a repeated name in one Accept now fails the whole Accept with a false "already approved"
@@ -140,20 +126,6 @@ probe-key: 865e41d8b4312cc946816bfea9e36790345505cd
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/hooks/dispatcher/accept.py, /home/lyphe/.claude/hooks/dispatcher/cmd/run.py, /home/lyphe/.claude/hooks/dispatcher/judgment_accept.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/hooks/dispatcher/store_write.py, /home/lyphe/.claude/hooks/intent_lock.py
 
-## INV-5742 — probe — the gates are checked before the launch-table ask and never after, and the ask makes the window about ten times wider
-
-the gates are checked before the launch-table ask and never after, and the ask makes the window about ten times wider
-
-```probe
-sh /home/lyphe/.claude/state/pipeline-reviews/agent-launch-config--metis/scn/stagger2.sh now resume 40
-expect: resume stagger 40 ms -> ["took","refused 409"] and "--resume children actually started: 1"   (measured on this tree: ["took","took"], 2, three runs out of three; HEAD gives ["took","refused 409"], 1)
-```
-
-measured 2026-09-28 by chain chain-agent-launch-config--metis-20260928-230031-e11a, finding M1, MEDIUM
-probe-key: 8fe0de5199e8f2955f04724593709a8ab908628b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/kanban-metis.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-env.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-spawn.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
-
 ## INV-5743 — probe — a table outage is charged by the driver as a failed launch, and parks the board for ten minutes
 
 a table outage is charged by the driver as a failed launch, and parks the board for ten minutes
@@ -167,34 +139,6 @@ measured 2026-09-28 by chain chain-agent-launch-config--metis-20260928-230031-e1
 probe-key: 7c92631fa3d5838604abd32e8efe3f7b95ac7a0b
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/kanban-metis.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-env.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-spawn.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
-
-## INV-5744 — probe — Two saves in flight: `saving` is one string, so the second overwrites the first's hold and the first to finish releases the other's
-
-Two saves in flight: `saving` is one string, so the second overwrites the first's hold and the first to finish releases the other's
-
-```probe
-cd /home/lyphe/.claude/state/pipeline-reviews/agent-launch-config--fill/athena-probes && node s12.mjs
-expect: the line `held=-` is printed BEFORE the line `hermes answered` (today ≈2.1 s vs ≈4.7 s); held once means hermes stays `held=hermes` until its own answer
-```
-
-measured 2026-09-28 by chain chain-agent-launch-config--fill-20260928-232057-5938, finding M1, MEDIUM
-probe-key: b0bc55a3044296cd33bf19125dbaf5d614725005
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/hooks/useAgentLaunch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
-
-## INV-5745 — probe — A non-JSON answer reaches the tab as a JSON parser's fragment
-
-A non-JSON answer reaches the tab as a JSON parser's fragment
-
-```probe
-cd /home/lyphe/.claude/state/pipeline-reviews/agent-launch-config--fill/athena-probes && node s6b.mjs
-expect: the `html-502` and `html-200` lines print an unreadable banner carrying `Unexpected token '<'` (a readable sentence would carry no parser text)
-```
-
-measured 2026-09-28 by chain chain-agent-launch-config--fill-20260928-232057-5938, finding L1, LOW
-probe-key: ee466fa289d9437e0dc09b553323423be5fc7e3e
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/hooks/useAgentLaunch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
 ## INV-5746 — probe — A 200 whose body is not a census blanks the workspace region
 
