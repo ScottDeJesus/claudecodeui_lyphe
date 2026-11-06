@@ -58,6 +58,12 @@ const TICK_INTERVAL_MS = 60_000;
 /** The ntfy channel's name in `notification_channel_endpoints`. */
 const NTFY_CHANNEL = 'ntfy';
 
+/**
+ * Pages are halted: on 2026-11-06 the operator asked for Cerberus notifications to stop reaching the phone. Every tick
+ * still records its incidents, so the reminder and re-open clocks stay true; nothing is pushed. `false` pages again.
+ */
+const PAGES_HALTED = true;
+
 let tickTimer: NodeJS.Timeout | null = null;
 
 type RedWatchCode = 'cerberus.red' | 'cerberus.red.reminder' | 'cerberus.recovered';
@@ -174,6 +180,10 @@ export function tickRedWatch(overview: CerberusOverview): void {
     return;
   }
 
+  if (PAGES_HALTED) {
+    console.log(`[red-watch] ${counts}${closed} → pages halted, nobody paged`);
+    return;
+  }
   const userIds = notificationChannelEndpointsDb.getUserIdsWithEnabledEndpoint(NTFY_CHANNEL);
   if (userIds.length === 0) {
     console.log(`[red-watch] ${counts}${closed} → no enabled ntfy endpoint, nobody paged`);
