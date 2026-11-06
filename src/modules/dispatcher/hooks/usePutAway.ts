@@ -15,7 +15,7 @@ type PutAway = {
   plan(plan: DispatcherPlan): () => void;
   /** An epic deck's corner press over the deck's drawn `plans`, the epic named `arc`. */
   arc(arc: string, plans: readonly DispatcherPlan[]): () => void;
-  /** Show for `plans`, all hidden at the dispatcher: they take their turn in the queue again. */
+  /** Show for `plans`, all hidden at the dispatcher: they come back held (paused, if they had walked), not started. */
   show(plans: readonly DispatcherPlan[]): void;
 };
 

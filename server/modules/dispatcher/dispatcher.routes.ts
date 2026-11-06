@@ -158,7 +158,7 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's twenty-seven routes: three reads of the plan list, twelve presses on a plan, eight on
+ * The dispatcher lane's twenty-eight routes: three reads of the plan list, thirteen presses on a plan, eight on
  * an arc, four on the board. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
@@ -271,6 +271,10 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
 
   router.post('/plans/:name/stop', relay('stop'));
   router.post('/plans/:name/resume', relay('resume'));
+  // The card's Release on a plan HELD at the gate (`dispatcher resume <plan> --by release`): the same verb as Start, with
+  // the dispatcher's one word for a release that is no override — the plan takes its turn in the queue, and Pause all is
+  // not lifted for it. The word is ours, never the request's; no body travels. Start (the route above) stays the override.
+  router.post('/plans/:name/release', relay('resume', () => ['--by', 'release']));
   router.post('/plans/:name/park', relay('park'));
   router.post('/plans/:name/unpark', relay('unpark'));
   // A plan taken out of the store for good (`dispatcher drop <name>`) — the one press no other press

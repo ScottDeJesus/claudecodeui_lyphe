@@ -869,6 +869,7 @@
     "waiting_other": "{{count}} waiting for you",
     "stop": "Stop",
     "resume": "Resume",
+    "release": "Release",
     "start": "Start",
     "collapse": "Collapse",
     "expand": "Expand",

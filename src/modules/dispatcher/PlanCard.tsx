@@ -61,7 +61,7 @@ function queueClause(hold: string): string {
  * THE CORNER PUTS THE CARD AWAY. A COMPLETE plan's corner is Dismiss: the card leaves the board, and no
  * list or count keeps it (`hiddenPlans.ts`; the dispatcher is never told). Any other plan's is Hide, and a
  * hide is the dispatcher's (`usePutAway`): the plan is paused and held out of the queue, `Hidden · N` lists
- * it and `Show` brings it back and lets it take its turn. News on a hidden plan draws its card again, still
+ * it and `Show` brings it back held (paused, if it had walked), not started. News on a hidden plan draws its card again, still
  * reading HIDDEN, with a `Show` of its own (`PlanControls`). Neither deletes anything, so no dialog guards
  * either. `onPutAway` is the caller's `usePutAway(carriedNames).plan(plan)`, because only the caller holds
  * the lane's carried names the store prunes against.

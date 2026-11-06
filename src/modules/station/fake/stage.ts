@@ -62,7 +62,8 @@ const ACCEPT: DispatcherAsk = {
   token: 'lock:station-fake-0000000000',
   options: [
     { label: 'Queue — starts on its turn', description: 'Record the verdict and put the run in the queue; it starts when its turn comes.' },
-    { label: 'Hide — held until shown', description: 'Record the verdict and keep the run hidden, not started; Show on the Hidden list puts it back in the queue.' },
+    { label: 'Hold — queued, held until released', description: 'Record the verdict and keep the run in the queue, visible on its card and not started; Release on its card puts it back on its turn.' },
+    { label: 'Hide — held until shown', description: 'Record the verdict and keep the run hidden, not started; Show on the Hidden list brings it back held.' },
     { label: 'Rework', description: 'Send your notes back to the feature\'s designer; nothing launches.' },
   ],
   rework: [WAITING_PLAN],

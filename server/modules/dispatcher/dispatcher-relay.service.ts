@@ -35,8 +35,8 @@ export function isLockOrder(order: RelayOrder): order is LockRelayOrder {
 // Used by `dispatcher.module.ts`: the reply his word makes to the prompt, in the shape the book carries.
 export function replyOfLockOrder(order: LockRelayOrder): AskReply {
   switch (order.verb) {
-    case 'queue': return { kind: 'accept', hidden: false };
-    case 'hide-lock': return { kind: 'accept', hidden: true };
+    case 'queue': return { kind: 'accept', placing: 'queue' };
+    case 'hide-lock': return { kind: 'accept', placing: 'hide' };
     case 'rework-lock': return { kind: 'rework', notes: order.notes };
     case 'answers': return { kind: 'answers', brief: order.brief };
   }

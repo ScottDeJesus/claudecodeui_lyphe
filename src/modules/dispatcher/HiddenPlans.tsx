@@ -20,8 +20,9 @@ import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/s
  *
  * THE STATUS WORD RIDES EVERY ROW (`hidden`), the one place on the screen that says what the plan is:
  * a plan hidden while it walked stops once its task in flight finishes. `Show` and `Show all` are each ONE
- * press of the dispatcher's `unhide` (`usePutAway`): the plans take their turn in the queue — they start when
- * it comes, and not before — and a shown card returns to the grid on the next frame, which is the store read back.
+ * press of the dispatcher's `unhide` (`usePutAway`): the plans come back HELD (PAUSED, if they had walked) and
+ * start by their own Release or Start — and a shown card returns to the grid on the next frame, which is the
+ * store read back.
  *
  * `data-hidden-plans` is the root's handle and `data-show-plan=<name>` each row's button, so a probe
  * presses one plan's Show without reading the rows' text.

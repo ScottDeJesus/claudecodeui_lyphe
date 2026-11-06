@@ -106,8 +106,8 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * the EPIC — every unfinished plan of it, paused and held out of the queue, in the `Hidden` list — and the
  * deck's done plans are dismissed, so the deck leaves; by the one rule a plan's corner follows
  * (`putAwayVerb`). It is ONE press: a `Show` of any of its plans, or news on any plan of the arc, brings the
- * whole deck back (`hiddenPlans.ts`; news draws the cards again, still reading HIDDEN, and Show lets them
- * run). A wholly done deck draws no `Dismiss done features`, which would be its corner again.
+ * whole deck back (`hiddenPlans.ts`; news draws the cards again, still reading HIDDEN, and Show brings them
+ * back held). A wholly done deck draws no `Dismiss done features`, which would be its corner again.
  *
  * A FOLD KEEPS THAT WHOLE HEAD (MAN-5412) and takes the bar, the flow and the cards: the model
  * switch and Start/Pause are VERBS, and the reader who folded a deck away asked for the row, not for a

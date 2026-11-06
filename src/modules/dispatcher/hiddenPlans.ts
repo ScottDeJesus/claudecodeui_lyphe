@@ -15,7 +15,7 @@ import type { DispatcherPlan, PreferenceEntryPatch } from '@/shared/types';
  *   of hidden cards that are done".
  * - HIDE is the press an UNFINISHED card offers (`putAwayVerb`): the dispatcher pauses the plan and holds it
  *   out of the queue, the card goes to the `Hidden` list at the foot of both homes, and `Show` brings it
- *   back and lets it take its turn, because a plan still to run must stay reachable.
+ *   back held (paused, if it had walked), because a plan still to run must stay reachable.
  *
  * An entry is read for a DONE plan only (`useDispatcherPlans`): one that names a plan with work still
  * ahead is none of this list's business and reads as no entry. The list is the operator's, per user, and

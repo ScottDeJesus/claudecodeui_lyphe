@@ -1,7 +1,8 @@
 import type { RelayedPress } from '@/shared/relayed-press-types.js';
 import type { DispatcherAsk, DispatcherCardAnswer, DispatcherStateEvent, ProviderPermissionDecision, ProviderRuntimePermissionGateway, ProviderRuntimeRecalledPrompt } from '@/shared/types.js';
+import { acceptAnswerOf } from '@/shared/utils.js';
 
-import { REWORK_OPTION, readReply } from './dispatcher-answer.service.js';
+import { readReply } from './dispatcher-answer.service.js';
 import type { AnswerDoor, AskReply, CarriedAnswer, CarryRelay } from './dispatcher-answer.service.js';
 import { isAskKey, keyOf } from './dispatcher-ask-names.service.js';
 import { createAskReads } from './dispatcher-ask-reads.service.js';
@@ -167,15 +168,18 @@ export type DispatcherAsks = {
 };
 
 /**
- * The PHONE's button input for one ask. An Accept is ONE question — the census, its three answers in
- * their order, Rework taking the operator's notes (`needsNote`: a button cannot carry words, so the
- * phone's Rework opens the app instead). A questions round is one question per designer question, its
- * options verbatim, headed with the plan's name.
+ * The PHONE's button input for one ask. An Accept is ONE question — the census and its answers in their
+ * order, minus Hold: ntfy carries three buttons at most (`MAX_OPTION_BUTTONS`), and a push that offered
+ * four would carry none. Hold is answered on the card, which the push's app button reaches. Rework takes
+ * the operator's notes (`needsNote`: a button cannot carry words, so the phone's Rework opens the app,
+ * at the plan's card, instead). A questions round is one question per designer question, its options
+ * verbatim, headed with the plan's name.
  */
 function inputOf(ask: DispatcherAsk): { questions: PanelQuestion[] } {
   if (ask.kind === 'accept') {
-    const options = ask.options.map((option, index) =>
-      index === REWORK_OPTION ? { ...option, needsNote: true as const } : option);
+    const options = ask.options
+      .filter((option) => acceptAnswerOf(option.label) !== 'hold')
+      .map((option) => (acceptAnswerOf(option.label) === 'rework' ? { ...option, needsNote: true as const } : option));
     return { questions: [{ question: ask.question, header: ask.header, multiSelect: false, options }] };
   }
   return {

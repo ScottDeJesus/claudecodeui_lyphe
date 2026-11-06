@@ -36,8 +36,10 @@ import { effectiveModelWord } from '@/shared/utils';
  *   front of, because the timer's press is the very Resume the button beside it sends. Resume runs
  *   under Pause all too: pressed under it, its own press is at or after the pause's moment (`line_gate`
  *   step 2), and the plan is let through while every plan not pressed stays held.
- * - `queued` → Start (it IS `resume`: the plan is approved and paused and has never walked). THIS START IS THE
- *   OVERRIDE: the master controller's one Start, at the top of In flight, lets every waiting plan go and leaves
+ * - `queued` → Release, then Start. The plan is approved and paused and has never walked — HELD: the Accept's Hold
+ *   answer puts a plan here, as does a Stop on a feature waiting its turn. RELEASE (`dispatcher resume <plan> --by
+ *   release`) puts it back on its turn in the queue, exactly where it was, and overrides nothing. START (it IS
+ *   `resume`) IS THE OVERRIDE: the master controller's one Start, at the top of In flight, lets every waiting plan go and leaves
  *   the queue's order and the epic limits to decide what runs, while this one lets THIS feature go right away —
  *   past the queue's order and its epic's feature limit (`release.own_press`).
  *   PAUSE ALL HOLDS A START ONLY WHEN THE PRESS CAME BEFORE IT WENT ON (`epic_dial.Dial.since`): a Start
@@ -47,7 +49,8 @@ import { effectiveModelWord } from '@/shared/utils';
  * - `scheduled` → the same, reading the armed hour: `Resume`/`Start` and `Cancel` (the schedule
  *   control). The hour itself is the card's own clock (`PlanFace.PlanClock`), said once.
  * - `hidden` → Show. The operator hid the plan, and a hide is the dispatcher's: the plan is paused and held out of the
- *   queue until he Shows it, which is also what lets it take its turn (`usePutAway`). The card is drawn at all only
+ *   queue until he Shows it, which lifts the hide and nothing else — the card then reads HELD (or PAUSED, if the plan
+ *   had walked) with its own Release or Start (`usePutAway`). The card is drawn at all only
  *   when news brought it back (an ask, an ending); the `Hidden` list is the usual way back.
  * - `parked` → Unpark. `idle` in `designed` or `questions` → Park, the way out of the Stop hold.
  * - `idle` in `designed` → `Accept when cut` before Park (`AcceptWhenCut`): the operator's Accept on the design he
@@ -101,7 +104,7 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   // A LIVE plan the queue holds while Pause all is on: the dispatcher's own reading (the board's dial and
   // this plan's clause), never the clause's words. Start is the press that picks this plan out of the pause.
   const startUnderPause = plan.status === 'live' && route?.epics?.paused === true && plan.queue_hold !== null;
-  const { stop, resume, schedule, park, unpark, plannerResume, setModel, armAccept, disarmAccept, busy } = useDispatcherVerbs(plan.name, 'plan',
+  const { stop, resume, release, schedule, park, unpark, plannerResume, setModel, armAccept, disarmAccept, busy } = useDispatcherVerbs(plan.name, 'plan',
     starts ? t('runner.start') : t('runner.resume'));
   const held = busy !== null;
   const armed = epochOf(plan.schedule?.start_at ?? null);
@@ -138,11 +141,19 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
     // ONE BUTTON, TWO STATES: the plan is at the gate (`starts` — Start, the override of the board's one Start) or
     // the plan is down mid-walk (`stops` — Resume, and `Resume at …`). The dispatcher's `resume` verb is what either
     // press runs, and the wording is what tells the operator whether he is beginning something or taking it back up.
+    // A plan HELD at the gate (`queued`) is offered Release before its Start: Release is the first choice (back on its
+    // turn), Start the override beside it. A `scheduled` plan has its hour armed and is released by it or by Start.
     // The hour is offered only to a plan that walked; once an hour IS set — on either — the control is its `Cancel`,
     // and where that hour is, the card's own clock already says (`PlanFace.PlanClock`).
+    const atGate = plan.status === 'queued';
     verbs = (
       <>
-        <Button size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => void resume()}
+        {atGate && (
+          <Button size="sm" className="h-8 finger:h-11" disabled={held} onClick={() => void release()} data-dispatcher-release>
+            {t('runner.release')}
+          </Button>
+        )}
+        <Button size="sm" variant={atGate ? 'secondary' : 'default'} className="h-8 finger:h-11" disabled={held} onClick={() => void resume()}
           {...(stops ? { 'data-dispatcher-resume': '' } : { 'data-dispatcher-start': '' })}>{word}</Button>
         {(stops || armed !== null) && (
           <ScheduleControl busy={held} onSchedule={(when) => void schedule(when)} startAt={armed} />

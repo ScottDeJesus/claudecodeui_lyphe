@@ -121,20 +121,6 @@ probe-key: 8fa53d1bac9f9cec9c9d2c27e055571fbe5bc7a7
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-names.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
-## INV-5727 — probe — HIGH — the chat door arms the park-at-peak hour BEFORE the store refuses, so a refused second Accept still schedules a Start for the plan the operator Queued
-
-HIGH — the chat door arms the park-at-peak hour BEFORE the store refuses, so a refused second Accept still schedules a Start for the plan the operator already answered
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/accept-once/athena-probes/hold_then_refuse.sh
-expect: `hour armed on the answered plan: None` (today: `2026-09-29T10:00:00Z`, with the second answer's text still reading "This answer recorded nothing")
-```
-
-measured 2026-09-28 by chain chain-accept-once-20260928-214132-9473, finding H1, HIGH
-probe-key: c6944f8dd646713cca7f890fbc04d9ba0f7f59c5
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/hooks/dispatcher/accept.py, /home/lyphe/.claude/hooks/dispatcher/cmd/run.py, /home/lyphe/.claude/hooks/dispatcher/judgment_accept.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/hooks/dispatcher/store_write.py, /home/lyphe/.claude/hooks/intent_lock.py
-
 ## INV-5729 — probe — LOW — a repeated name in one Accept now fails the whole Accept with a false "already approved"
 
 LOW — a repeated name in one Accept now fails the whole Accept with a false "already approved"
@@ -7944,56 +7930,6 @@ probe-key: 36eafe5a038bf5f5bb8fde98d4ebeffd15f55d80
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
 
-## INV-8359 — probe — LOW — at his text scale a header list leaves the viewport 5 px before the builder's "under about 340 px"
-
-LOW — at his text scale a header list leaves the viewport 5 px before the builder's "under about 340 px"
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-narrow.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-// READ-ONLY: every non-GET to /api is aborted; a dropdown is opened and closed with Escape, never chosen.
-import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
-import { DEV_USER } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { pinPreferences } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-import { answerThirdParties } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/wip-stub.mjs';
-const API = 'http://127.0.0.1:3011', APP = 'http://127.0.0.1:5183';
-const call = async (token, path, init = {}) => (await fetch(API + path, { ...init, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) } })).json();
-const token = (await call(null, '/api/auth/login', { method: 'POST', body: JSON.stringify(DEV_USER) })).token;
-const project = (await call(token, '/api/projects')).find((p) => String(p.fullPath ?? p.path ?? '').endsWith('claudecodeui_lyphe'));
-const chat = (await call(token, `/api/projects/${encodeURIComponent(project.projectId)}/sessions?limit=8`)).sessions.at(-1).id;
-const browser = await pw.chromium.launch();
-for (const [width, scale] of [[360, 1.072], [344, 1], [344, 1.072]]) {
-  const ctx = await browser.newContext({ viewport: { width, height: 800 }, colorScheme: 'light', locale: 'en-US', serviceWorkers: 'block' });
-  await ctx.addInitScript(([v]) => { localStorage.setItem('auth-token', v); localStorage.setItem('activeTab', 'runner'); }, [token]);
-  await pinPreferences(ctx, { theme: 'light' }, { writes: 'drop' }); await answerThirdParties(ctx);
-  await ctx.route(/\/api\//, (r) => (['GET', 'HEAD'].includes(r.request().method()) || /\/api\/(auth\/refresh|commands\/list)/.test(r.request().url()) ? r.fallback() : r.abort()));
-  const page = await ctx.newPage();
-  await page.goto(`${APP}/session/${chat}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('[data-master-controller]', { timeout: 30000 });
-  await page.evaluate((s) => { document.documentElement.style.fontSize = `${16 * s}px`; }, scale); await page.waitForTimeout(900);
-  const out = [];
-  for (const h of ['data-master-epics']) {
-    await page.locator(`[${h}] button[aria-haspopup="listbox"]`).click(); await page.waitForTimeout(300);
-    out.push(`${h.replace('data-master-', '')}: ${await page.evaluate(() => { const r = document.querySelector('[role="listbox"]').getBoundingClientRect(); return `${Math.round(r.left)}..${Math.round(r.right)}`; })}`);
-    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
-  }
-  console.log(`viewport ${width}px, text x${scale}: list spans ${out.join(' · ')}  (clipped when a span leaves 0..${width})`);
-  await ctx.close();
-}
-await browser.close();
-EOF
-printf 'cd /tmp && timeout 150 node "$1/p.mjs"\n' > "$D/p.sh"
-bash "$D/p.sh" "$D"
-cd /tmp; case "$D" in /tmp/athena-probe-narrow.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-expect: every line's span inside `0..<width>` — the 344 px line at text ×1.072 is the narrowest; a span outside it means the list is clipped
-```
-
-measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding L4, LOW
-probe-key: 92c34bda5fd69485ede6e4b9d762f71d8c27fd7f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
-
 ## INV-8360 — probe — MEDIUM — the gate's last check, "the live box is as found", fails whenever the dispatcher writes one event during the run
 
 MEDIUM — the gate's last check, "the live box is as found", fails whenever the dispatcher writes one event during the run
@@ -8461,27 +8397,13 @@ probe-key: e2b4820ffa01388a3f5c7ef7dc25286fa874110f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerToolsetSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionToolsets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
-## INV-8463 — probe — LOW — an epic deck of finished plans and one parked plan cannot be put away from its corner
-
-LOW — an epic deck of finished plans and one parked plan cannot be put away from its corner
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/parked_deck.sh
-expect: `hide ez.arc -> exit 2 | REFUSED hide ez.arc: every plan of it is finished or set aside …` while it stands; cured, exit 0 (or the board offers Dismiss for such a deck)
-```
-
-measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding L2, LOW
-probe-key: e5b3e69b031c00a62d68078d266a51687b64141b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
-
 ## INV-8464 — probe — LOW — a typed "do not queue it" now approves the plan into the queue and starts it
 
 LOW — a typed "do not queue it" now approves the plan into the queue and starts it
 
 ```probe
 bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/typed_not_queue.sh
-expect: `'do not queue it' -> hide=False (Queue: approved into the queue)` while it stands; cured, `hide=None` (Rework) or `hide=True`
+expect: `'do not queue it' -> placing=QUEUE (Queue: approved)` while it stands; cured, `placing=None` (Rework: nothing approved)
 ```
 
 measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding L3, LOW
@@ -25365,3 +25287,136 @@ measured 2026-11-04 by chain chain-dev-restart-quiet-hold-20261104-161216-ce01, 
 probe-key: 0b51ec53f68c2030426bc43b1f5344be1e5d0378
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/hold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/restart-hold/restart-hold.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/restart-hold-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionSounding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-tail.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/restart-hold-waits.mjs
+
+## INV-10957 — probe — MEDIUM — a Release that reaches a plan already started by his own Start silently takes the override back
+
+MEDIUM — a Release that reaches a plan already started by his own Start silently takes the override back
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/usr/bin/env bash
+R=$1
+mkdir -p "$R/state/dispatcher" || exit 1
+export DISPATCHER_HOME="$R/state/dispatcher" DISPATCHER_WIP_FLAG_PATH="$R/wip.flag" DISPATCHER_EPICS_FLAG_PATH="$R/epics.flag" PLAN_RUNNER_DEEPSEEK_FLAG_PATH="$R/ds.flag" DISPATCHER_PEAK_FLAG_PATH="$R/peak.flag"
+unset CLAUDE_CODE_SESSION_ID PLAN_RUNNER_DEEPSEEK DISPATCHER_SCRATCH_DAEMON
+python3 -I - "$R" <<'PY'
+import json, subprocess, sys
+sys.path.insert(0, "/home/lyphe/.claude/hooks")
+from dispatcher import store, store_write
+R = sys.argv[1]
+BIN = "/home/lyphe/.claude/scripts/dispatcher"
+def cli(*a): return subprocess.run([BIN, *a], capture_output=True, text=True, timeout=120)
+def card(n): return next(p for p in json.loads(cli("status", "--json").stdout)["plans"] if p["name"] == n)
+c = store.connect()
+with c: store_write.open_plan(c, "athena-rel", repo=R, session=None)
+with c:
+    store_write.put_design(c, "athena-rel", {"repo": R, "goal": "g", "delivers": "d", "architecture": "a", "interfaces": "i", "constraints": "c", "waits_on": [], "questions": [], "source_path": "athena"})
+    store_write.put_phases(c, "athena-rel", [{"key": "p1", "title": "T", "goal": "g", "assignee": "hephaestus", "waits_on": [], "start_here": []}], "athena")
+c.close()
+cli("accept", "athena-rel", "--held"); cli("epics", "pause")
+start = cli("resume", "athena-rel"); print("Start under Pause all:", (start.stdout.splitlines() or ["(no output)"])[0], "| queue_hold:", card("athena-rel")["queue_hold"])
+rel = cli("resume", "athena-rel", "--by", "release"); print("Release on the plan that is already running: exit", rel.returncode, "|", (rel.stdout.splitlines() or ["(no output)"])[0])
+print("queue_hold after:", card("athena-rel")["queue_hold"])
+PY
+EOF
+bash "$D/p.sh" "$D" 2>&1 | cut -c1-200
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today `Release on the plan that is already running: exit 0 | RESUMED athena-rel` and `queue_hold after: queue: Pause all is on`; cured: the Release is refused (exit 2) and `queue_hold after: None`
+```
+
+measured 2026-11-05 by chain chain-plan-hold-20261105-154133-b881, finding M1, MEDIUM
+probe-key: 51c3f154c9005863ba4671f71d0b72c4aaf1c9d4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-scratch.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-wire.ts, /home/lyphe/.claude/hooks/intent_lock.py
+
+## INV-10958 — probe — LOW — the board's one Start releases every deliberately Held plan, and the docs still say it reaches only a Stop's plans
+
+LOW — the board's one Start releases every deliberately Held plan, and the docs still say it reaches only a Stop's plans
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/usr/bin/env bash
+R=$1
+mkdir -p "$R/state/dispatcher" || exit 1
+export DISPATCHER_HOME="$R/state/dispatcher" DISPATCHER_WIP_FLAG_PATH="$R/wip.flag" DISPATCHER_EPICS_FLAG_PATH="$R/epics.flag" PLAN_RUNNER_DEEPSEEK_FLAG_PATH="$R/ds.flag" DISPATCHER_PEAK_FLAG_PATH="$R/peak.flag"
+unset CLAUDE_CODE_SESSION_ID PLAN_RUNNER_DEEPSEEK DISPATCHER_SCRATCH_DAEMON
+python3 -I - "$R" <<'PY'
+import json, subprocess, sys
+sys.path.insert(0, "/home/lyphe/.claude/hooks")
+from dispatcher import store, store_write
+R = sys.argv[1]
+BIN = "/home/lyphe/.claude/scripts/dispatcher"
+def cli(*a): return subprocess.run([BIN, *a], capture_output=True, text=True, timeout=120)
+def doc(): return json.loads(cli("status", "--json").stdout)
+c = store.connect()
+name = "athena-held-on-purpose"
+with c: store_write.open_plan(c, name, repo=R, session=None)
+with c:
+    store_write.put_design(c, name, {"repo": R, "goal": "g", "delivers": "d", "architecture": "a", "interfaces": "i", "constraints": "c", "waits_on": [], "questions": [], "source_path": "athena"})
+    store_write.put_phases(c, name, [{"key": "p1", "title": "T", "goal": "g", "assignee": "hephaestus", "waits_on": [], "start_here": []}], "athena")
+c.close()
+print("Hold:", cli("accept", name, "--held").stdout.strip())
+print("board's Start counts it (route.waiting):", doc()["route"]["waiting"])
+print("board's one Start:", (cli("start").stdout.splitlines() or ["(no output)"])[0])
+print("the Held plan now reads:", next(p for p in doc()["plans"] if p["name"] == name)["status"])
+PY
+EOF
+bash "$D/p.sh" "$D" 2>&1 | cut -c1-200
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today `route.waiting: 1`, `STARTED 1 plan(s)` and `the Held plan now reads: live`; cured (if the operator rules Hold's plans out of the board's Start): `route.waiting: 0`, no plan started, and the plan still `queued`
+```
+
+measured 2026-11-05 by chain chain-plan-hold-20261105-154133-b881, finding L1, LOW
+probe-key: 71560dec9e0c4657af100673dc8872c608211d00
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-scratch.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-wire.ts, /home/lyphe/.claude/hooks/intent_lock.py
+
+## INV-10960 — probe — LOW — "no index can drift again" holds in the product code, not in the proofs and probes that still read the three by position or by count
+
+LOW — "no index can drift again" holds in the product code, not in the proofs and probes that still read the three by position or by count
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 200 node .verify/probe-card-ask-machinery.mjs 2>&1 | grep -E "FAIL|PASS every|FAILED"
+bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/parked_deck.sh 2>&1 | tail -1
+echo "[probe exit $?]"
+# expect: today `[FAIL] lockOptions reads Queue, Hide and Rework by position 0, 1 and 2…`, `1 FAILED …` and `ValueError: too many values to unpack (expected 3)`; cured: neither line, and parked_deck.sh printing its own `hide ez.arc -> …` answer
+```
+
+measured 2026-11-05 by chain chain-plan-hold-20261105-154133-b881, finding L3, LOW
+probe-key: caa221732618b9d0a926c1bae37776eb8fb602cd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-scratch.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-wire.ts, /home/lyphe/.claude/hooks/intent_lock.py
+
+## INV-10961 — probe — LOW — MAN-1466 still tells the reader the Stop hold spells three options
+
+LOW — MAN-1466 still tells the reader the Stop hold spells three options
+
+```probe
+cd /home/lyphe/.claude && printf 'MAN-1466 lines spelling the three options: '; docstore get MAN-1466 --text | grep -c "'Hide — held until shown' · 'Rework'"
+echo "[probe exit $?]"
+# expect: `1` today; `0` once the row names the four (or only `OPTIONS_PHRASE`)
+```
+
+measured 2026-11-05 by chain chain-plan-hold-20261105-154133-b881, finding L4, LOW
+probe-key: cb8d45650c0335c7b57d25bc808f7cf177cdaaae
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-scratch.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-wire.ts, /home/lyphe/.claude/hooks/intent_lock.py
+
+## INV-10962 — probe — LOW — the three new standing proofs are governed by no row and named by none
+
+LOW — the three new standing proofs are governed by no row and named by none
+
+```probe
+cd /home/lyphe/.claude && for f in hold-release-scratch.py hold-release-board.mjs hold-release-wire.ts; do printf "$f: "; docstore govern /home/lyphe/.claude/claudecodeui_lyphe/.verify/$f --touch write --limit 3 --text | head -1 | cut -c1-60; done
+echo "[probe exit $?]"
+# expect: three `(no rows)` lines today; a token on each once a row governs the file
+```
+
+measured 2026-11-05 by chain chain-plan-hold-20261105-154133-b881, finding L5, LOW
+probe-key: 80f7ee59a1ca40721b767e5a4e8252378e1061e0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-scratch.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hold-release-wire.ts, /home/lyphe/.claude/hooks/intent_lock.py

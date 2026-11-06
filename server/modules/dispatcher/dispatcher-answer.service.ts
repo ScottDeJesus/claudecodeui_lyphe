@@ -1,6 +1,7 @@
 import { relayRecord } from '@/shared/relay-record.js';
 import type { RelayedPress } from '@/shared/relayed-press-types.js';
 import type { DispatcherAnswerOutcome, DispatcherAsk, ProviderPermissionDecision } from '@/shared/types.js';
+import { acceptAnswerOf } from '@/shared/utils.js';
 
 import type { DispatcherCommandResult } from './dispatcher-ask.transport.js';
 import { firstLine } from './dispatcher-ask.transport.js';
@@ -17,7 +18,8 @@ import { firstLine } from './dispatcher-ask.transport.js';
  * comes back as the answer's `said` (MAN-9152 §"Doors that exist today").
  *
  * - `accept` — Queue runs `dispatcher accept --lock <token> --by app:<door> <plans…>` and the plans join the
- *   queue, starting when their turn comes; Hide is the same with `--hidden`, approved and held out of the
+ *   queue, starting when their turn comes; Hold is the same with `--held`, approved paused and still visible,
+ *   not started until he Releases them; Hide is the same with `--hidden`, approved and held out of the
  *   queue until he Shows them. The token is the census he was shown, re-checked by the verb itself
  *   (`lock.stale`), so an answer whose plans moved on since approves NOTHING and the current prompt is
  *   raised again. `--by` names his press — the card, the phone or Kaylee — in `approved_by`; Kaylee's adds
@@ -38,18 +40,21 @@ import { firstLine } from './dispatcher-ask.transport.js';
  * with no notes. `readReply` answers `null`, and the prompt stays up — the operator's word is still owed.
  */
 
-/** The Rework answer's POSITION among the Accept prompt's three (`intent_lock.OPTIONS`: Queue, Hide, Rework). */
-export const REWORK_OPTION = 2;
-
 /**
  * `dispatcher accept`'s exit code for a plan that was approved already (`accept.ALREADY_APPROVED_EXIT`),
  * apart from every other refusal's 2. The dispatcher's own constant is the source; change one, change both.
  */
 const ACCEPT_ALREADY_APPROVED_EXIT = 3;
 
-/** One answer, read: an approval (into the queue, or hidden), a Rework's notes, or a questions round as one brief. */
+/** Where an approving answer puts the plans: into the queue, held (visible, not started) or hidden. */
+export type AcceptPlacing = 'queue' | 'hold' | 'hide';
+
+/** The flag `dispatcher accept` takes for each placing — Queue is the verb with no flag. */
+const ACCEPT_FLAGS: Record<AcceptPlacing, readonly string[]> = { queue: [], hold: ['--held'], hide: ['--hidden'] };
+
+/** One answer, read: an approval (into the queue, held or hidden), a Rework's notes, or a questions round as one brief. */
 export type AskReply =
-  | { kind: 'accept'; hidden: boolean }
+  | { kind: 'accept'; placing: AcceptPlacing }
   | { kind: 'rework'; notes: string }
   | { kind: 'answers'; brief: string };
 
@@ -110,11 +115,12 @@ export function readReply(ask: DispatcherAsk, decision: ProviderPermissionDecisi
   const input = decision.updatedInput as { answers?: unknown; notes?: unknown } | undefined;
   if (ask.kind === 'accept') {
     const chosen = textAtAsk(input?.answers, ask.question);
-    const [queue, hide, rework] = ask.options.map((option) => option.label);
-    if (chosen === queue) return { kind: 'accept', hidden: false };
-    if (chosen === hide) return { kind: 'accept', hidden: true };
+    // Only a label the prompt offered is an answer; which answer it is comes off the label, never its position.
+    const offered = ask.options.find((option) => option.label === chosen);
+    const answer = offered === undefined ? null : acceptAnswerOf(offered.label);
+    if (answer === 'queue' || answer === 'hold' || answer === 'hide') return { kind: 'accept', placing: answer };
     const notes = textAtAsk(input?.notes, ask.question);
-    return chosen === rework && notes !== '' ? { kind: 'rework', notes } : null;
+    return answer === 'rework' && notes !== '' ? { kind: 'rework', notes } : null;
   }
   const pairs = ask.questions.map((question) => ({ question: question.text, answer: textAt(input?.answers, question.text) }));
   if (pairs.every((pair) => pair.answer === '')) return null;
@@ -176,7 +182,7 @@ export async function carryReply(
   const runs: Array<{ args: string[]; stdin?: string }> = [];
   if (reply.kind === 'accept' && ask.kind === 'accept') {
     runs.push({
-      args: ['accept', '--lock', ask.token, '--by', `app:${door}`, ...relayed(relay?.acceptTarget ?? ask.plan, ask.token), ...(reply.hidden ? ['--hidden'] : []), ...ask.plans],
+      args: ['accept', '--lock', ask.token, '--by', `app:${door}`, ...relayed(relay?.acceptTarget ?? ask.plan, ask.token), ...ACCEPT_FLAGS[reply.placing], ...ask.plans],
     });
   } else if (reply.kind === 'rework' && ask.kind === 'accept') {
     for (const target of ask.rework) runs.push({ args: ['tell', target, '--brief', '-', ...relayed(target, null)], stdin: reply.notes });

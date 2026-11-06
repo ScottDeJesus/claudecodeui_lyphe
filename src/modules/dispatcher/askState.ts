@@ -16,6 +16,12 @@ import type { DispatcherAsk, DispatcherPlan } from '@/shared/types';
 /** One answer a lock offers, exactly as `intent_lock.OPTIONS` states it: the label the operator's word is sent as, and the description that says what it does. Local to this file: only `lockOptions` hands these out, and nothing names the type. */
 type LockOption = { label: string; description: string };
 
+/** The Accept prompt's four answers (`intent_lock.OPTIONS`): the word each option's label leads with (`Hold — queued, held until released`). */
+type LockAnswerWord = 'queue' | 'hold' | 'hide' | 'rework';
+
+/** Separates an option's answer word from its description in the hook's labels. */
+const LABEL_SEPARATOR = ' — ';
+
 /**
  * The ask's identity on the client: its `asked` record as `<id>-<at>` — the store's own, and the
  * same on every plan one lock names. React keys, the deck's dedupe and the bell's memory read it.
@@ -30,14 +36,21 @@ export function askIdentity(ask: DispatcherAsk): string {
 }
 
 /**
- * A lock's three answers by their contract position — Queue, Hide, Rework (`intent_lock.OPTIONS`)
- * — each `{ label, description }` verbatim.
+ * A lock's four answers — Queue, Hold, Hide, Rework (`intent_lock.OPTIONS`) — each `{ label, description }`
+ * verbatim, found by the word its label leads with and never by its position, so an answer added to the hook
+ * cannot move another one. The server's reader refuses a prompt that does not carry each answer once
+ * (`dispatcher-ask.reader.ts`); an answer missing here is that guarantee broken, and says so.
  *
  * Read by `LockAnswer`, which draws one button per answer: the labels are what the operator presses
  * and what the answer is sent back as, and each description is that button's own `title`.
  */
-export function lockOptions(ask: Extract<DispatcherAsk, { kind: 'accept' }>): { queue: LockOption; hide: LockOption; rework: LockOption } {
-  return { queue: ask.options[0], hide: ask.options[1], rework: ask.options[2] };
+export function lockOptions(ask: Extract<DispatcherAsk, { kind: 'accept' }>): Record<LockAnswerWord, LockOption> {
+  const answer = (word: LockAnswerWord): LockOption => {
+    const found = ask.options.find((option) => option.label.split(LABEL_SEPARATOR, 1)[0].trim().toLowerCase() === word);
+    if (found === undefined) throw new Error(`The lock of ${ask.plan} offers no ${word} answer: ${ask.options.map((option) => option.label).join(' | ')}`);
+    return found;
+  };
+  return { queue: answer('queue'), hold: answer('hold'), hide: answer('hide'), rework: answer('rework') };
 }
 
 /**

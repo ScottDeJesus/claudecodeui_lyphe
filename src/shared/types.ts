@@ -3468,7 +3468,7 @@ export type DispatcherPlanHidden = { at: string; arc: string | null };
 export type DispatcherAsk = { plan: string; plans: string[]; asked: { id: number; at: string } } & ({ kind: 'accept'; header: string; question: string; token: string; options: Array<{ label: string; description: string }>; rework: string[] } | { kind: 'questions'; questions: Array<{ text: string; options: string[] }>; target: string });
 /** One question of a round as it is being composed: the offered label picked, the words typed in its `Other…` field, and whether that field is open. The round's form holds one per question (`RoundAnswer`), and a saved draft of the round is the list of them (`AskDraft`). */
 export type RoundPick = { picked: string | null; other: string; otherOpen: boolean };
-/** A lock as it is being composed: whether Rework's notes field has taken the place of the three answers, and the notes as typed. The lock's form holds one (`LockAnswer`), and a saved draft of the lock is exactly this (`AskDraft`). */
+/** A lock as it is being composed: whether Rework's notes field has taken the place of the answers, and the notes as typed. The lock's form holds one (`LockAnswer`), and a saved draft of the lock is exactly this (`AskDraft`). */
 export type LockCompose = { rework: boolean; notes: string };
 /** A half-composed answer to ONE open ask, as the `askDrafts` list of the `dispatcher` preference keeps it (`modules/dispatcher/askDrafts.ts`): `name` is the ask's `askIdentity`, and the rest is what its form needs to come back exactly — a round's picks, or a lock's Rework notes. One entry per ask; it is never sent by itself. */
 export type AskDraft = { name: string } & ({ picks: RoundPick[] } | LockCompose);

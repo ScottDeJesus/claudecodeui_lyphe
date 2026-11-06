@@ -28,6 +28,7 @@ import type {
   ProviderCurrentActiveModel,
   ProviderModelsDefinition,
   ProviderSkillSource,
+  DispatcherAcceptAnswer,
   DispatcherModelChoice,
   QueuedChatMessage,
   SubagentActivity,
@@ -1665,6 +1666,30 @@ export function readDispatcherModelChoice(value: unknown): DispatcherModelChoice
 /** The 400 sentence both model routes answer with when `readDispatcherModelChoice` finds no word. */
 export function dispatcherModelChoiceError(): string {
   return `model must be one of ${DISPATCHER_MODEL_CHOICES.join(', ')}`;
+}
+
+// ---------------------------
+//----------------- DISPATCHER ACCEPT ANSWER UTILITIES ------------
+
+/**
+ * The four answers of the Accept prompt (`hooks/intent_lock.py` `OPTIONS`), in the order it offers them. Every label the
+ * prompt carries is one of these words followed by its description (`Queue — starts on its turn`).
+ */
+export const DISPATCHER_ACCEPT_ANSWERS: readonly DispatcherAcceptAnswer[] = ['queue', 'hold', 'hide', 'rework'];
+
+/** Separates an option's answer word from its description in the hook's labels (`Hold — queued, held until released`). */
+const ACCEPT_LABEL_SEPARATOR = ' — ';
+
+/**
+ * Which of the four answers an Accept option's label states, or `null` for a label that states none — read from the
+ * label's leading word, so an answer is found by WHAT IT SAYS and never by where the prompt happened to put it: adding
+ * an answer to the hook cannot move another one. Used by the document reader (`dispatcher-ask.reader.ts`, which refuses a
+ * prompt that does not carry each answer once), the answer service (`readReply`, which turns the label the operator chose
+ * into an act) and the asks service (`inputOf`, which tells the phone which answer needs words).
+ */
+export function acceptAnswerOf(label: string): DispatcherAcceptAnswer | null {
+  const word = label.split(ACCEPT_LABEL_SEPARATOR, 1)[0].trim().toLowerCase();
+  return DISPATCHER_ACCEPT_ANSWERS.find((answer) => answer === word) ?? null;
 }
 
 // ---------------------------
