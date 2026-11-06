@@ -7,6 +7,7 @@ import { useElapsed } from '@/shared/hooks/useElapsed';
 import { spendText } from '@/shared/spend';
 import { LLMProviderLogo } from '@/shared/ui';
 import type { SoulLaunchSnapshot } from '@/shared/types';
+import { cn } from '@/shared/utils';
 import { soulName } from '@/modules/chat/subagents/subagentRow';
 import { formatSubagentFinishTime } from '@/modules/chat/utils/subagentSummary';
 
@@ -33,6 +34,8 @@ import { formatSubagentFinishTime } from '@/modules/chat/utils/subagentSummary';
 
 type SoulLaunchPinRowProps = {
   launch: SoulLaunchSnapshot;
+  /** The name a person calls the model the soul ran on (`Opus 5.5`), drawn after its name. Absent while its launch record names no model the catalog knows. */
+  modelLabel?: string | null;
   onDismiss: (id: string) => void;
   /** Opens this row's transcript — in place in the gutter's widget, in a dialog from the strip. */
   onOpen: () => void;
@@ -64,7 +67,7 @@ function costLabel(launch: SoulLaunchSnapshot, t: TFunction): string {
   );
 }
 
-export const SoulLaunchPinRow = memo(({ launch, onDismiss, onOpen, openLabel }: SoulLaunchPinRowProps) => {
+export const SoulLaunchPinRow = memo(({ launch, modelLabel, onDismiss, onOpen, openLabel }: SoulLaunchPinRowProps) => {
   const { t } = useTranslation();
   const running = launch.state === 'running';
   // `null` for a finished launch: the hook then holds NO interval at all, so a strip of a dozen
@@ -107,18 +110,32 @@ export const SoulLaunchPinRow = memo(({ launch, onDismiss, onOpen, openLabel }: 
       {/* The mascot for a soul that ran on Claude, as every other row in this strip wears it. */}
       <LLMProviderLogo provider={launch.provider} claudeMark="mascot" className="h-4 w-4 flex-shrink-0" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex items-center gap-1.5">
+        {/* Wraps rather than clips the role, as the agent rows do (`PinnedAgentRow.tsx`): it keeps a floor of
+          * `basis-40` (10rem), so on a phone it takes a line of its own when the name and the model leave it
+          * less — a finished soul's chip sits on its own line then, exactly as a finished agent's does. The `/`
+          * is part of the role's own flex item, so it wraps with the role. */}
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <span className="flex-shrink-0 font-medium text-foreground">{soulName(launch.agent)}</span>
-          {launch.role && (
+          {modelLabel && (
             <>
+              <span className="flex-shrink-0 text-[10px] text-muted-foreground/40">·</span>
+              <span className="flex-shrink-0" data-testid="pinned-soul-model">{modelLabel}</span>
+            </>
+          )}
+          {launch.role && (
+            <span className="flex min-w-0 shrink grow basis-40 items-center gap-1.5">
               <span className="flex-shrink-0 text-[10px] text-muted-foreground/40">/</span>
               <span className="min-w-0 flex-1 truncate">{launch.role}</span>
-            </>
+            </span>
           )}
           {running ? (
             // "running" AND the clock, never the clock alone: a bare "3m 12s" beside a finished
             // agent's timestamp reads as the same kind of fact, and this one has to say which it is.
-            <span className="ml-auto flex flex-shrink-0 items-center gap-1 text-[11px] text-purple-600 dark:text-purple-300">
+            // On a phone the whole chip leaves the header — the word and the clock with it — and the
+            // pulsing dot, lit in its colour, says "running" from the second line, where the clock joins
+            // the figures. The role keeps the room the chip took, and a lone dot never wraps onto a line
+            // of its own.
+            <span className="ml-auto flex flex-shrink-0 items-center gap-1 text-[11px] text-purple-600 dark:text-purple-300 max-sm:hidden">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-purple-500 dark:bg-purple-400" />
               running
               {elapsed && <span className="tabular-nums text-muted-foreground/70">· {elapsed}</span>}
@@ -155,21 +172,33 @@ export const SoulLaunchPinRow = memo(({ launch, onDismiss, onOpen, openLabel }: 
           )}
         </div>
         {/* The second line: the task it was handed on the left, what it cost on the right — the same
-          * two columns the agent rows keep, so the strip has one shape whatever is pinned in it. */}
-        {(launch.brief || cost) && (
-          <div className="flex items-baseline gap-2 text-[11px] text-muted-foreground/80">
+          * two columns the agent rows keep, so the strip has one shape whatever is pinned in it. A
+          * running soul's pulsing dot leads the line and its clock joins the right column on a phone
+          * only (`sm:hidden`); a wide row shows both in the header chip, so a line holding nothing but
+          * those two is not drawn there. */}
+        {(launch.brief || cost || running) && (
+          <div className={cn('flex items-baseline gap-2 text-[11px] text-muted-foreground/80', !launch.brief && !cost && 'sm:hidden')}>
+            {running && (
+              <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse self-center rounded-full bg-purple-500 dark:bg-purple-400 sm:hidden" />
+            )}
             {launch.brief && (
               <span className="min-w-0 flex-1 truncate font-mono" title={launch.brief}>
                 {launch.brief}
               </span>
             )}
-            {cost && (
-              <span
-                className="ml-auto flex-shrink-0 tabular-nums"
-                title={detail}
-                data-testid="pinned-soul-cost"
-              >
-                {cost}
+            {(elapsed || cost) && (
+              // Without a cost it holds only the phone's clock, so a wide row drops it (and its gap) altogether.
+              <span className={cn('ml-auto flex flex-shrink-0 items-baseline gap-1.5 tabular-nums', !cost && 'sm:hidden')}>
+                {elapsed && (
+                  <span className="sm:hidden" data-testid="pinned-soul-elapsed">
+                    {cost ? `${elapsed} ·` : elapsed}
+                  </span>
+                )}
+                {cost && (
+                  <span title={detail} data-testid="pinned-soul-cost">
+                    {cost}
+                  </span>
+                )}
               </span>
             )}
           </div>

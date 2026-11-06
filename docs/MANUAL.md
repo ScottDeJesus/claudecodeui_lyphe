@@ -1346,9 +1346,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/ly
 section: chat-contracts/002 2. A raw model id never reaches the transcript
 
 `modelLabels.ts::resolveModelLabel` answers with the catalog's own label or with null, matching an id
-to a short alias by whole dash-segments; the rule and its traps are in that file's header. A null
-falls back to the provider's name, so a model the catalog never carried reads "Claude" rather than
-`claude-haiku-4-5-20251001`. The composer's chip is the one place an id shows — there it was typed.
+to a short alias by whole dash-segments; the rule and its traps are in that file's header.
+`useModelLabelResolver` (`src/modules/chat/hooks/`) binds it to the chat's provider and catalog; `ChatMessagesPane`
+(message headers, the agent rows in the transcript, exports) and `ChatInterface` (the pinned agents strip and the
+gutter widget's copy of those rows) each call it, so every surface names a model one way.
+A null falls back to the provider's name in a message header, so a model the catalog never carried reads "Claude"
+rather than `claude-haiku-4-5-20251001`; an agent row draws no label for it. The composer's chip is the one place an id
+shows — there it was typed; an agent's open view prints the id only where the catalog names no label (MAN-404).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useModelLabelResolver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/modelLabels.ts
 
 ## MAN-496 — 3. The tool badge ranks what it knows
 section: chat-contracts/003 3. The tool badge ranks what it knows
@@ -3160,7 +3166,7 @@ section: dispatch-souls/012 The client
 |---|---|
 | `src/modules/dispatch-souls/SoulLaunchFeed.tsx` | The lane's one door into the live bus, and the ONLY place in the client that names the `soul_launch_state` frame. Headless: it renders its children unchanged. `App` mounts it inside `LiveBusProvider`, inside the auth gate, below `WebSocketProvider` — nested inside `DispatcherFeed`, because a feed is a wrapper and not a sibling. |
 | `hooks/useSoulLaunches.ts` | The read side: the retained `souls:*` topic as a `Map` keyed by launch id. A map rather than the array because the reader looks each anchored id up once (and walks the values once for the launches stamped with the chat's own CLI session id, MAN-7583). `undefined` (nothing retained) and `[]` (the lane is empty) collapse to an empty map — to a screen they are the same instruction. |
-| `src/modules/chat/transcript/SoulLaunchPinRow.tsx` | One soul's row, drawn to be indistinguishable in SHAPE from the agent rows beside it. Its mark is `LLMProviderLogo` on the launch's provider — the DeepSeek whale, or Claude's mascot — centred beside its two lines, as an `Agent` subagent's row carries its own provider's mark. The row is also a button: an `onOpen` prop, given by both the strip (in a dialog) and the gutter's Subagents widget (in place), opens this soul's transcript live through the second route above ([docs/architecture/MANUAL.md (06-tool-view)](architecture/MANUAL.md) §Subagents). |
+| `src/modules/chat/transcript/SoulLaunchPinRow.tsx` | One soul's row, drawn to be indistinguishable in SHAPE from the agent rows beside it. Its mark is `LLMProviderLogo` on the launch's provider — the DeepSeek whale, or Claude's mascot — centred beside its two lines, as an `Agent` subagent's row carries its own provider's mark. The row is also a button: an `onOpen` prop, given by both the strip (in a dialog) and the gutter's Subagents widget (in place), opens this soul's transcript live through the second route above ([docs/architecture/MANUAL.md (06-tool-view)](architecture/MANUAL.md) §Subagents). On a phone (window under 640px) a RUNNING soul's `running · <elapsed>` chip leaves the header: the pulsing dot leads the task line and the elapsed clock sits at its right (`pinned-soul-elapsed`). The role keeps a 10rem floor and takes a line of its own when the name and the model leave it less, with its `/`; a finished soul's chip then sits on its own line, as a finished agent's does. The rule is the agent rows' (MAN-404), kept in both components. |
 
 The row lives in the CHAT module, not in `dispatch-souls/`: the pinned rows it lands among are the chat's, and
 a lane must not reach back into it.
@@ -3209,7 +3215,9 @@ looking at the real client — not asserting the shapes:
    the launch must be in `launches` with `state: running` within one poll (2 s).
 4. In the app, the chat's pinned rows draw the row — the strip above the composer on a region too
    narrow for the gutters, the gutter's Subagents widget on a wide one: the provider mark,
-   `<Soul> / <role>`, `running · <elapsed>` ticking, the brief's task line.
+   `<Soul> / <role>`, `running · <elapsed>` ticking, the brief's task line. Under 640px the
+   `running · <elapsed>` chip is not in the header: the pulsing dot leads the task line and the
+   elapsed clock sits at its right.
    `data-testid="pinned-soul-row"` carries `data-status`, `data-provider` and `data-launch-id`.
 5. Reload the tab. The row must still be there — it is named by the server-side collector and by the lane's `launched_by` stamp, not by the receipt scan.
 6. When the soul returns, the row flips to `finished <time>` with its cost, and `X` dismisses it for

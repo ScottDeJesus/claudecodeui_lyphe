@@ -5,6 +5,7 @@
 
 import type { ChatMessage,NormalizedMessage,SubagentActivity, SubagentUsage } from '@/shared/types';
 import { formatUsageLimitText } from '@/modules/chat/utils/chatFormatting';
+import { stripRecordedModelTagFromNotice } from '@/modules/chat/utils/subagentSummary';
 
 function formatToolResultContent(content: unknown): string {
   const text = typeof content === 'string' ? content : JSON.stringify(content);
@@ -342,7 +343,7 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
           if (taskNotif) {
             converted.push({
               type: 'assistant',
-              content: taskNotif.summary,
+              content: stripRecordedModelTagFromNotice(taskNotif.summary),
               timestamp: msg.timestamp,
               isTaskNotification: true,
               taskStatus: taskNotif.status,
@@ -504,7 +505,7 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
       case 'task_notification':
         converted.push({
           type: 'assistant',
-          content: msg.summary || 'Background task update',
+          content: stripRecordedModelTagFromNotice(msg.summary || 'Background task update'),
           timestamp: msg.timestamp,
           isTaskNotification: true,
           taskStatus: msg.status || 'completed',

@@ -3,6 +3,8 @@
  * Defines display behavior for all tool types 
  */
 
+import { stripRecordedModelTag } from '@/modules/chat/utils/subagentSummary';
+
 export type ToolDisplayConfig = {
   input: {
     type: 'one-line' | 'collapsible' | 'plan' | 'hidden';
@@ -536,7 +538,7 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
   Agent: {
     input: {
       type: 'collapsible',
-      title: (input) => input.description || input.subagent_type || 'Subagent',
+      title: (input) => stripRecordedModelTag(String(input.description ?? '')) || input.subagent_type || 'Subagent',
       defaultOpen: false,
       contentType: 'markdown',
       getContentProps: (input) => ({ content: input.prompt || '' })
@@ -551,7 +553,7 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       type: 'collapsible',
       title: (input) => {
         const subagentType = input.subagent_type || 'Agent';
-        const description = input.description || 'Running task';
+        const description = stripRecordedModelTag(String(input.description ?? '')) || 'Running task';
         return `Subagent / ${subagentType}: ${description}`;
       },
       defaultOpen: false,

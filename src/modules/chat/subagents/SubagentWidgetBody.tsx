@@ -96,6 +96,7 @@ export function SubagentWidgetBody({ sessionId }: { sessionId: string | null }) 
                 latest={row.latest}
                 summary={row.summary}
                 provider={row.provider}
+                modelLabel={row.modelLabel}
                 onDismiss={dismiss}
                 onOpen={() => setOpened({ sessionId, target: { kind: 'agent', id, label } })}
                 openLabel={t('gutters.subagents.openRow', { name: label })}
@@ -103,6 +104,7 @@ export function SubagentWidgetBody({ sessionId }: { sessionId: string | null }) 
             ) : (
               <SoulLaunchPinRow
                 launch={row.launch}
+                modelLabel={row.modelLabel}
                 onDismiss={dismiss}
                 onOpen={() => setOpened({ sessionId, target: { kind: 'soul', id, label } })}
                 openLabel={t('gutters.subagents.openRow', { name: label })}

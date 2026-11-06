@@ -58,6 +58,8 @@ type PinnedSubagentsProps = {
   sessionId: string | null;
   /** The chat's CLI session id, against which the lane's launches are anchored by their `launched_by` stamp; `null` until the provider has reported it. */
   cliSessionId: string | null;
+  /** The chat's resolver from a model id to its name, so a row says "Opus 5.5" as the transcript's headers do. */
+  resolveModelLabel: (modelId: string) => string | null;
 };
 
 /** The row whose transcript is open, tagged with the chat it was opened in. */
@@ -66,9 +68,9 @@ type OpenedTranscript = {
   target: SubagentTranscriptTarget & { label: string };
 };
 
-function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId }: PinnedSubagentsProps) {
+function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId, resolveModelLabel }: PinnedSubagentsProps) {
   const { t } = useTranslation();
-  const { rows, dismiss } = usePinnedSubagentRows(messages, soulLaunchIds, cliSessionId);
+  const { rows, dismiss } = usePinnedSubagentRows(messages, soulLaunchIds, cliSessionId, resolveModelLabel);
   const [opened, setOpened] = useState<OpenedTranscript | null>(null);
 
   const target = opened !== null && opened.sessionId === sessionId ? opened.target : null;
@@ -100,6 +102,7 @@ function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId }: P
               latest={entry.latest}
               summary={entry.summary}
               provider={entry.provider}
+              modelLabel={entry.modelLabel}
               onDismiss={dismiss}
               onOpen={open}
               openLabel={openLabel}
@@ -108,6 +111,7 @@ function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId }: P
             <SoulLaunchPinRow
               key={entry.key}
               launch={entry.launch}
+              modelLabel={entry.modelLabel}
               onDismiss={dismiss}
               onOpen={open}
               openLabel={openLabel}

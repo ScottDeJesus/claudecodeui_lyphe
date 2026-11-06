@@ -29,8 +29,10 @@ type SubagentPanelProps = {
   usage?: SubagentUsage;
   /** The session's provider; with the agent's own model it decides the row's mark. */
   provider?: LLMProvider;
-  /** The model the agent ran on, live or from history (`ChatMessage.subagentModel`). */
+  /** The model the agent ran on, live or from history (`ChatMessage.subagentModel`); it decides the row's mark. */
   model?: string;
+  /** The name a person calls that model (`Opus 5.5`), drawn after the agent's name. Absent while the record names no model the catalog knows. */
+  modelLabel?: string | null;
   onFileOpen?: (filePath: string, diffInfo?: unknown) => void;
   createDiff: (oldStr: string, newStr: string) => DiffLine[];
   selectedProject?: Project | null;
@@ -81,8 +83,15 @@ const ENDED_BADGE: Record<Exclude<SubagentInfo['status'], 'running'>, { label: s
  * to the same shape, so both render through this one panel.
  *
  * It wears the tool rows' frame (`toolRow.ts`) — the same pill, height and order as a Bash run: the
- * mark of the provider the agent ran on, its name, `/`, what it was asked to do, then its figures
- * and its outcome. The whole row toggles the timeline; there is no caret and no coloured stripe.
+ * mark of the provider the agent ran on, its name, the model it ran on (`· Opus 5.5`, named from the
+ * record by the chat's catalog, so a new generation shows its own number with no code change), `/`,
+ * what it was asked to do, then its figures and its outcome. The whole row toggles the timeline; there is no caret and no coloured stripe.
+ *
+ * THE HEADER WRAPS RATHER THAN CLIPS THE DESCRIPTION. The description is what tells two agents of one
+ * type apart, so it keeps a floor of `basis-40` (10rem): when the name, the model and the outcome leave
+ * it less, it takes a line of its own beside the outcome and reads in full. A wide row stays one line.
+ * The `/` is part of the description's own flex item, so it wraps with the description and never hangs
+ * at the end of the line above.
  *
  * The timeline is mounted only while the panel is open. The shared Collapsible
  * keeps its children mounted when closed, which for an agent that ran a
@@ -97,6 +106,7 @@ export const SubagentPanel = memo(({
   usage,
   provider,
   model,
+  modelLabel,
   onFileOpen,
   createDiff,
   selectedProject,
@@ -155,7 +165,7 @@ export const SubagentPanel = memo(({
         type="button"
         aria-expanded={showTimeline}
         onClick={() => setIsOpen((previous) => !previous)}
-        className={cn(TOOL_ROW_HEADER, 'w-full select-none text-left outline-none focus-visible:ring-1 focus-visible:ring-ring')}
+        className={cn(TOOL_ROW_HEADER, 'w-full flex-wrap gap-y-1 select-none text-left outline-none focus-visible:ring-1 focus-visible:ring-ring')}
       >
         {/* Defensive: a normalized message always carries its provider. The robot stands in only when
           * none is known, because `LLMProviderLogo` would otherwise dress it in Claude's mark. */}
@@ -171,24 +181,35 @@ export const SubagentPanel = memo(({
           <Bot aria-hidden className="h-3.5 w-4 flex-shrink-0 text-muted-foreground" />
         )}
         <span className={TOOL_ROW_LABEL}>{label || 'Agent'}</span>
-        {description && (
+        {modelLabel && (
           <>
+            <span className={TOOL_ROW_SEPARATOR}>·</span>
+            <span className="flex-shrink-0 text-xs text-muted-foreground" data-testid="subagent-row-model">{modelLabel}</span>
+          </>
+        )}
+        {description && (
+          <span className="flex min-w-0 shrink grow basis-40 items-center gap-2">
             <span className={TOOL_ROW_SEPARATOR}>/</span>
             <span className="min-w-0 flex-1 truncate text-xs text-foreground">{description}</span>
-          </>
+          </span>
         )}
         {nickname && (
           <span className="flex-shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground/70">{nickname}</span>
         )}
         <span className="ml-auto flex flex-shrink-0 items-center gap-2 pl-2">
+          {/* The spinner names the state for a screen reader, because the word beside it gives way on a narrow row. */}
           {status === 'running' && (
-            <span className="h-2.5 w-2.5 flex-shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-emerald-400" />
+            <span
+              role="img"
+              aria-label="running"
+              className="h-2.5 w-2.5 flex-shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-emerald-400"
+            />
           )}
-          {status === 'running' && <span className="text-[10px] text-muted-foreground/70">running</span>}
-          {/* The figures give way when the ROW is narrow (`.subagent-row__figures`, a container query in
-            * index.css) — not the window: at 768px the sidebar takes a third of the column. The row
-            * keeps what it was asked and its outcome rather than clipping both off its own frame; the
-            * pinned row still carries the figures. */}
+          {status === 'running' && <span aria-hidden className="subagent-row__running-word text-[10px] text-muted-foreground/70">running</span>}
+          {/* The figures and the word "running" give way when the ROW is narrow (`.subagent-row__figures`
+            * and `.subagent-row__running-word`, a container query in index.css) — not the window: at 768px
+            * the sidebar takes a third of the column. The row keeps what it was asked and its outcome
+            * rather than clipping both off its own frame; the pinned row still carries the figures. */}
           {(toolFigure || tokens || endFigure) && (
             <span className="subagent-row__figures text-[10px] tabular-nums text-muted-foreground/70">
               {[
@@ -208,8 +229,9 @@ export const SubagentPanel = memo(({
 
       {showTimeline && (
         <div className="settings-content-enter space-y-2 border-t border-border/50 bg-background/50 px-3 py-2">
-          {subagent?.model && (
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground/50">{subagent.model}</div>
+          {/* The raw id names the model only where the row's label cannot: a model the catalog does not carry. */}
+          {!modelLabel && model && (
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground/50">{model}</div>
           )}
 
           {prompt && (

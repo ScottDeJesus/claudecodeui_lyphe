@@ -11,11 +11,11 @@ import type { ChatMessage,
   ProviderModelsDefinition } from '@/shared/types';
 import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermissionState';
 import { getIntrinsicMessageKey } from '@/modules/chat/utils/messageKeys';
-import { resolveModelLabel as labelForModelId } from '@/modules/chat/utils/modelLabels';
 import { collectRunTerminalReplies, groupConsecutiveTools, isToolGroupItem } from '@/modules/chat/utils/toolGrouping';
 import { isHiddenWork } from '@/modules/chat/utils/workVisibility';
 import { useChatFontSize } from '@/shared/hooks/useChatFontSize';
 import { useLazyRowObserver } from '@/modules/chat/hooks/useLazyRowObserver';
+import { useModelLabelResolver } from '@/modules/chat/hooks/useModelLabelResolver';
 import { Card } from '@/shared/ui';
 import LazyMessageRow from '@/modules/chat/transcript/LazyMessageRow';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
@@ -178,14 +178,7 @@ function ChatMessagesPane({
   // has: what does the person call this model id? Null for an id the catalog
   // does not carry, which is how the caption falls back to the provider's name
   // instead of printing an identifier.
-  const resolveModelLabel = useCallback(
-    (modelId: string): string | null => labelForModelId(
-      providerModelCatalog[provider]?.OPTIONS ?? [],
-      modelId,
-      providerModelCatalog[provider]?.LABELS_BY_MODEL_ID,
-    ),
-    [provider, providerModelCatalog],
-  );
+  const resolveModelLabel = useModelLabelResolver(provider, providerModelCatalog);
   const lazyRows = useLazyRowObserver(scrollContainerRef);
   // The reader's own transcript size, published to every message body below as a variable.
   const { size: chatFontSize } = useChatFontSize();

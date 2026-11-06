@@ -311,6 +311,7 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
                 usage={message.subagentUsage}
                 provider={message.subagentProvider}
                 model={message.subagentModel}
+                modelLabel={message.subagentModel ? resolveModelLabel?.(message.subagentModel) : null}
                 onFileOpen={onFileOpen}
                 createDiff={createDiff}
                 selectedProject={selectedProject}

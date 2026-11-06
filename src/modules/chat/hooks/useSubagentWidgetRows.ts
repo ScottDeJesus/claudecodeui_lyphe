@@ -10,6 +10,9 @@ import { useSubagentSource } from '@/modules/chat/subagents/subagentSource';
 const NO_AGENT_MESSAGES: ChatMessage[] = [];
 const NO_SOUL_LAUNCH_IDS: string[] = [];
 
+/** The resolver a widget with no chat reads: it has no rows to name a model for. */
+const NO_MODEL_LABEL = (): null => null;
+
 /**
  * The pinned rows of whichever chat this widget is showing, and the reader's act on them.
  *
@@ -37,6 +40,7 @@ export function useSubagentWidgetRows(
     source?.agentMessages ?? NO_AGENT_MESSAGES,
     source?.soulLaunchIds ?? NO_SOUL_LAUNCH_IDS,
     source?.cliSessionId ?? null,
+    source?.resolveModelLabel ?? NO_MODEL_LABEL,
   );
 }
 

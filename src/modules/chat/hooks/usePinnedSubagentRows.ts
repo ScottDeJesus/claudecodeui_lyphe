@@ -64,6 +64,8 @@ type AgentEntry = {
    */
   dismissKey: string;
   provider?: SubagentMarkProvider;
+  /** The name a person calls the model the agent runs on (`Opus 5.5`), or `null` while its record names none the catalog knows. */
+  modelLabel: string | null;
   latest: string;
   summary: SubagentSummary;
 };
@@ -75,6 +77,8 @@ type SoulEntry = {
   endedAtMs: number;
   running: boolean;
   launch: SoulLaunchSnapshot;
+  /** The name a person calls the model the soul ran on, or `null` while its launch record names none the catalog knows. */
+  modelLabel: string | null;
 };
 
 /**
@@ -125,11 +129,18 @@ function expiryOf(entry: PinnedSubagentRow): number | null {
  * receipt into any transcript — pins the moment the lane pushes it. It is joined here, beside the
  * lane read this hook already holds, and not in the session-state hook: a lane push re-renders the
  * pinned rows (memoized behind the strip) and never the whole chat.
+ *
+ * `resolveModelLabel` is the chat's own resolver from a model id to its name (`useModelLabelResolver`),
+ * so a pinned row says "Opus 5.5" in the words the transcript's headers use, and a new generation
+ * shows its own number the day the catalog carries it. A row whose record names no model gets `null`
+ * and draws no label: an agent for its first seconds, and a soul launched with no model word until
+ * its receipt lands (`modelOf`, `soul-launch.service.ts`).
  */
 export function usePinnedSubagentRows(
   messages: ChatMessage[],
   soulLaunchIds: string[],
   cliSessionId: string | null,
+  resolveModelLabel: (modelId: string) => string | null,
 ): { rows: PinnedSubagentRow[]; dismiss: (id: string) => void; dismissMany: (ids: string[]) => void } {
   const dismissed = useDismissedPins();
 
@@ -166,6 +177,7 @@ export function usePinnedSubagentRows(
         id,
         dismissKey: message.subagent?.resume ? `${id}@${message.subagent.resume.toolUseId}` : id,
         provider: subagentMarkProvider(message.subagentProvider, message.subagentModel),
+        modelLabel: message.subagentModel ? resolveModelLabel(message.subagentModel) : null,
         latest: describeLatestActivity(message.subagentActivity),
         summary,
       };
@@ -206,6 +218,7 @@ export function usePinnedSubagentRows(
       endedAtMs,
       running: launch.state === 'running',
       launch,
+      modelLabel: launch.model ? resolveModelLabel(launch.model) : null,
     });
   }
 
