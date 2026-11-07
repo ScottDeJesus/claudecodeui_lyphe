@@ -6,7 +6,7 @@ import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { PermissionMode, ProviderModelOption } from '@/shared/types';
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
 import { Chip } from '@/shared/ui';
-import { resolveModelLabel } from '@/modules/chat/utils/modelLabels';
+import { resolveModelLabel } from '@/shared/modelLabels';
 import { permissionMark } from '@/modules/chat/utils/permissionMarks';
 import { useComposerMenuAnchor } from '@/modules/chat/hooks/useComposerMenuAnchor';
 import {

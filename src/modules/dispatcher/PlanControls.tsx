@@ -9,6 +9,7 @@ import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerb
 import { usePutAway } from '@/modules/dispatcher/hooks/usePutAway';
 import { ModelPick } from '@/modules/dispatcher/ModelPick';
 import { OverrideFold } from '@/modules/dispatcher/OverrideFold';
+import { planningPausedVia } from '@/modules/dispatcher/planningPress';
 import { ScheduleControl } from '@/modules/dispatcher/ScheduleControl';
 import { Button } from '@/shared/ui';
 import type { DispatcherPlan } from '@/shared/types';
@@ -81,11 +82,16 @@ import { effectiveModelWord } from '@/shared/utils';
  * A FEATURE CARRIES NO CONCURRENCY CONTROL: what runs is the pacer's and the queue's to decide, and the
  * card names neither as a press.
  *
- * A STALLED PLANNER IS DRAWN BESIDE ALL OF THEM, whatever the plan's status (`plan.planner.stalled`):
- * Resume planner, the press that puts the outing that ended short back to work. Which door it goes
+ * THE PLANNING PRESS IS NOT HERE: Pause planning and Resume planning live on the feature's line of the Planning card (`PlanningCard`), the
+ * one place they are pressed; the card's head still says `Planning paused` (`PlanCard`).
+ *
+ * A STALLED PLANNER IS DRAWN BESIDE ALL OF THEM, whatever the plan's status (`plan.planner.stalled`) — EXCEPT WHILE PLANNING IS
+ * PAUSED, its own or its epic's: Resume planner, the press that puts the outing that ended short back to work. Which door it goes
  * back through — `cut`, `judge`, a `tell` of `continue` — is the dispatcher's own reading of its store
  * at the press, so the card names none; the daemon asks again for an ending that was only the weather
- * (`planner_retry`), and this is the operator's hand for the ones it will not.
+ * (`planner_retry`), and this is the operator's hand for the ones it will not. The pause ends the outing in flight, so its entry
+ * stands stalled while the pause does, and Resume planning sends back every stalled entry within its reach: a Resume planner beside
+ * it would be a second way back past the brake, which the take-up holds anyway.
  *
  * A refusal is the dispatcher's own first line, toasted by `useDispatcherVerbs`.
  *
@@ -95,6 +101,9 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   const { t } = useTranslation();
   const { route, arcs, carriedNames } = useDispatcherPlans();
   const putAway = usePutAway(carriedNames);
+  // The feature's epic, read ONCE: its model word is what the fold's dropdown follows, and its planning pause is what holds the
+  // feature's own (`planningPausedVia`), so Resume planner's stand-down reads the same epic the fold does.
+  const epic = arcs.find((arc) => arc.name === plan.arc) ?? null;
   // A STOPPED plan is one that has walked: `report.launched` is that fact, and it is what tells the
   // two `scheduled` plans apart — one waiting for the Start it was queued with, one waiting for the
   // Resume that ends the stop. `paused` is stopped by definition (a paused plan that never walked
@@ -195,8 +204,9 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
     );
   }
 
-  // The stalled planner's Resume rides after whichever verbs the status drew, in the same row.
-  if (plan.planner?.stalled) {
+  // The stalled planner's Resume rides after them, in the same row, and stands down while planning is paused: Resume planning, on the
+  // Planning card, is the one way back then, and it sends back this very entry.
+  if (plan.planner?.stalled && planningPausedVia(plan, epic) === null) {
     verbs = (
       <>
         {verbs}
@@ -211,7 +221,7 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   const movable = plan.status !== 'complete';
   // What this feature follows when it has no word of its own: its epic's, if the epic carries one, else the
   // house switch's as the frame read it. A word of its own that equals its epic's departs from nothing.
-  const epicWord = plan.arc === null ? null : (arcs.find((arc) => arc.name === plan.arc)?.model ?? null);
+  const epicWord = epic?.model ?? null;
   const follows = epicWord ?? effectiveModelWord(null, route ? route.provider === 'deepseek' : null);
   const override = plan.model_own !== null && plan.model_own !== epicWord ? plan.model_own : null;
   return (

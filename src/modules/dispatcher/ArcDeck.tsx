@@ -22,6 +22,7 @@ import { PaceOverride } from '@/modules/dispatcher/PaceOverride';
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanCard } from '@/modules/dispatcher/PlanCard';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
+import { PlanningPausedLine } from '@/modules/dispatcher/PlanningPause';
 import { SessionPin } from '@/modules/dispatcher/SessionPin';
 import { SnapStripItem } from '@/modules/dispatcher/SnapStrip';
 import { SpendPills } from '@/modules/dispatcher/SpendPills';
@@ -96,7 +97,8 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * while `arc.queue` is set) before the hour a Schedule start armed, led by the flow's `◷`
  * (`data-dispatch-arc-schedule-note`); then the arc's description (`cardDescription`: its design's
  * `delivers` line, else its goal's where that yields nothing), folded to one line until pressed
- * (`CardDescription`), who is out on it, and the pacer's hold on its own queued outings with its Override
+ * (`CardDescription`), who is out on it, `Planning paused` while the epic's own planning pause stands
+ * (`PlanningPausedLine`, `arc.planning_paused`), and the pacer's hold on its own queued outings with its Override
  * (`PaceOverride`, `arc.pace_hold`); then its books as pills, counting at first sight
  * (`darc:<name>`), the last of them how long agents have
  * worked on the epic (`WorkingPill`). The corner is `⋯` — carrying `Dismiss done
@@ -245,6 +247,9 @@ export function DispatchArcDeck({
               {/* Who is out on the arc, under its description: a planner badge is a LONG LINE, and on
                   row one it would take the room the arc's name and word are read in. Nothing when none is. */}
               {arc.planner && <PlannerBadge planner={arc.planner} />}
+              {/* The operator's brake on the epic's own planning, said once in the head: a folded deck keeps it. Its press and the
+                  Resume that lifts it are the epic's line on the Planning card (`PlanningCard`), never the deck's. */}
+              {arc.planning_paused && <PlanningPausedLine via="own" />}
               {/* The pacer's hold on the epic's OWN queued outings — its design before any plan of it exists, its
                   whole-arc cut, a tell, its judgment — with its Override, or the Override standing with its Turn
                   off. It is the epic's alone: no plan card repeats it, so each hold has one press. */}

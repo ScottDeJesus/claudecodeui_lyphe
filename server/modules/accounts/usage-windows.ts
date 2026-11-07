@@ -21,8 +21,8 @@ import type { ClaudeUsageWindow } from '@/shared/types.js';
  * THREE PARSE RULES, in order of how much they matter:
  *
  *   1. A missing or null window is ABSENT, never 0 %. `seven_day_opus` is null on this account; a
- *      fabricated 0 % Opus bar beside two real ones is worse than no bar, so the gauge simply has one
- *      fewer row.
+ *      fabricated 0 % Opus bar beside the real weekly one is worse than no bar, so the gauge simply
+ *      has one fewer row.
  *   2. A 200 nobody can parse is still REACHED. Empty rows, `degraded` stays FALSE — the meter got an
  *      answer it could not read, which is a different fact from a meter that could not ask, and only
  *      the second one means the numbers on screen are stale.
@@ -31,7 +31,7 @@ import type { ClaudeUsageWindow } from '@/shared/types.js';
  *      is not a number and it belongs to the WINDOW the vendor named rather than to the entry that
  *      happened to carry the figure — a window the vendor flags while the percentage still reads
  *      comfortable escalates the ink, never softens it, and discarding the entry whole is how the
- *      warn-floor went inert for the two rows the panel actually draws. An unknown `kind` is DRAWN,
+ *      warn-floor went inert for the row the panel actually draws. An unknown `kind` is DRAWN,
  *      in the payload's own words: dropping it is what renders a green gauge beside a window sitting
  *      at 98 %.
  *
@@ -46,7 +46,6 @@ import type { ClaudeUsageWindow } from '@/shared/types.js';
 
 /** Top-level payload key → the row's label. This tuple is also the RENDER ORDER. */
 const WINDOW_ORDER: ReadonlyArray<readonly [string, string]> = [
-  ['five_hour', '5-hour'],
   ['seven_day', 'weekly'],
   ['seven_day_opus', 'weekly · Opus'],
   ['seven_day_sonnet', 'weekly · Sonnet'],
@@ -67,8 +66,6 @@ const MAX_LABEL = 24;
 /** `limits[].kind` → the top-level key it may FILL IN (rule 3: fill, never override).
  *  `weekly_scoped` is deliberately absent — it is per-MODEL and gets its own row. */
 const LIMIT_KINDS: Record<string, string> = {
-  session: 'five_hour',
-  five_hour: 'five_hour',
   weekly_all: 'seven_day',
   weekly_opus: 'seven_day_opus',
   weekly_sonnet: 'seven_day_sonnet',
@@ -118,7 +115,6 @@ function windowRow(value: unknown): WindowRow | null {
 export function parseWindows(payload: unknown): ClaudeUsageWindow[] {
   const top = isRecord(payload) ? payload : {};
   const found = new Map<string, ClaudeUsageWindow>();
-  const filled = new Map<string, string>(); // which `limits[]` kind supplied a FILLED window
   const severity = new Map<string, string>(); // the vendor's alarm, a floor on the colour ramp
   const scoped = new Map<string, ClaudeUsageWindow>(); // namespaced by model/kind; a repeat overwrites
 
@@ -153,34 +149,19 @@ export function parseWindows(payload: unknown): ClaudeUsageWindow[] {
       const kind = typeof item.kind === 'string' ? item.kind : '';
       const target = LIMIT_KINDS[kind];
       if (target) {
-        // ⚠ The alarm must follow the NUMBER. Recording it before the precedence rule below picked a
-        // winner took the badge from the entry the code REJECTED and pinned it on the entry it chose.
         if (!found.has(target)) {
           found.set(target, { key: target, label: WINDOW_LABELS.get(target) ?? target, ...row });
-          filled.set(target, kind);
-          noteSeverity(severity, target, row);
-        } else if (filled.has(target) && kind === target && filled.get(target) !== target) {
-          // `session` and `five_hour` both name the same window. When BOTH appear, the exactly-named
-          // one wins rather than whichever the vendor listed first — otherwise the number on screen
-          // depends on array order. A window the TOP LEVEL supplied is never touched (it is not in
-          // `filled`).
-          found.set(target, { key: target, label: WINDOW_LABELS.get(target) ?? target, ...row });
-          filled.set(target, kind);
-          severity.delete(target); // the previous entry's alarm loses with its number
-          noteSeverity(severity, target, row);
-        } else {
-          // ⚠ The entry names a window we ALREADY draw, so rule 3 discards its number — but an alarm
-          // is not a number. It belongs to the window the vendor flagged, not to the entry that lost
-          // the precedence contest, and this leg is the ordinary case rather than an exotic one: the
-          // top level supplies `five_hour` and `seven_day` on every live payload, so BOTH rows the
-          // footer and the panel render land here whenever `limits[]` flags them. Measured
-          // 2026-09-18: `weekly_all` at 86 % with `severity: 'warning'` beside a non-null top-level
-          // `seven_day: 86.0` served a `seven_day` row carrying NO severity, while a limits-only
-          // `weekly_scoped` row kept its `critical` — so the warn-floor was inert exactly where it
-          // matters, and a flagged window below the 80 % threshold would have drawn comfortable
-          // green. Record the alarm; leave the figure alone.
-          noteSeverity(severity, target, row);
         }
+        // ⚠ An entry that names a window we ALREADY draw has its number discarded by rule 3 — but an
+        // alarm is not a number. It belongs to the window the vendor flagged, not to the entry that
+        // carried it, and this is the ordinary case rather than an exotic one: the top level supplies
+        // `seven_day` on every live payload, so the row the footer and the panel render lands here
+        // whenever `limits[]` flags it. Measured 2026-09-18: `weekly_all` at 86 % with
+        // `severity: 'warning'` beside a non-null top-level `seven_day: 86.0` served a `seven_day` row
+        // carrying NO severity, while a limits-only `weekly_scoped` row kept its `critical` — so the
+        // warn-floor was inert exactly where it matters, and a flagged window below the 80 %
+        // threshold would have drawn comfortable green. Record the alarm; leave the figure alone.
+        noteSeverity(severity, target, row);
         continue;
       }
       if (kind === 'weekly_scoped') {
@@ -255,13 +236,11 @@ export function resetEpoch(value: unknown): number | null {
 /**
  * Flag any window whose reset instant fell AFTER its figure was read and before now.
  *
- * ⚠ THE WINDOW IS ANCHORED TO FIRST USE, NOT TO A WALL-CLOCK GRID, so THE NEXT BOUNDARY IS NOT
- * KNOWABLE FROM THIS ONE. Three `five_hour` resets in the CLI's own history land on three different
- * phases mod 5 h (12000 / 10200 / 1200 s); a fixed grid would put every one on a single phase.
- * Continuous use chains one block into the next and preserves the phase, an idle gap re-anchors it,
- * and while the account is idle there may be no next window at all. NEVER compute a following reset
- * as `resetsAt + 5h`, and never print a countdown to one: watching a window from inside it cannot
- * tell you where the next one starts.
+ * ⚠ THIS FUNCTION NAMES NO FOLLOWING RESET. Only a weekly window turns over on a known step (whole
+ * weeks — the client's `windowPastReset` applies it); any other window starts at first use or at a
+ * period nobody here knows, so its next boundary is not knowable from this one. NEVER compute a
+ * following reset from `resetsAt` here, and never print a countdown to one: watching a window from
+ * inside it cannot tell you where the next one starts.
  *
  * THE RESET INSTANT IS STABLE FOR THE LIFE OF ITS OWN WINDOW — measured 2026-09-01: held to ±0.4 s
  * across seven polls over twenty minutes (weekly included), and held at 07:20:00 across ~2.5 hours
@@ -273,8 +252,7 @@ export function resetEpoch(value: unknown): number | null {
  * (`pacer-door.ts` refuses a rolled window). What the panel draws for it is the client's own rule
  * (`windowPastReset`, `src/modules/accounts/utils/usageWindows.ts`): the window that began at the reset, 0 % used,
  * because a figure moves only when something uses the account (operator, 2026-11-03). A weekly window's reset steps
- * forward in whole weeks; a 5-hour window states none, since under first-use anchoring it may have no successor at
- * all and its next boundary is never knowable from this one.
+ * forward in whole weeks; any other window states none, since its next boundary is never knowable from this one.
  *
  * Pure, and applied at SERVE time rather than at parse time: the same cached reading is correct
  * before its reset and rolled after it, without being re-read.

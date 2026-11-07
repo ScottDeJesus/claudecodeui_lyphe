@@ -7,7 +7,7 @@ import { Button, SettingRow } from '@/shared/ui';
 
 /**
  * WHETHER AN ACCEPT DURING DEEPSEEK'S PEAK WAITS FOR THE WINDOW TO LIFT — the dispatcher's own switch,
- * `~/.claude/state/park_at_peak.flag`, drawn below the planner-lanes row, with the dispatcher's other host-wide
+ * `~/.claude/state/park_at_peak.flag`, drawn below the weekly-stop row, with the dispatcher's other host-wide
  * dials, because it is a switch of the same family: how the DeepSeek route spends its hours. The dispatcher reads it at
  * both Accept doors; on the Claude route it holds nothing, which is why it lives on this card and
  * not on the Roadmap tab's In flight face.

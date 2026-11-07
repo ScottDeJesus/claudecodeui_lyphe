@@ -236,13 +236,20 @@ export function GutterWidgetFrame({
         !open && 'shrink-0',
         // Fullscreen replaces the card's whole sizing rather than adding to it, and `tailwind-merge`
         // is what makes that a replacement: `max-h-none` beats `max-h-full`, `min-h-0` beats the
-        // open floor, `rounded-none` the card's radius. `z-[45]` is the transcript card's fullscreen
-        // layer — over the workspace, UNDER the dialog layer, so a dialog opened from here comes up
-        // in front (see `ShapeFrame`).
-        // Stated here with the transcript card's for the same reason: in the home-screen app the
-        // fullscreen header row and its switch must clear the status bar above and the notch band
-        // at the side, and this layer is the screen (see `ShapeFrame`, and src/index.css).
-        fullscreen && 'pwa-notch-safe fixed inset-0 z-[45] m-0 h-full max-h-none min-h-0 rounded-none border-0',
+        // open floor, `rounded-none` the card's radius.
+        // `z-[61]` is the SCREEN, covered by nothing: over the views rail (`z-50`) and the app switcher's FAB and
+        // radial (`z-60`), which share this card's stacking context — the workspace shell, `position: fixed` —
+        // and which under 61 draw over the card's first 48px: its icon, the start of its title and its
+        // top-left corner, where a tap lands on the docked FAB. The number only has to beat those two (the
+        // companion's phone sheet stands at the same 61, for the same two); Kaylee's disc (`z-59`) and her open
+        // panel (`z-45`) are in that context too, and go under the card with them. A dialog or a menu is
+        // portalled to `<body>` and the toast stack is mounted at the App root, both outside that context, so
+        // they stay in front of any number this card wears (measured at z-index 9999: the command palette
+        // still drew over it).
+        // `pwa-notch-safe` for the same reason the layer is the screen: in the home-screen app the fullscreen
+        // header row and its switch must clear the status bar above and the notch band at the side (see
+        // `ShapeFrame`, and src/index.css).
+        fullscreen && 'pwa-notch-safe fixed inset-0 z-[61] m-0 h-full max-h-none min-h-0 rounded-none border-0',
       )}
       // The closing clamp is a height for a card in a column; a fullscreen card is the screen.
       style={closing === null || fullscreen ? undefined : { maxHeight: `${closing}px` }}

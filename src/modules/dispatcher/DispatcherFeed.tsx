@@ -137,7 +137,7 @@ export function DispatcherFeed({ children }: { children: ReactNode }) {
  *
  * `arcs` AND `planners` ARE THE TWO FIELDS READ RATHER THAN DEMANDED. A frame from a server older
  * than either key is still a whole picture of the plans — the same reading a fresh page gets before
- * the first frame lands — so an absent list draws no arc headers, or no badges, instead of blanking
+ * the first frame lands — so an absent list draws no arc headers, no badges and no Planning lines, instead of blanking
  * every card the frame did carry. A key that IS there and is not a list is still refused, like every
  * other field here.
  */

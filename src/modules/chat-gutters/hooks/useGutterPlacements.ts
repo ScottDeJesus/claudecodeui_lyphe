@@ -56,7 +56,7 @@ const DEFAULT_PLACEMENTS: ChatGutterPlacements = {
   // it — which gains it through the parser's own repair, at order 0 on the right — it sorts ahead of the widget
   // that holds that rank, and nothing the reader placed changes order relative to the rest.
   followups: { side: 'right', order: 0, open: true },
-  // OPEN, and directly under the next steps: the operator asked for the account usage panel — the two windows, both
+  // OPEN, and directly under the next steps: the operator asked for the account usage panel — the usage meters, both
   // balances, every account's figures and the switch — and a widget he asked for is seen without hunting. It shares
   // `followups`' rank and is the SECOND key on purpose: ties break in key order, so it sorts right behind `followups`
   // and ahead of every widget that holds that rank in a stored arrangement. Where Next steps stands is the

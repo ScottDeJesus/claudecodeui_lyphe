@@ -16,9 +16,10 @@ type EmptyStateProps = {
   actionLabel?: string;
   onAction?: () => void;
   /**
-   * `sm`: one quiet line, for a place that keeps its room while it holds nothing yet — the title alone, at the body's small
-   * size in the muted ink (4.5:1 on both canvases), in a slimmer frame. Measured by the station's draft dock, whose line
-   * stands between her conversation and the talk control and must not outshout either.
+   * `sm`: one quiet line, for a place that keeps its room while it holds nothing yet — the title at the body's small
+   * size in the muted ink (4.5:1 on both canvases), in a slimmer frame, a message and an icon scaled down with it.
+   * Measured by the station's draft dock, whose line stands between her conversation and the talk control and must not
+   * outshout either.
    */
   size?: 'default' | 'sm';
 };
@@ -30,8 +31,8 @@ type EmptyStateProps = {
  * deepseek-spend, dispatcher, document-preview, file-manager, followups, git-panel, heal, jev, kanban, memory-intake, notes,
  * roadmap, runner-tab, schedules, shell, sidebar, standalone-shell, station, task-master and universe modules and the shared
  * KanbanLane — an empty folder, an empty board, a queue with nothing waiting, a History with nothing in it yet, and (at `sm`)
- * the station's draft dock while she holds no draft. Each means "there is nothing here yet", and a dashed frame around a serif
- * line says that without any of them inventing a way to.
+ * the station's draft dock while she holds no draft and the heal Rules list while no correction has come back. Each means
+ * "there is nothing here yet", and a dashed frame around a serif line says that without any of them inventing a way to.
  *
  * "Empty" is not "we don't know" and not "zero": this belongs where the app has looked and
  * found nothing. A pane that is still loading, or that failed to read, says its own thing.

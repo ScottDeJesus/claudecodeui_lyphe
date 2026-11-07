@@ -134,7 +134,8 @@ function aliasMatching(
  * caption) or the id itself (the composer's own chip, where the id is the thing the user typed in).
  *
  * Used by chat's `useModelLabelResolver` (transcript captions and exports, the agent rows in the transcript and
- * in the pinned strip and the gutter widget) and by ComposerModelMenu (the chip).
+ * in the pinned strip and the gutter widget) and ComposerModelMenu (the chip), and by `useModelName`
+ * (`src/shared/hooks`) for the dispatcher's Planning card, so a planner's model reads as an agent row names it.
  */
 export function resolveModelLabel(
   options: ProviderModelOption[],

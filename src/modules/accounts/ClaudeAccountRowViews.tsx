@@ -2,8 +2,7 @@ import { MoreHorizontal } from 'lucide-react';
 
 import { UsageRing } from '@/modules/accounts/UsageRing';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
-import { hasFiveHour, rowWindows } from '@/modules/accounts/utils/accountInUseUsage';
-import { ringWindowKeys } from '@/modules/accounts/utils/usageWindows';
+import { rowWeek } from '@/modules/accounts/utils/accountInUseUsage';
 import { ActionMenu, Avatar } from '@/shared/ui';
 import type { ClaudeAccountRow } from '@/shared/types';
 import { cn, formatShortDate } from '@/shared/utils';
@@ -18,7 +17,7 @@ const ROW_ACT_CLASS =
 
 /**
  * A line under a row that says something is wrong with the account: one short line, in the warn tone. Kept off the
- * row's right edge, which the rings' column runs to.
+ * row's right edge, which the ring's column runs to.
  */
 const WARN_LINE_CLASS = 'pr-2 text-xs leading-relaxed text-tone-ink';
 
@@ -66,17 +65,16 @@ type AccountRowViewProps = {
 };
 
 /**
- * One account the store holds: its name, then its state and its act on the left and its usage rings on the right, then
+ * One account the store holds: its name, then its state and its act on the left and its usage ring on the right, then
  * a warn line only when something needs the reader. Used by the accounts module's ClaudeAccountRows, one per account in
  * slug order.
  *
- * THE RINGS LINE UP DOWN THE LIST. Every row draws them at the right end of its second line, weekly last, each in a
- * cell of one fixed width: the weekly rings of every account stand in one column, the 5-hour rings beside them on the
- * accounts that have that window, so the accounts compare in one look. They are the rail's ring (`UsageRing`), with the
- * window's name and countdown written under each, because a phone has no hover.
+ * THE RINGS LINE UP DOWN THE LIST. Every row draws its ring at the right end of its second line, in a cell of one fixed
+ * width: the rings of every account stand in one column, so the accounts compare in one look. It is the rail's ring
+ * (`UsageRing`), with the window's name and countdown written under it, because a phone has no hover.
  *
- * The rings stand outside every press: the act is its own small button (`Use`, `Set up`), never the whole row, so a
- * long press that reads a ring's words cannot switch the account.
+ * The ring stands outside every press: the act is its own small button (`Use`, `Set up`), never the whole row, so a
+ * long press that reads the ring's words cannot switch the account.
  */
 export function AccountRowView({ account, hue, nowMs, busy, held, onUse, onSetup, onRemove }: AccountRowViewProps) {
   const refused = account.wall?.kind === 'refused';
@@ -84,9 +82,9 @@ export function AccountRowView({ account, hue, nowMs, busy, held, onUse, onSetup
   // "checking" is not a verdict yet.
   const canUse = account.token === 'saved' && !refused && !account.in_use;
   const needsSetup = account.token === 'none' || refused;
-  // The windows as every surface draws them: one whose reset has passed with no reading since is the window that began
-  // there — 0%, counting down to its next reset — so a ring never shows a closed week's figure.
-  const { five, week } = rowWindows(account, nowMs);
+  // The week as every surface draws it: one whose reset has passed with no reading since is the week that began
+  // there — 0%, counting down to its next reset — so the ring never shows a closed week's figure.
+  const week = rowWeek(account, nowMs);
   // A refused token's saved expiry promises what the warn line denies: the row shows the wall, not the date.
   const tokenNotice = refused ? null : tokenNoticeInWords(account.expires_at, nowMs);
   // The in-use row says why it waits instead, so it does not repeat the same fact twice.
@@ -100,8 +98,8 @@ export function AccountRowView({ account, hue, nowMs, busy, held, onUse, onSetup
     >
       <Avatar initials={accountInitials(account.slug)} hue={hue} size={24} />
       <div className="min-w-0 flex-1">
-        {/* The name and the row's menu. The state and the rings stand under the name, so only a name wider than the
-            row ends in an ellipsis. The menu stands over the weekly ring's column: its 28px trigger sits 10px in from the
+        {/* The name and the row's menu. The state and the ring stand under the name, so only a name wider than the
+            row ends in an ellipsis. The menu stands over the ring's column: its 28px trigger sits 10px in from the
             row's edge, centred on the 48px ring cell below it (`UsageRing`'s `w-12`). */}
         <div className="flex items-center gap-1">
           <div className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground" title={name}>{name}</div>
@@ -125,7 +123,7 @@ export function AccountRowView({ account, hue, nowMs, busy, held, onUse, onSetup
           />
         </div>
         <div className="flex items-start justify-between gap-2">
-          {/* The state and the one act, level with the rings' middles. */}
+          {/* The state and the one act, level with the ring's middle. */}
           <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-1.5">
             {account.in_use && <span className="text-xs font-medium text-accent-ink">✓ In use</span>}
             {canUse && (
@@ -157,16 +155,7 @@ export function AccountRowView({ account, hue, nowMs, busy, held, onUse, onSetup
           </div>
           <div className="flex flex-none items-start">
             {/* `owner`: three rows draw three "This week" rings, and a screen reader must hear whose each one is. */}
-            {ringWindowKeys(hasFiveHour(account)).map((windowKey) => (
-              <UsageRing
-                key={windowKey}
-                windowKey={windowKey}
-                usageWindow={windowKey === 'five_hour' ? five : week}
-                now={nowMs}
-                captioned
-                owner={account.slug}
-              />
-            ))}
+            <UsageRing usageWindow={week} now={nowMs} captioned owner={account.slug} />
           </div>
         </div>
         {refused && <p data-tone="warn" className={WARN_LINE_CLASS}>sign-in token refused</p>}
@@ -179,7 +168,7 @@ export function AccountRowView({ account, hue, nowMs, busy, held, onUse, onSetup
 }
 
 /**
- * A live identity the store does not hold yet: the same Set up act, with no rings and no menu.
+ * A live identity the store does not hold yet: the same Set up act, with no ring and no menu.
  * Used by the accounts module's ClaudeAccountRows, one per live identity the store does not hold.
  */
 export function CandidateRow({ slug, email, hue, busy, onSetup }: { slug: string; email: string | null; hue: number; busy: boolean; onSetup: (slug: string) => void }) {

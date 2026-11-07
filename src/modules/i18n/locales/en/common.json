@@ -127,6 +127,53 @@
       "readFailed": "This kind could not be read",
       "reading": "Reading this kind’s rows…"
     },
+    "rules": {
+      "title": "Rules",
+      "hint": "corrections you said again, in your own words",
+      "empty": {
+        "title": "No correction has come back",
+        "message": "Correct the same thing again in another chat and it lands here as one rule, in your own words, waiting in Memory for your press."
+      },
+      "quoted": "“{{quote}}”",
+      "shelf": {
+        "title": "Where it lands",
+        "rules": "your rules",
+        "requirements": "your requirements",
+        "memory": "{{project}} memory",
+        "memoryUnnamed": "a project’s memory",
+        "matches": "matches your shelf: {{text}}",
+        "matchesQueued": "matches what a chat queued: {{text}}"
+      },
+      "state": {
+        "waiting": "waiting for you in Memory",
+        "filed": "on your shelf since {{date}}",
+        "filedUndated": "on your shelf",
+        "discarded": "discarded {{date}}, its rows stay in the record",
+        "discardedUndated": "discarded, its rows stay in the record",
+        "unstaged": "on its way to Memory",
+        "refused": "the Memory door refused it: {{reason}}",
+        "refusedBare": "the Memory door refused it",
+        "queuedByChat": "already waiting in Memory, queued by a chat",
+        "onShelf": "already on your shelf before the heal",
+        "missing": "no longer found in Memory",
+        "unreadable": "Memory could not be read just now"
+      },
+      "returned_one": "you said it again after filing it",
+      "returned_other": "you said it again after filing it — {{count}} times",
+      "said_one": "Said once",
+      "said_other": "Said {{count}} times",
+      "open": "open",
+      "openTitle": "These rows stay open until the rule is filed",
+      "closed": "closed",
+      "closedTitle": "The rule is on your shelf, so these rows are closed",
+      "repeat": "same chat",
+      "repeatTitle": "Said again in the same chat within the hour: the session not acting on the first, so it lifts nothing",
+      "gone": "left the ledger",
+      "goneTitle": "This row is no longer in the friction ledger; its words are kept here",
+      "noWords": "no words kept",
+      "more_one": "{{count}} older rule is not shown",
+      "more_other": "{{count}} older rules are not shown"
+    },
     "model": {
       "label": "Model for heal souls",
       "offPeak": "Off-peak right now: DeepSeek is half price until {{time}}.",
@@ -1327,6 +1374,31 @@
       "off": "Turn off",
       "offTitle": "Hold this feature for the usage limit again"
     },
+    "planningPause": {
+      "press": "Pause planning",
+      "pressTitle": "Stop designing and planning this one until you resume it. Nothing else pauses.",
+      "resume": "Resume planning",
+      "resumeTitle": "Put this one's planning back to work, and send back what the pause ended.",
+      "paused": "Planning paused",
+      "pausedWithEpic": "Planning paused with its epic"
+    },
+    "planning": {
+      "title": "Planning",
+      "empty": "Nothing being planned",
+      "work": {
+        "design": "Designing",
+        "tell": "Continuing the design",
+        "cut": "Cutting into tasks",
+        "judge": "Judging what landed"
+      },
+      "waiting": {
+        "design": "Waiting to design",
+        "tell": "Waiting to continue the design",
+        "cut": "Waiting to cut into tasks",
+        "judge": "Waiting to judge what landed"
+      },
+      "endedShort": "Ended short"
+    },
     "acceptWhenCut": "Accept when cut",
     "acceptWhenCutArmed": "Accepted · starts when cut",
     "acceptWhenCutCancel": "Cancel",
@@ -1355,7 +1427,6 @@
     "queueHold": "Waiting · {{clause}}",
     "paceHold": "Held by pace · {{clause}}",
     "dismissDone": "Dismiss done · {{count}}",
-    "plannersOut": "planners {{out}} of {{lanes}} out",
     "dismiss": "Dismiss feature",
     "dismissArc": "Dismiss epic",
     "dismissDonePlans": "Dismiss done features · {{count}}",

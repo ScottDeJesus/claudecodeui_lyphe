@@ -3868,7 +3868,7 @@ The two reads the rest of the server makes of the house's Claude account store. 
 | `launchCredential` | `account-door.ts` | the account in use and its token, for a CLI start |
 | `chosenAccount` | `chosen-account.ts` | the house's choice now, or `null` |
 | `liveAccountEmail` | `account-identity.service.ts` (`identity`) | the live login's email, `oauthAccount.emailAddress` of `~/.claude.json`; the only credential-adjacent read the server keeps besides the meter, and it opens no credential file |
-| `notePacerReading` | `pacer-door.ts` (`note`) | files one window reading with the pacer: `(digest, windows, checkedAt, 'meter' \| 'chat')`; consumers `usage.service.ts` (`'meter'`) and `claude-chat-readings.ts` (`'chat'`, MAN-8859) |
+| `notePacerReading` | `pacer-door.ts` (`note`) | files the week's reading with the pacer (the `seven_day` row of `windows`): `(digest, windows, checkedAt, 'meter' \| 'chat')`; consumers `usage.service.ts` (`'meter'`) and `claude-chat-readings.ts` (`'chat'`, MAN-8859) |
 | `createAccountsModule` | `accounts.module.ts` | the composition root |
 
 ## `launchCredential()` — `account-door.ts`
@@ -4499,7 +4499,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Wo
 |---|---|
 | disc cell | `size-11 md:size-10` (44px phone, 40px desktop) holding `<AppSwitcherDock />`: its 28px box is centred at (24, 28) on a desktop and the app switcher's FAB is drawn over it. While the disc is seated here it draws no dot (see MAN-486): the Chat glyph's badge says a reply landed |
 | scroll region | the runs of `SCROLL_GROUPS` in order: `chat`, `tools`, `plans`, `house`, `plugins`, of the views left once `WorkspaceRail` has dropped every one stamped `hiddenFromNav` (Settings → Appearance → Hide Files / Hide Git / Hide Browser; MAN-8999) — the same tree is the phone drawer's navigation, so one filter hides the link at both widths. A run with no view is dropped first; a `RailHairline` (`h-px w-6 bg-border`, `aria-hidden`, `my-1`) stands between two drawn runs |
-| foot | outside the scroll, `relative z-40`: the usage rings (`UsageRings` from the accounts barrel: the 5-hour over the week, each labelled with its countdown to reset, 28px rings in 32px cells, a status and no button; MAN-9033), the views whose `group` is `foot` (Inbox: MAN-9013), the Settings button (`t('rail.settings')`, running `sidebarSharedProps.onShowSettings()`), then the account cell |
+| foot | outside the scroll, `relative z-40`: the usage ring (`UsageRings` from the accounts barrel: the week's, labelled with its countdown to reset, a 28px ring in a 32px cell, a status and no button; MAN-9033), the views whose `group` is `foot` (Inbox: MAN-9013), the Settings button (`t('rail.settings')`, running `sidebarSharedProps.onShowSettings()`), then the account cell |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRailBadges.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/RailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-mockup.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-read.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sheet.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-live.mjs
 
@@ -13399,7 +13399,8 @@ Kit `EmptyState` (`src/shared/ui/EmptyState.tsx`) with its Verve styles (`.vv-em
 - why: a place that keeps its room while it holds nothing must not outshout its neighbours.
 
 ## Sites
-- Many modules draw the default size (`grep -rl EmptyState src`). The one `size="sm"` site is the station's draft dock without a draft (MAN-9321).
+- Many modules draw the default size (`grep -rl EmptyState src`).
+- `size="sm"` sites: the station's draft dock without a draft (MAN-9321; title only) and the heal Rules section's empty list (`src/modules/heal/HealRuleList.tsx`; icon, title and message).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/EmptyState.tsx
 

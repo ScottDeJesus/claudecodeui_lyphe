@@ -87,25 +87,9 @@ export type DispatcherStateDependencies = {
 export type DispatcherStore = Omit<DispatcherPicture, 'plans'> & { plans: DocumentPlan[] };
 
 /**
- * The planner lane's dial and its census (`route.planners`, `planner_lanes.census`): the width the
- * operator set and how many planner rows are `out` against it. A dispatcher build older than the
- * field sends none, and that is ANOTHER BUILD TALKING and not a torn document — so an absent key reads
- * as `undefined` and the readout is simply not drawn — while a key that IS there and is not two counts
- * is refused by name, like every other field of the route.
- */
-function plannerLanesOf(raw: unknown): DispatcherRoute['planners'] {
-  if (raw === undefined) return undefined;
-  const planners = need(raw, isRecord, 'route.planners');
-  return {
-    lanes: need(field(planners, 'lanes'), isCount, 'route.planners.lanes'),
-    out: need(field(planners, 'out'), isCount, 'route.planners.out'),
-  };
-}
-
-/**
  * How many plans the board's Start would let go (`route.waiting`, `first_start.held`): a count the dispatcher
  * derives so the button and its press read one set. Absent from a build older than the field — ANOTHER BUILD
- * TALKING, like `route.planners` — so it reads `undefined` and no Start is drawn; a key that IS there and is
+ * TALKING, not a torn document — so it reads `undefined` and no Start is drawn; a key that IS there and is
  * not a count is refused by name.
  */
 function waitingOf(raw: unknown): number | undefined {
@@ -115,7 +99,6 @@ function waitingOf(raw: unknown): number | undefined {
 /** This box's posture. `word` is the whole posture in one phrase. */
 function routeOf(raw: unknown): DispatcherRoute {
   const route = need(raw, isRecord, 'route');
-  const planners = plannerLanesOf(field(route, 'planners'));
   const waiting = waitingOf(field(route, 'waiting'));
   const pace = paceSince(field(route, 'pace'));
   return {
@@ -123,10 +106,9 @@ function routeOf(raw: unknown): DispatcherRoute {
     word: need(field(route, 'word'), isText, 'route.word'),
     park_at_peak: need(field(route, 'park_at_peak'), isFlag, 'route.park_at_peak'),
     peak_until: need(field(route, 'peak_until'), isTextOrNull, 'route.peak_until'),
-    // `planners`, `waiting` and `pace` are each left off the object entirely when the build sent
-    // none, so the client's `planners?.`, `waiting` and `pace` read them as absent. (`epics`, below,
-    // is always a key: `null` is its absence.)
-    ...(planners === undefined ? {} : { planners }),
+    // `waiting` and `pace` are each left off the object entirely when the build sent none, so the
+    // client's `waiting` and `pace` read them as absent. (`epics`, below, is always a key: `null` is
+    // its absence.)
     ...(waiting === undefined ? {} : { waiting }),
     ...(pace === undefined ? {} : { pace }),
     // The epic dial's census, `null` for a build older than the key (`epicsOf`). Always present as a

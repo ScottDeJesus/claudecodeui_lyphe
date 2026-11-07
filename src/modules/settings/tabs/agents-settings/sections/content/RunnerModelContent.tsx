@@ -10,13 +10,12 @@ import RunnerGeminiBudgetRow from '@/modules/settings/tabs/agents-settings/secti
 import RunnerHealModelRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerHealModelRow';
 import RunnerMainSessionDactylsRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerMainSessionDactylsRow';
 import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow';
-import RunnerPlannerLanesRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerPlannerLanesRow';
 import RunnerWeeklyStopRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow';
 
 /**
  * Rendered by AgentCategoryContentSection under Claude's "account" panel: which model the plan
- * runner's hands — the builder, his fix-pass and Athena — actually dispatch on, how many planners run at
- * once, and whether the heal reflex may launch a heal at all.
+ * runner's hands — the builder, his fix-pass and Athena — actually dispatch on, and whether the heal
+ * reflex may launch a heal at all.
  *
  * It sits beside the Claude connection rather than in a tab of its own because that is the
  * question it answers: this account's souls, or DeepSeek's. Every switch it writes is a file the
@@ -25,9 +24,9 @@ import RunnerWeeklyStopRow from '@/modules/settings/tabs/agents-settings/section
  *
  * The read, the write and the re-read live in `useDeepSeekFlashSwitch` and `useHealMasterSwitch` —
  * one hook per switch rather than one generalised switch, because switches sharing a module move
- * together the first time one of them is edited, and these must never. The planner
- * lanes, the weekly stop, the park-at-peak switch, the Gemini budget cap, the Custom compaction switch and Dactyls for the main session each have a row of
- * their own file (`RunnerPlannerLanesRow`, `RunnerWeeklyStopRow`, `RunnerParkAtPeakRow`, `RunnerGeminiBudgetRow`, `RunnerCompactionRow` — drawn
+ * together the first time one of them is edited, and these must never. The weekly stop, the
+ * park-at-peak switch, the Gemini budget cap, the Custom compaction switch and Dactyls for the main session each have a row of
+ * their own file (`RunnerWeeklyStopRow`, `RunnerParkAtPeakRow`, `RunnerGeminiBudgetRow`, `RunnerCompactionRow` — drawn
  * directly under the DeepSeek row, because it asks that row's question of a chat's compaction: which small model does
  * a big model's chore — and `RunnerMainSessionDactylsRow`, drawn directly under that one, because it asks the same of
  * a main session's edits) with a hook of its own, and the fourth heal switch, `useHealModelSwitch`, is drawn by `RunnerHealModelRow` — its own file, because
@@ -105,12 +104,9 @@ export default function RunnerModelContent() {
       <RunnerCompactionRow />
       <RunnerMainSessionDactylsRow />
 
-      {/* HOW MANY PLANNERS RUN AT ONCE — its own file and its own hook, like the rows around it. How many
+      {/* WHERE THE WEEKLY WINDOW STOPS — the usage pacer's line for the weekly window, its own file and hook,
+          like the rows around it: plans stop starting when the week is on course to pass it. How many
           features and tasks run at once is not set here: it is In flight's header (`MasterController`). */}
-      <RunnerPlannerLanesRow />
-
-      {/* WHERE THE WEEKLY WINDOW STOPS — the usage pacer's line for the weekly window, its own file and hook
-          beside the planner lanes: plans stop starting when the week is on course to pass it. */}
       <RunnerWeeklyStopRow />
 
       <RunnerParkAtPeakRow />

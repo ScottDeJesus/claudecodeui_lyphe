@@ -5325,11 +5325,18 @@ the framer (`fullscreen`, `onToggleFullscreen`), so a caller that draws no frame
 switch and an unframed embed's `fullscreen` is false forever — the right answer for a box nobody
 drew.
 
-**The layer is `z-[45]`, under the dialogs on purpose.** Over everything the workspace draws (sticky
-rows at z-10/20, the app switcher's layer at z-40) and UNDER `Dialog`'s z-50. Fullscreen is a mode
-the reader sits in with the app live around it, so a dialog opened from it — the command palette, a
-confirm — must come up in front of it; on a layer above the dialogs the palette opens invisibly
-behind the card and keeps the keyboard, so every keystroke lands in a list the reader cannot see.
+**The transcript card's layer is `z-[45]`, and a gutter widget's is `z-[61]`.** The transcript card
+stands over the main region (sticky rows at z-10/20, the app switcher's layer at z-40) and UNDER the
+rail (z-50) and the app switcher's FAB (z-60), so the FAB stays live over it. A gutter widget is the
+screen itself, covered by nothing: it stands over the rail and the FAB, which share its stacking
+context (the workspace shell, `position: fixed`) and which under 61 draw over its first 48px — its
+icon, the start of its title and its top-left corner, where a tap lands on the docked FAB. 61 only
+has to beat those two (the companion's phone sheet stands there for the same two); Kaylee's disc (z-59)
+and her open panel (z-45) share the shell and go under the card with them. Neither number is
+about dialogs: `Dialog` and menus portal to `<body>` and the toast stack is mounted at the App root, both outside the shell's stacking context,
+so a dialog opened from a fullscreen card — the command palette, a confirm — is in front of it at
+any layer the card wears (measured with a gutter card forced to z-index 9999: the palette still drew
+over it). What a dialog takes from the card is the KEY, which the stand-down below hands it. Proof, read-only on the live app: `node .verify/gutter-fullscreen-live.mjs [--url http://127.0.0.1:5184]` — per width and colour scheme, every gutter widget in fullscreen: the frame fills the viewport; the top-left corner, the docked FAB's centre, the rail's old box and a 35-point grid across the frame each hit-test inside the card; the card's z-index is over the rail's and the FAB's; Playwright's trial click accepts the corner; Escape leaves. The Runs widget alone also opens the command palette over the card: it draws in front and takes the first Escape. Once the widgets are done, the FAB is live again at its dock. 1440 and the phone draw no gutter at all (the region must be 1500px: it first draws at 1549 with the chat list hidden), so they are checked for what they are: no gutter widget, no sideways scroll, the rail at `z-50` and the FAB at `z-60`. A card under 61 fails every cover check: the rail answers the corner and the FAB answers its own centre.
 
 **A fullscreen card is open and claims Escape.** The fold is forced open while it is up — a
 full-screen card showing only its own header is a screen of nothing — and the chevron is not drawn
@@ -5350,7 +5357,7 @@ The listener exists only while fullscreen is on.
 **The gutter widgets answer to the same rule, in their own file.** `GutterWidgetFrame` takes
 `fullscreen` and `onToggleFullscreen`; `ChatGutterLayout` holds WHICH widget has the screen (one
 value, so two fullscreen WIDGETS cannot happen — though a transcript card and a widget can both be
-fullscreen at once, two identical panels on one layer that one Escape leaves together) and owns the
+fullscreen at once, the widget over the card at its higher layer, and one Escape leaves them together) and owns the
 Escape listener, on the same host window and with the same dialog stand-down, and drops it when the region narrows past the
 gutters' threshold. The switch is a second control, so it
 is a second button beside the header's toggle rather than inside it — a button within a button is
@@ -5364,6 +5371,8 @@ A gutter widget may draw a different body while its card is full screen: the lay
 A retraction is the one thing that ends fullscreen without the reader: a fence that flashes back to
 the streaming half unmounts `WidgetFrame` entirely, and the card comes back as a card. That is the
 same restart the widget itself suffers there, and curing it is `StreamingMarkdown`'s shape to change.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/GutterWidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gutter-fullscreen-live.mjs
 
 ## MAN-423 — The live bus
 section: 07-live-widgets/012 The live bus
@@ -5476,7 +5485,7 @@ section: 07-live-widgets/014 If you change this, check that
 | `EMBED_SANDBOX` or the embed's URL validation | The sandbox is still EXACTLY `allow-scripts allow-same-origin allow-forms` (no `allow-popups`, no `allow-top-navigation`), the scheme is still checked by PARSING rather than by a prefix, and `isForeignOrigin` still runs before the iframe renders. The same-origin refusal is what keeps `allow-same-origin` away from `localStorage['auth-token']` |
 | The embed's declared height | The clamp is still applied and the `EMBED_*` constants are still the only spelling of it. The kind mounts no `useWidgetHost`, so nothing else can correct a wrong number — only the reader, through fullscreen |
 | `ShapeFrame`'s `fullscreen` prop | The flex chain is unbroken (root → `Collapsible` → `CollapsibleContent` + its inner `[&>div]` → body → wrapper → iframe at `height: 100%`), the fold is still forced open with the MEMORY untouched, and the root still carries `data-owns-escape` while it is up. A break in the chain leaves the frame at its card height inside a screen-sized box |
-| The fullscreen layer or the flush floor | The card still sits at `z-[45]`, under `Dialog`'s z-50 — raise it and a dialog opened from fullscreen comes up behind it holding the keyboard. The flush gutter card still has a floor under its `flex-1` — drop it and a tall neighbour crushes the Embed widget to 2px with no control left to reopen it |
+| The fullscreen layer or the flush floor | The transcript card still sits at `z-[45]`, under the rail and the FAB (the FAB stays live over it), and a gutter widget at `z-[61]`, over both — lower the gutter's under 61 and the rail and the docked FAB draw over the card's first 48px. A dialog is in front of either whatever the number, because it portals outside the shell's stacking context. The flush gutter card still has a floor under its `flex-1` — drop it and a tall neighbour crushes the Embed widget to 2px with no control left to reopen it |
 | `WidgetFrame`'s fullscreen state | It is still a class change and never a move: the live element must keep its position in the React tree across the toggle, or the iframe reloads and a part-typed DocSpace edit is gone. Toggle it and assert the SAME DOM node before and after |
 | The `key` on `WidgetFrameLive` OR on `DocSpaceFrame` | BOTH forks carry the key `<windowKey>:<code>` (host window and body) and both rest on the same premise — the revoke rule, not a reconciliation nicety. Without the body half a changed fence body is applied to the SAME element: `srcDoc` reassigned in place for an HTML widget, a new `src` for a DocSpace block. Either fires a second `load`, which the host cannot tell from the frame navigating itself away, and it silently revokes a healthy frame forever. Gate 9c rebuilds a body and requires `live.theme` to be set inside the new document — the sentinel half of that gate passes either way, because an in-place swap is also a new document, so `live.theme` is the read that matters. Without the window half a widget carried into the floating window reloads under the same element and is revoked: 1 `theme` message before the move, 0 after (`.verify/chat-surfaces-window.mjs` moves one across and back and requires it still sized and still hearing the host) |
 
@@ -6939,7 +6948,7 @@ how the pieces fit together.
 | `roadmap` | left | 1 | yes | badge `designing + in_flight` of `useRoadmap().selected.standing`, each read `?? 0`; `countTone: 'warn'` while `waiting_on_you > 0`; `Body: RoadmapWidgetBody` (MAN-7668); `FullscreenBody: RoadmapWidgetFullscreenBody` (the tab itself, drawn in place of `Body` while the card is full screen, MAN-7668); `flush: true`; title `gutters.roadmap.title` |
 | `subagents` | left | 2 | yes | `HeaderAction: SubagentWidgetClearCompleted` |
 | `followups` | right | 0 | yes | badge `followups.openCount` (the open items of the open chat across both groups), `Body: FollowupsWidgetBody`; not `flush`, no header action; title `gutters.followups.title`, icon `ListChecksIcon`; the open chat's own list, filled by the chat (MAN-9003, MAN-9004) |
-| `accounts` | right | 0, directly behind `followups` (key order breaks the tie) | yes | badge none (`count: 0`); `Body: AccountsWidgetBody`; not `flush`, no header action; title `gutters.accounts.title`, icon `UsersRoundIcon`; the account panel's own body — the usage windows, both balances, every account's `5h · wk` figures, a tap on a row to switch — read from `AccountsProvider` (MAN-460, MAN-463) |
+| `accounts` | right | 0, directly behind `followups` (key order breaks the tie) | yes | badge none (`count: 0`); `Body: AccountsWidgetBody`; not `flush`, no header action; title `gutters.accounts.title`, icon `UsersRoundIcon`; the account panel's own body — the usage meters, both balances, every account's weekly figure, a tap on a row to switch — read from `AccountsProvider` (MAN-460, MAN-463) |
 | `memory` | right | 1 | no | |
 | `embed` | right | 2 | no | `flush: true` |
 | `notes` | right | 3 | no | badge `notes?.length ?? 0`, `Body: NotesWidgetBody`; not `flush`, no header action (MAN-7518) |

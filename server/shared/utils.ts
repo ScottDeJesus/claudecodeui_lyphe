@@ -269,8 +269,8 @@ const LEADING_BOM = /^\uFEFF/;
  * than a read that never returns. The caller decides what `null` means (a default) and what grammar the
  * word must be in; this never throws.
  *
- * Used by `planner-lanes.ts` (the dispatcher's planner-lane dial) and `weekly-stop.ts` (the pacer's
- * weekly stop), whose readers agree with their Python counterparts clause for clause.
+ * Used by `weekly-stop.ts` (the pacer's weekly stop), whose reader agrees with its Python counterpart
+ * clause for clause.
  */
 export async function readFlagWord(filePath: string, maxBytes: number): Promise<string | null> {
   try {

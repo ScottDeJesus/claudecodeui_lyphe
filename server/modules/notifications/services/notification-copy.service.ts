@@ -50,7 +50,6 @@ const PROVIDER_LABELS: Record<string, string> = {
  * `seven_day_overage_included` — the CLI's own label table names it "Fable limit".
  */
 const WINDOW_LABELS: Record<string, string> = {
-  five_hour: '5-hour',
   seven_day: 'Weekly',
   seven_day_opus: 'Weekly Opus',
   seven_day_sonnet: 'Weekly Sonnet',
@@ -122,8 +121,8 @@ const WEEK_WINDOWS = new Set(['seven_day', 'seven_day_opus', 'seven_day_sonnet',
 
 /**
  * `resetsAt` arrives as the SDK's epoch number: seconds below 1e12, milliseconds above. A weekly
- * window — or any reset that is not today — names its day (`Thu 12:00 AM`); the 5-hour window's
- * reset is hours out and reads as the time alone.
+ * window — or any reset that is not today — names its day (`Thu 12:00 AM`); a reset later today
+ * reads as its time alone.
  */
 function resetsAtText(resetsAt: unknown, rateLimitType: unknown): string {
   const epoch = readNumber(resetsAt);

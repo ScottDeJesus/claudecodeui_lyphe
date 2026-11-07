@@ -8,11 +8,10 @@ import {
   doneDismiss,
   HiddenPlans,
   landFocusInHome,
-  LoosePlannerBadges,
   MasterController,
   moveCard,
   PlanCard,
-  PlannerLanesReadout,
+  PlanningCard,
   useCardRanks,
   useDispatcherPlans,
   usePutAway,
@@ -102,11 +101,17 @@ function pageStripToCard(deck: Element, plan: string): HTMLElement | null {
  * foot is the way back from a Hide. A dismissed card has no way back and needs none: the dispatcher
  * still holds the plan, and the card returns by itself when the plan has news.
  *
+ * THE PLANNING CARD COMES FIRST, ALWAYS (`PlanningCard`, operator 2026-11-07): what is being planned, one line per feature or epic, and
+ * the one place Pause planning and Resume planning are pressed. It stands at the top of the scroll body in a measure of its own
+ * (`max-w-3xl`), so a line's name and its press are never a wall apart, and it reads `Nothing being planned` when nothing is — the area
+ * is always where the operator looks for it.
+ *
  * The EmptyState is reachable and is not dead code: the tab is never off the bar, so a lane with no
- * plan on it — or one whose last plan ends under a person standing here — draws this, never a missing
- * tab. It shows only when nothing is DRAWN — no plan, no arc and no loose planner outing: an arc whose plans have all
- * been put away draws no deck at all (`useDispatcherPlans` drops it). `HiddenPlans` rides under it,
- * because a lane whose every unfinished plan is hidden must still offer the way back.
+ * plan on it — or one whose last plan ends under a person standing here — draws this under the Planning card, never a missing
+ * tab. It shows only when nothing is DRAWN and nothing is being planned — no plan, no arc and no Planning line: an arc whose plans
+ * have all been put away draws no deck at all (`useDispatcherPlans` drops it), and "nothing in flight" under a soul at work would be
+ * the pane's one lie. `HiddenPlans` closes the body either way, because a lane whose every unfinished plan is hidden must still offer
+ * the way back.
  *
  * IT IS ALSO THE LANDING'S DESTINATION (`revealPlan` / `onRevealed`). A tap on a plan's prompt opens
  * the page on `?runner=<plan>` (`useRunnerLanding`), and that plan's card has to be somewhere a
@@ -125,7 +130,7 @@ type RunnerPanelProps = {
 
 export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps) {
   const { t } = useTranslation();
-  const { plans, hidden, arcs, loosePlanners, count, carriedNames } = useDispatcherPlans();
+  const { plans, hidden, arcs, planning, count, carriedNames } = useDispatcherPlans();
   const putAway = usePutAway(carriedNames);
   // The topic's own value, for the one fact `useDispatcherPlans` folds away on purpose: `undefined` is
   // "nothing retained yet", which a board that has been dealt and drawn empty is NOT. Same topic, so
@@ -205,7 +210,7 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
     <div ref={panelRef} tabIndex={-1} className="flex h-full flex-col outline-none" data-runner-panel>
       {/* The header spans the pane, inset as the wall under it is, so the icon stands over the
           wall's left edge and `Dismiss done · N` over its right. Its first row is the title, the
-          count, the planner readout and `Dismiss done · N`; its second is the master controller on a
+          count and `Dismiss done · N`; its second is the master controller on a
           line of its own (`basis-full`), which is why `Dismiss done` comes BEFORE it in the markup — a
           full-width row pushes whatever follows it under, and the button belongs at the title's row
           end. The rows stand 12px apart (`gap-y-3`) so the 36px press never touches the controller's
@@ -218,10 +223,6 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
         {/* No badge at zero: the EmptyState below already says "nothing", and a "0" over it would
             say it a second time in a shape that reads like a count worth checking. */}
         {count > 0 && <Badge tone="neutral">{count}</Badge>}
-        {/* How full the planner lane is, beside the count of the cards it feeds. Not drawn when the
-            frame states no dial (an older dispatcher). The header wraps so a phone-wide one drops the
-            phrase to a second line whole rather than cutting it. */}
-        <PlannerLanesReadout />
         {/* Every drawn plan that is done, off the board in ONE write, with nothing added to
             `Hidden`. Not drawn when none is, so the button never offers to dismiss nothing. No
             dialog: it deletes nothing, and the dispatcher keeps every plan. `-my-1` lets the 36px
@@ -239,56 +240,56 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
         <MasterController className="basis-full" />
       </div>
 
-      {/* A LOOSE PLANNER COUNTS AS A ROW of this pane: it is something out on the lane with no card
-          of its own, and "nothing here" over a soul at work would be the pane's one lie. */}
-      {count === 0 && arcs.length === 0 && loosePlanners.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
-          {/* Over hidden plans the words are "every unfinished feature is hidden", never "nothing is
-              running": a hidden plan may still be finishing the task it had in flight, and the list below says which. */}
-          <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
-          <div className="w-full max-w-md">
-            <HiddenPlans hidden={hidden} carriedNames={carriedNames} />
+      <ScrollArea className="flex-1">
+        {/* THE PANE: the full width, one inset for everything in it, top to bottom — the Planning card,
+            the arc decks one under another (each paging its own plans in its own strip), the plans of no
+            arc in the wall's grid, and the way back from a Hide. */}
+        <div className="flex min-w-0 flex-col gap-6 px-4 py-5 lg:px-6">
+          <div className="min-w-0 max-w-3xl">
+            <PlanningCard />
           </div>
+          {/* A PLANNING LINE COUNTS AS A ROW of this pane, as a plan or an arc does: "nothing here" under a
+              soul at work would be the pane's one lie. */}
+          {count === 0 && arcs.length === 0 && planning.length === 0 ? (
+            <div className="flex min-w-0 justify-center py-6">
+              {/* Over hidden plans the words are "every unfinished feature is hidden", never "nothing is
+                  running": a hidden plan may still be finishing the task it had in flight, and the list below says which. */}
+              <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
+            </div>
+          ) : (
+            <>
+              {/* THE QUEUE FIRST, top down in the order its epics run, as a list of its own: a drop
+                  here moves an epic in the dispatcher's queue, never a card rank. */}
+              <DispatchArcDecks groups={line} carriedNames={carriedNames} sort={sortLine} line />
+              {/* THE OTHER ARCS SIT BELOW IT AND ABOVE THE PLANS NO ARC HOLDS, by the operator's card
+                  order, each deck holding the plans of its own arc: an arc's word and verbs reach every
+                  plan of it, so its plans are that arc's own strip rather than cards beside it. A
+                  hairline over them marks where the queue ends (`belowLine`). */}
+              <DispatchArcDecks groups={decks} carriedNames={carriedNames} sort={sortDecks} belowLine={line.length > 0} />
+              {/* The plans of no arc, in the pane's own wall. They are the ONLY cards in this grid: an
+                  arc's plans are paged one per view inside their deck's strip, so a loose card is the
+                  width the wall gives every card that has no arc to be read under. */}
+              {split.rest.length > 0 && (
+                <ul ref={attachWall} className={cn('min-w-0', LANE_WALL_GRID)} data-runner-loose-plans>
+                  {wallOrder.flatMap((name) => wallPlans.get(name) ?? []).map((plan) => (
+                    <li key={plan.name} className="min-w-0" {...wallItemProps(plan.name)}>
+                      <PlanCard plan={plan} onPutAway={putAway.plan(plan)} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+          {/* The hidden list keeps a measure of its own: its rows put a name and its `Show` at
+              either end of one line, and across a desktop-wide wall the two would be a screen apart.
+              Drawn only when something is hidden, so an empty wrapper adds no gap at the foot. */}
+          {hidden.length > 0 && (
+            <div className="min-w-0 max-w-2xl">
+              <HiddenPlans hidden={hidden} carriedNames={carriedNames} />
+            </div>
+          )}
         </div>
-      ) : (
-        <ScrollArea className="flex-1">
-          {/* THE PANE: the full width, one inset for everything in it, top to bottom — the outings no
-              deck can carry (`LoosePlannerBadges`, nothing on an ordinary lane), the arc decks one
-              under another (each paging its own plans in its own strip), the plans of no arc in the
-              wall's grid, and the way back from a Hide. */}
-          <div className="flex min-w-0 flex-col gap-6 px-4 py-5 lg:px-6">
-            <LoosePlannerBadges planners={loosePlanners} />
-            {/* THE QUEUE FIRST, top down in the order its epics run, as a list of its own: a drop
-                here moves an epic in the dispatcher's queue, never a card rank. */}
-            <DispatchArcDecks groups={line} carriedNames={carriedNames} sort={sortLine} line />
-            {/* THE OTHER ARCS SIT BELOW IT AND ABOVE THE PLANS NO ARC HOLDS, by the operator's card
-                order, each deck holding the plans of its own arc: an arc's word and verbs reach every
-                plan of it, so its plans are that arc's own strip rather than cards beside it. A
-                hairline over them marks where the queue ends (`belowLine`). */}
-            <DispatchArcDecks groups={decks} carriedNames={carriedNames} sort={sortDecks} belowLine={line.length > 0} />
-            {/* The plans of no arc, in the pane's own wall. They are the ONLY cards in this grid: an
-                arc's plans are paged one per view inside their deck's strip, so a loose card is the
-                width the wall gives every card that has no arc to be read under. */}
-            {split.rest.length > 0 && (
-              <ul ref={attachWall} className={cn('min-w-0', LANE_WALL_GRID)} data-runner-loose-plans>
-                {wallOrder.flatMap((name) => wallPlans.get(name) ?? []).map((plan) => (
-                  <li key={plan.name} className="min-w-0" {...wallItemProps(plan.name)}>
-                    <PlanCard plan={plan} onPutAway={putAway.plan(plan)} />
-                  </li>
-                ))}
-              </ul>
-            )}
-            {/* The hidden list keeps a measure of its own: its rows put a name and its `Show` at
-                either end of one line, and across a desktop-wide wall the two would be a screen apart.
-                Drawn only when something is hidden, so an empty wrapper adds no gap at the foot. */}
-            {hidden.length > 0 && (
-              <div className="min-w-0 max-w-2xl">
-                <HiddenPlans hidden={hidden} carriedNames={carriedNames} />
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-      )}
+      </ScrollArea>
     </div>
   );
 }

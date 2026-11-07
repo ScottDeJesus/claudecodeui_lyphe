@@ -138,9 +138,10 @@ export function ChatGutterLayout({
   // WHICH gutter widget has the whole viewport, or null. One value rather than a flag per card, so two
   // fullscreen WIDGETS is a state this layout cannot represent. It is not the whole app's answer: a
   // transcript embed card keeps its own fullscreen flag (`WidgetFrame`), so a card and a widget CAN
-  // both be fullscreen at once — two identical panels on one layer, the later in the document on top,
-  // and one Escape leaving both. Harmless, and recorded here so no one reasons from "only one". It is
-  // not a placement either: fullscreen is a thing the reader is doing now, not an arrangement to keep.
+  // both be fullscreen at once — two panels on two layers, the widget's (`z-[61]`) over the card's
+  // (`z-[45]`) whatever their order in the document, and one Escape leaving both. Harmless, and
+  // recorded here so no one reasons from "only one". It is not a placement either: fullscreen is a
+  // thing the reader is doing now, not an arrangement to keep.
   const [fullscreen, setFullscreen] = useState<GutterWidgetId | null>(null);
 
   // Escape leaves fullscreen, in the capture phase, and stops there: the card covers the viewport, so

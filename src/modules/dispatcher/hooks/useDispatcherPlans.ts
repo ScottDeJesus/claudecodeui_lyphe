@@ -3,8 +3,9 @@ import { useEffect, useMemo } from 'react';
 import { askIdentity } from '@/modules/dispatcher/askState';
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
 import { noteLaneClock, usePutAwayEntries } from '@/modules/dispatcher/hiddenPlans';
+import { planningLines } from '@/modules/dispatcher/planningLines';
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
-import type { DispatcherArc, DispatcherAsk, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherPlanner, DispatcherRoute, Tone } from '@/shared/types';
+import type { DispatcherArc, DispatcherAsk, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherPlanner, DispatcherRoute, PlanningLine, Tone } from '@/shared/types';
 
 /**
  * The lane's read side: every plan the dispatcher's store holds, every planner outing of it and
@@ -78,10 +79,12 @@ export function useDispatcherPlans(): {
    */
   planners: DispatcherPlanner[];
   /**
-   * The outings with NO card and NO deck to be drawn in — what both homes, the Roadmap tab's In flight
-   * face and the chat gutter's widget, draw as badges above the arc decks. Empty on an ordinary lane.
+   * WHAT IS BEING PLANNED, one line per feature or epic (`planningLines`): every subject with a planner
+   * outing on the document, carried or loose, put away or not — but a feature its epic's pause holds, which
+   * the epic's line says — and every subject whose own planning pause stands with none. What both homes'
+   * Planning card draws (`PlanningCard`); empty when nothing is.
    */
-  loosePlanners: DispatcherPlanner[];
+  planning: PlanningLine[];
   /** The dispatcher's next DeepSeek off-peak moment, epoch SECONDS, or `null` when the clock answered `none` or nothing is retained. */
   offpeakAt: number | null;
   /**
@@ -100,6 +103,8 @@ export function useDispatcherPlans(): {
   return useMemo(() => {
     const picture = value?.payload;
     const lane = Array.isArray(picture?.plans) ? picture.plans : [];
+    // The frame's own epics, put away or not: what `carriedNames` and the Planning card ask, and what the drawn `arcs` are cut from.
+    const laneArcs = Array.isArray(picture?.arcs) ? picture.arcs : [];
     // One entry per name is the store's own guarantee (`hiddenPlans.ts`), so a map loses nothing. Entries
     // are the dismissals of DONE plans; a hide is read off the plan itself.
     const entryOf = new Map(entries.map((entry) => [entry.name, entry]));
@@ -112,15 +117,14 @@ export function useDispatcherPlans(): {
     // a second one was made. The dispatcher still holds those plans, so they would come straight back
     // as cards. The arcs the lane carries ride along for the card order, whose entries name decks too:
     // an arc whose every plan is put away has no deck drawn, and its place is still its own.
-    const carriedNames = [...lane.map((plan) => plan.name), ...(Array.isArray(picture?.arcs) ? picture.arcs : []).map((arc) => arc.name)];
+    const carriedNames = [...lane.map((plan) => plan.name), ...laneArcs.map((arc) => arc.name)];
 
     // THE ARCS THE SCREEN ACTUALLY HAS CARDS FOR, which is one step stricter than the lane's own
     // list: the server drops an arc with no plan left on the lane, and a put-away plan is on the lane
     // but not on the screen. An arc whose every card the operator has put away would otherwise leave a
     // header standing over nothing, which no further frame would ever clear.
     const drawn = new Set(plans.map((plan) => plan.name));
-    const arcs = (Array.isArray(picture?.arcs) ? picture.arcs : [])
-      .filter((arc) => arc.plans.some((name) => drawn.has(name)));
+    const arcs = laneArcs.filter((arc) => arc.plans.some((name) => drawn.has(name)));
 
     const planners = Array.isArray(picture?.planners) ? picture.planners : [];
 
@@ -128,7 +132,7 @@ export function useDispatcherPlans(): {
     // lock names every plan of its arc), and only the drawn ones count: a plan the operator has put
     // away shows no card his word could reach.
     const waiting = new Set(plans.map(planAsking).filter((ask): ask is DispatcherAsk => ask !== null).map(askIdentity)).size;
-    // Any outing out counts, drawn or loose: a loose one is drawn as a badge above the decks.
+    // Any outing out counts, carried or loose: every one is a line of the Planning card.
     const running = plans.some((plan) => plan.status === 'live') || planners.some((outing) => outing.state === 'out');
     const tone: Tone | null = plans.length === 0 ? null
       : waiting > 0 ? 'warn'
@@ -140,10 +144,11 @@ export function useDispatcherPlans(): {
       plans,
       arcs,
       planners,
-      // Asked of what this screen DRAWS, never of the frame's own lists: a put-away plan, or an arc
-      // every one of whose cards the operator has put away, draws no card for its outing's badge to
-      // ride, and a soul at work there would otherwise be invisible on a lane still carrying it.
-      loosePlanners: plannersWithNoHome(planners, plans, arcs),
+      // Asked of the frame's WHOLE lane, never of what the screen draws: a put-away feature still has its
+      // designer out, and its line is the one place its planning press lives. What the screen DOES draw is
+      // handed in beside it — every drawn card's and deck's name — because a line whose subject has none is
+      // the one place left for its outing's pace hold and Override.
+      planning: planningLines(lane, laneArcs, planners, new Set([...drawn, ...arcs.map((arc) => arc.name)])),
       hidden,
       count: plans.length,
       waiting,
@@ -260,31 +265,4 @@ function latestEnding(plan: DispatcherPlan): number | null {
   if (plan.status !== 'complete') return stamp;
   const phaseEnds = (plan.phases ?? []).map((phase) => epochOf(phase.done_at)).filter((end): end is number => end !== null);
   return phaseEnds.length > 0 ? Math.max(...phaseEnds) : stamp;
-}
-
-/**
- * The outings whose `target` — and whose `plan` — name no plan and no arc this screen draws.
- *
- * THE ONE CASE IT EXISTS FOR IS AN ARC'S DESIGN BEFORE ITS ARC FILE LOADS. `dispatcher design
- * <arc> --arc` writes a planner row for a name the store holds no arc for yet: the arc's own file
- * is what opens the arc and the plans of it, and until that load lands, no card and no deck on the
- * screen answers to that name. The store's document is built for exactly this — the row is carried,
- * and it is the only thing that says the arc is being designed — so a client that drew only
- * `plan.planner` and `arc.planner` would show the operator nothing at all while a soul is out on the
- * arc he has just asked for.
- *
- * BOTH NAMES ARE ASKED BECAUSE BOTH ARE SCOPES (`store_planners._subjects`): `target` is the work the
- * outing is FOR and `plan` the name it LANDS in, which differ only for a judgment — an outing whose
- * `target` is the arc and whose `plan` is `<arc>--judgment`. The store holds both BARE, so this
- * compares the document's own bare names and never strips an adornment.
- */
-function plannersWithNoHome(
-  planners: DispatcherPlanner[],
-  plans: DispatcherPlan[],
-  arcs: DispatcherArc[],
-): DispatcherPlanner[] {
-  const named = new Set<string>();
-  for (const plan of plans) named.add(plan.name);
-  for (const arc of arcs) named.add(arc.name);
-  return planners.filter((planner) => !named.has(planner.target) && !named.has(planner.plan));
 }

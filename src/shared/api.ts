@@ -697,12 +697,6 @@ export const api = {
     deepseekFeatures: () => get('/api/settings/deepseek-features'),
     saveDeepseekFeatures: (enabled: boolean) => put('/api/settings/deepseek-features', { enabled }),
 
-    // The dispatcher's planner-lane dial — how many planners (designs, cuts, judgments) may be out at
-    // once. A fifth flag file on this host, in the same host-wide shape and with the same read-back
-    // answer: `lanes` is the whole number the file holds, at least 1, with no "all" above it.
-    plannerLanes: () => get('/api/settings/planner-lanes'),
-    savePlannerLanes: (state: { lanes: number }) => put('/api/settings/planner-lanes', state),
-
     // The usage pacer's weekly stop — where plans stop starting on the weekly window. Host-wide with the
     // same read-back answer: `percent` is the whole number the file holds, 50 to 99, 95 when none is set.
     weeklyStop: () => get('/api/settings/weekly-stop'),
@@ -1276,6 +1270,17 @@ export const api = {
     // it exists, its whole-arc cut, a tell, its judgment — and its undo. Never its plans' phases: each plan card lifts its own.
     arcOverride: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/override`, {}),
     arcOverrideOff: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/override-off`, {}),
+    // The operator's brake on ONE feature's designing and planning (`dispatcher pause-planning <plan> --by app:card`): the dispatcher
+    // holds its designs, tells, cuts and judgments and ends the outing in flight, answering `PAUSED PLANNING <plan> — …`, or its
+    // REFUSED line (a finished feature, a pause already standing) as a 409. `resumePlanning` lifts it and sends back what the brake
+    // ended (`RESUMED PLANNING <plan> — …`). The walk is untouched: `stop` and `resume` stay the walk's.
+    pausePlanning: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/pause-planning`, {}),
+    resumePlanning: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/resume-planning`, {}),
+    // The same two presses for an EPIC (`dispatcher pause-planning|resume-planning <arc>`) — its design and cut and every outing of its
+    // features — pressed from the epic's Planning line, and by the name its planner entry carries for the loose line of an epic with no
+    // feature yet.
+    arcPausePlanning: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/pause-planning`, {}),
+    arcResumePlanning: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/resume-planning`, {}),
     // "Accept when cut" on a DESIGNED plan (`dispatcher arm-accept <plan> --by app:card --design <stamp>`): the
     // stamp is the plan's `design_loaded_at` as the card drew it, so a press on a design that has since moved is
     // refused by the dispatcher. `disarmAccept` is its Cancel. The arc pair presses/cancels every designed (armed)

@@ -158,21 +158,22 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's twenty-eight routes: three reads of the plan list, thirteen presses on a plan, eight on
+ * The dispatcher lane's thirty-two routes: three reads of the plan list, fifteen presses on a plan, ten on
  * an arc, four on the board. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
- * word from the closed set of sixteen verbs, and — where the verb takes one — a word from the three
+ * word from the closed set of eighteen verbs, and — where the verb takes one — a word from the three
  * model words, the queue's three moves or the epic dial's seven words.
  *
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
  * first: the two together are what keep a handover from being drawn as an empty plan list.
  *
- * SIX OF THE SIXTEEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
+ * EIGHT OF THE EIGHTEEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
  * the dispatcher's own doors open on both: `model`, `stop`, `resume`, the `arm-accept` /
- * `disarm-accept` pair and `override` (with its `override-off` undo) take an arc's name as readily as a plan's. The two spellings are two routes
+ * `disarm-accept` pair, `override` (with its `override-off` undo) and the `pause-planning` / `resume-planning`
+ * pair take an arc's name as readily as a plan's. The two spellings are two routes
  * rather than one param because the NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a
  * fence that would be lost the moment one route accepted either adornment. `schedule` is a PLAN'S alone
  * here (the card's `Resume at …`): the deck's `Schedule start` is gone, though the terminal's
@@ -302,6 +303,18 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // pacer, or `--off` on a plan that carries none) is a 409 whose body is that sentence, untouched.
   router.post('/plans/:name/override', relay('override', () => ['--by', 'app:card']));
   router.post('/plans/:name/override-off', relay('override', () => ['--off', '--by', 'app:card']));
+  // The operator's brake on ONE feature's designing and planning (`dispatcher pause-planning <plan> --by app:card`) —
+  // the card's `Pause planning` — and its lift (`dispatcher resume-planning <plan> --by app:card`, `Resume planning`).
+  // The brake holds this feature's designs, tells, cuts and judgments and ends the outing in flight; its walk, the queue
+  // and the pacer are untouched, so it is NOT `stop`, the walk's verb. THE DISPATCHER RESOLVES THE NAME (a plan's first,
+  // then an epic's) and answers `PAUSED PLANNING <name> — <k> outing(s) ended` / `— no outing was out` and
+  // `RESUMED PLANNING <name> — <n> outing(s) sent back` / `— nothing to send back`. A refusal (`REFUSED pause-planning …`:
+  // a finished feature, one the roadmap still holds, a pause already standing; `REFUSED resume-planning …`: no pause of
+  // its own, with its epic's named when only that one stands) is a 409 whose body is that sentence, untouched. The
+  // dispatcher also refuses the lift inside a Claude session, and this lane's child environment carries none
+  // (`sessionlessEnv`), so the card's press is the operator's own. `--by app:card` is ours, never the request's; no body travels.
+  router.post('/plans/:name/pause-planning', relay('pause-planning', () => ['--by', 'app:card']));
+  router.post('/plans/:name/resume-planning', relay('resume-planning', () => ['--by', 'app:card']));
   // A DESIGNED plan Accepted ahead of its cut (`dispatcher arm-accept <name> --by app:card --design <stamp>`) —
   // the card's `Accept when cut`: the daemon approves the first cut of that exact design and walks it. The
   // stamp the card drew travels in the body and is checked before any spawn (`armAcceptArgs`); the dispatcher
@@ -325,8 +338,8 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   }));
 
   /**
-   * The ARC's seven verbs — `model`, `stop`, `resume`, `arm-accept`, `disarm-accept`, `override` and `queue` —
-   * relayed to the arc's own door.
+   * The ARC's nine verbs — `model`, `stop`, `resume`, `arm-accept`, `disarm-accept`, `override`, `pause-planning`,
+   * `resume-planning` and `queue` — relayed to the arc's own door.
    *
    * AN ARC IS ADDRESSED BY ITS OWN NAME, and the dispatcher is what resolves it. Each of the five
    * verbs a plan's door shares (`model`, `stop`, `resume`, `arm-accept`, `disarm-accept`) takes a
@@ -347,6 +360,12 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
    * `override` is the one verb here that acts on the ARC'S OWN outings and none of its plans: the epic's design, its
    * whole-arc cut, a tell and its judgment are rows aimed at the epic, and its Override lifts the pacer's hold on
    * exactly those (`hooks/dispatcher/cmd/override.py`).
+   *
+   * `pause-planning` and `resume-planning` are the epic's own brake and its lift, as `override` is its own lift: they act on
+   * the EPIC as a subject — its design and cut and every outing of its features, the judgment's included — and on no walk
+   * (`hooks/dispatcher/cmd/planning.py`). A feature of a paused epic carries no pause of its own, so the epic's lift is the one that
+   * frees it. Both are pressed from the epic's line of the board's Planning card, and an epic with no feature yet — a loose line
+   * there, its design's only mark — presses through this same door by the name its planner entry carries.
    *
    * `queue` IS THE ARC'S ALONE: `dispatcher queue <arc> --before <arc> | --last | --at N` moves the
    * epic in the order In flight runs them top down, and the dispatcher refuses an epic that is not in
@@ -396,6 +415,12 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // already past the pacer, `--off` on one that carries none) is a 409 whose body is the dispatcher's own sentence.
   router.post('/arcs/:name/override', arcRelay('override', () => ['--by', 'app:card']));
   router.post('/arcs/:name/override-off', arcRelay('override', () => ['--off', '--by', 'app:card']));
+  // The epic's `Pause planning` and `Resume planning` on its Planning card line (`dispatcher pause-planning|resume-planning <arc>
+  // --by app:card`), a loose line of an epic with no feature yet included: the brake on the EPIC's planning — its design and
+  // cut and every outing of its features — and its lift, which sends back what the brake ended. The dispatcher resolves the name
+  // and its refusals are 409s carrying its own sentence, exactly as the plan's two routes above.
+  router.post('/arcs/:name/pause-planning', arcRelay('pause-planning', () => ['--by', 'app:card']));
+  router.post('/arcs/:name/resume-planning', arcRelay('resume-planning', () => ['--by', 'app:card']));
   // An epic moved in the queue (`dispatcher queue <arc> --before <arc> | --last | --at N`): In flight's drag.
   router.post('/arcs/:name/queue', arcRelay('queue', queueArgs, QUEUE_BODY_ERROR));
 

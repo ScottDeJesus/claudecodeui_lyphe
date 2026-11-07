@@ -1,6 +1,6 @@
 import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage } from '@/shared/types.js';
 
-import { each, countOrNullSince, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, stallSince, textSince } from './dispatcher-state.transport.js';
+import { each, countOrNullSince, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, planningPausedSince, stallSince, textSince } from './dispatcher-state.transport.js';
 import { askingSince } from './dispatcher-ask.reader.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
@@ -208,6 +208,11 @@ export function planOf(raw: unknown): DocumentPlan {
     // `false` (`flagSince`): a build older than the key has no override to show, and the card then
     // draws only what the pace hold alone says.
     overridden: flagSince(field(plan, 'overridden'), `plan.overridden of ${name}`),
+    // The operator's planning pause on THIS plan alone — `{at, by}` while its own stands, never its epic's
+    // (`report.plan_dict.planning_paused`, `store_planning.plan_pause`) — read as the dispatcher's own reading of
+    // its log, never derived here. ABSENT reads `null` (`planningPausedSince`): a build older than the key never
+    // braked a subject, and the card then offers Pause planning where the dispatcher would take it.
+    planning_paused: planningPausedSince(field(plan, 'planning_paused'), `plan.planning_paused of ${name}`),
     created_at: need(field(plan, 'created_at'), isText, 'plan.created_at'),
     updated_at: need(field(plan, 'updated_at'), isText, 'plan.updated_at'),
     completed_at: need(field(plan, 'completed_at'), isTextOrNull, 'plan.completed_at'),

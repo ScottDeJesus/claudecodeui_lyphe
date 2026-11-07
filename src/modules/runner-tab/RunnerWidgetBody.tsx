@@ -8,11 +8,10 @@ import {
   doneDismiss,
   HiddenPlans,
   landFocusInHome,
-  LoosePlannerBadges,
   MasterController,
   moveCard,
   PlanCard,
-  PlannerLanesReadout,
+  PlanningCard,
   SessionPin,
   useCardRanks,
   useDispatcherPlans,
@@ -77,12 +76,16 @@ function openedBy(plan: DispatcherPlan, sessionId: string | null): boolean {
  * a card shown again keeps its fold, and the folds of cards that have left the lane go with them — one
  * memory, two homes.
  *
- * THE MASTER CONTROLLER HEADS THE WIDGET, under the planner readout (operator, 2026-10-15: "those changes need to
+ * THE MASTER CONTROLLER HEADS THE WIDGET (operator, 2026-10-15: "those changes need to
  * be reflected in the widget too"): `MasterController`, the very component the tab's header draws — the Claude ·
  * DeepSeek switch, one Start while a plan waits, Pause all — so a press here is the press there and both homes
  * redraw from the one frame. It has no compact form: its controls wrap between whole pieces at the gutter's
  * narrowest (300px), so this widget's scroller never
  * clips them. The cards below carry the same override folds as the tab's, through `PlanCard` and `DispatchArcDecks`.
+ *
+ * THE PLANNING CARD STANDS UNDER THE MASTER CONTROLLER, first of the column's content (`PlanningCard`, operator 2026-11-07): the same
+ * composition In flight draws first — what is being planned, one line per feature or epic, and the one place Pause planning and Resume
+ * planning are pressed — at the column's width, and `Nothing being planned` when nothing is, so it is always where he looks for it.
  *
  * `Dismiss done · N` heads the list (every drawn plan that is done, off the board in one write — the
  * tab header's own button) and `Hidden · N` closes it as the way back from any Hide. `data-runner-widget`
@@ -99,7 +102,7 @@ function openedBy(plan: DispatcherPlan, sessionId: string | null): boolean {
  */
 export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const { t } = useTranslation();
-  const { plans, hidden, arcs, loosePlanners, carriedNames } = useDispatcherPlans();
+  const { plans, hidden, arcs, planning, carriedNames } = useDispatcherPlans();
   // The lane split once, by the one rule both homes read, in the operator's order.
   const ranks = useCardRanks();
   const split = useMemo(() => byArc(plans, arcs, ranks), [plans, arcs, ranks]);
@@ -146,27 +149,27 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
     });
   };
 
-  // The empty state speaks of the LANE: a planner outing with no card at all is on this lane too — a
-  // soul out on an arc the store has no row for yet — even though nothing here can draw it an item.
+  // The empty state speaks of the LANE: a subject being planned is on this lane too — a soul out on an epic
+  // the board has no deck for yet — and the Planning card above says so, so "nothing in flight" under it would be a lie.
   // Over hidden plans the words say "hidden", never "nothing is running": a hidden plan may still be finishing the task it had in flight.
-  const nothingDrawn = plans.length === 0 && arcs.length === 0 && loosePlanners.length === 0;
+  const nothingDrawn = plans.length === 0 && arcs.length === 0 && planning.length === 0;
 
   return (
     // `tabIndex={-1}`: the last place a press that emptied the board hands the keyboard (`landFocusInHome`).
     <div ref={widgetRef} tabIndex={-1} data-runner-widget className="flex min-w-0 flex-col gap-4 outline-none">
-      {/* How full the planner lane is — the tab header's own readout. Not drawn when the frame states
-          no dial (an older dispatcher). */}
-      <PlannerLanesReadout />
       {/* THE MASTER CONTROLLER, the tab header's own component: one component, two mounts, one frame, so a
           press here is the one In flight shows. Not drawn when the frame states no dial. */}
       <MasterController />
+      {/* What is being planned, and the planning press on each: always drawn, the tab's own first card, in the tab's own
+          measure — the column is narrower than it, and the widget's fullscreen would otherwise put a line's press a screen
+          from its name. */}
+      <div className="min-w-0 max-w-3xl">
+        <PlanningCard />
+      </div>
       {nothingDrawn ? (
         <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
       ) : (
         <>
-          {/* The outings with no deck to be drawn in, above the list — the tab's own arrangement
-              (`LoosePlannerBadges`). It draws nothing when there are none. */}
-          <LoosePlannerBadges planners={loosePlanners} />
           {/* Not drawn when nothing is done; no dialog: it deletes nothing, and the dispatcher keeps every plan. */}
           {done && (
             <Button variant="secondary" size="sm" className="h-8 self-end" onClick={() => dismissDone(done.dismiss)} data-dismiss-done>

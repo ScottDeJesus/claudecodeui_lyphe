@@ -28,8 +28,8 @@ function RailHairline({ className }: { className?: string }) {
  * account a panel. The lit view says so with `aria-current="page"`.
  *
  * TOP TO BOTTOM: the app switcher's disc, a hairline, then the views in their runs — `chat`, `tools`, `plans`, `house`,
- * `plugins` — with a hairline between each pair of runs that are drawn, and at the foot the two usage rings (5-hour
- * over weekly: a status, not a button, always in their places), the Inbox, Settings and the account. The runs scroll
+ * `plugins` — with a hairline between each pair of runs that are drawn, and at the foot the usage ring (the
+ * week's: a status, not a button, always in its place), the Inbox, Settings and the account. The runs scroll
  * in a region of their own, so in a window too short for the rail the disc and the foot stay put. The region spans
  * the rail's whole width because a scroller clips at its own box, and the lit bar, the badges and the focus rings
  * reach to the rail's edges. It keeps 6px of scroll padding at each end, so a button the keyboard

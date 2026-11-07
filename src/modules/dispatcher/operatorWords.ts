@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 /** The words a house sentence names its work with, and the operator's word for each. */
 const OPERATOR_WORD: Readonly<Record<string, string>> = {
   plan: 'feature',
@@ -104,4 +106,38 @@ export function operatorWords(text: string, keep: readonly string[] = []): strin
       return lead + operatorCore(core, keep) + tail;
     })
     .join('');
+}
+
+/**
+ * The soul's name as a reader says it, by the store's own id — and an id this build has never heard of
+ * falls back to the id ITSELF (below), because a soul nobody has translated is still a soul to name.
+ */
+const SOUL_KEYS: Record<string, string> = {
+  'eupalinos': 'dispatcher.planner.soul.eupalinos',
+  'odysseus': 'dispatcher.planner.soul.odysseus',
+};
+
+/**
+ * `SOUL_KEYS` read as an OWN property, or `undefined` — which is what the fallback below tests.
+ *
+ * A PLAIN LOOKUP ANSWERS FOR EVERY MEMBER `Object.prototype` CARRIES: `SOUL_KEYS['__proto__']` is
+ * `Object.prototype` and `['constructor']` is `Object`, so an id that collided with one of those would
+ * never be `undefined`, the fallback would not fire, and i18next would be handed an OBJECT — the badge
+ * drawing `[object Object]` where the soul's own id belongs. No row the store writes can name such a
+ * soul today (`planners.queue_planner` vets a planner's verb against `souls.PLANNER_AGENTS`), and this
+ * is the one word that keeps that a fact rather than a hope about a future soul id. The house's own
+ * idiom, the shape `SidebarSessionIcon` and `kanban-attachments.service` read their tables with.
+ */
+function soulKeyOf(soul: string): string | undefined {
+  return Object.prototype.hasOwnProperty.call(SOUL_KEYS, soul) ? SOUL_KEYS[soul] : undefined;
+}
+
+/**
+ * The soul's name as a reader says it (`SOUL_KEYS`), or its own id for a soul this build has never heard of.
+ *
+ * Used by `PlannerBadge` and by `PlanningCard`'s lines, so the badge and the line name one soul one way.
+ */
+export function soulWord(t: TFunction, soul: string): string {
+  const soulKey = soulKeyOf(soul);
+  return soulKey === undefined ? soul : t(soulKey);
 }

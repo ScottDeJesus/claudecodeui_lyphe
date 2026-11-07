@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
 import type { LLMProvider, ProviderModelsDefinition } from '@/shared/types';
-import { resolveModelLabel } from '@/modules/chat/utils/modelLabels';
+import { resolveModelLabel } from '@/shared/modelLabels';
 
 /**
  * The one question the transcript asks of the model catalog: what does a person call this model id?
