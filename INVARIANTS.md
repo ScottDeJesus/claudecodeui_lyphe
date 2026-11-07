@@ -25277,3 +25277,27 @@ measured 2026-11-07 by chain chain-planning-card-leftovers-20261107-103915-f48d,
 probe-key: 8d5a32380ef782861cefcbe7b39d10c2beb42cba
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/GutterWidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/ShapeFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningLines.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gutter-fullscreen-live.mjs
+
+## INV-11365 — the memory door's approve writes the operator's real shelves from os.homedir() — a scratch DATABASE_PATH moves the queue, never the shelves
+
+`POST /api/memory/<mc-n>/approve` lands its candidate at paths built from `os.homedir()` alone: `~/.claude/RULES.md`, `~/.claude/REQUIREMENTS.md`, `~/.claude/CLAUDE.md` and `~/.claude/projects/<project>/memory/` (`memory-plan.ts`: `projectsRoot`, and the `rules`, `requirements` and `claude` entries of the plan). `DATABASE_PATH` moves the queue and nothing else. `scripts/sunset-probe.sh` `boot_probe_server` sets `DATABASE_PATH`, `CLOUDCLI_SPILL_ROOT` and no `HOME`, so a scratch server that approves a planted candidate writes the operator's real file.
+
+Keep: a probe never presses `file it` (approve) on any server. Show its wiring by answering the request inside the page (Playwright `page.route` on `**/api/memory/*/approve`, a 422) and counting that one POST left. Discard (`reject`) writes nothing to disk and is safe on a scratch store.
+
+why: three surfaces carry the press — the Memory panel, the chat gutter's body and the heal Rules cards (MAN-600) — and each looks harmless beside a throwaway store.
+
+Measured 2026-11-07, the heal Rules proof on a scratch stack: discard pressed on two planted candidates, approve on none; the mtimes of `RULES.md` and `REQUIREMENTS.md` did not move.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-plan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/memory-intake/hooks/useMemoryReview.ts
+
+## INV-11366 — heal Rules cards: a card's presses stay off until the HEAL summary lands, per candidate — never from the door's busyId alone
+
+Keep `RuleReview.isBusy(candidate)` as `candidate === busyId || settling.has(candidate)` in `useRuleReview.ts`, with `settling` a set of candidates, each released alone by that candidate's own `finally` after `useHeal().refresh()`. Never `busyId` alone, never one settling id.
+
+why: `useMemoryReview`'s `busyId` is ONE id and ends when the MEMORY queue is re-read; the heal summary a card is drawn from lands about a second later. In that gap the card still reads `pending` for a candidate already decided, so its presses came back on, and a second press on it is answered 422 `can only review a 'pending' memory; mc-<n> is 'rejected'`, the door's raw line, drawn on the card. A press on a SECOND card inside the gap moves `busyId` to that card and hands the first its presses back.
+
+Measured 2026-11-07, chain heal-returning-corrections--heal-page-fill, finding M-1, MEDIUM: the first build held one settling id (`busyId ?? settling`), and two cards pressed within about a second gave the earlier card its presses for one summary read. The set cured it. One card with the summary held 1.5 s: presses off within 62 ms of the click and off for the 4,368 ms until the summary landed.
+
+The Memory panel differs on purpose: every row goes quiet during any write (MAN-605). A card holds only its own. A fixture that draws `HealRuleListView` passes `isBusy`; there is no `busyId` on `RuleReview`. The section: MAN-9688, MAN-9689.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealRuleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/hooks/useRuleReview.ts

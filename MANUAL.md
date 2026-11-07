@@ -16841,3 +16841,90 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useExp
 | Words | `sidebar.json`: `sessions.select*`, `sessions.deleteSelected_*`, `deleteConfirmation.closeSessions_*` / `closeSessionsNotice_*`, `messages.deleteSessionsPartialFailure_*`, in all 11 shipped locales |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSessionSelection.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSidebarController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarModals.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarProjectSessions.tsx
+
+## MAN-9688 — src/modules/heal — the Rules section: HealPanel's mount, HealRuleList and the card
+
+The Rules section of the Inbox's Heal section (`HealPanel`, MAN-9013): the corrections he said again, one card each, in his own words, with the rows each came from and, on a rule waiting for him, the Memory door's two presses. The worker writes the shapes (`summary()`'s `rules` and `rules_more`, MAN-9677); `healRuleTypes.ts` types them key for key. Nothing here decides: the decision is the memory queue's, read when the summary is written. The presses, the project names and the summary's guard: MAN-9689.
+
+## Where it stands
+| fact | value |
+|---|---|
+| mount | `HealPanel` body: the left wrapper (`data-heal-column="left"`) holds `HealSection id="heal-kinds"`, then `id="heal-rules"`; the heals keep the right column (`id="heal-heals"`) |
+| panel under 48rem | one scroll, source order kinds, rules, heals |
+| panel at 48rem or wider | two columns 3fr / 2fr, the pills across both; the left wrapper is a two-row grid, so kinds and rules each scroll in their half. why: 22 kinds overflow the column alone, and one shared scroll put the rules a screen below the fold |
+| head | `heal.rules.title` = `Rules`, a neutral `Badge` of `rules.length + rules_more` above zero, hint `heal.rules.hint` |
+| pills | none carries the reader to `heal-rules` (`PILL_TARGET`): `friction` → `heal-kinds`, `lastHeal` and `cycle` → `heal-heals`, `ignored` and `spend` → the settings dialog |
+| `rules` absent | reads as none: a worker that predates the section never breaks the tab |
+| none | `rules` empty and `rules_more` 0: `EmptyState size="sm"` (MAN-9320), `heal.rules.empty.title` = `No correction has come back`. `rules_more` above 0 with no rule is never drawn as none |
+| older | `rules_more` above 0: `heal.rules.more`, `{{count}} older rule is not shown` or `{{count}} older rules are not shown` |
+| phone | 2026-11-07, 390×844, live ledger, regression kinds open: the section began at 46,795 px, under a kinds list of ~46,300 px |
+
+## `HealRuleList` — the wiring
+`HealRuleList({ rules, more, projectChoices })` gives `HealRuleListView({ rules, more, review, projectName })` the two things the drawing cannot know; the view is exported so a fixture draws every state on fake props.
+| prop of the view | read from |
+|---|---|
+| `review` | `useRuleReview()` |
+| `projectName` | `useMemo(() => projectNamer(projectChoices), [projectChoices])` |
+`projectChoices: readonly ProjectChoice[]` arrives by props: `WorkspaceMain` → `InboxPanel` → `HealPanel` → `HealRuleList` (MAN-9013), as Cerberus is handed its choices (MAN-7866). why: a read of the workspace's context from the heal module closes heal → workspace → inbox → heal through two lazy `import()`s, which `import/no-cycle` passes and which still breaks HMR (the comment on that rule in `.oxlintrc.json`).
+
+## The card
+Handles for a probe: on the card `data-heal-rule=<id>` and `data-heal-rule-state=<key>`; inside it `data-heal-rule-status`, `-shelf`, `-returned`, `-presses=<mc-n>`, `-file`, `-discard`, `-refusal`, `-said`, `-row=<id>` with `-row-how`; the list `data-heal-rules`, `-more`, `-empty`.
+- Title: his sentence in quotes (`rule.quote`). A rule found on a shelf (`state` `shelf`) is titled with his newest row's words; the shelf's own line then stands under the state (`matches your shelf: …` with no decision, `matches what a chat queued: …` with one), two lines until pressed open. With no row words the shelf line is the title.
+- Lands: `your rules`, `your requirements`, or `<project> memory` (`a project’s memory` when the rule names none), the project by `projectNamer`.
+- `returned_after_filing` above 0: `you said it again after filing it`.
+- `Said N times`, then ` · open` while the decision is `pending` or `unstaged`, ` · closed` once `approved` or for a shelf rule with no decision.
+- Rows, none folded away: `<day> · <project>`, a `same chat` badge on `how` `repeat`, a `left the ledger` badge on `gone`, his words or `no words kept`.
+
+| `data-heal-rule-state` | when | tone |
+|---|---|---|
+| `waiting` | `pending`, `state` `queued` | info |
+| `queuedByChat` | `pending`, `state` `shelf` | info |
+| `filed` | `approved` | positive |
+| `discarded` | `rejected` | neutral |
+| `unstaged` | `unstaged` | neutral |
+| `refused` | `refused` | warn |
+| `missing` | `missing` | warn |
+| `onShelf` | no decision, `state` `shelf` | positive |
+| `unreadable` | no decision on a queued rule, or status `unreadable` or unknown | warn |
+
+Presses: only where `decision.status` is `pending` and `decision.candidate` is set — `file it` and `discard`, both disabled by `review.isBusy(candidate)`, each `aria-describedby` the shelf line when one stands under the title, else the title (on a `queuedByChat` card the press files what the chat queued, not his sentence). Under them the refusal: `review.refusals[candidate]`, else `decision.refusal`. No third verb; nothing detaches a row (discarding is how a wrongly grouped rule goes).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealRuleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/healRuleTypes.ts
+
+## MAN-9689 — src/modules/heal — the Rules cards' data: useRuleReview, projectNamer, the summary's rules guard and the proof
+
+The Rules section's data and its presses (the section and its card: MAN-9688). The `file it` press is never made on a scratch stack: INV-11365.
+
+## `useRuleReview()` — the presses
+`RuleReview = { isBusy(candidate): boolean; refusals: Record<string, string>; onReview(candidate, approve): void }`. It wraps `useMemoryReview()` from the memory-intake barrel (MAN-605): the Memory panel's own write, `POST /api/memory/<mc-n>/approve` or `…/reject`, so approval stays his press alone and a refusal speaks in the door's words. It raises no toast: the card's state and refusal lines are the answer.
+| step | what |
+|---|---|
+| press | the candidate joins `settling`; its `unreached` reason is cleared |
+| write | `review(candidate, approve)`: the door runs one write at a time; the same card and verb joins the write going, any other press takes its turn behind it |
+| outcome `unreachable` | its `reason` is held in `unreached[candidate]` — the door holds only a 422's words |
+| every outcome | `useHeal().refresh()`, then this candidate leaves `settling`; a `finally` inside a `finally`, so a read that throws never leaves presses off |
+| `isBusy(c)` | `c === busyId || settling.has(c)` (`busyId` is the door's): one card's presses never turn another's off |
+| `refusals` | `{ ...door.refusals, ...unreached }` |
+The presses stay off past the door's own read, until the heal summary lands: INV-11366.
+
+## `projectNamer(projects)` — `healState.ts`
+`(slug) => string`. A transcript folder's slug is its project's `fullPath` with every non-alphanumeric character turned to `-` (`/home/me/.app` → `-home-me--app`); the project whose path makes the slug names it, by `displayName`. A slug no project holds stands as itself: a guessed name would be a fabricated one. Two paths making one slug: the first in the list wins. Built once per `projectChoices`, asked once per row.
+
+## The summary's guard — `HealContext.tsx`
+`summaryOf` refuses a body the panel cannot draw, and the panel then says `The friction ledger could not be read` with `Try again`: a render throw would be answered by the workspace's boundary blanking the whole main region, kinds and heals with it. A refusal is `phase: 'error'`, so `useHeal().summary` is `null` and the Inbox's Heal count reads 0 until a good summary lands (MAN-9013).
+`rulesAreWalkable(rules, rules_more)`:
+| key | accepted |
+|---|---|
+| `rules` absent or `null` | none |
+| `rules` present | a list; each rule a record with a string `quote`, a `decision` that is `null` or a record (an ABSENT `decision` key is refused), and a `rows` list of records with a numeric `ts` |
+| `rules_more` | absent, `null` or a number |
+Not checked: an unknown `shelf`, `state` or `decision.status`; the cards read them as unknown words. A key the cards walk unguarded joins this function in the same change. The producer never sends a refused shape: every rule it writes is whole, `ts` is always a number (`said_at` falls back to the cited time), and any fault answers `{"rules": [], "rules_more": 0}` (MAN-9677).
+
+## Proof
+2026-11-07, a scratch stack: `scripts/sunset-probe.sh` `boot_probe_server` and `.verify/lib/vite-scratch.config.mjs`, `HEAL_LEDGER_PATH` at a Python `.backup()` copy of the ledger, three rules planted through `heal_ledger.rules`, `memory_queue.propose` and the sweep (a house rule, a project rule, a shelf rule). 83 checks held at 390×844 and 1440×900, light and dark; frames `.verify/shots/heal-rules-fill-*.png` (gitignored). No probe script is kept.
+- Discard on the house rule: both presses on before the click and off within 62 ms; off from the write's answer until the summary landed (102 samples over 4,368 ms, the summary held 1.5 s) and after the Memory queue's re-read answered (99 samples over 4,355 ms); then `discarded Nov 7`, 3 rows listed, the store row `rejected`.
+- `file it`: one `POST /api/memory/mc-156/approve` answered 422 inside the page; the cap words replaced the earlier failure on the card.
+- A write aborted in the page: `The memory queue is not reachable.` on the card at once.
+- Live dev client `:5183`, read-only: `rules: 0`, the section draws its empty words between the kinds and the heals.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/context/HealContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/healState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/hooks/useRuleReview.ts

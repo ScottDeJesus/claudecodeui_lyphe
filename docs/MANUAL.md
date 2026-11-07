@@ -6380,7 +6380,7 @@ here (see §"Where the shapes live").
 **One provider, one poller.** `App.tsx` mounts `MemoryIntakeProvider` inside `ProtectedRoute`, so
 the queue is never asked for against the login screen. The provider holds the READING alone: the
 readers are `useInboxWaiting` (the rail's Inbox badge, through `useRailBadges`), the
-chat gutter and the panel; the writers are the panel, the gutter's body and the heal module's rule cards (Inbox → Heal → Rules), each through
+chat gutter and the panel; the writers are the panel, the gutter's body and the heal module's rule cards (Inbox → Heal → Rules, MAN-9688), each through
 `useMemoryReview`. The write lifecycle lives there rather than in the context for exactly that reason: a value carrying the in-flight id and the held
 refusals would change on every button press and re-render every reader.
 
@@ -6543,7 +6543,7 @@ press that waits still happens, on the card it was aimed at.
 
 Every row's buttons go quiet during one write, not only the row being written. `busyId` holds one id
 because the design writes one at a time, so painting only that row would leave the other five
-looking pressable and turn a refused press into a press that vanished.
+looking pressable and turn a refused press into a press that vanished. The heal Rules cards press the same two verbs through this hook and differ on this point: a card holds only its own candidate's buttons off, until the heal summary has landed (INV-11366).
 
 governs: /home/lyphe/.claude/docstore/ingest/inbox.py
 
@@ -14476,7 +14476,7 @@ A reading not yet landed counts as zero.
 
 ## `InboxPanel` — `InboxPanel.tsx`
 - Strip: the kit `Tabs` in its default segmented register, as the Roadmap view's faces draw it (`ariaLabel` `inbox.sections.label`). Three word tabs in the operator's order: Memory, Heal, Roadmap (`inbox.sections.*`). A tab carries `count` while its section's figure is above zero, `tone: 'warn'`, and `attention` = `inbox.sections.waiting` (`{{count}} waiting on you`), which the kit speaks as the tab's description. A section with nothing waiting stays on the strip, quiet. On a phone the tray is `equal`, the bar `px-3`.
-- Body: `role="tabpanel"` in its own `Suspense`, one section at a time: `MemoryIntakePanel` (MAN-603), `HealPanel`, `WaitingAsks`. Each is a full-height panel with scrollers of its own, so they mount whole under the strip, never stacked.
+- Body: `role="tabpanel"` in its own `Suspense`, one section at a time: `MemoryIntakePanel` (MAN-603), `HealPanel` (its Rules section: MAN-9688), `WaitingAsks`. Each is a full-height panel with scrollers of its own, so they mount whole under the strip, never stacked.
 - Handle: `data-inbox-panel=<memory|heal|roadmap>`, `deciding` until the entry is decided.
 - Held section: localStorage `inbox.section`, written only by a pick on the strip; a value that is not a section reads as Memory.
 - Entry rule (`entrySection(held, counts, landed)`): the held section if something waits in it, else the first section in strip order that has something waiting, else the held one. It answers `null` while a reading it rests on has not landed: no tab lit, the body a spinner. It answers the moment the answer is settled (the held section as soon as it has landed and waits).

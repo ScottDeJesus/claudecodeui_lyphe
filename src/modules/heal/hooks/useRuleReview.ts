@@ -3,14 +3,26 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useHeal } from '@/modules/heal/context/HealContext';
 import { useMemoryReview } from '@/modules/memory-intake';
 
-/** What the two presses need: the candidate whose write is out, this tab's held refusals by candidate, and the press. */
-export type RuleReview = { busyId: string | null; refusals: Record<string, string>; onReview: (candidate: string, approve: boolean) => void };
+/**
+ * What the two presses need: whether a candidate's presses are off (its write is out, or its decision has yet to reach
+ * the card), this tab's held refusals by candidate, and the press. A question per candidate and not one id, because
+ * two cards can be settling at once.
+ */
+export type RuleReview = { isBusy: (candidate: string) => boolean; refusals: Record<string, string>; onReview: (candidate: string, approve: boolean) => void };
 
 /** The held words with one candidate's entry gone: a reason describes one attempt, never the card. */
 function forget(held: Record<string, string>, candidate: string): Record<string, string> {
   if (!(candidate in held)) return held;
   const next = { ...held };
   delete next[candidate];
+  return next;
+}
+
+/** The settling candidates with one let go; the same set when it was not held, so nothing re-renders for it. */
+function released(held: ReadonlySet<string>, candidate: string): ReadonlySet<string> {
+  if (!held.has(candidate)) return held;
+  const next = new Set(held);
+  next.delete(candidate);
   return next;
 }
 
@@ -28,7 +40,9 @@ function forget(held: Record<string, string>, candidate: string): Record<string,
  *
  * THE CARD STAYS BUSY UNTIL THAT READ LANDS. The door lets go of its candidate once the Memory queue is re-read, but the
  * heal summary takes about a second more, and in that gap the card still reads `pending` for a candidate already
- * decided: both presses would come back on, for a second press the queue can only answer `gone`.
+ * decided: both presses would come back on, for a second press the queue can only answer `gone`. Each card holds its OWN
+ * presses off: a press on another card inside that read moves the door's one id to that card, and must not hand this one
+ * its presses back.
  *
  * A WRITE THAT NEVER REACHED THE QUEUE SAYS SO. The door holds only a 422's words and resolves any other failed write as
  * `unreachable` with its reason, which nothing else keeps — the card would look like a press that did nothing. The
@@ -37,9 +51,11 @@ function forget(held: Record<string, string>, candidate: string): Record<string,
 export function useRuleReview(): RuleReview {
   const { refresh } = useHeal();
   const { review, refusals, busyId } = useMemoryReview();
-  // The candidate pressed and not yet settled: from the press until the heal summary has answered. Essential because the
-  // door's `busyId` ends one read before the summary the card is drawn from does. One id, as the door's own is.
-  const [settling, setSettling] = useState<string | null>(null);
+  // The candidates pressed and not yet settled, each from its press until the heal summary has answered. Essential because
+  // the door's `busyId` is ONE id and ends one read before the summary the card is drawn from does: a second card pressed
+  // inside that read takes the door's id, and the first — still reading `pending` — would come back on. A set, so every
+  // card holds its own presses off until its own decision has reached it.
+  const [settling, setSettling] = useState<ReadonlySet<string>>(() => new Set());
   // Why a write never reached the queue, per candidate. Essential because the door's `refusals` holds only a 422's
   // words, and the response that said otherwise is read once and gone.
   const [unreached, setUnreached] = useState<Record<string, string>>({});
@@ -54,7 +70,7 @@ export function useRuleReview(): RuleReview {
   }, []);
 
   const press = useCallback(async (candidate: string, approve: boolean): Promise<void> => {
-    setSettling(candidate);
+    setSettling((held) => new Set(held).add(candidate));
     setUnreached((held) => forget(held, candidate));
     try {
       const outcome = await review(candidate, approve);
@@ -68,8 +84,8 @@ export function useRuleReview(): RuleReview {
       try {
         await refresh();
       } finally {
-        // Only this candidate's hold: a press on another card while this one settled owns the slot now.
-        if (mountedRef.current) setSettling((current) => (current === candidate ? null : current));
+        // Only this candidate's hold: a press on another card while this one settled keeps its own.
+        if (mountedRef.current) setSettling((held) => released(held, candidate));
       }
     }
   }, [refresh, review]);
@@ -78,5 +94,7 @@ export function useRuleReview(): RuleReview {
     void press(candidate, approve);
   }, [press]);
 
-  return { busyId: busyId ?? settling, refusals: { ...refusals, ...unreached }, onReview };
+  const isBusy = (candidate: string): boolean => candidate === busyId || settling.has(candidate);
+
+  return { isBusy, refusals: { ...refusals, ...unreached }, onReview };
 }

@@ -218,12 +218,12 @@ function RuleCard({ rule, review, projectName }: { rule: HealRule; review: RuleR
           {/* The Memory door's own two presses (MemoryCandidateRow), beside the state they act on and above the rows, so a
               rule said seven times keeps them in view; at the touch floor under a finger. */}
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="default" className="finger:h-11" disabled={review.busyId === candidate} aria-describedby={describedBy}
+            <Button size="sm" variant="default" className="finger:h-11" disabled={review.isBusy(candidate)} aria-describedby={describedBy}
               title={t('memory.actions.fileTitle', { defaultValue: 'file it — write this memory to disk' })} onClick={() => review.onReview(candidate, true)} data-heal-rule-file>
               <CheckIcon aria-hidden="true" />
               {t('memory.actions.file', { defaultValue: 'file it' })}
             </Button>
-            <Button size="sm" variant="ghost" className="finger:h-11" disabled={review.busyId === candidate} aria-describedby={describedBy}
+            <Button size="sm" variant="ghost" className="finger:h-11" disabled={review.isBusy(candidate)} aria-describedby={describedBy}
               title={t('memory.actions.discardTitle', { defaultValue: 'discard — nothing is written' })} onClick={() => review.onReview(candidate, false)} data-heal-rule-discard>
               <XIcon aria-hidden="true" />
               {t('memory.actions.discard', { defaultValue: 'discard' })}
