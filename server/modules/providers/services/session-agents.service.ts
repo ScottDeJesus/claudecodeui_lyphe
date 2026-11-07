@@ -42,8 +42,12 @@ const FINISHED_SHOWN_FOR_MS = 2 * 60 * 60 * 1000;
 /** A bound on the payload, newest first; a fan-out larger than this has scrolled out of any strip. */
 const MAX_AGENTS = 30;
 
-/** The receipt fields the strip reads: the backgrounded flag, the CLI's own total, the agent's id. */
-const RECEIPT_KEYS = ['isAsync', 'totalTokens', 'agentId', 'status'];
+/**
+ * The receipt fields the strip reads: the backgrounded flag, the CLI's own total, the agent's id, its
+ * launch status, and the model the launch resolved to — which names a row whose container carries no
+ * `subagent` metadata (the client's `readLaunchResolvedModel`).
+ */
+const RECEIPT_KEYS = ['isAsync', 'totalTokens', 'agentId', 'status', 'resolvedModel'];
 /** The launch-input fields the strip reads. */
 const INPUT_KEYS = ['description', 'subagent_type'];
 

@@ -1345,14 +1345,17 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/ly
 ## MAN-495 — 2. A raw model id never reaches the transcript
 section: chat-contracts/002 2. A raw model id never reaches the transcript
 
-`modelLabels.ts::resolveModelLabel` answers with the catalog's own label or with null, matching an id
+`modelLabels.ts::resolveModelLabel` answers with the catalog's own label, a DeepSeek name read off the id, or null, matching an id
 to a short alias by whole dash-segments; the rule and its traps are in that file's header.
 `useModelLabelResolver` (`src/modules/chat/hooks/`) binds it to the chat's provider and catalog; `ChatMessagesPane`
 (message headers, the agent rows in the transcript, exports) and `ChatInterface` (the pinned agents strip and the
 gutter widget's copy of those rows) each call it, so every surface names a model one way.
-A null falls back to the provider's name in a message header, so a model the catalog never carried reads "Claude"
-rather than `claude-haiku-4-5-20251001`; an agent row draws no label for it. The composer's chip is the one place an id
-shows — there it was typed; an agent's open view prints the id only where the catalog names no label (MAN-404).
+An id DeepSeek answers with (`deepseek-v4-pro`, `deepseek-flash`) is named off the id itself ("DeepSeek V4 Pro", "DeepSeek
+Flash"), because no catalog here lists DeepSeek's models: a DeepSeek turn's header and a DeepSeek agent's row say so rather
+than "Claude", and a new DeepSeek model names itself the day it first runs. That step sits before the alias match, so a
+catalog's `flash` alias can never name `deepseek-flash`. A null falls back to the provider's name in a message header, so a
+model nothing names reads "Claude" rather than `my-custom-model`; an agent row draws no label for it. The composer's chip is the one place an id
+shows — there it was typed; an agent's open view prints the id only where nothing names a label for it (MAN-404).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useModelLabelResolver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/modelLabels.ts
 
@@ -2979,15 +2982,16 @@ what a launch MEANS.
 
 | File | What this lane takes from it |
 |---|---|
-| `spec.json` | `started_at`, `role`, `agent`, `brief_path`, and `provider` — the switch's reading at launch time — and `launched_by` (the Claude CLI session id that launched it): carried on every snapshot, `null` when absent, and the stamp the open chat anchors the launch by (MAN-7583) and the purple dot reads (`running-launchers.service.ts`, MAN-6228) — and `dispatcher` (`{plan, phase}`, the launcher's mark that the launch is the dispatcher's own epic work, `solo/dispatch_mark.py`), which together with `role` and the chain index below sets `dispatcher_work` on the snapshot and keeps the launch off the purple dot (`dispatcher-work.service.ts`). **No spec, or no `started_at`, and the directory is not a launch**: it draws nothing rather than a phantom. |
-| `result.json` | Its ABSENCE is how "still out" is spelled. Present: `status`, `ended_at`, `duration_s`, `cost_usd` (PAID dollars — read as 0 where `provider` names Claude, `receiptCostUsd`, INV-4299), `tokens`, `tokens_in`, `tokens_out` (A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED: ALL THREE are `null` where a vendor billed the soul — DeepSeek's tokens are its own business, and so are the tokens of a receipt whose `provider` is `anthropic` (a Claude child an API key paid for: its `cost_usd` is read as it stands, its pin mark stays Claude's) — and `null` for one written before the split, which the pin reads as the total alone; `receiptTokens`), `cause`, `provider`, `provider_blocked` — and `session_id`, the Claude session the transcript read follows, once the soul has ended. |
-| `child.log` | The transcript read ONLY: its first `session_id`, when `result.json` has none yet, is handed to the providers module (`readClaudeTranscriptBySessionId`), which `GET /api/dispatch-souls/launches/:launchId/transcript` serves to the chat's Subagents widget. Nothing else in it is parsed. |
+| `spec.json` | `started_at`, `role`, `agent`, `brief_path`, `model` — the word the launcher was asked for (`opus`), `''` for a soul that took the default, the last record the pin's model name falls back to (MAN-531) — and `provider` — the switch's reading at launch time — and `launched_by` (the Claude CLI session id that launched it): carried on every snapshot, `null` when absent, and the stamp the open chat anchors the launch by (MAN-7583) and the purple dot reads (`running-launchers.service.ts`, MAN-6228) — and `dispatcher` (`{plan, phase}`, the launcher's mark that the launch is the dispatcher's own epic work, `solo/dispatch_mark.py`), which together with `role` and the chain index below sets `dispatcher_work` on the snapshot and keeps the launch off the purple dot (`dispatcher-work.service.ts`). **No spec, or no `started_at`, and the directory is not a launch**: it draws nothing rather than a phantom. |
+| `result.json` | Its ABSENCE is how "still out" is spelled. Present: `status`, `ended_at`, `duration_s`, `cost_usd` (PAID dollars — read as 0 where `provider` names Claude, `receiptCostUsd`, INV-4299), `model` (the id the child was served: the first record the pin's model name reads, MAN-531), `tokens`, `tokens_in`, `tokens_out` (A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED: ALL THREE are `null` where a vendor billed the soul — DeepSeek's tokens are its own business, and so are the tokens of a receipt whose `provider` is `anthropic` (a Claude child an API key paid for: its `cost_usd` is read as it stands, its pin mark stays Claude's) — and `null` for one written before the split, which the pin reads as the total alone; `receiptTokens`), `cause`, `provider`, `provider_blocked` — and `session_id`, the Claude session the transcript read follows, once the soul has ended. |
+| `child.log` | Two reads, both of its HEAD and never the whole file (a log grows to megabytes). Its first `session_id`, when `result.json` has none yet, is handed to the providers module (`readClaudeTranscriptBySessionId`), which `GET /api/dispatch-souls/launches/:launchId/transcript` serves to the chat's Subagents widget. And the `system`/`init` event's `model` (`readServedModel`, 64 KiB of head, the event ended by byte 12,422 at the furthest of the newest 400 logs), which names a soul while it is out — read once per launch and kept (MAN-531). Nothing else in it is parsed. |
 | `launcher.pid` / `child.pid` | Liveness, proved through `/proc/<pid>/cmdline` against a needle (`soul-run`, `claude`) — a pid is reused, so the number alone proves nothing. |
 | `brief.md` (via `spec.json`'s `brief_path`) | ONE line: the task, for the pin's second row. |
 | `../dispatch-chains/<chain id>/chain.json` and `walker.pid` | `status`, `until_pass`, each `stages[].launch`, and the walker proved through `/proc/<pid>/cmdline` carrying `chain-run` and the chain id. The purple dot reads `status`, the stages and the walker, and the pin reads `until_pass` and the stages; both ask `until_pass` and the stages once per pass, for the one set of launches the dispatcher's chains hold (`readDispatcherChainLaunchIds`), which flags a stage written before the mark existed — the pin sets `dispatcher_work` from it, the dot skips the stage. The chains root is the sibling of the souls root, so `DISPATCH_SOULS_STATE_DIR` moves both. `chain-record.transport.ts` owns the bytes. |
 
 **RULE: these are a contract the launcher does not know it has.** The receipt's wording, `result.json`'s
-`provider` and `status`, `spec.json`'s `provider`, and the directory layout are all read from here,
+`provider`, `status` and `model`, `spec.json`'s `provider` and `model`, the CLI's own `system`/`init` event at the front
+of `child.log` (the `model` a running soul is named by), and the directory layout are all read from here,
 by a program in another repository, on a two-second poll. Reword the receipt line and every soul
 unpins; rename a field and the pin paints the wrong vendor. The estate carries the same rule from
 its own side: INV-36, surfaced in MAN-838.
@@ -3001,6 +3005,8 @@ on a live state root, and one torn read must never cost the lane its other launc
 cannot be read at all is reported once per distinct message and omitted — never silently dropped,
 since a launch missing from both the list and the frame is indistinguishable from one that never
 existed.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.transport.ts
 
 ## MAN-529 — The brief's first line is not its first line
 section: dispatch-souls/005 What the lane reads — the launcher's layout is a read contract/006 The brief's first line is not its first line
@@ -3050,6 +3056,20 @@ crashes with the Claude mark while their own `launch.out` said `provider=deepsee
 a stub with no provider says nothing, and the row falls back to the launch-time pin, which the
 launcher always wrote before the fork.
 
+**The model follows the same rule, in the order the records exist.** `modelOf` takes the first record
+that names one: the receipt's `model` once the launch ended — the id the child was actually served —
+then the id the child itself announced on the `system`/`init` event at the front of its `child.log`
+(`readServedModel`, the head of the file only, never the whole log), then `spec.json`'s word, then
+nothing. The init event is what names a soul while it is out: `spec.json` holds only the word the
+launcher was asked for (`opus`) and `''` for a soul that took the default model, and the receipt
+lands at the very end. The event is there seconds after the launch (the 2 s poll plus the CLI's
+start-up hooks). Measured 2026-11-06 over the newest 400 launches on disk: it ended by byte 12,422 and every one
+carried it, and wherever the receipt exists too the two agree (0 of 398 differ). A launch's model never
+changes once found, so the lane keeps it per launch id (`servedModelByLaunchId`, owned by the
+composition root and emptied of the ids the lane stops carrying) and a log is read until it names one, not every
+poll — an ended launch's log is final, so even an empty answer is kept for it. The launch table
+(`charters/launch.toml`) is never asked: it says what a soul would be given, not what it was.
+
 `blocked` — the row's `DeepSeek refused this soul — it finished on Claude` note — takes EITHER
 witness: `result.json`'s `provider_blocked` once there is a receipt, or the fallback child's own log
 file while the soul is still out. Neither is sufficient alone; without the log a live fallback paints
@@ -3059,6 +3079,8 @@ This is the third surface on this box where a reader meets DeepSeek, and the onl
 key: the switch's controls write the flag ([docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch"),
 the account readout asks the vendor ([docs/MANUAL.md (deepseek-balance)](MANUAL.md)), and the pin simply
 paints the mark of the endpoint that was billed.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.transport.ts
 
 ## MAN-532 — The windows
 section: dispatch-souls/009 The windows

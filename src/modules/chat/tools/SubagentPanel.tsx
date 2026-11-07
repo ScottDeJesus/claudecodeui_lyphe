@@ -31,7 +31,7 @@ type SubagentPanelProps = {
   provider?: LLMProvider;
   /** The model the agent ran on, live or from history (`ChatMessage.subagentModel`); it decides the row's mark. */
   model?: string;
-  /** The name a person calls that model (`Opus 5.5`), drawn after the agent's name. Absent while the record names no model the catalog knows. */
+  /** The name a person calls that model (`Opus 5.5`), drawn after the agent's name. Absent while the record names no model, or one nothing names. */
   modelLabel?: string | null;
   onFileOpen?: (filePath: string, diffInfo?: unknown) => void;
   createDiff: (oldStr: string, newStr: string) => DiffLine[];
@@ -229,7 +229,7 @@ export const SubagentPanel = memo(({
 
       {showTimeline && (
         <div className="settings-content-enter space-y-2 border-t border-border/50 bg-background/50 px-3 py-2">
-          {/* The raw id names the model only where the row's label cannot: a model the catalog does not carry. */}
+          {/* The raw id names the model only where the row's label cannot: a model nothing names. */}
           {!modelLabel && model && (
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground/50">{model}</div>
           )}

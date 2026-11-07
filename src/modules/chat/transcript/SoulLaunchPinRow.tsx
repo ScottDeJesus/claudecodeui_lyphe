@@ -34,7 +34,7 @@ import { formatSubagentFinishTime } from '@/modules/chat/utils/subagentSummary';
 
 type SoulLaunchPinRowProps = {
   launch: SoulLaunchSnapshot;
-  /** The name a person calls the model the soul ran on (`Opus 5.5`), drawn after its name. Absent while its launch record names no model the catalog knows. */
+  /** The name a person calls the model the soul ran on (`Opus 5.5`), drawn after its name. Absent while its launch records name no model, or one nothing names. */
   modelLabel?: string | null;
   onDismiss: (id: string) => void;
   /** Opens this row's transcript — in place in the gutter's widget, in a dialog from the strip. */

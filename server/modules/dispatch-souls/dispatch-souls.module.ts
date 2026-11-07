@@ -87,6 +87,13 @@ export function createDispatchSoulsModule(): DispatchSoulsModule {
     console.error(message);
   };
 
+  /**
+   * What the lane has learned of each launch's served model (launch id → the id its child's log
+   * announced, `readServedModel`). It lives as long as the lane, so a log is read once per launch and
+   * not every two seconds; the walk empties it of the launches the lane has stopped carrying.
+   */
+  const servedModelByLaunchId = new Map<string, string>();
+
   const lane = createPolledLane<SoulLaunchSnapshot[], SoulLaunchStateEvent>({
     // Epoch SECONDS: every timestamp the launcher's Python wrote comes from `time.time()`, and a
     // millisecond clock compared against one of them makes every launch on the host read as
@@ -97,6 +104,7 @@ export function createDispatchSoulsModule(): DispatchSoulsModule {
         Date.now() / 1000,
         LAUNCH_KEEP_S,
         (dir, message) => logErrorOnce(`[DispatchSouls] could not read launch directory ${dir}: ${message}`),
+        servedModelByLaunchId,
       ),
     frame: (launches) => ({ kind: 'soul_launch_state', launches, at: Date.now() }),
     broadcast,

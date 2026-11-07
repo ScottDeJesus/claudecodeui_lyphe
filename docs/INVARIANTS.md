@@ -755,3 +755,113 @@ measured 2026-10-30 by chain chain-usage-gauge-renews-login-20261030-164930-1667
 probe-key: 10bc211978d758b1c34fa208bc25ecc0c3990030
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-login-renewal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11257 — probe — LOW — `readServedModel` is exported and nothing outside its own file uses it
+
+LOW — `readServedModel` is exported and nothing outside its own file uses it
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "readServedModel exports: $(grep -c 'export function readServedModel' server/modules/dispatch-souls/soul-launch.transport.ts) | files that CALL it: $(grep -rln 'readServedModel(' server src --include=*.ts --include=*.tsx | tr '\n' ' ')"
+echo "[probe exit $?]"
+# expect: `exports: 1 | files that CALL it: server/modules/dispatch-souls/soul-launch.transport.ts` (its own file only) while the defect stands; cured: `exports: 0`, or a second file in the list
+```
+
+measured 2026-11-06 by chain chain-agent-rows-model-while-running-20261106-200019-0fdd, finding L1, LOW
+probe-key: 63641dd5cedb229e1a61ed0807cd9a7e9030eb63
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/dispatch-souls.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-models.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useModelLabelResolver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/SubagentPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedAgentRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/modelLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/subagentSummary.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11258 — probe — LOW — three prop comments still say a row names no model "the catalog knows"
+
+LOW — three prop comments still say a row names no model "the catalog knows"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+grep -c "no model the catalog knows" src/modules/chat/transcript/SoulLaunchPinRow.tsx src/modules/chat/transcript/PinnedAgentRow.tsx src/modules/chat/tools/SubagentPanel.tsx
+echo "[probe exit $?]"
+# expect: 1 for each of the three files while the sentence stands; 0 for each once it no longer makes the catalog the thing that names a model
+```
+
+measured 2026-11-06 by chain chain-agent-rows-model-while-running-20261106-200019-0fdd, finding L2, LOW
+probe-key: 274ba4fcd12e03ee06be2239837f888b812a39d8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/dispatch-souls.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-models.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useModelLabelResolver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/SubagentPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedAgentRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/modelLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/subagentSummary.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11259 — probe — LOW — the whole-history agent list drops the receipt's `resolvedModel`, so an agent known only from it, with no transcript metadata, is unnamed
+
+LOW — the whole-history agent list drops the receipt's `resolvedModel`, so an agent known only from it, with no transcript metadata, is unnamed
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/server.mts" <<'TS'
+import fs from 'node:fs';
+import { collectSessionAgents } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts';
+const receipt = { isAsync: true, status: 'async_launched', agentId: 'a0681e9a3591853e6', description: 'Calendar matcher cross-check [opus]', resolvedModel: 'claude-opus-5-5', prompt: 'You are building…', outputFile: '/tmp/x.output', canReadOutputFile: true };
+const full = { id: 'm1', sessionId: 's1', timestamp: new Date(Date.now() - 20_000).toISOString(), provider: 'claude', kind: 'tool_use', toolName: 'Agent', toolId: 'toolu_01probe',
+  toolInput: { description: 'Calendar matcher cross-check', subagent_type: 'general-purpose', prompt: 'You are building…' },
+  toolResult: { content: 'Async agent launched successfully.', isError: false, toolUseResult: receipt, timestamp: new Date(Date.now() - 19_000).toISOString() } };
+const [compact] = collectSessionAgents([full as never]);
+fs.writeFileSync(process.argv[2], JSON.stringify({ full, compact }));
+console.log('server: the whole-history list keeps these receipt keys:', JSON.stringify(Object.keys((compact as any).toolResult.toolUseResult)), '| has subagent metadata:', 'subagent' in (compact as object));
+process.exit(0);
+TS
+cat > "$D/client.mts" <<'TS'
+import fs from 'node:fs';
+import { normalizedToChatMessages } from '/home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts';
+const { full, compact } = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const model = (m: unknown) => normalizedToChatMessages([m as never]).find((c) => c.isSubagentContainer)?.subagentModel;
+console.log('client: the agent in the loaded window (full receipt) names its model:', JSON.stringify(model(full)) ?? 'undefined');
+console.log("client: the same agent as the server's whole-history list ships it:", JSON.stringify(model(compact)) ?? 'undefined');
+process.exit(0);
+TS
+cat > "$D/p.sh" <<'EOF'
+D=$(cd "$(dirname "$0")" && pwd)
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TSX_TSCONFIG_PATH=$PWD/server/tsconfig.json timeout 90 node --import tsx "$D/server.mts" "$D/pair.json" 2>&1 | tail -2
+TSX_TSCONFIG_PATH=$PWD/tsconfig.json timeout 90 node --import tsx "$D/client.mts" "$D/pair.json" 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: the server line lists `["isAsync","agentId","status"]` with `has subagent metadata: false`, the loaded-window line `"claude-opus-5-5"` and the whole-history line `undefined` while the defect stands; cured: the last line also reads `"claude-opus-5-5"`
+```
+
+measured 2026-11-06 by chain chain-agent-rows-model-while-running-20261106-200019-0fdd, finding L3, LOW
+probe-key: 3b97fe7c1298b7fc73a59dab565cbe59a0fb3b36
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/dispatch-souls.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-models.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useModelLabelResolver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/SubagentPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedAgentRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/modelLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/subagentSummary.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11260 — probe — LOW — the rows this walk rewrote reach no editor of the files they describe
+
+LOW — the rows this walk rewrote reach no editor of the files they describe
+
+```probe
+R=/home/lyphe/.claude/claudecodeui_lyphe
+for f in server/modules/dispatch-souls/soul-launch.transport.ts server/modules/dispatch-souls/soul-launch.service.ts src/modules/chat/utils/subagentSummary.ts; do
+  echo "$(basename "$f"): $(docstore govern "$R/$f" --touch write --limit 3 --text | cut -d' ' -f1 | tr '\n' ' ')"
+done
+echo "[probe exit $?]"
+# expect: `soul-launch.transport.ts: (no`, `soul-launch.service.ts: INV-4893 INV-7062 MAN-7583` and `subagentSummary.ts: (no` while the rows are ungoverned; cured: MAN-531 or MAN-528 among the first two lines' rows and MAN-404 on the third
+```
+
+measured 2026-11-06 by chain chain-agent-rows-model-while-running-20261106-200019-0fdd, finding L4, LOW
+probe-key: 81799eb1a77e57915d04bb2bbde0b91f087f0dc2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/dispatch-souls.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-models.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useModelLabelResolver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/SubagentPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedAgentRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/modelLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/subagentSummary.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11261 — probe — LOW — MAN-404 now states the model fold twice, with two records and with three
+
+LOW — MAN-404 now states the model fold twice, with two records and with three
+
+```probe
+cd /home/lyphe/.claude || exit 1
+echo "two-record sentence: $(docstore get MAN-404 --text | grep -c "the history record's .subagent.model., else the newest model the") | three-record sentence: $(docstore get MAN-404 --text | grep -c 'first of three records')"
+echo "[probe exit $?]"
+# expect: `two-record sentence: 1 | three-record sentence: 1` while MAN-404 states the fold twice; cured: the first count reads 0 (or the sentence names the third record)
+```
+
+measured 2026-11-06 by chain chain-agent-rows-model-while-running-20261106-200019-0fdd, finding L5, LOW
+probe-key: c21d19425df42b9a84b31bb2af161b5eddd203fa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/dispatch-souls.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-models.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useModelLabelResolver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/SubagentPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedAgentRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/modelLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/subagentSummary.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts

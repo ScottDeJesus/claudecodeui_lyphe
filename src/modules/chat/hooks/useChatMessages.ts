@@ -5,7 +5,7 @@
 
 import type { ChatMessage,NormalizedMessage,SubagentActivity, SubagentUsage } from '@/shared/types';
 import { formatUsageLimitText } from '@/modules/chat/utils/chatFormatting';
-import { stripRecordedModelTagFromNotice } from '@/modules/chat/utils/subagentSummary';
+import { readLaunchResolvedModel, stripRecordedModelTagFromNotice } from '@/modules/chat/utils/subagentSummary';
 
 function formatToolResultContent(content: unknown): string {
   const text = typeof content === 'string' ? content : JSON.stringify(content);
@@ -472,8 +472,12 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
           subagentActivity,
           subagentUsage,
           subagentProvider: isSubagentContainer ? msg.provider : undefined,
+          // Three records, in order: the history's, the newest live turn's, and what the launch's own
+          // result says it resolved to — which a background agent has from its first second.
           subagentModel: isSubagentContainer
-            ? msg.subagent?.model ?? (msg.toolId ? liveSubagentModel.get(msg.toolId) : undefined)
+            ? msg.subagent?.model
+              ?? (msg.toolId ? liveSubagentModel.get(msg.toolId) : undefined)
+              ?? readLaunchResolvedModel(toolResult)
             : undefined,
           memoryCitations: msg.memoryCitations,
           ...sharedMetadata,

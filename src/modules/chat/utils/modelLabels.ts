@@ -67,6 +67,39 @@ function captionFor(option: ProviderModelOption, modelId: string): string {
   return LABEL_VERSION.test(label) ? label.replace(LABEL_VERSION, version) : `${label} ${version}`;
 }
 
+/**
+ * An id DeepSeek's own endpoint answers with, whole: `deepseek` and then dash-separated segments of
+ * letters, digits and dotted versions (`deepseek-v4-pro`, `deepseek-flash`, `deepseek-v3.2`). Anything
+ * else — a path, a bracket, a space — is not an id this reader names.
+ */
+const DEEPSEEK_ID = /^deepseek(?:-[a-z0-9]+(?:\.\d+)*)*$/;
+
+/** A version segment — a letter and its number (`v4`, `r1`, `v3.2`) — which a name writes with the letter capitalized. */
+const VERSION_SEGMENT = /^[a-z]\d+(?:\.\d+)*$/;
+
+/**
+ * The name for an id DeepSeek's endpoint answers with: `deepseek-v4-pro` → "DeepSeek V4 Pro",
+ * `deepseek-flash` → "DeepSeek Flash", and a `deepseek-v5-pro` nothing has run yet → "DeepSeek V5 Pro".
+ *
+ * DeepSeek has no catalog in this app — only Claude reports one — so its words come off the id itself,
+ * the way a new Claude generation's number comes off the record: the vendor first, a version segment
+ * (`v4`) with its letter capitalized, every other segment capitalized. A new DeepSeek model therefore
+ * names itself the day it first runs, with no code change. The `[1m]` context suffix is dropped, as for
+ * Claude: it is the same model with a larger window.
+ *
+ * Null for any id that is not DeepSeek's. The vendor is read off the id's own first segment, which is
+ * what keeps `deepseek-flash` from being caught by a catalog's `flash` alias in `aliasMatching`.
+ */
+function deepseekLabelOf(modelId: string): string | null {
+  const id = modelId.toLowerCase().replace(ONE_MILLION_SUFFIX, '');
+  if (!DEEPSEEK_ID.test(id)) return null;
+  const words = id.split('-').map((segment) => (
+    VERSION_SEGMENT.test(segment) ? segment.toUpperCase() : `${segment.charAt(0).toUpperCase()}${segment.slice(1)}`
+  ));
+  // The vendor's own spelling, not a capitalized `Deepseek`.
+  return ['DeepSeek', ...words.slice(1)].join(' ');
+}
+
 /** The catalog entry whose alias tokens all appear among the id's segments, longest alias first. */
 function aliasMatching(
   options: ProviderModelOption[],
@@ -88,7 +121,10 @@ function aliasMatching(
  * 2. The provider's name for the id, where its catalog lists it (`labelsByModelId`, Claude's
  *    `LABELS_BY_MODEL_ID`): `claude-sonnet-5-5` → "Sonnet 5.5", `claude-sonnet-5` → "Sonnet 5". The
  *    server has already put the generation into that name; nothing here second-guesses it.
- * 3. Only for an id no catalog names: the id is read as its dash-separated segments and matched
+ * 3. An id DeepSeek answers with (`deepseek-v4-pro`, `deepseek-flash`): named off the id itself, because
+ *    no catalog here lists DeepSeek's models (`deepseekLabelOf`). It comes BEFORE the alias match, which
+ *    would otherwise hand a catalog's `flash` entry to `deepseek-flash`.
+ * 4. Only for an id no catalog names: the id is read as its dash-separated segments and matched
  *    against the options' aliases — segments, never substrings, because `opus` is inside `opusplan`
  *    and a substring match would hand back the wrong name with no way to tell — and captioned with
  *    that family plus the id's own generation (`captionFor`).
@@ -114,6 +150,9 @@ export function resolveModelLabel(
   for (const candidate of [modelId, modelId.replace(ONE_MILLION_SUFFIX, '')]) {
     if (Object.prototype.hasOwnProperty.call(labelsByModelId, candidate)) return labelsByModelId[candidate];
   }
+
+  const deepseekLabel = deepseekLabelOf(modelId);
+  if (deepseekLabel) return deepseekLabel;
 
   const segments = new Set(tokensOf(modelId));
   // Longest alias first, so a catalog carrying both `opus[1m]` and a bare `opus` names an id

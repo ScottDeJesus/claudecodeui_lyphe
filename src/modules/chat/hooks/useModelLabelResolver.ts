@@ -6,7 +6,8 @@ import { resolveModelLabel } from '@/modules/chat/utils/modelLabels';
 /**
  * The one question the transcript asks of the model catalog: what does a person call this model id?
  *
- * Answers `null` for an id the catalog does not carry, so a caller decides its own fallback (a
+ * Answers `null` for an id nothing names — the catalog does not carry it and it is not one DeepSeek
+ * answers with, which the resolver names off the id itself — so a caller decides its own fallback (a
  * message header names the provider; an agent row names nothing) rather than printing an identifier.
  * Its identity changes only when the provider or the catalog does, so it is safe in a dependency list.
  *

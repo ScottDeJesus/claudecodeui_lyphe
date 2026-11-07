@@ -87,17 +87,23 @@ function providerOf(spec: unknown, result: unknown, ended: boolean): 'deepseek' 
 }
 
 /**
- * The model a launch ran on, for the pin to name.
+ * The model a launch ran on, for the pin to name — from the first record that names one:
  *
- * The receipt outranks the pin here too: `result.json` records the id the child was actually served
- * (`claude-sonnet-5-5`), while `spec.json` holds only the word the launcher was asked for (`opus`, or
- * nothing at all for a soul that took the session's default). So the receipt answers once it has
- * landed, the spec before then, and `''` when neither names one — the pin then draws no model rather
- * than a guess.
+ * 1. THE RECEIPT, once the launch has ended: `result.json` records the id the child was actually served
+ *    (`claude-sonnet-5-5`), so it outranks every word the launcher was merely asked for.
+ * 2. THE CHILD'S OWN INIT EVENT (`servedModel`, off its `child.log`): the same id, seconds after the
+ *    launch. It names a soul while it runs, because `spec.json` holds only the word the launcher was
+ *    asked for (`opus`), or `''` for a soul that took the default, and the receipt lands at the end.
+ *    Where both exist they agree (newest 400 launches: 398 carry both, none differ).
+ * 3. THE SPEC'S WORD, before the child has announced anything.
+ * 4. `''`: the pin then draws no model rather than a guess. The launch table (`charters/launch.toml`)
+ *    is never asked — it says what a soul WOULD be given, not what it was.
  */
-function modelOf(spec: unknown, result: unknown, ended: boolean): string {
+function modelOf(spec: unknown, result: unknown, ended: boolean, servedModel: string): string {
   const receipt = ended ? readString(field(result, 'model')) : '';
-  return receipt !== '' ? receipt : readString(field(spec, 'model'));
+  if (receipt !== '') return receipt;
+  if (servedModel !== '') return servedModel;
+  return readString(field(spec, 'model'));
 }
 
 /**
@@ -218,7 +224,7 @@ export function classifyLaunch(
     // absent is honest, and the row simply carries no description.
     brief: files.briefLine,
     provider,
-    model: modelOf(spec, result, ended),
+    model: modelOf(spec, result, ended, files.servedModel),
     // DeepSeek refused this soul or never answered it: the receipt says why, and nothing ran on
     // Claude instead (the launcher never re-routes a soul).
     blocked: readString(field(result, 'provider_blocked')) !== '',
@@ -255,22 +261,29 @@ export function classifyLaunch(
  *
  * `keepS` bounds the walk twice: the directory listing skips what nothing has written to since the
  * window opened, and the classification drops what ended before it.
+ *
+ * `servedModelByLaunchId` is the lane's memory of the model each child's log announced, owned by the
+ * composition root: a log is read once per launch, not every poll, and the walk drops the ids the lane
+ * no longer carries. Omitted, no child's log is read.
  */
 export function snapshotLaunches(
   stateDir: string,
   now: number,
   keepS: number = DEFAULT_ENDED_KEEP_S,
   onLaunchError?: (dir: string, message: string) => void,
+  servedModelByLaunchId?: Map<string, string>,
 ): SoulLaunchSnapshot[] {
   const launches: SoulLaunchSnapshot[] = [];
   // One pass over the dispatcher's chains for the whole walk, not one per launch. It reaches back as
   // far as the launches do: a chain's directory is rewritten at each stage, so it is never older than
   // the newest launch it holds.
   const dispatcherChainLaunchIds = readDispatcherChainLaunchIds(stateDir, (now - keepS) * 1000);
-  for (const name of listLaunchDirs(stateDir, (now - keepS) * 1000)) {
+  const listedLaunchIds = listLaunchDirs(stateDir, (now - keepS) * 1000);
+  for (const name of listedLaunchIds) {
     const dir = path.join(stateDir, name);
     try {
-      const snapshot = classifyLaunch(readLaunchFiles(dir, name), now, keepS, dispatcherChainLaunchIds);
+      const files = readLaunchFiles(dir, name, servedModelByLaunchId);
+      const snapshot = classifyLaunch(files, now, keepS, dispatcherChainLaunchIds);
       if (snapshot !== null) launches.push(snapshot);
     } catch (error) {
       // ONE unreadable launch never costs the others their reading — but it must not vanish in
@@ -280,5 +293,14 @@ export function snapshotLaunches(
       onLaunchError?.(dir, error instanceof Error ? error.message : String(error));
     }
   }
+  if (servedModelByLaunchId !== undefined) forgetUnlistedLaunches(servedModelByLaunchId, listedLaunchIds);
   return launches.sort((left, right) => left.started_at - right.started_at);
+}
+
+/** Drops every launch id the walk no longer lists, so the lane's memory of served models stays as small as the lane. */
+function forgetUnlistedLaunches(servedModelByLaunchId: Map<string, string>, listedLaunchIds: readonly string[]): void {
+  const listed = new Set(listedLaunchIds);
+  for (const launchId of servedModelByLaunchId.keys()) {
+    if (!listed.has(launchId)) servedModelByLaunchId.delete(launchId);
+  }
 }

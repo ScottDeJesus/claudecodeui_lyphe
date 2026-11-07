@@ -64,7 +64,7 @@ type AgentEntry = {
    */
   dismissKey: string;
   provider?: SubagentMarkProvider;
-  /** The name a person calls the model the agent runs on (`Opus 5.5`), or `null` while its record names none the catalog knows. */
+  /** The name a person calls the model the agent runs on (`Opus 5.5`), or `null` while its record names no model, or one nothing names. */
   modelLabel: string | null;
   latest: string;
   summary: SubagentSummary;
@@ -77,7 +77,7 @@ type SoulEntry = {
   endedAtMs: number;
   running: boolean;
   launch: SoulLaunchSnapshot;
-  /** The name a person calls the model the soul ran on, or `null` while its launch record names none the catalog knows. */
+  /** The name a person calls the model the soul ran on, or `null` while its launch records name no model, or one nothing names. */
   modelLabel: string | null;
 };
 
@@ -132,9 +132,10 @@ function expiryOf(entry: PinnedSubagentRow): number | null {
  *
  * `resolveModelLabel` is the chat's own resolver from a model id to its name (`useModelLabelResolver`),
  * so a pinned row says "Opus 5.5" in the words the transcript's headers use, and a new generation
- * shows its own number the day the catalog carries it. A row whose record names no model gets `null`
- * and draws no label: an agent for its first seconds, and a soul launched with no model word until
- * its receipt lands (`modelOf`, `soul-launch.service.ts`).
+ * shows its own number the day the catalog carries it. A DeepSeek agent or soul says "DeepSeek Flash"
+ * the same way: the resolver names a DeepSeek id off the id itself. A row whose record names no model
+ * gets `null` and draws no label: an agent that has no record of its model yet, and a soul whose launch
+ * records (`modelOf`, `soul-launch.service.ts`) name none.
  */
 export function usePinnedSubagentRows(
   messages: ChatMessage[],

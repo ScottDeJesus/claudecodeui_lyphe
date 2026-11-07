@@ -463,8 +463,10 @@ export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
  * `blocked` marks a launch DeepSeek refused or never answered: it did no work, and the launcher
  * never re-routes a soul to Claude.
  *
- * `model` is the model the soul ran on: the id `result.json` records once the receipt landed, else the
- * word `spec.json` launched it with — `''` while neither names one, which a pin draws as no model at all.
+ * `model` is the model the soul ran on, from the first record that names one: the id `result.json` records once
+ * the receipt landed, else the id the child itself announced on its log's init event (there seconds after the
+ * launch, which is what names a running soul that took the default model), else the word `spec.json` launched
+ * it with — `''` while none names one, which a pin draws as no model at all.
  *
  * `launched_by` is the CLI session id the launcher stamped into `spec.json` from its own
  * `CLAUDE_CODE_SESSION_ID` at the moment it minted the launch — ownership recorded by the process

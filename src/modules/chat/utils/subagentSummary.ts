@@ -117,6 +117,22 @@ const isAsyncLaunchReceipt = (toolResult?: ToolResult | null): boolean => (
     ?.toolUseResult?.isAsync === true
 );
 
+/**
+ * The model an `Agent` launch's own result says it resolved to, or `undefined` when it names none.
+ *
+ * A background agent's `async_launched` result carries `resolvedModel` (`claude-opus-5-5`) from the
+ * moment the agent starts — before any turn of its own streams into this chat, and a background agent
+ * may never stream one. It is the live projection's last record of a row's model, behind the history's
+ * and the newest live turn's; the history reader takes the same word as its own fallback
+ * (`claude-sessions.provider.ts`). Read by `useChatMessages`.
+ */
+export function readLaunchResolvedModel(toolResult?: ToolResult | null): string | undefined {
+  const receipt = toolResult?.toolUseResult;
+  if (typeof receipt !== 'object' || receipt === null || !('resolvedModel' in receipt)) return undefined;
+  const { resolvedModel } = receipt;
+  return typeof resolvedModel === 'string' && resolvedModel.trim() !== '' ? resolvedModel : undefined;
+}
+
 export function readSubagentSummary({
   toolInput,
   toolResult,

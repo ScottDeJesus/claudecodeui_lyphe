@@ -13,7 +13,8 @@ import path from 'node:path';
  * written before the fork and is the whole contract of the launch; `result.json` is written by
  * the detached half when the child ends, and its ABSENCE is how "the soul is still out" is
  * spelled; `brief.md` is the task it was handed; `launcher.pid` and `child.pid` name the two
- * processes that carry it. We read those and invent none of them.
+ * processes that carry it; `child.log` is the child's own stream-json, whose first events name the
+ * model it was served. We read those and invent none of them.
  */
 
 /** How much of a brief is read for the one line the pin shows. A brief is a task, not a corpus. */
@@ -30,6 +31,16 @@ const BRIEF_HEAD_BYTES = 4096;
  * larger one only for the briefs whose first four kilobytes say nothing about the task.
  */
 const BRIEF_PREAMBLE_BYTES = 16 * 1024;
+
+/**
+ * How much of a child's log is read for the model it announced: the `system` `init` event, the CLI's
+ * first line once its start-up hooks answer. It ended at byte 12,422 at the furthest of the newest 400
+ * logs on disk, so 64 KiB is five times the worst case and a sliver of a log that grows to megabytes.
+ */
+const CHILD_LOG_HEAD_BYTES = 64 * 1024;
+
+/** Picks the init line out of a head full of long hook events, so only that one line is ever parsed. */
+const INIT_EVENT_MARK = /"subtype"\s*:\s*"init"/;
 
 /** The needle `/proc/<pid>/cmdline` must carry for a pid to still be the process we recorded. */
 const LAUNCHER_NEEDLE = 'soul-run';
@@ -52,6 +63,8 @@ export type SoulLaunchFiles = {
   childAlive: boolean;
   /** The brief's first meaningful line, for the pin's description. `''` when it cannot be read. */
   briefLine: string;
+  /** The model the child announced on its log's init event; `''` until it has, when the log names none, or when no log read was asked for ({@link readLaunchFiles}). */
+  servedModel: string;
 };
 
 /** A `readdir` failure — a state root that does not exist yet — is an empty lane, not a fault. */
@@ -198,6 +211,36 @@ export function readBriefLine(file: string): string {
   return taskLineIn(whole) ?? briefLines(whole)[0] ?? '';
 }
 
+/** The model a `system`/`init` event line announces; `''` for a line that is anything else, or torn. */
+function modelOfInitLine(line: string): string {
+  try {
+    const event: unknown = JSON.parse(line);
+    if (field(event, 'type') !== 'system' || field(event, 'subtype') !== 'init') return '';
+    const model = field(event, 'model');
+    return typeof model === 'string' ? model.trim() : '';
+  } catch {
+    // A line cut by the head's cap, or one the child is still writing: it names nothing yet.
+    return '';
+  }
+}
+
+/**
+ * The model the child announced on the init event at the front of its `child.log`, or `''`.
+ *
+ * The log is the CLI's own stream-json, so that `model` is the id it was served (`claude-sonnet-5-5`),
+ * there seconds after the launch and long before the receipt. It is what names a soul that took the
+ * default model (`spec.json` says `model: ""`) while it runs. Only the head of the log is read.
+ */
+function readServedModel(dir: string): string {
+  const head = readHead(path.join(dir, 'child.log'), CHILD_LOG_HEAD_BYTES);
+  for (const line of head.text.split('\n')) {
+    if (!INIT_EVENT_MARK.test(line)) continue;
+    const model = modelOfInitLine(line);
+    if (model !== '') return model;
+  }
+  return '';
+}
+
 /**
  * One launch's `spec.json` alone, or `null` — the whole contract of the launch, and the one file
  * that names who launched it (`launched_by`). Exported for `running-launchers.service.ts`, which
@@ -217,8 +260,31 @@ export function hasLaunchReceipt(dir: string): boolean {
   return fs.existsSync(path.join(dir, 'result.json'));
 }
 
-/** Everything the lane reads out of one launch directory. Never throws: a torn read answers empty. */
-export function readLaunchFiles(dir: string, launchId: string): SoulLaunchFiles {
+/**
+ * The model the child's log announced, read once per launch: a launch's served model never changes, so
+ * what a read finds is kept in `kept` (launch id → model). An EMPTY answer is kept only for an ended
+ * launch — a running one has not announced yet, while an ended launch's log is final.
+ */
+function servedModelOf(dir: string, launchId: string, ended: boolean, kept: Map<string, string>): string {
+  const known = kept.get(launchId);
+  if (known !== undefined) return known;
+  const served = readServedModel(dir);
+  if (served !== '' || ended) kept.set(launchId, served);
+  return served;
+}
+
+/**
+ * Everything the lane reads out of one launch directory. Never throws: a torn read answers empty.
+ *
+ * `servedModelByLaunchId` is the lane's memory of what each child's log announced, owned by the
+ * composition root. A caller that reads only a launch's state or words (`running-launchers.service.ts`,
+ * `run-reads.service.ts`) omits it, and no log is opened for them.
+ */
+export function readLaunchFiles(
+  dir: string,
+  launchId: string,
+  servedModelByLaunchId?: Map<string, string>,
+): SoulLaunchFiles {
   const spec = readLaunchSpec(dir);
   const result = readJson(path.join(dir, 'result.json'));
   const briefPath = field(spec, 'brief_path');
@@ -229,5 +295,8 @@ export function readLaunchFiles(dir: string, launchId: string): SoulLaunchFiles 
     launcherAlive: owns(dir, 'launcher.pid', LAUNCHER_NEEDLE),
     childAlive: owns(dir, 'child.pid', CHILD_NEEDLE),
     briefLine: typeof briefPath === 'string' ? readBriefLine(briefPath) : '',
+    servedModel: servedModelByLaunchId === undefined
+      ? ''
+      : servedModelOf(dir, launchId, result !== null, servedModelByLaunchId),
   };
 }

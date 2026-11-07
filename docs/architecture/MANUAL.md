@@ -4052,24 +4052,33 @@ line instead, and `N tools` joins the figures on its right (`pinned-subagent-too
 soul's row (`SoulLaunchPinRow`) does the same with its clock (`pinned-soul-elapsed`). A finished row keeps
 its chip, which takes a line of its own on a phone whenever the description's floor leaves it no room.
 The model behind the mark is
-`ChatMessage.subagentModel`: the history record's `subagent.model`, else the newest model the
-agent's live turns named (`useChatMessages` folds it from the rows streamed with its
-`parentToolUseId`), so a DeepSeek agent wears the whale while it runs, not only after a reload.
+`ChatMessage.subagentModel`, the first of three records: the history's (`subagent.model`, the newest
+REAL model the agent's own transcript names — a `<synthetic>` placeholder that a refusal or API error
+leaves at its end never counts, `isPlaceholderModel`), the newest model its live turns named
+(`useChatMessages` folds it from the rows streamed with its `parentToolUseId`), and what its launch
+result says it resolved to (`resolvedModel`, which a background agent's `async_launched` result carries
+from its first second — `readLaunchResolvedModel`; the whole-history list keeps it in its compact
+receipt, `RECEIPT_KEYS` in `session-agents.service.ts`, so an agent launched before the loaded window is
+named too). So a DeepSeek agent wears the whale while it runs, not only after a reload.
 
 THE MODEL LABEL is that same `subagentModel`, named by the chat's own catalog (`useModelLabelResolver`,
 the resolver the message headers and the composer chip read: the family from the catalog, the
 generation from the id on the record), so a new generation shows its own number with no code change.
-No record yet, or an id the catalog does not carry, draws no label — never a guess. The pinned rows
+A DeepSeek id (`deepseek-v4-pro`, `deepseek-flash`) is named off the id itself — "DeepSeek V4 Pro",
+"DeepSeek Flash" — because no catalog here lists DeepSeek's models, and a new one names itself the
+day it first runs. No record yet, or an id nothing names, draws no label — never a guess. The pinned rows
 (`PinnedAgentRow`, `SoulLaunchPinRow`) draw the same label after the name; `usePinnedSubagentRows`
 resolves it through the resolver the chat publishes with its rows (`ChatSubagentSource.resolveModelLabel`),
-so the gutter widget names a model as the strip does. A soul's model is `SoulLaunchSnapshot.model`:
-`result.json`'s id once the receipt landed, else `spec.json`'s word (`modelOf`). A description recorded
+so the gutter widget names a model as the strip does. A soul's model is `SoulLaunchSnapshot.model`: the
+receipt's id once it ended, else the id the child announced on its own log's init event — there
+seconds after the launch, so a RUNNING build row names its model — else `spec.json`'s word, else
+nothing (`modelOf`, MAN-531). A description recorded
 with a trailing model tag (`[opus]`, `[sonnet via shim]`, `[inherit: session model]`) is drawn without it
 (`stripRecordedModelTag`), as is the description an agent's completion notice quotes
 (`stripRecordedModelTagFromNotice`, for a summary that opens `Agent "`), so nothing says the model twice.
 
 While open the row shows the task prompt, the timeline, and the agent's markdown result, and the raw
-model id only where the catalog names no label for it. A timeline
+model id only where nothing names a label for it. A timeline
 entry of `kind: 'tool'` goes through `ToolRenderer` with `mode="input"` — the same router
 the main thread uses — so a subagent's shell command looks identical to the parent's.
 Entries of kind `text` and `thinking` render as notes.
@@ -4080,7 +4089,7 @@ the "show N more" button raises the limit by four times that. Separately,
 included", because the backend truncates long timelines for transport; that line appears
 only once nothing is left to expand locally.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/SubagentPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedAgentRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedSubagents.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/SubagentPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedAgentRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedSubagents.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/subagentSummary.ts
 
 ## MAN-6221 — Subagents — Live nesting. A running subagent's rows arrive stamped with `parentToolUseId` — Claude's
 section: 06-tool-view/012 Subagents/001 Live nesting. A running subagent's rows arrive stamped with `parentToolUseId` — Claude's
@@ -4175,7 +4184,7 @@ leave the strip once the main thread had done twenty rows of work since. Every l
 (offset 0) therefore carries `agents`
 — the conversation's running and recently finished containers read from the full cached history
 (`collectSessionAgents` in `server/modules/providers/services/session-agents.service.ts`), compacted
-to what the strip reads: the launch description and type, the receipt's `isAsync`/`totalTokens`,
+to what the strip reads: the launch description and type, the receipt's `isAsync`, `totalTokens`, `agentId`, `status` and `resolvedModel` (`RECEIPT_KEYS`; the last is an agent's model, MAN-404),
 the finish time, `subagent` with its usage, and a timeline that keeps every entry's kind and tool
 name (the tool count) but content only on the newest tool call and prose (the latest-activity line).
 The store holds it per slot (`getAgents`); `useChatSessionState` hands the strip the loaded
