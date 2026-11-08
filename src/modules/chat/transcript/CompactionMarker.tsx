@@ -10,9 +10,10 @@ type CompactionMarkerProps = {
   /** The compaction this row stands for, as its `compaction` row carries it. */
   marker: ChatCompactionMarker;
   /**
-   * Turns a model id into the name the catalog shows for it, or null when the catalog has never heard
-   * of it: the pane's own function, the one every reply's caption is named by. A null falls back to the
-   * summarizer's word, never to the chat's provider, because that word is the operator's own choice.
+   * Turns a model id into the name a person calls it (the catalog's label, or a DeepSeek name read off
+   * the id), or null when nothing names it: the pane's own function, the one every reply's caption is
+   * named by. A null falls back to the summarizer's word, never to the chat's provider, because that
+   * word is the operator's own choice.
    */
   resolveModelLabel?: (modelId: string) => string | null;
 };

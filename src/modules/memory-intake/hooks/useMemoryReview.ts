@@ -35,12 +35,15 @@ async function readBody(response: Response): Promise<unknown> {
 }
 
 /**
- * The two review verbs and their lifecycle. Module-private, with ONE caller: MemoryIntakePanel.
+ * The two review verbs and their lifecycle. Used by MemoryIntakePanel and MemoryWidgetBody, and
+ * through this module's barrel by the heal module's rule cards (`useRuleReview`), which carry the
+ * same two presses.
  *
  * It lives here rather than in MemoryIntakeContext on purpose. The context is read by the
  * Inbox's waiting count and the chat gutter as well as the panel; a value that also carried
  * the in-flight id and the held refusals would change on every button press and re-render all
- * of them for a fact only the panel can see.
+ * of them for a fact only the surface that presses can see. Each caller holds its own copy of
+ * that state.
  *
  * A refused write is NOT a failure: the cap guard answers in plain English, the card stays
  * pending, and that text is what the person needs in order to trim the memory and try again.

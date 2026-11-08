@@ -1,6 +1,7 @@
 import { sessionsDb } from '@/modules/database/index.js';
 import { chatRunRegistry } from '@/modules/websocket/services/chat-run-registry.service.js';
 import type { ChatWebSocketDependencies } from '@/modules/websocket/services/chat-websocket.service.js';
+import type { ChatAttachmentDescriptor } from '@/shared/image-attachments.js';
 import type { LLMProvider, NormalizedMessage, ProviderPermissionDecision } from '@/shared/types.js';
 
 /**
@@ -80,8 +81,8 @@ export function answerChatPermission(
  * pending to fold into (the turn ended in the instant before the push, a compaction holds the chat, the provider keeps no
  * live process). The caller then starts a turn instead, so a steer never silently vanishes.
  *
- * Consumed by the companion module's `send_to_session` and the panel's Send steer (through its send verb): the one door a
- * message enters a running turn by.
+ * Consumed by the companion module's `send_to_session` and the panel's Send steer (through its send verb): the companion's
+ * door into a running turn. The composer's Steer enters by `steerChatTurn` below, which differs in when the message is shown.
  */
 export async function steerChatRun(
   sessionId: string,
@@ -102,4 +103,43 @@ export async function steerChatRun(
   // completed run drops a frame it cannot deliver), and the history read carries the persisted row either way.
   run.writer.send(echo);
   return 'folded';
+}
+
+/** What the composer's Steer sends into a running turn. Consumed by `steerChatTurn`, and built by `chat-websocket.service.ts` from a `chat.steer` frame. */
+export type ChatSteerRequest = {
+  content: string;
+  /** The UUID the message is tracked by: the provider keeps it as the message's own id and echoes the message under it when it reads it. */
+  messageId: string;
+  /** Verified descriptors (direct children of the upload store), split as a turn's are. */
+  images: ChatAttachmentDescriptor[];
+  files: ChatAttachmentDescriptor[];
+};
+
+/**
+ * Folds the composer's message into the turn a session is running now, and writes nothing to the run's stream: the provider
+ * echoes the message under `messageId` when it actually READS it (at its next tool call), and that echo is what every tab
+ * shows — where the turn took the message in, not where it was typed. (The companion's `steerChatRun` differs on purpose:
+ * it draws its own row at the push.)
+ *
+ * Answers `'not_running'` when the session has no run in flight or its runtime has no turn pending to fold into (the turn
+ * ended in the instant before the push, a compaction holds the chat, the provider keeps no live process); the composer then
+ * sends the message as the next turn, so a steer never silently vanishes.
+ *
+ * Consumed by `chat-websocket.service.ts` (`chat.steer`).
+ */
+export async function steerChatTurn(
+  sessionId: string,
+  steer: ChatSteerRequest,
+  dependencies: ChatWebSocketDependencies,
+): Promise<'folded' | 'not_running'> {
+  const run = chatRunRegistry.getRun(sessionId);
+  if (!run || run.status !== 'running') {
+    return 'not_running';
+  }
+
+  return dependencies.runtime.steer(run.provider, sessionId, steer.content, {
+    messageId: steer.messageId,
+    images: steer.images,
+    files: steer.files,
+  });
 }

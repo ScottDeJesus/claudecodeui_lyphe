@@ -44,10 +44,9 @@ function secondsStampInWords(seconds: number): string {
   return new Date(seconds * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-/** The two windows this app has its own name for; everything else keeps the provider's label, which is the only place a `weekly_scoped:*` plan is named. */
+/** The window this app has its own name for; everything else keeps the provider's label, which is the only place a `weekly_scoped:*` plan is named. */
 function windowLabel(usageWindow: ClaudeUsageWindow): string {
-  if (usageWindow.key === 'five_hour' || usageWindow.key === 'seven_day') return WINDOW_NAMES[usageWindow.key];
-  return usageWindow.label;
+  return usageWindow.key === 'seven_day' ? WINDOW_NAMES.seven_day : usageWindow.label;
 }
 
 /**
@@ -118,32 +117,29 @@ function UsageNote({ children }: { children: string }) {
 
 const NO_PACE = { tickAt: null, markAt: null, caption: null } as const;
 
-/** The pacer's two annotations for ONE usage window, and the caption the 5-hour meter carries. Everything but the 5-hour and weekly windows — and every meter on a reading with no pace — gets none, so today's block is what it was. */
+/** The pacer's two annotations for ONE usage window, and the caption the This week meter carries. Every other window — and every meter on a reading with no pace — gets none, so today's block is what it was. */
 function paceForWindow(key: string, pace: ClaudeUsagePace | null): { tickAt: number | null; markAt: number | null; caption: string | null } {
-  if (!pace) return NO_PACE;
-  if (key === 'five_hour') return { tickAt: pace.ceiling5, markAt: pace.projected5, caption: pace.words.trim() || null };
-  if (key === 'seven_day') return { tickAt: pace.ceiling7, markAt: pace.projected7, caption: null };
-  return NO_PACE;
+  if (!pace || key !== 'seven_day') return NO_PACE;
+  // `typeof`: the wire is untrusted, and a pace whose `words` is no string keeps its tick and mark and draws no
+  // caption — never a throw in render.
+  const words = typeof pace.words === 'string' ? pace.words.trim() : '';
+  return { tickAt: pace.ceiling7, markAt: pace.projected7, caption: words || null };
 }
 
 /**
  * The usage block of the account panel (D7).
  * Used by the accounts module's AccountPanelBody, which the popover and the Accounts widget both draw — the only screens that draw these
- * bars (the rail's UsageRings show the same two figures as rings);
+ * bars (the rail's UsageRings show the same figure as a ring);
  * it is a separate file because the account rows below it are a different subject and this
  * one is all about what a number does and does not mean.
  *
  * There is deliberately no flexible-spend bar: the provider reports no such window, and a third
  * bar reading "—" would invent a limit nobody set.
  *
- * THE PACER'S PICTURE SITS ON THE BARS, in three pieces and one sentence: a ceiling tick and a
- * projected-end mark on the 5-hour and weekly meters (`usage.pace`), and the pacer's own words as
- * one caption under the 5-hour meter. The figures arrive as percents from the usage route, which
- * converts them once, so the meter does no arithmetic. An absent pace draws none of it.
- *
- * AN ACCOUNT WITH NO 5-HOUR WINDOW ARRIVES WITHOUT ONE (`accountInUseUsage` drops it when the door's
- * `no_five` says so), so its meter and the caption under it are simply not drawn — this file asks
- * nothing about it and draws exactly the windows it is handed.
+ * THE PACER'S PICTURE SITS ON THE WEEKLY BAR, in three pieces and one sentence: a ceiling tick and a
+ * projected-end mark on the This week meter (`usage.pace`), and the pacer's own words as one caption under it.
+ * The figures arrive as percents from the usage route, which converts them once, so the meter does
+ * no arithmetic. An absent pace draws none of it.
  */
 export function UsageMeters({ usage }: { usage: ClaudeUsage | null }) {
   // The pacer's projection as the usage route attached it, in percent; an unreachable answer has no

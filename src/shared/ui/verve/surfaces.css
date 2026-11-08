@@ -52,13 +52,20 @@
  * a portalled Dialog above the modal, and closing that returns the reader to the modal untouched.
  * A modal that must cover the FAB portals itself the way Dialog does; this number does not drop.
  *
- * The fullscreen embed surfaces are a sixth neighbour, in-tree at `z-[45]` — a transcript embed card
- * (ShapeFrame) or a chat gutter widget (GutterWidgetFrame) given the whole viewport. They sit under
- * the dialog layer on purpose, so the FAB stays live over them, as it does over BrowserUsePanel's
- * fullscreen view. Accepted with one consequence: an application launched from the FAB draws on
- * AppSwitcherLayer (z-40), behind the opaque card, until the reader leaves fullscreen. The number
- * cannot be both above this FAB and below Dialog, and staying below Dialog is the one that matters:
- * above it, a dialog opened from fullscreen comes up invisibly and keeps the keyboard.
+ * The fullscreen embed surfaces are a sixth neighbour, in-tree and given the whole viewport, on two
+ * layers. A transcript embed card (ShapeFrame) stands at `z-[45]`, under the rail and this FAB, so
+ * the FAB stays live over it, as it does over BrowserUsePanel's fullscreen view. Accepted with one
+ * consequence: an application launched from the FAB draws on AppSwitcherLayer (z-40), behind the
+ * opaque card, until the reader leaves fullscreen.
+ *
+ * A chat gutter widget (GutterWidgetFrame) is the opposite, at `z-[61]`: over the rail and this FAB,
+ * so no part of it is covered — under 61 the rail and the docked FAB draw over its first 48px, its
+ * icon and its top-left corner included. 61 only has to beat 50 and 60 (the companion's phone sheet
+ * stands there for the same two); Kaylee's disc (`z-59`) and her open panel (`z-45`) share this
+ * shell and go under the card with them. Neither number is about Dialog: it portals to <body>,
+ * outside this shell's stacking context, so a dialog opened from either kind of fullscreen is in
+ * front of both (measured with a gutter card at z-index 9999: the command palette still drew over
+ * it).
  *
  * The seventh is a sibling more than a neighbour: the switcher's radial (AppSwitcherRadial.tsx), a
  * `fixed inset-0` layer in this same container at `z-[60]`, THIS FAB'S OWN LEVEL, and later in the tree so

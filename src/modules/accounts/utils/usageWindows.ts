@@ -1,10 +1,7 @@
 import type { ClaudeUsageWindow, Tone } from '@/shared/types';
 
-/** The two windows this app has its own name for, in the words the meters print and the usage rings' hover repeats. */
-export const WINDOW_NAMES = { five_hour: 'Current 5-hour window', seven_day: 'This week' } as const;
-
-/** The window keys the usage rings draw (`UsageRing`): each one's tone band is its own. */
-type RingWindowKey = keyof typeof WINDOW_NAMES;
+/** The window this app has its own name for, in the words the meters print and the usage ring's hover repeats. */
+export const WINDOW_NAMES = { seven_day: 'This week' } as const;
 
 /** Amber from here up (D7). One number, written once, so no two readings of a window disagree about what "heavy" is. */
 export const HEAVY_PERCENT = 80;
@@ -47,34 +44,22 @@ export function windowValue(percent: number | null): string {
   return percent === null ? '—' : `${percent}% used`;
 }
 
-/** Red from here, on both rings: the figures where the account is approaching its last usage. */
+/** Red from here, on the ring: the figure where the account is approaching its last usage. */
 const RING_DANGER_PERCENT = 90;
 
-/**
- * Yellow from here, per window. The week is the one the operator watches for how bad it is (75); the 5-hour window
- * refills within hours, so its yellow comes a little later (80). Written here and nowhere else.
- */
-const RING_WARN_PERCENT: Record<RingWindowKey, number> = { five_hour: 80, seven_day: 75 };
+/** Yellow from here. The week is the window the operator watches for how bad it is. Written here and nowhere else. */
+const RING_WARN_PERCENT = 75;
 
 /**
- * The Verve tone a usage ring's container carries as `data-tone`: green below the window's yellow, yellow from it, red
- * from `RING_DANGER_PERCENT`. A figure ON a boundary takes the higher colour (75 on the week is yellow, 90 is red).
+ * The Verve tone a usage ring's container carries as `data-tone`: green below `RING_WARN_PERCENT`, yellow from it, red
+ * from `RING_DANGER_PERCENT`. A figure ON a boundary takes the higher colour (75 is yellow, 90 is red).
  * Judged on the ROUNDED figure `windowPercent` gives, the one the tooltip prints, so a ring never says 75% beside green.
  * `null` is no reading and no tone — the ring draws its track alone. The bar meters keep `windowTone`'s own two states.
  */
-export function ringTone(windowKey: RingWindowKey, percent: number | null): Tone | null {
+export function ringTone(percent: number | null): Tone | null {
   if (percent === null) return null;
   if (percent >= RING_DANGER_PERCENT) return 'danger';
-  return percent >= RING_WARN_PERCENT[windowKey] ? 'warn' : 'positive';
-}
-
-/**
- * The rings an account draws, in their order: the 5-hour window, then the week — the week alone for an account with no
- * 5-hour window (`hasFiveHour`), which has no 5-hour ring and no empty place for one. Used by the accounts module's
- * UsageRings (the rail's rings, for the account in use) and ClaudeAccountRowViews (each account row's rings).
- */
-export function ringWindowKeys(withFiveHour: boolean): RingWindowKey[] {
-  return withFiveHour ? ['five_hour', 'seven_day'] : ['seven_day'];
+  return percent >= RING_WARN_PERCENT ? 'warn' : 'positive';
 }
 
 /**
@@ -121,7 +106,7 @@ const WEEK_MS = 7 * 86_400_000;
 
 /**
  * Whether a window's period is a week: `seven_day`, its model-scoped kin and `weekly_scoped:*`. Any other window
- * (`five_hour`, `limit:*`) starts at first use or at a period nobody here knows, so its next reset is not knowable.
+ * (`limit:*`) starts at first use or at a period nobody here knows, so its next reset is not knowable.
  */
 function repeatsWeekly(key: string): boolean {
   return key.startsWith('seven_day') || key.startsWith('weekly_scoped');
@@ -135,8 +120,8 @@ function repeatsWeekly(key: string): boolean {
  * drawing it (or "was N%") would put last week's number on this week. So the figure is 0, and the reset it
  * names is the next one:
  *   - a weekly window's reset steps forward in whole 7-day steps to the first still ahead of `nowMs`;
- *   - any other window states NO reset (`resetsAt: null`) — a 5-hour window starts at first use, so after its
- *     reset there is no running window and no reset to count to, until a reading brings one.
+ *   - any other window states NO reset (`resetsAt: null`) — it starts at first use or at a period nobody here
+ *     knows, so after its reset there is no running window and no reset to count to, until a reading brings one.
  * The figure the window held before does not matter, and neither does the vendor's `severity`: it flagged the
  * closed window, so a carried window carries neither (a flag would keep a 0% bar amber).
  *

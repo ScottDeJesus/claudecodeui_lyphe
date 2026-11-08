@@ -9,7 +9,7 @@ type MeterProps = {
   label: string;
   /**
    * The accessible name, when the visible label is not it. The inline register abbreviates —
-   * "5h" beside a 4px bar — and "5h" read aloud names no window anyone knows.
+   * "wk" beside a 4px bar — and "wk" read aloud names no window anyone knows.
    */
   ariaLabel?: string;
   /** The figure as the reader should see it: "42% used", "$4.20 of $25.00". */
@@ -20,7 +20,7 @@ type MeterProps = {
    * `inline` is the one-line form for tight chrome (a table cell, a checklist row, a card's strip): label, track and
    * figure on a single baseline, no `sub`.
    * `ring` is the glanceable form for a rail or a header: a thick ring, 28px across, whose arc fills clockwise from 12
-   * o'clock to `percent` and whose middle holds `label` (a word or two: "5h"). It draws no figure and no `sub` — the
+   * o'clock to `percent` and whose middle holds `label` (a word or two: "wk"). It draws no figure and no `sub` — the
    * caller's tooltip says the words — so `ariaLabel` is what names it, and `value` still feeds `aria-valuetext`.
    */
   variant?: 'stacked' | 'inline' | 'ring';
@@ -41,7 +41,7 @@ type MeterProps = {
 /**
  * A labelled horizontal bar with its figure and a line of context under it — or, as `variant="ring"`, a small ring.
  * Used by the accounts module (Phase 13) for the usage windows on the signed-in account (the bars in its panel, and the
- * two rings at the foot of the project-workspace rail), by the file manager for an upload in flight, by
+ * ring at the foot of the project-workspace rail), by the file manager for an upload in flight, by
  * TaskMaster's task card for its subtask progress, and by the companion module's face card in Settings for the frames made
  * so far of each look of hers being made; all of them need the same treatment of a figure nobody has yet.
  *

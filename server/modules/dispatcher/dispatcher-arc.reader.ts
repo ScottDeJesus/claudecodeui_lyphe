@@ -1,6 +1,6 @@
 import type { DispatcherArc, DispatcherArcQueue, DispatcherArcStatus } from '@/shared/types.js';
 
-import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, isWholeFrom, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, isWholeFrom, modelSince, names, need, oneOf, planningPausedSince, textSince } from './dispatcher-state.transport.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
 /**
@@ -95,6 +95,10 @@ export function arcOf(raw: unknown): DispatcherArc {
     // deck then draws no Override.
     pace_hold: textSince(field(arc, 'pace_hold'), `arc.pace_hold of ${name}`) ?? '',
     overridden: flagSince(field(arc, 'overridden'), `arc.overridden of ${name}`),
+    // The operator's planning pause on THIS epic's own planning — `{at, by}` while it stands, else `null`
+    // (`report_arcs.arc_dict.planning_paused`, `store_planning.arc_pause`). The dispatcher's own reading of the epic's
+    // log; each feature it holds carries `null` of its own. ABSENT reads `null`, as the plan's does.
+    planning_paused: planningPausedSince(field(arc, 'planning_paused'), `arc.planning_paused of ${name}`),
     created_at: need(field(arc, 'created_at'), isText, 'arc.created_at'),
     completed_at: need(field(arc, 'completed_at'), isTextOrNull, 'arc.completed_at'),
     // The arc's books are its plans' sums cut at the moment each feature joined the epic

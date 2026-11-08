@@ -680,19 +680,9 @@
         "edits_other": "{{count, number}} edits"
       }
     },
-    "plannerLanes": {
-      "label": "Planner lanes",
-      "description": "How many planners (designs, cuts, judgments) run at once — {{count}} at a time. Lowering it stops no planner already out; the lane takes no new one until it has room. Takes effect at once.",
-      "lane": "1 lane",
-      "lanes": "{{count}} lanes",
-      "lanesDown": "One lane fewer",
-      "lanesUp": "One lane more",
-      "lanesLabel": "Planners run at once",
-      "unreadable": "The dial could not be read from the server, so its position is unknown. It is retried whenever this page regains focus."
-    },
     "weeklyStop": {
       "label": "Weekly stop",
-      "description": "Plans stop starting when the week is on course to pass {{percent}}% of its limit. Set it at or under what the week has already used and no plan starts until you raise it or the week resets; the same line decides when this account counts as full for the automatic account switch. Plans already running are never stopped, and the 5-hour window keeps its own line. Takes effect at once.",
+      "description": "Plans stop starting when the week is on course to pass {{percent}}% of its limit. Set it at or under what the week has already used and no plan starts until you raise it or the week resets; the same line decides when this account counts as full for the automatic account switch. Plans already running are never stopped. Takes effect at once.",
       "selectLabel": "Weekly stop, in percent of the weekly limit",
       "unreadable": "The setting could not be read from the server, so its value is unknown. It is retried whenever this page regains focus."
     },

@@ -80,18 +80,47 @@ const lineOf = (digits: string | undefined): number | null => {
   return line >= 1 && line <= 9_999_999 ? line : null;
 };
 
+// One UTF-8 character's escape at a time: an ASCII byte, or a 2-, 3- or 4-byte sequence with its
+// continuation bytes. Matching per character is what lets a literal `%` or a broken sequence
+// elsewhere in the text leave the valid escapes around it decoding, where one
+// `decodeURIComponent` over the whole string throws and decodes none.
+const UTF8_ESCAPE_RE = /%(?:[0-7][\da-f]|[cd][\da-f]%[89ab][\da-f]|e[\da-f](?:%[89ab][\da-f]){2}|f[0-4](?:%[89ab][\da-f]){3})/gi;
+
+/**
+ * An href's path as the filesystem spells it. A Markdown link's href is a URL: the parser escapes
+ * spaces and non-ASCII letters before the link override sees them, so `My Notes.md` arrives as
+ * `My%20Notes.md`. Decoded ONCE — a second pass would rename a file really called `a%20b.md`
+ * (`a%2520b.md` decodes to exactly that). Escapes that are not a character (a stray `%`, a lone
+ * surrogate, an overlong sequence) stay as written, because the file may really be named that.
+ */
+function decodeHrefEscapes(value: string): string {
+  return value.replace(UTF8_ESCAPE_RE, (escape) => {
+    try {
+      return decodeURIComponent(escape);
+    } catch {
+      return escape;
+    }
+  });
+}
+
 /**
  * What a link's own href or text has always counted as a file here: a separator (`/` or `\`) or a
  * trailing `.ext`, once an optional `:line[:col]` is set aside. That is looser than the prose
  * grammar on purpose — the author DECLARED it a link, so a directory (`docs/plans/`), a dotfile
- * (`.gitignore`), an extensionless file (`src/Makefile`), an anchor (`src/parser.ts#L42`), a query
- * (`src/a.ts?raw`) and a percent-encoded name are all still handed to the in-app opener exactly as
- * they always were, instead of opening a new tab at a relative URL on the app's own origin. Not one
- * of those is text a bare-path scan should chip, which is why this reading is the link's alone.
+ * (`.gitignore`), an extensionless file (`src/Makefile`), an anchor (`src/parser.ts#L42`) and a
+ * query (`src/a.ts?raw`) are all still handed to the in-app opener exactly as they always were,
+ * instead of opening a new tab at a relative URL on the app's own origin. Not one of those is text
+ * a bare-path scan should chip, which is why this reading is the link's alone.
+ *
+ * `decodeEscapes` is for an href, whose path is a URL: the `:line` suffix is read off the text as
+ * written (an encoded colon inside a name, `notes.md%3A12`, is part of the name and not a line),
+ * then the path is decoded and judged as a file on its decoded spelling (`notes%2Emd` is
+ * `notes.md`).
  */
-function readDeclaredRef(trimmed: string): FileRef | null {
+function readDeclaredRef(trimmed: string, decodeEscapes: boolean): FileRef | null {
   const suffix = DECLARED_SUFFIX_RE.exec(trimmed);
-  const path = suffix ? trimmed.slice(0, suffix.index) : trimmed;
+  const writtenPath = suffix ? trimmed.slice(0, suffix.index) : trimmed;
+  const path = decodeEscapes ? decodeHrefEscapes(writtenPath) : writtenPath;
   if (!path || path === '#') return null;
   if (!/[\\/]/.test(path) && !/\.[a-z0-9]+$/i.test(path)) return null;
   const line = lineOf(suffix?.[1]);
@@ -106,16 +135,20 @@ function readDeclaredRef(trimmed: string): FileRef | null {
  * policy is `readDeclaredRef` above: the reading an author-declared href has always had here. It
  * accepts every reference the strict grammar does, with the same path and line, and more besides.
  * Two policies, one home. (One option alone relaxes only its own check on the strict grammar.)
+ *
+ * `decodeEscapes` (default FALSE) belongs to that declared reading alone and is read nowhere else:
+ * `MarkdownLink` sets it for a link's href, which is a URL, and not for its text, which is the
+ * author's literal words.
  */
 export function parseFileRef(
   text: string,
-  options: { requireSeparator?: boolean; requireKnownExtension?: boolean } = {}
+  options: { requireSeparator?: boolean; requireKnownExtension?: boolean; decodeEscapes?: boolean } = {}
 ): FileRef | null {
-  const { requireSeparator = true, requireKnownExtension = true } = options;
+  const { requireSeparator = true, requireKnownExtension = true, decodeEscapes = false } = options;
   const trimmed = text.trim();
   // A URL is a reference to the web, not to the workspace, and its path half parses perfectly.
   if (!trimmed || trimmed.includes('://')) return null;
-  if (!requireSeparator && !requireKnownExtension) return readDeclaredRef(trimmed);
+  if (!requireSeparator && !requireKnownExtension) return readDeclaredRef(trimmed, decodeEscapes);
   const match = FILE_REF_RE.exec(trimmed);
   if (!match) return null;
   const [, stemPath, extension, lineText, columnText] = match;

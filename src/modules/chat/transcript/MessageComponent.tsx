@@ -51,9 +51,9 @@ type MessageComponentProps = {
    */
   onForkFromMessage?: (message: ChatMessage) => void;
   /**
-   * Turns a model id into the name the catalog shows for it, or null when the
-   * catalog has never heard of it. A raw id is never a label, so a null here
-   * falls back to the provider's own name rather than printing the id.
+   * Turns a model id into the name a person calls it — the catalog's label, or a DeepSeek
+   * name read off the id — or null when nothing names it. A raw id is never a label, so a
+   * null here falls back to the provider's own name rather than printing the id.
    */
   resolveModelLabel?: (modelId: string) => string | null;
   /**

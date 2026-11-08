@@ -6,6 +6,7 @@ import { HealPanel } from '@/modules/heal';
 import { useInboxWaiting } from '@/modules/inbox/hooks/useInboxWaiting';
 import { MemoryIntakePanel } from '@/modules/memory-intake';
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
+import type { ProjectChoice } from '@/shared/types';
 import { Spinner, Tabs } from '@/shared/ui';
 
 /** The Inbox's three sections in the operator's order — the strip draws them so, and the entry rule walks them so — each with the key of its word. */
@@ -90,9 +91,11 @@ const spinner = <div className="grid h-full place-items-center"><Spinner /></div
  * `data-inbox-panel` carries the section on screen (`deciding` until the entry is), the handle a browser probe finds the
  * Inbox by.
  *
- * Used by project-workspace's WorkspaceMain as the `inbox` view's pane, through this module's barrel (lazily).
+ * Used by project-workspace's WorkspaceMain as the `inbox` view's pane, through this module's barrel (lazily). It is
+ * handed the projects the workspace holds and passes them to the Heal section, which names a rule's project with them:
+ * a module that cannot import the workspace (the workspace mounts it) is given what it needs, as Cerberus is.
  */
-export default function InboxPanel() {
+export default function InboxPanel({ projectChoices }: { projectChoices: readonly ProjectChoice[] }) {
   const { t } = useTranslation();
   const { isMobile } = useDeviceSettings({ trackPWA: false });
   const counts = useInboxWaiting();
@@ -143,7 +146,7 @@ export default function InboxPanel() {
         <Suspense fallback={spinner}>
           {section === null && spinner}
           {section === 'memory' && <MemoryIntakePanel />}
-          {section === 'heal' && <HealPanel />}
+          {section === 'heal' && <HealPanel projectChoices={projectChoices} />}
           {section === 'roadmap' && <WaitingAsks />}
         </Suspense>
       </div>

@@ -42,6 +42,9 @@ import { effectiveModelWord } from '@/shared/utils';
  * `Accept when cut` (`AcceptWhenCut`, `arc.armable` / `arc.armed`) heads the row while any designed member can
  * still be Accepted ahead of its cut, or stands armed with its Cancel.
  *
+ * THE EPIC'S PLANNING PRESS IS NOT HERE: Pause planning and Resume planning live on the epic's line of the Planning card (`PlanningCard`),
+ * the one place they are pressed; the deck's head still says `Planning paused` (`DispatchArcDeck`). Pause and Resume below are the walk's.
+ *
  * Handles: `data-dispatch-arc-stop`, `data-dispatch-arc-resume`, the fold's (`OverrideFold`) and the model
  * dropdown's (`data-dispatch-arc-model`). A probe
  * scopes them under the deck's own `[data-dispatch-arc][data-arc-name]` root, so it reads and presses ONE arc

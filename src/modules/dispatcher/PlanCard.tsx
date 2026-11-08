@@ -14,6 +14,8 @@ import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanControls } from '@/modules/dispatcher/PlanControls';
 import { PlanClock, PlanFace, PlanStatusBadge } from '@/modules/dispatcher/PlanFace';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
+import { PlanningPausedLine } from '@/modules/dispatcher/PlanningPause';
+import { planningPausedVia } from '@/modules/dispatcher/planningPress';
 import { SpendPills } from '@/modules/dispatcher/SpendPills';
 import { WorkingPill } from '@/modules/dispatcher/WorkingPill';
 import { planAgentOut } from '@/modules/dispatcher/workingTime';
@@ -93,10 +95,17 @@ function queueClause(hold: string): string {
  * and no later clause: the card says the first clause the gate asks, as the gate does.
  *
  * `HELD BY PACE` IS THE PACER'S, IN THE SAME ROW AND THE SAME WORDS' RULE (`plan.pace_hold`): the clause the
- * pacer's gate returned — `no room on the 5-hour window — …`, or `<plan> <phase> goes first` — with the
+ * pacer's gate returned — `no room on the weekly window — …`, or `<plan> <phase> goes first` — with the
  * `pace:` lead stripped, because the card says "Held by pace" itself. The two holds never describe one ask (a phase the
  * queue holds is not in the pacer's demand), so a plan the queue holds draws a pace clause only for a planner outing aimed
  * at it, beside the queue's line; a frame without the key (an older dispatcher) draws no line.
+ *
+ * PLANNING PAUSED IS SAID IN THE HEAD (`PlanningPausedLine`, `data-plan-planning-paused`): one line of the lead row, after the
+ * planner badge — `Planning paused` for the feature's own pause (`plan.planning_paused`), `Planning paused with its epic` while only
+ * its epic's stands (`planningPausedVia`, the epic read off the lane's arcs as `PlanControls` reads it), and neither on a complete
+ * feature, which has no planning left to hold — in foreground ink and no tone:
+ * the pause is the operator's own brake, and the status badge stays the dispatcher's own word, since the pause writes no walk flag.
+ * The press, and its Resume where the pause stands, are the feature's line on the Planning card (`PlanningCard`), never the card's.
  *
  * A STALLED PLAN SAYS WHY (`plan.stalled`, the dispatcher's own cause word — `report_stall`): the head's
  * second row carries one line, `data-plan-stalled`, naming whether the dispatcher is down or the run
@@ -141,7 +150,9 @@ export function PlanCard({
   // Whether `Delete feature…` has been pressed and its question is up. Local, since it is this card's
   // question, and the dialog is mounted only while it is asked.
   const [deleting, setDeleting] = useState(false);
-  const { planners } = useDispatcherPlans();
+  const { planners, arcs } = useDispatcherPlans();
+  // Whose planning pause is on this card, or none: its own, else its epic's (a feature its epic holds carries `null` of its own).
+  const pausedVia = planningPausedVia(plan, arcs.find((arc) => arc.name === plan.arc) ?? null);
   // The pacer's clause for this plan (`plan.pace_hold`, `pace_report.plan_hold`: the first of its own asks the pacer holds — any
   // ready phase, else a queued planner outing aimed at the plan; one aimed at its epic is the arc deck's): the gate sends it in the
   // same row as `queue_hold`, beside it when both are set. Absent on a dispatcher older than the key reads.
@@ -177,9 +188,10 @@ export function PlanCard({
                 {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
                     what the PLAN is (`designing`), the badge who is doing something about it; the wait is
                     a fact about THIS plan ("before this, that"). Neither draws anything when absent. */}
-                {(plan.planner || waitsOn.length > 0 || plan.queue_hold || paceHold || plan.overridden || plan.stalled) && (
+                {(plan.planner || waitsOn.length > 0 || plan.queue_hold || paceHold || plan.overridden || plan.stalled || pausedVia !== null) && (
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     {plan.planner && <PlannerBadge planner={plan.planner} />}
+                    {pausedVia !== null && <PlanningPausedLine via={pausedVia} />}
                     {waitsOn.length > 0 && (
                       <span data-plan-waits-on className="min-w-0 break-words font-mono text-xs text-muted-foreground">
                         {t('dispatcher.waitsOn', { names: waitsOn.join(', ') })}

@@ -269,8 +269,8 @@ const LEADING_BOM = /^\uFEFF/;
  * than a read that never returns. The caller decides what `null` means (a default) and what grammar the
  * word must be in; this never throws.
  *
- * Used by `planner-lanes.ts` (the dispatcher's planner-lane dial) and `weekly-stop.ts` (the pacer's
- * weekly stop), whose readers agree with their Python counterparts clause for clause.
+ * Used by `weekly-stop.ts` (the pacer's weekly stop), whose reader agrees with its Python counterpart
+ * clause for clause.
  */
 export async function readFlagWord(filePath: string, maxBytes: number): Promise<string | null> {
   try {
@@ -809,6 +809,20 @@ export function buildDefaultProviderCurrentActiveModel(
   return {
     model: models.DEFAULT,
   };
+}
+
+/**
+ * Whether a recorded model is a placeholder rather than a model id.
+ *
+ * Claude Code stamps locally-synthesized rows (API-error placeholders, a rate-limit refusal and the
+ * like) with `model: "<synthetic>"`. An angle-bracketed value is never a real model id, so a reader
+ * that takes "the model" off a record skips it: used by the Claude model reader
+ * (`claude-models.provider.ts`, the session's model) and the Claude subagent transcript reader
+ * (`claude-sessions.provider.ts`, an agent's model), so a refusal that ends an agent's transcript
+ * does not rename the agent.
+ */
+export function isPlaceholderModel(model: string): boolean {
+  return model.startsWith('<') && model.endsWith('>');
 }
 
 // ---------------------------

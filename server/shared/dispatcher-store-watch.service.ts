@@ -26,8 +26,8 @@ import { watchDirectory, type DirectoryWatch } from './directory-watch.service.j
  *                                                                 rewrites with no store write at all.
  *                                                                 Only the chains of phases now running are
  *                                                                 watched (`followChains`)
- *   status only        `epics.flag`, `planners.flag`,          the switches the document reports
- *                      `park_at_peak.flag`, `weekly_stop.flag`,
+ *   status only        `epics.flag`, `park_at_peak.flag`,      the switches the document reports
+ *                      `weekly_stop.flag`,
  *                      `deepseek_features.flag`
  *   status only        `claude_account/{accounts,chosen}.json` which payer a plan runs under
  *   status only        `pacer/readings.sqlite`(`-wal`),        the pacer's picture. SLOW (`PACER_SETTLE_MS`):
@@ -83,7 +83,7 @@ const SETTLE_MS = 300;
 
 /**
  * The pacer's readings are appended by every agent step on the host, so while any agent works they
- * arrive about once a second and each moves a percentage on a five-hour window. A status read costs
+ * arrive about once a second and each moves a percentage on the weekly window. A status read costs
  * seconds of CPU; following each reading would put the lane back on a continuous clock whenever an
  * agent is out. Ten seconds is the pace at which that figure can change anything a reader sees.
  */
@@ -95,7 +95,6 @@ const STATUS_LANE: readonly StoreWatchLane[] = ['status'];
 const STORE_FILES: ReadonlySet<string> = new Set(['dispatcher.db', 'dispatcher.db-wal', 'daemon.lock']);
 const FLAG_FILES: ReadonlySet<string> = new Set([
   'epics.flag',
-  'planners.flag',
   'park_at_peak.flag',
   'weekly_stop.flag',
   'deepseek_features.flag',

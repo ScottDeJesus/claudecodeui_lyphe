@@ -75,8 +75,8 @@ export async function writeFlagFile(filePath: string, enabled: boolean): Promise
 
 /**
  * Writes one flag file's text, through a scratch file and a rename — the ONE writer of every
- * host-wide flag this server owns: the on/off pair (`writeFlagFile`) and the planner lane's integer
- * (`planner-lanes.ts`) alike, so a fix to the dance below reaches them all.
+ * host-wide flag this server owns: the on/off pair (`writeFlagFile`) and the weekly stop's integer
+ * (`weekly-stop.ts`) alike, so a fix to the dance below reaches them all.
  *
  * Another process reads these files while this one writes them, and a plain `writeFile` is a
  * truncate followed by a write — a reader landing between the two sees an empty file. That reads

@@ -5,6 +5,14 @@ import type { PendingPermissionRequest } from '@/shared/types';
 import { Banner, Button } from '@/shared/ui';
 import { buildClaudeToolPermissionEntry, formatToolInputForDisplay } from '@/modules/chat/utils/chatPermissions';
 import { getClaudeSettings } from '@/shared/userSettings';
+import { McpElicitationPanel } from '@/modules/chat/tools/InteractiveRenderers/McpElicitationPanel';
+
+/**
+ * The tool name the backend gives an MCP server's request for input ("elicitation") when it forwards it
+ * as a permission request. It is no tool the model can call: it routes the request to the elicitation
+ * panel below instead of the allow / decline banner.
+ */
+const MCP_ELICITATION_TOOL_NAME = 'McpElicitation';
 
 type PermissionRequestsBannerProps = {
   pendingPermissionRequests: PendingPermissionRequest[];
@@ -18,6 +26,8 @@ type PermissionRequestsBannerProps = {
 /**
  * Rendered by chat's ChatComposer above the input to surface pending tool
  * permission requests and their allow / allow-and-remember / decline actions.
+ * An MCP server's request for input is drawn as its own form (McpElicitationPanel)
+ * in the same place, because it asks for typed content rather than a yes.
  *
  * All three actions are the contract, not a menu of niceties: the run is
  * blocked on `handlePermissionDecision` and every one of them answers it.
@@ -44,6 +54,9 @@ export default function PermissionRequestsBanner({
   return (
     <div className="mx-auto mb-3 max-w-[54.25rem] space-y-2">
       {filteredRequests.map((request) => {
+        if (request.toolName === MCP_ELICITATION_TOOL_NAME) {
+          return <McpElicitationPanel key={request.requestId} request={request} onDecision={handlePermissionDecision} />;
+        }
 
         const rawInput = formatToolInputForDisplay(request.input);
         const permissionEntry = buildClaudeToolPermissionEntry(request.toolName, rawInput);

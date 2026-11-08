@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { sessionsDb } from '@/modules/database/index.js';
 import type { IProviderModels } from '@/shared/interfaces.js';
 import type { ProviderCurrentActiveModel, ProviderModelsDefinition } from '@/shared/types.js';
-import { buildDefaultProviderCurrentActiveModel } from '@/shared/utils.js';
+import { buildDefaultProviderCurrentActiveModel, isPlaceholderModel } from '@/shared/utils.js';
 
 import { readClaudeModelsDefinition } from './claude-model-catalog.js';
 
@@ -25,13 +25,6 @@ const ANSI_PATTERN = new RegExp(
   + '|(?:[\\dA-PR-TZcf-ntqry=><~]))',
   'g',
 );
-
-/**
- * Claude Code stamps locally-synthesized rows (API-error placeholders and the
- * like) with `model: "<synthetic>"`. Angle-bracketed values are placeholders,
- * never real model ids, and must not be surfaced as the session's model.
- */
-const isPlaceholderModel = (model: string): boolean => model.startsWith('<') && model.endsWith('>');
 
 const extractClaudeEventModel = (event: ClaudeInitEvent, sessionId: string): string | null => {
   const eventSessionId = event.sessionId ?? event.session_id;

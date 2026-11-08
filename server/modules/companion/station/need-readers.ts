@@ -1,6 +1,6 @@
 import type { DispatcherPicture } from '@/modules/dispatcher/index.js';
 import { listOpenFollowupGroups } from '@/modules/followups/index.js';
-import { buildClaudeToolPermissionEntry } from '@/modules/providers/index.js';
+import { MCP_ELICITATION_TOOL_NAME, buildClaudeToolPermissionEntry } from '@/modules/providers/index.js';
 import { isRecord } from '@/shared/document-fields.js';
 import type { StationAskKind, StationNeed } from '@/shared/station-types.js';
 import type { DispatcherAsk, DispatcherPlan } from '@/shared/types.js';
@@ -10,7 +10,7 @@ import { buildCardBook, type Card, type CardBook } from '../eyes/card-lines.js';
 import { checkName } from '../eyes/cerberus-lines.js';
 import { clipLine } from '../eyes/line-words.js';
 import type { CompanionHouse } from '../house.js';
-import { oldestPendingAsk, questionsOf, type OldestAsk } from '../tools/ask-decision.js';
+import { elicitationOf, oldestPendingAsk, questionsOf, type OldestAsk } from '../tools/ask-decision.js';
 import { chatNameOf, chatRows, pendingAsksOf, type ChatRow } from '../tools/house-reads.js';
 
 /**
@@ -114,7 +114,12 @@ export async function planNeeds(house: CompanionHouse): Promise<StationNeed[]> {
 
 //----------------- CHATS' ASKS ------------
 
-/** What kind of ask a tool is: `answerFor` gives `AskUserQuestion` and the plan tool (under both names) a shape of their own and every other tool is a permission. */
+/**
+ * What kind of ask a tool is: `answerFor` gives `AskUserQuestion` and the plan tool (under both names) a shape of their own and every
+ * other tool is a permission. An MCP server's request for input (`McpElicitation`) has a shape of its own in `answerFor` too, but the
+ * stage has no kind for a form: it stays a `permission` here and is drawn CUT with no rule (`isCut`, `chatAskNeed`), so the stage
+ * offers no Allow and no Always for it — only Deny, which declines it, and "Open the chat", where the form is.
+ */
 function askKindOf(toolName: string): StationAskKind {
   if (toolName === 'AskUserQuestion') return 'question';
   return toolName === 'ExitPlanMode' || toolName === 'exit_plan_mode' ? 'plan' : 'permission';
@@ -140,11 +145,17 @@ const BODY_HIDDEN_TOOLS: ReadonlySet<string> = new Set(['Edit', 'MultiEdit', 'Wr
  */
 function isCut(kind: StationAskKind, toolName: string, what: string): boolean {
   if (kind === 'question') return false;
+  // A form is filled in the chat: the stage shows what is asked, never the form, so no yes is offered for it here.
+  if (toolName === MCP_ELICITATION_TOOL_NAME) return true;
   return CUT_MARKER.test(what) || (kind === 'permission' && BODY_HIDDEN_TOOLS.has(toolName));
 }
 
 /** What the ask would do, whole: a permission is `describeToolInput` (a command whole to 600 characters), a question its first question's text, a plan its text, each cut with a count (`wholeLine`). */
 function whatOf(kind: StationAskKind, toolName: string, input: unknown): string {
+  if (toolName === MCP_ELICITATION_TOOL_NAME) {
+    const { server, message } = elicitationOf(input);
+    return `${server} asks for his input: ${wholeLine(message)}`;
+  }
   if (kind === 'permission') return describeToolInput(toolName, input);
   if (kind === 'question') {
     const questions = questionsOf(input);
@@ -170,7 +181,8 @@ function chatAskNeed(sessionId: string, chat: string, { ask, more }: OldestAsk):
     tool: ask.toolName,
     what,
     cut,
-    rule: kind === 'permission' ? buildClaudeToolPermissionEntry(ask.toolName, ask.input) : null,
+    // A form names no tool, so there is no rule for an Always to keep.
+    rule: kind === 'permission' && ask.toolName !== MCP_ELICITATION_TOOL_NAME ? buildClaudeToolPermissionEntry(ask.toolName, ask.input) : null,
     options: questions.length === 1 ? questions[0].options.map(oneLine).filter(Boolean) : [],
     more,
   };

@@ -81,6 +81,7 @@ import { applyToolsetLaunch, askToolsetLaunch, createToolsetSync, toolsetDigest 
 import { assertProjectFolderExists, ProjectFolderMissingError } from './claude-project-folder.js';
 import { confirmResumableProviderSession } from './claude-resumable-session.js';
 import { describeErrorResult } from './claude-error-result.js';
+import { MCP_ELICITATION_TOOL_NAME, toElicitationResult } from './claude-elicitation.js';
 import { createSignalState, detectRuntimeSignals } from './claude-runtime-signals.js';
 import { installedCliVersionForLaunch } from './installed-cli-version.js';
 import { readMcpSignIn } from './mcp-sign-in.js';
@@ -118,6 +119,7 @@ const BG_WAIT_CEILING_MS = 30 * 60 * 1000;
 const RECONCILIATION_WINDOW_MS = 10 * 1000;
 
 const TOOLS_REQUIRING_INTERACTION = new Set(['AskUserQuestion', 'ExitPlanMode']);
+
 // The permission modes in which the SDK answers for the user and never calls `canUseTool`:
 // there, the PreToolUse hook is the only door an interactive tool can reach a human through.
 const HOOK_MODES = new Set(['bypassPermissions', 'auto', 'dontAsk']);
@@ -1029,6 +1031,9 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
   // The steers that missed their turn (a turn with no tool call left never takes one): each runs as the CLI's next turn, whose
   // result lists its uuid. That result is the steer's own reply, not background work finishing.
   const missedSteers = new Set();
+  // The composer's steers, by uuid: the CLI echoes each when it reads it, and only these echoes are shown. The companion's
+  // steer draws its own row at the push, so it is not in here. Emptied as results account for them.
+  const shownSteers = new Set();
   // The appends this process pushed (a compaction's seed): their `result` is no turn's end unless the
   // append was alone in its push (see the loop).
   const appends = createAppendLedger();
@@ -1327,19 +1332,25 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
     get hasPendingSteer() {
       return steeredUuids.size > 0;
     },
-    /** Pushes one uuid-stamped user message into a turn in flight, opening no turn; false when no turn is pending or the process is closing. */
-    steer(content) {
+    /**
+     * Pushes one uuid-stamped user message into a turn in flight, opening no turn; false when no turn is pending or the process is closing.
+     *
+     * `messageId` (a uuid the composer made) becomes the message's uuid, which the CLI keeps as the transcript row's own and echoes when
+     * it reads the message: that echo is shown on the run, and is how the composer learns its message was taken. `images` and `files`
+     * are the verified attachment descriptors, built into the message as a turn's are. Without a `messageId` (the companion's steer)
+     * the message gets a uuid of its own and nothing is echoed.
+     */
+    async steer(content, { messageId, images, files } = {}) {
       // A Stop marks the instance before it interrupts: a steer accepted after that would be answered as a turn of its own.
-      if (closing || !queue || pendingTurn === null || abortedInstances.has(queryInstance)) return false;
-      const uuid = crypto.randomUUID();
-      queue.push({
-        type: 'user',
-        message: { role: 'user', content },
-        parent_tool_use_id: null,
-        uuid,
-        timestamp: new Date().toISOString()
-      });
-      steeredUuids.add(uuid);
+      const cannotTake = () => closing || !queue || pendingTurn === null || abortedInstances.has(queryInstance);
+      if (cannotTake()) return false;
+      const [message] = await buildPromptMessages(content, images, files, turnOptions.cwd, undefined, messageId);
+      // Reading an attachment takes a moment: the turn may have ended, or a Stop landed, meanwhile.
+      if (cannotTake() || !message) return false;
+      // `next`: the CLI reads it at the next tool-call boundary, without stopping the turn.
+      queue.push({ ...message, priority: 'next' });
+      steeredUuids.add(message.uuid);
+      if (messageId) shownSteers.add(message.uuid);
       idle?.touch(resolveIdleCloseMs(turnOptions.idleCloseMs));
       console.log(`[Claude SDK] Steer folded into the running turn of session ${sessionKey()}`);
       return true;
@@ -1384,6 +1395,10 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
       }
       const resolved = await resolveSdkOptions(options, context, providerSessionId);
       sdkOptions = resolved.sdkOptions;
+      // Makes the CLI echo each message it reads from stdin, at the moment it reads it. For a message the
+      // composer steered into a turn that echo is the only word on when — and whether — Claude took it in;
+      // the loop below drops every other echo, so nothing else on screen changes.
+      sdkOptions.extraArgs = { ...(sdkOptions.extraArgs || {}), 'replay-user-messages': null };
       // The account in use and the environment its sign-in token rides, read ONCE here — the spawn —
       // and never for a re-adoption, whose CLI already runs with the environment it was started on.
       // With no token the environment is empty and this launch rides the live login exactly as before.
@@ -1596,6 +1611,67 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
         });
       };
 
+      // An MCP server asking the person for input mid-call ("elicitation"). The CLI declares form and URL
+      // elicitation support to every server, and without this callback the SDK answers each request with `decline`
+      // itself — the server is told a person refused when nobody was shown anything. The request takes the
+      // permission round trip (the frames `promptForToolDecision` writes), so it reaches every attached tab,
+      // survives a refresh and raises a notification. There is no timeout here: the server keeps its own, and an
+      // abort arrives through the signal. A turn nobody attends (the agent API, commit-message generation) is
+      // answered with the SDK's own default, an immediate decline, rather than a run waiting on an answer that
+      // cannot come; it is read from the turn now pending, because the process outlives any one turn.
+      sdkOptions.onElicitation = async (request, elicitationOptions) => {
+        if (turnOptions.unattended === true) {
+          return { action: 'decline' };
+        }
+        const requestId = createRequestId();
+        const input = {
+          serverName: request.serverName,
+          message: request.message,
+          mode: request.mode ?? 'form',
+          requestedSchema: request.requestedSchema,
+          url: request.url,
+          elicitationId: request.elicitationId,
+          title: request.title,
+          displayName: request.displayName,
+          description: request.description
+        };
+        // The ask's own name: a successor that re-adopts this process and is handed the same parked request
+        // raises it again on a fresh request id, and the tab's bell and the push both key on the ask.
+        const promptKey = promptKeyFor(null, sessionId || capturedSessionId, MCP_ELICITATION_TOOL_NAME, input);
+        const serverLabel = request.displayName || request.serverName;
+        ws.send(createNormalizedMessage({ kind: 'permission_request', requestId, promptKey, toolName: MCP_ELICITATION_TOOL_NAME, input, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
+        emitNotification(createNotificationEvent({
+          provider: 'claude',
+          sessionId: sessionId || capturedSessionId || null,
+          kind: 'action_required',
+          code: 'agent.notification',
+          meta: { message: `${serverLabel} asks: ${request.message}`, sessionName: sessionSummary },
+          severity: 'warning',
+          requiresUserAction: true,
+          dedupeKey: `claude:elicitation:${sessionId || capturedSessionId || 'none'}:${promptKey}`
+        }));
+
+        const decision = await waitForToolApproval(requestId, {
+          timeoutMs: 0,
+          signal: elicitationOptions?.signal,
+          metadata: {
+            _sessionId: sessionId || capturedSessionId || null,
+            _toolName: MCP_ELICITATION_TOOL_NAME,
+            _input: input,
+            _promptKey: promptKey,
+            _receivedAt: new Date()
+          },
+          onCancel: (reason) => {
+            ws.send(createNormalizedMessage({ kind: 'permission_cancelled', requestId, reason, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
+          }
+        });
+        if (decision && !decision.cancelled) {
+          // Same as `promptForToolDecision`: retract the answered prompt on every attached tab.
+          ws.send(createNormalizedMessage({ kind: 'permission_resolved', requestId, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
+        }
+        return toElicitationResult(decision, request.mode);
+      };
+
       // A fresh process with tool sets in play is not handed its prompt until they are synced, so its
       // first turn already has the tools; the prompt is released when the sync settles (below).
       const holdsPromptForToolsets = !reattach && Object.keys(resolved.toolsets.servers ?? {}).length > 0;
@@ -1669,6 +1745,21 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
           }
         } else {
           // session_id already captured
+        }
+
+        // The CLI's echo of a message it read from stdin (`replay-user-messages`, set at launch). A composer steer is
+        // shown now, where Claude read it, on every tab watching the run; every other echo is a message this page
+        // already drew or draws another way (the turn's own prompt, a compaction's seed, the companion's steer).
+        if (message.type === 'user' && message.isReplay === true) {
+          if (shownSteers.delete(message.uuid)) {
+            for (const steered of context.normalizeMessage(transformMessage(message), capturedSessionId || sessionId || null)) {
+              // A message read mid-turn is stored as an attachment of the turn, not as a user row of its own, so it is no
+              // anchor for editing.
+              delete steered.transcriptAnchorId;
+              ws.send(steered);
+            }
+          }
+          continue;
         }
 
         if (message.type === 'system' && message.subtype === 'init') {
@@ -1869,7 +1960,10 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
           if (steeredUuids.size > 0 && Array.isArray(message.user_message_uuids)) {
             const listed = message.user_message_uuids;
             const unlisted = [...steeredUuids].filter((uuid) => !listed.includes(uuid));
-            for (const uuid of listed) steeredUuids.delete(uuid);
+            for (const uuid of listed) {
+              steeredUuids.delete(uuid);
+              shownSteers.delete(uuid);
+            }
             if (answersTurn && unlisted.length > 0) {
               console.log(`[Claude SDK] A steer for session ${sessionKey() || 'NEW'} missed its turn and runs as a turn of its own`);
               for (const uuid of unlisted) {
@@ -1880,6 +1974,7 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
           }
           // The result of a missed steer's own turn: told apart here so it is not taken for a background task finishing.
           const ownSteers = Array.isArray(message.user_message_uuids) ? message.user_message_uuids.filter((uuid) => missedSteers.delete(uuid)) : [];
+          for (const uuid of ownSteers) shownSteers.delete(uuid);
           if (ownSteers.length > 0) console.log(`[Claude SDK] The steer for session ${sessionKey() || 'NEW'} that missed its turn has finished its own`);
           // A turn the CLI ended in error says what failed, on the page, ahead of the run's one
           // `complete` (an `error` row is informational, never terminal). This result is the only thing
@@ -2261,11 +2356,12 @@ function listPendingSessionIds() {
 /**
  * Folds a message into the turn the session's process is running now, as the SDK folds a queued message into a turn
  * in flight. 'not_running' when the session has no process, the process is closing, or no turn is pending to fold into.
- * Read by `providerRuntimeService.steer`, which the companion's send reaches through the chat gateway.
+ * Read by `providerRuntimeService.steer`, which the chat gateway reaches for the companion's send and the composer's Steer.
+ * `options`: the composer's `messageId`, `images` and `files` (see the process handle's `steer`); the companion passes none.
  */
-function steerClaudeSession(sessionId, content) {
+async function steerClaudeSession(sessionId, content, options = {}) {
   const chatProcess = getSession(sessionId)?.process;
-  return chatProcess && !chatProcess.closing && chatProcess.steer(content) ? 'folded' : 'not_running';
+  return chatProcess && !chatProcess.closing && (await chatProcess.steer(content, options)) ? 'folded' : 'not_running';
 }
 
 export const claudeRuntime = {

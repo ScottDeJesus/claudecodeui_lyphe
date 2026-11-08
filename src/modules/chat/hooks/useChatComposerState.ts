@@ -17,7 +17,7 @@ import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPr
 import { useHostMove, useHostWindow } from '@/shared/context/HostWindowContext';
 import { applyPlainMode, usePlainModePreference } from '@/shared/hooks/usePlainModePreference';
 import { useAttachmentIntake } from '@/shared/hooks/useAttachmentIntake';
-import type { CommandModalPayload, CostCommandData, HelpCommandData, MarkSessionProcessing, ModelCommandData, QueuedDraft, SessionActivityMap, StatusCommandData,QueuedSendOptions,ChatAttachment,ChatMessage,PendingPermissionRequest,PermissionMode,SessionEstablishedContext,Project,ProjectSession,LLMProvider,SlashCommand,SentUserTurn } from '@/shared/types';
+import type { CommandModalPayload, CostCommandData, HelpCommandData, MarkSessionProcessing, ModelCommandData, PendingSteer, QueuedDraft, SessionActivityMap, StatusCommandData,QueuedSendOptions,ChatAttachment,ChatMessage,PendingPermissionRequest,PermissionMode,SessionEstablishedContext,Project,ProjectSession,LLMProvider,SlashCommand,SentUserTurn } from '@/shared/types';
 import { grantClaudeToolPermission } from '@/modules/chat/utils/chatPermissions';
 import {
   appendQueuedMessage,
@@ -36,6 +36,7 @@ import { useInputHistory } from '@/modules/chat/hooks/useInputHistory';
 import { useSlashCommands } from '@/modules/chat/hooks/useSlashCommands';
 import { useRestartOnInstalledCli } from '@/modules/chat/hooks/useRestartOnInstalledCli';
 import { useScopedAttachments } from '@/modules/chat/hooks/useScopedAttachments';
+import { useSteeredMessages } from '@/modules/chat/hooks/useSteeredMessages';
 import { isEngineHandledCommand, isImageAttachment } from '@/shared/utils';
 
 type UseChatComposerStateArgs = {
@@ -58,6 +59,8 @@ type UseChatComposerStateArgs = {
   tokenBudget: Record<string, unknown> | null;
   sendMessage: (message: unknown) => void;
   sendByCtrlEnter?: boolean;
+  /** From the provider capabilities: whether a message can be sent into a running turn (`chat.steer`). Gates the send menu's Steer choice. */
+  supportsSteering?: boolean;
   onSessionProcessing?: MarkSessionProcessing;
   /**
    * Invoked with the freshly allocated session id when the user sends the
@@ -100,6 +103,12 @@ type SubmitOptions = {
    * run that command instead of being sent.
    */
   skipCommandInterception?: boolean;
+  /**
+   * The send menu's Steer row: while a turn runs, send the message into it (read at the agent's next tool
+   * call) instead of queueing it for after. Falls through to the ordinary send when no turn is running any
+   * more.
+   */
+  steerIntoTurn?: boolean;
 };
 
 const createFakeSubmitEvent = () => {
@@ -170,6 +179,7 @@ export function useChatComposerState({
   tokenBudget,
   sendMessage,
   sendByCtrlEnter,
+  supportsSteering = false,
   onSessionProcessing,
   onSessionEstablished,
   onFileOpen,
@@ -606,6 +616,35 @@ export function useChatComposerState({
     selectedSession,
   ]);
 
+  // Empties the composer of a message that has just been taken out of it — to the queue, or into the
+  // running turn. The chat on screen is the one the message was typed in: its text, files, command menu
+  // and saved draft go. The user changed chats during the upload: the composer they left still holds the
+  // text and files as its draft, and those go instead, or going back and pressing Enter would send the
+  // same message a second time.
+  const emptyComposerOfTakenMessage = useCallback(
+    (content: string, isOpenComposer: boolean, submitScope: string | null) => {
+      if (isOpenComposer) {
+        setInput('');
+        inputValueRef.current = '';
+        clearAttachmentsFor(submitScope);
+        resetCommandMenuState();
+        setIsTextareaExpanded(false);
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+        }
+        if (draftScopeRef.current) {
+          writeDraftText(draftScopeRef.current, '');
+        }
+        return;
+      }
+      clearAttachmentsFor(submitScope);
+      if (submitScope && readDraftText(submitScope) === content) {
+        writeDraftText(submitScope, '');
+      }
+    },
+    [clearAttachmentsFor, resetCommandMenuState, setInput],
+  );
+
   // Hands a message to the server's queue to be sent "when this finishes" and shows it as the
   // queued card. Attachments must already be uploaded.
   //
@@ -619,35 +658,21 @@ export function useChatComposerState({
   // follow-up and must not be erased with this one. If the server refuses the message it goes back
   // into the composer, in front of anything typed since, and the composer says so, rather than
   // showing a card nothing will send. A message the app queues itself touches no composer.
+  //
+  // `putBackIfRefused` is for a steered message the turn could not take, queued as the next turn: it
+  // left the composer when it was steered, so it is put back like a typed one if the queue refuses it too.
   const queueMessage = useCallback(
     async (
       durableDraft: QueuedDraft,
       queuedSessionKey: string | null,
       submitScope: string | null,
       takenFromComposer: boolean,
+      putBackIfRefused = false,
     ) => {
       const queuedFromOpenComposer = takenFromComposer
         && (!queuedSessionKey || sessionKeyRef.current === queuedSessionKey);
-      if (queuedFromOpenComposer) {
-        setInput('');
-        inputValueRef.current = '';
-        clearAttachmentsFor(submitScope);
-        resetCommandMenuState();
-        setIsTextareaExpanded(false);
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-        }
-        if (draftScopeRef.current) {
-          writeDraftText(draftScopeRef.current, '');
-        }
-      } else if (takenFromComposer) {
-        // The user changed sessions during the upload. The composer they left still holds the text
-        // and files as its draft: clear them, or going back and pressing Enter would queue the same
-        // message a second time.
-        clearAttachmentsFor(submitScope);
-        if (submitScope && readDraftText(submitScope) === durableDraft.content) {
-          writeDraftText(submitScope, '');
-        }
+      if (takenFromComposer) {
+        emptyComposerOfTakenMessage(durableDraft.content, queuedFromOpenComposer, submitScope);
       }
 
       let queuedCard = durableDraft;
@@ -680,7 +705,7 @@ export function useChatComposerState({
               : `Failed to queue message: ${message}`,
             timestamp: new Date(),
           });
-          if (!takenFromComposer) {
+          if (!takenFromComposer && !putBackIfRefused) {
             return;
           }
           const withTypedSince = (typedSince: string) => (
@@ -690,7 +715,7 @@ export function useChatComposerState({
             const restored = withTypedSince(inputValueRef.current);
             setInput(restored);
             inputValueRef.current = restored;
-            if (queuedFromOpenComposer) {
+            if (queuedFromOpenComposer || putBackIfRefused) {
               setAttachedFiles((current) => [...durableDraft.attachments, ...current]);
             }
             if (draftScopeRef.current) {
@@ -728,8 +753,53 @@ export function useChatComposerState({
           : queuedCard.attachments,
       }));
     },
-    [addMessage, clearAttachmentsFor, recordSentMessage, resetCommandMenuState, setAttachedFiles, setInput, t],
+    [addMessage, emptyComposerOfTakenMessage, recordSentMessage, setAttachedFiles, setInput, t],
   );
+
+  // What the steered-messages hook needs of this composer, as small callbacks it cannot reach itself.
+  const isOpenSession = useCallback((candidate: string) => sessionKeyRef.current === candidate, []);
+  // A steer the turn could not take goes out as the next turn. It left the composer when it was steered, so
+  // the queue puts it back there if it refuses it too (`putBackIfRefused`).
+  const queueAsNextTurn = useCallback(
+    (steer: PendingSteer) => {
+      void queueMessage(
+        {
+          id: createQueuedMessageId(),
+          content: steer.content,
+          attachments: steer.attachments,
+          uploadedAttachments: steer.uploadedAttachments,
+          options: buildSendOptions(steer.content),
+        },
+        steer.sessionKey,
+        steer.submitScope,
+        false,
+        true,
+      );
+    },
+    [buildSendOptions, queueMessage],
+  );
+  const restoreToComposer = useCallback(
+    (unread: PendingSteer[], restoredSessionKey: string) => {
+      const restored = [...unread.map((steer) => steer.content), inputValueRef.current]
+        .filter((part) => part.trim())
+        .join('\n\n');
+      setInput(restored);
+      inputValueRef.current = restored;
+      setAttachedFiles((current) => [...unread.flatMap((steer) => steer.attachments), ...current]);
+      writeDraftText(restoredSessionKey, restored);
+    },
+    [setAttachedFiles, setInput],
+  );
+  const { pendingSteers, steerIntoRunningTurn, handleSteerOutcome } = useSteeredMessages({
+    sessionKey,
+    isLoading,
+    sendMessage,
+    recordSentMessage,
+    takeOutOfComposer: emptyComposerOfTakenMessage,
+    isOpenSession,
+    queueAsNextTurn,
+    restoreToComposer,
+  });
 
   const submitMessage = useCallback(
     async (
@@ -788,6 +858,13 @@ export function useChatComposerState({
         try {
           const queuedOptions = buildSendOptions(currentInput);
           const queuedSessionKey = sessionKey;
+          // Steering sends the message into the running turn instead of after it, when the send menu asked
+          // for that and the provider can take it. A slash command is a turn of its own, so it always
+          // waits in the queue.
+          const steersIntoTurn = submitOptions?.steerIntoTurn === true
+            && supportsSteering
+            && Boolean(queuedSessionKey)
+            && !currentInput.trimStart().startsWith('/');
           let uploadedAttachments: unknown[] = [];
           try {
             uploadedAttachments = await uploadAttachmentFiles(currentAttachments);
@@ -799,6 +876,18 @@ export function useChatComposerState({
               content: `Failed to upload files: ${message}`,
               timestamp: new Date(),
             });
+            return;
+          }
+
+          if (steersIntoTurn && queuedSessionKey) {
+            // `steerIntoRunningTurn` empties the composer before it returns, as `queueMessage` does.
+            steerIntoRunningTurn(
+              { content: currentInput, attachments: currentAttachments, uploadedAttachments },
+              queuedSessionKey,
+              submitScope,
+            );
+            queueTakeInFlightRef.current = false;
+            holdsQueueTake = false;
             return;
           }
 
@@ -1039,6 +1128,8 @@ export function useChatComposerState({
       simpleChatListEnabled,
       plainModeEnabled,
       slashCommands,
+      steerIntoRunningTurn,
+      supportsSteering,
     ],
   );
 
@@ -1074,6 +1165,16 @@ export function useChatComposerState({
   useEffect(() => {
     handleSubmitRef.current = handleSubmit;
   }, [handleSubmit]);
+
+  // The send button's hold-menu while a turn runs: Queue is what a tap on that button does, Steer sends the
+  // message into the running turn. Both go through the ordinary submit (same upload and validation); Steer
+  // only diverges once the message is ready to leave the composer.
+  const handleSendMenuChoice = useCallback(
+    async (choice: 'queue' | 'steer'): Promise<void> => {
+      await handleSubmit(createFakeSubmitEvent(), undefined, choice === 'steer' ? { steerIntoTurn: true } : undefined);
+    },
+    [handleSubmit],
+  );
 
   // The VPS dispatcher owns sending. While the card is visible, periodically reconcile it with the
   // server, so the UI notices when the server claims it or another tab adds to it.
@@ -1533,9 +1634,12 @@ export function useChatComposerState({
     isDragActive,
     openAttachmentPicker,
     handleSubmit,
+    handleSendMenuChoice,
     queuedDraft,
     editQueuedDraft,
     deleteQueuedDraft,
+    pendingSteers,
+    handleSteerOutcome,
     handleVoiceTranscript,
     handleInputChange,
     handleKeyDown,

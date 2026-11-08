@@ -68,10 +68,16 @@ export function plannerOf(raw: unknown): DispatcherPlanner {
     paid_vendor: textSince(field(planner, 'paid_vendor'), 'planner.paid_vendor'),
     // THIS ROW'S OWN HOLD AND OVERRIDE (`pace_report.mark_outings`), the dispatcher's readings off the walk it made once:
     // the pacer's clause on the queued row (`""` when it is not held, or lifted) and whether its target carries the
-    // operator's override. They are what a loose planner badge — an epic's design with no plan yet, so no card and no
-    // deck — draws its Override from. ABSENT reads `""` and `false` (a build older than the keys held nothing here).
+    // operator's override. They are what the board's Planning card draws an Override from, on the line of an outing whose
+    // subject has no card and no deck on screen — an epic's design with no plan yet, or a subject put away. ABSENT reads `""`
+    // and `false` (a build older than the keys held nothing here).
     pace_hold: textSince(field(planner, 'pace_hold'), `planner.pace_hold for ${target}`) ?? '',
     overridden: flagSince(field(planner, 'overridden'), `planner.overridden for ${target}`),
+    // WHETHER A STANDING PLANNING PAUSE HOLDS THIS OUTING, whatever its state (`report_planners.mark_paused`): the
+    // ended entry the pause itself left reads `true` too, which is what lets a loose Planning line — no epic on the lane to
+    // read its own `planning_paused` from — draw Resume planning once the pause has ended its outing. ABSENT reads
+    // `false` (a build older than the key braked nothing).
+    planning_paused: flagSince(field(planner, 'planning_paused'), `planner.planning_paused for ${target}`),
   };
 }
 

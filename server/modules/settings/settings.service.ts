@@ -12,7 +12,6 @@ import { readHealCycle, writeHealCycle } from './heal-cycle-switch.js';
 import { readHealCap, readHealMaster, writeHealCap, writeHealMaster } from './heal-switch.js';
 import { getGeminiPlanCapState, setGeminiPlanCapState } from './gemini-plan-cap.js';
 import { getParkAtPeakState, setParkAtPeakState } from './park-at-peak-switch.js';
-import { getPlannerLanesState, setPlannerLanesState } from './planner-lanes.js';
 import { getWeeklyStopState, setWeeklyStopState } from './weekly-stop.js';
 
 /**
@@ -301,25 +300,9 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       return setMainSessionDactylsState(enabledInput);
     },
     /**
-     * The dispatcher's planner-lane dial: how many planners (designs, cuts, judgments) may be out at
-     * once. Both bodies live in `planner-lanes.ts`, beside the file's own reader and writer, for the
-     * reason the park-at-peak pair above does; what belongs here is the line that hands a press to
-     * the dispatcher.
-     */
-    async getPlannerLanes() {
-      return getPlannerLanesState();
-    },
-    async setPlannerLanes(lanesInput: unknown) {
-      const state = await setPlannerLanesState(lanesInput);
-      // The press is the event: a wider dial frees queued planners the rule was holding, and they are
-      // taken up on the kick rather than at the next session event. A refused input has thrown by now
-      // and nothing was written, so no kick rides on a press that never moved the file.
-      void kickDispatcher();
-      return state;
-    },
-    /**
      * Where the usage pacer stops starting plans on the weekly window, in whole percent. Both bodies
-     * live in `weekly-stop.ts`, as the planner-lane pair above does.
+     * live in `weekly-stop.ts`, beside the file's own reader and writer, for the reason the
+     * park-at-peak pair above does.
      */
     async getWeeklyStop() {
       return getWeeklyStopState();

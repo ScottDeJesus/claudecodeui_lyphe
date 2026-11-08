@@ -37,7 +37,8 @@ const MemoryIntakeContext = createStableContext<MemoryIntakeValue | null>(import
  * the login screen.
  *
  * It holds the READING and nothing else. The Inbox's waiting count, the chat gutter and the
- * panel read it, and only the panel writes; keeping the write lifecycle out (hooks/useMemoryReview.ts)
+ * panel read it; the surfaces that press (the panel, the gutter's body and the heal module's rule
+ * cards) write through hooks/useMemoryReview.ts, and keeping that write lifecycle out of here
  * is what stops a button press re-rendering the readers.
  */
 export function MemoryIntakeProvider({ children }: { children: ReactNode }) {

@@ -2,7 +2,7 @@ import { runDispatcherCommand, type DispatcherCommandDependencies } from '@/shar
 import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
 
 /**
- * Relaying the dispatcher's own sixteen verbs: `stop`, `resume`, `schedule` (a stopped plan's Resume
+ * Relaying the dispatcher's own eighteen verbs: `stop`, `resume`, `schedule` (a stopped plan's Resume
  * at a time), `park` (a designed plan set aside), `unpark` (handed
  * back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word, or `default` to follow the
  * top), `drop` (a plan removed, with everything the store holds of it — refused while a phase
@@ -19,11 +19,15 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * and starts by its own Release or Start). Hide and Show take
  * plan or epic names, any number of them, and are BOARD verbs for the relay: the names are the argv.
  * `override` is the card's lift of the usage pacer's hold for one plan or one epic (`--by app:card`, and `--off`
- * for its undo), the pacer's gate and no other.
+ * for its undo), the pacer's gate and no other. `pause-planning` and `resume-planning` are the card's brake on one
+ * feature's or one epic's designing and planning and its lift (`--by app:card`): the dispatcher holds that subject's
+ * planner outings, ends the one in flight and, on the lift, sends back what the brake ended — its own record, so the
+ * walk's `stop` and `resume` stay the walk's.
  *
- * SIX OF THE SIXTEEN NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `model`, the
- * `arm-accept` / `disarm-accept` pair (every designed, or every armed, plan of it) and `override` (the epic's OWN
- * queued outings, none of its plans' phases), each
+ * EIGHT OF THE EIGHTEEN NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `model`, the
+ * `arm-accept` / `disarm-accept` pair (every designed, or every armed, plan of it), `override` (the epic's OWN
+ * queued outings, none of its plans' phases) and the `pause-planning` / `resume-planning` pair (the epic's own
+ * planning: its design and cut and every outing of its features), each
  * resolved by the dispatcher's own door and by nothing on this side (`schedule <arc>` is the terminal's
  * alone: the deck has no Schedule start). An arc has no walk of its own:
  * `stop <arc>` is this same verb over the arc's LIVE plans — what is walking and what is approved,
@@ -58,7 +62,8 @@ export type DispatcherVerbDependencies = DispatcherCommandDependencies;
  * still carries `plan: ""`. `verbArgs` follow the name — `schedule`'s hour, `model`'s word,
  * `queue`'s move and `epics`' word, and for `hide` / `unhide` the plan and epic names themselves, each already
  * checked by the route against the shapes the dispatcher accepts, and `planner-resume`'s `--by app:card`,
- * which the route spells itself (so does `override`'s `--by app:card`, with `--off` for the undo); `stop`, `resume`, `park`, `unpark` and `drop` take none.
+ * which the route spells itself (so does `override`'s `--by app:card`, with `--off` for the undo, and so does the
+ * planning pair's); `stop`, `resume`, `park`, `unpark` and `drop` take none.
  */
 export async function runDispatcherVerb(
   verb: DispatcherVerb,

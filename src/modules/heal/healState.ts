@@ -1,5 +1,5 @@
 import type { HealCard, HealClass, HealKindRow, HealStatus } from '@/modules/heal/healTypes';
-import type { Tone } from '@/shared/types';
+import type { Project, Tone } from '@/shared/types';
 
 /**
  * How the ledger's facts reach the eye — the same job `dispatcher/dispatcherState.ts` does for a plan.
@@ -63,6 +63,22 @@ export function transcriptRef(transcript: string, line: number | null): string {
   const cut = transcript.lastIndexOf('/');
   const name = cut === -1 ? transcript : transcript.slice(cut + 1);
   return line === null ? name : `${name}:${line}`;
+}
+
+/**
+ * Names a transcript folder's slug the way CloudCLI names the project. A folder under `~/.claude/projects` is its
+ * project's path with every character that is not a letter or a digit turned to `-` (`/home/me/.app` is
+ * `-home-me--app`), so the project whose path makes the slug is the one; the slug itself stands when no project the app
+ * holds does — a folder no one registered is still a place, and a guessed name would be a fabricated one. Where two
+ * paths make one slug the first in the list wins. The map is built once per list: a card asks it once per row.
+ */
+export function projectNamer(projects: readonly Pick<Project, 'displayName' | 'fullPath'>[]): (slug: string) => string {
+  const nameBySlug = new Map<string, string>();
+  for (const project of projects) {
+    const slug = project.fullPath.replace(/[^a-zA-Z0-9]/g, '-');
+    if (!nameBySlug.has(slug)) nameBySlug.set(slug, project.displayName);
+  }
+  return (slug) => nameBySlug.get(slug) ?? slug;
 }
 
 /** The trend glyph and its word. Null trend prints a dash and SAYS "no trend" — never a fabricated arrow. */

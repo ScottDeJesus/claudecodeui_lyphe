@@ -1,7 +1,9 @@
 import { sessionsDb } from '@/modules/database/index.js';
-import { buildClaudeToolPermissionEntry, providerRuntimeService, sessionHostLivenessSnapshot } from '@/modules/providers/index.js';
+import { MCP_ELICITATION_TOOL_NAME, buildClaudeToolPermissionEntry, providerRuntimeService, sessionHostLivenessSnapshot } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
 import { describeToolCall, describeToolInput, oneLine } from '@/shared/tool-call-hint.js';
+
+import { elicitationOf } from './ask-decision.js';
 
 /**
  * What a chat is doing at this moment, read from the running server and nothing else: its state, and one line
@@ -65,6 +67,13 @@ export function askLine(ask: ListedAsk, detailed = false): string {
     return `asks "${cutAt(oneLine(questions[0]?.question ?? ''), 100)}"${questions.length > 1 ? ` (and ${questions.length - 1} more)` : ''}${options}`;
   }
   if (ask.toolName === 'ExitPlanMode') return 'a plan is ready and waits for his approval';
+  if (ask.toolName === MCP_ELICITATION_TOOL_NAME) {
+    // An MCP server asking for input is no permission: there is no rule to store and no Allow to give. In the line she decides
+    // on, she is told what she can do with it.
+    const { server, message } = elicitationOf(ask.input);
+    const asked = `${server} asks for his input${message === '' ? '' : `: "${cutAt(oneLine(message), 100)}"`}`;
+    return detailed ? `${asked} — a form for him to fill in the chat; from here she can only decline it (deny)` : asked;
+  }
   const toolName = ask.toolName ?? 'a tool';
   if (!detailed) return `wants permission: ${describeToolCall(toolName, ask.input)}`;
   const entry = buildClaudeToolPermissionEntry(toolName, ask.input);

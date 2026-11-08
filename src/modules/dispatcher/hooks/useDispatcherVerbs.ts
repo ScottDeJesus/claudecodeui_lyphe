@@ -35,18 +35,26 @@ export type DispatcherPlanVerbs = ArmAcceptPlanVerbs & {
   /** The operator's lift of the pacer's hold for this plan, and its undo: the pacer's gate and nothing else. */
   override(): Promise<void>;
   overrideOff(): Promise<void>;
+  /**
+   * The operator's brake on THIS feature's designing and planning, and its lift, which sends back what the brake ended: the planning
+   * record, never the walk's `stop` and `resume`. Each REPORTS BACK, as `answer` does — `true` exactly when the lane took the press
+   * (2xx) — because the press holds itself disabled from a press the lane took until the card shows it (`PlanningPausePress`).
+   */
+  pausePlanning(): Promise<boolean>;
+  resumePlanning(): Promise<boolean>;
   setModel(choice: DispatcherModelChoice): Promise<void>;
   /**
    * The operator's word on the prompt this plan's card is drawing: the chosen label (or typed
-   * words) by question, and a Rework's notes by question. The one press here that REPORTS BACK —
-   * `true` exactly when the lane took it (2xx) — because the card draws its answered state from it.
+   * words) by question, and a Rework's notes by question. One of the presses here that REPORT BACK
+   * (`pausePlanning` and `resumePlanning` are the others) — `true` exactly when the lane took it (2xx) —
+   * because the card draws its answered state from it.
    */
   answer(ask: DispatcherAsk, answers: Record<string, string>, notes?: Record<string, string>): Promise<boolean>;
   busy: DispatcherPress | null;
 };
 
 /**
- * What an arc header may press — the three verbs the dispatcher's own arc door opens on that a deck
+ * What an arc header may press — the verbs the dispatcher's own arc door opens on that a deck
  * draws. `park`, `unpark`, `drop` and `schedule` are the plan card's own and no
  * arc deck draws them (the deck has no Schedule start), so no arc callback exists for them rather than
  * one that would have no route to reach.
@@ -57,14 +65,21 @@ export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
   /** The operator's lift of the pacer's hold for the epic's OWN queued outings, and its undo — none of its plans' phases. */
   override(): Promise<void>;
   overrideOff(): Promise<void>;
+  /**
+   * The operator's brake on the EPIC's planning — its design and cut and every outing of its features — and its lift, pressed from the
+   * epic's Planning line, a loose one (an epic with no feature yet) by the epic's name. Each REPORTS BACK like the feature's pair: `true`
+   * exactly when the lane took the press (2xx).
+   */
+  pausePlanning(): Promise<boolean>;
+  resumePlanning(): Promise<boolean>;
   /** `default` hands the epic's model back to the top; a word is its own override and goes to every plan of it. */
   setModel(choice: DispatcherModelChoice): Promise<void>;
   busy: DispatcherPress | null;
 };
 
 /**
- * Stop, Resume, Release, Schedule, Park, Unpark, Model, Drop, Resume planner, Override (and its undo) and Answer for one plan — or Stop, Resume
- * and Model for one dispatch ARC — and what to say about each.
+ * Stop, Resume, Release, Schedule, Park, Unpark, Model, Drop, Resume planner, Override (and its undo), Pause planning, Resume planning and Answer for one
+ * plan — or Stop, Resume, Model, Override (and its undo), Pause planning and Resume planning for one dispatch ARC — and what to say about each.
  *
  * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same verbs:
  * `scope` decides which route a press is relayed through (`POST /api/dispatcher/plans/:name/…` or
@@ -99,9 +114,10 @@ export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
  * with the other would name a verb the operator never saw. It is `resume` that runs either way. (An
  * epic's deck draws Resume alone: the plans waiting for their first Start are the board's one Start's.)
  *
- * ANSWER IS THE ONE PRESS THAT REPORTS BACK, and the only one whose outcome a control reads: the
- * card draws its answered state from a `true`, so `send` resolves whether the lane took the word
- * (2xx) and the others resolve `void`, their outcome nobody's but the next frame's. It travels
+ * ANSWER AND THE PLANNING PAIR ARE THE PRESSES THAT REPORT BACK, and the only ones whose outcome a control reads: the
+ * card draws its answered state from `answer`'s `true`, and `PlanningPausePress` holds itself disabled from a press the lane took
+ * until the card shows it (`pausePlanning`, `resumePlanning`), so `send` resolves whether the lane took the press (2xx) and the
+ * others resolve `void`, their outcome nobody's but the next frame's. `answer` travels
  * the plan door alone (`POST /api/dispatcher/answer`, never one of the verb routes) and is not a
  * `DispatcherVerb` — that set is exactly what the server spawns.
  *
@@ -139,6 +155,8 @@ export function useDispatcherVerbs(
       if (verb === 'planner-resume') return t('dispatcher.plannerResume');
       if (verb === 'override') return t('dispatcher.override.press');
       if (verb === 'override-off') return t('dispatcher.override.off');
+      if (verb === 'pause-planning') return t('dispatcher.planningPause.press');
+      if (verb === 'resume-planning') return t('dispatcher.planningPause.resume');
       if (verb === 'schedule') return t('runner.schedule.refused');
       if (verb === 'model') return t('runner.model.refused');
       if (verb === 'answer') return t('dispatcher.ask.word');
@@ -176,8 +194,8 @@ export function useDispatcherVerbs(
   });
 
   // The verbs are one-way presses: each awaits `send` and returns `void`, because nothing
-  // reads their outcome — the card redraws from the next frame. `answer`, below, is the one that
-  // hands the boolean back.
+  // reads their outcome — the card redraws from the next frame. `answer` and the planning pair, below,
+  // are the ones that hand the boolean back.
   const stop = useCallback(
     async () => {
       await send('stop', () => (scope === 'arc' ? api.dispatcher.arcStop(name) : api.dispatcher.stop(name)));
@@ -228,6 +246,17 @@ export function useDispatcherVerbs(
     async () => { await send('override-off', () => (scope === 'arc' ? api.dispatcher.arcOverrideOff(name) : api.dispatcher.overrideOff(name))); },
     [name, scope, send],
   );
+  // The operator's brake on one feature's or one epic's planning, and its lift: two doors of the dispatcher's own pair,
+  // one `busy`. The dispatcher resolves the name and says why it refused; nothing is drawn until the next frame. Each hands back
+  // whether the lane took the press, so the button can hold itself until the frame shows it (`PlanningPausePress`).
+  const pausePlanning = useCallback(
+    () => send('pause-planning', () => (scope === 'arc' ? api.dispatcher.arcPausePlanning(name) : api.dispatcher.pausePlanning(name))),
+    [name, scope, send],
+  );
+  const resumePlanning = useCallback(
+    () => send('resume-planning', () => (scope === 'arc' ? api.dispatcher.arcResumePlanning(name) : api.dispatcher.resumePlanning(name))),
+    [name, scope, send],
+  );
 
   // The card's own press: the operator's word on the prompt it is drawing, relayed to the lane's
   // answer door rather than a verb route — and handed on, because the card draws its answered
@@ -241,6 +270,6 @@ export function useDispatcherVerbs(
   // "Accept when cut" and its Cancel: this hook's `send` carries them (`useArmAcceptVerbs`), both doors.
   const armVerbs = useArmAcceptVerbs(name, scope, send);
 
-  if (scope === 'arc') return { stop, resume, override, overrideOff, setModel, ...armVerbs, busy };
-  return { stop, resume, release, schedule, park, unpark, drop, plannerResume, override, overrideOff, setModel, answer, ...armVerbs, busy };
+  if (scope === 'arc') return { stop, resume, override, overrideOff, pausePlanning, resumePlanning, setModel, ...armVerbs, busy };
+  return { stop, resume, release, schedule, park, unpark, drop, plannerResume, override, overrideOff, pausePlanning, resumePlanning, setModel, answer, ...armVerbs, busy };
 }

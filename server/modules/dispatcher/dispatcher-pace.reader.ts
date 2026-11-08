@@ -4,7 +4,7 @@ import { field, isCount, isCountOrNull, isFlag, isRecord, isText, need } from '.
 
 /**
  * The pacer's picture as the document states it (`route.pace`, `pace_report.route`): the account it
- * read, the reading behind it, both windows, the probe, how many asks it holds and its one sentence.
+ * read, the reading behind it, the week, the probe, how many asks it holds and its one sentence.
  *
  * It has its own file for the reason `dispatcher-epics.reader.ts` does: `dispatcher-state.service.ts`
  * imports the database module (`sessionsDb`), so anything a probe reads from a saved document must be
@@ -19,13 +19,13 @@ import { field, isCount, isCountOrNull, isFlag, isRecord, isText, need } from '.
  * that needs percents (the account panel's meters) converts at the usage route, never here.
  */
 
-/** One window of the picture, `null` when the pacer could not read it. Every figure is a fraction or
+/** The week of the picture, `null` when the pacer could not read it. Every figure is a fraction or
  *  `null` when THAT figure could not be read — the probe's `projected` is null until the account's
  *  cost is measured (`project.Window`: "An unread figure is None"), and a reader that demanded a
- *  count froze the whole lane on the first probe (measured 2026-10-20: the 5-hour window rolled and
- *  every read threw `no route.pace.five.projected`, leaving a pre-roll document on the board).
- *  `resets_at` is epoch seconds, or `null` on a reading that carries no reset. */
-function windowOf(raw: unknown, where: string): DispatcherPace['five'] {
+ *  count froze the whole lane on the first probe (measured 2026-10-20: a window's `projected` was
+ *  unread and every read threw `no route.pace.<window>.projected`, leaving the last good document
+ *  on the board). `resets_at` is epoch seconds, or `null` on a reading that carries no reset. */
+function windowOf(raw: unknown, where: string): DispatcherPace['week'] {
   if (raw === null) return null;
   const window = need(raw, isRecord, where);
   return {
@@ -37,14 +37,13 @@ function windowOf(raw: unknown, where: string): DispatcherPace['five'] {
 }
 
 /** The reading the picture was built on: its instant (epoch seconds or null), its source word, and
- *  whether it is fresh enough to pace on and still open. */
+ *  whether it is fresh enough to pace on. */
 function readingOf(raw: unknown): DispatcherPace['reading'] {
   const reading = need(raw, isRecord, 'route.pace.reading');
   return {
     at: need(field(reading, 'at'), isCountOrNull, 'route.pace.reading.at'),
     source: need(field(reading, 'source'), isText, 'route.pace.reading.source'),
     fresh: need(field(reading, 'fresh'), isFlag, 'route.pace.reading.fresh'),
-    rolled: need(field(reading, 'rolled'), isFlag, 'route.pace.reading.rolled'),
   };
 }
 
@@ -62,7 +61,6 @@ export function paceSince(raw: unknown): DispatcherPace | null | undefined {
   return {
     account: need(field(pace, 'account'), isText, 'route.pace.account'),
     reading: readingOf(field(pace, 'reading')),
-    five: windowOf(field(pace, 'five'), 'route.pace.five'),
     week: windowOf(field(pace, 'week'), 'route.pace.week'),
     probe: need(field(pace, 'probe'), isFlag, 'route.pace.probe'),
     held: need(field(pace, 'held'), isCount, 'route.pace.held'),

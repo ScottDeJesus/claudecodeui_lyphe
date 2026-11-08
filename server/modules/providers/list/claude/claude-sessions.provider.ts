@@ -31,6 +31,7 @@ import { prepareTranscriptMessages } from '@/shared/message-unification.js';
 import {
   createNormalizedMessage,
   generateMessageId,
+  isPlaceholderModel,
   readObjectRecord,
   sliceTailPage,
   truncateSubagentActivity,
@@ -84,6 +85,7 @@ const IN_FLIGHT_BELIEVED_FOR_MS = 4 * 60 * 60 * 1000;
 
 export type ClaudeSubagentTranscript = {
   activity: SubagentActivity[];
+  /** The newest model id an assistant record named, a `<synthetic>` placeholder never counting; absent until one did. */
   model?: string;
   /** Present once one assistant record carried a non-zero usage. */
   usage?: SubagentUsage;
@@ -213,7 +215,9 @@ export async function readClaudeSubagentTranscript(filePath: string): Promise<Cl
         }
 
         if (entry.message?.role === 'assistant' && Array.isArray(entry.message?.content)) {
-          if (typeof entry.message.model === 'string') {
+          // The newest REAL model: a refusal or an API error is stamped `<synthetic>`, and when one ends
+          // the transcript it would otherwise rename an agent that ran on `claude-opus-5-5`.
+          if (typeof entry.message.model === 'string' && !isPlaceholderModel(entry.message.model)) {
             transcript.model = entry.message.model;
           }
           lastStopReason = typeof entry.message.stop_reason === 'string' ? entry.message.stop_reason : null;

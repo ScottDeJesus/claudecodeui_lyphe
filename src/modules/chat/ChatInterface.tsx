@@ -10,6 +10,7 @@ import PermissionContext from '@/modules/chat/context/PermissionContext';
 import type { TokenUsageSurface } from '@/modules/chat/composer/TokenUsageSummary';
 import type { ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
 import { api } from '@/shared/api';
+import { LLM_PROVIDER_LABELS } from '@/shared/constants';
 import type {
   ChatMessage,
   Project,
@@ -169,6 +170,7 @@ function ChatInterface({
     resolvePermissionModeForProvider,
     supportsMessageEditing,
     supportsSessionForking,
+    supportsSteering,
   } = useChatProviderState({
     selectedSession,
     selectedProject,
@@ -301,9 +303,12 @@ function ChatInterface({
     isDragActive,
     openAttachmentPicker,
     handleSubmit,
+    handleSendMenuChoice,
     queuedDraft,
     editQueuedDraft,
     deleteQueuedDraft,
+    pendingSteers,
+    handleSteerOutcome,
     handleVoiceTranscript,
     handleInputChange,
     handleKeyDown,
@@ -343,6 +348,7 @@ function ChatInterface({
     tokenBudget,
     sendMessage,
     sendByCtrlEnter,
+    supportsSteering,
     onSessionProcessing,
     onSessionEstablished: handleSessionEstablished,
     onFileOpen,
@@ -399,6 +405,7 @@ function ChatInterface({
     onWebSocketReconnect: handleWebSocketReconnect,
     requestLatestMessages,
     sessionStore,
+    onSteerOutcome: handleSteerOutcome,
   });
 
   useEffect(() => {
@@ -715,6 +722,10 @@ function ChatInterface({
           queuedDraft={queuedDraft}
           onEditQueuedDraft={editQueuedDraft}
           onDeleteQueuedDraft={deleteQueuedDraft}
+          supportsSteering={supportsSteering}
+          onSendMenuChoice={handleSendMenuChoice}
+          pendingSteers={pendingSteers}
+          providerLabel={LLM_PROVIDER_LABELS[provider]}
           attachedFiles={attachedFiles}
           onRemoveAttachment={(index) =>
             setAttachedFiles((previous) =>

@@ -7,7 +7,7 @@ import { writeFlagText } from './deepseek-flash-switch.js';
 
 /**
  * Where the usage pacer stops starting plans on the WEEKLY window, as a file — the operator's line,
- * in whole percent. The 5-hour window has no such setting; its ceiling stays the pacer's own.
+ * in whole percent.
  *
  * The pacer reads this exact path at every picture (`hooks/plan_runner/pacer/weekly_stop.py`, read by
  * `project._windows` and `pacer windows`), so a press here reaches the next pass with nothing restarted

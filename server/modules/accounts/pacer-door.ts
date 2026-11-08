@@ -18,13 +18,13 @@ import { isFiniteNumber, isRecord, resetEpoch } from './usage-windows.js';
  * own chats trigger the account rule. The pacer's projection needs both, and nothing else polls the
  * OAuth endpoint (`claude-api-backup` ruled polling out).
  *
- * WHAT THE DOOR TAKES. One JSON object on stdin: `{"account", "at" (epoch seconds), "five":
- * {"used": fraction, "resets_at": epoch} | null, "week": … | null}`. Fractions here are 0..1, the
- * pacer's only unit; this file is where a meter's PERCENT is divided by a hundred, so no reader of
- * the store ever has to ask which scale a number is in.
+ * WHAT THE DOOR TAKES. One JSON object on stdin: `{"account", "at" (epoch seconds), "week":
+ * {"used": fraction, "resets_at": epoch}}`. Fractions here are 0..1, the pacer's only unit; this
+ * file is where a meter's PERCENT is divided by a hundred, so no reader of the store ever has to
+ * ask which scale a number is in.
  *
- * A READING IS DROPPED, NEVER SENT, when there is no login to file it under, and when neither
- * window is a live one. A window whose reset has already passed is HISTORY (a rolled window): its
+ * A READING IS DROPPED, NEVER SENT, when there is no login to file it under, and when the week
+ * is not a live window. A window whose reset has already passed is HISTORY (a rolled window): its
  * percentage describes a block that is over, and filing it would put a stale figure at the head of
  * the account's newest reading. A window with no readable reset cannot be filed at all, because it
  * cannot be told which block it belongs to.
@@ -66,7 +66,6 @@ type StatusReading = { at?: unknown };
 /** The status verb's answer, as far as this file reads it (`door_status.as_json`). */
 export type PacerStatus = {
   reading?: StatusReading | null;
-  five?: StatusWindow | null;
   week?: StatusWindow | null;
   words?: unknown;
 };
@@ -75,8 +74,7 @@ export type PacerStatus = {
 type NoteBody = {
   account: string;
   at: number;
-  five: DoorWindow | null;
-  week: DoorWindow | null;
+  week: DoorWindow;
 };
 
 /**
@@ -100,9 +98,9 @@ function doorWindow(
   // same way, so the two sources agree on one window instead of splitting it a second apart.
   const at = Math.floor(checkedAt / 1000);
   const resetsAt = Math.round(resets / 1000);
-  // ⚠ The door demands `at < resets_at` STRICTLY and refuses the WHOLE object when one window
-  // fails it. A reset within half a second of the read rounds onto `at`; dropping this window here
-  // keeps the other window's reading instead of losing both.
+  // ⚠ The door demands `at < resets_at` STRICTLY and refuses the whole object when the window
+  // fails it. A reset within half a second of the read rounds onto `at`; dropping the window here
+  // spares the door a call it would refuse.
   if (resetsAt <= at) return null;
   return { used: window.percent / 100, resets_at: resetsAt };
 }
@@ -126,11 +124,10 @@ export function note(
 ): void {
   const account = digest.trim();
   if (!account) return; // no login, no owner for the reading
-  const five = doorWindow(windows, 'five_hour', checkedAt);
   const week = doorWindow(windows, 'seven_day', checkedAt);
-  if (five === null && week === null) return; // nothing here the door would keep
+  if (week === null) return; // nothing here the door would keep
 
-  const body: NoteBody = { account, at: Math.floor(checkedAt / 1000), five, week };
+  const body: NoteBody = { account, at: Math.floor(checkedAt / 1000), week };
   // ⚠ The spawn can throw SYNCHRONOUSLY — an argument carrying a NUL byte is `ERR_INVALID_ARG_VALUE`,
   // raised before any child exists. That is the same fact as a door that never answered: a reading
   // dropped, never a poll lost.
@@ -204,28 +201,25 @@ function percentOf(value: unknown): number | null {
  * The status verb's answer → `ClaudeUsage.pace`, the ONE place the pacer's fractions become the
  * wire's percents. Consumers: `usage.service.ts`'s `measure`.
  *
- * All seven figures are nullable because the pacer can see one window and not the other; `words`
- * is the pacer's own sentence and is required, so a body without one is no picture (null) rather
- * than a captionless set of marks. A null status — any failure of `status()` — is null here, and
- * the key is left off the reading entirely.
+ * All three figures are nullable because the pacer may hold no week yet, or one without every
+ * figure (a probe's projection waits on the account's cost being measured); `words` is the
+ * pacer's own sentence and is required, so a body without one is no picture (null) rather than a
+ * captionless set of marks. A null status — any failure of `status()` — is null here, and the key
+ * is left off the reading entirely.
  *
  * A PACER FAULT IS NOT A PICTURE, and it is not a failure of `status()` either: a home that cannot
- * be opened still makes `pacer status` exit 0 with `probe: true`, a `why` naming the fault, every
- * window null and its diagnostic sentence in `words` ("pace: the 5-hour window is unknown"). A real
- * picture — fresh, stale or rolled — always carries the moment of the reading it was built from, so
- * a body whose `reading.at` is null draws nothing and the key is left off. The caption this file
+ * be opened still makes `pacer status` exit 0 with `probe: true`, a `why` naming the fault, the
+ * week null and its diagnostic sentence in `words` ("pace: the weekly window is unknown"). A real
+ * picture — fresh or stale — always carries the moment of the reading it was built from, so a
+ * body whose `reading.at` is null draws nothing and the key is left off. The caption this file
  * would otherwise attach would describe a pacer that could not read, not this account's projection.
  */
 export function paceOf(status: PacerStatus | null): ClaudeUsagePace | null {
   if (status === null || typeof status.words !== 'string') return null;
   const reading = status.reading ?? null;
   if (reading === null || !isFiniteNumber(reading.at)) return null;
-  const five = status.five ?? null;
   const week = status.week ?? null;
   return {
-    used5: percentOf(five?.used),
-    projected5: percentOf(five?.projected),
-    ceiling5: percentOf(five?.ceiling),
     used7: percentOf(week?.used),
     projected7: percentOf(week?.projected),
     ceiling7: percentOf(week?.ceiling),

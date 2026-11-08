@@ -25,8 +25,9 @@ import { Button } from '@/shared/ui';
  * `data-dispatcher-override-off` on Turn off, each with `data-override-scope` (`plan` or `arc`) — an arc deck
  * holds its plans' cards, so a probe tells the deck's own press from theirs by it.
  *
- * Used by `PlanCard` (this module), in the row where the queue's hold draws, and by `DispatchArcDeck`, in the
- * deck head under the planner badge.
+ * Used by `PlanCard` (this module), in the row where the queue's hold draws, by `DispatchArcDeck`, in the
+ * deck head under the planner badge, and by `PlanningCard`, under the line of an outing whose subject has no card
+ * and no deck on screen (an epic with no feature yet, a feature or epic put away) — there its door is the line's.
  */
 export function PaceOverride({
   name,

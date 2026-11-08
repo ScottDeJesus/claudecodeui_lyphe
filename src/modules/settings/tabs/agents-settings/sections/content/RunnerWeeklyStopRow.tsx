@@ -6,11 +6,10 @@ import { Button, Select, SettingRow } from '@/shared/ui';
 
 /**
  * WHERE THE WEEKLY WINDOW STOPS — the usage pacer's own line, `~/.claude/state/weekly_stop.flag`. Plans stop
- * starting when the week is on course to pass it. It answers a question of its own, about the WEEKLY window
- * alone: the 5-hour window keeps the pacer's fixed ceiling, and no work already running is stopped by a lower
- * line. The file's default, when none is set, is 95%.
+ * starting when the week is on course to pass it. It answers a question of its own, about the WEEKLY window:
+ * no work already running is stopped by a lower line. The file's default, when none is set, is 95%.
  *
- * Its own file and its own hook, as `RunnerPlannerLanesRow` is, and for the same reason: `RunnerModelContent`
+ * Its own file and its own hook, as `RunnerParkAtPeakRow` is, and for the same reason: `RunnerModelContent`
  * is past what it should hold, and a row whose read, write and re-read are its own hook has nothing to share
  * with the rows around it except their grammar — the unknown state in words, the retry in the control's slot.
  *
@@ -20,7 +19,7 @@ import { Button, Select, SettingRow } from '@/shared/ui';
  *
  * It wears `GaugeIcon`, which no other row on this card uses.
  *
- * Used by `RunnerModelContent`, which draws it beside the planner-lanes row.
+ * Used by `RunnerModelContent`, which draws it among the dispatcher's host-wide dials.
  */
 export default function RunnerWeeklyStopRow() {
   const { t } = useTranslation('settings');
@@ -46,7 +45,7 @@ export default function RunnerWeeklyStopRow() {
             })
           : t('status.loading', { ns: 'common', defaultValue: 'Loading...' })
         : t('agents.weeklyStop.description', {
-            defaultValue: 'Plans stop starting when the week is on course to pass {{percent}}% of its limit. Set it at or under what the week has already used and no plan starts until you raise it or the week resets; the same line decides when this account counts as full for the automatic account switch. Plans already running are never stopped, and the 5-hour window keeps its own line. Takes effect at once.',
+            defaultValue: 'Plans stop starting when the week is on course to pass {{percent}}% of its limit. Set it at or under what the week has already used and no plan starts until you raise it or the week resets; the same line decides when this account counts as full for the automatic account switch. Plans already running are never stopped. Takes effect at once.',
             percent,
           })}
     >

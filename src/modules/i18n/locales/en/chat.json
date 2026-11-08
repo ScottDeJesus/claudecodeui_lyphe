@@ -84,6 +84,29 @@
     "leaveAsIs": "Leave it as it is",
     "allowAlreadyRemembered": "Allow, already remembered"
   },
+  "mcpElicitation": {
+    "asks": "{{server}} asks for your input",
+    "submit": "Submit",
+    "decline": "Decline",
+    "openLink": "Open link",
+    "unsafeUrl": "Only http and https links can be opened from here.",
+    "optional": "optional",
+    "choose": "Choose…",
+    "required": "Required",
+    "notANumber": "Enter a number",
+    "notAnInteger": "Enter a whole number",
+    "tooSmall": "At least {{value}}",
+    "tooLarge": "At most {{value}}",
+    "tooShort": "At least {{count}} characters",
+    "tooLong": "At most {{count}} characters",
+    "tooFew": "Pick at least {{count}}",
+    "tooMany": "Pick at most {{count}}",
+    "notAnEmail": "Enter an email address",
+    "notAUri": "Enter a full address, such as https://example.com",
+    "notADate": "Enter a date",
+    "notADateTime": "Enter a date and time",
+    "notTheFormat": "Not a valid {{format}}"
+  },
   "todo": {
     "updated": "Todo list has been updated successfully",
     "current": "Current Todo List"
@@ -158,6 +181,14 @@
       "willSend": "Will send when this finishes",
       "edit": "Edit queued message",
       "delete": "Delete queued message"
+    },
+    "steer": {
+      "label": "Steering",
+      "sending": "Sending…",
+      "willRead": "{{provider}} reads it at its next tool call",
+      "holdHint": "hold to steer",
+      "attachments_one": "{{count}} file attached",
+      "attachments_other": "{{count}} files attached"
     }
   },
   "composer": {
@@ -345,6 +376,17 @@
     "json": {
       "label": "JSON (.json)",
       "description": "Every message, unformatted, for tooling."
+    }
+  },
+  "sendMenu": {
+    "trigger": "Send options",
+    "queue": {
+      "label": "Queue",
+      "descriptionResponding": "Send when this turn ends"
+    },
+    "steer": {
+      "label": "Steer",
+      "description": "Send into this turn; read at the next tool call"
     }
   },
   "schedule": {

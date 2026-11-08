@@ -141,10 +141,11 @@ export function WidgetFrame({
   // Escape leaves fullscreen, and takes the key with it. CAPTURE phase and `stopPropagation`: the
   // card covers the viewport, so nothing BEHIND it — the transcript's own turn-abort Escape, a menu —
   // should act on the same press. A modal dialog is the exception, because it is not behind: the card
-  // sits under the dialog layer (`z-[45]` under `z-50`), so a dialog opened over a fullscreen card is
-  // in front of it and the press is the dialog's — and so is a panel that owns the key, a menu or a
-  // Select opened on top of it. It is asked for rather than out-raced — see `otherOverlayHoldsEscape`. The listener exists only while fullscreen is on, so an ordinary card never
-  // touches the key at all.
+  // sits under the dialog layer (a dialog portals to `<body>`, outside the shell this card is drawn in),
+  // so a dialog opened over a fullscreen card is in front of it and the press is the dialog's — and so
+  // is a panel that owns the key, a menu or a Select opened on top of it. It is asked for rather than
+  // out-raced — see `otherOverlayHoldsEscape`. The listener exists only while fullscreen is on, so an
+  // ordinary card never touches the key at all.
   //
   // THE WINDOW IS THE ONE THE CHAT IS DRAWN IN. A card lives in the transcript, and the transcript can
   // stand in a picture-in-picture window, where a key pressed reaches that window and never the opener:

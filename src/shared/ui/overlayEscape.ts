@@ -27,8 +27,10 @@ export const OWNS_ESCAPE_SELECTOR = '[data-owns-escape]';
  *
  * Asked by the two fullscreen surfaces — a transcript embed card (`WidgetFrame`) and a chat gutter
  * widget (`ChatGutterLayout`) — before they take the key. Two kinds of thing are in front of them:
- *  - a modal DIALOG: both surfaces sit under the dialog layer (`z-[45]` under `Dialog`'s z-50), so a
- *    dialog opened from fullscreen is in front and the press is its;
+ *  - a modal DIALOG: both surfaces sit under the dialog layer — `Dialog` portals to `<body>`, outside the
+ *    workspace shell's stacking context the surfaces are drawn in, so a dialog opened from fullscreen is
+ *    in front whatever number the surface wears (`z-[45]` a transcript card, `z-[61]` a gutter widget)
+ *    and the press is its;
  *  - any panel that states it owns the key (`OWNS_ESCAPE`) — a Select opened INSIDE the fullscreen
  *    widget, the composer's menu — which is the contract every other Escape listener in this app
  *    already honours ("a new one claims the key the same way", above).

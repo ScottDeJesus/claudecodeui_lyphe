@@ -492,10 +492,11 @@ function WorkspaceMain({
           )}
 
           {/* No gate, for the same reason: what waits on the operator is the house's, not the open project's.
-              Its three bodies are each a full-height panel with a scroller of its own, so the pane just gives it the room. */}
+              Its three bodies are each a full-height panel with a scroller of its own, so the pane just gives it the room.
+              It is handed the projects only to name them: the Heal section's rules carry a transcript folder's slug. */}
           {activeTab === 'inbox' && (
             <div className="h-full overflow-hidden">
-              <InboxPanel />
+              <InboxPanel projectChoices={projectChoices} />
             </div>
           )}
 

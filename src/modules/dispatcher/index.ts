@@ -43,10 +43,6 @@ export { moveCard, useCardRanks } from '@/modules/dispatcher/cardOrderEntries';
 // `src/modules/station` (`CardStage`), for the feature or epic on Kaylee Station's stage.
 export { PlanCard } from '@/modules/dispatcher/PlanCard';
 export { DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
-// How full the planner lane is — `planners <out> of <lanes> out` — drawn from the frame's own route by
-// the header of the Roadmap tab's In flight face and the chat gutter's widget, and by neither when the
-// frame states none.
-export { PlannerLanesReadout } from '@/modules/dispatcher/PlannerLanesReadout';
 // The master controller — the Claude · DeepSeek house switch, the board's one Start and Pause all
 // — drawn from the frame's own route by the header of the Roadmap tab's In flight face and at the
 // top of the chat gutter's Runs widget (one component, two mounts), and not at all when the frame states no census.
@@ -66,10 +62,10 @@ export { SessionPin } from '@/modules/dispatcher/SessionPin';
 // Answer that opens its card: the inbox module's Roadmap section. The asks are this module's vocabulary, so the
 // list is drawn here and the Inbox only mounts it.
 export { WaitingAsks } from '@/modules/dispatcher/WaitingAsks';
-// One planner outing as one line — who is out, on what model, for how long — and the row of them for
-// the outings no card and no deck can carry. Drawn by the plan card's and the arc deck's own headers
-// inside this module, and by the In flight face and the chat gutter's widget above the arc decks for the rest.
-export { LoosePlannerBadges, PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
+// What is being planned, one line per feature or epic with who is doing it, on what model and for how long, and the
+// planning press on each — the one place Pause planning and Resume planning are pressed. Drawn first by both homes in
+// `src/modules/runner-tab`: the Roadmap tab's In flight face and the chat gutter's Runs widget.
+export { PlanningCard } from '@/modules/dispatcher/PlanningCard';
 // The dispatcher's sentence in the operator's words — arc, plan and phase said as epic, feature and
 // task. Read by the verbs' toasts and the plan card's captions inside this module, and by the roadmap
 // module's writes (`useRoadmapWrites`), whose refusal toast shows the dispatcher's first line through it.

@@ -28,7 +28,7 @@ import {
 } from '@/shared/ui';
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
-import type { QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
+import type { PendingSteer, QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
 import CommandMenu from '@/modules/chat/composer/CommandMenu';
 import ActivityIndicator from '@/modules/chat/composer/ActivityIndicator';
 import { ComposerAttachmentTray } from '@/modules/chat/composer/ComposerAttachmentTray';
@@ -37,6 +37,9 @@ import VoiceInputButton from '@/modules/chat/composer/VoiceInputButton';
 import PermissionRequestsBanner from '@/modules/chat/composer/PermissionRequestsBanner';
 import TokenUsageSummary from '@/modules/chat/composer/TokenUsageSummary';
 import QueuedMessageCard from '@/modules/chat/composer/QueuedMessageCard';
+import SteeredMessageCard from '@/modules/chat/composer/SteeredMessageCard';
+import { SendMenuPopover } from '@/modules/chat/composer/SendMenuPopover';
+import type { SendMenuChoice } from '@/modules/chat/composer/SendMenuPopover';
 import { ScheduleMessagePopover } from '@/modules/chat/composer/ScheduleMessagePopover';
 import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageList';
 import ComposerDeepSeekSwitch from '@/modules/chat/composer/ComposerDeepSeekSwitch';
@@ -49,6 +52,9 @@ type MentionableFile = {
   name: string;
   path: string;
 };
+
+// A stable empty default, so a composer with no steered messages does not get a new array each render.
+const NO_PENDING_STEERS: PendingSteer[] = [];
 
 type ChatComposerProps = {
   /** The chat this composer writes into, or null before it has one: the key its input box is registered under as a page anchor. */
@@ -108,6 +114,14 @@ type ChatComposerProps = {
   onCancelScheduledMessage: (id: string) => void;
   onEditQueuedDraft: () => void;
   onDeleteQueuedDraft: () => void;
+  /** Whether the provider can take a message into a running turn; gates the send button's hold-menu while a turn runs. False until the capability matrix has loaded, or for a provider it does not list. */
+  supportsSteering?: boolean;
+  /** Handles the hold-menu's choice: queue the typed message for after the turn, or steer it into the turn. */
+  onSendMenuChoice?: (choice: SendMenuChoice) => void;
+  /** Messages sent into the running turn that the agent has not read yet, each shown as a card above the composer until its echo lands in the transcript. */
+  pendingSteers?: PendingSteer[];
+  /** The provider's display name, for the steer card's sentence. */
+  providerLabel: string;
   attachedFiles: File[];
   onRemoveAttachment: (index: number) => void;
   /** The sentence for the files the last intake did not take; null when it took them all. */
@@ -194,6 +208,10 @@ export default function ChatComposer({
   onCancelScheduledMessage,
   onEditQueuedDraft,
   onDeleteQueuedDraft,
+  supportsSteering = false,
+  onSendMenuChoice,
+  pendingSteers = NO_PENDING_STEERS,
+  providerLabel,
   attachedFiles,
   onRemoveAttachment,
   refused,
@@ -237,6 +255,9 @@ export default function ChatComposer({
   // Send-later hangs off a press-and-hold on the SEND button; it has no button of its own.
   const sendButtonRef = useRef<HTMLButtonElement | null>(null);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  // The same hold, while a turn is running: it opens the Queue / Steer menu instead. Owned here for the same
+  // reason as the schedule panel's — this composer owns the button.
+  const [isSendMenuOpen, setIsSendMenuOpen] = useState(false);
   // The window the composer is drawn in: the command menu is placed against ITS viewport, and the
   // send button's hold is timed on it (a hidden opener throttles its timers).
   const hostWindow = useHostWindow();
@@ -247,6 +268,7 @@ export default function ChatComposer({
   // — without it, holding to schedule would ALSO send the message on release.
   const longPressFiredRef = useRef(false);
   const closeSchedule = useCallback(() => setIsScheduleOpen(false), []);
+  const closeSendMenu = useCallback(() => setIsSendMenuOpen(false), []);
   const getSendButton = useCallback(() => sendButtonRef.current, []);
   const fileDropdownRef = useRef<HTMLDivElement | null>(null);
   const selectedFileRef = useRef<HTMLDivElement | null>(null);
@@ -313,6 +335,17 @@ export default function ChatComposer({
   // in each case holding must do nothing rather than open a menu that cannot act.
   const canScheduleFromSend = !isLoading && !isRecording && !isTranscribing && input.trim().length > 0;
 
+  // While a turn is running, a typed message can be queued for after it (a tap on send) or sent into it. A
+  // slash command is a turn of its own and always waits, so it is offered no steering.
+  const canQueueDraft = isLoading && Boolean(input.trim() || attachedFiles.length > 0);
+  const canSteerFromSend = canQueueDraft && supportsSteering && !isRecording && !isTranscribing
+    && !input.trimStart().startsWith('/');
+  const canHoldSend = canScheduleFromSend || canSteerFromSend;
+  // A menu taken away under the hand (the text cleared, the turn ended) must not leave its flag standing, or it would
+  // come back, with no hold, the next time a message is typed during a turn. Set while rendering, which React re-runs
+  // at once (as `Select` does for a picker that turns disabled), so the stale flag is never committed.
+  if (isSendMenuOpen && !canSteerFromSend) setIsSendMenuOpen(false);
+
   const cancelLongPress = useCallback(() => {
     const pending = longPressTimerRef.current;
     if (pending) {
@@ -328,16 +361,22 @@ export default function ChatComposer({
     // well mean "stop".
     longPressFiredRef.current = false;
     cancelLongPress();
-    if (!canScheduleFromSend) return;
+    if (!canHoldSend) return;
+    // Which panel the hold opens is decided when it is pressed, not when it fires.
+    const opensSchedule = canScheduleFromSend;
     longPressTimerRef.current = {
       id: hostWindow.setTimeout(() => {
         longPressTimerRef.current = null;
         longPressFiredRef.current = true;
-        setIsScheduleOpen(true);
+        if (opensSchedule) {
+          setIsScheduleOpen(true);
+        } else {
+          setIsSendMenuOpen(true);
+        }
       }, LONG_PRESS_MS),
       armedOn: hostWindow,
     };
-  }, [canScheduleFromSend, cancelLongPress, hostWindow]);
+  }, [canHoldSend, canScheduleFromSend, cancelLongPress, hostWindow]);
 
   // A timer left running past unmount would call setState on a dead component.
   useEffect(() => cancelLongPress, [cancelLongPress]);
@@ -347,7 +386,6 @@ export default function ChatComposer({
   const hasActivityIndicator = Boolean(activity && !hasPendingPermissions);
 
   const hasQueuedDraft = Boolean(queuedDraft);
-  const canQueueDraft = isLoading && Boolean(input.trim() || attachedFiles.length > 0);
   const submitAriaLabel = canQueueDraft
     ? hasQueuedDraft
       ? t('input.queue.append', { defaultValue: 'Add to queued message' })
@@ -358,7 +396,9 @@ export default function ChatComposer({
 
   const sendLabelWithHint = canScheduleFromSend
     ? `${submitAriaLabel} — ${t('schedule.holdHint', { defaultValue: 'hold to send later' })}`
-    : submitAriaLabel;
+    : canSteerFromSend
+      ? `${submitAriaLabel} — ${t('input.steer.holdHint', { defaultValue: 'hold to steer' })}`
+      : submitAriaLabel;
 
   return (
     <div className="chat-composer-shell relative flex-shrink-0 px-2 pb-2 pt-0 sm:px-4 sm:pb-4 md:px-4 md:pb-6">
@@ -404,6 +444,10 @@ export default function ChatComposer({
           </button>
         </div>
       )}
+
+      {pendingSteers.map((steer) => (
+        <SteeredMessageCard key={steer.messageId} steer={steer} providerLabel={providerLabel} />
+      ))}
 
       {queuedDraft && (
         <QueuedMessageCard
@@ -636,7 +680,7 @@ export default function ChatComposer({
               onContextMenu={(e: MouseEvent<HTMLButtonElement>) => {
                 // Holding a button raises the platform's own callout on some phones, which
                 // would cover the menu the same gesture just opened.
-                if (canScheduleFromSend) e.preventDefault();
+                if (canHoldSend) e.preventDefault();
               }}
               onClickCapture={(e: MouseEvent<HTMLButtonElement>) => {
                 if (!longPressFiredRef.current) return;
@@ -689,6 +733,14 @@ export default function ChatComposer({
               onClose={closeSchedule}
               getTrigger={getSendButton}
               onSchedule={onScheduleMessage}
+            />
+            {/* The same button's hold while a turn runs. Its flag is cleared the moment a message can no longer be
+                steered (above), so a turn that ends under the open menu takes it away for good. */}
+            <SendMenuPopover
+              isOpen={isSendMenuOpen}
+              onClose={closeSendMenu}
+              getTrigger={getSendButton}
+              onSelect={(choice) => onSendMenuChoice?.(choice)}
             />
           </div>
 

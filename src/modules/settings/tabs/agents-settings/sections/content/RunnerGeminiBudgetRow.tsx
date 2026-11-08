@@ -26,7 +26,7 @@ function dollars(usd: number): string {
  * `/api/settings/gemini-plan-cap`). One cap binds every budget on the host, each plan's and each chain's that
  * no plan owns, so it is drawn under Park at peak, among the dispatcher's host-wide dials.
  *
- * Its own file, as `RunnerPlannerLanesRow` is: a row whose read, write and re-read are its own hook
+ * Its own file, as `RunnerParkAtPeakRow` is: a row whose read, write and re-read are its own hook
  * (`useGeminiPlanCap`) shares nothing with the rows around it except their grammar — the unknown amount said
  * in words, the retry in the control's slot.
  *

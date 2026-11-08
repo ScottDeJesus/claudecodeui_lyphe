@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { epochOf, plannerStatusTone } from '@/modules/dispatcher/dispatcherState';
-import { operatorWords } from '@/modules/dispatcher/operatorWords';
-import { PaceOverride } from '@/modules/dispatcher/PaceOverride';
+import { operatorWords, soulWord } from '@/modules/dispatcher/operatorWords';
 import { useElapsed } from '@/shared/hooks/useElapsed';
 import { Badge } from '@/shared/ui';
 import type { DispatcherPlanner } from '@/shared/types';
@@ -16,7 +15,8 @@ import type { DispatcherPlanner } from '@/shared/types';
  * whom. The line reads `Eupalinos · designing · opus · 12m`.
  *
  * NOTHING HERE IS DERIVED. The soul and the model are the row's own words; the work word is the row's
- * `verb` and `state` read through the two tables below; the clock is `useElapsed`, the app's ONE
+ * `verb` and `state` read through the table below, the soul's name through `soulWord` (`operatorWords.ts`,
+ * which the Planning card's lines read too); the clock is `useElapsed`, the app's ONE
  * spelling of elapsed (`PlanClock` reads it the same way, and the composer's clock before it); the
  * tone is `plannerStatusTone`, beside every other tone of this lane's vocabulary.
  *
@@ -29,19 +29,10 @@ import type { DispatcherPlanner } from '@/shared/types';
  * `data-planner-badge`, `data-planner-target`, `data-planner-soul` and `data-planner-state` are the
  * browser harness's handles, so a probe reads one outing's mark without reading the card's text.
  *
- * Used on the head's lead row of `PlanCard` and `DispatchArcDeck` (`PlannerBadge`), and by both homes —
- * the Roadmap tab's In flight face and the chat gutter's widget — for the outings that have no card and
- * no deck to be drawn in (`LoosePlannerBadges`).
+ * Used on the head's lead row of `PlanCard` and `DispatchArcDeck`. Every outing, carried or loose, is also a
+ * line of the Planning card (`PlanningCard`), which words it for a reader triaging what is being planned — but a
+ * feature's while its epic's pause holds it, which the epic's own line says.
  */
-
-/**
- * The soul's name as a reader says it, by the store's own id — and an id this build has never heard of
- * falls back to the id ITSELF (below), because a soul nobody has translated is still a soul to name.
- */
-const SOUL_KEYS: Record<string, string> = {
-  'eupalinos': 'dispatcher.planner.soul.eupalinos',
-  'odysseus': 'dispatcher.planner.soul.odysseus',
-};
 
 /**
  * What the outing is doing while it is OUT, by its verb — a total table, because the verb is a closed
@@ -55,24 +46,6 @@ const WORK_KEYS: Record<DispatcherPlanner['verb'], string> = {
   cut: 'dispatcher.planner.cutting',
 };
 
-/**
- * `SOUL_KEYS` read as an OWN property, or `undefined` — which is what the fallback below tests.
- *
- * A PLAIN LOOKUP ANSWERS FOR EVERY MEMBER `Object.prototype` CARRIES: `SOUL_KEYS['__proto__']` is
- * `Object.prototype` and `['constructor']` is `Object`, so an id that collided with one of those would
- * never be `undefined`, the fallback would not fire, and i18next would be handed an OBJECT — the badge
- * drawing `[object Object]` where the soul's own id belongs. No row the store writes can name such a
- * soul today (`planners.queue_planner` vets a planner's verb against `souls.PLANNER_AGENTS`), and this
- * is the one word that keeps that a fact rather than a hope about a future soul id. The house's own
- * idiom, the shape `SidebarSessionIcon` and `kanban-attachments.service` read their tables with.
- *
- * `WORK_KEYS` needs no such reading: its key set is the CLOSED union `planner.verb`, refused by name in
- * the reader (`dispatcher-planner.reader.ts`), so nothing can reach it that the literal does not hold.
- */
-function soulKeyOf(soul: string): string | undefined {
-  return Object.prototype.hasOwnProperty.call(SOUL_KEYS, soul) ? SOUL_KEYS[soul] : undefined;
-}
-
 /** One outing as its badge: the soul, the work, the model and — while it is queued or out — the clock. */
 export function PlannerBadge({ planner }: { planner: DispatcherPlanner }) {
   const { t } = useTranslation();
@@ -83,7 +56,6 @@ export function PlannerBadge({ planner }: { planner: DispatcherPlanner }) {
   const since = ended ? null : epochOf(planner.state === 'queued' ? planner.created_at : planner.launched_at);
   const elapsed = useElapsed(since);
 
-  const soulKey = soulKeyOf(planner.soul);
   const work = ended
     ? planner.outcome === null
       ? t('dispatcher.planner.endedShort')
@@ -92,7 +64,7 @@ export function PlannerBadge({ planner }: { planner: DispatcherPlanner }) {
       ? t('dispatcher.planner.queued')
       : t(WORK_KEYS[planner.verb]);
 
-  const line = [soulKey === undefined ? planner.soul : t(soulKey), work, planner.model, elapsed]
+  const line = [soulWord(t, planner.soul), work, planner.model, elapsed]
     .filter(Boolean)
     .join(' · ');
 
@@ -107,50 +79,5 @@ export function PlannerBadge({ planner }: { planner: DispatcherPlanner }) {
     >
       {line}
     </Badge>
-  );
-}
-
-/**
- * The outings with no card and no deck to be drawn in, one badge each, in the lane's own order.
- *
- * AN ARC'S DESIGN BEFORE ITS ARC FILE LOADS IS THE CASE THIS EXISTS FOR: `dispatcher design <arc>
- * --arc` writes a planner row for a name the store holds no arc for yet, and until the arc's own file
- * is loaded no plan and no arc on the screen answers to it. The row is the ONLY thing that says an arc
- * is being designed, so the tab and the gutter draw it above the decks rather than nowhere
- * (`useDispatcherPlans` answers which entries those are).
- *
- * THE PACER'S HOLD ON SUCH AN OUTING IS DRAWN HERE, because here is its only card: with no plan card and no
- * deck, nothing else could carry the Override of a design the pacer has not let out. The row's own clause and
- * override state ride on it (`planner.pace_hold`, `planner.overridden`, the dispatcher's readings off the one
- * walk), and the press is the dispatcher's `override <name>`, which resolves the name — an epic's, or a plan's
- * whose card is put away — so the epic's door relays both. An outing with a card or a deck is held on THAT
- * card and never here, so each hold has one press.
- *
- * IT DRAWS NOTHING AT ALL WHEN THERE ARE NONE, and returns `null` rather than an empty row: an
- * operator who was never in this state sees the pane exactly as it was before badges existed.
- *
- * Used by `RunnerPanel` (the tab), immediately above `DispatchArcDecks`, and `RunnerWidgetBody` (the
- * gutter), immediately above its list of decks and cards.
- */
-export function LoosePlannerBadges({
-  planners,
-}: {
-  /** The entries that name no plan and no arc the lane draws (`useDispatcherPlans`). */
-  planners: readonly DispatcherPlanner[];
-}) {
-  if (planners.length === 0) return null;
-  return (
-    // Flush in both homes: the tab's scroll body and the widget's card own the inset, exactly as they
-    // do for the decks under it, so a badge stands over the decks it belongs to.
-    <ul data-loose-planners className="flex min-w-0 flex-wrap items-center gap-2">
-      {planners.map((planner) => (
-        <li key={planner.id} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <PlannerBadge planner={planner} />
-          {(planner.pace_hold || planner.overridden) && (
-            <PaceOverride name={planner.target} hold={planner.pace_hold} overridden={planner.overridden} scope="arc" />
-          )}
-        </li>
-      ))}
-    </ul>
   );
 }

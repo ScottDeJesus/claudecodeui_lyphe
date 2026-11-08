@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
  *
  * The interval lives and dies with the component that calls this. The callers are the account
  * panel's body — mounted ONLY while the popover is open or the gutter widget is unfolded — and the
- * usage rings on the views rail, which stand whenever the rail does. The tick is a clock and never a
+ * usage ring on the views rail, which stands whenever the rail does. The tick is a clock and never a
  * read: it fetches nothing, it only redraws a countdown, or a window that has just passed its reset.
  *
  * The first tick is aligned to the next real minute boundary rather than set a flat 60s from

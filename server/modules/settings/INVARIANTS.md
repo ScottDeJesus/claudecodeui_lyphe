@@ -11,7 +11,7 @@
 
 THE ON/OFF FLAGS ARE THE SAME RULE IN A SECOND READER: `readFlagFile` (`deepseek-flash-switch.ts`: the DeepSeek flag, `custom_compaction`, `dactyls`, `main_session_dactyls`, the three Jev flags, `park_at_peak`) opens `O_NONBLOCK` and answers OFF for anything but a regular file within `FLAG_MAX_BYTES`. A blocking open there held a libuv thread per FIFO, so four such reads stalled every other file read of the process.
 
-A third reader, `readFlagWord` (`server/shared/utils.ts`: `planner-lanes.ts`, `weekly-stop.ts`), `stat`s the path first and answers `null` for a FIFO (`isFile()` false) before any open.
+A third reader, `readFlagWord` (`server/shared/utils.ts`, used by `weekly-stop.ts`), `stat`s the path first and answers `null` for a FIFO (`isFile()` false) before any open.
 
 The Python twin agrees: `ledger.cap_usd()` opens `O_NONBLOCK` and reads a FIFO as empty, `5.0` (MAN-8959).
 

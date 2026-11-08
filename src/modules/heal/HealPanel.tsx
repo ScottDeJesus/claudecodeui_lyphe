@@ -7,9 +7,11 @@ import { HealCardList } from '@/modules/heal/HealCardList';
 import { HealCycleList } from '@/modules/heal/HealCycleList';
 import { HealKindList } from '@/modules/heal/HealKindList';
 import { HealPills } from '@/modules/heal/HealPills';
+import { HealRuleList } from '@/modules/heal/HealRuleList';
 import { HealSettingsDialog } from '@/modules/heal/HealSettingsDialog';
 import { useHeal } from '@/modules/heal/context/HealContext';
 import type { HealPillKey } from '@/modules/heal/healTypes';
+import type { ProjectChoice } from '@/shared/types';
 import { Badge, Button, EmptyState, ScrollArea, Spinner, Tooltip } from '@/shared/ui';
 
 /**
@@ -31,23 +33,29 @@ const PILL_TARGET: Record<HealPillKey, string | 'settings'> = {
  * ORDERED THE WAY A READER TRIAGES. The header is the house panel header — the mark, the title, and
  * one cog for the settings. Under it the toolbar (`HealActions`): the model and the cycle's Start/Stop,
  * the verbs a reader arrives for. Then the vitals (the pills — five numbers, each in the tone that
- * says whether to act), then friction BY KIND with any regression at the top, and — in the heals
- * column — the CYCLES above the heals: what last night did is the question, and a heal is one line
- * of a cycle's answer.
+ * says whether to act), then friction BY KIND with any regression at the top, then the RULES — the
+ * corrections he said again, each in his own words with the rows it came from, waiting in Memory for
+ * his press — and, in the heals column, the CYCLES above the heals: what last night did is the
+ * question, and a heal is one line of a cycle's answer.
  *
- * THE DESKTOP IS NOT A PHONE. Once the PANEL is 48rem wide the body is two columns — friction by kind on the wider left
- * (3fr), heals on the right (2fr) — each its own scroll region, so a long kind list never pushes the
- * heals off screen; the pills span both above them. Narrower, everything stacks in one scroll, the
- * shape a phone needs. The query is the panel's own width (`container-type` on the root), never the
- * window's: a 1024px window minus the sidebar leaves a panel too narrow for two columns, and a
- * viewport breakpoint split it anyway and clipped the kind rows.
+ * THE DESKTOP IS NOT A PHONE. Once the PANEL is 48rem wide the body is two columns — friction by kind with the
+ * rules under it on the wider left (3fr), heals on the right (2fr) — each section its own scroll region, so a
+ * long kind list never pushes the rules or the heals off screen; the pills span both above them. Narrower,
+ * everything stacks in one scroll, in the order kinds, rules, heals — the shape a phone needs. The query is
+ * the panel's own width (`container-type` on the root), never the window's: a 1024px window minus the
+ * sidebar leaves a panel too narrow for two columns, and a viewport breakpoint split it anyway and clipped
+ * the kind rows.
  *
  * THREE NON-LIST STATES, EACH ITS OWN FACT. Not asked yet is a spinner; a ledger that could not be
  * read is a plug-out with the reason under it and the way back; a ledger that answered with nothing
  * is the pills over an empty list — the cog still live, because a reader with no friction may still
  * have a cap to set or a refusal to ignore.
+ *
+ * Used by the inbox module's InboxPanel as its Heal section, through this module's barrel (lazily). The Inbox
+ * hands it the projects the workspace holds (`projectChoices`), so the Rules section names a rule's project the
+ * way the sidebar does rather than by the slug of its transcript folder.
  */
-export function HealPanel() {
+export function HealPanel({ projectChoices }: { projectChoices: readonly ProjectChoice[] }) {
   const { t } = useTranslation();
   // The context owns the poll — one `--status` read a minute, plus a visibilitychange — and this
   // panel draws what it last read. The state is the context's own union, never a second one here.
@@ -132,13 +140,33 @@ export function HealPanel() {
                 <HealPills summary={state.summary} activePill={activePill} onSelect={onPillSelect} />
               </div>
 
-              <HealSection
-                id="heal-kinds"
-                title={t('heal.kinds.title', { defaultValue: 'Friction by kind' })}
-                hint={t('heal.kinds.hint', { defaultValue: 'the door’s own word — what a heal is scoped to' })}
+              {/* The left column takes the cell the kinds held alone, so the body's grid and the heals keep theirs. Inside it
+                  each section takes what it needs and the two split the column evenly once both overflow, each scrolling in
+                  its half: 22 kinds already overflow the column alone, so one shared scroll would put the rules a screen
+                  below the fold. On the one-column stack the wrapper is the body's own gap-6 flow, so a phone reads kinds,
+                  rules, heals in source order. */}
+              <div
+                className="flex min-w-0 flex-col gap-6 [@container(min-width:48rem)]:grid [@container(min-width:48rem)]:min-h-0 [@container(min-width:48rem)]:grid-rows-[minmax(0,auto)_minmax(0,auto)] [@container(min-width:48rem)]:gap-5"
+                data-heal-column="left"
               >
-                <HealKindList kinds={state.summary.kinds} />
-              </HealSection>
+                <HealSection
+                  id="heal-kinds"
+                  title={t('heal.kinds.title', { defaultValue: 'Friction by kind' })}
+                  hint={t('heal.kinds.hint', { defaultValue: 'the door’s own word — what a heal is scoped to' })}
+                >
+                  <HealKindList kinds={state.summary.kinds} />
+                </HealSection>
+
+                {/* `rules` is absent on a worker that predates the section: that reads as none, never as a broken tab. */}
+                <HealSection
+                  id="heal-rules"
+                  title={t('heal.rules.title', { defaultValue: 'Rules' })}
+                  hint={t('heal.rules.hint', { defaultValue: 'corrections you said again, in your own words' })}
+                  count={(state.summary.rules?.length ?? 0) + (state.summary.rules_more ?? 0)}
+                >
+                  <HealRuleList rules={state.summary.rules ?? []} more={state.summary.rules_more ?? 0} projectChoices={projectChoices} />
+                </HealSection>
+              </div>
 
               <HealSection id="heal-heals" title={t('heal.cards.title', { defaultValue: 'Heals' })} count={state.summary.heals.length}>
                 <div className="flex min-w-0 flex-col gap-4">

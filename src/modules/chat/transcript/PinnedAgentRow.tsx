@@ -25,7 +25,7 @@ type PinnedAgentRowProps = {
   summary: SubagentSummary;
   /** The provider it ran on: its mark is the row's, Claude's being the mascot the chat draws. The robot stands in only when none is known. */
   provider?: SubagentMarkProvider;
-  /** The name a person calls the model it runs on (`Opus 5.5`), drawn after the agent's name. Absent while its record names no model the catalog knows. */
+  /** The name a person calls the model it runs on (`Opus 5.5`), drawn after the agent's name. Absent while its record names no model, or one nothing names. */
   modelLabel?: string | null;
   onDismiss: (id: string) => void;
   /** Opens this row's transcript — in place in the gutter's widget, in a dialog from the strip. */

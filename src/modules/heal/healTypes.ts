@@ -18,6 +18,8 @@
  * These shapes are the tab's reading of the worker's `--status` payload. Nothing here fetches.
  */
 
+import type { HealRule } from '@/modules/heal/healRuleTypes';
+
 /** The door's own word. Free text: the set grows as doors are added, so it is never an enum. */
 export type HealKind = string;
 
@@ -288,6 +290,10 @@ export type HealSummary = {
   /** The open cycle's id, or null when none is open. */
   cycle_open: string | null;
   cycle_state: HealCycleState;
+  /** The returning corrections, newest citation first, up to twenty. Absent reads as none: an older worker never breaks the tab. */
+  rules?: HealRule[];
+  /** How many rules the summary did not send. Absent reads as zero. */
+  rules_more?: number;
 };
 
 /** What the screen is showing: the three facts a reader can be told, never conflated. */

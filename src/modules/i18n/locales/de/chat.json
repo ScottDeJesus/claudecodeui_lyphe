@@ -117,7 +117,15 @@
     "deepseekFlashReading": "Der Schalter wird gelesen…",
     "deepseekFlashUnreadable": "Der Schalter konnte nicht gelesen werden — zum erneuten Versuch tippen.",
     "clearInput": "Eingabe leeren",
-    "scrollToBottom": "Nach unten scrollen"
+    "scrollToBottom": "Nach unten scrollen",
+    "steer": {
+      "label": "Steuern",
+      "sending": "Wird gesendet…",
+      "willRead": "{{provider}} liest es beim nächsten Tool-Aufruf",
+      "holdHint": "zum Steuern gedrückt halten",
+      "attachments_one": "{{count}} Datei angehängt",
+      "attachments_other": "{{count}} Dateien angehängt"
+    }
   },
   "providerSelection": {
     "title": "KI-Assistent wählen",
@@ -245,6 +253,17 @@
     "json": {
       "label": "JSON (.json)",
       "description": "Alle Nachrichten, unformatiert, für Tools."
+    }
+  },
+  "sendMenu": {
+    "trigger": "Sendeoptionen",
+    "queue": {
+      "label": "In Warteschlange stellen",
+      "descriptionResponding": "Senden, wenn dieser Durchlauf endet"
+    },
+    "steer": {
+      "label": "Steuern",
+      "description": "In diesen Durchlauf senden; wird beim nächsten Tool-Aufruf gelesen"
     }
   },
   "schedule": {

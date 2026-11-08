@@ -26,6 +26,29 @@ const SUMMARY_ARRAYS = ['kinds', 'heals', 'ignore', 'cycles'] as const;
  */
 const SWITCH_KEYS = ['master', 'daily_cap', 'model', 'cycle'] as const;
 
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * Whether the summary's optional `rules` and `rules_more` are what the Rules section can walk without a guard of its
+ * own. An ABSENT key reads as none — an older worker never breaks the tab — but a key that is there is walked by the
+ * cards: `rules.map`, `rule.rows.map`, each row's time, `decision.decided_at`. A wrong shape throws inside the panel and
+ * the workspace's boundary answers by blanking the whole main region, kinds and heals with it, so it is refused here,
+ * for the reason `summaryOf` gives, and the panel says it could not be read. Only what the cards dereference is checked:
+ * an unknown shelf, state or decision status is a word they already read as unknown, and `decision: null` is a rule
+ * found on a shelf (an absent `decision` key is not that).
+ */
+function rulesAreWalkable(rules: unknown, more: unknown): boolean {
+  if (more !== undefined && more !== null && typeof more !== 'number') return false;
+  if (rules === undefined || rules === null) return true;
+  if (!Array.isArray(rules)) return false;
+  const list: readonly unknown[] = rules;
+  return list.every((rule) => isRecord(rule)
+    && typeof rule.quote === 'string'
+    && (rule.decision === null || isRecord(rule.decision))
+    && Array.isArray(rule.rows)
+    && rule.rows.every((row: unknown) => isRecord(row) && typeof row.ts === 'number'));
+}
+
 /**
  * The body as a summary, or a throw the caller turns into `phase: 'error'`.
  *
@@ -46,7 +69,9 @@ function summaryOf(body: unknown): HealSummary {
     && SWITCH_KEYS.every((key) => key in switches)
     && SUMMARY_ARRAYS.every((key) => Array.isArray(summary[key]))
     // The Cycle pill prints `cycle_state.text` on its first render: an absent state is a refusal too.
-    && typeof summary.cycle_state === 'object' && summary.cycle_state !== null;
+    && typeof summary.cycle_state === 'object' && summary.cycle_state !== null
+    // The Rules section walks `rules` unguarded whenever the key is there, so a wrong shape is a refusal too.
+    && rulesAreWalkable(summary.rules, summary.rules_more);
   if (!drawn) throw new Error('the heal worker did not answer with a summary');
   return summary as HealSummary;
 }
