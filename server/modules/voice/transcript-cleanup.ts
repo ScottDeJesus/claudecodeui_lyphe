@@ -280,7 +280,8 @@ function removeDisfluencies(text: string): string {
  * `cleanTranscripts`; off keeps every um and repeat as said), then, after that and whatever the switch says, each misheard form
  * of a house word in `vocabulary` replaced by its spelling. An empty vocabulary is how that second step is turned off. Text
  * with nothing to change comes back byte for byte; a lone "Um." with fillers removed is `''`.
- * Consumed by `voice-provider.ts` (the chat mic's OpenAI branch) and `gemini-transcribe.ts` (the Gemini branch and Kaylee's press).
+ * Consumed by `voice-provider.ts` (the chat mic's OpenAI branch), `local-transcribe.ts` (the local hearing the chat mic's Gemini
+ * branch and Kaylee's press try first) and `gemini-transcribe.ts` (the Gemini fallback behind it).
  */
 export function cleanTranscript(text: string, options: { removeFillers: boolean; vocabulary: readonly VocabularyEntry[] }): string {
   const withoutDisfluencies = options.removeFillers ? removeDisfluencies(text) : text;

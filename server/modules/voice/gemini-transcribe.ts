@@ -134,8 +134,9 @@ function answerFrom(attempt: Attempt, key: string): TranscribeAnswer {
  * failure; it answers `no_key` (no request made), `refused` (Google refused the key) or `failed` as a sentence
  * ready to show. NOT COUNTED against any Gemini budget (the operator's ruling): no admit before, no record after.
  * One log line per call, never the key.
- * Consumed by `voice-provider.ts` (the chat mic when the account's provider is Gemini) and, through the voice
- * barrel as `transcribeSpeech`, by the companion's press door (she always hears through Gemini).
+ * Consumed by `transcribe-speech.ts`, the one door for the chat mic (when the account's provider is Gemini) and the
+ * companion's press: it asks the local speech-to-text service first and comes here only when that gives no words (it missed,
+ * or answered that the clip holds none).
  */
 export async function transcribeWithGemini(userId: number, audio: VoiceAudioUpload): Promise<TranscribeAnswer> {
   const startedAt = Date.now();
@@ -158,7 +159,7 @@ export async function transcribeWithGemini(userId: number, audio: VoiceAudioUplo
       generationConfig: { temperature: 0 },
     });
     answer = answerFrom(await postWithRetry(`${GEMINI_MODELS_URL}/${encodeURIComponent(model)}:generateContent`, key, body), key);
-    // After the no-speech reading (`readTranscript` has already turned `[no speech]` into ''), and the only place a Gemini transcript is cleaned and corrected: the chat mic's Gemini branch and Kaylee's press both come through here, and Kaylee's name cut (`companion-press.ts`) reads what this answers.
+    // After the no-speech reading (`readTranscript` has already turned `[no speech]` into ''), and the only place a Gemini transcript is cleaned and corrected: the chat mic's Gemini branch and Kaylee's press reach it through `transcribeSpeech` when the local service gives no words, and Kaylee's name cut (`companion-press.ts`) reads the text that comes out.
     if (answer.ok) answer = { ok: true, text: cleanTranscript(answer.text, { removeFillers: cleanTranscripts, vocabulary }) };
   }
 

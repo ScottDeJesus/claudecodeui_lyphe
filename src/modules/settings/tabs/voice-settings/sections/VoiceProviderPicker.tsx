@@ -13,8 +13,8 @@ type VoiceProviderPickerProps = {
  * The chat's voice provider: Gemini or OpenAI-compatible, as the kit's SegmentedControl (a radio group, the arrows moving
  * the choice) in the kit's Field, labelled "Voice service" with "Which service hears the chat's mic and speaks its read-aloud."
  * under it. Composed for the settings module's VoiceSettingsTab, at the head of the backend section, above the OpenAI-compatible
- * fields, which stand only while 'openai' is picked. It governs the chat's mic and its read-aloud: Kaylee hears and speaks
- * through Gemini whatever it says.
+ * fields, which stand only while 'openai' is picked. It governs the chat's mic and its read-aloud: Kaylee speaks through
+ * Gemini, and hears on the local speech-to-text service first and Gemini after, whatever it says.
  */
 export function VoiceProviderPicker({ value, onChange }: VoiceProviderPickerProps) {
   const { t } = useTranslation('settings');

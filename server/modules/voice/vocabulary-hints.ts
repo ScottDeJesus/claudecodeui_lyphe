@@ -28,7 +28,8 @@ export function geminiVocabularyBlock(vocabulary: readonly VocabularyEntry[]): s
 /**
  * Whisper's `prompt` for the account's vocabulary: the spellings as a short list of names, which steers its spelling of them
  * (it takes no instruction, only text to continue in the style of). Entries are dropped from the END, whole, until it fits
- * `WHISPER_PROMPT_MAX_CHARS`; empty for an empty vocabulary, and the caller then sends no prompt. Consumed by `voice-provider.ts`.
+ * `WHISPER_PROMPT_MAX_CHARS`; empty for an empty vocabulary, and the caller then sends no prompt. Consumed by `voice-provider.ts` and
+ * `local-transcribe.ts`, whose service reads the same list as the names to respell sound-alikes to.
  */
 export function whisperVocabularyPrompt(vocabulary: readonly VocabularyEntry[]): string {
   const names: string[] = [];

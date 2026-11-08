@@ -37,7 +37,7 @@ const SEED = ((): readonly VocabularyEntry[] => {
  * The account's vocabulary, read fresh on every call (never cached, so a saved entry applies on the next press with no restart):
  * its own saved list when it has one, an emptied list included, else the seed. A stored list that fails its check reads as
  * never saved. A copy either way: a caller that edits its list edits neither the seed nor the next read.
- * Consumed by `gemini-transcribe.ts` and `voice-provider.ts` (both transcribers, the net and the hints), `gemini-speech.ts`
+ * Consumed by `gemini-transcribe.ts`, `local-transcribe.ts` and `voice-provider.ts` (every transcriber, the net and the hints), `gemini-speech.ts`
  * and `voice-provider.ts` (the respelling for speech) and the vocabulary routes.
  */
 export function readVocabulary(userId: number): VocabularyEntry[] {

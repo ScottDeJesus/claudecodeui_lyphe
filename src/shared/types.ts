@@ -1016,11 +1016,12 @@ export type VoicePlayState = 'idle' | 'loading' | 'playing';
 //----------------- CHAT VOICE PROVIDER AND GEMINI VOICE SETTINGS ------------
 
 /**
- * Which backend hears the chat composer's mic and speaks the chat's read-aloud for the account: 'gemini' (the default: Gemini
- * on the server's key, with no key or header from the browser) or 'openai' (the OpenAI-compatible backend, which an account
+ * Which backend hears the chat composer's mic and speaks the chat's read-aloud for the account: 'gemini' (the default: the
+ * server hears the mic on its own speech-to-text service first and on its Gemini key when that gives no words, and speaks
+ * read-aloud on that key, with no key or header from the browser) or 'openai' (the OpenAI-compatible backend, which an account
  * that stored it keeps). Client mirror of the server's `VoiceProvider`. Read by the settings module's provider picker and
  * voice-settings hook, and by the chat module's provider hook, `transcribeVoice` and `synthesizeVoice`, which route the clip
- * and the text on it. It governs the chat alone: Kaylee hears and speaks through Gemini whatever it says.
+ * and the text on it. It governs the chat alone: Kaylee speaks through Gemini and hears the way 'gemini' does, whatever it says.
  */
 export type VoiceProvider = 'openai' | 'gemini';
 

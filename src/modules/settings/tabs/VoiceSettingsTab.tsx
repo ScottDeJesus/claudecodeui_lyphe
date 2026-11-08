@@ -28,10 +28,10 @@ function Field({ label, ...props }: { label: string } & InputHTMLAttributes<HTML
  * Rendered by Settings for the "voice" tab: voice on or off; with it on, the chat's provider (VoiceProviderPicker: Gemini or
  * an OpenAI-compatible backend, for the mic and read-aloud alike) heading the backend section. The OpenAI-compatible fields
  * under it (base URL, key, speech-to-text model, speech model, voice, format) stand only while that provider is picked: on
- * Gemini the server hears and speaks on its own key, in the speech model and voice of the Gemini section below, so those
+ * Gemini the server hears on its own speech-to-text service, then on its own key, and speaks on that key, in the speech model and voice of the Gemini section below, so those
  * fields would change nothing. Then, whether or not voice is on, the transcript-cleanup switch (it governs the chat mic and
  * Kaylee's presses alike), the vocabulary of house words (VocabularySection: misheard spellings corrected for both ears, and
- * how Kaylee says each), Gemini (GeminiVoiceSection), because Kaylee hears and speaks through Gemini always, and her own section.
+ * how Kaylee says each), Gemini (GeminiVoiceSection), because Kaylee speaks through Gemini always and hears through it whenever the local speech-to-text service gives no words, and her own section.
  */
 export default function VoiceSettingsTab() {
   const { t } = useTranslation('settings');
@@ -129,7 +129,7 @@ export default function VoiceSettingsTab() {
       {/* Whether or not voice is on, whichever provider is picked: the words both ears correct and Kaylee's voice respells. It reads and saves for itself. */}
       <VocabularySection />
 
-      {/* Whether or not voice is on: Kaylee hears and speaks through Gemini whatever the picker says. */}
+      {/* Whether or not voice is on: Kaylee speaks through Gemini, and hears through it when the local speech-to-text service gives no words, whatever the picker says. */}
       <GeminiVoiceSection
         keyStatus={keyStatus}
         transcriptionModel={voiceSettings?.gemini.transcriptionModel ?? ''}

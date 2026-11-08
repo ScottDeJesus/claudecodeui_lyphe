@@ -28,7 +28,8 @@ function checkVoiceHealth(): Promise<boolean> {
  * Whether the voice control for `purpose` should be drawn: 'speak' is read-aloud (the default, MessageSpeakControl) and
  * 'dictate' is the composer's mic (ChatComposer).
  *
- * Both controls follow the account's provider. On Gemini the server transcribes and speaks on its own key, so the browser needs
+ * Both controls follow the account's provider. On Gemini the server transcribes (on its own speech-to-text service first, on its
+ * Gemini key when that gives no words) and speaks on its key, so the browser needs
  * no backend: the mic is drawn whenever voice input is on, and read-aloud is drawn when the server's health says the account has a
  * Gemini key in reach (the browser's own base URL is never reached on Gemini, so it does not count). On the OpenAI-compatible
  * provider both answers are the browser's base URL or the proxy's configuration, which the server's health reports.

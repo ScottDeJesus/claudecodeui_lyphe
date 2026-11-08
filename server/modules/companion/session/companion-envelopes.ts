@@ -184,7 +184,7 @@ export function operatorEnvelope(text: string, via: 'typed' | 'spoken'): string 
 /**
  * `<operator via="spoken" heard="nothing"></operator>`: a press of the talk button that carried no
  * words she could hear. Consumed by the companion session's `pushOperatorEmpty`, which the press door
- * (`companion-press.ts`) calls for a clip too short to hold words or one Gemini heard nothing in.
+ * (`companion-press.ts`) calls for a clip too short to hold words or one the hearing found nothing in.
  */
 export function emptyPressEnvelope(): string {
   return `${openTag('operator', [['via', 'spoken'], ['heard', 'nothing']])}</operator>`;

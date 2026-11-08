@@ -2139,9 +2139,11 @@ export type VoiceService = {
 /**
  * Which backend hears the chat composer's mic and speaks the chat's read-aloud for an account.
  *
- * `gemini` (the default) is the Gemini doors: the transcription door for the mic and the speech door
- * for read-aloud. `openai` is the OpenAI-compatible proxy (`voice.service.ts`), which an account that
- * stored it keeps. The choice governs the chat alone: the companion hears and speaks through Gemini,
+ * `gemini` (the default) is the server's own hearing and the Gemini speech door: the mic is heard on this box's
+ * own speech-to-text service first and by Gemini's transcription door when that gives no words
+ * (`transcribe-speech.ts`), and read-aloud is spoken by the speech door. `openai` is the OpenAI-compatible
+ * proxy (`voice.service.ts`), which an account that stored it keeps. The choice governs the chat alone: the
+ * companion speaks through Gemini and hears the way `gemini` does (the local service first, Gemini after),
  * whatever this says. Read by `voice-settings.ts` (which validates it), `voice-provider.ts` (which
  * routes on it) and the settings routes (which answer it).
  */
@@ -2204,15 +2206,18 @@ export type VocabularyEntry = {
 export type GeminiKeyStatus = { source: 'stored' | 'house' | 'none'; last4: string | null };
 
 /**
- * What one Gemini transcription came to, as a value rather than a throw.
+ * What one transcription of a clip came to, as a value rather than a throw.
  *
- * `ok: true` carries the trimmed words heard; an empty string is a success (nothing was
- * said). `ok: false` names why and carries a ready sentence for the person: `no_key` (no key
+ * `ok: true` carries the trimmed words heard, from the local speech-to-text service or from
+ * Gemini; an empty string is a success (nothing was said). `ok: false` is Gemini's, and only
+ * when the local service gave no answer either (a clip it answered with no words keeps that
+ * empty answer instead), and names why with a ready sentence for the person: `no_key` (no key
  * in reach; no request was made), `refused` (Google refused the key) and `failed` (anything
  * else: another status, a network error or timeout, an answer without text). Every sentence
- * has passed the key-shape redaction. Shared by `gemini-transcribe.ts` (builds it),
- * `voice-provider.ts` (maps it to the chat mic's HTTP answer) and the companion's press
- * door, which reads it through the voice barrel's `transcribeSpeech`.
+ * has passed the key-shape redaction. Shared by
+ * `gemini-transcribe.ts` and `transcribe-speech.ts` (build it), `voice-provider.ts` (maps it
+ * to the chat mic's HTTP answer) and the companion's press door, which reads it through the
+ * voice barrel's `transcribeSpeech`.
  */
 export type TranscribeAnswer =
   | { ok: true; text: string }

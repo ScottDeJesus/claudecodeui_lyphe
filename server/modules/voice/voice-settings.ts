@@ -146,8 +146,8 @@ function withDefaults(overrides: StoredOverrides): VoiceSettings {
 /**
  * The account's voice settings, read fresh from the database on every call (never cached, so a saved change is
  * heard by the next press). A stored field that fails its limit reads as its default.
- * Consumed by `gemini-transcribe.ts` (the transcription model and `cleanTranscripts`), `gemini-speech.ts` (the speech model and
- * the voice), `voice-provider.ts` (the provider and `cleanTranscripts`) and the settings routes. Exported through the voice
+ * Consumed by `gemini-transcribe.ts` (the transcription model and `cleanTranscripts`), `local-transcribe.ts` (`cleanTranscripts`),
+ * `gemini-speech.ts` (the speech model and the voice), `voice-provider.ts` (the provider and `cleanTranscripts`) and the settings routes. Exported through the voice
  * barrel for the companion, which reads `gemini.soundTags` at the start of each turn (the parse) and at each push (the register),
  * and every setting for `read_settings`.
  */

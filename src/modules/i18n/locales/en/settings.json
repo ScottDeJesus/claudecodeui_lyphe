@@ -155,7 +155,7 @@
     },
     "gemini": {
       "title": "Gemini",
-      "description": "Kaylee hears and speaks through Gemini. The chat's mic and read-aloud use it when picked above.",
+      "description": "Kaylee speaks through Gemini, and hears through it whenever this server's own speech-to-text service can't give her the words. When Gemini is picked above, the chat's mic hears the same way and its read-aloud speaks through it.",
       "key": "API key",
       "keyField": "Gemini API key",
       "keyPlaceholder": "Paste a Gemini API key",

@@ -20,7 +20,7 @@ import { readCompanionSettings } from './companion-settings.js';
  *      name press from any other page is the clip a page still held when the floor moved away from it (its ears closed `gone`),
  *      and taking the floor back would undo the move that closed it. With no page holding the floor, a name press takes it;
  *   2. it is HEARD: a clip shorter than `EMPTY_PRESS_UNDER_MS` by the page's own clock (or one with no bytes) is the empty
- *      press with no Gemini call; any other goes through the voice barrel's `transcribeSpeech`, whose empty answer is the
+ *      press with nothing asked to hear it; any other goes through the voice barrel's `transcribeSpeech`, whose empty answer is the
  *      empty press too and whose text is what he said. A name press is heard exactly as a button press is: the same call,
  *      the same refusals, the same arrival order;
  *   3. it is SETTLED: his line joins her log (role `operator`, via `spoken`, the words as its text, `''` for the empty
@@ -28,12 +28,12 @@ import { readCompanionSettings } from './companion-settings.js';
  *      name press that was only her name, `<operator via="spoken" heard="name">`.
  *
  * WHAT A NAME PRESS LOGS AND PUSHES. "what he says after the wake word is the press" (ruling 2): `stripCall` cuts her name
- * (settings' `name`, default Kaylee) and its greetings off the front of Gemini's transcript, and a closing "over to you,
+ * (settings' `name`, default Kaylee) and its greetings off the front of the transcript, and a closing "over to you,
  * <name>" off the back, before anything is logged or pushed, so "Hey Kaylee, what chats are working?" reaches her as "What
  * chats are working?". When nothing is left he only called her: the log keeps the transcript as heard ("Kaylee."), which
  * is what her memory's exact-text match needs, and she is pushed `heard="name"`, a turn she answers as someone called by
- * name does. Gemini's words that do not open with her name are pushed as they are, their opening untouched: the page
- * already heard her name, a misheard "Gilly" must not swallow his call, and his answer asks Gemini for no second check.
+ * name does. Words that do not open with her name are pushed as they are, their opening untouched: the page
+ * already heard her name, a misheard "Gilly" must not swallow his call, and his answer asks for no second check.
  *
  * A button press is untouched by any of this: its transcript is logged and pushed as heard.
  *
@@ -51,7 +51,7 @@ import { readCompanionSettings } from './companion-settings.js';
  * Consumer: `companion.service.ts`, which builds one and exposes it as its `press` verb for `POST /press`.
  */
 
-/** A clip shorter than this (by the page's own clock, in ms) has no words to hear: it is the empty press, and Gemini is not asked. */
+/** A clip shorter than this (by the page's own clock, in ms) has no words to hear: it is the empty press, and nothing is asked to hear it. */
 const EMPTY_PRESS_UNDER_MS = 400;
 
 /** The clip a press carries, how long the page's recorder says it ran and what opened it: his talk `button`, or her `name` heard by the page's ears. Consumed by `companion.service.ts` and `companion.routes.ts`. */
@@ -96,7 +96,7 @@ function nameOf(account: CompanionAccount): string {
  * What a heard press becomes. A button press, and a name press that heard nothing, are logged as heard. A name press is cut
  * by `stripCall` first: what is left of it is his line; when nothing is left he only called her (or only closed on her
  * name), so the log keeps the transcript as heard and she is pushed the call. `stripCall` leaves '' only when a cut took
- * the whole transcript, and Gemini's text is never blank, so an empty `rest` is always a call.
+ * the whole transcript, and a transcript that reaches the cut is never blank, so an empty `rest` is always a call.
  */
 function settling(account: CompanionAccount, transcript: string, opened: PressInput['opened']): Settling {
   if (transcript === '') return { logged: '', push: 'empty' };

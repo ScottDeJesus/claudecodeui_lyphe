@@ -3,7 +3,7 @@ import type { VoiceAudioUpload, VoiceRequestOverrides, VoiceService, VoiceServic
 import { chatStatusForRefusal } from './gemini-errors.js';
 import { geminiKeyStatus } from './gemini-key.js';
 import { synthesizeReadAloud } from './gemini-read-aloud.js';
-import { transcribeWithGemini } from './gemini-transcribe.js';
+import { transcribeSpeech } from './transcribe-speech.js';
 import { cleanTranscript } from './transcript-cleanup.js';
 import { whisperVocabularyPrompt } from './vocabulary-hints.js';
 import { readVocabulary } from './vocabulary.js';
@@ -12,11 +12,13 @@ import { readVoiceSettings } from './voice-settings.js';
 
 /**
  * Builds the routes' one decision: which backend hears and speaks the chat for this account. The account's provider `gemini`
- * (the default) goes to the Gemini doors, for the composer's mic and for read-aloud alike; `openai` goes to the OpenAI-compatible
+ * (the default) hears the composer's mic through `transcribeSpeech` (this box's own speech-to-text service first, Gemini when that
+ * gives no words) and speaks read-aloud through the Gemini door; `openai` goes to the OpenAI-compatible
  * proxy exactly as it always did, still reading the browser's `x-voice-*` headers (`overrides`). The clip goes with the account's
  * vocabulary as Whisper's `prompt` (it takes no instruction), and its text comes back cleaned of fillers and repeats when the
- * account's `cleanTranscripts` is on and with every misheard house word corrected whatever that switch says (the Gemini door does its
- * own, once). The Gemini door's three refusals are mapped to the status the route answers with (`chatStatusForRefusal`): no key and
+ * account's `cleanTranscripts` is on and with every misheard house word corrected whatever that switch says (on `gemini`, whichever
+ * door heard the clip, the local service or Gemini, does its own, once). A refusal on `gemini` is Gemini's and reaches the route only when the local
+ * service gave no answer at all; its three are mapped to the status the route answers with (`chatStatusForRefusal`): no key and
  * a refused key are 409 (the person can fix both in Settings → Voice), a failed call is 502.
  *
  * `synthesizeForChat` is read-aloud. On `gemini` the server speaks it (`synthesizeReadAloud`: Kaylee's speech door, in the account's
@@ -54,7 +56,7 @@ export function createVoiceProvider(voiceService: VoiceService) {
           : result;
       }
 
-      const answer = await transcribeWithGemini(userId, audio);
+      const answer = await transcribeSpeech(userId, audio);
       if (answer.ok) return { ok: true, value: { text: answer.text } };
       return { ok: false, status: chatStatusForRefusal(answer.reason), error: answer.sentence };
     },

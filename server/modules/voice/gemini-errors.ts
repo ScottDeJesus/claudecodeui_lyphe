@@ -34,7 +34,7 @@ export function redactKey(sentence: string, key: string): string {
   return sentence.replaceAll(key, '[key]').replace(KEY_SHAPE, '[key]');
 }
 
-/** The text as a JSON object, or `null` when it is not one (an array, a string, a number, or not JSON at all). Consumed by `gemini-transcribe.ts` (the reply) and `gemini-speech.ts` (the stream's events). */
+/** The text as a JSON object, or `null` when it is not one (an array, a string, a number, or not JSON at all). Consumed by `gemini-transcribe.ts` (the reply), `gemini-speech.ts` (the stream's events) and `local-transcribe.ts` (the local service's reply). */
 export function parseJsonObject<TObject extends object>(text: string): TObject | null {
   try {
     const parsed: unknown = JSON.parse(text);
@@ -74,7 +74,7 @@ export function namesTheKey(status: number, body: GoogleErrorBody | null, bodyTe
   return bodyText.includes('API_KEY_INVALID') || /api key/i.test(String(body?.error?.message ?? ''));
 }
 
-/** What a `fetch` that threw says: its message and, when undici gave one, the cause's (`fetch failed (connect ECONNREFUSED …)`). Consumed by `gemini-transcribe.ts` and `gemini-speech.ts`. */
+/** What a `fetch` that threw says: its message and, when undici gave one, the cause's (`fetch failed (connect ECONNREFUSED …)`). Consumed by `gemini-transcribe.ts`, `gemini-speech.ts` and `local-transcribe.ts`. */
 export function describeFetchFailure(error: unknown): string {
   const cause = error instanceof Error && error.cause instanceof Error ? ` (${error.cause.message})` : '';
   return `${error instanceof Error ? error.message : String(error)}${cause}`;

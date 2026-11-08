@@ -1,5 +1,6 @@
-// Her name, in words. The page's ears decide on Moonshine's transcript and the server's press door strips Gemini's, both
-// with the rules below, so what her name sounds like has one home.
+// Her name, in words. The page's ears decide on Moonshine's transcript and the server's press door strips the one its own
+// hearing made (this box's speech-to-text service, or Gemini when that gives no words), both with the rules below, so what her name
+// sounds like has one home.
 //
 // No recognizer separates "Kaylee" from "Kelly" by spelling (measured 2026-10-30 on 70 clips: Moonshine base wrote her
 // name as Kaylee, Kaley, Killy and Kelly; Gemini wrote one of his four real "Kaylee"s as "Gilly"). So her default name
@@ -131,9 +132,9 @@ export function endsWithHold(text: string): boolean {
 }
 
 /**
- * Gemini's transcript of a name press, less its opening greeting and name and its closing "over to you, <name>".
+ * The server's transcript of a name press, less its opening greeting and name and its closing "over to you, <name>".
  * The two cuts are independent, each made in the ORIGINAL text at the matched words' own character positions, so every
- * other character stays as Gemini wrote it. After the opening cut the leading punctuation and spaces go and the first
+ * other character stays as it was heard. After the opening cut the leading punctuation and spaces go and the first
  * letter is upper-cased; after the closing cut the trailing spaces and a trailing comma, semicolon, colon or dash go,
  * and a sentence's own . ? or ! stays. A text with neither cut comes back trimmed and otherwise untouched. A transcript
  * that is only her close ("Over to you, Kaylee.") comes back `{ rest: '', called: false, closed: true }`.

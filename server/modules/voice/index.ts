@@ -1,8 +1,9 @@
 // voiceRoutes: used by the server entrypoint to mount authenticated STT/TTS endpoints and the account's voice settings.
 export { voiceRoutes } from './voice.module.js';
-// transcribeSpeech: used by the companion module's press door to turn the operator's recorded clip into words. It always
-// hears through Gemini, whatever the chat composer's provider picker says, and is not counted against any Gemini budget.
-export { transcribeWithGemini as transcribeSpeech } from './gemini-transcribe.js';
+// transcribeSpeech: used by the companion module's press door to turn the operator's recorded clip into words. It hears on this
+// box's own speech-to-text service first and falls back to Gemini when that gives no words, whatever the chat composer's provider
+// picker says; the Gemini fallback is not counted against any Gemini budget.
+export { transcribeSpeech } from './transcribe-speech.js';
 // synthesizeSentence: used by the companion module's speech door (`companion-speech.ts`, behind `GET /api/companion/speech/:turnId/:index`)
 // to speak one of her sentences in the account's Gemini voice, streamed as PCM. Not counted against any Gemini budget.
 export { synthesizeSentence } from './gemini-speech.js';

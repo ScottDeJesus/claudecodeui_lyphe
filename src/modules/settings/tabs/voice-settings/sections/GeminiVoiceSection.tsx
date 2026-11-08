@@ -60,15 +60,16 @@ const MODEL_SHAPE = /^[A-Za-z0-9._-]{1,80}$/;
 const VOICE_SHAPE = /^[A-Za-z0-9_-]{1,40}$/;
 
 /**
- * Settings > Voice > Gemini, shown whatever the chat's voice provider, because Kaylee hears and speaks through Gemini either
- * way, and the chat's own mic and read-aloud do when Gemini is the provider: the speech model and voice here speak both.
+ * Settings > Voice > Gemini, shown whatever the chat's voice provider, because Kaylee speaks through Gemini either way and
+ * hears through it whenever this server's own speech-to-text service gives no words, and the chat's own mic and read-aloud do the
+ * same when Gemini is the provider: the speech model and voice here speak both, and the transcription model hears when it is asked.
  * Composed for the settings module's VoiceSettingsTab, after the voice-input section and before her own;
  * `.verify/kaylee-talk-scaffold.mjs` draws it for each key source, refused and waiting, and
  * `.verify/kaylee-voice-scaffold.mjs` with her voice's rows.
  *
  * THE KEY ROW leads, because whether Gemini works and on whose key is the first thing to know. Under "API key" its line
  * says which key is in use: "✓ Using your key ending 1a2b", "✓ Using the house's key" (green: Gemini works), or
- * "▲ No key: Gemini is off" (amber: she cannot hear). Under that, the card's full width: a password field, then Save —
+ * "▲ No key: Gemini is off" (amber: she cannot speak, and hears only what the local service can). Under that, the card's full width: a password field, then Save —
  * Replace once his own key is stored — and Clear, only then. Enter saves too. The field empties the moment a key is sent,
  * so a key never stands in the page after its save, and is never shown back beyond the four characters the line names.
  * A key that cannot be one (under 20 characters, or with a space) says so under the field and is not sent. Clear asks
@@ -101,7 +102,7 @@ export function GeminiVoiceSection({
 
   const title = t('voiceSettings.gemini.title', { defaultValue: 'Gemini' });
   const description = t('voiceSettings.gemini.description', {
-    defaultValue: "Kaylee hears and speaks through Gemini. The chat's mic uses it when picked above.",
+    defaultValue: "Kaylee speaks through Gemini, and hears through it whenever this server's own speech-to-text service can't give her the words. When Gemini is picked above, the chat's mic hears the same way and its read-aloud speaks through it.",
   });
 
   if (keyStatus === null) {

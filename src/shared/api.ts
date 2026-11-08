@@ -1672,7 +1672,8 @@ export function voiceConfigSignature(provider: VoiceProvider): string {
 
 /**
  * Transcribes recorded audio. With the 'gemini' provider (the default) it always goes through the CloudCLI voice proxy, which
- * transcribes on the server's Gemini key: the browser's own endpoint is never reached and none of its `x-voice-*` headers (its
+ * hears it on the server (its own speech-to-text service first, the server's Gemini key when that gives no words): the browser's
+ * own endpoint is never reached and none of its `x-voice-*` headers (its
  * OpenAI-compatible key and model) ride along. With 'openai' it posts directly to the user's configured OpenAI-compatible
  * endpoint when one is set (the account's vocabulary prompt and cleanup applied through the server's engine:
  * `transcribeOnOwnEndpoint`, `src/shared/voiceDirect.ts`) and otherwise goes through the proxy, which applies them itself.
