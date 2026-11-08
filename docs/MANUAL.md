@@ -3569,7 +3569,7 @@ AN ENDED OUTING DRAWS NO CLOCK, and says what became of it instead: `ended short
 stall — `report_planners.line` prints those words on the text face, so the card and `dispatcher status`
 say it once, the same way. Its tone is `plannerStatusTone`: `warn`, because an ending is the one state
 nobody asked for; `info` for a soul at work; `neutral` for one still queued. Every `ended` entry the
-document carries is one whose work is still SHORT of a plan (`report_planners`), so the word and the tone
+document carries is one whose work is still owed — SHORT of a plan, or an outing that never launched or that the house holds a `no-run` record for (`report_planners.entries`) — so the word and the tone
 are one reading of one row and nothing here asks the store a second question. Handles: `data-planner-badge`,
 `data-planner-target`, `data-planner-soul`, `data-planner-state`.
 
@@ -10505,7 +10505,7 @@ section: The dispatcher types — the store's document, mirrored in two files/00
 - `DispatcherPlan.planner` and `DispatcherArc.planner` are `DispatcherPlanner | null` — the ONE outing that
   plan or that arc reports, the store's own pick (`report_planners.of_plan` / `of_arc`): a plan's own
   newest live row, else its arc's when it has none of its own, then the newest ending of either whose work
-  is still short of a plan; an arc's is the newest live row whose `target` IS the arc, else that ending. A
+  is still owed (`report_planners.entries`); an arc's is the newest live row whose `target` IS the arc, else that ending. A
   row naming one of an arc's plans is that PLAN's and never the arc's, so the header and the cards under it
   never state one outing twice. Read through `plannerSince`, so a build older than the field reads `null`
   and the card draws no badge.
