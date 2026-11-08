@@ -1,4 +1,6 @@
-import type { DispatcherArc, DispatcherEvent, DispatcherPlan } from '@/shared/types.js';
+import type { DispatcherArc, DispatcherArcNoRun, DispatcherEvent, DispatcherPlan } from '@/shared/types.js';
+
+import { createArcAlertWatch } from './dispatcher-arc-alerts.service.js';
 
 /**
  * Which dispatcher endings earn a notification, and the memory that makes each one push once.
@@ -13,6 +15,11 @@ import type { DispatcherArc, DispatcherEvent, DispatcherPlan } from '@/shared/ty
  * The kept RECORDS (a feature of an epic finishing, `dispatcher.feature_finished`) have a watermark of their own and never move the
  * push one: an epic's finish is keyed on its newest feature `complete`, the very id a record is kept under, so a record that advanced
  * the push mark would put that finish behind it, lost whenever the epic turns `complete` a picture after its last feature.
+ *
+ * An EPIC'S OWN `no-run` alert (`dispatcher.no_run`, keyed `epic-no-run:<epic>:<id>`) has a mark of its own too, and for a stronger reason
+ * than a record's: it rides a row of the epic's own log (`arc_events`), a sequence of ids apart from the plan events' this file's single
+ * watermark counts, so no plan-event mark can say whether one was announced (`dispatcher-arc-alerts.service.ts` holds it, seeded as this
+ * one is). A `no-run` on a PLAN's log is a plan event and goes through the push mark below.
  *
  * "Already announced" is held by the caller in durable storage rather than in this process, for a
  * measured reason: the dev server restarts on every edit through a handover that runs the old and the
@@ -30,7 +37,8 @@ export type DispatcherEndingCode =
   | 'dispatcher.epic_finished'
   | 'dispatcher.paused'
   | 'dispatcher.limit_paused'
-  | 'dispatcher.relaunched';
+  | 'dispatcher.relaunched'
+  | 'dispatcher.no_run';
 
 export type DispatcherEndingMeta = {
   /** The plan's name — what the notification's own header reads ("Feature finished · <name>"); the epic's on an epic ending. */
@@ -61,7 +69,7 @@ export type DispatcherEndingMeta = {
   tokensOut: number;
   /** The phase the event names, by its KEY, or `null` for a plan-level event (INV-183). */
   phase: string | null;
-  /** The event's own sentence — for a relaunch, what was taken up again and by whom; for a pause the daemon held, its cause. `''` when it carries none. */
+  /** The event's own sentence — for a relaunch, what was taken up again and by whom; for a pause the daemon held, its cause; for a `no-run`, the house's sentence saying what it tried and why nothing is running. `''` when it carries none. */
   detail: string;
   /** Epoch SECONDS a usage-limit pause lifts at (`dispatcher.limit_paused` only), else `null`. */
   resetsAt: number | null;
@@ -72,7 +80,7 @@ export type DispatcherEndingMeta = {
 export type DispatcherEnding = {
   /** `<name>:<event id>` — one line of one plan's log, and the store makes that pair unique; `epic:<epic>:<event id>` for an epic ending, keyed on the completion that finished it. */
   key: string;
-  /** The event's own id: the watermark this ending advances. */
+  /** The event's own id: the watermark this ending advances. An epic's `no-run` alert carries a row id of the epic's own log (`arc_events`), which advances the arc alert mark and never the push mark. */
   eventId: number;
   code: DispatcherEndingCode;
   meta: DispatcherEndingMeta;
@@ -96,6 +104,13 @@ export type DispatcherEndingsDependencies = {
    */
   readRecordMark: () => number | null;
   writeRecordMark: (eventId: number) => void;
+  /**
+   * The highest id of an EPIC's own log (`arc_events`) whose `no-run` alert was already announced, or `null` when none was ever stored. A mark
+   * of its own, never the push mark: those ids are a sequence of their own (`dispatcher-arc-alerts.service.ts`). It is not derived from
+   * the push mark when absent — they cannot be compared — so the first picture seeds it from the highest alert it holds.
+   */
+  readArcAlertMark: () => number | null;
+  writeArcAlertMark: (arcEventId: number) => void;
   /** Tells the users about one ending. Synchronous; a throw leaves that ending and the ones after it due. */
   announce: (ending: DispatcherEnding) => void;
 };
@@ -103,22 +118,34 @@ export type DispatcherEndingsDependencies = {
 export type DispatcherEndingsNotifier = {
   /**
    * Reads one picture of the lane — `GET /plans`' own picture, never a second read of the store: its
-   * plans, and the epics (`arcs`) of the same document, whose `status` says when an epic is finished.
+   * plans, and the epics (`arcs`) of the same document, whose `status` says when an epic is finished and
+   * whose `no_run` carries an epic's own open alert. The caller hands every epic of the STORE: the lane's picture keeps only the epics with a
+   * plan still on it, and the epic whose own design never started has none.
    */
   observe(plans: DispatcherPlan[], arcs: DispatcherArc[]): void;
 };
 
+/** The event kind the house logs a `no-run` under (`hooks/dispatcher/store_alerts.py` `NO_RUN`), on a plan's log and on an epic's. */
+const NO_RUN_KIND = 'no-run';
+
 /**
- * The three kinds of event that can earn a push, and what each is worth saying.
+ * The four kinds of event that can earn a push, and what each is worth saying.
  *
  * `complete` is the plan's own end: the dispatcher stamps `completed_at` OUTSIDE the eligibility gate
  * (INV-188), so this is the one event that means the whole plan is over. `paused` is every way a
  * walk stops needing a hand — the pause verb, a halt on an API error, the storm guard — and it is a
  * stop-and-look rather than a fault; a pause for a USAGE LIMIT is the same event told apart by its
  * lift-time tail (`limitPause`) and earns its own code, one push per wall. `relaunched` is the only
- * one that reads as a warning: a phase the walk had left standing was taken up again, usually because
+ * one of those three that reads as a warning: a phase the walk had left standing was taken up again, usually because
  * its build came back and said the work could continue, and that is news the operator wants whether
- * or not he asked for it.
+ * or not he asked for it. `no-run` is the fourth, and the one the house writes only after it has tried to mend
+ * (`hooks/dispatcher/store_alerts.py`): a claim with no run behind it that it could not heal, or a launch refused outright, its `detail` the
+ * sentence that says what it tried and why. It is a warning too, and it SPEAKS EVERY TIME — the wave rule below does not reach it: an hour of
+ * silence over a planner that is not running is the failure the record exists to end, so it never opens a wave, never joins one
+ * (`NO_RUN_KIND`) and is no landing, whatever plan it stands on.
+ *
+ * `planner` is not here, and that is what its kind is for: the house's heals — its one relaunch of a designer, a cut or a judgment — are
+ * logged as `planner` events, so a claim the house mended pushes nothing, and nothing maps one to `dispatcher.relaunched`, which is a task's.
  *
  * A plan in no epic pushes each of them as it happens. A FEATURE OF AN EPIC (`plan.arc` set) is read
  * as one piece of work with its siblings, and tells the operator less, and tells him once:
@@ -137,6 +164,7 @@ const ENDING_CODES = new Map<string, DispatcherEndingCode>([
   ['complete', 'dispatcher.finished'],
   ['paused', 'dispatcher.paused'],
   ['relaunched', 'dispatcher.relaunched'],
+  [NO_RUN_KIND, 'dispatcher.no_run'],
 ]);
 
 /**
@@ -308,8 +336,39 @@ function isJudgmentPlan(plan: DispatcherPlan): boolean {
   return plan.arc !== null && plan.name === `${plan.arc}${JUDGMENT_SUFFIX}`;
 }
 
-/** The two watermarks (the file's head): the push mark, and the record mark `dispatcher.feature_finished` rides. */
+/** The two watermarks (the file's head): the push mark, and the record mark `dispatcher.feature_finished` rides. The epics' alert mark is `dispatcher-arc-alerts.service.ts`'s. */
 type Marks = { push: number; record: number };
+
+/**
+ * An epic's open `no-run` alert as the ending it earns: keyed `epic-no-run:<epic>:<id>` on the record's row in the epic's own log, so the
+ * dedupe of the orchestrator tells two records of one epic apart and never takes one for a plan event. No landing and no chat (`sessionId`
+ * `null`): the push opens the app at the root, where the Roadmap tab says the rest. The epic's own books fill the figures the wording
+ * leaves out, as an epic's finish does.
+ */
+function arcAlertEnding(arc: DispatcherArc, noRun: DispatcherArcNoRun): DispatcherEnding {
+  return {
+    key: `epic-no-run:${arc.name}:${noRun.id}`,
+    eventId: noRun.id,
+    code: 'dispatcher.no_run',
+    meta: {
+      sessionName: arc.name,
+      epic: arc.name,
+      features: null,
+      tasks: null,
+      phases: 0,
+      done: 0,
+      costUsd: arc.cost_usd,
+      tokens: arc.tokens,
+      tokensIn: arc.tokens_in,
+      tokensOut: arc.tokens_out,
+      phase: null,
+      detail: noRun.detail,
+      resetsAt: null,
+      limitGuess: false,
+    },
+    sessionId: null,
+  };
+}
 
 /**
  * The epics that are finished, one ending each, keyed on the completion that finished them.
@@ -389,6 +448,9 @@ export function createDispatcherEndingsNotifier(
   /** The marks as this process last read or wrote them; `undefined` until the first picture loads them, `null` while the store was never seen. */
   let knownMarks: Marks | null | undefined;
 
+  /** The epics' own `no-run` alerts, each announced once under a mark of its own (`dispatcher-arc-alerts.service.ts`). */
+  const arcAlerts = createArcAlertWatch({ read: dependencies.readArcAlertMark, write: dependencies.writeArcAlertMark });
+
   /**
    * The marks as the caller holds them, or `null` when no push mark was ever stored (first sight of the store). A record mark never
    * stored beside a push mark is written from it, once: the events at or before the push mark were all handled.
@@ -435,8 +497,8 @@ export function createDispatcherEndingsNotifier(
         // `speakingLimitPauses`.
         if (limit !== null && !speaking.has(event.id)) continue;
         // A feature of an epic speaks only for the event that opens a wave. Its `complete` is none: a feature's is a record
-        // (above), and its judgment's is the epic's finish, below: see `waveStarters`.
-        if (limit === null && plan.arc !== null && !waveStart.has(event.id)) continue;
+        // (above), and its judgment's is the epic's finish, below: see `waveStarters`. A `no-run` is the exception: it speaks every time.
+        if (limit === null && plan.arc !== null && event.kind !== NO_RUN_KIND && !waveStart.has(event.id)) continue;
         due.push(endingOf(plan, event, limit === null ? code : 'dispatcher.limit_paused', limit));
       }
     }
@@ -459,6 +521,8 @@ export function createDispatcherEndingsNotifier(
 
   return {
     observe(plans, arcs) {
+      // Independent of the push mark below, which returns early on a first sight and when nothing is due: the epics' alerts are asked first.
+      arcAlerts.observe(arcs, (arc, noRun) => dependencies.announce(arcAlertEnding(arc, noRun)));
       if (knownMarks === undefined) knownMarks = readMarks();
       if (knownMarks === null) {
         // First sight of the dispatcher's store on this database: the events already in it are

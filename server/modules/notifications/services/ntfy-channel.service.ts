@@ -154,6 +154,10 @@ function tagsFor(event: ChannelEvent): string[] {
   // ending's own event-id key (`dispatcher-endings.service.ts`), which a window that swallowed a second
   // event inside the same minute would break.
   if (event.code === 'dispatcher.relaunched') return ['warning'];
+  // A piece of planning the house could not get a run behind asks for a hand the same way, and is not in `COLLAPSIBLE_CODES` for the
+  // same reason: it is said every time it is written, and a window that swallowed a second one inside the minute would hush a claim
+  // that is not running (`dispatcher-endings.service.ts`).
+  if (event.code === 'dispatcher.no_run') return ['warning'];
   // A usage limit is a wait with a time on it, not a finish and not a crash.
   if (event.code === 'dispatcher.limit_paused') return ['hourglass_flowing_sand'];
   switch (event.kind) {

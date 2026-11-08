@@ -1463,6 +1463,8 @@
         "odysseus": "Odysseus"
       },
       "queued": "queued",
+      "queuedWaiting": "queued · {{waiting}}",
+      "notRunning": "not running: {{reason}}",
       "designing": "designing",
       "judging": "judging",
       "cutting": "cutting",

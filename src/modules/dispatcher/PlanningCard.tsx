@@ -33,7 +33,8 @@ const WAITING_KEYS: Record<DispatcherPlanner['verb'], string> = {
  * face), then what is happening to it, who is doing it on which model and for how long, then its planning press at the line's end.
  *
  * THE STATE IS ONE WORD, AND ITS TONE IS THE PLANNER BADGE'S (`plannerStatusTone`): out reads `info` (work is happening), waiting
- * `neutral`, ended short `warn` (amber — the one state that wants a hand: the plan card's Resume planner, or the daemon's retry). The words
+ * `neutral`, ended short `warn` (amber — the one state that wants a hand: the plan card's Resume planner, or the daemon's retry), and an outing
+ * the house says is not running `danger` (`outing.no_run`; the sentence itself is the plan card's badge's, `PlannerBadge`). The words
  * carry it without colour. A subject whose OWN pause stands reads `Planning paused` in foreground ink and no tone (`PlanningPausedLine`,
  * the card head's register: the operator's own brake is a fact, not an alarm) whatever its outing reads, since the pause is what holds it.
  *
@@ -68,7 +69,7 @@ function PlanningLineRow({ line }: { line: PlanningLine }) {
     word = <PlanningPausedLine via="own" />;
   } else if (outing !== null) {
     const key = outing.state === 'ended' ? 'dispatcher.planning.endedShort' : outing.state === 'queued' ? WAITING_KEYS[outing.verb] : WORK_KEYS[outing.verb];
-    word = <Badge as="span" tone={plannerStatusTone(outing.state)} className="vv-badge--compact">{t(key)}</Badge>;
+    word = <Badge as="span" tone={plannerStatusTone(outing)} className="vv-badge--compact">{t(key)}</Badge>;
   }
   const who = outing === null ? [] : [soulWord(t, outing.soul), modelName ?? outing.model, ticking ? elapsed : ''];
   const cause = !paused && outing?.state === 'ended' && outing.outcome ? operatorWords(outing.outcome) : null;

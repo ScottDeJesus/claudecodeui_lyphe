@@ -4,7 +4,7 @@ import { appConfigDb, sessionsDb, userDb } from '@/modules/database/index.js';
 import { createNotificationEvent, notifyUserIfEnabled } from '@/modules/notifications/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import type { RelayAnswer, RelayOrder } from '@/shared/relayed-press-types.js';
-import type { DispatcherStateEvent, DispatcherVerb } from '@/shared/types.js';
+import type { DispatcherArc, DispatcherStateEvent, DispatcherVerb } from '@/shared/types.js';
 import { sessionlessEnv } from '@/shared/child-env.js';
 import type { DispatcherStoreWatch } from '@/shared/dispatcher-store-watch.service.js';
 import { expandHome } from '@/shared/utils.js';
@@ -85,6 +85,9 @@ const ANNOUNCED_THROUGH_KEY = 'dispatcher_announced_through';
 /** The `app_config` key holding the highest event id already KEPT as a record (`dispatcher.feature_finished`): a mark of its own beside the push one, for the reason `dispatcher-endings.service.ts` gives. */
 const RECORDED_THROUGH_KEY = 'dispatcher_recorded_through';
 
+/** The `app_config` key holding the highest record id of an EPIC's own log (`arc_events`) whose `no-run` alert was already announced: a mark of its own, because those ids are a sequence of their own and the push mark is a plan-event id (`dispatcher-arc-alerts.service.ts`). */
+const ARC_ALERT_THROUGH_KEY = 'dispatcher_arc_alert_through';
+
 /** One of those marks as the whole number stored, or `null` when none was ever stored. */
 function readStoredMark(key: string): number | null {
   const raw = appConfigDb.get(key);
@@ -109,13 +112,20 @@ const buildEndingEvent = createNotificationEvent as (input: {
 }) => object;
 
 /**
+ * The endings that are a warning and not a look: a phase the walk had left standing and took up again (`dispatcher.relaunched`), and a
+ * piece of planning the house could not get a run behind, whose own sentence says what it tried (`dispatcher.no_run`). Both tell the
+ * operator of something he may need to act on, so both are handed on as an `error` kind with the `warning` severity.
+ */
+const WARNING_CODES: ReadonlySet<DispatcherEnding['code']> = new Set(['dispatcher.relaunched', 'dispatcher.no_run']);
+
+/**
  * The kind an ending is handed to the orchestrator as. A feature of an epic finishing is a `record` — the history keeps it, the
- * station's strip draws it, and no push preference or channel hears it — and a relaunch is the one warning (`error`). Every other
- * code is a look (`stop`).
+ * station's strip draws it, and no push preference or channel hears it — and a relaunch and a `no_run` are the two warnings (`error`).
+ * Every other code is a look (`stop`).
  */
 function kindOfEnding(ending: DispatcherEnding): 'stop' | 'error' | 'record' {
   if (ending.code === 'dispatcher.feature_finished') return 'record';
-  return ending.code === 'dispatcher.relaunched' ? 'error' : 'stop';
+  return WARNING_CODES.has(ending.code) ? 'error' : 'stop';
 }
 
 /**
@@ -123,8 +133,9 @@ function kindOfEnding(ending: DispatcherEnding): 'stop' | 'error' | 'record' {
  * what reaches each of them. A plan belongs to no login, so every active user is told, and the dedupe key carries the user because
  * the orchestrator's dedupe is process-wide: without it the second user's push reads as a repeat.
  *
- * Every code is a look except one warning: a plan or an epic that finished, or a plan that paused, is a state to read at leisure,
- * while a phase taken up again is the walk changing its mind about something the operator may already have given up on. What an
+ * Every code is a look except two warnings (`WARNING_CODES`): a plan or an epic that finished, or a plan that paused, is a state to read
+ * at leisure, while a phase taken up again is the walk changing its mind about something the operator may already have given up on, and a
+ * `no_run` is the house saying a piece of planning has no run behind it and that it could not mend that. What an
  * epic's features earn is decided before this point (`dispatcher-endings.service.ts`); this sends what it is handed. A landing
  * (`dispatcher.finished`, `dispatcher.epic_finished`, `dispatcher.feature_finished`) carries the chat that asked for the work as the
  * event's `sessionId`, so a tap on its push opens that chat — while the house still holds the chat: the plan's `session_app_id` is
@@ -149,7 +160,7 @@ export function announceDispatcherEnding(ending: DispatcherEnding, logError: (me
           sessionId: chat,
           code: ending.code,
           meta: ending.meta,
-          severity: ending.code === 'dispatcher.relaunched' ? 'warning' : 'info',
+          severity: WARNING_CODES.has(ending.code) ? 'warning' : 'info',
           dedupeKey: `dispatcher:${userId}:${ending.key}`,
         }),
       });
@@ -230,8 +241,18 @@ export function createDispatcherModule(storeWatch: DispatcherStoreWatch): Dispat
     writeMark: (eventId) => appConfigDb.set(ANNOUNCED_THROUGH_KEY, String(eventId)),
     readRecordMark: () => readStoredMark(RECORDED_THROUGH_KEY),
     writeRecordMark: (eventId) => appConfigDb.set(RECORDED_THROUGH_KEY, String(eventId)),
+    readArcAlertMark: () => readStoredMark(ARC_ALERT_THROUGH_KEY),
+    writeArcAlertMark: (arcEventId) => appConfigDb.set(ARC_ALERT_THROUGH_KEY, String(arcEventId)),
     announce: (ending) => announceDispatcherEnding(ending, logErrorOnce),
   });
+
+  /**
+   * The epics of the STORE as the latest reading found them — every one, where the lane's picture keeps only those with a plan still on
+   * it (`arcsOnLane`). The endings notifier reads the epics' own `no-run` alerts from it: the epic whose own design never started has no
+   * plan at all, the lane drops it, and it is the one that alert is for. Set by `snapshot` and read by the `broadcast` that follows that
+   * very reading (`polled-lane.service.ts` lands one reading at a time and broadcasts it before the next begins).
+   */
+  let storeArcs: DispatcherArc[] = [];
 
   const commands = { bin, timeoutMs: VERB_TIMEOUT_MS, env };
   const prompts = createDispatcherPrompts({ commands, log: logErrorOnce });
@@ -252,16 +273,19 @@ export function createDispatcherModule(storeWatch: DispatcherStoreWatch): Dispat
       // alert `endings` raises next lists no item the completion closed and every gap the finish filed.
       followups.settle(store);
       const picture = lanePictureOf(store);
+      storeArcs = store.arcs;
       // The running phases name the chain records the watch follows: a walk's progress is written there
       // and nowhere in the store until it ends.
       storeWatch.followChains(runningChainIds(picture));
       return picture;
     },
     // Endings are read off the same picture the tabs receive, and only when it changed — which an
-    // ending always is. A failure to announce never costs the tabs their frame.
+    // ending always is. A failure to announce never costs the tabs their frame. The epics' own `no-run`
+    // alerts are read from the store's epics (`storeArcs`), never the lane's cut of them; one still moves
+    // the picture, because the epic's outing, which `planners` carries whole, reads the same sentence.
     broadcast: (frame) => {
       try {
-        endings.observe(frame.plans, frame.arcs);
+        endings.observe(frame.plans, storeArcs);
       } catch (error) {
         logErrorOnce(`[Dispatcher] could not announce an ending: ${error instanceof Error ? error.message : String(error)}`);
       }
