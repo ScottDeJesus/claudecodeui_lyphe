@@ -10,7 +10,6 @@
 export type VoiceConfig = {
   baseUrl: string;
   apiKey: string;
-  sttModel: string;
   ttsModel: string;
   ttsVoice: string;
   ttsFormat: string;
@@ -24,7 +23,6 @@ export const VOICE_CONFIG_SYNC_EVENT = 'voice-config:sync';
 export const VOICE_CONFIG_DEFAULTS: VoiceConfig = {
   baseUrl: '',
   apiKey: '',
-  sttModel: '',
   ttsModel: '',
   ttsVoice: '',
   ttsFormat: '',
@@ -55,7 +53,6 @@ export function voiceConfigHeaders(): Record<string, string> {
   const c = readVoiceConfig();
   const h: Record<string, string> = {};
   if (c.apiKey) h['x-voice-api-key'] = c.apiKey;
-  if (c.sttModel) h['x-voice-stt-model'] = c.sttModel;
   if (c.ttsModel) h['x-voice-tts-model'] = c.ttsModel;
   if (c.ttsVoice) h['x-voice-tts-voice'] = c.ttsVoice;
   if (c.ttsFormat.trim()) h['x-voice-tts-format'] = c.ttsFormat.trim();

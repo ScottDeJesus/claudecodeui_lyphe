@@ -2,7 +2,7 @@ import { synthesizeSentence, type SpeechAnswer } from '@/modules/voice/index.js'
 import { AppError } from '@/shared/utils.js';
 
 import type { CompanionAccount } from './companion-account.js';
-import { geminiRefusal } from './companion-input.js';
+import { speechRefusal } from './companion-input.js';
 import { readCompanionSettings } from './companion-settings.js';
 import { appendAudio, createSpeechEntry, finishEntry, followEntry, joinEntry, type SpeechEntry } from './companion-speech-cache.js';
 import { utteranceOf, type Utterance } from './companion-utterance.js';
@@ -130,7 +130,7 @@ function startSynthesis(account: CompanionAccount, { turnId, index }: SpeechRequ
       speechCache.remove(turnId, index, entry);
       finishEntry(entry);
       if (answer.reason !== 'failed') writeRefusalLine(answer.sentence);
-      return geminiRefusal(answer);
+      return speechRefusal(answer);
     }
     void fill(entry, answer.chunks);
     return null;

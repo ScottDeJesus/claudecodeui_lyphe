@@ -125,7 +125,8 @@ function answerFrom(attempt: Attempt, key: string): TranscribeAnswer {
 
 /**
  * Turns one clip into the words spoken, through Gemini, for one account: the account's key (else the house's) and
- * its transcription model, one `generateContent` call with `temperature: 0`. A clip with no words in it answers `ok` with
+ * its transcription model, one `generateContent` call with `temperature: 0`. Gemini is the BACKUP transcriber: this is called only
+ * when the account's home server could not hear the clip (or the account has none), by `speech-transcriber.ts`. A clip with no words in it answers `ok` with
  * empty text (the model is told to say `[no speech]`, which is read as none). With the account's `cleanTranscripts` on, the model
  * is told to leave out fillers and repeats and the text that comes back is cleaned once more (`transcript-cleanup.ts`, which also
  * empties a lone "Um."), after the no-speech reading; off, the model is told to keep them and they are left in. The account's
@@ -134,8 +135,7 @@ function answerFrom(attempt: Attempt, key: string): TranscribeAnswer {
  * failure; it answers `no_key` (no request made), `refused` (Google refused the key) or `failed` as a sentence
  * ready to show. NOT COUNTED against any Gemini budget (the operator's ruling): no admit before, no record after.
  * One log line per call, never the key.
- * Consumed by `voice-provider.ts` (the chat mic when the account's provider is Gemini) and, through the voice
- * barrel as `transcribeSpeech`, by the companion's press door (she always hears through Gemini).
+ * Consumed by `speech-transcriber.ts`, the one try-then-backup transcriber that the chat mic and the companion's press both go through.
  */
 export async function transcribeWithGemini(userId: number, audio: VoiceAudioUpload): Promise<TranscribeAnswer> {
   const startedAt = Date.now();
@@ -158,7 +158,7 @@ export async function transcribeWithGemini(userId: number, audio: VoiceAudioUplo
       generationConfig: { temperature: 0 },
     });
     answer = answerFrom(await postWithRetry(`${GEMINI_MODELS_URL}/${encodeURIComponent(model)}:generateContent`, key, body), key);
-    // After the no-speech reading (`readTranscript` has already turned `[no speech]` into ''), and the only place a Gemini transcript is cleaned and corrected: the chat mic's Gemini branch and Kaylee's press both come through here, and Kaylee's name cut (`companion-press.ts`) reads what this answers.
+    // After the no-speech reading (`readTranscript` has already turned `[no speech]` into ''), and the only place a Gemini transcript is cleaned and corrected: whatever stands in for the home server comes through here (the home server's text is cleaned by the box itself, and `speech-transcriber.ts` applies the account's corrections to it), and Kaylee's name cut (`companion-press.ts`) reads what the transcriber answers.
     if (answer.ok) answer = { ok: true, text: cleanTranscript(answer.text, { removeFillers: cleanTranscripts, vocabulary }) };
   }
 

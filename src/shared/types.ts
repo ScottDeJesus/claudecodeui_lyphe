@@ -1016,36 +1016,40 @@ export type VoicePlayState = 'idle' | 'loading' | 'playing';
 //----------------- CHAT VOICE PROVIDER AND GEMINI VOICE SETTINGS ------------
 
 /**
- * Which backend hears the chat composer's mic and speaks the chat's read-aloud for the account: 'gemini' (the default: Gemini
- * on the server's key, with no key or header from the browser) or 'openai' (the OpenAI-compatible backend, which an account
- * that stored it keeps). Client mirror of the server's `VoiceProvider`. Read by the settings module's provider picker and
- * voice-settings hook, and by the chat module's provider hook, `transcribeVoice` and `synthesizeVoice`, which route the clip
- * and the text on it. It governs the chat alone: Kaylee hears and speaks through Gemini whatever it says.
+ * Which backend speaks the chat's read-aloud for the account: 'gemini' (the default: Gemini on the server's key, with no key or
+ * header from the browser) or 'openai' (the OpenAI-compatible backend, which an account that stored it keeps). Client mirror of
+ * the server's `VoiceProvider`. Read by the settings module's provider picker and voice-settings hook, and by the chat module's
+ * provider hook and `synthesizeVoice`, which route the text on it. It governs read-aloud alone: every transcription goes to the
+ * account's home server first, with Gemini as the backup, and Kaylee speaks through Gemini whatever it says.
  */
 export type VoiceProvider = 'openai' | 'gemini';
 
 /**
- * The account's voice settings as `GET /api/voice/settings` answers them: the chat's `provider` and the Gemini choices
- * (`gemini.transcriptionModel` and `gemini.speechModel`, 1-80 characters of letters, digits, `.`, `_` and `-`; `gemini.voice`,
- * 1-40 characters of letters, digits, `_` and `-`; `gemini.soundTags`, the one list of sounds Kaylee may make: 1-30 tags, each 1-24
- * lower-case letters with single spaces between words), and `cleanTranscripts` (default true): whether a transcript has its um,
- * uh and repeated words removed before it is used, for the chat mic and Kaylee's press alike. Client mirror of the server's
- * `VoiceSettings`. Read and saved by the settings module's `useVoiceSettings`; a save sends a `VoiceSettingsPatch`.
+ * The account's voice settings as `GET /api/voice/settings` answers them: the read-aloud `provider`, `homeServer.address` (the
+ * home server that transcribes first, null until one is saved; its key is not here, see `HomeServerKeyStatus`), the Gemini choices
+ * (`gemini.transcriptionModel`, the BACKUP transcriber's model, and `gemini.speechModel`, 1-80 characters of letters, digits, `.`, `_`
+ * and `-`; `gemini.voice`, 1-40 characters of letters, digits, `_` and `-`; `gemini.soundTags`, the one list of sounds Kaylee may make:
+ * 1-30 tags, each 1-24 lower-case letters with single spaces between words), and `cleanTranscripts` (default true): whether a
+ * transcript has its um, uh and repeated words removed before it is used, for the chat mic and Kaylee's press alike. Client mirror of
+ * the server's `VoiceSettings`. Read and saved by the settings module's `useVoiceSettings`; a save sends a `VoiceSettingsPatch`.
  */
 export type VoiceSettings = {
   provider: VoiceProvider;
   cleanTranscripts: boolean;
+  homeServer: { address: string | null };
   gemini: { transcriptionModel: string; speechModel: string; voice: string; soundTags: string[] };
 };
 
 /**
- * What `PUT /api/voice/settings` takes: any subset of `VoiceSettings`, the nested `gemini` object included, merged field by
- * field. `gemini.soundTags: null` drops the account's own list, so Google's set (the server's `DEFAULT_SOUND_TAGS`) applies again.
- * Sent by the settings module's `useVoiceSettings` through `api.voice.saveSettings`.
+ * What `PUT /api/voice/settings` takes: any subset of `VoiceSettings`, the nested `homeServer` and `gemini` objects included,
+ * merged field by field. `homeServer.address: null` forgets the saved address (the home server is then off and Gemini
+ * transcribes alone). `gemini.soundTags: null` drops the account's own list, so Google's set (the server's `DEFAULT_SOUND_TAGS`)
+ * applies again. Sent by the settings module's `useVoiceSettings` through `api.voice.saveSettings`.
  */
 export type VoiceSettingsPatch = {
   provider?: VoiceProvider;
   cleanTranscripts?: boolean;
+  homeServer?: { address?: string | null };
   gemini?: Partial<Omit<VoiceSettings['gemini'], 'soundTags'>> & { soundTags?: string[] | null };
 };
 
@@ -1077,6 +1081,14 @@ export type VocabularyRow = { id: number; entry: VocabularyEntry };
  * the settings module's `useVoiceSettings` and drawn by its `GeminiVoiceSection`'s `keyStatus` prop.
  */
 export type GeminiKeyStatus = { source: 'stored' | 'house' | 'none'; last4: string | null };
+
+/**
+ * Whether the account has a home server key, and the only part of it the page ever sees: 'stored' is his own (`last4` its last
+ * four characters) and 'none' means the home server has no key and is off. There is no house key. Client mirror of the server's
+ * `HomeServerKeyStatus`. Answered by every voice-settings call, held by the settings module's `useVoiceSettings` and drawn by its
+ * `HomeServerSection`'s `keyStatus` prop.
+ */
+export type HomeServerKeyStatus = { source: 'stored' | 'none'; last4: string | null };
 
 // ---------------------------
 
@@ -3567,7 +3579,7 @@ export type DispatcherPlan = { name: string; state: string; status: DispatcherPl
 export type DispatcherArcStatus = 'empty' | 'complete' | 'hidden' | 'judging' | 'stalled' | 'live' | 'scheduled' | 'paused' | 'queued' | 'designing';
 /** An epic's place in the queue (`report_arcs.arc_dict.queue`, from `line_gate.places`): `position` is its place counted from 1, top down — the run order the operator gave In flight — and `turn` says what that place means NOW: `now` (it is running, it is the first epic not started that can start with no epic above it able to, or a plan of it was let through the queue's order by its own press or by a wait of an epic in progress), `waiting` (its turn is behind an epic above it), `paused` (the dial's Pause all is on, so no epic starts) or `hidden` (every open plan of the epic is hidden: it keeps its place and is out of the line). Never a column and never the arc's status word (INV-172): the store holds only the place the operator gave and when, and membership and turns are derived at every read (`epic_line`, `line_gate`). Where an epic is NOT in the queue — its turn is over, or it has no open plan — the arc's `queue` is `null`, never a place. */
 export type DispatcherArcQueue = { position: number; turn: 'now' | 'waiting' | 'paused' | 'hidden' };
-/** An epic's open `no-run` record as the document states it: `id` is the record's row in the epic's own log (`arc_events`), a SEQUENCE OF ITS OWN — never an event id of a plan's log — so the endings notifier keeps a mark of its own for it (`dispatcher-arc-alerts.service.ts`) and pushes each `id` once; `at` is the record's store stamp, and `detail` the sentence that says why the house could not get a run behind the epic's outing and what it tried first. It stands while the epic's newest own outing has not moved past it. */
+/** An epic's open `no-run` record as the document states it: `id` is the record's row in the epic's own log (`arc_events`), a SEQUENCE OF ITS OWN — never an event id of a plan's log — so the endings notifier keeps a mark of its own for it (`dispatcher-arc-alerts.service.ts`) and pushes each record once; `at` is the record's store stamp, which the mark reads beside the `id` because the store hands an id out again once the row holding it is removed (`arc_events.id` has no AUTOINCREMENT) and a stamp only climbs, and `detail` the sentence that says why the house could not get a run behind the epic's outing and what it tried first. It stands while the epic's newest own outing has not moved past it. */
 export type DispatcherArcNoRun = { id: number; at: string; detail: string };
 /** One arc of the store (`report_arcs.arc_dict`): its words, its own model word, its derived status and the NAMES of its plans, in `store.arc_plans` order — the arc file's order, except for a member that pre-dated its arc — which is what a reader joins against `plans[].arc` in the same document. `model` is the ARC's own word, never one plan's effective one: it is what the arc's control draws and what `dispatcher model <arc> <word>` hands to every plan of the arc. `cost_usd`, the four token keys and `runtime_s` are the epic's books: the plan cards' figures in the same document (`report.plan_dict`'s own, a phase mid-walk counted as its card counts it) cut at the moment each feature JOINED the epic — a stage counts when it launched at or after it, a feature born in the epic counts whole — so an epic that took a finished feature in after it ran does not carry that feature's past, while the feature's own card keeps it (`report_arcs._books`, INV-4299). `paid_vendor` labels those dollars over the same cut. `walking`, `stopped` and `schedule` are its own verbs' readings, taken off the same document's plan rows — so the header and `dispatcher stop|resume|schedule <arc>` can never disagree about what a press reaches. */
 export type DispatcherArc = { name: string; goal: string | null; architecture: string | null; delivers: string | null; /** The epic's OWN model word (`report_arcs.arc_dict`), or `null` while it carries none and follows the house switch — never one of its plans' effective words. Pressing it hands the word to every plan of the epic (`store.set_arc_model`), and `default` clears the epic's and theirs. */ model: DispatcherModelWord | null; status: DispatcherArcStatus; /** Whether any of the arc's plans is LIVE (`report_arcs.walking` — the `live` ones): a walk is out on it, or it is approved and unpaused and so the rule's to take up when its waits are complete. This is what `dispatcher stop <arc>` acts on and the set the header draws Pause for — so Pause reaches the plans waiting their turn as well as the one in flight, and the next one cannot start the moment the walker of the one before it ends. */ walking: boolean; /** Whether any of the arc's plans is STOPPED — approved, paused and unfinished (`report_arcs.stopped`): `queued` at the gate, `paused` mid-walk, `scheduled` with an hour armed — never `hidden`, which waits for Show. It is the set a terminal's `dispatcher resume <arc>` and `dispatcher schedule <arc>` act on; the deck draws no press for the whole set (the plans held for their first Start are the board's Start's), only for `midwalk` and `stalled`. */ stopped: boolean; /** Whether any of the arc's plans is STOPPED MID-WALK (`report_arcs.midwalk`): a walk has gone out for it and it is not moving — `paused`, or `scheduled` with an hour armed after a walk. The deck draws Resume for it, beside `stalled`; a plan never launched (waiting for its first Start) is not one, so an epic whose waiting plans are all of that kind draws no Resume. */ midwalk: boolean; /** Whether any of the arc's plans is STALLED (`report_arcs.stalled`): released, with its only running work ended and nothing to record it (`report_stall`). It is what the deck draws Resume for beside `midwalk` — `dispatcher resume <arc>` takes these plans along with the stopped ones, waking the daemon — and it never replaces Pause: a stalled plan is released, so Pause still reaches it (`walking`). */ stalled: boolean; /** The ONE hour the arc's STOPPED plans are armed for, as the timer's own ISO stamp, or null (`report_arcs.hour`). Over the same set the arc's Cancel reaches — which is the set its Start reaches — whoever armed it. One stamp because one press wrote them all; null when none of them is armed, and when they were armed apart — the header then offers the press again rather than naming a time half its plans are not waiting for. */ schedule: string | null; /** How many of the arc's plans the "Accept when cut" press reaches now — `designed` and not yet armed (`report_arcs.armable`). The deck draws the press while this is above zero. */ armable: number; /** How many of the arc's plans carry an "Accept when cut" press (`report_arcs.armed`): what the deck's Cancel reaches. */ armed: number; plans: string[]; /** The one planner outing of the ARC — its design, its cut, its judgment (`report_planners.of_arc`: the newest live row whose `target` IS the arc, else its newest ending still short of a plan). A row naming one of the arc's plans is that PLAN's, and rides `plan.planner` instead, so the deck's header and a card inside it can never state one outing twice. `null` on an arc no planner is on, and against a dispatcher build older than the field. */ planner: DispatcherPlanner | null; /** The usage pacer's clause on the epic's OWN queued outings — the planner rows whose target IS the epic: its design before any plan of it exists, its whole-arc cut, a tell, its judgment (`report_arcs.arc_dict.pace_hold`, `pace_report.arc_hold`), with its `pace:` lead — or `''`. The deck draws it with the epic's Override, and a plan card never repeats it. `''` while `overridden` is true, and against a dispatcher build older than the key (read tolerantly, `arcOf`). */ pace_hold: string; /** Whether the operator has let the epic's own outings start past the pacer (`dispatcher override <arc>`, `store_override.overridden_arcs`) — the deck then draws `Override on` with its Turn off. Derived by the dispatcher from the epic's own log; `false` against a build older than the key. */ overridden: boolean; /** The operator's planning pause on THIS epic (`DispatcherPlanningPause`), or `null` while its own does not stand (`report_arcs.arc_dict`, `store_planning.arc_pause`): it holds the epic's design and cut and every outing of its features, the judgment's included, and ended the ones in flight. Each feature it holds carries `null` of its own — the epic's Planning line holds the one Resume planning that lifts it. `null` against a dispatcher build older than the key (read tolerantly, `planningPausedSince`). */ planning_paused: DispatcherPlanningPause | null; created_at: string; completed_at: string | null; cost_usd: number; paid_vendor: string | null; tokens: number; tokens_in: number; tokens_out: number; tokens_cache_read: number | null; /** How long at least one agent was out on the epic, in whole seconds (`report_arcs.arc_dict`): the UNION of its plans' intervals and the outings whose subject is the epic itself — its design, its cut, its judge — never its plans' `runtime_s` added, because features of one epic walk at the same time. Read like `DispatcherPlan.runtime_s`: derived, ticked between frames only while an agent is out, `0` against a build older than the field. */ runtime_s: number; /** The epic's place in the queue (`report_arcs.arc_dict.queue`, from `line_gate.places`), or `null` for an epic not in it — its turn is over, or no plan of it is open — and against a dispatcher build older than the field, where nothing is drawn of a queue. Read tolerantly (`arcOf`); a key that IS there and does not read is refused by name. */ queue: DispatcherArcQueue | null; /** The epic's OWN open `no-run` record (`DispatcherArcNoRun`), or `null` while none stands (`report_arcs.arc_dict.no_run`, `run_record.open_arc_alert`): the house could not get a run behind an outing that names the epic itself — its design, its whole-arc cut. A record on a PLAN's log is that plan's, never the epic's (`DispatcherPlanner.no_run`, the plan's events). `null` against a dispatcher build older than the key (read tolerantly, `arcOf`). */ no_run: DispatcherArcNoRun | null };

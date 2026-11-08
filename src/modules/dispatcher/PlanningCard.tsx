@@ -34,13 +34,19 @@ const WAITING_KEYS: Record<DispatcherPlanner['verb'], string> = {
  *
  * THE STATE IS ONE WORD, AND ITS TONE IS THE PLANNER BADGE'S (`plannerStatusTone`): out reads `info` (work is happening), waiting
  * `neutral`, ended short `warn` (amber — the one state that wants a hand: the plan card's Resume planner, or the daemon's retry), and an outing
- * the house says is not running `danger` (`outing.no_run`; the sentence itself is the plan card's badge's, `PlannerBadge`). The words
- * carry it without colour. A subject whose OWN pause stands reads `Planning paused` in foreground ink and no tone (`PlanningPausedLine`,
- * the card head's register: the operator's own brake is a fact, not an alarm) whatever its outing reads, since the pause is what holds it.
+ * the house says is not running `danger`, worded `Not running` (`outing.no_run`, read by truthiness: a frame from a server older than the
+ * key carries none). The words carry it without colour. A subject whose OWN pause stands reads `Planning paused` in foreground ink and no
+ * tone (`PlanningPausedLine`, the card head's register: the operator's own brake is a fact, not an alarm) whatever its outing reads,
+ * since the pause is what holds it.
+ *
+ * THE HOUSE'S OWN SENTENCE RIDES AFTER THE WORD, where an ended outing's cause does. An epic with no plan on the lane has neither a plan card nor
+ * a deck, so `PlannerBadge` is never drawn for it and this line is the one screen the push's `Open the Roadmap tab` can land on: it says here
+ * what the push said, in the operator's words (`operatorWords`).
  *
  * WHO, ON WHAT, FOR HOW LONG: the soul's name (`soulWord`), the model as an agent row names it (`useModelName`, the store's own word
  * until the catalog names it), and the clock (`useElapsed`) — since the outing was WRITTEN while it waits, since it FORKED while it is out,
- * and none once it has ended or is paused: the word says what became of it. Why it ended rides after, in the operator's words.
+ * and none once it has ended, is paused, or the house says it is not running: the word says what became of it, and nothing is happening to
+ * tick for. Why it ended, or why it is not running, rides after, in the operator's words.
  *
  * A TELL IS ONE WORD, `Continuing the design`: the store writes the operator's answers, a Rework's notes and the `continue` a Resume
  * planner sends as the same verb, and the document carries nothing that tells them apart, so the line says what is true of all three.
@@ -59,7 +65,9 @@ const WAITING_KEYS: Record<DispatcherPlanner['verb'], string> = {
 function PlanningLineRow({ line }: { line: PlanningLine }) {
   const { t } = useTranslation();
   const { outing, paused } = line;
-  const ticking = outing !== null && outing.state !== 'ended' && !paused;
+  // The house's own sentence for an outing it says is not running, or none: a pause outranks it (the pause is what holds the outing).
+  const noRun = !paused && outing !== null ? outing.no_run : '';
+  const ticking = outing !== null && outing.state !== 'ended' && !paused && !noRun;
   const elapsed = useElapsed(ticking ? epochOf(outing.state === 'queued' ? outing.created_at : outing.launched_at) : null);
   const modelName = useModelName(outing?.model ?? null);
   const state = paused ? 'paused' : outing?.state ?? 'paused';
@@ -68,11 +76,13 @@ function PlanningLineRow({ line }: { line: PlanningLine }) {
   if (paused) {
     word = <PlanningPausedLine via="own" />;
   } else if (outing !== null) {
-    const key = outing.state === 'ended' ? 'dispatcher.planning.endedShort' : outing.state === 'queued' ? WAITING_KEYS[outing.verb] : WORK_KEYS[outing.verb];
+    const key = noRun
+      ? 'dispatcher.planning.notRunning'
+      : outing.state === 'ended' ? 'dispatcher.planning.endedShort' : outing.state === 'queued' ? WAITING_KEYS[outing.verb] : WORK_KEYS[outing.verb];
     word = <Badge as="span" tone={plannerStatusTone(outing)} className="vv-badge--compact">{t(key)}</Badge>;
   }
   const who = outing === null ? [] : [soulWord(t, outing.soul), modelName ?? outing.model, ticking ? elapsed : ''];
-  const cause = !paused && outing?.state === 'ended' && outing.outcome ? operatorWords(outing.outcome) : null;
+  const cause = noRun ? operatorWords(noRun) : !paused && outing?.state === 'ended' && outing.outcome ? operatorWords(outing.outcome) : null;
 
   return (
     <li data-planning-line={line.name} data-planning-kind={line.kind} data-planning-loose={String(line.loose)} data-planning-drawn={String(line.drawn)}

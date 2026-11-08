@@ -3,15 +3,19 @@ import type { DispatcherArc, DispatcherPlan, DispatcherPlanner } from '@/shared/
 /**
  * Whether an outing of the lane's own list is OUT on `name` — a planner child at work whose `target` or
  * `plan` is that name, which are the rows `report_runtime` counts for it.
+ *
+ * An outing the house says is NOT RUNNING (`no_run`: it has had no process behind it for minutes and no dispatcher recorded its end) is
+ * `out` in the store's word and at work in nobody's, so it does not count: its time does not tick and its pill does not light, as
+ * `PlannerBadge` says it is not running. `no_run` is read by truthiness: a frame from a server older than the key carries none.
  */
 function outingOut(planners: readonly DispatcherPlanner[], name: string): boolean {
-  return planners.some((outing) => outing.state === 'out' && (outing.target === name || outing.plan === name));
+  return planners.some((outing) => outing.state === 'out' && !outing.no_run && (outing.target === name || outing.plan === name));
 }
 
 /**
  * Whether an agent is out on this plan RIGHT NOW: a walk with a soul out or its walker alive on one of
  * its phases (`phase.busy`, the chain layer's own answer and the one the dispatcher's open intervals are
- * made from), or a planner outing of its own that is `out`. This is what lets its working time tick
+ * made from), or a planner outing of its own that is `out` and not said to be stuck. This is what lets its working time tick
  * between frames, and nothing else does: a plan that is `live` and waiting — on its epic's turn, on
  * another feature — has no agent out, and a clock running there would be saying it works.
  *

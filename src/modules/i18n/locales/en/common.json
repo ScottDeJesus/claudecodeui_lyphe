@@ -1397,7 +1397,8 @@
         "cut": "Waiting to cut into tasks",
         "judge": "Waiting to judge what landed"
       },
-      "endedShort": "Ended short"
+      "endedShort": "Ended short",
+      "notRunning": "Not running"
     },
     "acceptWhenCut": "Accept when cut",
     "acceptWhenCutArmed": "Accepted · starts when cut",

@@ -1,11 +1,11 @@
-import { transcribeSpeech, type TranscribeAnswer } from '@/modules/voice/index.js';
+import { transcribeSpeech, type HeardAnswer } from '@/modules/voice/index.js';
 import type { VoiceAudioUpload } from '@/shared/types.js';
 import type { AppError } from '@/shared/utils.js';
 
 import { stripCall } from '../../../shared/wake-words.js';
 
 import type { CompanionAccount } from './companion-account.js';
-import { MESSAGE_TEXT_MAX, characterCount, geminiRefusal, inputInvalid } from './companion-input.js';
+import { MESSAGE_TEXT_MAX, characterCount, inputInvalid, speechRefusal } from './companion-input.js';
 import { readCompanionSettings } from './companion-settings.js';
 
 /**
@@ -20,20 +20,21 @@ import { readCompanionSettings } from './companion-settings.js';
  *      name press from any other page is the clip a page still held when the floor moved away from it (its ears closed `gone`),
  *      and taking the floor back would undo the move that closed it. With no page holding the floor, a name press takes it;
  *   2. it is HEARD: a clip shorter than `EMPTY_PRESS_UNDER_MS` by the page's own clock (or one with no bytes) is the empty
- *      press with no Gemini call; any other goes through the voice barrel's `transcribeSpeech`, whose empty answer is the
- *      empty press too and whose text is what he said. A name press is heard exactly as a button press is: the same call,
- *      the same refusals, the same arrival order;
+ *      press with no transcription request; any other goes through the voice barrel's `transcribeSpeech` (his home server
+ *      first, Gemini the backup, the very call the chat's mic makes), whose empty answer is the empty press too and whose text
+ *      is what he said. A name press is heard exactly as a button press is: the same call, the same refusals, the same arrival
+ *      order;
  *   3. it is SETTLED: his line joins her log (role `operator`, via `spoken`, the words as its text, `''` for the empty
  *      press) and is pushed to her, as `<operator via="spoken">…`, `<operator via="spoken" heard="nothing">` or, for a
  *      name press that was only her name, `<operator via="spoken" heard="name">`.
  *
  * WHAT A NAME PRESS LOGS AND PUSHES. "what he says after the wake word is the press" (ruling 2): `stripCall` cuts her name
- * (settings' `name`, default Kaylee) and its greetings off the front of Gemini's transcript, and a closing "over to you,
+ * (settings' `name`, default Kaylee) and its greetings off the front of the transcript, and a closing "over to you,
  * <name>" off the back, before anything is logged or pushed, so "Hey Kaylee, what chats are working?" reaches her as "What
  * chats are working?". When nothing is left he only called her: the log keeps the transcript as heard ("Kaylee."), which
  * is what her memory's exact-text match needs, and she is pushed `heard="name"`, a turn she answers as someone called by
- * name does. Gemini's words that do not open with her name are pushed as they are, their opening untouched: the page
- * already heard her name, a misheard "Gilly" must not swallow his call, and his answer asks Gemini for no second check.
+ * name does. Words that do not open with her name are pushed as they are, their opening untouched: the page
+ * already heard her name, a misheard "Gilly" must not swallow his call, and his answer asks the transcriber for no second check.
  *
  * A button press is untouched by any of this: its transcript is logged and pushed as heard.
  *
@@ -43,15 +44,17 @@ import { readCompanionSettings } from './companion-settings.js';
  *
  * A hearing that is refused or fails does not wake her. Nothing is pushed; a system line "I could not hear that: <sentence>"
  * goes into her log, and the press answers an `AppError` carrying that sentence — 409 `COMPANION_SPEECH_REFUSED` for
- * `no_key` and `refused`, 502 `COMPANION_SPEECH_FAILED` for `failed`. A transcript past `MESSAGE_TEXT_MAX` characters, the
- * limit of a typed line, is refused the same way (400 `COMPANION_INPUT_INVALID` naming `audio`, as the typed door names
- * `text`) rather than logged and pushed whole. Her Gemini calls are not counted against any budget (the operator's ruling),
- * so nothing here asks one.
+ * `no_key` and `refused`, 502 `COMPANION_SPEECH_FAILED` for `failed`. The sentence names both transcribers once the home
+ * server was tried and holds no key. A clip Gemini heard because the home server could not is heard like any other, and its
+ * line in her log is followed by a system line saying so ("Home server didn't answer; Gemini transcribed this"), so he knows
+ * the box is down. A transcript past `MESSAGE_TEXT_MAX` characters, the limit of a typed line, is refused the same way (400
+ * `COMPANION_INPUT_INVALID` naming `audio`, as the typed door names `text`) rather than logged and pushed whole. Gemini's calls,
+ * the backup's, are not counted against any budget (the operator's ruling), so nothing here asks one.
  *
  * Consumer: `companion.service.ts`, which builds one and exposes it as its `press` verb for `POST /press`.
  */
 
-/** A clip shorter than this (by the page's own clock, in ms) has no words to hear: it is the empty press, and Gemini is not asked. */
+/** A clip shorter than this (by the page's own clock, in ms) has no words to hear: it is the empty press, and no transcriber is asked. */
 const EMPTY_PRESS_UNDER_MS = 400;
 
 /** The clip a press carries, how long the page's recorder says it ran and what opened it: his talk `button`, or her `name` heard by the page's ears. Consumed by `companion.service.ts` and `companion.routes.ts`. */
@@ -71,8 +74,8 @@ type PressDeps = {
 };
 
 /** The clip heard: the empty press without a request when there is nothing to hear, else the voice barrel's answer. Never rejects. */
-async function hear(userId: number, { audio, durationMs }: PressInput): Promise<TranscribeAnswer> {
-  if (durationMs < EMPTY_PRESS_UNDER_MS || audio.bytes.length === 0) return { ok: true, text: '' };
+async function hear(userId: number, { audio, durationMs }: PressInput): Promise<HeardAnswer> {
+  if (durationMs < EMPTY_PRESS_UNDER_MS || audio.bytes.length === 0) return { ok: true, text: '', standIn: null };
   try {
     return await transcribeSpeech(userId, audio);
   } catch (error) {
@@ -96,7 +99,7 @@ function nameOf(account: CompanionAccount): string {
  * What a heard press becomes. A button press, and a name press that heard nothing, are logged as heard. A name press is cut
  * by `stripCall` first: what is left of it is his line; when nothing is left he only called her (or only closed on her
  * name), so the log keeps the transcript as heard and she is pushed the call. `stripCall` leaves '' only when a cut took
- * the whole transcript, and Gemini's text is never blank, so an empty `rest` is always a call.
+ * the whole transcript, and a transcriber's text is never blank, so an empty `rest` is always a call.
  */
 function settling(account: CompanionAccount, transcript: string, opened: PressInput['opened']): Settling {
   if (transcript === '') return { logged: '', push: 'empty' };
@@ -117,8 +120,8 @@ export function createPress({ accountOf, refuseWhileStopping }: PressDeps) {
   const chains = new Map<number, Promise<void>>();
 
   /** Logs his line and pushes it: the words as spoken, the empty press, or his call by name. Runs in the chain, in arrival order. */
-  function settle(account: CompanionAccount, answer: TranscribeAnswer, opened: PressInput['opened']): PressAnswer {
-    if (!answer.ok) return refuseUnheard(account, geminiRefusal(answer));
+  function settle(account: CompanionAccount, answer: HeardAnswer, opened: PressInput['opened']): PressAnswer {
+    if (!answer.ok) return refuseUnheard(account, speechRefusal(answer));
     const { logged, push } = settling(account, answer.text, opened);
     // The limit reads what would be logged, so a name press is measured less its name.
     const characters = characterCount(logged);
@@ -126,6 +129,7 @@ export function createPress({ accountOf, refuseWhileStopping }: PressDeps) {
     // The transcription can take seconds: the server may have begun to stop meanwhile.
     refuseWhileStopping();
     account.store.appendLog({ role: 'operator', via: 'spoken', text: logged });
+    if (answer.standIn !== null) account.store.appendLog({ role: 'system', text: answer.standIn });
     if (push === 'empty') account.session.pushOperatorEmpty();
     else if (push === 'called') account.session.pushOperatorCalled();
     else account.session.pushOperator(logged, 'spoken');

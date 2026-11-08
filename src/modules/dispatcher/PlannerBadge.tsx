@@ -30,6 +30,10 @@ import type { DispatcherPlanner } from '@/shared/types';
  *   `not running: <the house's sentence>` in the `danger` tone, whatever its state word would have been.
  * Both are house sentences relayed verbatim, so they pass through `operatorWords` where they are drawn.
  *
+ * BOTH KEYS ARE READ BY TRUTHINESS, never against `''`: the client holds whatever frame arrives (`DispatcherFeed.asPicture` checks a
+ * list of outings, not the keys of each), so a frame from a server older than `waiting` and `no_run` carries neither, and an absent key
+ * is no reason and no alert — not a throw in `operatorWords`, not the loudest tone on every outing (`planning_paused` is read the same way).
+ *
  * THE CLOCK COUNTS WHAT IS STILL HAPPENING, which is why an ENDED outing draws none, and neither does one the house says is not
  * running: the word that replaces its work (`ended short: <outcome>`, `not running: <sentence>`) already says what became of it,
  * and how long ago it died is the store's own `ended_at`, printed by `dispatcher status`. A queued outing has waited
@@ -63,7 +67,7 @@ const WORK_KEYS: Record<DispatcherPlanner['verb'], string> = {
  * no other home on the card and is said in the line.
  */
 function waitingWords(planner: DispatcherPlanner): string {
-  if (planner.waiting === '' || planner.waiting === planner.pace_hold) return '';
+  if (!planner.waiting || planner.waiting === planner.pace_hold) return '';
   return operatorWords(planner.waiting);
 }
 
@@ -72,7 +76,7 @@ function waitingWords(planner: DispatcherPlanner): string {
  * became of it; a queued one says that it waits, and why when the take-up has a reason; one that is out says what it is doing.
  */
 function workWord(t: TFunction, planner: DispatcherPlanner): string {
-  if (planner.no_run !== '') return t('dispatcher.planner.notRunning', { reason: operatorWords(planner.no_run) });
+  if (planner.no_run) return t('dispatcher.planner.notRunning', { reason: operatorWords(planner.no_run) });
   if (planner.state === 'ended') {
     return planner.outcome === null
       ? t('dispatcher.planner.endedShort')
@@ -92,7 +96,7 @@ export function PlannerBadge({ planner }: { planner: DispatcherPlanner }) {
   // (`report_planners.entries`), so the word below and the warning tone are the same reading of the
   // same row: nothing here has to ask the store a second question to tell a stall from a finish.
   const ended = planner.state === 'ended';
-  const stuck = planner.no_run !== '';
+  const stuck = Boolean(planner.no_run);
   const since = ended || stuck ? null : epochOf(planner.state === 'queued' ? planner.created_at : planner.launched_at);
   const elapsed = useElapsed(since);
 

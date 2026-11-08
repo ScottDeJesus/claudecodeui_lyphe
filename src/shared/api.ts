@@ -13,7 +13,7 @@ import type { RoadmapWriteBody } from '@/shared/roadmap-types';
 import type { StationAskAnswer } from '@/shared/station-types';
 import { IS_PLATFORM, companionClientId, recordingFileName } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
-import { synthesizeOnOwnEndpoint, transcribeOnOwnEndpoint } from '@/shared/voiceDirect';
+import { synthesizeOnOwnEndpoint } from '@/shared/voiceDirect';
 
 // Headers are a plain record rather than the full `HeadersInit` union so the
 // defaults below can be merged with a caller's headers by spreading.
@@ -844,24 +844,23 @@ export const api = {
         body: formData,
       }),
     tts: (text: string, options: ApiRequestOptions = {}) => post('/api/voice/tts', { text }, options),
-    // The account's chat-mic provider and Gemini transcription model, with the status of its one Gemini key:
-    // `{ settings: VoiceSettings, key: GeminiKeyStatus }`. A save answers the same shape; the key calls answer `{ key }`.
-    // The key goes out on its save and never comes back, only its status. A refusal is a 400 `VOICE_SETTINGS_INVALID`.
+    // The account's read-aloud provider, home server address and Gemini choices (the backup transcription model among them), with the
+    // status of its two keys: `{ settings: VoiceSettings, key: GeminiKeyStatus, homeServerKey: HomeServerKeyStatus }`. A save answers
+    // the same shape; the Gemini key calls answer `{ key }` and the home server key calls `{ homeServerKey }`. A key goes out on its
+    // save and never comes back, only its status. A refusal is a 400 `VOICE_SETTINGS_INVALID`.
     settings: () => get('/api/voice/settings'),
     saveSettings: (patch: VoiceSettingsPatch) => put('/api/voice/settings', patch),
     saveGeminiKey: (key: string) => put('/api/voice/gemini-key', { key }),
     clearGeminiKey: () => del('/api/voice/gemini-key'),
+    saveHomeServerKey: (key: string) => put('/api/voice/home-server-key', { key }),
+    clearHomeServerKey: () => del('/api/voice/home-server-key'),
     // The account's house words, as one whole list: `{ vocabulary: VocabularyEntry[] }` both ways. The save REPLACES the list and
     // answers it as stored (trimmed, deduplicated); a refusal is a 400 `VOICE_VOCABULARY_INVALID` whose sentence names the entry or form.
     vocabulary: () => get('/api/voice/vocabulary'),
     saveVocabulary: (vocabulary: VocabularyEntry[]) => put('/api/voice/vocabulary', { vocabulary }),
-    // The server's speech engine for a caller that talks to its own OpenAI-compatible backend (this page's browser-direct
-    // voice calls, a standalone dictation app): the server never sees that traffic, so it answers the text halves alone.
-    // `transcribeHints` is `{ prompt }`, Whisper's `prompt` for the account's vocabulary (`''`: send none). `clean` takes a
-    // transcript and answers `{ text }` as the server's own path would (fillers out per the account's switch, misheard house
-    // words corrected). `speakable` answers `{ text }`, the text to hand a speech backend with house words respelled.
-    transcribeHints: (options: ApiRequestOptions = {}) => get('/api/voice/transcribe-hints', options),
-    clean: (text: string, options: ApiRequestOptions = {}) => post('/api/voice/clean', { text }, options),
+    // The server's speech engine for a caller that talks to its own OpenAI-compatible backend (this page's browser-direct read-aloud):
+    // the server never sees that traffic, so it answers the text half alone. `speakable` answers `{ text }`, the text to hand a
+    // speech backend with house words respelled.
     speakable: (text: string, options: ApiRequestOptions = {}) => post('/api/voice/speakable', { text }, options),
   },
 
@@ -1259,7 +1258,7 @@ export const api = {
     drop: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/drop`, {}),
     // A plan's STALLED planner outing put back to work (`dispatcher planner-resume <plan>`): the
     // dispatcher reads which door from its own store — `cut`, `judge`, or a `tell` of `continue` — and
-    // answers with that door's own sentence (`QUEUED cut <plan> — …`), or `REFUSED planner-resume …` as a 409.
+    // answers with that door's own sentence (`LAUNCHED cut <plan> — run …`, `QUEUED …` or `FAILED …`), or `REFUSED planner-resume …` as a 409.
     plannerResume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/planner-resume`, {}),
     // The operator's lift of the usage pacer's hold for ONE plan (`dispatcher override <plan> --by app:card`):
     // `OVERRIDDEN <plan> — …`, or the dispatcher's REFUSED line (a finished plan, one already past the pacer)
@@ -1664,28 +1663,15 @@ export function voiceConfigSignature(provider: VoiceProvider): string {
 }
 
 /**
- * Transcribes recorded audio. With the 'gemini' provider (the default) it always goes through the CloudCLI voice proxy, which
- * transcribes on the server's Gemini key: the browser's own endpoint is never reached and none of its `x-voice-*` headers (its
- * OpenAI-compatible key and model) ride along. With 'openai' it posts directly to the user's configured OpenAI-compatible
- * endpoint when one is set (the account's vocabulary prompt and cleanup applied through the server's engine:
- * `transcribeOnOwnEndpoint`, `src/shared/voiceDirect.ts`) and otherwise goes through the proxy, which applies them itself.
- * Callers pass the account's provider from the chat module's `useVoiceProvider`.
+ * Transcribes recorded audio. It always goes through the CloudCLI voice route, whatever the account's read-aloud provider says: the
+ * server hears the clip on the account's home server first and on Gemini only when the home server cannot, and answers the cleaned
+ * `{ text }` (with a `notice` line when Gemini stood in). The browser's own endpoint is never reached and none of its `x-voice-*`
+ * headers ride along: the home server and its key are the account's, kept on the server. Used by the chat composer's mic (`useVoiceInput`).
  */
-export function transcribeVoice(blob: Blob, filename: string, provider: VoiceProvider = 'gemini'): Promise<Response> {
+export function transcribeVoice(blob: Blob, filename: string): Promise<Response> {
   const body = new FormData();
-
-  if (provider === 'gemini') {
-    body.append('audio', blob, filename);
-    return api.voice.transcribe(body);
-  }
-
-  const config = readVoiceConfig();
-  if (config.baseUrl.trim()) {
-    return transcribeOnOwnEndpoint(blob, filename, config, api.voice);
-  }
-
   body.append('audio', blob, filename);
-  return api.voice.transcribe(body, voiceConfigHeaders());
+  return api.voice.transcribe(body);
 }
 
 /**

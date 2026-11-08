@@ -75,7 +75,7 @@ export type {
 export { apiKeysDb } from '@/modules/database/repositories/api-keys.js';
 export { appConfigDb } from '@/modules/database/repositories/app-config.js';
 // credentialsDb: used by the settings module's credentials routes and by the voice module, which keeps the account's one
-// Gemini key here (credential_type 'gemini_api_key').
+// Gemini key (credential_type 'gemini_api_key') and its one home server key (credential_type 'home_server_key') here.
 export { credentialsDb } from '@/modules/database/repositories/credentials.js';
 // cronJobsDb: the cron registry's own tables — read by the schedules module's read service, written
 // by its sync service and by the module's CLI door (add / remove / list / sync).

@@ -1,10 +1,12 @@
 /**
- * Transcript cleanup: the one post-processor both speech-to-text paths run (the chat mic and Kaylee's press). Two steps, in this
- * order. First, when the account's `cleanTranscripts` setting is on, it removes what a person does not mean to say (um, uh, a
- * word said twice, a cut-off "w-what") and nothing else. A false positive that drops a real word is worse than a missed filler,
- * so every rule below leans toward leaving the text alone. It is English: the lists and the repeat rule know English words, so
- * a speaker of another language turns the setting off in Settings → Voice. Second, whatever the setting, the account's vocabulary
- * replaces each misheard form of a house word with its spelling (`vocabulary-match.ts`); an empty vocabulary does nothing.
+ * Transcript cleanup: the house's own post-processor of a transcript, for the chat mic and Kaylee's press alike. Two steps, in this
+ * order. First, when it is asked to (the account's `cleanTranscripts` setting is on, and for the home server's text only when the
+ * box's own cleanup did not run: the box cleans its transcript itself and the house does not do it again, bar one question it puts to
+ * a tidied text, whether it is nothing but fillers, which the box leaves in), it removes what a person does not mean to say (um, uh,
+ * a word said twice, a cut-off "w-what") and nothing else. A false positive that drops a real word is worse than a missed filler, so
+ * every rule below leans toward leaving the text alone. It is English: the lists and the repeat rule know English words, so a speaker
+ * of another language turns the setting off in Settings → Voice. Second, always, the account's vocabulary replaces each misheard form
+ * of a house word with its spelling (`vocabulary-match.ts`), on the box's text too; an empty vocabulary does nothing.
  */
 
 import type { VocabularyEntry } from '@/shared/types.js';
@@ -100,7 +102,11 @@ const RECAPITALISE_NEXT = '';
 
 /** The text before a candidate ends where a sentence opens: the start, after a full stop, question or exclamation mark, or after an opening quote that begins a line ("He said, “Um, …"). */
 const SENTENCE_OPENING = /(?:^|[.?!…]["'”’)\]]*)\s*(?:["“‘]\s*)*$|[,:]\s*["“‘]\s*$/u;
-const HAS_WORD_CHARACTER = /[\p{L}\p{N}]/u;
+/**
+ * A letter or a digit: what makes a text words rather than only punctuation and space. Consumed by `removeDisfluencies` below and by
+ * `speech-transcriber.ts`, which reads a home server answer with no such character as a clip with no speech.
+ */
+export const HAS_WORD_CHARACTER = /[\p{L}\p{N}]/u;
 const LAST_WORD = /([\p{L}\p{N}'’]+)\s*$/u;
 
 /** A list entry as a pattern: spaces inside a phrase match any run of whitespace. */
@@ -276,11 +282,12 @@ function removeDisfluencies(text: string): string {
 }
 
 /**
- * What a transcript comes to before anyone reads it: its disfluencies removed when `removeFillers` is on (the account's
- * `cleanTranscripts`; off keeps every um and repeat as said), then, after that and whatever the switch says, each misheard form
- * of a house word in `vocabulary` replaced by its spelling. An empty vocabulary is how that second step is turned off. Text
- * with nothing to change comes back byte for byte; a lone "Um." with fillers removed is `''`.
- * Consumed by `voice-provider.ts` (the chat mic's OpenAI branch) and `gemini-transcribe.ts` (the Gemini branch and Kaylee's press).
+ * What a transcript comes to before anyone reads it: its disfluencies removed when `removeFillers` is on, then, after that and
+ * whatever the switch says, each misheard form of a house word in `vocabulary` replaced by its spelling. An empty vocabulary is
+ * how that second step is turned off. Text with nothing to change comes back byte for byte; a lone "Um." with fillers removed is `''`.
+ * Consumed by `speech-transcriber.ts` (the home server's text: `removeFillers` only when cleanup was asked and the box did not do it,
+ * and the corrections always; and, with an empty vocabulary, to ask of any text with cleanup asked whether a lone filler is all it
+ * holds) and `gemini-transcribe.ts` (the backup's text: `removeFillers` is the account's `cleanTranscripts`).
  */
 export function cleanTranscript(text: string, options: { removeFillers: boolean; vocabulary: readonly VocabularyEntry[] }): string {
   const withoutDisfluencies = options.removeFillers ? removeDisfluencies(text) : text;

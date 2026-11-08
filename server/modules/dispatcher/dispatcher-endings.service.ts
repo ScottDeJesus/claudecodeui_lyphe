@@ -1,4 +1,4 @@
-import type { DispatcherArc, DispatcherArcNoRun, DispatcherEvent, DispatcherPlan } from '@/shared/types.js';
+import type { DispatcherArc, DispatcherArcAlertMark, DispatcherArcNoRun, DispatcherEvent, DispatcherPlan } from '@/shared/types.js';
 
 import { createArcAlertWatch } from './dispatcher-arc-alerts.service.js';
 
@@ -18,8 +18,8 @@ import { createArcAlertWatch } from './dispatcher-arc-alerts.service.js';
  *
  * An EPIC'S OWN `no-run` alert (`dispatcher.no_run`, keyed `epic-no-run:<epic>:<id>`) has a mark of its own too, and for a stronger reason
  * than a record's: it rides a row of the epic's own log (`arc_events`), a sequence of ids apart from the plan events' this file's single
- * watermark counts, so no plan-event mark can say whether one was announced (`dispatcher-arc-alerts.service.ts` holds it, seeded as this
- * one is). A `no-run` on a PLAN's log is a plan event and goes through the push mark below.
+ * watermark counts, so no plan-event mark can say whether one was announced (`dispatcher-arc-alerts.service.ts` holds it, as an id and a
+ * stamp, seeded as this one is). A `no-run` on a PLAN's log is a plan event and goes through the push mark below.
  *
  * "Already announced" is held by the caller in durable storage rather than in this process, for a
  * measured reason: the dev server restarts on every edit through a handover that runs the old and the
@@ -105,12 +105,13 @@ export type DispatcherEndingsDependencies = {
   readRecordMark: () => number | null;
   writeRecordMark: (eventId: number) => void;
   /**
-   * The highest id of an EPIC's own log (`arc_events`) whose `no-run` alert was already announced, or `null` when none was ever stored. A mark
-   * of its own, never the push mark: those ids are a sequence of their own (`dispatcher-arc-alerts.service.ts`). It is not derived from
-   * the push mark when absent — they cannot be compared — so the first picture seeds it from the highest alert it holds.
+   * The mark on an EPIC's own `no-run` alerts (`arc_events`) — the highest record id and the latest record stamp already announced — or `null`
+   * when none was ever stored. A mark of its own, never the push mark: those ids are a sequence of their own, and the store hands an id out
+   * again, which the stamp tells apart (`dispatcher-arc-alerts.service.ts`). It is not derived from the push mark when absent — they cannot
+   * be compared — so the first picture seeds it from the alerts it holds.
    */
-  readArcAlertMark: () => number | null;
-  writeArcAlertMark: (arcEventId: number) => void;
+  readArcAlertMark: () => DispatcherArcAlertMark | null;
+  writeArcAlertMark: (mark: DispatcherArcAlertMark) => void;
   /** Tells the users about one ending. Synchronous; a throw leaves that ending and the ones after it due. */
   announce: (ending: DispatcherEnding) => void;
 };

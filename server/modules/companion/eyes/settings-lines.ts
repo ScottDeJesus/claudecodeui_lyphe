@@ -1,5 +1,5 @@
 import type { CompanionSettings } from '@/shared/companion-types.js';
-import type { GeminiKeyStatus, VoiceSettings } from '@/shared/types.js';
+import type { GeminiKeyStatus, HomeServerKeyStatus, VoiceSettings } from '@/shared/types.js';
 
 import { characterCount } from '../companion-input.js';
 
@@ -7,8 +7,8 @@ import { characterCount } from '../companion-input.js';
  * Her settings and the voice's, for `read_settings` (`house-reads.ts`), as one line per setting. PURE — the settings arrive as
  * values. Nothing here is written back: `read_settings` reads, and no tool of hers writes his settings.
  *
- * NEVER A KEY. The Gemini key is said by whose it is and by nothing of it: `GeminiKeyStatus.last4` is not read in this file,
- * so not even the last characters of a key of his can reach her context.
+ * NEVER A KEY. The Gemini key is said by whose it is, and the home server's by whether it is set, and by nothing of either:
+ * `last4` of neither status is read in this file, so not even the last characters of a key of his can reach her context.
  *
  * Consumer: `house-reads.ts` (`read_settings`).
  */
@@ -20,7 +20,7 @@ const KEY_WORDS: Readonly<Record<GeminiKeyStatus['source'], string>> = {
   none: 'no key',
 };
 
-/** The chat's voice provider (its mic and its read-aloud) by its name. */
+/** The chat's read-aloud provider by its name. */
 const PROVIDER_WORDS: Readonly<Record<VoiceSettings['provider'], string>> = { openai: 'OpenAI', gemini: 'Gemini' };
 
 /**
@@ -41,14 +41,18 @@ export function companionSettingsLines(settings: CompanionSettings, modelLabel: 
 }
 
 /**
- * `voice`: the chat's voice provider (its mic and its read-aloud), whether transcripts are cleaned of fillers and repeats, the transcription and speech models, her voice, her sounds, and whose Gemini key is in use.
- * `source` is `GeminiKeyStatus['source']` and nothing else of the status.
+ * `voice`: how his speech is heard (the home server first, Gemini the backup, for the chat's mic and her press alike, and whether the home
+ * server is set up), the chat's read-aloud provider, whether transcripts are cleaned of fillers and repeats, the backup's transcription model,
+ * the speech model, her voice, her sounds, and whose Gemini key is in use.
+ * `source` is `GeminiKeyStatus['source']` and `homeServerKey` is `HomeServerKeyStatus['source']`, and nothing else of either status.
  */
-export function voiceSettingsLines(voice: VoiceSettings, source: GeminiKeyStatus['source']): string[] {
+export function voiceSettingsLines(voice: VoiceSettings, source: GeminiKeyStatus['source'], homeServerKey: HomeServerKeyStatus['source']): string[] {
+  const homeServerSet = voice.homeServer.address !== null && homeServerKey === 'stored';
   return [
-    `Chat voice provider (mic and read-aloud): ${PROVIDER_WORDS[voice.provider]}.`,
+    `How he is heard (the chat mic and her talk press): ${homeServerSet ? 'his home server transcribes it, with Gemini as the backup when the home server cannot' : 'the home server is not set up, so Gemini transcribes it'}.`,
+    `Chat read-aloud provider: ${PROVIDER_WORDS[voice.provider]}.`,
     `Transcript cleanup: ${voice.cleanTranscripts ? 'on, so um, uh and repeated words are removed from what he says' : 'off, so his fillers, stutters and repeats are kept as said (the vocabulary still corrects his house words)'}.`,
-    `Transcription model: ${voice.gemini.transcriptionModel}.`,
+    `Backup transcription model (Gemini's): ${voice.gemini.transcriptionModel}.`,
     `Speech model: ${voice.gemini.speechModel}.`,
     `Her voice: ${voice.gemini.voice}.`,
     `Her sounds: ${voice.gemini.soundTags.join(', ')}.`,

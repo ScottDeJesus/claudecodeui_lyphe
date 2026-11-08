@@ -141,7 +141,7 @@ export function arcOf(raw: unknown): DispatcherArc {
     queue: queueOf(field(arc, 'queue'), name),
     // The epic's OWN open `no-run` record (`report_arcs.arc_dict.no_run`): the house could not get a run behind an outing that names the
     // epic itself — its design, its whole-arc cut. Carried as the document states it; `null` while none stands and for a build older than
-    // the key. The endings notifier pushes each record once from it, under a mark of its own on `id` (`dispatcher-arc-alerts.service.ts`).
+    // the key. The endings notifier pushes each record once from it, under a mark of its own on `id` and `at` (`dispatcher-arc-alerts.service.ts`).
     no_run: noRunOf(field(arc, 'no_run'), name),
   };
 }

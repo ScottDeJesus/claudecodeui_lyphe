@@ -85,8 +85,11 @@ const ANNOUNCED_THROUGH_KEY = 'dispatcher_announced_through';
 /** The `app_config` key holding the highest event id already KEPT as a record (`dispatcher.feature_finished`): a mark of its own beside the push one, for the reason `dispatcher-endings.service.ts` gives. */
 const RECORDED_THROUGH_KEY = 'dispatcher_recorded_through';
 
-/** The `app_config` key holding the highest record id of an EPIC's own log (`arc_events`) whose `no-run` alert was already announced: a mark of its own, because those ids are a sequence of their own and the push mark is a plan-event id (`dispatcher-arc-alerts.service.ts`). */
+/** The `app_config` key holding the highest record id of an EPIC's own log (`arc_events`) whose `no-run` alert was already announced: a mark of its own, because those ids are a sequence of their own and the push mark is a plan-event id (`dispatcher-arc-alerts.service.ts`). Its stamp rides beside it (`ARC_ALERT_STAMP_KEY`). */
 const ARC_ALERT_THROUGH_KEY = 'dispatcher_arc_alert_through';
+
+/** The `app_config` key holding the latest record stamp already announced, the other half of the epic alerts' mark: the store hands an id out again (`arc_events.id` has no AUTOINCREMENT) and a record that took one is told by its stamp. A key of its own, so the id key keeps the one meaning it always had and a mark stored as a bare id reads with no stamp. */
+const ARC_ALERT_STAMP_KEY = 'dispatcher_arc_alert_through_at';
 
 /** One of those marks as the whole number stored, or `null` when none was ever stored. */
 function readStoredMark(key: string): number | null {
@@ -241,8 +244,15 @@ export function createDispatcherModule(storeWatch: DispatcherStoreWatch): Dispat
     writeMark: (eventId) => appConfigDb.set(ANNOUNCED_THROUGH_KEY, String(eventId)),
     readRecordMark: () => readStoredMark(RECORDED_THROUGH_KEY),
     writeRecordMark: (eventId) => appConfigDb.set(RECORDED_THROUGH_KEY, String(eventId)),
-    readArcAlertMark: () => readStoredMark(ARC_ALERT_THROUGH_KEY),
-    writeArcAlertMark: (arcEventId) => appConfigDb.set(ARC_ALERT_THROUGH_KEY, String(arcEventId)),
+    readArcAlertMark: () => {
+      const id = readStoredMark(ARC_ALERT_THROUGH_KEY);
+      return id === null ? null : { id, at: appConfigDb.get(ARC_ALERT_STAMP_KEY) };
+    },
+    // The stamp first: a stop between the two writes leaves the stamp ahead of the id, which can only tell one alert twice and never swallow one.
+    writeArcAlertMark: (mark) => {
+      if (mark.at !== null) appConfigDb.set(ARC_ALERT_STAMP_KEY, mark.at);
+      appConfigDb.set(ARC_ALERT_THROUGH_KEY, String(mark.id));
+    },
     announce: (ending) => announceDispatcherEnding(ending, logErrorOnce),
   });
 

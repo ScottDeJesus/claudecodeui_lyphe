@@ -72,10 +72,11 @@ export function planStatusTone(status: DispatcherPlanStatus): Tone {
  * — the same `info` a running phase wears.
  *
  * Takes the whole outing and not its state, because the alert is a second fact about the same row. Used by `PlannerBadge` and by
- * `PlanningCard`'s state word, so the two read one tone for one outing.
+ * `PlanningCard`'s state word, so the two read one tone for one outing. `no_run` is read by truthiness: a frame from a server older than
+ * the key carries none (`DispatcherFeed.asPicture` does not check the keys of each outing), and an absent key is no alert.
  */
 export function plannerStatusTone(outing: DispatcherPlanner): Tone {
-  if (outing.no_run !== '') return 'danger';
+  if (outing.no_run) return 'danger';
   if (outing.state === 'ended') return 'warn';
   return outing.state === 'out' ? 'info' : 'neutral';
 }

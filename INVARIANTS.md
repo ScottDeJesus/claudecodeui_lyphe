@@ -812,14 +812,14 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 - The `defaultValue` beside a key: the drawn text when its key is absent, the fallback when present — both carry the new words (`ComposerDeepSeekSwitch.tsx`, `RunnerParkAtPeakRow.tsx`).
 - The command palette's `Go to Roadmap` keywords carry both vocabularies (the `runner` entry of `PLAN_VIEWS`, `useWorkspaceViews.ts`).
 - The ten other locales hold none of the dispatcher keys and fall back to English. Their values whose English changed say what the new English says: `chat.json` `input.deepseekFlashTooltip`, `settings.json` `agents.runnerModel.description`, fr `agents.runnerParkAtPeak.*`. "plan runner" is "runner" in them, left in English.
-- The push copy: `notification-copy.service.ts` — `Feature finished`, `Epic finished`, `Feature paused`, `Features paused …`, `Task relaunched`, `Task <key> was taken up again`, `<done>/<n> tasks`.
+- The push copy: `notification-copy.service.ts` — `Feature finished`, `Epic finished`, `Feature paused`, `Features paused …`, `Task relaunched`, `Task <key> was taken up again`, `<done>/<n> tasks`, `Not running` (its body is the house's sentence, `meta.detail`, as written).
 - The server's two sentences: `NO_ANSWER.timeout` (`server/shared/dispatcher-command.ts`), `OTHER_PROCESS_EXAMPLES` (`claude-activity.service.ts`).
 
 **A house sentence a dispatcher surface relays verbatim** passes through `operatorWords` (MAN-7596) where it is drawn, and nowhere else:
 - `useDispatcherVerbs` — the verb toast.
 - `PlanFace` — the caption's posture.
-- `PlannerBadge` — the cause a planner outing ended on.
-- `PlanningCard` — the same cause, beside `Ended short` on an ended outing's line.
+- `PlannerBadge` — the cause a planner outing ended on, the reason a queued one waits (`waiting`) and the sentence of one the house says is not running (`no_run`).
+- `PlanningCard` — the same cause, beside `Ended short` on an ended outing's line, and the `no_run` sentence beside `Not running`.
 - `useRoadmapWrites` — the refusal toast of a roadmap write (its success toasts are written in the locale, `roadmap.toast.*`).
 - The dispatcher's own bytes never change.
 
@@ -7482,21 +7482,6 @@ probe-key: 8f8a9727fa6574fca1521fbe96f7305ac007520e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-live.mjs
 
-## INV-8354 — probe — MEDIUM — four docstore rows still state or write All for the epic dial, or call a retired function; the intent names them
-
-MEDIUM — four docstore rows still state or write All for the epic dial, or call a retired function; the intent names them
-
-```probe
-cd /home/lyphe/.claude && for t in INV-6329 INV-8330 INV-8316 MAN-8432; do printf '%s ' "$t"; docstore get "$t" --text | grep -c -E "model\.clean|Dial\(\"all\"|Dial\('all'|Dial\(limit='all'|limit all|dial reads All"; done
-echo "[probe exit $?]"
-expect: `1` after each of the four tokens while they are stale; `0` for each once corrected
-```
-
-measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding M1, MEDIUM
-probe-key: cb98f12deb6ca252bb8e01a0042e3c5733a9db80
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
-
 ## INV-8356 — probe — LOW — two Starts at once do not "start each plan once and kick once": `held` is read outside the write
 
 LOW — two Starts at once do not "start each plan once and kick once": `held` is read outside the write
@@ -10015,31 +10000,6 @@ measured 2026-10-21 by chain chain-usage-limits--account-switch--chats-20261021-
 probe-key: 16a5577b3803846c5d824a47bd408c050621cbb6
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/chosen-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-audit.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-engine-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-launch-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-chat-launch.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-chat-launch.sh
-
-## INV-9263 — probe — HIGH — the proof pauses the operator's LIVE queue; the pause lives in a house-wide flag the scratch home does not redirect
-
-HIGH — the proof pauses the operator's LIVE queue; the pause lives in a house-wide flag the scratch home does not redirect
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-epicflag.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'INNER'
-D=$(cd "$(dirname "$0")" && pwd)
-V=/home/lyphe/.claude/claudecodeui_lyphe/.verify
-echo "flag the proof's own env resolves for 'dispatcher epics pause' (DISPATCHER_HOME scratch, no override var): $(env -u DISPATCHER_EPICS_FLAG_PATH DISPATCHER_HOME=/tmp/heph-ovr-sim/dispatcher PYTHONPATH=/home/lyphe/.claude/hooks python3 -c 'from dispatcher import epic_dial; print(epic_dial.flag_path())')"
-echo "proof lines that run 'dispatcher epics ...': $(grep -c "dispatcher('epics'" $V/probe-pace-override.mjs) | proof files that point the dial at a scratch file: $(grep -l DISPATCHER_EPICS_FLAG_PATH $V/probe-pace-override.mjs $V/probe-pace-override.sh | wc -l)"
-printf 'paused yes\npaused_at 2026-10-22T00:00:00Z\n' > "$D/epics.flag"
-for v in pause resume; do env -u CLAUDE_CODE_SESSION_ID DISPATCHER_EPICS_FLAG_PATH="$D/epics.flag" DISPATCHER_HOME="$D/h" /home/lyphe/.claude/scripts/dispatcher epics $v 2>&1 | grep -v 'started no daemon'; done
-echo "a /tmp stand-in for an operator who already had Pause all on, after the proof's pause then resume: $(head -1 "$D/epics.flag")"
-INNER
-bash "$D/p.sh"; case "$D" in /tmp/athena-probe-epicflag.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-expect: while the defect stands — the first line ends /home/lyphe/.claude/state/epics.flag, `proof lines … : 2 | … scratch file: 0`, and the stand-in reads `paused no`; # cured — the .sh exports DISPATCHER_EPICS_FLAG_PATH under its scratch (count 1 or 2) and the first line names a /tmp path (a run that sets the var in the shell first).
-```
-
-measured 2026-10-21 by chain chain-plan-card-override-20261021-171051-2000, finding H1, HIGH
-probe-key: 479625b53c76dcb450b2cb853b3222c42f808d3c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.sh, /home/lyphe/.claude/hooks/dispatcher/pace_demand.py, /home/lyphe/.claude/hooks/dispatcher/pace_report.py
 
 ## INV-9266 — probe — LOW — the press's toast speaks a terminal command beside a Turn off button, and a refused Turn off is headed "Override"
 
@@ -14019,7 +13979,8 @@ MEDIUM — a silent press longer than 0.4 s is transcribed into words he never s
 ```probe
 D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
 cat > "$D/p.sh" <<'EOF'
-# ONE Gemini call (2 s of digital silence, the house key, well under a cent): what does the press door's hearing say when nobody spoke?
+# ONE Gemini call (2 s of digital silence, the house key, well under a cent): what does the Gemini door, the press door's backup hearing, say when nobody spoke?
+# The door is called directly: the voice barrel's transcribeSpeech hears an account with a home server on the box first and makes no Gemini call (INV-11542).
 cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
 D="$1"
 sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
@@ -14030,8 +13991,8 @@ open(sys.argv[1], 'wb').write(b'RIFF' + struct.pack('<I', 36 + len(pcm)) + b'WAV
 PY
 cat > "$D/gem.mjs" <<'JS'
 import fs from 'node:fs';
-const { transcribeSpeech } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts');
-const answer = await transcribeSpeech(1, { bytes: fs.readFileSync(process.argv[2]), mimeType: 'audio/wav', fileName: 'silence.wav' });
+const { transcribeWithGemini } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts');
+const answer = await transcribeWithGemini(1, { bytes: fs.readFileSync(process.argv[2]), mimeType: 'audio/wav', fileName: 'silence.wav' });
 console.log('ANSWER', JSON.stringify(answer));
 JS
 env -u GEMINI_API_KEY DATABASE_PATH="$D/auth.db" CERBERUS_DB_PATH="$D/cerberus.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$D/gem.mjs" "$D/silence.wav" 2>&1 | grep '^ANSWER' || echo "ANSWER none"
@@ -14077,7 +14038,7 @@ bash "$D/p.sh" "$D"; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
 measured 2026-10-27 by chain chain-kaylee--talk--chat-mic-20261027-104340-73f9, finding L1, LOW
 probe-key: 2f1ed1c031a8427548511f1111b1c136dc210053
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceProvider.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVoiceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceProvider.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useVoiceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## INV-9901 — probe — LOW — the talk button's tooltip sits on half of the page's error sentence (`CompanionTalkButton.tsx`, the `Tooltip` at the button; surfaced by this diff's `talk.error`)
 
@@ -14144,11 +14105,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-whole.mjs
 
 ## INV-9908 — server/modules/voice — the Gemini door is never counted against a budget, and the key stays in one header
 
-`transcribeWithGemini` serves the chat mic (provider `gemini`) and Kaylee's press (`transcribeSpeech`); `synthesizeSentence` serves Kaylee's voice and, through `gemini-read-aloud.ts`, the chat's read-aloud (provider `gemini`). Operator, 2026-10-26, asked which Gemini budget her hearing and her voice count against: "Kaylee doesn't count for the budget."
+`transcribeWithGemini` is the BACKUP transcriber: `speech-transcriber.ts` calls it for the chat mic and Kaylee's press only when the account's home server cannot hear a clip, or the account has none (INV-11542); `synthesizeSentence` serves Kaylee's voice and, through `gemini-read-aloud.ts`, the chat's read-aloud (provider `gemini`). Operator, 2026-10-26, asked which Gemini budget her hearing and her voice count against: "Kaylee doesn't count for the budget."
 
 | rule | why |
 |---|---|
-| Add no `admit`, no `record` and no budget name to `gemini-transcribe.ts`, `gemini-speech.ts`, `gemini-read-aloud.ts`, `voice-provider.ts`, `companion-press.ts` or `companion-speech.ts` | the operator's ruling; the chat mic and the chat's read-aloud on Gemini ride the same doors and are not counted either |
+| Add no `admit`, no `record` and no budget name to `gemini-transcribe.ts`, `speech-transcriber.ts`, `gemini-speech.ts`, `gemini-read-aloud.ts`, `voice-provider.ts`, `companion-press.ts` or `companion-speech.ts` | the operator's ruling; the chat mic and the press when Gemini stands in, and the chat's read-aloud on Gemini, ride the same doors and are not counted either |
 | The key goes in the `x-goog-api-key` header only, and every sentence the door returns passes `redactKey` (`gemini-errors.ts`) | a key in a URL, a log line or a sentence is a leaked key |
 | Keep `resolveGeminiKey` out of the voice barrel | the raw key leaves the module nowhere |
 | A probe of this door makes no Gemini call where the code allows it (the refusal is proven on a server with no key in reach), and otherwise ONE call: on `gemini-3.8-flash` for the transcribing door, on `gemini-3.8-flash-lite-tts` with one short sentence for the speech door | the standing Gemini budget constraint binds a builder's proof even though this door is not counted |
@@ -14156,7 +14117,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-whole.mjs
 
 Detail: MAN-9098 (settings, key, routes), MAN-9099 (the call).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-press.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-read-aloud.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-press.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-read-aloud.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts
 
 ## INV-9914 — probe — MEDIUM — the hook does not serve the rows that say what landed, for 12 of the 21 code files this phase documents
 
@@ -14236,7 +14197,7 @@ case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D" ;; esac
 measured 2026-10-27 by chain chain-kaylee--talk--docs-20261027-130001-122c, finding L1, LOW
 probe-key: 7e3bf21f9c4f312af0ea83fa6f82defb29fc79b6
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/VoiceInputButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceAvailable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceInput.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceProvider.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useMicRecorder.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/mic-recorder-move.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/VoiceInputButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceAvailable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceInput.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceProvider.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useMicRecorder.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-mic.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/mic-recorder-move.mjs
 
 ## INV-9917 — probe — LOW — MAN-9092: "every read-aloud control makes no `/api/voice` request" is false (it asks `GET /api/voice/health`)
 
@@ -14255,7 +14216,7 @@ case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D" ;; esac
 measured 2026-10-27 by chain chain-kaylee--talk--docs-20261027-130001-122c, finding L2, LOW
 probe-key: 13c32522878e471e098d317a884f728d29a6db78
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/VoiceInputButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceAvailable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceInput.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceProvider.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useMicRecorder.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-chat-mic.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/mic-recorder-move.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/VoiceInputButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceAvailable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceInput.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceProvider.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useMicRecorder.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-mic.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/mic-recorder-move.mjs
 
 ## INV-9918 — probe — LOW — MAN-9098's barrel table names a consumer that does not exist
 
@@ -22291,14 +22252,14 @@ The vocabulary (MAN-9451) is ONE list read fresh per call, applied at three plac
 
 | rule | why |
 |---|---|
-| The misheard-word net is `correctMisheardWords`, called from `cleanTranscript` AFTER the filler step, on both transcribers (`gemini-transcribe.ts`, `voice-provider.ts`), whatever `cleanTranscripts` says. No other code rewrites the words of a transcript | one net, one place to read; a second rewrite could undo or double the first |
+| The misheard-word net is `correctMisheardWords`, called from `cleanTranscript` AFTER the filler step, on every transcription (`speech-transcriber.ts` for the home server's text, `gemini-transcribe.ts` for the backup's), whatever `cleanTranscripts` says. The account's spellings also go to the home server in `prompt` (`homeServerVocabularyLine`: "Word1, Word2, Word3.") for its own cleanup to respell sound-alikes by. The house removes no filler or repeat from a text the box says it tidied (INV-11542); the net is the one step that always runs after the box | one net, one place to read; the box's respelling is a language model's judgment (measured 2026-11-08 on the real box: "chot" came back "chat" with `chat.` as the whole prompt, twice, and stayed "chot" with `chat` added to the nine-word seed line, twice), so only the net guarantees a saved spelling |
 | The list is read with `readVocabulary(userId)` on every call and never cached or copied into a module-level value. An empty list turns every use off | an entry saved in Settings applies on the next press with no restart. Read-aloud is the one place a replay does not: the chat's player caches a message's audio by its text and the provider (on `openai` the browser's voice config too: `voicePlayer.ts`), never by the pronunciation, so a message read before an edit replays its old audio until the page reloads and every message not yet read speaks the new one |
 | The respelling (`respellForSpeech`) is applied to the TEXT OF THE SYNTHESIS REQUEST only (`gemini-speech.ts`, which speaks Kaylee's sentences and, handed the text as written by `gemini-read-aloud.ts`, the chat's read-aloud on `gemini`, so the one respelling is not made twice; the proxy branch of `synthesizeForChat`; and `POST /speakable`, whose answer the page sends as the `input` of its own speech call): never to a sentence the page shows, a log line or a stored row | the person reads the spelling; only the voice hears the pronunciation |
 | A word is a word by `server/shared/word-edges.ts` for fillers, the net and the respelling alike | two edge rules would disagree on `life.ts` or `life/config` |
 | A new field of the account's `voice` document is carried by `storedDocument` with `!== undefined`, never truthiness | `savePreferences` replaces the WHOLE `voice` value on every write: a field `storedDocument` does not carry is dropped by the next settings save, and a stored `[]` or `false` is a choice, not a missing value |
 | The vocabulary has its own routes (`GET`/`PUT /api/voice/vocabulary`, the whole list); `PUT /api/voice/settings` refuses a `vocabulary` key | a whole-list replace and a field merge are different writes |
-| A client that talks to its own OpenAI-compatible endpoint (the page's browser-direct `transcribeVoice` / `synthesizeVoice` in `src/shared/api.ts`, which delegate to `src/shared/voiceDirect.ts`; the standalone dictation app) gets the prompt, the cleanup and the respelling from `GET /transcribe-hints`, `POST /clean` and `POST /speakable`, which call the same functions the server path calls (`whisperVocabularyPrompt`, `cleanTranscript`, `respellForSpeech`). The page holds no copy of the matching, and none of the three routes reaches a backend | the browser-direct call never touches the server, so without them the operator's real chat mic (no stored provider, a browser base URL) skipped the net and the prompt, and read-aloud skipped the respelling |
-| The page asks for the hints on EVERY clip and treats all three calls as optional: a failure, a refusal or no answer in 5 s is the raw text / no prompt / the unrespelled text and one `console.warn`, never an error to the person | a new entry applies on the next press with no reload, and the vocabulary only improves dictation: it never gets to stop it |
+| A page that speaks on its own OpenAI-compatible endpoint (the browser-direct `synthesizeVoice` in `src/shared/api.ts`, which delegates to `src/shared/voiceDirect.ts`) gets the respelling from `POST /speakable`, which calls the same function the server path calls (`respellForSpeech`). The page holds no copy of the matching, and the route reaches no backend. Transcription has no browser-direct path: a clip goes to the server | the browser-direct call never touches the server, so without the route read-aloud skipped the respelling |
+| The page treats that call as optional: a failure, a refusal or no answer in 5 s is the unrespelled text and one `console.warn`, never an error to the person | the vocabulary only improves speech: it never gets to stop it |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-match.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useVoiceInput.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/voicePlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/voiceDirect.ts
 
@@ -25517,3 +25478,482 @@ measured 2026-11-07 by chain chain-upstream-1378-20261107-163846-f9cc, finding L
 probe-key: 57c1130f20e46b9659035664dab349474f2dd684
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/need-readers.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-elicitation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SendMenuPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SteeredMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSteeredMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/McpElicitationPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect/fileRefs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/mcpElicitationForm.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11536 — A planner outing's `waiting` and `no_run` are read by truthiness — an editor of the badge, its tone, the Planning line or the working time must not break it
+
+Reference: MAN-9732 (the alert), MAN-6788 (the badge), MAN-9671 (the Planning line).
+1. **`outing.waiting` and `outing.no_run` are tested for truthiness, never compared with `''`.** `PlannerBadge` (`waitingWords`, `workWord`, `stuck`), `plannerStatusTone`, `PlanningLineRow` (`noRun`) and `outingOut` in `workingTime.ts` read them as `outing.no_run` or `!outing.waiting`. why: the client draws whatever frame arrives (`DispatcherFeed.asPicture` checks a list of outings, not each outing's keys), and a frame from a server older than the keys carries neither; `undefined !== ''` throws in `operatorWords` and paints every outing `danger`.
+2. **`no_run` outranks the state word and draws no clock**, on the badge and on the Planning line, for a queued, an out and an ended outing alike. why: nothing is happening to tick for.
+3. **A planning pause outranks it on the Planning line.** A subject whose own pause stands reads `Planning paused` whatever `no_run` says. why: the pause is what holds the outing.
+4. **A `no_run` outing is not counted as out for the working time.** `outingOut` skips it, so the plan card's and the deck's working time and pill stop. `useDispatcherPlans`' `running` (the lane's tone) still counts any `out` outing.
+5. **One tone for one outing.** `plannerStatusTone(outing)` takes the whole outing; the badge and the Planning line both call it. why: a second reading of the row is a second answer.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlannerBadge.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/workingTime.ts
+
+## INV-11537 — probe — MEDIUM — the epic alert's mark rides an id the store hands out again, so the next alert after a removal is swallowed
+
+MEDIUM — the epic alert's mark rides an id the store hands out again, so the next alert after a removal is swallowed
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-f1.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# The epic alert's mark sits on an arc_events id, and that id is a plain INTEGER PRIMARY KEY: a delete frees the top ids and the next row takes them again.
+D="$(cd "$(dirname "$0")" && pwd)"
+export PLAN_RUNNER_PACER_HOME="$D/pacer" XDG_RUNTIME_DIR="$D/none" PYTHONDONTWRITEBYTECODE=1 CLAUDE_CODE_SESSION_ID=athena-probe DISPATCHER_EPICS_FLAG_PATH="$D/epics.flag"
+unset DISPATCHER_SESSION DISPATCHER_SCRATCH_DAEMON
+mkdir -p "$D/pacer" "$D/none" "$D/repo" "$D/arc" "$D/plan" || exit 1
+DISPATCHER_HOME="$D/arc" python3 -I - "$D" <<'PY'
+import subprocess, sys
+sys.path.insert(0, "/home/lyphe/.claude/hooks")
+from dispatcher import store
+D = sys.argv[1]; R = D + "/repo"
+c = store.connect()
+with c:
+    store.add_roadmap(c, "rm", title="rm", goal="g"); store.add_milestone(c, "ms", roadmap="rm", title="ms", goal="g")
+    store.add_arc(c, "alpha", milestone="ms", title="t", goal="g", repo=R); store.add_arc(c, "beta", milestone="ms", title="t", goal="g", repo=R)
+ids = lambda: [r[0] for r in c.execute("select id from arc_events where kind='no-run' order by id")]
+with c: store.record_no_run(c, ("arc", "alpha"), "alpha's design did not start")
+with c: store.record_no_run(c, ("arc", "beta"), "beta's design did not start")
+mark = max(ids())                                   # CloudCLI has pushed both: its arc mark is the highest id
+done = subprocess.run(["/home/lyphe/.claude/scripts/dispatcher", "roadmap", "remove", "arc", "beta"], capture_output=True, text=True)   # the operator removes the epic he was told about
+with c: store.record_no_run(c, ("arc", "alpha"), "alpha's design did not start again")
+newest = max(ids())
+print(f"EPIC: remove exit {done.returncode} | arc mark after both pushes {mark} | newest alert id after the removal and a new alert {newest} | ids {ids()}")
+print("EPIC BROKEN: the new alert's id is not above the mark, so the notifier never pushes it" if newest <= mark else "EPIC HELD: the new alert's id is above the mark")
+PY
+DISPATCHER_HOME="$D/plan" python3 -I - "$D" <<'PY'
+import subprocess, sys
+sys.path.insert(0, "/home/lyphe/.claude/hooks")
+from dispatcher import store
+D = sys.argv[1]; R = D + "/repo"
+c = store.connect()
+with c:
+    store.open_plan(c, "one", repo=R, session="athena-probe"); store.open_plan(c, "two", repo=R, session="athena-probe")
+with c: store.event(c, "one", "no-run", detail="one's cut was refused")
+mark = c.execute("select max(id) from events").fetchone()[0]      # the push mark after the first alert
+done = subprocess.run(["/home/lyphe/.claude/scripts/dispatcher", "drop", "one"], capture_output=True, text=True)   # the operator drops the plan he was told about
+with c: store.event(c, "two", "no-run", detail="two's cut was refused")
+new = c.execute("select max(id) from events where kind='no-run'").fetchone()[0]
+print(f"PLAN: drop exit {done.returncode} | push mark {mark} | the next alert's event id {new}")
+print("PLAN BROKEN: the new alert's event id is not above the push mark" if new <= mark else "PLAN HELD: above the mark")
+PY
+EOF
+bash "$D/p.sh" 2>&1 | grep -v "started no daemon"
+# expect: EPIC BROKEN and PLAN BROKEN today (newest alert id 2 is not above the mark 2; event id 3 is not above the push mark 3); EPIC HELD and PLAN HELD once the ids only climb
+```
+
+measured 2026-11-08 by chain chain-launches-verified--cloudcli-20261108-102921-4dc1, finding M1, MEDIUM
+probe-key: 0c608cf3f0ccdc777369ca269da66490c7785db0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-arc-alerts.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-arc.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-planner.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlannerBadge.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+
+## INV-11538 — probe — MEDIUM — a frame from a server older than the keys makes the badge throw, and every outing reads `danger`
+
+MEDIUM — a frame from a server older than the keys makes the badge throw, and every outing reads `danger`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-f2.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# The real PlannerBadge over the real en bundle, handed a planner from a server OLDER than `waiting` / `no_run` (the keys absent), as the bus holds one while a handover is in flight.
+D="$(cd "$(dirname "$0")" && pwd)"
+cat > "$D/badge.mts" <<'TS'
+import { register } from 'node:module';
+register('data:text/javascript,' + encodeURIComponent("export async function load(url, context, next) { if (url.endsWith('.css')) return { format: 'module', source: 'export default {}', shortCircuit: true }; return next(url, context); }"));
+(globalThis as any).window = globalThis;
+const fs = await import('node:fs');
+const React = (await import('react')).default;
+const { renderToStaticMarkup } = await import('react-dom/server');
+const i18n = (await import('i18next')).default;
+const { initReactI18next } = await import('react-i18next');
+const en = JSON.parse(fs.readFileSync('/home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json', 'utf8'));
+await i18n.use(initReactI18next).init({ lng: 'en', fallbackLng: 'en', defaultNS: 'common', ns: ['common'], resources: { en: { common: en } }, interpolation: { escapeValue: false }, react: { useSuspense: false } });
+const { PlannerBadge } = await import('/home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlannerBadge.tsx');
+const { plannerStatusTone } = await import('/home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts');
+// every key an older server sent, none of the two it did not know
+const old: any = { id: 1, target: 'bare', plan: 'bare', soul: 'eupalinos', model: 'opus', verb: 'design', state: 'queued', stalled: false, launch_id: null, created_at: '2026-11-08T10:00:00Z', launched_at: null, ended_at: null, outcome: null, tokens: 0, cost_usd: 0, paid_vendor: '', pace_hold: '', overridden: false, planning_paused: false };
+console.log('tone of an outing whose frame lacks no_run:', plannerStatusTone(old), '(a queued outing nobody alerted on reads neutral)');
+try {
+  const html = renderToStaticMarkup(React.createElement(PlannerBadge as never, { planner: old }));
+  const text = html.replace(/<[^>]+>/g, '');
+  console.log('badge drew:', JSON.stringify(text));
+  console.log(/not running|undefined/.test(text) ? 'BROKEN: the badge claims an alert the frame never carried' : 'HELD: the badge reads the older frame as no alert');
+} catch (error) { console.log('BROKEN: the render threw —', (error as Error).message.slice(0, 120)); }
+process.exit(0);
+TS
+cd /tmp && TSX_TSCONFIG_PATH=/home/lyphe/.claude/claudecodeui_lyphe/tsconfig.json cloudcli-tsx "$D/badge.mts" 2>&1 | grep -v Experimental
+EOF
+bash "$D/p.sh"
+# expect: tone "danger" and "BROKEN: the render threw — Cannot read properties of undefined (reading 'split')" today; tone "neutral" and "HELD: the badge reads the older frame as no alert" once an absent key reads as no alert
+```
+
+measured 2026-11-08 by chain chain-launches-verified--cloudcli-20261108-102921-4dc1, finding M2, MEDIUM
+probe-key: 82205e782823e14b10eb98ad4be1170cd07d9dba
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-arc-alerts.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-arc.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-planner.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlannerBadge.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+
+## INV-11539 — probe — MEDIUM — the Planning line, the only screen of an epic with no plan, takes the `danger` tone and nothing else
+
+MEDIUM — the Planning line, the only screen of an epic with no plan, takes the `danger` tone and nothing else
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-f3.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# The real Planning card over the real live bus: an epic with no plan whose design the house gave up on (the only screen such an epic has), and one more epic whose outing is queued, with the house's no_run on it.
+D="$(cd "$(dirname "$0")" && pwd)"
+cat > "$D/planning.mts" <<'TS'
+import { register } from 'node:module';
+register('data:text/javascript,' + encodeURIComponent("export async function load(url, context, next) { if (url.endsWith('.css')) return { format: 'module', source: 'export default {}', shortCircuit: true }; return next(url, context); }"));
+(globalThis as any).window = globalThis;
+const fs = await import('node:fs');
+const React = (await import('react')).default;
+const { renderToStaticMarkup } = await import('react-dom/server');
+const i18n = (await import('i18next')).default;
+const { initReactI18next } = await import('react-i18next');
+const en = JSON.parse(fs.readFileSync('/home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json', 'utf8'));
+await i18n.use(initReactI18next).init({ lng: 'en', fallbackLng: 'en', defaultNS: 'common', ns: ['common'], resources: { en: { common: en } }, interpolation: { escapeValue: false }, react: { useSuspense: false } });
+const M = '/home/lyphe/.claude/claudecodeui_lyphe/src';
+const { LiveBusProvider, useLiveBus, DISPATCHER_ALL_TOPIC } = await import(`${M}/modules/live-bus/index.ts`);
+const { PlanningCard } = await import(`${M}/modules/dispatcher/PlanningCard.tsx`);
+const { ToastProvider } = await import(`${M}/shared/context/ToastContext.tsx`);
+const SENTENCE = "Eupalinos's design of bare ended short (it finished without landing the design), and the house's relaunch ended short too (it finished without landing the design)";
+const base = { soul: 'eupalinos', model: 'opus', verb: 'design', stalled: false, launch_id: null, launched_at: null, ended_at: null, outcome: null, tokens: 0, cost_usd: 0, paid_vendor: '', pace_hold: '', overridden: false, planning_paused: false, waiting: '' };
+const ended = { ...base, id: 1, target: 'bare', plan: 'bare', state: 'ended', stalled: true, created_at: '2026-11-08T10:00:00Z', ended_at: '2026-11-08T10:04:00Z', outcome: 'done', no_run: SENTENCE };
+const queued = { ...base, id: 2, target: 'later', plan: 'later', state: 'queued', created_at: new Date(Date.now() - 7 * 60_000).toISOString(), no_run: "Eupalinos's design of later has waited 7 minutes and no dispatcher took it up, even after the house kicked it (no daemon)" };
+function Seed() { useLiveBus().publish(DISPATCHER_ALL_TOPIC, { plans: [], arcs: [], planners: [ended, queued], route: null, daemon: null }); return null; }
+try {
+  const html = renderToStaticMarkup(React.createElement(LiveBusProvider as never, null, React.createElement(ToastProvider as never, null, React.createElement(Seed), React.createElement(PlanningCard))));
+  const lines = [...html.matchAll(/<li [^>]*data-planning-line="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/\s+/g, ' ').trim()]);
+  for (const [name, text] of lines) console.log(`line ${name}: ${text}`);
+  const says = lines.every(([, text]) => /not running|relaunch ended short|no dispatcher took it up/.test(text));
+  console.log(says ? 'HELD: each line says that its epic is not running, or why' : 'BROKEN: a line with the house\'s no_run on its outing carries neither "not running" nor the sentence; the queued one also keeps its clock ticking');
+} catch (error) { console.log('render threw:', (error as Error).message.slice(0, 200)); }
+process.exit(0);
+TS
+cd /tmp && TSX_TSCONFIG_PATH=/home/lyphe/.claude/claudecodeui_lyphe/tsconfig.json cloudcli-tsx "$D/planning.mts" 2>&1 | grep -v Experimental
+EOF
+bash "$D/p.sh"
+# expect: BROKEN today (the `bare` line reads "Ended short … done", the `later` line "Waiting to design … 7m 0s", neither carries the sentence); HELD once each line says that its epic is not running, or why
+```
+
+measured 2026-11-08 by chain chain-launches-verified--cloudcli-20261108-102921-4dc1, finding M3, MEDIUM
+probe-key: c3e8eccff616bca790615cae22c64a5c0abdd61f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-arc-alerts.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-arc.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-planner.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlannerBadge.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+
+## INV-11540 — probe — LOW (adjacent) — an outing that is `out` with a `no_run` still counts as an agent at work
+
+LOW (adjacent) — an outing that is `out` with a `no_run` still counts as an agent at work
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-f4.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# The lane's "an agent is at work" reading (what ticks a card's working time and lights the pill) for an outing that is OUT with the house's no_run on it.
+D="$(cd "$(dirname "$0")" && pwd)"
+cat > "$D/agent.mts" <<'TS'
+import { planAgentOut } from '/home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/workingTime.ts';
+const plan: any = { name: 'solo', phases: [{ busy: false }] };
+const outing = (noRun: string): any => ({ target: 'solo', plan: 'solo', state: 'out', no_run: noRun, waiting: '' });
+const healthy = planAgentOut(plan, [outing('')]);
+const stuck = planAgentOut(plan, [outing("Eupalinos's design of solo has had no process behind it for 7 minutes and no dispatcher recorded its end (no daemon)")]);
+console.log('out outing, healthy -> agent at work:', healthy, '| out outing the house says has no process -> agent at work:', stuck);
+console.log(healthy && !stuck ? 'HELD: the lane stops counting an outing the house says is not running' : 'BROKEN: the lane still counts the working time of an outing the house says has no process');
+process.exit(0);
+TS
+cd /tmp && cloudcli-tsx "$D/agent.mts" 2>&1 | grep -v Experimental
+EOF
+bash "$D/p.sh"
+# expect: agent at work true / true and BROKEN today; true / false and HELD once an out outing the house says has no process stops counting
+```
+
+measured 2026-11-08 by chain chain-launches-verified--cloudcli-20261108-102921-4dc1, finding L1, LOW
+probe-key: 7612d9b2ee7ca7cc68b18653d1adc24b0f4102c5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-arc-alerts.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-arc.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-planner.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlannerBadge.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+
+## INV-11542 — server/modules/voice — every clip goes to the home server first and Gemini hears it only when the home server cannot, through one shared transcriber
+
+Operator, 2026-11-08: "I'd like to add local transcription from a home server box instead of Gemini 3.5 flash lite", then "I want Gemini as a backup please", then, giving the box's API: send `clean=1` "when you want the "um"s removed, and pass the vocabulary in prompt so your custom words get fixed". The chat mic (`POST /api/voice/transcribe`) and Kaylee's press both call `transcribeSpeech` (`speech-transcriber.ts`); MAN-9104 is the how.
+
+| rule | why |
+|---|---|
+| A clip is heard ONLY through `transcribeSpeech`; `transcribeWithGemini` has one caller, `speech-transcriber.ts` | one try-then-backup path: a second caller is a second policy, and the two drift |
+| Gemini is never asked when the home server answered, a 2xx with `text: ''` included. It IS asked when the box is unreachable, gives no complete answer in 15 s (`HOME_SERVER_WAIT_MS`: a dictation of more than some 100 s of speech with Clean on, or some five minutes with it off, always runs out of it), refuses the key, answers an error (its 400 for audio it cannot read and its 413 for a clip over 50 MB included), or answers 2xx without a string `text`; and straight away, saying nothing, when the account has no address or no key | the box heard it, so a second hearing is spend for nothing; a box that is not set up is not down |
+| The box is asked to clean the transcript when the account's Clean transcripts switch is on (`clean=1`) and for its raw words when it is off (`clean=0`), and every request carries the account's vocabulary in `prompt` as one line ("Word1, Word2, Word3.", `homeServerVocabularyLine`; no `prompt` for an empty vocabulary, and a line cut to its first whole entries past 2,000 characters). The box's `text` is the transcript. When its `tidy` reads "tidied" the house removes no filler or repeat again and applies only the saved misheard-word corrections (INV-10622). When cleanup was asked and `tidy` reads "raw (...)" the box's cleanup failed: the house runs `cleanTranscript` on the text as it always did and the log names the box's reason. A text with no words is no speech whatever `tidy` says, and with cleanup asked so is a text of nothing but fillers: the real box answers a bare "Um" as `tidied`, and the house's own pass has always read a lone filler as the empty press, which the press door settles as no turn of his | the box's cleanup is the operator's choice of cleaner, and the house's stays as the net under a box cleanup that failed, so a person who asked for clean never gets an uncleaned transcript. Measured 2026-11-08 on the real box: `tidied` even for text with nothing to change; `raw (clean=0)` when told `clean=0` and for a clip with no speech; `raw (tidy failed: TimeoutError)` and `raw (tidy rejected: 341 words heard, 120 returned)` when its cleanup broke on a long dictation. Its cleanup can also change which words a title says, and what it does depends on the `prompt`: the box heard `Close the follow up on Update the Sticky Header.` and with no `prompt`, or `chat.` as the whole prompt, answered `Close the follow-up on updating the sticky header.`, while the nine-word seed line kept `Update the Sticky Header` (so Clean ON is not verbatim; Clean OFF is) |
+| The home key goes in the `Authorization: Bearer` header only; the service takes it out of the box's own words before they are cut (as written and as JSON spells it) and `speech-transcriber.ts` runs `redactKey` with it over every `detail`, sentence and log line; no log line or sentence holds the address (a failed connection is worded by its error code, never by the error's message) | a key in a sentence or a log line is a leaked key |
+| When Gemini stood in, the person is told in one short line: the page shows `notice` where the mic's errors show (`useVoiceInput`), and Kaylee's press adds it to her log as a system line. When neither could hear, the sentence names both and holds no key | the person must learn that the box is down |
+| A probe never changes the box's own settings and never takes it down: a failure path is proven on a scratch database with a closed port (refused), a wrong key (the box answers 401), a listener that never answers (the 15 s wait) or Gemini's host answered by a stand-in; a real Gemini call is made once per case, on the account's own cheap model | the box is the operator's live service, and the standing Gemini budget rule binds a builder's proof |
+| The address is the account's setting (`voice.homeServer.address`) and the key its credential (`home_server_key`); neither is in code, in the environment or in a tracked file | one build runs for every account |
+
+Detail: MAN-9104 (the transcriber: `clean` and `prompt`), MAN-9739 (the wait and the box's 2xx answer), MAN-9740 (the failures and the route's answers), MAN-9102 (the address), MAN-9103 (the key and the routes), MAN-9099 (the Gemini door). Rule INV-9908 still binds the Gemini door: no budget, the key in one header.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-press.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/home-server-address.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/home-server-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts
+
+## INV-11550 — probe — LOW (design limit, flagged) — a dictation longer than about 100 s of speech with Clean transcripts on (about five minutes with it off) can never be heard by the box: the 15 s wait ends first and Gemini hears it, though the box was up and still working
+
+LOW (design limit, flagged) — a dictation longer than about 100 s of speech with Clean transcripts on (about five minutes with it off) can never be heard by the box: the 15 s wait ends first and Gemini hears it, though the box was up and still working
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/home-transcription/athena-probes/long-dictation.sh
+echo "[probe exit $?]"
+# expect: today `the box answered HTTP 200 in ~19500 ms` beside `HOME_SERVER_WAIT_MS = 15_000` (the wait ends first): a 410 s clip asked raw (`clean=0`); asked `clean=1`, the default, the box outlasts the wait from about 100 s of speech (MAN-9739); cured when the wait scales with the clip or the cleaned answer fits it. One normal request of a 410 s clip to the real box, about 20 s.
+```
+
+Open: the operator decides whether `HOME_SERVER_WAIT_MS` (one constant, `speech-transcriber.ts`) stays, grows or scales with the clip. The notice for a wait that ran out reads `Home server took too long; Gemini transcribed this`.
+
+measured 2026-11-08 by chain chain-home-transcription-20261108-122947-6631, finding L6, LOW
+probe-key: c23145f790483e603258707269cf3776936237ce
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/home-server-address.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/home-server-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/HomeServerSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/voiceDirect.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-transcribe.mjs
+
+## INV-11554 — probe — LOW — Kaylee's memory row MAN-9480 still holds "I'm using Gemini exclusively for transcription"
+
+LOW — Kaylee's memory row MAN-9480 still holds "I'm using Gemini exclusively for transcription"
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/home-transcription/athena-probes/stale-memory-row.sh
+echo "[probe exit $?]"
+# expect: today `… exclusively: 1`; cured when the row is retired or rewritten (0, or the row gone)
+```
+
+measured 2026-11-08 by chain chain-home-transcription-20261108-122947-6631, finding L10, LOW
+probe-key: 881c99e94d98c745003c71135c0fdc4d151d6f10
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/home-server-address.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/home-server-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/HomeServerSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/voiceDirect.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-transcribe.mjs
+
+## INV-11555 — probe — MEDIUM — a lone filler survives Clean transcripts: the real box says "tidied" for a bare "Um", and the house no longer runs its filler step on a tidied text
+
+MEDIUM — a lone filler survives Clean transcripts: the real box says "tidied" for a bare "Um", and the house no longer runs its filler step on a tidied text
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+R=/home/lyphe/.claude/claudecodeui_lyphe
+python3 -I - "$R/.verify/fixtures/home-server-fillers.wav" "$D/lone-um.wav" <<'PY'
+import sys, wave
+w = wave.open(sys.argv[1]); sr = w.getframerate(); data = w.readframes(int(0.75 * sr))
+o = wave.open(sys.argv[2], 'wb'); o.setnchannels(1); o.setsampwidth(2); o.setframerate(sr); o.writeframes(data); o.close()
+PY
+cat > "$D/p.mjs" <<'JS'
+import fs from 'node:fs';
+const { signDevToken } = await import('/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signout-kit.mjs');
+const headers = { Authorization: `Bearer ${signDevToken({ issuedSecondsAgo: 0 })}` };
+const origin = 'http://127.0.0.1:5184';
+const settings = await (await fetch(`${origin}/api/voice/settings`, { headers })).json();
+const form = new FormData();
+form.append('audio', new Blob([fs.readFileSync(process.argv[2])], { type: 'audio/wav' }), 'lone-um.wav');
+const r = await fetch(`${origin}/api/voice/transcribe`, { method: 'POST', headers, body: form });
+console.log(`Clean transcripts: ${settings.settings.cleanTranscripts ? 'ON' : 'OFF'} | live route answers HTTP ${r.status}: ${await r.text()}`);
+JS
+node "$D/p.mjs" "$D/lone-um.wav"
+EOF
+bash "$D/p.sh" "$D"; echo "[probe exit $?]"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: today `Clean transcripts: ON | live route answers HTTP 200: {"text":"Um"}` (the real box answers `{"text": "Um", "raw_text": "Um", "tidy": "tidied"}` and the house keeps it); cured: `{"text":""}`, a lone filler read as no speech. The clip is the first 0.75 s of the builder's own `home-server-fillers.wav`, one spoken "Um". Read-only: the dev token, one POST, the real box, no Gemini call (the box answers).
+```
+
+measured 2026-11-08 by chain chain-home-transcription-box-cleanup-20261108-141630-653d, finding M1, MEDIUM
+probe-key: 2a00af2310c545af2adef2b4a1298596e0f0fa96
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-hints.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean.mjs
+
+## INV-11556 — probe — LOW — a vocabulary near the check's limits makes the first Clean-on press after every edit run out the 15 s wait: Gemini hears it, and the notice blames the box
+
+LOW — a vocabulary near the check's limits makes the first Clean-on press after every edit run out the 15 s wait: Gemini hears it, and the notice blames the box
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/v.mjs" <<'JS'
+import fs from 'node:fs';
+const REPO = '/home/lyphe/.claude/claudecodeui_lyphe';
+if (!process.env.DATABASE_PATH?.startsWith('/tmp/')) { console.error('refusing: DATABASE_PATH must be under /tmp'); process.exit(2); }
+const realFetch = globalThis.fetch; let geminiAsked = 0;
+globalThis.fetch = (input, init) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  if (new URL(url).host === 'generativelanguage.googleapis.com') { geminiAsked += 1; return Promise.resolve(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'gemini stand-in words' }] }, finishReason: 'STOP' }] }), { status: 200 })); }
+  return realFetch(input, init);
+};
+const lines = []; const realLog = console.log;
+console.log = (...a) => { const l = a.join(' '); if (l.startsWith('[voice]')) lines.push(l); else realLog(...a); };
+await (await import(`${REPO}/server/modules/database/index.ts`)).initializeDatabase();
+const { transcribeSpeech } = await import(`${REPO}/server/modules/voice/index.ts`);
+const { saveVocabulary } = await import(`${REPO}/server/modules/voice/vocabulary.ts`);
+const uid = Number(process.env.PROBE_USER);
+let seed = Date.now() % 2147483647;
+const rnd = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
+const word = () => Array.from({ length: 60 }, () => 'abcdefghijklmnopqrstuvwxyz'[Math.floor(rnd() * 26)]).join('');
+saveVocabulary(uid, Array.from({ length: 100 }, () => { const w = word(); return { spelling: w, pronunciation: w, misheard: [] }; }));
+const bytes = fs.readFileSync(`${REPO}/.verify/fixtures/kaylee-eyes-answer-one.wav`);
+for (const label of ['first press after saving the list', 'second press']) {
+  lines.length = 0; const t = Date.now();
+  const a = await transcribeSpeech(uid, { bytes, mimeType: 'audio/wav', fileName: 'clip.wav' });
+  realLog(`${label.padEnd(36)} ${((Date.now() - t) / 1000).toFixed(1).padStart(5)} s  standIn: ${JSON.stringify(a.standIn ?? null)}`);
+  for (const l of lines) realLog('   ' + l.slice(0, 150));
+}
+process.exit(0);
+JS
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+S=$(mktemp -d /tmp/athena-probe-v.XXXXXX) || exit 1
+: > "$S/empty.env"
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$S/auth.db'" || exit 1
+set -a; . "$HOME/.claude/state/secrets/home-stt.env"; set +a
+U=$(sqlite3 "$S/auth.db" "select user_id from user_credentials where credential_type='home_server_key' and is_active=1 order by user_id desc limit 1")
+cd /home/lyphe/.claude/claudecodeui_lyphe && env -u GEMINI_API_KEY GEMINI_ENV_FILE="$S/empty.env" DATABASE_PATH="$S/auth.db" CERBERUS_DB_PATH="$S/cerberus.db" PROBE_USER="$U" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/v.mjs" 2>&1 | grep -v -E "^Database|ExperimentalWarning|^\(Use"
+cd /tmp; case "$S" in /tmp/athena-probe-v.??????) rm -rf "$S";; esac
+EOF
+bash "$D/p.sh" "$D"; echo "[probe exit $?]"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: today `first press after saving the list  15.0 s  standIn: "Home server took too long; Gemini transcribed this"` and `second press  1.2 s  standIn: null`; cured when the first press is heard by the box (no stand-in) or the line is bounded before it is sent. Real box, scratch copy of the auth database, Gemini's host answered by a stand-in in the script (no Gemini request leaves the machine); the list is 100 random 60-character words, new on every run so the box has never seen it. About 20 s.
+```
+
+measured 2026-11-08 by chain chain-home-transcription-box-cleanup-20261108-141630-653d, finding L1, LOW
+probe-key: 159953779e3a5781c3611f44bd70b7cf9e7e46a6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-hints.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean.mjs
+
+## INV-11557 — probe — LOW (design limit, flagged by the builder, re-measured) — with Clean on, a dictation over about two minutes outlasts the 15 s wait; the box finishes, Gemini hears it
+
+LOW (design limit, flagged by the builder, re-measured) — with Clean on, a dictation over about two minutes outlasts the 15 s wait; the box finishes, Gemini hears it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/dict.mjs" <<'JS'
+import fs from 'node:fs';
+const FIX = '/home/lyphe/.claude/claudecodeui_lyphe/.verify/fixtures';
+const wavData = (file) => { const b = fs.readFileSync(`${FIX}/${file}`); let at = 12; while (at + 8 <= b.length) { const size = b.readUInt32LE(at + 4); if (b.toString('latin1', at, at + 4) === 'data') return b.subarray(at + 8, at + 8 + size); at += 8 + size; } throw new Error('no data'); };
+function dictation(seconds) {
+  const clips = fs.readdirSync(FIX).filter((n) => n.endsWith('.wav')).filter((n) => fs.readFileSync(`${FIX}/${n}`).readUInt32LE(24) === 24000);
+  const pieces = []; let length = 0;
+  for (let i = 0; length < seconds * 48000; i += 1) { const p = wavData(clips[i % clips.length]); pieces.push(p, Buffer.alloc(12000)); length += p.length + 12000; }
+  const header = Buffer.from(fs.readFileSync(`${FIX}/home-server-fillers.wav`).subarray(0, 44));
+  header.writeUInt32LE(36 + length, 4); header.writeUInt32LE(length, 40);
+  return Buffer.concat([header, ...pieces]);
+}
+const wav = dictation(Number(process.argv[2]));
+for (const clean of ['1', '0']) {
+  const form = new FormData();
+  form.append('file', new Blob([wav], { type: 'audio/wav' }), 'd.wav'); form.append('model', 'whisper-1'); form.append('clean', clean);
+  const t = Date.now();
+  const r = await fetch(`${process.env.HOME_STT_URL.replace(/\/$/, '')}/audio/transcriptions`, { method: 'POST', headers: { authorization: `Bearer ${process.env.HOME_STT_KEY}` }, body: form });
+  const j = await r.json().catch(() => ({}));
+  console.log(`${process.argv[2]} s dictation, clean=${clean}: HTTP ${r.status} in ${((Date.now() - t) / 1000).toFixed(1)} s | tidy: ${String(j.tidy).slice(0, 40)}`);
+}
+JS
+cat > "$D/p.sh" <<'EOF'
+set -a; . "$HOME/.claude/state/secrets/home-stt.env"; set +a
+timeout 120 node "$1/dict.mjs" 140
+grep -n 'const HOME_SERVER_WAIT_MS' /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts
+EOF
+bash "$D/p.sh" "$D"; echo "[probe exit $?]"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: today `140 s dictation, clean=1: HTTP 200 in 17.7 s` (16.3 s and 15.7 s at 120 s) beside `clean=0 … in 6.8 s` and `const HOME_SERVER_WAIT_MS = 15_000`: the box answers, the wait has ended, Gemini heard the clip; cured when the wait scales with the clip, or the cleaned answer fits it. Two real box requests, about 25 s.
+```
+
+measured 2026-11-08 by chain chain-home-transcription-box-cleanup-20261108-141630-653d, finding L2, LOW
+probe-key: 1cc1b56bcf714504b6ccd06c2f611496df3d5a70
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-hints.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean.mjs
+
+## INV-11558 — probe — LOW — the builder's live proof puts the account's Clean switch back to a hard-coded ON, not to what it found
+
+LOW — the builder's live proof puts the account's Clean switch back to a hard-coded ON, not to what it found
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/stub-live.mjs" <<'JS'
+import http from 'node:http';
+import { spawn } from 'node:child_process';
+const state = { cleanTranscripts: false, puts: [] };
+const server = http.createServer((req, res) => {
+  const chunks = []; req.on('data', (c) => chunks.push(c));
+  req.on('end', () => {
+    const body = Buffer.concat(chunks).toString('utf8');
+    const send = (obj) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
+    if (req.url === '/api/voice/settings' && req.method === 'GET') return send({ settings: { cleanTranscripts: state.cleanTranscripts, homeServer: { address: 'https://box.example/v1' } }, homeServerKey: { source: 'stored' } });
+    if (req.url === '/api/voice/settings' && req.method === 'PUT') { const patch = JSON.parse(body); state.puts.push(patch); if ('cleanTranscripts' in patch) state.cleanTranscripts = patch.cleanTranscripts; return send({ settings: { cleanTranscripts: state.cleanTranscripts } }); }
+    if (req.url === '/api/voice/vocabulary') return send({ vocabulary: [] });
+    if (req.url === '/api/voice/transcribe') return send({ text: 'stand-in words' });
+    res.writeHead(404); res.end();
+  });
+});
+await new Promise((r) => server.listen(0, '127.0.0.1', r));
+const origin = `http://127.0.0.1:${server.address().port}`;
+const child = spawn('node', ['.verify/home-server-clean-live.mjs'], { cwd: '/home/lyphe/.claude/claudecodeui_lyphe', env: { ...process.env, HEPH_APP_URL: origin }, stdio: ['ignore', 'pipe', 'pipe'] });
+let out = ''; child.stdout.on('data', (d) => { out += d; }); child.stderr.on('data', (d) => { out += d; });
+await new Promise((r) => child.on('close', r));
+console.log(out.split('\n').filter((l) => /^account 1|starts with Clean|Clean transcripts is back ON/.test(l)).map((l) => l.slice(0, 120)).join('\n'));
+console.log(`the stand-in account started with Clean transcripts OFF; the proof left it: ${state.cleanTranscripts ? 'ON' : 'OFF'}`);
+server.close(); process.exit(0);
+JS
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 100 node "$1/stub-live.mjs" 2>&1 | tail -6
+EOF
+bash "$D/p.sh" "$D"; echo "[probe exit $?]"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: today `the stand-in account started with Clean transcripts OFF; the proof left it: ON` and `PASS Clean transcripts is back ON`; cured: `… left it: OFF`. The script is the builder's live proof run unchanged against a stand-in of the voice routes (`HEPH_APP_URL`), so no real account is touched.
+```
+
+measured 2026-11-08 by chain chain-home-transcription-box-cleanup-20261108-141630-653d, finding L3, LOW
+probe-key: a17c06ccdecf98e96b1079a831be82053da66c27
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-hints.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean.mjs
+
+## INV-11559 — probe — LOW (docs) — the measured meaning-changing rewrite by the box's cleanup is in no row or comment any more, and it still happens
+
+LOW (docs) — the measured meaning-changing rewrite by the box's cleanup is in no row or comment any more, and it still happens
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+set -a; . "$HOME/.claude/state/secrets/home-stt.env"; set +a
+cat > "$1/ab.mjs" <<'JS'
+import fs from 'node:fs';
+const file = '/home/lyphe/.claude/claudecodeui_lyphe/.verify/fixtures/kaylee-eyes-close-followup.wav';
+for (const [label, prompt] of [['no vocabulary', ''], ['one word, "chat."', 'chat.'], ['the 9-word seed line', 'Kaylee, lypheCli, Restorly, Headscale, Cerberus, dactyl, Athena, Hermes, Lyphe.']]) {
+  const form = new FormData();
+  form.append('file', new Blob([fs.readFileSync(file)], { type: 'audio/wav' }), 'c.wav'); form.append('model', 'whisper-1'); form.append('clean', '1');
+  if (prompt) form.append('prompt', prompt);
+  const r = await fetch(`${process.env.HOME_STT_URL.replace(/\/$/, '')}/audio/transcriptions`, { method: 'POST', headers: { authorization: `Bearer ${process.env.HOME_STT_KEY}` }, body: form });
+  const j = await r.json();
+  console.log(`Clean ON, ${label.padEnd(22)} the box answers ${JSON.stringify(j.text)}   (it heard ${JSON.stringify(j.raw_text)})`);
+}
+JS
+node "$1/ab.mjs"
+H=/home/lyphe/.claude/claudecodeui_lyphe
+echo "rows or comments that record this kind of rewrite (update -> updating): $(cat $H/MANUAL.md $H/INVARIANTS.md | grep -c 'updating the sticky header')"
+EOF
+bash "$D/p.sh" "$D"; echo "[probe exit $?]"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: today the first two lines answer `…on updating the sticky header.` (the box rewrote the title it was told) and the last line `0`; cured when a row or comment records that the box's cleanup can rewrite words (the count is above 0). Three real box requests, about 3 s.
+```
+
+measured 2026-11-08 by chain chain-home-transcription-box-cleanup-20261108-141630-653d, finding L4, LOW
+probe-key: 6c43a9eae7cb3ef7fc923fd279d98fa6b51d16ea
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-hints.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean.mjs
+
+## INV-11560 — probe — LOW (docs) — MAN-9104's split left six pointers aimed at a row that no longer holds what they cite, and the new rows carry titles nobody can search by
+
+LOW (docs) — MAN-9104's split left six pointers aimed at a row that no longer holds what they cite, and the new rows carry titles nobody can search by
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+for t in MAN-9489 MAN-9103 MAN-9105 MAN-9098 MAN-9102; do
+  printf '%s points at MAN-9104 for read-aloud: %s\n' "$t" "$(docstore get $t --text | grep -c -E 'MAN-9104 §Read-aloud on `gemini`|gemini-read-aloud\.ts.{0,3}, MAN-9104|speaks on the account.s Gemini key \(MAN-9104\)')"
+done
+for t in MAN-9104 MAN-9741; do
+  printf '%s holds the "## Read-aloud on `gemini`" section: %s\n' "$t" "$(docstore get $t --text | grep -c '^## Read-aloud on `gemini`')"
+done
+printf 'MAN-9740 title: %s\n' "$(docstore get MAN-9740 --text | head -1 | sed 's/.* — //')"
+EOF
+bash "$D/p.sh"; echo "[probe exit $?]"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: today the five rows each print 1 or more, `MAN-9104 holds … section: 0`, `MAN-9741 holds … section: 1` and `MAN-9740 title: kind`; cured when each pointer names MAN-9741 (or the section is back in MAN-9104) and the child rows carry titles a reader can search by.
+```
+
+measured 2026-11-08 by chain chain-home-transcription-box-cleanup-20261108-141630-653d, finding L5, LOW
+probe-key: 79d0641404afd4623242eb4e8dc9227fc70901ef
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-hints.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean.mjs

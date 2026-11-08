@@ -151,9 +151,9 @@ const subscribeToNothing = (): (() => void) => () => {};
 const readCurrentProvider = (): VoiceProvider => currentProvider;
 
 /**
- * Which backend the account's chat uses for the mic and for read-aloud: the server-side setting behind Settings > Voice's
- * picker. Used by the chat module's `useVoiceAvailable`, which draws the composer's mic whenever voice input is on when it says
- * 'gemini' and asks the server's `/health` for read-aloud.
+ * Which backend speaks the account's chat read-aloud: the server-side setting behind Settings > Voice's picker. Used by the chat
+ * module's `useVoiceAvailable('speak')`, which draws a message's read-aloud button from the server's `/health` for that provider.
+ * The mic does not follow it: every clip goes to the server, which hears it on the account's home server with Gemini as the backup.
  *
  * `active` says whether this caller needs the answer. One `GET /api/voice/settings` per page serves every active
  * caller, made by the first to mount and asked again when `VOICE_CONFIG_SYNC_EVENT` fires (Settings does after a
@@ -167,10 +167,9 @@ export function useVoiceProvider(active: boolean): VoiceProvider {
 }
 
 /**
- * The provider as last read, for code that acts on it at one moment and draws nothing from it: `useVoiceInput`, which
- * sends a clip down the matching path when the recording ends, and the read-aloud player (`voicePlayer`), which speaks a
- * message down the matching path. The composer's `useVoiceAvailable('dictate')` and each message's `useVoiceAvailable('speak')`
- * keep the answer fresh for as long as a voice control is drawn.
+ * The provider as last read, for code that acts on it at one moment and draws nothing from it: the read-aloud player
+ * (`voicePlayer`), which speaks a message down the matching path. Each message's `useVoiceAvailable('speak')` keeps the answer
+ * fresh for as long as a read-aloud control is drawn.
  */
 export function currentVoiceProvider(): VoiceProvider {
   return currentProvider;

@@ -11,9 +11,9 @@ const NEW_WORD: VocabularyEntry = { spelling: '', pronunciation: '', misheard: [
 
 /**
  * Settings > Voice > Vocabulary: the house words, as an editable table, one row per word. A word is its spelling, how it sounds,
- * and the spellings a transcriber gives it by mistake. One list serves three jobs: both transcribers are told the spellings, the
- * misheard forms in every transcript are replaced with them (the chat mic's and Kaylee's presses alike, whether or not fillers
- * are cleaned), and Kaylee's voice says each word the way it sounds. The list is the account's, kept on the server and read on
+ * and the spellings a transcriber gives it by mistake. One list serves three jobs: the transcribers are told the spellings (the
+ * home server as one line, Gemini, the backup, in its instruction), the misheard forms in every transcript are replaced with them
+ * (the chat mic's and Kaylee's presses alike, whether or not fillers are cleaned), and Kaylee's voice says each word the way it sounds. The list is the account's, kept on the server and read on
  * every press, so a change applies at once. It stands whether or not voice is on. Composed for the settings module's
  * VoiceSettingsTab, after the transcript-cleanup switch; it reads and saves for itself (`useVocabulary`).
  *

@@ -26,8 +26,11 @@ import { watchDirectory, type DirectoryWatch } from './directory-watch.service.j
  *                                                                 rewrites with no store write at all.
  *                                                                 Only the chains of phases now running are
  *                                                                 watched (`followChains`)
- *   status only        `epics.flag`, `park_at_peak.flag`,      the switches the document reports
- *                      `weekly_stop.flag`,
+ *   status only        `epics.flag`                            the dial, in the state root: the dispatcher's own
+ *                                                                 reader follows `$DISPATCHER_HOME` (`epic_dial.flag_path`),
+ *                                                                 so a scratch home's dial is its own
+ *   status only        `park_at_peak.flag`,                    the other switches the document reports, at
+ *                      `weekly_stop.flag`,                      fixed `~/.claude/state` paths
  *                      `deepseek_features.flag`
  *   status only        `claude_account/{accounts,chosen}.json` which payer a plan runs under
  *   status only        `pacer/readings.sqlite`(`-wal`),        the pacer's picture. SLOW (`PACER_SETTLE_MS`):
@@ -93,12 +96,10 @@ const BOTH_LANES: readonly StoreWatchLane[] = ['status', 'roadmap'];
 const STATUS_LANE: readonly StoreWatchLane[] = ['status'];
 
 const STORE_FILES: ReadonlySet<string> = new Set(['dispatcher.db', 'dispatcher.db-wal', 'daemon.lock']);
-const FLAG_FILES: ReadonlySet<string> = new Set([
-  'epics.flag',
-  'park_at_peak.flag',
-  'weekly_stop.flag',
-  'deepseek_features.flag',
-]);
+/** The dial (Pause all): in the state root, which `$DISPATCHER_HOME` moves, as every record of the dispatcher is. */
+const DIAL_FILE = 'epics.flag';
+/** The other switches the document reports: read from fixed `~/.claude/state/*.flag` paths. */
+const FLAG_FILES: ReadonlySet<string> = new Set(['park_at_peak.flag', 'weekly_stop.flag', 'deepseek_features.flag']);
 const ACCOUNT_FILES: ReadonlySet<string> = new Set(['accounts.json', 'chosen.json']);
 const PACER_FILES: ReadonlySet<string> = new Set(['readings.sqlite', 'readings.sqlite-wal', 'rates.json']);
 const CHAIN_FILES: ReadonlySet<string> = new Set(['chain.json', 'walker.pid']);
@@ -121,8 +122,10 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
   const chainsRoot = path.join(stateRoot, 'dispatch-chains');
   const pacerDir = overrideOr(env, 'PLAN_RUNNER_PACER_HOME', path.join(stateRoot, 'pacer'));
   const accountDir = overrideOr(env, 'PLAN_RUNNER_CLAUDE_ACCOUNT_HOME', path.join(stateRoot, 'claude_account'));
-  // The flags are read from fixed `~/.claude/state/*.flag` paths; a probe's per-flag override is not followed.
+  // The dial is `epics.flag` in the state root (`epic_dial.flag_path`); the other flags are read from fixed `~/.claude/state/*.flag`
+  // paths. A probe's per-flag override is not followed. On the live home both are one directory, and one watch serves them.
   const flagsDir = path.join(os.homedir(), '.claude', 'state');
+  const dialWithFlags = path.resolve(stateRoot) === flagsDir;
   const transientDir = path.join(env.XDG_RUNTIME_DIR || `/run/user/${os.userInfo().uid}`, 'systemd', 'transient');
 
   const pokes: Record<StoreWatchLane, Set<() => void>> = { status: new Set(), roadmap: new Set() };
@@ -212,7 +215,13 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
           if (name === 'wake.sock') return quickly(BOTH_LANES);
           return kind === 'change' && STORE_FILES.has(name) ? quickly(BOTH_LANES) : null;
         }),
-        open(flagsDir, (_kind, name) => (FLAG_FILES.has(name) ? quickly(STATUS_LANE) : null)),
+        open(flagsDir, (_kind, name) =>
+          FLAG_FILES.has(name) || (dialWithFlags && name === DIAL_FILE) ? quickly(STATUS_LANE) : null,
+        ),
+        // A scratch home's dial sits beside its store, not among the live flags.
+        ...(dialWithFlags
+          ? []
+          : [open(stateRoot, (_kind, name) => (name === DIAL_FILE ? quickly(STATUS_LANE) : null))]),
         open(accountDir, (_kind, name) => (ACCOUNT_FILES.has(name) ? quickly(STATUS_LANE) : null)),
         open(pacerDir, (kind, name) => {
           if (!PACER_FILES.has(name)) return null;

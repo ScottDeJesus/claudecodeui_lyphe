@@ -7,6 +7,7 @@ import { useUiPreferences, useSetUiPreference } from '@/shared/context/UiPrefere
 import { useVoiceConfig } from '@/modules/settings/hooks/useVoiceConfig';
 import { useVoiceSettings } from '@/modules/settings/hooks/useVoiceSettings';
 import { GeminiVoiceSection } from '@/modules/settings/tabs/voice-settings/sections/GeminiVoiceSection';
+import { HomeServerSection } from '@/modules/settings/tabs/voice-settings/sections/HomeServerSection';
 import { TranscriptCleanupSection } from '@/modules/settings/tabs/voice-settings/sections/TranscriptCleanupSection';
 import { VocabularySection } from '@/modules/settings/tabs/voice-settings/sections/VocabularySection';
 import { VoiceProviderPicker } from '@/modules/settings/tabs/voice-settings/sections/VoiceProviderPicker';
@@ -25,13 +26,15 @@ function Field({ label, ...props }: { label: string } & InputHTMLAttributes<HTML
 }
 
 /**
- * Rendered by Settings for the "voice" tab: voice on or off; with it on, the chat's provider (VoiceProviderPicker: Gemini or
- * an OpenAI-compatible backend, for the mic and read-aloud alike) heading the backend section. The OpenAI-compatible fields
- * under it (base URL, key, speech-to-text model, speech model, voice, format) stand only while that provider is picked: on
- * Gemini the server hears and speaks on its own key, in the speech model and voice of the Gemini section below, so those
- * fields would change nothing. Then, whether or not voice is on, the transcript-cleanup switch (it governs the chat mic and
- * Kaylee's presses alike), the vocabulary of house words (VocabularySection: misheard spellings corrected for both ears, and
- * how Kaylee says each), Gemini (GeminiVoiceSection), because Kaylee hears and speaks through Gemini always, and her own section.
+ * Rendered by Settings for the "voice" tab: voice on or off; with it on, the read-aloud provider (VoiceProviderPicker: Gemini or
+ * an OpenAI-compatible backend) heading the backend section. The OpenAI-compatible fields under it (base URL, key, speech model,
+ * voice, format) stand only while that provider is picked: on Gemini the server speaks on its own key, in the speech model and
+ * voice of the Gemini section below, so those fields would change nothing. Nothing here chooses who transcribes: the home server
+ * (HomeServerSection) hears every clip first, for the chat mic and Kaylee's presses alike, and Gemini hears it only when the
+ * home server cannot. Then, whether or not voice is on, the transcript-cleanup switch (it governs the chat mic and Kaylee's
+ * presses alike), the vocabulary of house words (VocabularySection: misheard spellings corrected for every transcription, and
+ * how Kaylee says each), the home server, Gemini (GeminiVoiceSection: the backup transcriber, and the speaker of Kaylee's voice
+ * and the chat's read-aloud), and her own section.
  */
 export default function VoiceSettingsTab() {
   const { t } = useTranslation('settings');
@@ -39,7 +42,10 @@ export default function VoiceSettingsTab() {
   const setPreference = useSetUiPreference();
   const { config, update } = useVoiceConfig();
   const voiceEnabled = preferences.voiceEnabled;
-  const { settings: voiceSettings, keyStatus, saving, error, providerRefusal, saveSettings, saveKey, clearKey, retry } = useVoiceSettings();
+  const {
+    settings: voiceSettings, keyStatus, homeServerKey, saving, error, providerRefusal, homeServerRefusal,
+    saveSettings, saveKey, clearKey, saveHomeServerKey, clearHomeServerKey, retry,
+  } = useVoiceSettings();
   // The OpenAI-compatible fields stand only while that backend is picked. Before the settings are read the picker says Gemini,
   // which is the server's default.
   const pickedProvider = voiceSettings?.provider ?? 'gemini';
@@ -86,13 +92,7 @@ export default function VoiceSettingsTab() {
                   value={config.apiKey}
                   onChange={(e) => update({ apiKey: e.target.value })}
                 />
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-                  <Field
-                    label={t('voiceSettings.sttModel')}
-                    placeholder="whisper-1"
-                    value={config.sttModel}
-                    onChange={(e) => update({ sttModel: e.target.value })}
-                  />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <Field
                     label={t('voiceSettings.ttsModel')}
                     placeholder="tts-1"
@@ -129,7 +129,19 @@ export default function VoiceSettingsTab() {
       {/* Whether or not voice is on, whichever provider is picked: the words both ears correct and Kaylee's voice respells. It reads and saves for itself. */}
       <VocabularySection />
 
-      {/* Whether or not voice is on: Kaylee hears and speaks through Gemini whatever the picker says. */}
+      {/* Whether or not voice is on: the home server hears every clip first, for the chat mic and Kaylee alike, whatever the picker says. It reads and saves through the same hook as Gemini's. */}
+      <HomeServerSection
+        keyStatus={homeServerKey}
+        address={voiceSettings?.homeServer.address ?? null}
+        saving={saving}
+        error={homeServerRefusal ?? (homeServerKey === null ? error : null)}
+        onSaveAddress={(address) => { void saveSettings({ homeServer: { address } }); }}
+        onSaveKey={saveHomeServerKey}
+        onClearKey={clearHomeServerKey}
+        onRetry={retry}
+      />
+
+      {/* Whether or not voice is on: Gemini is the backup that hears when the home server cannot, and Kaylee speaks through it whatever the picker says. */}
       <GeminiVoiceSection
         keyStatus={keyStatus}
         transcriptionModel={voiceSettings?.gemini.transcriptionModel ?? ''}
