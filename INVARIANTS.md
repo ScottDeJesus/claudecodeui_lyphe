@@ -199,20 +199,6 @@ probe-key: f5e68ada55d0782b88d57b3ea9765725f85a962a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessageImages.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lightbox-zoom.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pwa-notch-close-controls.mjs
 
-## INV-5778 — probe — the uninstall-confirm banner clips its Remove button on phones
-
-the uninstall-confirm banner clips its Remove button on phones
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/settings-mobile-round2/athena-r2-banner.mjs | grep -E '^w=(320|341) x1\.(072|2):'
-expect: w=320 x1.072 reads "Usage Dashbo:REMOVE-CUT-7px Session Mana:REMOVE-CUT-11px snake_case_p:REMOVE-CUT-325px Extraordinar:REMOVE-CUT-31px"; healed when every name reads ok
-```
-
-measured 2026-09-29 by chain chain-settings-mobile-round2-20260929-081949-f36c, finding L1, LOW
-probe-key: 2b6e674875c6788262734d2592c59f84e955b85f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plugins/PluginSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SettingRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-measure.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs
-
 ## INV-5790 — probe — The standing proof cannot see a lead cut by an ellipsis or by a clipping ancestor
 
 The standing proof cannot see a lead cut by an ellipsis or by a clipping ancestor
@@ -243,20 +229,6 @@ measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, find
 probe-key: e5c97527ca014e1398bcf3be3e1557e755bb9143
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/feature/SKILL.md
-
-## INV-5887 — probe — `useHostMove` calls the listener from the render BEFORE the one that committed the move
-
-`useHostMove` calls the listener from the render BEFORE the one that committed the move
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--host-window/athena-probe-s6.mjs
-expect: `listener closure heard (n after the change is 1): [0]` while the defect stands; `[1]` once the ref is written in a layout effect ahead of the subscription
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--host-window-20260929-165634-a050, finding M1, MEDIUM
-probe-key: 38e830cbd0bf67fdf0635c47446420fbf936f47e
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/HostWindowContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts
 
 ## INV-5889 — the newest conversation has one spelling — src/shared/sessionRecency.ts
 
@@ -300,76 +272,6 @@ measured 2026-09-29 by chain chain-app-drawer-chat--projects-door-20260929-17160
 probe-key: e58ba3ce7986fa70dd0c73b2c22e54aaf33ebec4
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSidebarController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/sidebarProjectFormatting.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/sessionRecency.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
-
-## INV-5902 — probe — When the registry loses the row of the left slot, the layer draws the right application under `data-pane-side="left"`, and every act over it is greyed
-
-When the registry loses the row of the left slot, the layer draws the right application under `data-pane-side="left"`, and every act over it is greyed
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--switcher-acts/athena-probes/s10b.mjs
-expect: the "after delete" line reads front left, cur null, disabled [false,false,true,true,true] while the layer still draws EIS App; the run ends "registry BASELINE RESTORED"
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--switcher-acts-20260929-172332-8408, finding M2, MEDIUM
-probe-key: c6f09bfc38b11189d453e9f377cd16d3e1ebb412
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
-
-## INV-5918 — probe — a mouse press held on a node in the edge fade is lost (desktop, gutter)
-
-a mouse press held on a node in the edge fade is lost (desktop, gutter)
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/flow-scroll/athena-press-edge.mjs
-expect: PRESS-OK on both edges (today: PRESS-LOST leading n7 [] and PRESS-LOST trailing n18 [], exit 1)
-```
-
-measured 2026-09-29 by chain chain-flow-scroll-20260929-170014-ed7d, finding M1, MEDIUM
-probe-key: f961cec6b22f651e36fe44ee2a19032be8e9f9c1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useFlowTrack.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/StatusFlow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-status-flow-scroll.mjs
-
-## INV-5919 — probe — on WebKit the track's end padding is not scrollable overflow: the last node sits flush and its ring is cut
-
-on WebKit the track's end padding is not scrollable overflow: the last node sits flush and its ring is cut
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/flow-scroll/athena-webkit-end.mjs
-expect: roomRight px {"webkit":10,"chromium":10} (today: {"webkit":0,"chromium":10}, exit 1)
-```
-
-measured 2026-09-29 by chain chain-flow-scroll-20260929-170014-ed7d, finding M2, MEDIUM
-probe-key: 6a42b9093c77d000fb32191a3dfd2db1dfb5e172
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useFlowTrack.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/StatusFlow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-status-flow-scroll.mjs
-
-## INV-5920 — probe — Tab into an overflowing flow throws the track back to phase 1
-
-Tab into an overflowing flow throws the track back to phase 1
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/flow-scroll/athena-tab-jump.mjs
-expect: the current phase stays in view after the Tab (today: opened {"scrollLeft":246,"liveInView":true} → after Tab {"scrollLeft":0,"liveInView":false,"focus":"n1"}, exit 1)
-```
-
-measured 2026-09-29 by chain chain-flow-scroll-20260929-170014-ed7d, finding L1, LOW
-probe-key: 31cdb372e94bb03ea86f20eada09414242717ee4
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useFlowTrack.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/StatusFlow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-status-flow-scroll.mjs
-
-## INV-5921 — probe — `taken` is set by touches and wheels that never scroll the track, and outlives the element
-
-`taken` is set by touches and wheels that never scroll the track, and outlives the element
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/flow-scroll/athena-wheel-taken.mjs
-expect: the landed phase is in view (today: {"scrollLeft":0,"landedInView":false}, exit 1)
-```
-
-measured 2026-09-29 by chain chain-flow-scroll-20260929-170014-ed7d, finding L2, LOW
-probe-key: 9dda15a292bd778d5d976e2f61818e84f22dc48d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useFlowTrack.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/StatusFlow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-status-flow-scroll.mjs
 
 ## INV-5932 — probe — (MED) — a sign-out caused by emptied storage leaves no client trace
 
@@ -23913,26 +23815,6 @@ measured 2026-11-04 by chain chain-pace-override-every-hold-20261104-070306-9181
 probe-key: 69dc31bd5d7c7e6c380d84cac69d8d8bd909687e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/cmd/override.py, /home/lyphe/.claude/hooks/dispatcher/report.py, /home/lyphe/.claude/hooks/dispatcher/store_override.py
-
-## INV-10783 — probe — LOW (outside TARGET, not edited) — `cmd/override.py`'s module docstring still states the deleted reach
-
-LOW (outside TARGET, not edited) — `cmd/override.py`'s module docstring still states the deleted reach
-
-```probe
-D=$(mktemp -d); cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude
-echo "override.py docstring keeps the old reach: $(grep -c 'goes while ANY open plan of it carries the override' hooks/dispatcher/cmd/override.py)"
-echo "pace_demand marks epic rows from the epic's own override: $(grep -c 'lifted = past | _overridden_arcs' hooks/dispatcher/pace_demand.py)"
-EOF
-bash "$D/p.sh"
-echo "[probe exit $?]"; cd /tmp; case "$D" in /tmp/tmp.??????????) rm -r "$D";; esac
-# expect: `override.py docstring keeps the old reach: 1`, `pace_demand marks epic rows from the epic's own override: 1` while stale; cured: 0 and 1
-```
-
-measured 2026-11-04 by chain chain-pace-override-every-hold-20261104-070306-9181, finding L2, LOW
-probe-key: 6ca7f12b7f59070aae14ebe0e23c74ea37106fc3
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/cmd/override.py
 
 ## INV-10788 — probe — a multi-word credential under a credential-named field reaches the model (INV-7153)
 
