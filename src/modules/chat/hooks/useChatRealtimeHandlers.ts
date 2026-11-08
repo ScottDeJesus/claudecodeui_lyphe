@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react';
 
-import type { ServerEvent,MarkSessionIdle,MarkSessionProcessing,PendingPermissionRequest,ProjectSession,LLMProvider,NormalizedMessage,StreamFlushTimer } from '@/shared/types';
+import type { ServerEvent,MarkSessionIdle,MarkSessionProcessing,PendingPermissionRequest,ProjectSession,LLMProvider,NormalizedMessage,StreamFlushTimer,SteerOutcome } from '@/shared/types';
 import { showCompletionTitleIndicator } from '@/modules/chat/utils/pageTitleNotification';
 import { useHostMove, useHostWindow } from '@/shared/context/HostWindowContext';
 import { playChatCompletionSound, playNotificationSound } from '@/shared/utils';
@@ -93,6 +93,12 @@ type UseChatRealtimeHandlersArgs = {
   onWebSocketReconnect?: () => void;
   requestLatestMessages: (sessionId: string, allowNetwork?: boolean) => Promise<void>;
   sessionStore: SessionStore;
+  /**
+   * Reports what became of a message sent into a running turn, so the composer can settle its card: the
+   * server's acceptance or refusal, and — for every live user message, steered or not — `delivered` with its
+   * id, which the composer matches against its own.
+   */
+  onSteerOutcome?: (sessionId: string, messageId: string, outcome: SteerOutcome) => void;
 };
 
 /* ------------------------------------------------------------------ */
@@ -127,6 +133,7 @@ export function useChatRealtimeHandlers({
   onWebSocketReconnect,
   requestLatestMessages,
   sessionStore,
+  onSteerOutcome,
 }: UseChatRealtimeHandlersArgs) {
   // The window the next stream flush is armed on. A ref rather than state because the socket
   // listener reads it at arm time, nothing renders from it, and the context's `hostWindow` changes
@@ -243,12 +250,34 @@ export function useChatRealtimeHandlers({
           return;
         }
 
+        case 'chat_steer_accepted': {
+          // Only the tab that sent the message gets this; it is not a transcript row.
+          if (sid && typeof msg.messageId === 'string') {
+            onSteerOutcome?.(sid, msg.messageId, 'accepted');
+          }
+          return;
+        }
+
         case 'protocol_error': {
+          // An error that names a `messageId` answers a message the composer steered into a running turn.
+          const steeredId = typeof msg.messageId === 'string' ? msg.messageId : null;
+          // `STEER_UNAVAILABLE`: the turn had already ended. The run is not failing — it finished — so
+          // nothing is shown or idled here; the composer sends the message as the next turn instead.
+          if (sid && steeredId !== null && msg.code === 'STEER_UNAVAILABLE') {
+            onSteerOutcome?.(sid, steeredId, 'refused');
+            return;
+          }
           console.error('[Chat] Protocol error:', msg.code, msg.error);
           if (sid) {
-            // Surface the failure in the conversation and stop the spinner —
-            // the run never started (or was rejected), so no `complete` follows.
-            onSessionIdle?.(sid);
+            if (steeredId !== null) {
+              // Any other refusal of a steer is said in the conversation like any failure, but the run the message
+              // was sent into goes on: it is not idled, and the message goes back to the composer.
+              onSteerOutcome?.(sid, steeredId, 'failed');
+            } else {
+              // Surface the failure in the conversation and stop the spinner —
+              // the run never started (or was rejected), so no `complete` follows.
+              onSessionIdle?.(sid);
+            }
             sessionStore.appendRealtime(sid, {
               // Random suffix: the store replaces a row held under the same id, so two errors in
               // one millisecond must not share one.
@@ -352,6 +381,12 @@ export function useChatRealtimeHandlers({
         sessionStore.appendRealtime(sid, msg as unknown as NormalizedMessage);
       }
 
+      // A user message on the live stream is a steered message the agent just read (the turn's own prompt is
+      // never echoed); the composer drops its card if it is one of its own.
+      if (sid && msg.kind === 'text' && msg.role === 'user' && typeof msg.id === 'string') {
+        onSteerOutcome?.(sid, msg.id, 'delivered');
+      }
+
       // --- UI side effects for specific kinds ---
       switch (msg.kind) {
         case 'complete': {
@@ -378,6 +413,13 @@ export function useChatRealtimeHandlers({
             // Abort was requested — the complete event confirms it. No
             // further UI action is needed beyond clearing the entry above.
             break;
+          }
+
+          // A run that ended on its own settles the messages steered into it that were never echoed: the CLI
+          // runs them as its next turn. (A stopped run is left out on purpose, above: its unread messages
+          // go back to the composer, and so do a failed run's.)
+          if (sid && msg.success !== false) {
+            onSteerOutcome?.(sid, '', 'run_finished');
           }
 
           // Celebrate only successful runs (failed runs end with success: false). No announcement
@@ -505,5 +547,6 @@ export function useChatRealtimeHandlers({
     onWebSocketReconnect,
     requestLatestMessages,
     sessionStore,
+    onSteerOutcome,
   ]);
 }

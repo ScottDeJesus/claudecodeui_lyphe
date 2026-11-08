@@ -232,3 +232,37 @@ section: README/010 Performance
 - Tool results route through `ToolRenderer` (no duplicate rendering paths)
 - `CollapsibleDisplay` uses children pattern (no wasteful contentProps indirection)
 - Configs are static module-level objects — zero runtime overhead for lookups
+
+## MAN-9697 — McpElicitationPanel and mcpElicitationForm — an MCP server's form on the composer: where it is drawn, what each press answers, how a schema becomes fields and an answer is checked
+
+An MCP server's request for input reaches the page as a `permission_request` with `toolName: 'McpElicitation'` and the request as `input` (`ElicitationRequestInput`, `src/shared/types.ts`). The server's half, and what each decision becomes (`toElicitationResult`): MAN-332. What may not be broken: INV-11419.
+
+## Where it is drawn
+- `PermissionRequestsBanner` (in the composer) sends a request whose `toolName` is `McpElicitation` to `McpElicitationPanel` and builds no Allow / Deny banner for it. The panel takes `PermissionPanelProps` (`request`, `onDecision`) like `AskUserQuestionPanel`, but stands in the banner's place above the composer, not inline in the transcript (MAN-406).
+- Root `[data-mcp-elicitation]`. The form scrolls inside `max-h-[70dvh]`; Decline and Submit stay pinned under it.
+
+## What each press answers
+| press | decision |
+|---|---|
+| Submit (form mode) | `{ allow: true, updatedInput: { content } }`, only when no field has a problem; problems show under their fields after the first Submit and the first one is scrolled into view |
+| Open link (URL mode, `http:` or `https:` only) | `{ allow: true, updatedInput: {} }`: the server maps it to `accept` with no content |
+| Decline | `{ allow: false }` |
+A URL that is not http(s) (`javascript:` above all) is shown as text under a sentence and offers no Open link. The companion and the station can only decline (MAN-9481).
+
+## `mcpElicitationForm.ts` — pure, no DOM
+| function | does |
+|---|---|
+| `readElicitationFields(requestedSchema)` | the flat object schema into `ElicitationField[]` in the server's order. Kinds: `text`, `number`, `integer`, `boolean`, `choice`, `multi`. Choices from `enum` (labelled by `enumNames`) or from `oneOf` / `anyOf` entries of `const` and `title`; a `multi` is an array whose `items` give them. `format` → input type: `email`, `uri` → `url`, `date`, `date-time` → `datetime-local`. Reads `minLength`, `maxLength`, `minimum`, `maximum`, `minItems`, `maxItems` and `default` |
+| `initialElicitationValues(fields)` | the start: every field at its default; a default the input could not show starts the field empty |
+| `problemWithAnswer(field, value)` | `ElicitationProblem` or `null`: a code plus the figure its sentence names; the panel words it with `mcpElicitation.*` |
+| `buildElicitationContent(fields, values)` | what goes back: a boolean always (unticked is `false`); a number as a number; any other field only when answered |
+| `isOpenableUrl(url)` | `true` for http(s) alone |
+- A single choice is held as its POSITION in `choices` (`''` is nothing chosen), so a blank enum value is still a value; it is sent untrimmed.
+- A `date-time` goes out as an ISO instant in UTC (a `datetime-local` gives local time with no offset, which RFC 3339 rejects). A local time a daylight-saving change skipped is refused, not sent shifted.
+- Lengths count code points. A `format` the server's rules lack is not checked.
+
+## Dependency and strings
+- `ajv-formats` (`^3.0.1`) is a direct dependency, imported as `ajv-formats/dist/formats` (`fullFormats`, the rules file alone). why: the MCP SDK validates an accepted answer with ajv and ajv-formats in full mode, so the panel checks by the same rules.
+- `mcpElicitation.*` in `chat.json`, English only.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/PermissionRequestsBanner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/McpElicitationPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/mcpElicitationForm.ts

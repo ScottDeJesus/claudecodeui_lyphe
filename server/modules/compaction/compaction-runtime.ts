@@ -151,11 +151,11 @@ export function withChatCompaction<Inner extends CompactionInnerRuntime>(inner: 
       return flight ? flight.stop() : inner.abort(provider, sessionId);
     },
 
-    async steer(provider: LLMProvider, sessionId: string, content: string): Promise<'folded' | 'not_running'> {
+    async steer(provider: LLMProvider, sessionId: string, content: string, options?: AnyRecord): Promise<'folded' | 'not_running'> {
       // A compaction in flight owns the chat: a message pushed into its process would land in the summarized turn
       // (or between the guard and the seed), so a steer answers 'not_running' and the caller runs a turn after it.
       if (provider === 'claude' && flightOf(sessionId)) return 'not_running';
-      return inner.steer(provider, sessionId, content);
+      return inner.steer(provider, sessionId, content, options);
     },
   };
 

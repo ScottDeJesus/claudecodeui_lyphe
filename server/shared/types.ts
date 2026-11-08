@@ -215,6 +215,7 @@ export type MessageKind =
  */
 export type GatewayEventKind =
   | 'chat_subscribed'
+  | 'chat_steer_accepted'
   | 'session_upserted'
   | 'loading_progress'
   | 'soul_launch_state'

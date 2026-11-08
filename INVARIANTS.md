@@ -25301,3 +25301,337 @@ Measured 2026-11-07, chain heal-returning-corrections--heal-page-fill, finding M
 The Memory panel differs on purpose: every row goes quiet during any write (MAN-605). A card holds only its own. A fixture that draws `HealRuleListView` passes `isBusy`; there is no `busyId` on `RuleReview`. The section: MAN-9688, MAN-9689.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealRuleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/hooks/useRuleReview.ts
+
+## INV-11418 — chat.steer refusals — edits that break them: every refusal names the messageId, and a protocol_error that carries a messageId is a steer's
+
+A `protocol_error` that carries a `messageId` answers a `chat.steer`, and the page settles that steer's card by it (MAN-9696, MAN-305).
+
+1. Every refusal of `chat.steer` carries the frame's `messageId` (the one the page sent when it is a UUID, else one the server made): `resolveSendTarget` takes `errorExtra` and puts it on `SESSION_ID_REQUIRED`, `SESSION_NOT_FOUND` and `UNSUPPORTED_PROVIDER`; `handleChatSteer` passes it to `MESSAGE_REQUIRED` and `STEER_UNAVAILABLE` and catches its own throws as `INTERNAL_ERROR` with it. why: a refusal with no id leaves the card waiting on a message the server has already turned away.
+2. `useChatRealtimeHandlers` reads any `protocol_error` with a string `messageId` as a steer's: `STEER_UNAVAILABLE` → `refused`, any other code → `failed`, and never `onSessionIdle`. why: the run the message was sent into goes on. A new frame's error must not put a `messageId` on a `protocol_error`: it would be read as a steer's, and its run left running.
+3. `sendProtocolError`'s `extra` fields are written first, so they never replace `kind`, `code`, `error` or `sessionId`.
+4. Another frame whose refusal has to name a message of the client's own uses a field of its own name, never `messageId`.
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -c "errorExtra" server/modules/websocket/services/chat-websocket.service.ts; grep -c "{ messageId }" server/modules/websocket/services/chat-websocket.service.ts; grep -c "steeredId" src/modules/chat/hooks/useChatRealtimeHandlers.ts
+expect: three numbers, each above 0 — a 0 on the first two is a steer refusal that names no message (its card waits for ever); a 0 on the third is a page that no longer settles a card by it
+```
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSteeredMessages.ts
+
+## INV-11423 — probe — MEDIUM — an `McpElicitation` ask is answered as a tool permission by the station rail and by the companion; a bare Allow becomes `accept` with empty content
+
+MEDIUM — an `McpElicitation` ask is answered as a tool permission by the station rail and by the companion; a bare Allow becomes `accept` with empty content
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+export D
+cat > "$D/p.sh" <<'PEOF'
+: > "$D/auth.db"
+cat > "$D/run.mjs" <<'EOF'
+const { getConnection, initializeDatabase } = await import('@/modules/database/index.js');
+await initializeDatabase();
+const { providerRuntimeService } = await import('@/modules/providers/index.js');
+const { answerStationAsk } = await import('@/modules/companion/station/station-needs.js');
+const { toElicitationResult } = await import('@/modules/providers/list/claude/claude-elicitation.js');
+const db = getConnection();
+db.prepare("INSERT INTO projects (project_id, project_path) VALUES ('p1','/tmp/athena-probe-proj')").run();
+const sid = 'aaaaaaaa-0000-4000-8000-000000000002';
+db.prepare("INSERT INTO sessions (session_id, provider, project_path, custom_name, isArchived, created_at, updated_at) VALUES (?, 'claude', '/tmp/athena-probe-proj', 'athena elicitation probe', 0, '2026-10-26T10:00:00Z', '2026-10-26T10:00:00Z')").run(sid);
+const input = { serverName: 'fastmail', message: 'Which folder should I file this in?', mode: 'form',
+  requestedSchema: { type: 'object', properties: { folder: { type: 'string' } }, required: ['folder'] } };
+const ask = { requestId: 'r-elic', toolName: 'McpElicitation', input };
+providerRuntimeService.getPendingApprovalsForSession = (id) => (id === sid ? [ask] : []);
+const settled = [];
+const runtime = { resolveToolApproval: (id, d) => settled.push({ id, d }) };
+const out = await answerStationAsk(1, { sessionId: sid, requestId: 'r-elic', answer: 'allow' }, runtime);
+console.log(`ELIC station POST /asks "allow": ok=${out.ok}${out.ok ? '' : ' status=' + out.status}`);
+console.log(`ELIC runtime settled: ${JSON.stringify(settled)}`);
+console.log(`ELIC what the MCP server receives: ${JSON.stringify(toElicitationResult(settled[0]?.d ?? null, input.mode))}`);
+EOF
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/run.mjs" 2>&1 | grep -E '^ELIC|rror'
+PEOF
+bash "$D/p.sh"
+cd /tmp
+case "$D" in /tmp/athena-probe.??????) rm -r "$D" ;; esac
+echo "[probe exit $?]"
+# expect: `ok=true`, `runtime settled: [{"id":"r-elic","d":{"allow":true}}]` and `the MCP server receives: {"action":"accept","content":{}}` while the ask lanes take it for a tool permission; cured when it prints `ok=false status=400`, `settled: []` and `{"action":"cancel"}`
+```
+
+measured 2026-11-07 by chain chain-upstream-1378-20261107-163846-f9cc, finding M1, MEDIUM
+probe-key: fca9071c1a23f82d7f6353c133e0bcd0ab47e78a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/need-readers.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-elicitation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SendMenuPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SteeredMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSteeredMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/McpElicitationPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect/fileRefs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/mcpElicitationForm.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11424 — probe — LOW — a schema `format` named like an `Object.prototype` member crashes the chat view when Submit is pressed
+
+LOW — a schema `format` named like an `Object.prototype` member crashes the chat view when Submit is pressed
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mts" <<'EOF'
+const { readElicitationFields, problemWithAnswer } = await import('/home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/mcpElicitationForm.ts');
+for (const format of ['email', 'hasOwnProperty', 'valueOf', 'isPrototypeOf']) {
+  const fields = readElicitationFields({ properties: { f: { type: 'string', format } } } as any);
+  let out: string;
+  try { out = JSON.stringify(problemWithAnswer(fields[0], 'abc')); } catch (e) { out = `THROWS ${(e as Error).message}`; }
+  console.log(`HOSTILE format=${format} typed "abc" -> ${out}`);
+}
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 60 npx tsx "$1/p.mts" 2>&1 | grep -E '^HOSTILE|rror' || echo "no answer"
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `format=hasOwnProperty … THROWS Cannot convert undefined or null to object`, the same for `valueOf`, and `isPrototypeOf … badFormat`; cured when the three print `null` (an unknown format is not checked)
+```
+
+measured 2026-11-07 by chain chain-upstream-1378-20261107-163846-f9cc, finding L1, LOW
+probe-key: ec44bff303d4e39b2af8c5d27277c0c35514f9e5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/need-readers.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-elicitation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SendMenuPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SteeredMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSteeredMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/McpElicitationPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect/fileRefs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/mcpElicitationForm.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11425 — probe — LOW — the send-options menu's open flag leaks: after it is taken away under the hand, the next typed message opens it again with no hold
+
+LOW — the send-options menu's open flag leaks: after it is taken away under the hand, the next typed message opens it again with no hold
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { createScratchChat, deleteScratchChat, COMPOSER } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs';
+import { APP_BOOT_MS } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs';
+const SEND = '.chat-composer-shell div.ml-auto.flex > button:last-of-type';
+const MENU = 'div[role="menu"][aria-label="Send options"]';
+const session = await openConsole({ project: false, viewport: { width: 390, height: 844 }, contextOptions: { hasTouch: true, isMobile: true } });
+const { page } = session;
+const sessionId = await createScratchChat(session);
+let pageSocket = null;
+// The turn is faked and every frame the page sends is swallowed: no model runs, the server hears nothing.
+await page.routeWebSocket(/\/ws\?/, (ws) => { pageSocket = ws; const server = ws.connectToServer(); ws.onMessage(() => {}); server.onMessage((m) => ws.send(m)); });
+try {
+  await page.goto(`${session.appUrl}/session/${sessionId}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('textarea', { timeout: APP_BOOT_MS });
+  await page.waitForTimeout(2500);
+  pageSocket.send(JSON.stringify({ kind: 'chat_subscribed', sessionId, provider: 'claude', isProcessing: true, pendingPermissions: [], timestamp: new Date().toISOString() }));
+  await page.waitForTimeout(800);
+  await page.fill(COMPOSER, 'first words');
+  const box = await page.locator(SEND).boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down(); await page.waitForTimeout(800); await page.waitForSelector(MENU, { timeout: 5000 }); await page.mouse.up();
+  const opened = await page.locator(MENU).count();
+  await page.fill(COMPOSER, ''); await page.waitForTimeout(400);
+  const afterClear = await page.locator(MENU).count();
+  await page.fill(COMPOSER, 'second words'); await page.waitForTimeout(600);
+  console.log(`MENULEAK menus after the hold: ${opened} | after the text was cleared: ${afterClear} | after typing again with NO hold: ${await page.locator(MENU).count()}`);
+} finally {
+  await deleteScratchChat(session, sessionId).catch(() => {});
+  await session.browser.close();
+}
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd "$1" && timeout 200 node p.mjs 2>&1 | grep -E '^MENULEAK|rror' || echo "no answer"
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `menus after the hold: 1 | after the text was cleared: 0 | after typing again with NO hold: 1`; cured when the last number is 0
+```
+
+measured 2026-11-07 by chain chain-upstream-1378-20261107-163846-f9cc, finding L2, LOW
+probe-key: 4934fc9cd5a50f0c921e13c022b60b57e6205f8b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/need-readers.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-elicitation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SendMenuPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SteeredMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSteeredMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/McpElicitationPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect/fileRefs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/mcpElicitationForm.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11426 — probe — LOW — a refusal of a steer other than `STEER_UNAVAILABLE` strands its card on "Sending…", takes the text out of the composer, and flips the chat to idle while the run goes on
+
+LOW — a refusal of a steer other than `STEER_UNAVAILABLE` strands its card on "Sending…", takes the text out of the composer, and flips the chat to idle while the run goes on
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { createScratchChat, deleteScratchChat, COMPOSER } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs';
+import { APP_BOOT_MS } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs';
+const SEND = '.chat-composer-shell div.ml-auto.flex > button:last-of-type';
+const MENU = 'div[role="menu"][aria-label="Send options"]';
+const session = await openConsole({ project: false, viewport: { width: 390, height: 844 }, contextOptions: { hasTouch: true, isMobile: true } });
+const { page } = session;
+const sessionId = await createScratchChat(session);
+let pageSocket = null; const swallowed = [];
+// The turn is faked and every frame the page sends is swallowed: no model runs, the server hears nothing.
+await page.routeWebSocket(/\/ws\?/, (ws) => { pageSocket = ws; const server = ws.connectToServer(); ws.onMessage((m) => { try { swallowed.push(JSON.parse(String(m))); } catch {} }); server.onMessage((m) => ws.send(m)); });
+const inject = (frame) => pageSocket.send(JSON.stringify({ sessionId, provider: 'claude', timestamp: new Date().toISOString(), ...frame }));
+const state = () => page.evaluate((send) => JSON.stringify({ sendLabel: document.querySelector(send)?.getAttribute('aria-label'), cards: [...document.querySelectorAll('[role="status"]')].map((e) => e.textContent.trim()).filter((t) => /tool call|Sending/.test(t)) }), SEND);
+try {
+  await page.goto(`${session.appUrl}/session/${sessionId}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('textarea', { timeout: APP_BOOT_MS });
+  await page.waitForTimeout(2500);
+  inject({ kind: 'chat_subscribed', isProcessing: true, pendingPermissions: [] });
+  await page.waitForTimeout(800);
+  await page.fill(COMPOSER, 'steer me');
+  const box = await page.locator(SEND).boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down(); await page.waitForTimeout(800); await page.waitForSelector(MENU, { timeout: 5000 }); await page.mouse.up();
+  await page.locator(`${MENU} [role="menuitem"]`, { hasText: 'Steer' }).click();
+  await page.waitForTimeout(500);
+  const steer = swallowed.find((m) => m.type === 'chat.steer');
+  console.log('STEERERR while the steer is out:', await state());
+  inject({ kind: 'protocol_error', code: 'MESSAGE_REQUIRED', error: 'chat.steer requires a message.', messageId: steer.messageId });
+  await page.waitForTimeout(800);
+  console.log('STEERERR after a refusal that carries its messageId:', await state(), '| composer text:', JSON.stringify(await page.inputValue(COMPOSER)));
+} finally {
+  await deleteScratchChat(session, sessionId).catch(() => {});
+  await session.browser.close();
+}
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd "$1" && timeout 200 node p.mjs 2>&1 | grep -E '^STEERERR|rror' || echo "no answer"
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `while the steer is out: {"sendLabel":"Stop","cards":["· Sending…"]}` then `after a refusal that carries its messageId: {"sendLabel":"Send","cards":["· Sending…"]} | composer text: ""` while the defect stands; cured when the card is gone and the text is back in the composer
+```
+
+measured 2026-11-07 by chain chain-upstream-1378-20261107-163846-f9cc, finding L3, LOW
+probe-key: 45df4adcab77c0afe748875a4f60e9a6adcb6364
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/need-readers.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-elicitation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SendMenuPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SteeredMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSteeredMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/McpElicitationPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect/fileRefs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/mcpElicitationForm.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11427 — probe — LOW (carried) — a composer steer that finds no tool call to join runs as a turn the page shows no working state for; INV-9835 (MEDIUM, standing) is now reachable from the operator's own hand
+
+LOW (carried) — a composer steer that finds no tool call to join runs as a turn the page shows no working state for; INV-9835 (MEDIUM, standing) is now reachable from the operator's own hand
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+// One short Haiku turn, no tools: Claude writes a long reply; a composer Steer sent while it writes finds no tool call to join, so the
+// CLI runs it as its own turn after the first `complete`. What does the page show while that turn runs?
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { createScratchChat, openScratchChatOnHaiku, deleteScratchChat, sendTurn, COMPOSER } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs';
+const TURN = 'Write the integers from 1 to 450 in English words, separated by commas. No other text, no tools.';
+const SEND = '.chat-composer-shell div.ml-auto.flex > button:last-of-type';
+const MENU = 'div[role="menu"][aria-label="Send options"]';
+const session = await openConsole({ project: false, viewport: { width: 390, height: 844 }, contextOptions: { hasTouch: true, isMobile: true } });
+const { page } = session;
+const frames = [];
+page.on('websocket', (socket) => socket.on('framereceived', (event) => { try { frames.push(JSON.parse(String(event.payload))); } catch {} }));
+const seen = (p) => frames.some(p);
+let sessionId = null;
+try {
+  sessionId = await createScratchChat(session);
+  await openScratchChatOnHaiku(session, sessionId);
+  await sendTurn(page, TURN);
+  await page.waitForTimeout(3500);
+  await page.fill(COMPOSER, 'ALSO: after you finish, write the single word MISSED.');
+  const box = await page.locator(SEND).boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down(); await page.waitForTimeout(800); await page.waitForSelector(MENU, { timeout: 5000 }); await page.mouse.up();
+  await page.locator(`${MENU} [role="menuitem"]`, { hasText: 'Steer' }).click();
+  for (let i = 0; i < 400 && !seen((m) => m.kind === 'complete'); i += 1) await page.waitForTimeout(150);
+  const labels = new Set(); let replyAfterMs = null; const t0 = Date.now();
+  for (let i = 0; i < 40; i += 1) {
+    const s = await page.evaluate((send) => ({ label: document.querySelector(send)?.getAttribute('aria-label') ?? '', reply: [...document.querySelectorAll('.chat-message')].some((el) => el.textContent.includes('MISSED') && !el.textContent.includes('ALSO:')) }), SEND);
+    labels.add(s.label.startsWith('Stop') ? 'Stop' : 'Send');
+    if (s.reply && replyAfterMs === null) { replyAfterMs = Date.now() - t0; break; }
+    await page.waitForTimeout(300);
+  }
+  console.log(`MISSPAGE steer accepted: ${seen((m) => m.kind === 'chat_steer_accepted')} | from the first complete until the steer's own reply, the send button read: ${[...labels].join('/')} | reply after ${replyAfterMs === null ? 'never (12 s)' : `${(replyAfterMs / 1000).toFixed(1)} s`}`);
+} finally {
+  if (sessionId) await deleteScratchChat(session, sessionId).catch(() => {});
+  await session.browser.close();
+}
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd "$1" && timeout 300 node p.mjs 2>&1 | grep -E '^MISSPAGE|rror' || echo "no answer"
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `steer accepted: true | … the send button read: Send | reply after ~3 s` while no run stands behind a missed steer; cured when `Stop` is among what the button read
+```
+
+measured 2026-11-07 by chain chain-upstream-1378-20261107-163846-f9cc, finding L4, LOW
+probe-key: 360748841313f0a683781d72b0e7b4bc78ecd140
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/need-readers.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-elicitation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SendMenuPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SteeredMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSteeredMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/McpElicitationPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect/fileRefs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/mcpElicitationForm.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11428 — probe — LOW — rows the diff makes false were left: MAN-9068 (the store's own flag stands on it), MAN-300, MAN-712, MAN-301; no row names the new launch flag
+
+LOW — rows the diff makes false were left: MAN-9068 (the store's own flag stands on it), MAN-300, MAN-712, MAN-301; no row names the new launch flag
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+S=~/.claude/scripts/docstore
+echo "MAN-9068 says the SDK stream replays no user row for the steer: $($S get MAN-9068 --text | grep -c 'replays no `user` row for the steer')"
+echo "MAN-9068 names the handle's steer as steer(content): $($S get MAN-9068 --text | grep -c "handle's \`steer(content)\`")"
+echo "MAN-9068 flags the store raised: $($S get MAN-9068 --json | python3 -I -c 'import json,sys; print(len(json.load(sys.stdin)["row"].get("flags") or []))')"
+echo "MAN-300 says exactly two client files while naming more: $($S get MAN-300 --text | grep -c 'exactly two client files')"
+echo "MAN-712's chat-run-verbs line names steerChatTurn: $($S get MAN-712 --text | grep 'services/chat-run-verbs.service.ts' | grep -c steerChatTurn)"
+echo "MAN-301 still calls resolveSendTarget the front half of two frames: $($S get MAN-301 --text | grep -c 'shared front half of `chat.send` and')"
+cd /home/lyphe/.claude/claudecodeui_lyphe && echo "exported manuals naming --replay-user-messages: $(git grep -l 'replay-user-messages' -- '*MANUAL.md' ATLAS.md INVARIANTS.md | wc -l)"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `1`, `1`, `1`, `1`, `0`, `1`, `0` while the rows are stale; cured when MAN-9068's first three read 0, 0, 0, MAN-300's 0, MAN-712's 1, MAN-301's 0 and some manual names the flag
+```
+
+measured 2026-11-07 by chain chain-upstream-1378-20261107-163846-f9cc, finding L5, LOW
+probe-key: c1c69d8a445f23871af31060f504ff06cfb5fecb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/need-readers.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-elicitation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SendMenuPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SteeredMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSteeredMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/McpElicitationPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect/fileRefs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/mcpElicitationForm.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11429 — probe — LOW — what the six rewritten rows lost: the `source` pointer of every one (no body text)
+
+LOW — what the six rewritten rows lost: the `source` pointer of every one (no body text)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+for t in MAN-332 MAN-712 MAN-454 MAN-300 MAN-305 MAN-306; do
+  ~/.claude/scripts/docstore history "$t" --json | python3 -I -c '
+import json, sys
+w = [r for r in json.load(sys.stdin)["rows"] if r["verb"] == "write"][0]
+b, a = w["before"].get("source"), w["after"].get("source")
+print(sys.argv[1], "| latest write by", w["actor"], "| source before:", (b or {}).get("anchor", "none"), "| source after:", (a or {}).get("anchor", "NONE"))' "$t"
+done
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: each of the six prints its anchor as `source before` and `NONE` as `source after` while the pointer is gone; cured when `source after` names the anchor again
+```
+
+measured 2026-11-07 by chain chain-upstream-1378-20261107-163846-f9cc, finding L6, LOW
+probe-key: 984dcd1c4ce664c6346633d9ce7d83c76468d064
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/need-readers.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-elicitation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SendMenuPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SteeredMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSteeredMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/McpElicitationPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect/fileRefs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/mcpElicitationForm.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-11430 — probe — LOW — German: the one steer string the fork added itself has no German, and `mcpElicitation` has none (upstream has none either)
+
+LOW — German: the one steer string the fork added itself has no German, and `mcpElicitation` has none (upstream has none either)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+python3 -I - <<'PY'
+import json
+de = json.load(open("/home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/de/chat.json"))
+en = json.load(open("/home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/chat.json"))
+print("input.steer keys in en:", sorted(en["input"]["steer"]), "| in de:", sorted(de["input"]["steer"]))
+PY
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: en lists `holdHint`, de does not, while the key is missing; cured when both list the same six
+```
+
+measured 2026-11-07 by chain chain-upstream-1378-20261107-163846-f9cc, finding L7, LOW
+probe-key: 57c1130f20e46b9659035664dab349474f2dd684
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/station/need-readers.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-elicitation.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SendMenuPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SteeredMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSteeredMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/McpElicitationPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect/fileRefs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/mcpElicitationForm.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts

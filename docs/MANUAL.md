@@ -6384,6 +6384,8 @@ chat gutter and the panel; the writers are the panel, the gutter's body and the 
 `useMemoryReview`. The write lifecycle lives there rather than in the context for exactly that reason: a value carrying the in-flight id and the held
 refusals would change on every button press and re-render every reader.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/memory-intake/context/MemoryIntakeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/memory-intake/hooks/useMemoryReview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/memory-intake/index.ts
+
 ## MAN-602 — The reading, and when it is taken
 section: memory-intake/002 The reading, and when it is taken
 

@@ -79,8 +79,8 @@ section: 01-websocket-transport/003 The pieces
 | `server/modules/websocket/services/websocket-auth.service.ts` | `verifyWebSocketClient` — the upgrade-time gate for every path |
 | `server/modules/auth/auth.middleware.ts` | `authenticateWebSocket` — first DB user in platform mode, JWT verification in OSS mode |
 | `server/modules/websocket/services/websocket-state.service.ts` | `connectedClients`, the set of open `/ws` sockets, and `WS_OPEN_STATE`; the socket-to-account map (`registerSocketUser`) behind `sendToUser` and `isUserConnected` |
-| `server/modules/websocket/services/chat-run-verbs.service.ts` | `abortChatRun`, `answerChatPermission` — the `chat.abort` and `chat.permission-response` actions as verbs the handlers and the companion module share |
-| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the seven inbound handlers, `protocol_error`, the call to the attachment trust boundary (`filterAttachmentsToUploadStore`, MAN-9407), `runDetachedChatTurn`, and the one `session_host_liveness` snapshot a connecting socket is sent (MAN-8122) |
+| `server/modules/websocket/services/chat-run-verbs.service.ts` | `abortChatRun`, `answerChatPermission`, `steerChatTurn` — the `chat.abort`, `chat.permission-response` and `chat.steer` actions as verbs; the companion module calls the first two, and `steerChatRun`, its own door into a running turn (MAN-9068) |
+| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the eight inbound handlers, `protocol_error`, the call to the attachment trust boundary (`filterAttachmentsToUploadStore`, MAN-9407), `runDetachedChatTurn`, and the one `session_host_liveness` snapshot a connecting socket is sent (MAN-8122) |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | `chatRunRegistry` — one run per session, `seq` stamping, the replay buffer, the exactly-one-`complete` contract |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter` — the object runtimes write into; swallows `session_created`, fans out to every attached socket |
 | `server/modules/websocket/services/chat-session-audience.service.ts` | Which sockets have a session open, and the join of every one of them to a run nobody asked for from a browser (MAN-311) |
@@ -95,6 +95,7 @@ section: 01-websocket-transport/003 The pieces
 | `src/modules/chat/hooks/useChatRealtimeHandlers.ts` | The one `kind` switch on the client, and `lastSeqRef` bookkeeping |
 | `src/modules/chat/ChatInterface.tsx`, `src/modules/chat/hooks/useChatSessionState.ts` | The two places that send `chat.subscribe` |
 | `src/modules/chat/hooks/useChatComposerState.ts` | Builds `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response`; takes its files through `useAttachmentIntake` and uploads them with `uploadAttachmentFiles` (`src/shared`, MAN-9406) |
+| `src/modules/chat/hooks/useSteeredMessages.ts` | Builds `chat.steer` and settles each steered message's card from the outcomes `useChatRealtimeHandlers` reports; composed by `useChatComposerState.ts` (MAN-9696) |
 | `src/modules/chat/hooks/useSessionPresence.ts` | Builds `chat.presence` — the one place, called once from `ChatInterface.tsx`. Also exports `useIsLookingAtSession(isActive)`, the same pair (chat on screen, document visible) as a boolean (MAN-7575) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/websocket/desktop-notifications-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/projects-with-sessions-fetch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/taskmaster/taskmaster.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-audience.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/plugin-websocket-proxy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/session-upsert-broadcast.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/shell-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-auth.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-server.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx
@@ -215,24 +216,26 @@ frame with no `kind` at all (`:96-98`), which is how the Task Master frames pass
 ## MAN-300 — The chat protocol going up
 section: 01-websocket-transport/007 The chat protocol going up
 
-**RULE: seven `type` values, dispatched by one switch (`chat-websocket.service.ts:649-671`).
+**RULE: eight `type` values, dispatched by one switch (`chat-websocket.service.ts:813-847`).
 Anything else is answered with `protocol_error` / `UNKNOWN_MESSAGE_TYPE`; anything that
 throws is answered with `INTERNAL_ERROR`.**
 
 | `type` | Payload | What the server does |
 | --- | --- | --- |
-| `chat.send` | `sessionId`, `content`, `options` | Resolves the session row, registers the run, dispatches to the provider runtime (`:146-158`) |
-| `chat.edit-send` | as above plus `anchorId` | Announces `history_truncated`, rewinds or resumes the provider transcript at the anchor, then dispatches (`:314-408`) |
-| `chat.abort` | `sessionId` | Aborts the runtime and emits the terminal `complete` on its behalf (`:415-438`) |
+| `chat.send` | `sessionId`, `content`, `options` | Resolves the session row, registers the run, dispatches to the provider runtime (`:142-154`) |
+| `chat.edit-send` | as above plus `anchorId` | Announces `history_truncated`, rewinds or resumes the provider transcript at the anchor, then dispatches (`:339-433`) |
+| `chat.steer` | `sessionId`, `messageId` (a UUID; one is made when it is not), `content`, `options.attachments` | Folds the message into the turn the session is running (`steerChatTurn`, which asks the runtime and writes nothing itself) and answers the sender `chat_steer_accepted { sessionId, messageId }`. The CLI echoes the message under `messageId` when it READS it, at its next tool call, and that echo is what every tab shows. Refused with `STEER_UNAVAILABLE` (carrying `messageId`) when no run is running or the runtime has no turn pending: the composer then queues the message as the next turn. Every other refusal (an empty message `MESSAGE_REQUIRED`, a missing session, a throw `INTERNAL_ERROR`) carries the `messageId` too, and the composer puts the text back (`handleChatSteer`, `:452-506`) |
+| `chat.abort` | `sessionId` | Aborts the runtime and emits the terminal `complete` on its behalf (`:513-527`) |
 | `chat.subscribe` | `sessions: [{ sessionId, lastSeq }]` | Records each session as open on this socket (a run that starts later joins it at its first event), acks with `chat_subscribed`, attaches this socket to a running run, replays what was missed |
-| `chat.permission-response` | `requestId`, `allow`, `updatedInput?`, `message?`, `rememberEntry?` | Resolves one pending tool approval (`:511-522`) |
+| `chat.permission-response` | `requestId`, `allow`, `updatedInput?`, `message?`, `rememberEntry?` | Resolves one pending tool approval (`:607-618`) |
 | `chat.presence` | `sessionId`, `visible`, `clientId?`, `focused?`, `view?` | Records which session this socket is showing, for the notification channels' watched-session check (`handleChatPresence` in `chat-websocket.service.ts`), and what is on his screen for Kaylee's `<view>`: `clientId` (1 to 200 characters) names the page, `focused` says its window has the keyboard, `view` is the station's `StationFocus`, kept only when whole (MAN-9057). A report with a session and no `view` (the chat view's own) also makes that the ONE session this socket has open for run audiences (`markSocketShowing`, MAN-311) |
 | `chat.ping` | — | Answers `pong`. The browser's liveness probe; `WebSocketContext.tsx` swallows the answer, so no feature ever sees it |
 
-Five of the first six are built in exactly two client files: the composer builds sends, aborts and
-permission answers (`useChatComposerState.ts:877`, `:1187`, `:1229`), and
-`chat.subscribe` is built in `useChatSessionState.ts:811` and
-`ChatInterface.tsx:330`. `chat.presence` has a third home of its own,
+The chat page builds its own frames in a few places: the composer builds sends, aborts and
+permission answers (`useChatComposerState.ts:1074`, `:1522`, `:1564`), steers are built by
+`useSteeredMessages.ts` (`steerIntoRunningTurn`, `:101`, reached from the composer's send-button hold menu), and
+`chat.subscribe` is built in `useChatSessionState.ts:943` and
+`ChatInterface.tsx:381` (the git panel's delegation subscribes to the run it starts too). `chat.presence` has a home of its own,
 `src/modules/chat/hooks/useSessionPresence.ts`, called once from `ChatInterface.tsx` (every report it sends carries the page's
 `clientId` and the host document's `hasFocus()` as `focused`, and no `view`), which
 passes the session only while the chat tab is the one showing (a hidden chat behind Files,
@@ -248,8 +251,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessio
 ## MAN-301 — The client is not trusted past the session id
 section: 01-websocket-transport/007 The chat protocol going up/008 The client is not trusted past the session id
 
-`resolveSendTarget` is the shared front half of `chat.send` and
-`chat.edit-send`. It reads the row from `sessionsDb` and takes provider, project path and
+`resolveSendTarget` is the shared front half of `chat.send`,
+`chat.edit-send` and `chat.steer`. It reads the row from `sessionsDb` and takes provider, project path and
 provider-native id from there:
 
 > the session row and provider come from the database, never from the client.
@@ -267,7 +270,7 @@ else `~/.cloudcli/assets`, where `POST /api/assets/images` and `POST /api/assets
 **direct child** of that directory: relative paths are anchored there, absolute paths must
 already be inside it, and traversal or subdirectories are dropped with a warning. Survivors are
 deduped by path and re-split into `attachments` / `images` / `files` before the runtime sees
-them (`chat-websocket.service.ts`, `chat.send`'s options). Her typed door
+them (`readVerifiedAttachments` in `chat-websocket.service.ts`, the one reader of `chat.send`'s and `chat.steer`'s options). Her typed door
 (`POST /api/companion/messages`, `prepareTypedAttachments`: MAN-9411) runs the same
 filter on every record it is posted; it takes only `path` and `name` from the page and reads
 size and type off the stored file.
@@ -277,39 +280,47 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/service
 ## MAN-305 — Protocol errors have their own kind
 section: 01-websocket-transport/007 The chat protocol going up/009 Protocol errors have their own kind
 
-`sendProtocolError` (`:121-134`) emits `kind: 'protocol_error'` rather than a provider
+`sendProtocolError` (`:114-130`) emits `kind: 'protocol_error'` rather than a provider
 `error`, and the reason is worth keeping:
 
 > so the frontend can distinguish "your request was invalid" from "the model run produced
 > an error" without inspecting text.
-> — `chat-websocket.service.ts:117-119`
+> — `chat-websocket.service.ts:110-112`
 
 Every code that exists, with the line that emits it:
 
 | Code | Line | Meaning |
 | --- | --- | --- |
-| `SESSION_ID_REQUIRED` | `:178`, `:422` | The frame carried no usable `sessionId` |
-| `SESSION_NOT_FOUND` | `:186` | No row in `sessions` — create it over REST first |
+| `SESSION_ID_REQUIRED` | `:177`, `:520` | The frame carried no usable `sessionId` |
+| `SESSION_NOT_FOUND` | `:185` | No row in `sessions` — create it over REST first |
 | `UNSUPPORTED_PROVIDER` | `:195` | The session's provider has no registered runtime |
-| `RUN_IN_PROGRESS` | `:232` | `startRun` refused: this session already has a running run |
-| `ANCHOR_REQUIRED` | `:328` | `chat.edit-send` without an `anchorId` |
-| `EDIT_NOT_SUPPORTED` | `:338` | The provider cannot re-run from a point |
-| `ANCHOR_NOT_FOUND` | `:345` | The anchor is no longer in the transcript |
-| `ANCHOR_LOOKUP_FAILED` | `:351` | Reading the transcript threw |
-| `EDIT_REWIND_FAILED` | `:400` | The rewind itself failed; the run is ended too |
-| `NO_ACTIVE_RUN` | `:428` | `chat.abort` for a session with nothing running |
-| `UNKNOWN_MESSAGE_TYPE` | `:669` | Unrecognised `type` |
-| `INTERNAL_ERROR` | `:675` | Anything thrown out of a handler |
+| `RUN_IN_PROGRESS` | `:250` | `startRun` refused: this session already has a running run |
+| `ANCHOR_REQUIRED` | `:353` | `chat.edit-send` without an `anchorId` |
+| `EDIT_NOT_SUPPORTED` | `:363` | The provider cannot re-run from a point |
+| `ANCHOR_NOT_FOUND` | `:370` | The anchor is no longer in the transcript |
+| `ANCHOR_LOOKUP_FAILED` | `:376` | Reading the transcript threw |
+| `EDIT_REWIND_FAILED` | `:425` | The rewind itself failed; the run is ended too |
+| `NO_ACTIVE_RUN` | `:525` | `chat.abort` for a session with nothing running |
+| `MESSAGE_REQUIRED` | `:470` | `chat.steer` with no text and no attachment; carries the `messageId` |
+| `STEER_UNAVAILABLE` | `:484` | `chat.steer` when no turn can take the message (no running run, no turn pending, the provider keeps no live process); carries the `messageId`. Not a failure: the client queues the message as the next turn and shows no error |
+| `UNKNOWN_MESSAGE_TYPE` | `:845` | Unrecognised `type` |
+| `INTERNAL_ERROR` | `:504`, `:851` | Anything thrown out of a handler; `:504` is `handleChatSteer`'s own catch, which names the `messageId` |
+
+Every refusal of a `chat.steer` carries the frame's `messageId` (`SESSION_ID_REQUIRED`, `SESSION_NOT_FOUND` and
+`UNSUPPORTED_PROVIDER` too: `resolveSendTarget` forwards it, `:168-200`), because the page keeps a card for the message
+until an answer settles it.
 
 On the client, `protocol_error` both surfaces an error row and clears the spinner
-(`useChatRealtimeHandlers.ts:157-173`) — correct precisely because no `complete` will
-follow a request that never became a run.
+(`useChatRealtimeHandlers.ts:261-293`) — correct precisely because no `complete` will
+follow a request that never became a run. The exception is an error that names a steer's `messageId`: the run it
+was sent into goes on, so the spinner is left alone, the error row is still drawn, and the message's card is settled
+(`STEER_UNAVAILABLE` queues it as the next turn; any other code puts its text back in the composer).
 
 **Three inbound frames fail silently by design.** `chat.permission-response` returns without
-an answer when `requestId` is missing or empty (`:516-518`), `chat.subscribe` with no
-`sessions` array does nothing at all (`:456`), and `chat.presence` never answers at all — a
+an answer when `requestId` is missing or empty (`:608-610`), `chat.subscribe` with no
+`sessions` array does nothing at all (`:544`), and `chat.presence` never answers at all — a
 missing or non-string `sessionId` is recorded as "watching nothing" rather than refused
-(`:538-544`). No ack, no error, in all three.
+(`:635-640`). No ack, no error, in all three.
 
 ## MAN-306 — The chat protocol coming down
 section: 01-websocket-transport/010 The chat protocol coming down
@@ -323,7 +334,7 @@ in `server/shared/types.ts`.**
 `history_truncated`, `task_notification`, `compaction`.
 
 **`GatewayEventKind` (`server/shared/types.ts`) — produced by the gateway, no provider involved:**
-`chat_subscribed`, `session_upserted`, `loading_progress`, `soul_launch_state`, `kanban_metis_state`, `kanban_event`, `universe_activity`, `universe_map`, `protocol_error`.
+`chat_subscribed`, `chat_steer_accepted`, `session_upserted`, `loading_progress`, `soul_launch_state`, `kanban_metis_state`, `kanban_event`, `universe_activity`, `universe_map`, `protocol_error`.
 `kanban_metis_state` is `server/modules/kanban-metis`'s own frame — a board's live Metis
 sessions, pushed on change the same way `soul_launch_state` is (`kanban-metis.module.ts`'s
 polled lane) — and it has no row in the consumption table below for the same reason
@@ -354,9 +365,10 @@ Two kinds in those unions never appear where you would look for them:
 | `error` | Provider runtime | A message row. **Not** terminal |
 | `complete` | Runtime, or synthesised by the registry | Terminal: clears processing state and triggers a REST tail refresh (`:237-279`) |
 | `permission_request`, `permission_resolved`, `permission_cancelled` | Provider runtime | The permission banner and its pending list (`:285-328`) |
-| `history_truncated` | `chat-websocket.service.ts:388-393` | `sessionStore.truncateAt` (`:116-124`) |
-| `chat_subscribed` | `chat-websocket.service.ts:485-492` | Authoritative processing state plus pending permissions (`:126-155`) |
-| `protocol_error` | `chat-websocket.service.ts:127` | Error row, spinner cleared |
+| `history_truncated` | `chat-websocket.service.ts:413-418` | `sessionStore.truncateAt` (`:116-124`) |
+| `chat_subscribed` | `chat-websocket.service.ts:581-588` | Authoritative processing state plus pending permissions (`:126-155`) |
+| `chat_steer_accepted` | `handleChatSteer` in `chat-websocket.service.ts` | Sent to the SENDER only, once the runtime has taken a `chat.steer` message into the running turn: `{ sessionId, messageId }`. Not a transcript row; `useChatRealtimeHandlers` reports it to the composer, which turns the message's card from "Sending…" to "reads it at its next tool call". The row itself arrives later, as the CLI's echo of the message under the same id |
+| `protocol_error` | `chat-websocket.service.ts:122-129` | Error row, spinner cleared; an error that names a steer's `messageId` settles that steer's card instead and leaves the run's spinner alone (MAN-305) |
 | `session_upserted` | `session-upsert-broadcast.service.ts:81-105` | `useProjectsState` — sidebar rows and alias folding |
 | `loading_progress` | `projects-with-sessions-fetch.service.ts:164-175` | `useProjectsState` — project scan progress (`:720-736`) |
 | `soul_launch_state` | `dispatch-souls/dispatch-souls.module.ts` | The launcher souls a session started by hand, pushed on change. `SoulLaunchFeed` publishes it into the live bus; the chat handler returns early on it too, in the same `case` group |
@@ -977,13 +989,13 @@ section: 02-realtime-stream/003 The pieces
 | `src/modules/chat/hooks/useSessionStore.ts` | Per-session slots. `appendRealtime`, `updateStreaming`, `finalizeStreaming`, `truncateAt`, and the merge of live and persisted rows. |
 | `src/modules/chat/hooks/useChatMessages.ts` | `normalizedToChatMessages` — the projection from store records to UI objects. Pairs `tool_use` with `tool_result`, folds subagent rows into their container, turns a `compaction` message into its content-less marker row (MAN-8060), and memoises through a `WeakMap`. |
 | `src/modules/chat/hooks/useChatSessionState.ts` | Sends `chat.subscribe` on session open and on reconnect, owns `requestLatestMessages` and `resetStreamingState`, and memoises `chatMessages`. |
-| `src/modules/chat/hooks/useChatComposerState.ts` | The outbound side: `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response`, plus the optimistic user echo. |
+| `src/modules/chat/hooks/useChatComposerState.ts` | The outbound side: `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response`, plus the optimistic user echo; `chat.steer` comes from `useSteeredMessages.ts`, which it composes. |
 | `src/modules/chat/hooks/useSessionPresence.ts` | Sends `chat.presence`: which session this tab is showing, restated on reconnect, on `visibilitychange` and every 30 s, and cleared on the way out — so the notification channels skip a session you are watching. `useIsLookingAtSession(isActive)` exposes the same "watching" test as a boolean for the scroll follow and the reply anchor (MAN-7575). |
 | `src/shared/hooks/useSessionProtection.ts` | The per-session activity map that the indicator and the abort button derive from. |
 | `src/modules/chat/transcript/StreamingMarkdown.tsx` | Renders an assistant reply, streaming or finished, as a settled half plus a pending half. |
 | `src/modules/chat/utils/streamingMarkdown.ts` | `splitStreamingMarkdown` — where it is safe to cut a partially-written markdown document in two. |
 | `src/shared/types.ts` | `ServerEvent` at `:204`, the client's view of a frame. Every field the handler reads is optional here. |
-| `server/modules/websocket/services/chat-websocket.service.ts` | Handles `chat.send`, `chat.edit-send`, `chat.abort`, `chat.subscribe`, `chat.permission-response`, `chat.presence`. Registers the run, then hands the turn to the provider runtime. |
+| `server/modules/websocket/services/chat-websocket.service.ts` | Handles `chat.send`, `chat.edit-send`, `chat.steer`, `chat.abort`, `chat.subscribe`, `chat.permission-response`, `chat.presence`, `chat.ping`. Registers the run, then hands the turn to the provider runtime; a `chat.steer` folds into the running turn instead. |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | One entry per app session. `decorateAndRecordEvent` at `:94` is the choke point: session-id rewrite, `seq` assignment, replay buffering, terminal-`complete` de-duplication, and the `lastEventAt` stamp that makes a run's silence measurable from outside (`:107`). |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | The object provider runtimes think is their socket. Swallows `session_created`; `forward` at `:160` fans out to every watching connection and collects dead ones. |
 | `server/shared/utils.ts` | `createNormalizedMessage` at `:348` and `createCompleteMessage` — the envelope every provider event is built with. **Not** `message-unification.ts`; that file exports only `prepareTranscriptMessages`, which runs on REST history reads and never on the live path. |
@@ -1345,7 +1357,7 @@ change, and do not assume the status text you see in the UI came from it.
 ## MAN-332 — Permission requests
 section: 02-realtime-stream/010 Permission requests
 
-Claude is the only provider with interactive tool approvals. Asking a human is one function,
+Claude is the only provider with interactive tool approvals. Asking a human about a tool is one function,
 `promptForToolDecision` in `claude-runtime.provider.js`: it emits `permission_request` under two
 names — `requestId`, the ATTEMPT's, minted fresh every time a process raises the ask, and
 `promptKey`, the ASK's own (the tool use id the CLI stamped on the call, carried unchanged by a
@@ -1380,6 +1392,19 @@ SDK reads that field in **seconds**, so a day, which is what keeps the SDK from 
 that is deliberately waiting on a person. The wait itself has no timeout for an interactive tool,
 through either caller; an ordinary tool's wait is `CLAUDE_TOOL_APPROVAL_TIMEOUT_MS` and the
 runtime denies the tool when it runs out.
+
+**An MCP server's request for input is the one other ask, through a door of its own.** The CLI
+declares form and URL elicitation to every MCP server, and with no `onElicitation` the SDK declines
+each request itself: the server is told a person refused when nobody was shown anything.
+`sdkOptions.onElicitation` (`claude-runtime.provider.js`) raises it as a `permission_request` with
+`toolName: 'McpElicitation'` and the request as `input`, under the same two names (its `promptKey`
+is a digest of the request, since no tool use id names it), pushes an `agent.notification` with no
+answer buttons because the answer is a form, and waits with no timeout of its own: the server keeps
+its own, and an abort arrives on the signal. The client draws it as `McpElicitationPanel` (MAN-9697; what may not be broken: INV-11419), inside the
+composer's `PermissionRequestsBanner`: Submit answers `allow` with `updatedInput.content`, Decline
+answers a denial, and a request that goes away unanswered is `cancel`, never an invented accept
+(`toElicitationResult`). A turn nobody attends (`options.unattended`, set by the agent API and by
+commit-message generation) gets the SDK's own immediate decline.
 
 **The app itself asks no chat.** A plan that lands owing the operator's word has its Accept prompt or its designer's questions drawn on the plan's card and pushed to the phone by the dispatcher lane (`server/modules/dispatcher/dispatcher-asks.service.ts`, MAN-7400), never raised as a `permission_request`. The lane registers a permission gateway with the provider registry (`registerPermissionGateway`) that answers the phone's taps through the dispatcher's own verbs, never a run, and lists nothing: `listPending` and `listPendingSessions` are optional on the gateway, and every reader of `providerRegistry.listPermissionGateways()` — `chat.subscribe`'s `pendingPermissions`, the sidebar's waiting mark — calls them optionally. `resolveToolApproval` stops at the first gateway that claims the key and warns once when none does; the dispatcher's claims every key of its own, held or not, and settles it from the store.
 
@@ -4457,12 +4482,13 @@ optimistic prune only covers the answering tab; the server's `permission_resolve
 does the same removal everywhere else — other tabs, and the replay a refreshed tab
 receives mid-run. A `permission_cancelled` frame removes a prompt with no decision at all.
 
-Three prompts, two placements:
+Four prompts, two placements:
 
 | Prompt | Panel | How it is chosen |
 | --- | --- | --- |
 | `ExitPlanMode` or `exit_plan_mode` | `PlanDisplay`, inline in the transcript | `PlanDisplay` calls `usePermission()` and searches the pending list itself, by tool name. `PermissionRequestsBanner` filters those two names out so the prompt is not offered twice |
 | `AskUserQuestion` | `AskUserQuestionPanel`, inline in the transcript, inside the question's own tool card | `QuestionAnswerContent` calls `usePermission()` and takes the pending request whose `permissionKey` equals the row's — the identity the permission layer uses for every row — and shows the answers this conversation sent — kept in a module map by session and row identity, so a lazily remounted card still shows them — until the server folds them in on the next history load. That memory is consulted only AFTER the pending search: a new request with a different id gets its panel on a fresh card even when the question is byte-identical to one already answered, and a request replayed under the SAME id (a decision whose socket frame was dropped, re-sent on reconnect) is offered again by the card that answered it. `PermissionRequestsBanner` filters the name out so the question is asked once |
+| `McpElicitation` (an MCP server asking for typed input) | `McpElicitationPanel`, in the composer's `PermissionRequestsBanner`, where the Allow / Deny banner would stand | `PermissionRequestsBanner` matches the tool name before it builds the generic banner. Submit sends `{allow: true, updatedInput: {content}}`, Decline `{allow: false}`, a URL request's Open link `{allow: true, updatedInput: {}}` (MAN-9697, MAN-332) |
 | anything else | The generic `Confirmation` banner | Fallback in `PermissionRequestsBanner` |
 
 `PlanDisplay` shows its footer only while a plan request is pending, and sends
@@ -5774,8 +5800,15 @@ What "matches" means, rung by rung:
   as a whole inline code span it becomes a chip; the scanner refuses it, because each of its segments
   must be non-empty, so the same text in a sentence stays plain. Measured on 2026-09-13. Making them
   agree is a change to `detect/fileRefs.ts`. `MarkdownLink` calls
-  `parseFileRef` with both options false, which is the looser reading an author-declared link has
-  always had here. A chip is drawn only from strings: a path inside `**bold**` or a link stays text.
+  `parseFileRef` with `requireSeparator` and `requireKnownExtension` false, which is the looser reading
+  an author-declared link has always had here, and sets `decodeEscapes` (default false) for the href
+  alone (`HREF_POLICY`). A Markdown href is a URL, so the parser has escaped a space or a non-ASCII
+  letter in it (`My%20Notes.md`): its path is decoded ONCE, one UTF-8 character's escape at a time, and
+  judged as a file on the decoded spelling (`notes%2Emd` is `notes.md`). The `:line` suffix is read off
+  the text as written (`notes.md%3A12` is a name, not a line), and an escape that is no character (a
+  stray `%`, a lone surrogate, an overlong sequence) stays as written. The link's text, a code span and
+  the prose scan never decode: a file really named `a%20b.md` written there must not be renamed.
+  A chip is drawn only from strings: a path inside `**bold**` or a link stays text.
 - **The plugin** walks root children only, so nothing inside a list item or a blockquote is
   grouped. Tabbed code is a maximal run of two or more adjacent fences, every one with a language,
   not all the same language, and none of them `widget`, `mermaid`, `stats` or `diff`. A lead-in is a
@@ -6149,7 +6182,7 @@ section: 08-rendered-shapes/009 If you change this, check that
 | `CodeFence`'s order, its streaming return, or its export branch | The fences probe: both mermaid fences wear `data-shape="diagram"`, a malformed `stats` fence keeps every line, and the streaming mount draws no shape and no svg. The groups probe's export mount: the mermaid fence comes out as its source inside its `diagram` frame. `useShapeInteractive` stays above the streaming return, so every render calls the same hooks |
 | `MermaidDiagram`'s render id | The gallery, `phase-32.mjs`, knows a diagram drew only by the `mermaid-` prefix on the svg id `MermaidDiagram` gives each render. Change the prefix and its four live-diagram lines redden with the diagram on screen |
 | `LONG_OUTPUT_LINES` or `LONG_OUTPUT_PREVIEW_LINES` | The fences probe's 25-line fence stays whole and its 26-line fence clamps, and `probe-shapes-detect.mjs` pins the pair at 25 and 12 |
-| `parseFileRef`, `FILE_REF_SCAN` or `MarkdownLink`'s policy | The inline probe: no chip in a URL, time, version or npm scope; every link that opened in the Files tab still does; the scan's cost ceiling. The whole-text parser and the scanner are built from the same fragments and are meant to agree; today they differ on one case only, a path holding `//` (see **The triggers**), so a change to either must say which way that case goes — and an absolute path and a dotfile are cases they now AGREE on, which is what a change must not undo |
+| `parseFileRef`, `FILE_REF_SCAN` or `MarkdownLink`'s policy | The inline probe: no chip in a URL, time, version or npm scope; every link that opened in the Files tab still does; the scan's cost ceiling. The whole-text parser and the scanner are built from the same fragments and are meant to agree; today they differ on one case only, a path holding `//` (see **The triggers**), so a change to either must say which way that case goes — and an absolute path and a dotfile are cases they now AGREE on, which is what a change must not undo. `decodeEscapes` stays set by `MarkdownLink` for a link's href alone and decodes once (`a%2520b.md` is `a%20b.md`, not `a b.md`): link text, code spans and the prose scan stay literal |
 | `ChipsSuppressedContext` or where it is provided | The inline probe's backticked path in a link, a section heading and a sortable header stays today's code span, and React logs no nested-control warning |
 | `openFileReference`'s signature, or the file-manager chain behind it | `probe-shapes-lineopen.mjs` end to end, and the inline probe's click that must land on the target row |
 | `surface-signal.ts` | `WIDGET_SIGNAL`'s bytes are another session's and move unchanged, and `MARKDOWN_SIGNAL` names only conventions `detect.ts` really implements. It costs tokens on every turn |
@@ -6852,6 +6885,7 @@ Handled by `server/modules/websocket/services/chat-websocket.service.ts`.
 | --- | --- |
 | `chat.send` | Start a run for a session. |
 | `chat.edit-send` | Replace an already-sent message and re-run from that anchor. |
+| `chat.steer` | Send a message into the turn the session is running now (`messageId`, `content`, `options.attachments`); the model reads it at its next tool call. Answered `chat_steer_accepted`, or refused `STEER_UNAVAILABLE` when no turn can take it. |
 | `chat.abort` | Stop the running run. |
 | `chat.subscribe` | Watch one or more sessions, replaying from `lastSeq`; each is also recorded as open on this socket, so a run that starts later with no socket joins it (MAN-311). |
 | `chat.permission-response` | Answer a `permission_request`. |

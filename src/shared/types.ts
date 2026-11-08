@@ -936,6 +936,38 @@ export type QueuedDraft = {
   options?: QueuedSendOptions;
 };
 
+/**
+ * A message sent into a running turn (steering) that the agent has not read yet. The composer shows it as a card
+ * until its echo reaches the transcript; `status` is `sending` until the server confirms it reached the turn, then
+ * `accepted`. Local to the tab that sent it.
+ */
+export type PendingSteer = {
+  /** The UUID the message was sent with; its transcript row and live echo carry it too. */
+  messageId: string;
+  /** The session whose turn it was sent into. */
+  sessionKey: string;
+  /** The chat scope its composer text and files lived in, so a refusal that has to put them back can find that scope. */
+  submitScope: string | null;
+  content: string;
+  /** Browser files kept so the message can go back into the composer intact. */
+  attachments: File[];
+  /** Descriptors uploaded before it was sent, reused if it has to be queued instead. */
+  uploadedAttachments: unknown[];
+  status: 'sending' | 'accepted';
+};
+
+/**
+ * What became of a steered message, as the realtime handler reports it to the composer: `accepted` (the server put it
+ * into the turn), `refused` (the turn had already ended, so it should go out as the next turn) or `delivered` (the
+ * agent read it; its echo is in the transcript). `delivered` is reported for every live user message, so the
+ * composer matches it against its own ids. `failed` is a refusal for a reason of the message's own (an empty
+ * message, a session the server does not hold, a throw): nothing was sent into any turn, so the text goes back to
+ * the composer. `run_finished` is about the whole run, not one message: it ended on its own (not stopped, not
+ * failed), so a message the server took and the agent has not echoed is the CLI's to run as its next turn, and its
+ * card is retired; it names no message.
+ */
+export type SteerOutcome = 'accepted' | 'refused' | 'delivered' | 'failed' | 'run_finished';
+
 /** Viewport-relative placement box (right/bottom offsets plus max height and width) computed for a composer popover so the model and permission menus stay inside the window. */
 export type ComposerMenuAnchor = {
   right: number;
@@ -1298,6 +1330,69 @@ export type PermissionPanelProps = {
     decision: { allow?: boolean; message?: string; updatedInput?: unknown },
   ) => void;
 };
+
+// ---------------------------
+
+//----------------- MCP ELICITATION FORM ------------
+
+/** One value an MCP elicitation form field can hold once parsed, as the protocol allows them: a string, a number, a boolean or a list of strings. This is what goes back to the server for that field. */
+export type ElicitationFieldValue = string | number | boolean | string[];
+
+/** The person's answers to an elicitation form as typed, one entry per field key and kept raw (a half-typed number is still text) until they are checked and parsed on Submit. A single choice is held as its position in the field's choices, '' meaning nothing chosen. */
+export type ElicitationRawValues = Record<string, string | boolean | string[]>;
+
+/** One option of a choice or multi-choice field: the `value` the server receives and the `label` the person reads. */
+export type ElicitationChoice = {
+  value: string;
+  label: string;
+};
+
+/** One field of the schema an MCP server asked the person to fill, read into what the form needs to draw it and to check an answer; built by `readElicitationFields` from the request's `requestedSchema`. */
+export type ElicitationField = {
+  key: string;
+  label: string;
+  description?: string;
+  required: boolean;
+  kind: 'text' | 'number' | 'integer' | 'boolean' | 'choice' | 'multi';
+  /** The HTML input type that suits the field's `format`; only a `text` field draws it. */
+  inputType: 'text' | 'email' | 'url' | 'date' | 'datetime-local';
+  format?: string;
+  choices: ElicitationChoice[];
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+  minItems?: number;
+  maxItems?: number;
+  /** What the field starts as: text, a tick, or the ticked choices. */
+  initial: string | boolean | string[];
+};
+
+/** An MCP elicitation request as the backend forwards it from the Agent SDK's `onElicitation`, carried as the `input` of a permission request named `McpElicitation`. */
+export type ElicitationRequestInput = {
+  serverName?: string;
+  displayName?: string;
+  title?: string;
+  description?: string;
+  message?: string;
+  mode?: 'form' | 'url';
+  url?: string;
+  requestedSchema?: { properties?: Record<string, unknown>; required?: unknown };
+};
+
+/** Why a field's answer is refused, as a code plus the figure its sentence names. The form logic returns it and the panel words it, so the rules carry no translated text. */
+export type ElicitationProblem =
+  | { code: 'required' }
+  | { code: 'notANumber' }
+  | { code: 'notAnInteger' }
+  | { code: 'tooSmall'; value: number }
+  | { code: 'tooLarge'; value: number }
+  | { code: 'tooShort'; count: number }
+  | { code: 'tooLong'; count: number }
+  | { code: 'tooFew'; count: number }
+  | { code: 'tooMany'; count: number }
+  /** The answer is not a valid value of the field's `format` (or a date-time that does not exist); the panel picks the sentence by format. */
+  | { code: 'badFormat'; format: string | undefined };
 
 // ---------------------------
 

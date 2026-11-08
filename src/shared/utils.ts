@@ -296,8 +296,8 @@ export const getPageTitle = (
  * download action and the file manager's both do.
  *
  * The anchor has to be in the document for the click to count, and the object URL is revoked
- * immediately after: the browser has taken its own reference by then, and leaving it would hold
- * the whole file in memory for the life of the tab.
+ * right after: leaving it would hold the whole file in memory for the life of the tab. The name
+ * goes to the anchor's `download` attribute as-is, so non-ASCII names survive.
  */
 export function downloadBlobAsFile(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
@@ -310,7 +310,9 @@ export function downloadBlobAsFile(blob: Blob, fileName: string): void {
   anchor.click();
   document.body.removeChild(anchor);
 
-  URL.revokeObjectURL(url);
+  // Not in this task: Firefox and Safari read the object URL after `click()` returns, and a
+  // revoke that has already happened cancels the download.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 // ---------------------------

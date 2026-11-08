@@ -26,6 +26,11 @@ export { readAccountDefaultModelAlias } from './list/claude/claude-account-defau
 // entry the runtime's grammar matcher accepts for the ask — the same string the chat page's "Allow and remember" writes.
 export { buildClaudeToolPermissionEntry } from './list/claude/claude-tool-permission-entry.js';
 
+// MCP_ELICITATION_TOOL_NAME: used by the companion module's ask lanes (`answer_session`, `pending_ask`, the station's asks). An MCP
+// server's request for input waits in the pending list under this name, but it is a form for him to fill in the chat and no tool
+// permission to allow, so those lanes must tell it from one.
+export { MCP_ELICITATION_TOOL_NAME } from './list/claude/claude-elicitation.js';
+
 // launchAccountEnv: used by the Cerberus diagnosis agent and its summary audit, whose own CLI starts
 // ride the account the house chose exactly as a chat's process does.
 export { launchAccountEnv } from './list/claude/claude-launch-account.js';

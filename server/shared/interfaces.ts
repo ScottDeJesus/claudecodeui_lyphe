@@ -62,9 +62,12 @@ export interface IProviderRuntime {
    * OPTIONAL — only a runtime that keeps a live process per chat has one. Folds `content` into the turn that process is
    * running now, as one more user message of that turn (it opens no turn of its own), and answers `'folded'`; answers
    * `'not_running'` when the chat has no process, the process is closing or no turn is pending. Read by
-   * `providerRuntimeService.steer`, which the chat gateway's `steerChatRun` calls for the companion's send.
+   * `providerRuntimeService.steer`, which the chat gateway's `steerChatRun` calls for the companion's send and
+   * `steerChatTurn` for the composer's Steer. `options` is the composer's alone: the `messageId` (a UUID) the message
+   * is tracked by, which the provider echoes when it reads the message, and the verified `images` and `files`
+   * descriptors; the companion passes none.
    */
-  steer?(appSessionId: string, content: string): 'folded' | 'not_running';
+  steer?(appSessionId: string, content: string, options?: AnyRecord): Promise<'folded' | 'not_running'> | 'folded' | 'not_running';
 }
 
 /**

@@ -243,7 +243,7 @@ export function actTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<an
           .min(1)
           .max(ANSWER_MAX)
           .describe(
-            'For a permission request: allow, deny or always. always allows AND stores the rule for every later chat of his account, so say it only when he asked to remember it; read_session pending_ask names the rule it would store. For a question with options: the option\'s label, or his own words when none fits (allow, deny and always are not answers to a question). For a plan: allow approves it, deny sends it back for revision.'
+            'For a permission request: allow, deny or always. always allows AND stores the rule for every later chat of his account, so say it only when he asked to remember it; read_session pending_ask names the rule it would store. For a question with options: the option\'s label, or his own words when none fits (allow, deny and always are not answers to a question). For a plan: allow approves it, deny sends it back for revision. For an MCP server\'s request for input (a form): only deny, which declines it; the form is for him to fill in the chat, and allow and always are refused.'
           ),
       },
       (args) => answerSession(deps, args)

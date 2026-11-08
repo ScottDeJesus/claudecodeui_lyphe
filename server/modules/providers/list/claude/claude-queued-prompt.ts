@@ -14,6 +14,10 @@ import type { AnyRecord } from '@/shared/types.js';
  * The row carries no edit anchor (`normalizeMessage` skips it): rewinding a conversation to an attachment row is not
  * a resume point the CLI accepts.
  *
+ * The user row's id is the one the message was SENT with (`source_uuid`, the uuid stamped on the pushed message), not
+ * the attachment row's own: the composer's Steer sends under an id of its own, and the live echo of the CLI reading the
+ * message carries that same id, so the live bubble and the history row are one message to the page and not two.
+ *
  * Consumer: `claude-sessions.provider.ts` (`normalizeMessage`, the history reader's one door).
  */
 
@@ -21,7 +25,8 @@ import type { AnyRecord } from '@/shared/types.js';
 export function queuedPromptAsUserRow(raw: AnyRecord): AnyRecord | null {
   const queued: unknown = raw.attachment;
   if (raw.type !== 'attachment' || typeof queued !== 'object' || queued === null) return null;
-  const { type, commandMode, prompt, timestamp } = queued as AnyRecord;
+  const { type, commandMode, prompt, timestamp, source_uuid: sourceUuid } = queued as AnyRecord;
   if (type !== 'queued_command' || commandMode !== 'prompt' || typeof prompt !== 'string' || prompt.trim() === '') return null;
-  return { type: 'user', uuid: raw.uuid, timestamp: raw.timestamp ?? timestamp, message: { role: 'user', content: prompt } };
+  const sentAs = typeof sourceUuid === 'string' && sourceUuid !== '' ? sourceUuid : raw.uuid;
+  return { type: 'user', uuid: sentAs, timestamp: raw.timestamp ?? timestamp, message: { role: 'user', content: prompt } };
 }

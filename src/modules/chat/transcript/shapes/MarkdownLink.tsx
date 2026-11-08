@@ -15,6 +15,12 @@ const isExternalHref = (href?: string): boolean =>
 // extension besides. With both options off `parseFileRef` reads what this override always accepted.
 const LINK_POLICY = { requireSeparator: false, requireKnownExtension: false } as const;
 
+// The same policy for the href alone, which is a URL: the Markdown parser escapes spaces and
+// non-ASCII letters in it (`My Notes.md` arrives as `My%20Notes.md`), and the opener wants the path
+// as the filesystem spells it. The link TEXT keeps `LINK_POLICY`: it is the author's literal words,
+// and a file really named `a%20b.md` written there must not be renamed.
+const HREF_POLICY = { ...LINK_POLICY, decodeEscapes: true } as const;
+
 // Extract plain text from link children so a reference rendered only as link
 // text (e.g. `[src/foo.ts]()` with an empty href) can still be opened.
 const childrenToText = (children: ReactNode): string => {
@@ -45,7 +51,8 @@ type MarkdownLinkProps = { href?: string; children?: ReactNode };
  * `detect.ts`'s `parseFileRef`. This override asks it under the loose `LINK_POLICY`, the prose scan
  * under the strict default — two policies, one home. The `:line` a reference carries is passed on
  * to `openFileReference`, so a link to `src/foo.ts:130` opens the Files tab at line 130; every
- * other link opens exactly where it always did.
+ * other link opens exactly where it always did. An href's path is percent-decoded on the way
+ * (`HREF_POLICY`), so `[notes](My%20Notes.md)` opens `My Notes.md`.
  */
 export function MarkdownLink({ href, children }: MarkdownLinkProps) {
   const { openFileReference } = usePaletteOps();
@@ -53,7 +60,7 @@ export function MarkdownLink({ href, children }: MarkdownLinkProps) {
   // Prefer the href when it is a real path; otherwise fall back to the
   // link text, since models often emit `[src/foo.ts]()` with an empty href.
   const linkText = childrenToText(children);
-  const hrefRef = href ? parseFileRef(href, LINK_POLICY) : null;
+  const hrefRef = href ? parseFileRef(href, HREF_POLICY) : null;
   const textRef = hrefRef ? null : parseFileRef(linkText, LINK_POLICY);
   const fileRef = hrefRef ?? textRef;
   // The string the reference was READ from, which is what the anchor falls back to when there is

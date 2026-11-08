@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import JSZip from 'jszip';
 
 import { api } from '@/shared/api';
-import { downloadBlobAsFile } from '@/shared/utils';
+import { copyTextToClipboard, downloadBlobAsFile } from '@/shared/utils';
 import type { FileTreeNode,Project } from '@/shared/types';
 
 // Invalid filename characters
@@ -238,14 +238,17 @@ export function useFileTreeOperations({
     }
   }, [selectedProject, newItemParent, newItemType, newItemName, validateFilename, showToast, t, onRefresh, handleCancelCreate]);
 
-  // Copy path to clipboard
+  // Copy path to clipboard. The shared helper falls back to `execCommand('copy')` when the
+  // Clipboard API is missing (plain-HTTP access) or rejects the write (some mobile browsers),
+  // and the one toast reports its outcome once it is known.
   const handleCopyPath = useCallback((item: FileTreeNode) => {
-    navigator.clipboard.writeText(item.path).catch(() => {
-      // Clipboard API may fail in some contexts (e.g., non-HTTPS)
-      showToast(t('fileTree.toast.copyFailed', 'Failed to copy path'), 'error');
-      return;
+    void copyTextToClipboard(item.path).then((didCopy) => {
+      if (didCopy) {
+        showToast(t('fileTree.toast.pathCopied', 'Path copied to clipboard'), 'success');
+      } else {
+        showToast(t('fileTree.toast.copyFailed', 'Failed to copy path'), 'error');
+      }
     });
-    showToast(t('fileTree.toast.pathCopied', 'Path copied to clipboard'), 'success');
   }, [showToast, t]);
 
   // Download a single file

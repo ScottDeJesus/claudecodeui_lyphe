@@ -902,7 +902,7 @@ The chat's composer menus, transcript controls, copy helper, transcript export a
 
 | unit | file | bound to `hostWindow` |
 | --- | --- | --- |
-| `ComposerModelMenu`, `ComposerPermissionMenu`, `ScheduleMessagePopover` | `src/modules/chat/composer/` | portal target `hostWindow.document.body` |
+| `ComposerModelMenu`, `ComposerPermissionMenu`, `ScheduleMessagePopover`, `SendMenuPopover` (MAN-9696) | `src/modules/chat/composer/` | portal target `hostWindow.document.body` |
 | `useComposerMenuAnchor` | `src/modules/chat/hooks/useComposerMenuAnchor.ts` | anchor from `hostWindow.innerWidth`/`innerHeight`; `resize`, `scroll` and Escape `keydown` on `hostWindow`; outside press on the host document |
 | `CommandMenu` | `src/modules/chat/composer/CommandMenu.tsx` | portal; `getMenuPosition(position, hostWindow)`: phone layout when `hostWindow.innerWidth < 640` (height ceiling 54% of the window's height), else the desktop layout (360px ceiling) clamped against `hostWindow.innerWidth`; outside press tested with `isNodeLike`. `ChatComposer` anchors it from `hostWindow.innerHeight` |
 | `MessageCopyControl` | `src/modules/chat/transcript/MessageCopyControl.tsx` | format-menu portal; placement from `hostWindow.innerWidth`/`innerHeight`; `mousedown`, `scroll`, `resize` on `hostWindow`; copy through `copyTextToClipboard(text, hostWindow)` |
@@ -4732,14 +4732,14 @@ Kaylee's reads of the house. Every read answers from the database and the runnin
 | State | Line |
 |---|---|
 | working | last tool call in the run's replay buffer (`describeToolCall`), else the last assistant words cut at 80 code points, else `just started` |
-| waiting | `AskUserQuestion`: `asks "<first question, 100 code points>"` plus ` (and N more)`; `ExitPlanMode`: `a plan is ready and waits for his approval`; else `wants permission: <describeToolCall>`; no ask found: `waiting on him` |
+| waiting | `AskUserQuestion`: `asks "<first question, 100 code points>"` plus ` (and N more)`; `ExitPlanMode`: `a plan is ready and waits for his approval`; `McpElicitation` (an MCP server's request for input): `<server> asks for his input: "<message, 100 code points>"` (the colon and message left off when the message is empty); else `wants permission: <describeToolCall>`; no ask found: `waiting on him` |
 | live, asleep | `idle just now` / `idle N min` / `idle N h` (under 48 h) / `idle N d`; `idle, no recorded activity` when the row has no time |
 
 Cuts count code points (`cutAt`), so none lands inside an emoji.
 
 Readers of `activityLine`: `rosterText()`, `list_sessions`, `feeds/alert-block.ts` and `station/station-sessions.ts` (MAN-9268). The station serves the line unchanged and unescaped (a JSON field is no tag): the rail cuts it to one line on the page (a `Tooltip` repeats it for a pointer), the chat's stage (MAN-9291) draws it whole.
 
-`pendingAsksOf(sessionId)` is the gateway's list of the asks a chat is blocked on, oldest first. `askLine(ask, detailed = false)` is the waiting line above for ONE ask; `detailed` is the line she decides on: with exactly one question, ` Options: A | B | C` (the option labels) follows, and a permission carries what it would run in full (`describeToolInput`: a Bash command whole up to 600 characters, a count of what was cut) with the rule an "always" would store. Without it a Bash command is cut at 60 characters, as a roster line is scanned. `activityLine` uses it for the oldest ask undetailed; `read_session`'s `pending_ask` uses it for every ask detailed.
+`pendingAsksOf(sessionId)` is the gateway's list of the asks a chat is blocked on, oldest first. `askLine(ask, detailed = false)` is the waiting line above for ONE ask; `detailed` is the line she decides on: with exactly one question, ` Options: A | B | C` (the option labels) follows, and a permission carries what it would run in full (`describeToolInput`: a Bash command whole up to 600 characters, a count of what was cut) with the rule an "always" would store. An `McpElicitation` has no rule to store: detailed, its line ends ` — a form for him to fill in the chat; from here she can only decline it (deny)`. `elicitationOf` (`ask-decision.ts`) reads who asks (the server's display name, else its name, else `An MCP server`), what, and in which mode (MAN-9481). Without it a Bash command is cut at 60 characters, as a roster line is scanned. `activityLine` uses it for the oldest ask undetailed; `read_session`'s `pending_ask` uses it for every ask detailed.
 
 ## Roster (`rosterText`)
 - One line per working, waiting or live chat: `name · project · state: activity · id <sessionId>`; 20 lines at most, waiting first; `…and N more active; list_sessions with scope active names them.` past 20.
@@ -5439,17 +5439,19 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 ## MAN-9481 — server/modules/companion/tools — stop_session, rename_session and — `answer_session { session, answer 1–2000 }`
 section: server/modules/companion/tools — stop_session, rename_session and answer_session: acting on a chat through the house's own verbs/001 `answer_session { session, answer 1–2000 }`
 
-Answers the OLDEST pending approval of the chat (`getPendingApprovalsForSession`, by `receivedAt`; the others are counted in the sentence) through `answerChatPermission` — the verb `chat.permission-response` calls. With nothing pending: an `isError` sentence that says so. What the ask would run is shown to her IN FULL where she decides on it — `read_session pending_ask` and `answer_session`'s own sentences (`describeToolInput` in `server/shared/tool-call-hint.ts`: a Bash command whole, a file tool's whole path, any other input as JSON; 600 characters, then a count of what was cut; a line break shows as ` ↵ `) — and `pending_ask` adds the rule an "always" would store. The 60-character `describeToolCall` hint stays for the roster, where a line is scanned. What an answer means to each ask is `ask-decision.ts`'s (`answerFor`), and every decision is the page's own. `answerFor` has two callers: `answer_session` here, and the station's `POST /api/companion/station/asks` (`answerStationAsk`, `station/station-needs.ts`, MAN-9273), a third door beside the chat page's own banner. Both take the same steps — the ask must still be waiting, `answerFor` decides, an "always" writes its rule through `rememberAllowedTool`, `answerChatPermission` settles — so an answer from her, from the rail's stage and from the page leave the same marks. Withholding a cut ask's Allow is the stage's law, not the route's: the route does not look at `cut` (MAN-9273):
+Answers the OLDEST pending approval of the chat (`getPendingApprovalsForSession`, by `receivedAt`; the others are counted in the sentence) through `answerChatPermission` — the verb `chat.permission-response` calls. With nothing pending: an `isError` sentence that says so. What the ask would run is shown to her IN FULL where she decides on it — `read_session pending_ask` and `answer_session`'s own sentences (`describeToolInput` in `server/shared/tool-call-hint.ts`: a Bash command whole, a file tool's whole path, any other input as JSON; 600 characters, then a count of what was cut; a line break shows as ` ↵ `) — and `pending_ask` adds the rule an "always" would store (for an MCP server's request for input, `askLine` says instead who asks and what, and that from here she can only decline it). The 60-character `describeToolCall` hint stays for the roster, where a line is scanned. What an answer means to each ask is `ask-decision.ts`'s (`answerFor`), and every decision is the page's own. `answerFor` has two callers: `answer_session` here, and the station's `POST /api/companion/station/asks` (`answerStationAsk`, `station/station-needs.ts`, MAN-9273), a third door beside the chat page's own banner. Both take the same steps — the ask must still be waiting, `answerFor` decides, an "always" writes its rule through `rememberAllowedTool`, `answerChatPermission` settles — so an answer from her, from the rail's stage and from the page leave the same marks. Withholding a cut ask's Allow is the stage's law, not the route's: the route does not look at `cut` (MAN-9273):
 
 | ask | answer | decision |
 |---|---|---|
-| a permission (any tool) | `allow` | `{ allow: true }` |
+| a permission (any tool but the three below) | `allow` | `{ allow: true }` |
 | | `deny` | `{ allow: false, message: 'User denied tool use' }` |
 | | `always` | `{ allow: true, rememberEntry }` and the entry merged into `claudePermissions` |
 | `AskUserQuestion`, one question | an option's label, matched case-insensitively (the option's own spelling is sent), else her words; `allow`, `deny` and `always` are refused unless an option is called that, because an answer sent to the chat cannot be taken back | `{ allow: true, updatedInput: { ...input, answers: { [question]: answer } } }` (`AskUserQuestionPanel.tsx`, `handleSubmit`) |
 | `AskUserQuestion`, several | — | refused: "answer it in the chat"; the resolver is not called |
 | `ExitPlanMode` / `exit_plan_mode` | `allow` | `{ allow: true }` |
 | | `deny` | `{ allow: false, message: 'User asked to revise the plan' }` (`PlanDisplay.tsx`) |
+| `McpElicitation` (an MCP server's request for input: a form or a link for him to fill in the chat) | `deny` | `{ allow: false }`, which declines it (`McpElicitationPanel.tsx`, Decline) |
+| | `allow`, `always`, any other word | refused: "it is a form for him to fill in the chat"; the resolver is not called. why: a bare `allow` would reach the MCP server as an accept of a form nobody filled (`toElicitationResult`), and an `always` would store a rule that names no tool |
 
 Any other word on a permission or a plan is refused with the words that are accepted; a permission's refusal also names the entry `always` would store. `always` on a plan or a question is not an answer.
 
@@ -7497,7 +7499,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionP
 
 ## MAN-9123 — The queued message — one per session, appended to on the server, sent by the dispatcher: routes, merge, claim, restore and the composer's rules
 
-A message sent while a turn runs is queued; the dispatcher sends it when the session is idle. One queued message per `(user_id, draft_scope)` row of `session_drafts` (column `queued_message`).
+A message sent while a turn runs is queued (a tap on Send; the hold on Send also offers Steer, which sends it into the turn instead: MAN-9696); the dispatcher sends it when the session is idle. One queued message per `(user_id, draft_scope)` row of `session_drafts` (column `queued_message`).
 
 ## Routes (`server/modules/user/user.routes.ts`, mounted at `/api/user`)
 | Route | Body | Answers |
@@ -7546,6 +7548,7 @@ A refusal stores nothing.
 | Action | Rule |
 |---|---|
 | queue | emptied composer; on refusal the text returns in front of anything typed since, and an error line shows (`input.queue.notCombinable` for 409, else `Failed to queue message: …`) |
+| steer refused (`STEER_UNAVAILABLE`) | the message left the composer when it was steered, so `queueMessage` runs with `putBackIfRefused`: it queues as the next turn, and if the server refuses it too, the text and files go back to the composer like a typed message's (MAN-9696) |
 | Edit / Delete | `takeCardOffServerQueue` clears on the server and acts on the message the server REMOVED, never the card's copy; a second press while a clear is in flight is ignored |
 | clear did not land | card stays; error line `Failed to remove the queued message: … It is still queued.` |
 | Edit, nothing removed | composer left empty. why: the dispatcher already sent it; filling it sends twice |
@@ -11494,11 +11497,11 @@ Four readers run together (`Promise.allSettled`); their answers join in this ord
 |---|---|---|---|
 | `accept` | `accept:<asked.id>-<asked.at>` | ask, by its `asked` identity: a lock over several features is one item | `card` (dispatcher name), `epic` (a lock over more than one feature names the lead plan's epic), `title`, `headline` (the question's first non-blank line, else the ask's header), `features` |
 | `questions` | `questions:<asked.id>-<asked.at>` | round | `card` = the plan the round is on (the ask's `target` is a designer target, not a card), `title`, `headline` (first question's first line), `count` |
-| `ask` | `ask:<requestId>` | waiting chat: its OLDEST ask | `sessionId`, `requestId`, `chat`, `ask` (`question` for `AskUserQuestion`, `plan` for `ExitPlanMode` / `exit_plan_mode`, else `permission`), `tool`, `what`, `cut`, `rule`, `options`, `more` (asks behind it) |
+| `ask` | `ask:<requestId>` | waiting chat: its OLDEST ask | `sessionId`, `requestId`, `chat`, `ask` (`question` for `AskUserQuestion`, `plan` for `ExitPlanMode` / `exit_plan_mode`, else `permission`; an `McpElicitation` is a `permission` too, but always `cut` and with a `null` rule), `tool`, `what`, `cut`, `rule`, `options`, `more` (asks behind it) |
 | `followups` | `followups:<sessionId>` | chat with an open follow-up, newest first | `sessionId`, `chat`, `count` (the chat's whole open count), `newest` (its newest item's text) |
 | `check` | `check:<node>/<key>` | Cerberus check `failing` or `denied`, in the tab's worst-first order (yellow is a warning) | `node`, `key`, `label` (`checkName`), `status`, `value` (`clipLine` to 600), `since` |
 - A plan the operator hid (`plan.hidden !== null`) draws no card: its ask is left out (`list_alerts`' rule).
-- `ask` fields: `what` of a permission is `describeToolInput` whole; of a question its first question's text plus ` (and N more)`; of a plan its text. A question's or plan's text goes through `describeToolInput`'s Bash cut: one line (a break is ` ↵ `), 600 characters, then `… (N more characters not shown)`. `rule` = `buildClaudeToolPermissionEntry` for a permission, else `null`. `options` = the only question's options when there is exactly one question, else `[]`. `cut` = `isCut(kind, tool, what)`: true when a permission or plan's `what` carries the `… (N more characters not shown)` marker (`CUT_MARKER`), or a permission's tool is `Edit`, `MultiEdit` or `Write` (`BODY_HIDDEN_TOOLS`: the line shows the file's path, never the body); always false for a question. why: a press fires only what it shows whole, so a page withholds Allow, Always allow and Approve on a cut ask. A chat whose ask carries no request id cannot be answered and is left out.
+- `ask` fields: `what` of a permission is `describeToolInput` whole; of an `McpElicitation` "<server> asks for his input: <message>" (`elicitationOf`, the message through the same Bash cut); of a question its first question's text plus ` (and N more)`; of a plan its text. A question's or plan's text goes through `describeToolInput`'s Bash cut: one line (a break is ` ↵ `), 600 characters, then `… (N more characters not shown)`. `rule` = `buildClaudeToolPermissionEntry` for a permission (`null` for an `McpElicitation`: it names no tool), else `null`. `options` = the only question's options when there is exactly one question, else `[]`. `cut` = `isCut(kind, tool, what)`: true when a permission or plan's `what` carries the `… (N more characters not shown)` marker (`CUT_MARKER`), or a permission's tool is `Edit`, `MultiEdit` or `Write` (`BODY_HIDDEN_TOOLS`: the line shows the file's path, never the body), or the tool is `McpElicitation` (a form the stage never draws); always false for a question. why: a press fires only what it shows whole, so a page withholds Allow, Always allow and Approve on a cut ask. A chat whose ask carries no request id cannot be answered and is left out.
 - `StationNeed` carries no `say`: the rail offers him no phrase to say, on any kind. She reads an action back in her own words and judges from the conversation whether he agreed (MAN-9171), and her `open` and `answer_session` take any phrasing. The rail only shows each item and fires nothing.
 
 ## `answerStationAsk(userId, answer, runtime)` — the page's own decision
@@ -11508,7 +11511,7 @@ The steps `answer_session` takes (MAN-9065), so an answer from her and one from 
 3. A verdict with `remember` (an "always") → `rememberAllowedTool(userId, entry)` BEFORE the answer. why: a write that throws leaves the ask waiting and the call repeatable.
 4. `answerChatPermission(requestId, decision, { runtime })`. `told` is the verdict's sentence, plus ` N more ask(s) still waiting there.` when others wait in that chat.
 - Only a chat's ask is answered here. An Accept and a round are answered on the dispatcher's own card.
-- The route does not look at `cut`: withholding Allow, Always allow and Approve on a cut ask is the stage's law (MAN-9282), and a POST of `allow` for a cut ask settles it as the page's own decision does. why: the decisions are the page's byte for byte, and a POST is the operator's own word.
+- The route does not look at `cut`: withholding Allow, Always allow and Approve on a cut ask is the stage's law (MAN-9282), and a POST of `allow` for a cut ask settles it as the page's own decision does. why: the decisions are the page's byte for byte, and a POST is the operator's own word. The one carve-out is `answerFor`'s, not the route's: for an `McpElicitation` ask `allow` and `always` are refused (400, "answer it in the chat") because the page's own decision for a form carries typed content, and a bare Allow would accept a form nobody filled; its `deny` declines it.
 
 ## Proof — `.verify/kaylee-station-needs.mjs`
 | mode | runs | shows |
@@ -11824,7 +11827,7 @@ The `ask` stage view: a chat's waiting permission, question or plan, answered he
 | `permission` | Allow (`data-station-answer="allow"`), Deny (outline, `deny`), Always allow (tonal, `always`) | Allow shows only when the ask is not cut. Always shows only when `need.rule !== null` and the ask is not cut, with the rule written under it (`data-station-ask-rule`, `station.needs.ask.rule`: "Always allow also keeps <rule/> as a standing rule for every later chat of yours."). The rule is the `<code>` child, so a rule holding `<` reads as written |
 | `plan` | Approve (`allow`), Send back (`deny`) | Approve shows only when the ask is not cut. Hint "Send back returns the plan to its chat to revise." |
 | `question` | options as `QuestionOptionRow` radios (`radiogroup`, "Its options"), his own words in a `TextArea`, "Send the answer" (`send`) | one answer stands: a pick clears the field, typing clears the pick; `answer` = trimmed words, else the pick; Send is `aria-disabled` until one stands. Keyed by `requestId`, so a pick or half-typed words stay with their ask. Label "Or answer in your own words", or "Your answer" with no options |
-- A cut ask (`isCut(need)` = `need.cut !== false`: a server that sends no flag counts as cut, never as whole; MAN-9256) offers no Allow, Always allow or Approve and no rule line. Deny (Send back) stays, and `CutNote` stands in the answers' place: `role=note`, `data-station-ask-cut`, warn ink with ▲, `station.needs.ask.cut` "Only part of this is shown here, so a yes waits for the chat, where the whole stands." A question is never cut. why: a press fires only what it shows whole.
+- A cut ask (`isCut(need)` = `need.cut !== false`: a server that sends no flag counts as cut, never as whole; MAN-9256) offers no Allow, Always allow or Approve and no rule line. Deny (Send back) stays, and `CutNote` stands in the answers' place: `role=note`, `data-station-ask-cut`, warn ink with ▲, `station.needs.ask.cut` "Only part of this is shown here, so a yes waits for the chat, where the whole stands." A question is never cut. An MCP server's request for input (`McpElicitation`) always is, so the stage offers no Allow and no Always for it: Deny declines it and "Open the chat" is where the form is. why: a press fires only what it shows whole.
 - A press is `busy` while its answer is out and `aria-disabled` while another is.
 - The server decides each word (`answerFor`), as the chat's own forms decide theirs.
 
@@ -16889,7 +16892,7 @@ Handles for a probe: on the card `data-heal-rule=<id>` and `data-heal-rule-state
 
 Presses: only where `decision.status` is `pending` and `decision.candidate` is set — `file it` and `discard`, both disabled by `review.isBusy(candidate)`, each `aria-describedby` the shelf line when one stands under the title, else the title (on a `queuedByChat` card the press files what the chat queued, not his sentence). Under them the refusal: `review.refusals[candidate]`, else `decision.refusal`. No third verb; nothing detaches a row (discarding is how a wrongly grouped rule goes).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealRuleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/healRuleTypes.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealRuleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/healRuleTypes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/healTypes.ts
 
 ## MAN-9689 — src/modules/heal — the Rules cards' data: useRuleReview, projectNamer, the summary's rules guard and the proof
 
@@ -16928,3 +16931,45 @@ Not checked: an unknown `shelf`, `state` or `decision.status`; the cards read th
 - Live dev client `:5183`, read-only: `rules: 0`, the section draws its empty words between the kinds and the heals.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/context/HealContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/healState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/hooks/useRuleReview.ts
+
+## MAN-9696 — src/modules/chat/composer — Steer: the hold on Send, SendMenuPopover, SteeredMessageCard and useSteeredMessages, the composer's half of chat.steer
+
+The composer's half of a steer: a message sent into the turn a Claude process is running, read at that turn's next tool call. The server's half (the verb, the miss, the echo, the history row) is MAN-9068. The frames: `chat.steer` (MAN-300), `chat_steer_accepted` (MAN-306), the refusals (MAN-305; every refusal names the `messageId`: INV-11418).
+
+## The hold on Send — `ChatComposer.tsx`
+One timer (`longPressTimerRef`, `LONG_PRESS_MS` 500, armed on the window the composer is drawn in: MAN-7466) serves two menus. The panel is chosen when the press starts, not when the timer fires (`opensSchedule`).
+| when the press starts | the hold opens |
+|---|---|
+| no turn running, text typed, not recording or transcribing (`canScheduleFromSend`) | `ScheduleMessagePopover`: send later |
+| a turn running, text or a file typed, `supportsSteering`, not recording or transcribing, the text not starting with `/` (`canSteerFromSend`) | `SendMenuPopover`: Queue, then Steer |
+| anything else | nothing |
+- A tap on Send while a turn runs still queues (MAN-9123). Queue is the menu's first row, so a hold opened by accident does the safe thing. A slash command is a turn of its own and always waits.
+- The button's label ends `hold to steer` (`input.steer.holdHint`) when `canSteerFromSend`, `hold to send later` (`schedule.holdHint`) when `canScheduleFromSend`.
+- `isSendMenuOpen` is cleared during render the moment `canSteerFromSend` turns false (the turn ended, the text was cleared). why: a flag left standing reopens the menu, with no hold, at the next message typed during a turn.
+- The menu has no button of its own. why: the footer row is the tightest strip on a phone. 2026-11-07: 68 px free at 390 px wide, 38 px at 360 px; the mic button takes about 36 px.
+- `SendMenuPopover` is portalled into `hostWindow.document.body` and anchored by `useComposerMenuAnchor`, as the model and permission menus are (MAN-7466).
+
+## `supportsSteering`
+`ProviderCapabilities.supportsSteering` (`provider-capabilities.service.ts`): `true` for `claude`, `false` for `cursor`, `codex` and `opencode`. `useChatProviderState` reads it from `GET /api/providers/capabilities` and holds `false` until that has loaded or for a provider it does not list; `ChatInterface` hands it to `useChatComposerState` and `ChatComposer`.
+
+## The send — `useChatComposerState.ts`, `useSteeredMessages.ts`
+1. A menu choice calls `handleSendMenuChoice(choice)`: `handleSubmit` with `{ steerIntoTurn: true }` for Steer, an ordinary queueing submit for Queue. Same validation and attachment upload as a queued send.
+2. `submitMessage` steers only when `steerIntoTurn`, `supportsSteering`, the chat has a session id and the text is no slash command; else it queues.
+3. `steerIntoRunningTurn` makes the id (`createSteerMessageId`: a v4 UUID built from `randomHexId`, because `crypto.randomUUID` needs a secure context and the app is often opened over plain http), adds a `PendingSteer` (`status: 'sending'`), sends `chat.steer { sessionId, messageId, content, options: { attachments } }`, records the text in the input history and empties the composer (`emptyComposerOfTakenMessage`, shared with `queueMessage`).
+4. The text goes as typed, with no `/plain` prefix: that command is for a message that opens a turn, and the queue adds none either.
+
+## The card and its outcomes
+`SteeredMessageCard`, one per `PendingSteer` of the open chat, above the composer; no edit and no delete, because the message is already in the agent's input. It reads `Steering · Sending…` until `chat_steer_accepted`, then `<provider> reads it at its next tool call`. `useChatRealtimeHandlers` reports each fact to `handleSteerOutcome(sessionId, messageId, outcome)` (`SteerOutcome`, `src/shared/types.ts`):
+| outcome | from | card | message |
+|---|---|---|---|
+| `accepted` | `chat_steer_accepted` | `sending` → `accepted`; dropped when the turn is no longer running by then | stays in the turn |
+| `delivered` | any live user `text` frame whose id is the `messageId` or `<messageId>_…` (a message with an image is split into parts) | dropped | read by the CLI; that frame is the transcript row |
+| `refused` | `protocol_error` `STEER_UNAVAILABLE` naming the `messageId` | dropped | queued as the next turn (`queueAsNextTurn`); if the queue refuses it too, text and files go back to the composer (MAN-9123). No error row, the run's spinner untouched |
+| `failed` | any other `protocol_error` naming the `messageId` | dropped | text and files back in the composer ahead of anything typed since (`restoreToComposer`). The error row is drawn; the run's spinner untouched |
+| `run_finished` | a `complete` that is neither `aborted` nor `success: false` | every `accepted` card of that session dropped | the CLI runs a message it did not echo as its next turn (MAN-9068) |
+- A Stop or a failed run with an `accepted` card still standing: when `isLoading` falls, the text goes back to the composer (`restoreToComposer`) and is never sent behind the person's back.
+- Switching chats drops the other chats' cards: those messages are the run's already.
+- A CLI process started before `--replay-user-messages` echoes nothing, so its card stays until the run ends.
+- Strings: `input.steer.*` and `sendMenu.*` in `chat.json`, English and German.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ChatComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SendMenuPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SteeredMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSteeredMessages.ts

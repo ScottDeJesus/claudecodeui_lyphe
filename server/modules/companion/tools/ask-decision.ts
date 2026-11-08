@@ -1,11 +1,11 @@
 import { userPreferencesDb } from '@/modules/database/index.js';
-import { buildClaudeToolPermissionEntry } from '@/modules/providers/index.js';
+import { MCP_ELICITATION_TOOL_NAME, buildClaudeToolPermissionEntry } from '@/modules/providers/index.js';
 import { isRecord } from '@/shared/document-fields.js';
 import { describeToolInput, oneLine } from '@/shared/tool-call-hint.js';
 import type { ProviderPermissionDecision } from '@/shared/types.js';
 
 /**
- * What an answer means to the ask it answers: the decision the runtime's own resolver is handed, for the three kinds
+ * What an answer means to the ask it answers: the decision the runtime's own resolver is handed, for the four kinds
  * of ask a chat can be waiting on. The functions read an ask and a sentence and say what to hand the resolver, or why
  * they cannot, so each door that answers (`answer_session`, `act-tools.ts`; the station's `POST /asks`,
  * `station/station-needs.ts`) is left only the doing, and the station's reader of a chat's asks (`station/need-readers.ts`) lists them in the same terms. The one write here is `rememberAllowedTool`, the rule an
@@ -22,7 +22,11 @@ import type { ProviderPermissionDecision } from '@/shared/types.js';
  *     the chat as his answer (an answer cannot be taken back). A question with several parts cannot be answered by
  *     one sentence and is not guessed at;
  *   - `ExitPlanMode`: `allow` approves with `{ allow: true }` and `deny` sends the plan back with `{ allow: false,
- *     message: 'User asked to revise the plan' }` (`PlanDisplay.tsx`, `handleBuild` and `handleRevise`).
+ *     message: 'User asked to revise the plan' }` (`PlanDisplay.tsx`, `handleBuild` and `handleRevise`);
+ *   - an MCP server's request for input (`McpElicitation`): a form (or a link) he fills in the chat, which no sentence of
+ *     hers can fill. `deny` declines it with `{ allow: false }`, the page's own Decline (`McpElicitationPanel.tsx`);
+ *     every other word is refused, because a bare `allow` would reach the MCP server as an accept of a form nobody
+ *     filled (`toElicitationResult`), and `always` would store a rule that names no tool.
  *
  * Consumers: `tools/act-tools.ts` (the `answer_session` handler), `station/station-needs.ts` (`answerStationAsk`, the
  * station's `POST /asks`) and `station/need-readers.ts` (the reader that lists a waiting chat's asks).
@@ -110,6 +114,36 @@ function answerQuestion(ask: PendingAsk, words: string, chatName: string): AskAn
   };
 }
 
+/**
+ * Who is asking, what, and in which mode, from the input an `McpElicitation` ask was raised with (`onElicitation` in the Claude
+ * runtime): the server's display name or its name, the words it asks with, and `url` when it wants a page opened (else `form`).
+ * Read defensively: the input is an MCP server's, and a missing or mistyped field says "An MCP server" or nothing rather than
+ * throwing. Consumed here, by `tools/chat-activity.ts` (`askLine`) and by `station/need-readers.ts` (the rail's line).
+ */
+export function elicitationOf(input: unknown): { server: string; message: string; mode: 'form' | 'url' } {
+  const record = isRecord(input) ? input : {};
+  const server = [record.displayName, record.serverName].find((name): name is string => typeof name === 'string' && name.trim() !== '');
+  return {
+    server: server?.trim() ?? 'An MCP server',
+    message: typeof record.message === 'string' ? record.message : '',
+    mode: record.mode === 'url' ? 'url' : 'form',
+  };
+}
+
+/**
+ * An MCP server's request for input. It is a form (or a link) for him to fill in the chat, so no word of hers answers it:
+ * `deny` declines it, as the page's Decline does, and every other word is refused — `allow` and `always` are the words of a
+ * permission, and sent on they would accept a form nobody filled.
+ */
+function answerElicitation(ask: PendingAsk, words: string, chatName: string): AskAnswer {
+  const { server, message } = elicitationOf(ask.input);
+  if (words.toLowerCase() === 'deny') {
+    return { ok: true, decision: { allow: false }, remember: null, told: `Declined ${server}'s request for input in ${chatName}.` };
+  }
+  const asked = message === '' ? '' : ` ("${oneLine(message)}")`;
+  return refused(`${chatName} is relaying ${server}'s request for input${asked}. It is a form for him to fill in the chat, so "${words}" is not an answer to it: tell him to answer it there. Only deny settles it from here, and it declines the request.`);
+}
+
 /** An `ExitPlanMode` ask: `allow` approves the plan, `deny` sends it back for revision. */
 function answerPlan(words: string, chatName: string): AskAnswer {
   const verdict = words.toLowerCase();
@@ -145,13 +179,15 @@ function answerPermission(ask: PendingAsk, words: string, chatName: string): Ask
 }
 
 /**
- * What `words` means to `ask`, for the chat called `chatName`. `AskUserQuestion` and `ExitPlanMode` (the page names
- * the second `exit_plan_mode` as well) are the two asks with a shape of their own; every other tool is a permission.
+ * What `words` means to `ask`, for the chat called `chatName`. `AskUserQuestion`, `ExitPlanMode` (the page names the second
+ * `exit_plan_mode` as well) and an MCP server's request for input (`McpElicitation`) are the three asks with a shape of
+ * their own; every other tool is a permission.
  * Consumed by `act-tools.ts` and `station/station-needs.ts`.
  */
 export function answerFor(ask: PendingAsk, words: string, chatName: string): AskAnswer {
   if (ask.toolName === 'AskUserQuestion') return answerQuestion(ask, words, chatName);
   if (ask.toolName === 'ExitPlanMode' || ask.toolName === 'exit_plan_mode') return answerPlan(words, chatName);
+  if (ask.toolName === MCP_ELICITATION_TOOL_NAME) return answerElicitation(ask, words, chatName);
   return answerPermission(ask, words, chatName);
 }
 
