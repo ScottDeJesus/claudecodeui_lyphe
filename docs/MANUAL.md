@@ -12170,7 +12170,7 @@ Proof: `node .verify/probe-card-ask.mjs --retired` (`:5183`; dark and light at 1
 
 The title reading pushes its picture once more and waits for the title: a live frame can land after the pushed picture and put the lane back. Shot: `.verify/shots/card-ask-desktop-1440x900-{dark,light}-amber-widget.png`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DispatcherAskBell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/feedback.css
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DispatcherAskBell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/feedback.css
 
 ## MAN-7577 — The card order and the sortable lists
 

@@ -66,7 +66,9 @@ export function useDispatcherPlans(): {
    * on the operator, `info` while an agent is at work (a drawn plan reading `live`, or a planner
    * outing at work — `out` and not said by the house to be not running, `outingAtWork`), `positive` only
    * once every drawn plan is `complete`, and `neutral` for work nobody is doing (stalled, paused,
-   * scheduled, parked, an outing the house says has no process). RUNNING OUTRANKS FINISHED: a lane still at work
+   * scheduled, parked). An outing the house says has no process counts for nothing here: it never makes the
+   * lane `info`, and — as a queued one does not — it does not hold `positive` back from a lane whose every
+   * drawn plan is `complete`. RUNNING OUTRANKS FINISHED: a lane still at work
    * never wears the green that says it is done — an epic in flight read as finished (operator,
    * 2026-10-08). `null` while nothing is drawn.
    */
