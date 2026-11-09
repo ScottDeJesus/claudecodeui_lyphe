@@ -273,90 +273,6 @@ probe-key: e58ba3ce7986fa70dd0c73b2c22e54aaf33ebec4
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSidebarController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/sidebarProjectFormatting.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/sessionRecency.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
-## INV-5932 — probe — (MED) — a sign-out caused by emptied storage leaves no client trace
-
-(MED) — a sign-out caused by emptied storage leaves no client trace
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/signed-out/athena-probes/storage-wiped-no-trace.mjs
-expect: page trace records: 1 or more, naming why the session ended (measured: 0)
-```
-
-measured 2026-09-29 by chain chain-signed-out-20260929-173238-19f4, finding M2, MEDIUM
-probe-key: 311bc0c067d615548137dc72e0fde468dc5582e2
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/context/AuthContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/hooks/useSharedSessionFollower.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-tree/hooks/useFileTreeUpload.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signout-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-signed-out.mjs
-
-## INV-5935 — probe — . `host-window-home.mjs`: the useDeviceSettings row cannot fail
-
-. `host-window-home.mjs`: the useDeviceSettings row cannot fail
-
-```probe
-/home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--seam-kit/mutants/run-mutant.sh host-window-home '[{"glob":"**/src/shared/hooks/useDeviceSettings.ts*","from":"hostWindow.innerWidth < mobileBreakpoint","to":"false"}]' | tail -1
-expect: ALL PASS (with useDeviceSettings forced to "wide" at 390px; a discriminating row prints a FAIL)
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--seam-kit-20260929-183302-c8d1, finding M1, MEDIUM
-probe-key: 98c1cc42df5145720d91e3b31dd510aff5469a3b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
-
-## INV-5936 — probe — . `host-window-kit.mjs`: reverting four of its subjects leaves it on ALL PASS
-
-. `host-window-kit.mjs`: reverting four of its subjects leaves it on ALL PASS
-
-```probe
-/home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--seam-kit/mutants/run-mutant.sh host-window-kit '[{"glob":"**/src/shared/ui/Dialog.tsx*","from":"hostWindow.requestAnimationFrame(","to":"requestAnimationFrame("},{"glob":"**/src/shared/ui/Dialog.tsx*","from":"hostWindow.cancelAnimationFrame(","to":"cancelAnimationFrame("},{"glob":"**/src/shared/ui/Tooltip.tsx*","from":"isNodeLike(target) && ","to":"(target instanceof Node) && "},{"glob":"**/src/shared/ui/useZoomPan.ts*","from":"resizeObserverIn(hostWindow, ","to":"((cb) => new ResizeObserver(cb))("}]' | tail -1
-expect: ALL PASS (with the Dialog frame back on the global window, Tooltip's isNodeLike reverted to instanceof, and useZoomPan's observer built by the opener's constructor)
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--seam-kit-20260929-183302-c8d1, finding M2, MEDIUM
-probe-key: 4a7f025d87c8f4d794b09113c7f4a5aaddedba01
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
-
-## INV-5937 — probe — . `useZoomPan`: a press held across a move poisons the next click
-
-. `useZoomPan`: a press held across a move poisons the next click
-
-```probe
-cd /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--seam-kit/athena-scaffold && node lightbox.mjs 2>&1 | grep '^VIOLATED L9'
-expect: a line reading VIOLATED L9 (adversarial) … {"stillThere":true}  (fixed: HELD L9 … {"stillThere":false})
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--seam-kit-20260929-183302-c8d1, finding L3, LOW
-probe-key: f8df98b1c8786e0e6655fa9ebfafeaa4fc4c2d14
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
-
-## INV-5954 — probe — Two of `CommandMenu`'s three viewport reads survive a mutant in the window probe (a 420-px window cannot reach line 117)
-
-Two of `CommandMenu`'s three viewport reads survive a mutant in the window probe (a 420-px window cannot reach line 117)
-
-```probe
-cd /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--seam-chat-surfaces/athena-probes && MUT='[{"glob":"**/src/modules/chat/composer/CommandMenu.tsx*","from":"hostWindow.innerWidth - 440","to":"innerWidth - 440"}]' node --import ./preload.mjs /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs | grep -E "FAIL|all checks"
-expect: a "[FAIL] the command menu is placed against the window's width" line; today "all checks passed" (the same mutant against `node wide.mjs` — the probe with a 700-px window — prints that FAIL with "right":740)
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--seam-chat-surfaces-20260929-193540-fce5, finding L1, LOW
-probe-key: 95e3498d7f6051f22800fe42cb35dc9607a8140b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs
-
-## INV-6002 — probe — The updated proof script cannot fail for the regression it names, and nothing in it guards H1
-
-The updated proof script cannot fail for the regression it names, and nothing in it guards H1
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--float-panel/probes/guard-vacuous.mjs
-expect: the mutant line (`hidden`, display none) does not read the same assertionValue as the as-built line (today both read "assertionValue":0, with display flex vs none)
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--float-panel-20260929-224731-39b9, finding M1, MEDIUM
-probe-key: 3d2505355b432dfaed5d0ad22452cf30cffe063d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPlaceholder.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-panel.mjs
-
 ## INV-6010 — WorkspaceFrame's reportCovered is a layout effect — a passive one loses the race with a reply
 
 `WorkspaceFrame`'s `CoverReporter` reports whether the main region is covered (an application up over it, or Kaylee Station on screen over the whole frame) with `useLayoutEffect(() => reportCovered(covered), [covered, reportCovered])`. Keep it a layout effect.
@@ -366,20 +282,6 @@ why: chat-host's unread rule judges a frame against `covered`. A passive effect 
 Proof: `.verify/fab-radial-door.mjs`, dot leg (MAN-7481). The rule: MAN-7482.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx
-
-## INV-6011 — probe — a double activation of a radial item inside the close fade runs the act twice (Open in a new tab: two pages; Reload: two document requests)
-
-a double activation of a radial item inside the close fade runs the act twice (Open in a new tab: two pages; Reload: two document requests)
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--radial-fill/athena-radial-dblclick.mjs
-expect: every row prints newPages 1 (today: gapMs 0, 30, 60 print newPages 2)
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--radial-fill-20260930-002344-4ad4, finding L1, LOW
-probe-key: d0acbb8cd3549ac83ed13eaec368502feb5d83e0
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useUnreadReply.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs
 
 ## INV-6017 — probe — a window closed between the browser making it and the app attaching its `pagehide` listener strands the tab: placement `'window'`, no window, the door dead, sometimes the chat lost in the dead document
 
@@ -461,62 +363,6 @@ expect: exit 1 with `VIOLATED: in simple-list mode the deep link is replaced by 
 ```
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatProject.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs
-
-## INV-6047 — probe — "no console error while signed in, in the tab or in the window" cannot fail for a server 5xx or a failed resource load
-
-"no console error while signed in, in the tab or in the window" cannot fail for a server 5xx or a failed resource load
-
-```probe
-/home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes/mut500.sh
-expect: two " 500 GET /api/providers/sessions/<id>/token-usage" lines, "console errors while signed in (404s, aborted fetches and blocked font loads aside): 0", then "ALL CHECKS PASS" and "exit=0"
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--whole-20260930-040206-0899, finding M1, MEDIUM
-probe-key: b0dffed85ca37351871965ac08b685cb19ac0254
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
-
-## INV-6049 — probe — `windowGone` has no timeout: a window that does not close hangs the run for ever
-
-`windowGone` has no timeout: a window that does not close hangs the run for ever
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes/probe-d-windowgone.mjs
-expect: "windowGone on a window that stays open: STILL PENDING after 45000ms"
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--whole-20260930-040206-0899, finding L2, LOW
-probe-key: 9426e39b720c75b3d77ebd412488b5115a12a877
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
-
-## INV-6050 — probe — `simple-list-deep-link.mjs` prints "held" while it exits 1, and exits 0 when tree mode is the one that lost the link
-
-`simple-list-deep-link.mjs` prints "held" while it exits 1, and exits 0 when tree mode is the one that lost the link
-
-```probe
-cd /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes && ./deeplink-stub.sh / / ; ./deeplink-stub.sh /session/x /
-expect: first prints "held: the deep link survives a late session lookup in both modes" with exit=1; second prints the same line with exit=0 although tree mode lost the link
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--whole-20260930-040206-0899, finding L3, LOW
-probe-key: fa3d7358fd45ad38453c886d20d1e4b9f0f4a61c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
-
-## INV-6052 — probe — a run that is killed leaves its scratch chat behind
-
-a run that is killed leaves its scratch chat behind
-
-```probe
-/home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes/kill-midrun.sh
-expect: "scratch chat deleted: false" and "threw: page.waitForTimeout: Target page, context or browser has been closed"; afterwards `DELETE /api/providers/sessions/<the printed id>?force=true` answers 200 (the chat was still there)
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--whole-20260930-040206-0899, finding L5, LOW
-probe-key: 464b0f3ffa93fc62ef8bc40bedd7f4b1551de8ae
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
 
 ## INV-6053 — probe — the harness's Google Fonts accommodation hides an 8.4 s blank window, and the report does not flag it
 
