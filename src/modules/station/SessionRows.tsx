@@ -61,7 +61,7 @@ function HerMark({ her, wrap = false }: { her: StationHerMark; wrap?: boolean })
 /** A row's tooltip box: as wide as its words up to 28rem, wrapping; never drawn where nothing hovers, the kit's long press included. */
 const TIP = 'max-w-[min(28rem,calc(100vw-2rem))] whitespace-normal [overflow-wrap:anywhere] [@media(hover:none)]:hidden';
 
-type SessionRowProps = {
+export type SessionRowProps = {
   session: StationSession;
   tier: StationTier;
   density: StationDensity;
@@ -72,8 +72,9 @@ type SessionRowProps = {
 };
 
 /**
- * One chat's row: its name over its project, its state chip at the right of the name's first line, the line she reads of it cut
- * to one line, and her mark when she looks at it. A chat waiting on him says what it waits on in the warn ink. The cut line is
+ * One chat's row: its name over its project, its state chip at the right of the name's first line, the line the companion reads
+ * of it cut to one line, and the companion's mark when it looks at this chat. Drawn by `SessionRows` below and by this module's
+ * `LiveSessionsView`, the scene's start rim, so a chat reads alike in the rim and in "Where things stand". A chat waiting on him says what it waits on in the warn ink. The cut line is
  * read whole on the stage this row's press opens, which is how a finger reads it; the `Tooltip` over the row only repeats it for
  * a pointer, and for a keyboard as the row takes the focus. It is not drawn where nothing hovers (`hover:none`), the kit's long
  * press included: a finger reads the line whole on the stage its press opens, and a bubble would only stand over it. On the columns the
@@ -85,7 +86,7 @@ type SessionRowProps = {
  * say. Her mark is her initial's disc beside the chip: her words are said by her status line in her head, which compact keeps
  * in view, and once more to a reader of the row.
  */
-function SessionRow({ session, tier, density, current, her, onPress }: SessionRowProps) {
+export function SessionRow({ session, tier, density, current, her, onPress }: SessionRowProps) {
   const press = () => onPress({ kind: 'chat', sessionId: session.sessionId, label: session.name });
   if (density === 'compact') {
     const waiting = session.state === 'waiting';

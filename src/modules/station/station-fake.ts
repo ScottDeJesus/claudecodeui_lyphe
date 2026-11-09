@@ -7,6 +7,7 @@ import { CONVERSATION_FAKE, CONVERSATION_STATES } from '@/modules/station/fake/c
 import { CORNER_FAKE, CORNER_STATES } from '@/modules/station/fake/corner';
 import { DOCK_FAKE, DOCK_STATES } from '@/modules/station/fake/dock';
 import { HEAD_FAKE, HEAD_STATES } from '@/modules/station/fake/head';
+import { LIVE_FAKE } from '@/modules/station/fake/live';
 import { NEEDS_FAKE, NEEDS_STATES } from '@/modules/station/fake/needs';
 import { PORTRAIT_STATES } from '@/modules/station/fake/portrait';
 import { HOME_CHAT_STAGE, HOME_FOCUS, ROADMAP_PICTURES, SESSIONS_FAKE, SESSIONS_STATES } from '@/modules/station/fake/sessions';
@@ -74,6 +75,7 @@ type StationStageDrawing = StationDrawing & { canGoBack: boolean; shelf: Station
  */
 const REGION_FAKES: Partial<Record<StationSlot, Record<StationPicture, StationDrawing | null>>> = {
   strip: STRIP_FAKE,
+  live: LIVE_FAKE,
   corner: CORNER_FAKE,
   needs: NEEDS_FAKE,
   sessions: SESSIONS_FAKE,

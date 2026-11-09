@@ -99,6 +99,7 @@
  * `.vv-dialog__backdrop`'s are: no token names either, and a light-ink wash would turn dark mode's
  * scrim into a glow. */
 @keyframes vv-sheet-in { from { transform: translateX(110%); } }
+@keyframes vv-sheet-in-left { from { transform: translateX(-110%); } }
 @keyframes vv-sheet-scrim { from { opacity: 0; } }
 
 .vv-sheet__scrim { background: rgba(16, 17, 22, 0.28); }
@@ -108,9 +109,16 @@
   border-left: 1px solid var(--border);
   box-shadow: -16px 0 44px rgba(32, 26, 20, 0.12);
 }
+/* Pinned left (`side: 'left'`): the hairline and the shadow on the panel's open side, and it slides in from the left. */
+.vv-sheet__panel[data-side='left'] {
+  border-left: 0;
+  border-right: 1px solid var(--border);
+  box-shadow: 16px 0 44px rgba(32, 26, 20, 0.12);
+}
 @media screen and (prefers-reduced-motion: no-preference) {
   .vv-sheet__scrim { animation: vv-sheet-scrim 0.4s ease backwards; }
   .vv-sheet__panel { animation: vv-sheet-in 0.5s var(--ease-enter) backwards; }
+  .vv-sheet__panel[data-side='left'] { animation-name: vv-sheet-in-left; }
 }
 
 .vv-sheet__head { padding: 16px 20px; border-bottom: 1px solid var(--border); }
@@ -142,6 +150,7 @@
 }
 .vv-sheet__close:hover { background: var(--border); }
 .vv-sheet__body { padding: 18px 20px; }
+.vv-sheet__body[data-flush] { padding: 0; }
 .vv-sheet__foot { padding: 14px 20px; border-top: 1px solid var(--border); }
 
 /* ---------------------------------------------------------------- Timeline */

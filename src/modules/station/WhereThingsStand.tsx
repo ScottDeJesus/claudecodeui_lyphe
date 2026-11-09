@@ -1,14 +1,12 @@
-import type { TFunction } from 'i18next';
-import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCompanion } from '@/modules/companion';
 import { useRoadmap } from '@/modules/roadmap';
 import { useStation, useStationPref } from '@/modules/station/context/StationContext';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
+import { herMarkOf } from '@/modules/station/herMark';
 import { RoadmapRows } from '@/modules/station/RoadmapRows';
 import { SessionRows } from '@/modules/station/SessionRows';
-import type { CompanionActivity, CompanionPhase } from '@/shared/companion-types';
 import type { Roadmap } from '@/shared/roadmap-types';
 import type { StationFocus, StationSession } from '@/shared/station-types';
 import type { StationDensity, StationHerMark, StationRegionProps, StationTier } from '@/shared/types';
@@ -53,13 +51,12 @@ type WhereThingsStandViewProps = {
  * Its sections draw every state of their own: `SessionRows` (reading, failed, no sessions, nothing running, the rows and the asleep
  * fold, her mark) and `RoadmapRows` (reading, no roadmap, nothing open, the open epics and their features, the complete fold).
  *
- * THE HEAD (full density): "Where things stand" in the title face the right rail's "What needs you" wears (a bordered header over
- * a serif heading, the same height, so the two rails' hairlines meet across the page), over the Sessions and Roadmap eyebrows; the
- * scroller is the region the heading names (`aria-labelledby`).
+ * NO HEAD OF ITS OWN: wherever it is drawn something else names it — the scene's sheet "Where things stand" (full density, one
+ * call away from the bar), the one-column arrangement's section switch (compact) — so the scroller carries the name as its
+ * `aria-label` and the Sessions and Roadmap eyebrows lead.
  *
- * AT COMPACT DENSITY (the one-column arrangement's "Where things stand") no head is drawn: the section switch names the rail, and the
- * scroller carries the name as its `aria-label`. Each chat and each feature is one line, the epics and the two folds as in full,
- * the two sections closer together; the rail's one scroller fills the section it is given.
+ * AT COMPACT DENSITY each chat and each feature is one line, the epics and the two folds as in full, the two sections closer
+ * together; the rail's one scroller fills the section it is given.
  *
  * ONE SCROLLER, NOT TWO: the rail is one scroller, remembered under `sessions`, with the sessions over the roadmap. Beside the
  * corner the rail's column is 380–780 px tall, and two scrollers would split that between a list of chats and twenty-odd
@@ -72,23 +69,14 @@ export function WhereThingsStandView({
   tier, density, sessions, failure, onReread, roadmap, focus, her, asleepOpen, onAsleepOpen, completeOpen, onCompleteOpen, onPress, scrollRef,
 }: WhereThingsStandViewProps) {
   const { t } = useTranslation();
-  const headId = useId();
   const compact = density === 'compact';
   const name = t('station.rail.name', { defaultValue: 'Where things stand' });
   return (
     <>
-      {!compact && (
-        // The right rail's head, face for face (`WhatNeedsYouView`): the same box, the same breakpoint's padding and the same 26 px
-        // line, so the two rails' hairlines meet across the page.
-        <header className="shrink-0 border-b border-border px-3 py-3 min-[1360px]:px-4">
-          <h2 id={headId} className="flex min-h-[1.625rem] min-w-0 items-center font-serif text-lg font-normal leading-tight text-foreground">{name}</h2>
-        </header>
-      )}
       <ScrollArea
         ref={scrollRef}
         role="region"
-        aria-label={compact ? name : undefined}
-        aria-labelledby={compact ? undefined : headId}
+        aria-label={name}
         data-station-rail=""
         className="min-h-0 flex-1"
       >
@@ -118,28 +106,6 @@ export function WhereThingsStandView({
       </ScrollArea>
     </>
   );
-}
-
-/** The phases in which her activity names a chat she is looking at, each with its words; in every other phase she draws no mark. */
-const HER_WORDS: Partial<Record<CompanionPhase, { key: string; english: string }>> = {
-  reading_session: { key: 'station.sessions.her.reading', english: '{{name}} is reading {{chat}}' },
-  drafting: { key: 'station.sessions.her.drafting', english: '{{name}} is drafting for {{chat}}' },
-  walking: { key: 'station.sessions.her.walking', english: '{{name}} is walking {{chat}}' },
-};
-
-/**
- * Her mark, from her activity: the chat it names, her initial (her name's first letter, as her disc draws it) and her words, the
- * presence's own verbs ("reading", "drafting for", "walking") with the chat named. Null when she looks at no chat: an idle or
- * thinking turn, a read of code, a draft for a chat not yet started.
- */
-function herMarkOf(t: TFunction, activity: CompanionActivity | null, name: string): StationHerMark | null {
-  const words = activity === null ? undefined : HER_WORDS[activity.phase];
-  if (activity === null || activity.session === null || words === undefined) return null;
-  return {
-    sessionId: activity.session.sessionId,
-    initial: Array.from(name)[0]?.toUpperCase() ?? '',
-    words: t(words.key, { name, chat: activity.session.name, defaultValue: words.english }),
-  };
 }
 
 /**

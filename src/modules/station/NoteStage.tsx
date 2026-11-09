@@ -148,13 +148,13 @@ export function NoteStageView({ focus, note, readFailed = null, pageHref, onPin,
     if (readFailed !== null) {
       return (
         <div data-station-note="failed">
-          <StageReadFailed kind="note" title={t('station.cards.readFailed', { defaultValue: 'Her cards could not be read just now.' })} onRetry={readFailed.onRetry} />
+          <StageReadFailed kind="note" title={t('station.cards.readFailed', { defaultValue: 'The cards could not be read just now.' })} onRetry={readFailed.onRetry} />
         </div>
       );
     }
     return (
       <div data-station-note="reading" className="grid place-items-center py-10">
-        <Spinner size={32} label={t('station.cards.reading', { defaultValue: 'Reading her cards…' })} />
+        <Spinner size={32} label={t('station.cards.reading', { defaultValue: 'Reading the cards…' })} />
       </div>
     );
   }

@@ -1,5 +1,5 @@
-import { Inbox } from 'lucide-react';
-import { useId } from 'react';
+import { ChevronDown, Inbox } from 'lucide-react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionActionCard, useCompanion } from '@/modules/companion';
@@ -28,6 +28,9 @@ const FAULT_LINES: Readonly<Record<StationNeed['kind'], LocaleWords>> = {
   check: { key: 'station.needs.fault.check', english: 'Couldn’t read the checks just now' },
 };
 
+/** The most items the scene's end rim shows at once (Astrolabe's rim budget); the rest are one press away, "<n> more". */
+const RIM_BUDGET = 3;
+
 /**
  * Where an item's press puts it: its whole on the stage, never fired from here. An Accept and a round go to their card (the
  * dispatcher's own `PlanCard`, its lock or round form: the one answer form, MAN-7400), named by its title; a chat's ask to
@@ -49,11 +52,11 @@ function focusOf(need: StationNeed): StationFocus {
 
 type WhatNeedsYouViewProps = {
   /**
-   * `compact`: each item on one line, her action card unchanged. At either density the rail fills the room it is given (a
-   * column, or compact's section) and scrolls inside itself.
+   * `full` (the scene's end rim): at most three items at once, the rest behind "<n> more". `compact`: each item on one line, every
+   * item drawn, the action card unchanged. At either density the rail fills the room it is given and scrolls inside itself.
    */
   density: StationDensity;
-  /** The one action waiting for his word, as her picture holds it; null when none stands. */
+  /** The one action waiting for your word, as the companion's picture holds it; null when none stands. */
   pending: CompanionPendingAction | null;
   /** Everything that needs him, in the order the server answers; null until the first read answers. */
   needs: StationNeed[] | null;
@@ -97,6 +100,13 @@ type WhatNeedsYouViewProps = {
  *   line back with no word from the page;
  * - each kind whose read failed, as a warn line under the rest ("▲ Couldn’t read the permissions just now").
  *
+ * QUIET UNTIL IT'S TRUE: it marks itself true (`data-station-true`) while anything here asks for you — an item, the action card, a
+ * failed read, a kind that could not be read — so the scene's end rim opens as the first arrives and settles shut when the last is
+ * answered. Before the first read it is not true: the rim waits, and nothing reads "Reading…" at you.
+ *
+ * THE BUDGET, at full density: at most three items at once, the one on the stage kept among them, and under them "<n> more", which
+ * draws the rest in place (the rim scrolls). The head's count is every item's.
+ *
  * NOTHING FIRES FROM HERE. An item's press puts its whole on the stage, where the owner's own form fires it: the census
  * whole on the dispatcher's card, the command whole on the ask's stage.
  *
@@ -118,6 +128,13 @@ export function WhatNeedsYouView({
   const current = focus === null ? null : focusKey(focus);
   const livePending = useLivePending(pending);
   const count = needsCountOf(needs, livePending);
+  // Whether "<n> more" has been pressed: every item drawn, past the rim's budget. The view's own and never stored, so the rim opens
+  // on its three again next time.
+  const [allShown, setAllShown] = useState(false);
+  const budgeted = !compact && !allShown;
+  const shown = needs === null ? [] : needs.filter((need, at) => !budgeted || at < RIM_BUDGET || focusKey(focusOf(need)) === current);
+  const more = needs === null ? 0 : needs.length - shown.length;
+  const isTrue = (count !== null && count > 0) || failure !== null || faults.length > 0;
 
   const body = (
     <div
@@ -151,12 +168,16 @@ export function WhatNeedsYouView({
           </div>
         )
       ) : needs.length === 0 ? (
-        <div data-station-needs-empty="" className="py-2">
-          <EmptyState icon={Inbox} title={t('station.needs.empty', 'Nothing needs you.')} />
-        </div>
+        // In the scene's rim nothing stands for "nothing": the rim is open only for what is true (the action card, a failed read),
+        // and settles shut without it. The one-column section always stands, so there it says so.
+        compact && (
+          <div data-station-needs-empty="" className="py-2">
+            <EmptyState icon={Inbox} title={t('station.needs.empty', 'Nothing needs you.')} />
+          </div>
+        )
       ) : (
         <ul aria-labelledby={headId} className={cn('flex min-w-0 flex-col', compact ? 'gap-2' : 'gap-2.5')}>
-          {needs.map((need) => {
+          {shown.map((need) => {
             const target = focusOf(need);
             return (
               <NeedItem
@@ -172,6 +193,13 @@ export function WhatNeedsYouView({
         </ul>
       )}
 
+      {more > 0 && (
+        <Button variant="ghost" size="sm" data-station-needs-more="" className="self-start text-muted-foreground finger:h-11" onClick={() => setAllShown(true)}>
+          {t('station.needs.more', { count: more, defaultValue_one: '{{count}} more', defaultValue_other: '{{count}} more' })}
+          <ChevronDown aria-hidden="true" />
+        </Button>
+      )}
+
       {[...new Set(faults.map((kind) => FAULT_LINES[kind]))].map((line) => (
         <p key={line.key} data-station-needs-fault="" data-tone="warn" className="flex items-start gap-1.5 text-xs leading-snug text-tone-ink">
           <span aria-hidden="true">▲</span>
@@ -184,6 +212,7 @@ export function WhatNeedsYouView({
   return (
     <section
       data-station-needs={needs === null ? 'reading' : needs.length}
+      data-station-true={isTrue ? '' : undefined}
       aria-labelledby={headId}
       className="flex min-h-0 min-w-0 flex-1 flex-col"
     >

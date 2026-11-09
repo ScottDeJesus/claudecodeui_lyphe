@@ -71,7 +71,11 @@ type StationTalkText = {
   setFiles: Dispatch<SetStateAction<File[]>>;
 };
 
+/** "Where things stand" over the scene: whether its sheet is open, and the press that opens or shuts it. */
+type StationWhere = { open: boolean; setOpen: (open: boolean) => void };
+
 const StationContext = createStableContext<StationContextValue | null>(import.meta.hot, 'StationContext', null);
+const StationWhereContext = createStableContext<StationWhere | null>(import.meta.hot, 'StationWhereContext', null);
 const StationPrefsContext = createStableContext<StationPrefs | null>(import.meta.hot, 'StationPrefsContext', null);
 const StationTalkTextContext = createStableContext<StationTalkText | null>(import.meta.hot, 'StationTalkTextContext', null);
 
@@ -83,6 +87,17 @@ const StationTalkTextContext = createStableContext<StationTalkText | null>(impor
 export function useStation(): StationContextValue {
   const context = useContext(StationContext);
   if (!context) throw new Error('useStation must be used within a StationProvider');
+  return context;
+}
+
+/**
+ * "Where things stand" over the scene: whether its sheet is open (`open`) and the press that opens or shuts it (`setOpen`). Read by
+ * `StationShell`, which draws the sheet and the bar's press, and by the start rim (`LiveSessions`), whose "more" opens it. Put
+ * anything on the stage and it shuts. Its own context, so opening it draws nothing but its readers.
+ */
+export function useStationWhere(): StationWhere {
+  const context = useContext(StationWhereContext);
+  if (!context) throw new Error('useStationWhere must be used within a StationProvider');
   return context;
 }
 
@@ -158,6 +173,10 @@ export function StationProvider({ children }: { children: ReactNode }) {
   // The files he has attached to those words and not sent: held beside them for the same reason (the Compact switch's new tree starts a new
   // box), and in memory only because a browser `File` cannot be stored.
   const [talkFiles, setTalkFiles] = useState<File[]>([]);
+  // Whether "Where things stand" stands open over the scene (the sheet the bar's press and the start rim's "more" open). State,
+  // because the sheet draws from it; memory only, so a reload starts with it shut. Anything put on the stage shuts it (`setFocus`),
+  // so a row pressed in it is seen at once.
+  const [whereOpen, setWhereOpen] = useState(false);
 
   // The stage as the last press left it: the truth `setFocus` and `back` decide from, so they never decide from a render
   // that predates the previous press.
@@ -179,6 +198,7 @@ export function StationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setFocus = useCallback((next: StationFocus | null) => {
+    setWhereOpen(false);
     const held = stageRef.current;
     const same = next === null ? held.focus === null : held.focus !== null && focusKey(held.focus) === focusKey(next);
     if (same) {
@@ -241,6 +261,7 @@ export function StationProvider({ children }: { children: ReactNode }) {
     [stage, setFocus, restaged, back, tier, phone, sideways, scrollMemory],
   );
   const prefsValue = useMemo<StationPrefs>(() => ({ prefs, setPref }), [prefs, setPref]);
+  const whereValue = useMemo<StationWhere>(() => ({ open: whereOpen, setOpen: setWhereOpen }), [whereOpen]);
   const talkTextValue = useMemo<StationTalkText>(
     () => ({ text: talkText, setText: setTalkText, files: talkFiles, setFiles: setTalkFiles }),
     [talkText, talkFiles],
@@ -249,7 +270,9 @@ export function StationProvider({ children }: { children: ReactNode }) {
   return (
     <StationContext.Provider value={value}>
       <StationPrefsContext.Provider value={prefsValue}>
-        <StationTalkTextContext.Provider value={talkTextValue}>{children}</StationTalkTextContext.Provider>
+        <StationWhereContext.Provider value={whereValue}>
+          <StationTalkTextContext.Provider value={talkTextValue}>{children}</StationTalkTextContext.Provider>
+        </StationWhereContext.Provider>
       </StationPrefsContext.Provider>
     </StationContext.Provider>
   );

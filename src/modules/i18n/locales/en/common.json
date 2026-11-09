@@ -3301,9 +3301,9 @@
       "resize": "Resize {{name}}'s panel"
     },
     "status": {
-      "asleep": "Asleep · your next message wakes her",
+      "asleep": "Asleep · wakes on your next message",
       "waking": "Waking up",
-      "failed": "Stopped · your next message starts her again",
+      "failed": "Stopped · starts again on your next message",
       "idle": "Idle",
       "thinking": "Thinking",
       "readingSession": "Reading <subject/>",
@@ -3343,18 +3343,18 @@
     },
     "focus": "Focus",
     "model": "Model",
-    "modelRefused": "Her model wasn't changed",
+    "modelRefused": "The model wasn't changed",
     "live": "Live",
-    "liveHint": "On: she hears the house's alerts and speaks up without being asked.",
+    "liveHint": "On: hears the house's alerts and speaks up without being asked.",
     "liveOnRefused": "Live wasn't turned on",
     "liveOffRefused": "Live wasn't turned off",
     "stop": "Stop",
     "stopHint": "Stop {{name}}'s answer",
-    "stopRefused": "Her answer didn't stop",
+    "stopRefused": "The answer didn't stop",
     "clear": "Clear",
     "clearLabel": "Clear {{name}}'s conversation",
     "clearTitle": "Clear {{name}}'s conversation?",
-    "clearMessage": "She forgets this conversation, her unpinned cards, the draft and the walkthrough, and starts fresh. Your pinned cards stay, and so does what she keeps in her memory; briefs she already sent stay in their chats.",
+    "clearMessage": "Forgets this conversation, the unpinned cards, the draft and the walkthrough, and starts fresh. Your pinned cards stay, and so does what is kept in memory; briefs already sent stay in their chats.",
     "clearConfirm": "Clear the conversation",
     "clearRefused": "{{name}}'s conversation wasn't cleared",
     "cancel": "Cancel",
@@ -3369,7 +3369,7 @@
       "nothingHeard": "Nothing heard",
       "newest": "Newest",
       "emptyTitle": "Nothing said yet",
-      "emptyMessage": "Type to {{name}} below. She keeps track of every chat you're running, drafts what to tell one, and sends only on your word."
+      "emptyMessage": "Type to {{name}} below. {{name}} keeps track of every chat you're running, drafts what to tell one, and sends only on your word."
     },
     "attachments": {
       "strip": "You attached"
@@ -3417,7 +3417,7 @@
       "clearConfirm": "Clear the draft",
       "clearRefused": "The draft wasn't cleared",
       "theirsChanged": "{{name}} changed the draft while you were editing.",
-      "useTheirs": "Use hers",
+      "useTheirs": "Use {{name}}’s",
       "sendRefused": "Not sent: {{reason}}",
       "sendRefusedPlain": "Not sent. Try again.",
       "saveRefused": "Your edit wasn't saved: {{reason}}",
@@ -3488,13 +3488,13 @@
       "label": "Voice on this device"
     },
     "ears": {
-      "label": "Listen for her name on this device",
+      "label": "Listen for the wake word on this device",
       "waiting": "Listening for {{name}}",
-      "readying": "Getting her ears ready",
-      "needsTouch": "Touch the page to let her listen",
-      "elsewhere": "She listens on the page you last talked to her from",
+      "readying": "Getting ready to listen",
+      "needsTouch": "Touch the page to start listening",
+      "elsewhere": "Listening on the page you last talked from",
       "hearing": "Listening",
-      "unavailable": "She can't listen on this page"
+      "unavailable": "Can't listen on this page"
     },
     "door": {
       "label": "{{name}}"
@@ -3520,8 +3520,8 @@
       "openCard": "Open {{kind}} {{title}} on the stage"
     },
     "head": {
-      "controls": "Her controls",
-      "menu": "Her controls and CloudCLI",
+      "controls": "Controls",
+      "menu": "Controls and CloudCLI",
       "showChat": "Show chat",
       "showPortrait": "Show portrait"
     },
@@ -3569,7 +3569,7 @@
       "clear": "Clear the stage",
       "empty": {
         "title": "Nothing on the stage",
-        "message": "Press anything, or ask her to show you something."
+        "message": "Press anything, or ask to see something."
       }
     },
     "card": {
@@ -3579,6 +3579,15 @@
       "page": "A page in DocSpace",
       "block": "One block of a page in DocSpace",
       "open": "Open in DocSpace"
+    },
+    "live": {
+      "title": "What’s running",
+      "more_one": "{{count}} more running",
+      "more_other": "{{count}} more running"
+    },
+    "where": {
+      "title": "Where things stand",
+      "open": "Where things stand"
     },
     "rail": {
       "name": "Where things stand"
@@ -3627,8 +3636,8 @@
       "say": "Say “What is {{name}} doing?”"
     },
     "cards": {
-      "reading": "Reading her cards…",
-      "readFailed": "Her cards could not be read just now.",
+      "reading": "Reading the cards…",
+      "readFailed": "The cards could not be read just now.",
       "retry": "Try again",
       "pin": "Pin",
       "unpin": "Unpin",
@@ -3645,8 +3654,8 @@
       "walk": {
         "refused": "The walkthrough did not move",
         "endRefused": "The walkthrough did not end",
-        "reading": "Reading her walkthrough…",
-        "readFailed": "Her walkthrough could not be read just now.",
+        "reading": "Reading the walkthrough…",
+        "readFailed": "The walkthrough could not be read just now.",
         "label": "The walkthrough of {{name}}",
         "place": "Item {{at}} of {{total}}",
         "notBegun": "Not begun",
@@ -3663,7 +3672,7 @@
         "end": "End the walkthrough"
       },
       "shelf": {
-        "label": "Her cards",
+        "label": "Cards",
         "pinnedWord": ", pinned",
         "more": "+{{count}} more in the conversation"
       }
@@ -3679,6 +3688,8 @@
     },
     "needs": {
       "title": "What needs you",
+      "more_one": "{{count}} more",
+      "more_other": "{{count}} more",
       "reading": "Reading what needs you…",
       "empty": "Nothing needs you.",
       "retry": "Try again",
@@ -3778,6 +3789,7 @@
       "rule": "You last looked",
       "nothingNew": "Nothing new since you last looked",
       "nothingNewShort": "Nothing new",
+      "week": "This week",
       "quiet": "Nothing has landed this week",
       "loading": "Reading what landed…",
       "failed": "Couldn’t read what landed",
@@ -3789,7 +3801,7 @@
     },
     "dock": {
       "label": "{{name}}’s draft",
-      "empty": "When she drafts a brief for a session, it waits here for your Send."
+      "empty": "When {{name}} drafts a brief for a session, it waits here for your Send."
     },
     "memory": {
       "title": "What I'm keeping",
@@ -3814,15 +3826,15 @@
       "youTyped": "You typed",
       "quoted": "“{{quote}}”",
       "noWords": "No words of yours are kept with this one.",
-      "reading": "Reading her memory…",
-      "unreadable": "Her memory can't be read just now",
+      "reading": "Reading the memory…",
+      "unreadable": "The memory can't be read just now",
       "retry": "Try again",
       "empty": {
         "title": "Nothing kept yet",
-        "message": "What she keeps of what you say shows here."
+        "message": "What is kept of what you say shows here."
       },
       "page": "Open the full page",
-      "pageLabel": "Open the full page: her memory in DocSpace, in a new tab"
+      "pageLabel": "Open the full page: the memory in DocSpace, in a new tab"
     }
   }
 }

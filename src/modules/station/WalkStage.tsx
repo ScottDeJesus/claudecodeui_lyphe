@@ -85,13 +85,13 @@ export function WalkStageView({ walk, readFailed = null, sessionName, onBack, on
     if (readFailed !== null) {
       return (
         <div data-station-walk="failed">
-          <StageReadFailed kind="walk" title={t('station.cards.walk.readFailed', { defaultValue: 'Her walkthrough could not be read just now.' })} onRetry={readFailed.onRetry} />
+          <StageReadFailed kind="walk" title={t('station.cards.walk.readFailed', { defaultValue: 'The walkthrough could not be read just now.' })} onRetry={readFailed.onRetry} />
         </div>
       );
     }
     return (
       <div data-station-walk="reading" className="grid place-items-center py-10">
-        <Spinner size={32} label={t('station.cards.walk.reading', { defaultValue: 'Reading her walkthrough…' })} />
+        <Spinner size={32} label={t('station.cards.walk.reading', { defaultValue: 'Reading the walkthrough…' })} />
       </div>
     );
   }

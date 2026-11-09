@@ -143,7 +143,7 @@ export function MemoryCornerView({
   if (state === 'reading') {
     body = (
       <div className="flex justify-center py-4">
-        <Spinner size={20} label={t('station.memory.reading', { defaultValue: 'Reading her memory…' })} />
+        <Spinner size={20} label={t('station.memory.reading', { defaultValue: 'Reading the memory…' })} />
       </div>
     );
   } else if (state === 'unreadable') {
@@ -167,7 +167,7 @@ export function MemoryCornerView({
       <EmptyState
         icon={Bookmark}
         title={t('station.memory.empty.title', { defaultValue: 'Nothing kept yet' })}
-        message={t('station.memory.empty.message', { defaultValue: 'What she keeps of what you say shows here.' })}
+        message={t('station.memory.empty.message', { defaultValue: 'What is kept of what you say shows here.' })}
       />
     );
   } else {
@@ -213,7 +213,7 @@ export function MemoryCornerView({
                 target="_blank"
                 rel="noopener noreferrer"
                 data-station-corner-page=""
-                aria-label={t('station.memory.pageLabel', { defaultValue: 'Open the full page: her memory in DocSpace, in a new tab' })}
+                aria-label={t('station.memory.pageLabel', { defaultValue: 'Open the full page: the memory in DocSpace, in a new tab' })}
                 className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'self-start px-2.5 text-accent-ink', TOUCH_PRESS)}
               >
                 {t('station.memory.page', { defaultValue: 'Open the full page' })}

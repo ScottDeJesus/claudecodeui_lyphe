@@ -1,9 +1,9 @@
+import { LayoutList } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import type { StationCompactSwitch } from '@/shared/types';
 import { AppLogo, Button, Switch } from '@/shared/ui';
-import { cn } from '@/shared/utils';
 
 type StationBarProps = {
   /** The `strip` slot's region, drawn across the bar's middle; nothing while no region fills it, and nothing in compact. */
@@ -12,14 +12,20 @@ type StationBarProps = {
   compactSwitch: StationCompactSwitch | null;
   /** The press on "CloudCLI", the way back to the workspace (`StationShell` binds it). */
   onBackToCloudcli: () => void;
+  /**
+   * "Where things stand": every chat, the roadmap and the companion's memory, opened over the scene. Null where the arrangement
+   * holds them itself (compact's section), and no press is drawn.
+   */
+  onWhere: (() => void) | null;
 };
 
 /**
  * THE STATION'S BAR, across the top of every arrangement but the phone's (its top row is her head, `HeadRow`, and holds the bar's
  * place): "Kaylee Station" in the app's display serif at the title weight the Settings page uses (Verve's `--font-display`: italic for emphasis, never
  * bold), its second word in the emphasis ink Verve spells for warm text (`warn-ink`, which reads at AA on either canvas where `garnish` is
- * a shape's colour and reads 3:1 on the light one); the `strip` slot across its middle; and at its right his "Compact" switch, then "CloudCLI" with the
- * app's own mark, the way back to the workspace.
+ * a shape's colour and reads 3:1 on the light one); the `strip` slot across its middle, there only while it has something to say
+ * (`stationScene.css`); and at its right "Where things stand" (in the scene: everything that is not happening now, one press
+ * away), your "Compact" switch, then "CloudCLI" with the app's own mark, the way back to the workspace.
  *
  * The title is the page's one `h1`. In compact (below 1024 px, and wherever his switch is on) the strip is a row of the
  * arrangement's own, under her head, and the bar holds none.
@@ -33,7 +39,7 @@ type StationBarProps = {
  *
  * A pure view: the presses are the caller's. Drawn by `StationShellView` (this module), above the body of every arrangement.
  */
-export function StationBar({ strip, compactSwitch, onBackToCloudcli }: StationBarProps) {
+export function StationBar({ strip, compactSwitch, onBackToCloudcli, onWhere }: StationBarProps) {
   const { t } = useTranslation();
   // A slot with no region draws nothing: no strip box, so the way back alone holds the right.
   const hasStrip = strip !== undefined && strip !== null && strip !== false;
@@ -57,27 +63,35 @@ export function StationBar({ strip, compactSwitch, onBackToCloudcli }: StationBa
           {strip}
         </div>
       )}
-      {compactSwitch !== null && (
-        // The switch carries the name; the word beside it is for the eye. The kit's 30 px switch gets the label's 44 px catch.
-        <label
-          data-station-compact-toggle={compactSwitch.on ? 'on' : 'off'}
-          className="ml-auto flex shrink-0 cursor-pointer items-center gap-2 finger:min-h-11"
+      <div className="ml-auto flex shrink-0 items-center gap-x-4">
+        {onWhere !== null && (
+          <Button variant="outline" size="sm" data-station-where="" className="shrink-0 finger:h-11" onClick={onWhere}>
+            <LayoutList aria-hidden="true" />
+            {t('station.where.open', { defaultValue: 'Where things stand' })}
+          </Button>
+        )}
+        {compactSwitch !== null && (
+          // The switch carries the name; the word beside it is for the eye. The kit's 30 px switch gets the label's 44 px catch.
+          <label
+            data-station-compact-toggle={compactSwitch.on ? 'on' : 'off'}
+            className="flex shrink-0 cursor-pointer items-center gap-2 finger:min-h-11"
+          >
+            <span aria-hidden="true" className="text-sm font-medium text-foreground">{compactLabel}</span>
+            <Switch checked={compactSwitch.on} label={compactLabel} onChange={compactSwitch.onChange} />
+          </label>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          data-station-back-to-cloudcli=""
+          aria-label={t('station.bar.backLabel', { defaultValue: 'Back to CloudCLI' })}
+          className="shrink-0 finger:h-11"
+          onClick={onBackToCloudcli}
         >
-          <span aria-hidden="true" className="text-sm font-medium text-foreground">{compactLabel}</span>
-          <Switch checked={compactSwitch.on} label={compactLabel} onChange={compactSwitch.onChange} />
-        </label>
-      )}
-      <Button
-        variant="outline"
-        size="sm"
-        data-station-back-to-cloudcli=""
-        aria-label={t('station.bar.backLabel', { defaultValue: 'Back to CloudCLI' })}
-        className={cn('shrink-0 finger:h-11', compactSwitch === null && 'ml-auto')}
-        onClick={onBackToCloudcli}
-      >
-        <AppLogo size={64} className="size-4 rounded-[25%]" />
-        {t('station.bar.back', { defaultValue: 'CloudCLI' })}
-      </Button>
+          <AppLogo size={64} className="size-4 rounded-[25%]" />
+          {t('station.bar.back', { defaultValue: 'CloudCLI' })}
+        </Button>
+      </div>
     </header>
   );
 }

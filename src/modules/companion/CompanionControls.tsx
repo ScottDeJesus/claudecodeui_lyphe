@@ -1,9 +1,9 @@
-import { Square } from 'lucide-react';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionEarsSwitch } from '@/modules/companion/CompanionEarsSwitch';
+import { CompanionStopButton } from '@/modules/companion/CompanionStopButton';
 import { CompanionVoiceSwitch } from '@/modules/companion/CompanionVoiceSwitch';
 import { errorMessage } from '@/shared/api';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
@@ -45,8 +45,13 @@ type CompanionControlsProps = {
   | {
       /** `line` is the station's: every control in one line, Stop first, wrapping where the line runs out of width. */
       layout: 'line';
-      /** Where the line's controls stand in its box: `start` (the default) under words that start there, `center` under her face centred over hers (the station's wide head). */
+      /** Where the line's controls stand in its box: `start` (the default) under words that start there, `center` under a face centred over them. */
       align?: 'start' | 'center';
+      /**
+       * The caller draws Stop itself (`CompanionStopButton`), where it can be pressed without opening anything: the station's
+       * dock, whose line stands behind a press. The line then draws no Stop of its own.
+       */
+      stopOutside?: boolean;
     }
 );
 
@@ -93,8 +98,6 @@ export function CompanionControls(props: CompanionControlsProps) {
   const [confirmingClear, setConfirmingClear] = useState(false);
   // Clear's answer is out: the dialog's confirm is busy, and a second press is refused rather than sent twice.
   const [clearing, setClearing] = useState(false);
-  // Stop is out: the button is busy until her turn has stopped or the stop is refused.
-  const [stopping, setStopping] = useState(false);
 
   const ready = picture !== null;
   const model = pendingModel ?? picture?.settings.model ?? null;
@@ -118,13 +121,6 @@ export function CompanionControls(props: CompanionControlsProps) {
       .finally(() => setPendingLive(null));
   };
 
-  const stop = () => {
-    setStopping(true);
-    onInterrupt()
-      .catch((error: unknown) => refused(t('companion.stopRefused'), error))
-      .finally(() => setStopping(false));
-  };
-
   const clear = () => {
     setClearing(true);
     onClear()
@@ -133,12 +129,7 @@ export function CompanionControls(props: CompanionControlsProps) {
       .finally(() => setClearing(false));
   };
 
-  const stopButton = (
-    <Button variant="outline" size="sm" busy={stopping} onClick={stop} className="shrink-0 finger:h-11" aria-label={t('companion.stopHint', { name })}>
-      <Square aria-hidden="true" className="fill-current" />
-      {t('companion.stop')}
-    </Button>
-  );
+  const stopButton = <CompanionStopButton name={name} onInterrupt={onInterrupt} />;
 
   const select = (
     <Select
@@ -207,7 +198,7 @@ export function CompanionControls(props: CompanionControlsProps) {
     return (
       <>
         <div data-companion-controls="line" className={cn('flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2', props.align === 'center' && 'justify-center')}>
-          {turnRunning && stopButton}
+          {turnRunning && !props.stopOutside && stopButton}
           {/* A fixed width, so the line does not move as he picks a model with a longer name. */}
           <div className="w-36 min-w-0">{select}</div>
           {liveSwitch}

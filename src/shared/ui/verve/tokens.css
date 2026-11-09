@@ -217,7 +217,27 @@
   --dur-quick:.2s;
   --dur-move:.35s;
   --dur-theme:.45s;
+  /* Astrolabe's two springs, sampled into `linear()` so CSS runs the real curve: LOCK (ω 2π·2.2, ζ .62) is how a thing that
+     became true arrives and how a choice locks, one 8% overshoot and settled; LOBE (ω 2π·2.3, ζ .36) is the livelier one, for a
+     bead or a mark that pops. What stops being true SETTLES: it accelerates away and never springs. A spring has no fixed
+     duration, so each comes with the time its curve was sampled over. */
+  --ease-lock:linear(0, 0.12 8%, 0.37 15%, 0.63 23%, 0.84 31%, 0.98 38%, 1.06 46%, 1.08 54%, 1.08 62%, 1.06 69%, 1.04 77%, 1.02 85%, 1 92%, 1);
+  --ease-lobe:linear(0, 0.25 6%, 0.73 13%, 1.13 19%, 1.29 25%, 1.25 31%, 1.11 38%, 0.98 44%, 0.92 50%, 0.92 56%, 0.96 63%, 1 69%, 1.02 75%, 1.03 81%, 1.02 88%, 1 94%, 1);
+  --ease-settle:cubic-bezier(.5,0,.9,.3);
+  --duration-fade:240ms;
+  --duration-lock:520ms;
+  --duration-lobe:880ms;
+  --duration-settle:360ms;
+  /* The places of a scene (the station's): a rim's width, and the companion's core at rest in the dock. */
+  --size-rim:300px;
+  --size-core-rest:56px;
 }
+/* ARRIVE, LIVE, SETTLE: what becomes true arrives from its place on the lock spring and what stops being true settles back
+   toward it. `--ast-from` is the place's offset (a rim's side, the dock below, the core's shrink); a scale from the middle by default. */
+@keyframes ast-arrive{from{opacity:0;transform:var(--ast-from,scale(.96))}to{opacity:1;transform:none}}
+@keyframes ast-settle{from{opacity:1;transform:none}to{opacity:0;transform:var(--ast-from,scale(.96))}}
+@keyframes ast-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes ast-fade-out{from{opacity:1}to{opacity:0}}
 @keyframes vv-rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
 @keyframes vv-pop{from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none}}
 @keyframes vv-fade{from{opacity:0}to{opacity:1}}

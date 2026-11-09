@@ -4,12 +4,12 @@ import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { resizeObserverIn } from '@/shared/utils';
 
 /**
- * The px a square box is drawn at, read off the box as the layout makes it, and the ref callback to put on it. Her face's box is
- * sized by CSS from her column (132 or 200 px by its height in her head, the room her portrait is given in the portrait view),
- * which only the layout knows; her initial, drawn where her face is not made yet, takes the px to fill it. `initialPx` stands
- * until the first reading. A ResizeObserver, so it follows the box: an event, never a poll.
+ * The px a square box is drawn at, read off the box as the layout makes it, and the ref callback to put on it. The companion's
+ * face is sized by CSS (the room the portrait is given in the scene's center), which only the layout knows; the drawing takes the
+ * px to fill it. `initialPx` stands until the first reading. A ResizeObserver, so it follows the box: an event, never a poll.
  *
- * Used by this module's StationHeadView (her face's disc) and StationPortraitView (her face, undisced).
+ * Used by this module's StationHeadView (the dock's core, the compact head's disc, the phone row's face) and StationPortraitView
+ * (the face, undisced, in the center).
  */
 export function useDrawnSquare(initialPx: number): [(node: HTMLDivElement | null) => void, number] {
   const hostWindow = useHostWindow();

@@ -4218,11 +4218,12 @@ export type ClaudeApiCardView = {
 export type StationTier = 'wide' | 'laptop' | 'narrow';
 
 /**
- * How the station's shell arranges its regions: `wide` (four columns), `laptop` (three), `compact` (one column under her head,
- * one switch between its sections) or `phone` (her head as the top row, the section in the middle, a bottom bar of the sections
- * round the talk control, for the thumb). Computed by `StationShell` from the window's `tier`, `useStation().phone` and his
- * `compact` switch: compact below 1024 px (the tier `narrow`) and wherever his switch is on. Drawn by `StationShellView`, which
- * draws the bar in every arrangement but the phone's.
+ * How the station's shell arranges its regions: `wide` and `laptop` (the scene: the companion or the stage in the center, a rim
+ * on either side that opens only while something in it is true, the dock across the foot; a laptop's rims are narrower),
+ * `compact` (one column under the companion's head, one switch between its sections) or `phone` (the head as the top row, the
+ * section in the middle, a bottom bar of the sections round the talk control, for the thumb). Computed by `StationShell` from the
+ * window's `tier`, `useStation().phone` and your `compact` switch: compact below 1024 px (the tier `narrow`) and wherever the
+ * switch is on. Drawn by `StationShellView`, which draws the bar in every arrangement but the phone's.
  */
 export type StationArrangement = 'wide' | 'laptop' | 'compact' | 'phone';
 
@@ -4234,10 +4235,11 @@ export type StationArrangement = 'wide' | 'laptop' | 'compact' | 'phone';
 export type StationCompactSwitch = { on: boolean; onChange: (on: boolean) => void };
 
 /**
- * The named places of the station's layout that a region fills: `strip`, `sessions`, `corner`, `head`, `conversation`, `dock`,
- * `talk` and `needs`. A slot nothing fills draws nothing. Keys the layout's slot map and the fixtures' slices.
+ * The named places of the station's layout that a region fills: `strip`, `live` (the chats running now: the scene's start rim),
+ * `sessions`, `corner`, `head`, `conversation`, `dock`, `talk` and `needs`. A slot nothing fills draws nothing. Keys the layout's
+ * slot map and the fixtures' slices.
  */
-export type StationSlot = 'strip' | 'sessions' | 'corner' | 'head' | 'conversation' | 'dock' | 'talk' | 'needs';
+export type StationSlot = 'strip' | 'live' | 'sessions' | 'corner' | 'head' | 'conversation' | 'dock' | 'talk' | 'needs';
 
 /**
  * Every place the station remembers a scroll position for: the slots and the `stage`. The key of the station's scroll

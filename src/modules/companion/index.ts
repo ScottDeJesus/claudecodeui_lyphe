@@ -32,6 +32,9 @@ export { CompanionFace } from '@/modules/companion/CompanionFace';
 export { CompanionStatus } from '@/modules/companion/CompanionStatus';
 // her controls (Stop, model, Live, Clear, this device's voice and ears): this module's panel header (CompanionHeader), and the station's head.
 export { CompanionControls } from '@/modules/companion/CompanionControls';
+// Stop alone, while a turn runs: this module's controls, and the station's dock, which shows it beside the companion's core while the
+// controls themselves stand behind a press.
+export { CompanionStopButton } from '@/modules/companion/CompanionStopButton';
 // her exchange with him: this module's panel (CompanionPanel), and the station's conversation.
 export { CompanionLog } from '@/modules/companion/CompanionLog';
 // keeps a scroller on its newest content while the reader is there: this module's log, and the station's portrait, whose words follow her answer as it streams.

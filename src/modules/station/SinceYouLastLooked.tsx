@@ -96,8 +96,9 @@ type SinceYouLastLookedViewProps = {
  * - THE TIMELINE (open, `LandedTimeline`): the week's landings oldest to newest, sideways under a finger, landed on the
  *   newest. The rule "You last looked" stands between the last landing he saw and the first he has not, so "since you
  *   last looked" is a place on the line and not only a colour; every landing after it wears the warm edge (`LandedEntry`).
- * - FOLDED: one line, the count, the newest landing as one line (its title, then its time), and the press that opens the
- *   week again: the bar's own height on a desk, the strip's 44 px line on a phone.
+ * - FOLDED (until you open it): one line, the count, the newest landing as one line (its title, then its time), and the press
+ *   that opens the week again: the bar's own height on a desk, the strip's 44 px line on a phone. In the scene's bar with nothing
+ *   new, the press alone: what you have seen does not stand in the bar.
  * - THE COUNT, at the line's head either way: "<n> new", a press that marks them all seen; a keyboard's focus then lands
  *   on the words that replace it. With nothing new, the words "Nothing new since you last looked" stand there instead
  *   (below 768 px, "Nothing new"), and the newest landing beside them says what last landed and when.
@@ -146,6 +147,9 @@ export function SinceYouLastLookedView({
 
   // What is drawn: the folded line while folded, and always at compact.
   const folded = collapsed || density === 'compact';
+  // Folded in the scene's bar with nothing new: the week is one press away and nothing else stands — no "Nothing new" (a
+  // non-event) and no newest landing (already seen). The words stay for a screen reader and the keyboard's focus.
+  const quietSeen = folded && density === 'full' && !countOnly && freshCount === 0;
   if (failure !== null) return <StripFailedLine failure={failure} onReread={onReread} countOnly={countOnly} />;
   if (landed === null) return <StripReadingLine folded={folded} countOnly={countOnly} />;
   if (newest === null) return <StripQuietLine />;
@@ -183,7 +187,7 @@ export function SinceYouLastLookedView({
       </Tooltip>
     </div>
   ) : (
-    <p ref={nothingNew} tabIndex={-1} data-strip-nothing-new="" className={cn('shrink-0 text-sm text-muted-foreground', countOnly && 'border-l border-border pl-2.5')}>
+    <p ref={nothingNew} tabIndex={-1} data-strip-nothing-new="" className={cn('shrink-0 text-sm text-muted-foreground', countOnly && 'border-l border-border pl-2.5', quietSeen && 'sr-only')}>
       <span className={cn('max-md:hidden', countOnly && 'hidden')}>{t('station.strip.nothingNew', { defaultValue: 'Nothing new since you last looked' })}</span>
       <span className={cn('md:hidden', countOnly && 'md:inline')}>{t('station.strip.nothingNewShort', { defaultValue: 'Nothing new' })}</span>
     </p>
@@ -192,7 +196,22 @@ export function SinceYouLastLookedView({
   const foldLabel = collapsed
     ? t('station.strip.expand', { defaultValue: 'Show the whole week' })
     : t('station.strip.collapse', { defaultValue: 'Show only the newest' });
-  const fold = (
+  // With nothing new in the scene's bar the fold is the strip's one press, so it says its word: "This week".
+  const fold = quietSeen ? (
+    <div className="ml-auto shrink-0">
+      <Button
+        variant="outline"
+        size="sm"
+        data-strip-fold="collapsed"
+        aria-label={foldLabel}
+        className="finger:h-11"
+        onClick={() => onCollapse(false)}
+      >
+        <UnfoldHorizontal aria-hidden="true" />
+        {t('station.strip.week', { defaultValue: 'This week' })}
+      </Button>
+    </div>
+  ) : (
     <div className="ml-auto shrink-0">
       <Tooltip content={foldLabel} position="bottom" showOnFocus>
         <Button
@@ -221,7 +240,7 @@ export function SinceYouLastLookedView({
     return (
       <StripLine state="folded" fresh={freshCount} below={countOnly ? null : below}>
         {lead}
-        {!countOnly && <div className="min-w-0 max-w-md">{entryOf(newest, entries.length - 1, { oneLine: true })}</div>}
+        {!countOnly && !quietSeen && <div className="min-w-0 max-w-md">{entryOf(newest, entries.length - 1, { oneLine: true })}</div>}
         {fold}
       </StripLine>
     );
@@ -265,14 +284,15 @@ type StripWeek = { open: boolean; onOpen: (open: boolean) => void };
  *
  * - THE LANDINGS AND HIS LAST LOOK are the provider's: a landing joins on the history's own write (`station_landed`), and the
  *   last look is written on his look-aways and on "<n> new" (`markSeen`). This binder starts no read and sets no timer.
- * - THE FOLD is the columns' pref `stripCollapsed`, per device, written by his press alone. Handed the compact arrangement's `week`,
+ * - THE FOLD is the scene's pref `stripCollapsed`, per device, folded until written by your press. Handed the compact arrangement's `week`,
  *   it is the week's: the line's fold opens it, the strip drawn open over the body (at full) shuts it; compact never writes the pref.
  * - A PRESS puts a shipped feature's or an epic's card, or a landing's chat, on the stage (`stageOf`), and shuts the `week`. It
  *   marks nothing seen: the look-aways and "<n> new" do. A recovered check never reaches here (the view opens its line in place).
  */
 export function SinceYouLastLooked({ density, week, countOnly }: StationRegionProps & { week?: StripWeek; countOnly?: boolean }) {
   const { landed, seenAt, markSeen, failure, reread } = useStationLanded();
-  const [collapsed, setCollapsed] = useStationPref('stripCollapsed', false);
+  // Folded until you open it: the week across the bar is one press away, and the bar stays quiet.
+  const [collapsed, setCollapsed] = useStationPref('stripCollapsed', true);
   const { setFocus, scrollMemory } = useStation();
   const { sessions } = useStationSessions();
   // The fold: the arrangement's week when it hands one, else the columns' pref, which compact never writes.

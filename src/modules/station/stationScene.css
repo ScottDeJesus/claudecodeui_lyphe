@@ -1,0 +1,101 @@
+/* THE STATION AS A SCENE: the motion and the places of the wide and laptop arrangements (`StationShellView`), and the
+ * arrival motion of `StationArrival`. Astrolabe's principle: quiet until it's true. At rest the screen is the companion and
+ * your work; a place takes room only while something in it is true, arrives on the lock spring, and settles away when it stops.
+ * Every rule here reads a data condition off what is drawn (a region's `data-station-true`, the stage's `data-station-stage`,
+ * a piece's `data-arrival`), never a mode. The springs and durations are the tokens' (`--ease-lock`, `--duration-settle` …). */
+
+/* ---------- arrival (StationArrival) ---------- */
+[data-arrival] { --ast-from: scale(0.96); }
+[data-arrival][data-from='rim-start'] { --ast-from: translateX(-20px); }
+[data-arrival][data-from='rim-end'] { --ast-from: translateX(20px); }
+[data-arrival][data-from='dock'] { --ast-from: translateY(16px); }
+[data-arrival][data-from='core'] { --ast-from: translateY(18px) scale(0.86); }
+[data-arrival='arriving'] { animation: ast-arrive var(--duration-lock) var(--ease-lock) both; }
+[data-arrival='arriving'][data-spring='lobe'] { animation-duration: var(--duration-lobe); animation-timing-function: var(--ease-lobe); }
+[data-arrival='settling'] { animation: ast-settle var(--duration-settle) var(--ease-settle) both; pointer-events: none; }
+
+/* ---------- the rims: what happened elsewhere (start) and what asks for you (end) ----------
+ * A rim is 0 wide and hidden until a region in it says it holds something true (`data-station-true`); then it opens to
+ * `--size-rim` on the lock spring and its body slides in from its own edge. When nothing in it is true any more it settles
+ * shut, and only then is it hidden, so nothing in a shut rim takes a Tab or a screen reader's attention. The body keeps the
+ * rim's full width while the rim opens and closes around it, so its words never reflow mid-motion. */
+[data-station-rim] {
+  display: flex;
+  flex: none;
+  width: 0;
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: width var(--duration-settle) var(--ease-settle), visibility 0s linear var(--duration-settle);
+}
+[data-station-rim='end'] { justify-content: flex-end; }
+[data-station-rim]:has([data-station-true]) {
+  width: var(--size-rim);
+  visibility: visible;
+  transition: width var(--duration-lock) var(--ease-lock), visibility 0s;
+}
+[data-station-rim-body] {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: var(--size-rim);
+  min-height: 0;
+  opacity: 0;
+  transform: translateX(var(--rim-from));
+  transition: opacity var(--duration-settle) var(--ease-settle), transform var(--duration-settle) var(--ease-settle);
+}
+[data-station-rim='start'] > [data-station-rim-body] { --rim-from: -20px; border-right: 1px solid var(--border); }
+[data-station-rim='end'] > [data-station-rim-body] { --rim-from: 20px; border-left: 1px solid var(--border); }
+[data-station-rim]:has([data-station-true]) > [data-station-rim-body] {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--duration-fade) ease, transform var(--duration-lock) var(--ease-lock);
+}
+/* A laptop gives each rim less, so the stage between two open rims still reads at a card's measure. */
+[data-station-arrangement='laptop'] { --size-rim: 264px; }
+
+/* ---------- the center: the companion at rest, or the one thing on the stage ----------
+ * At rest the stage's cell keeps only its shelf (the companion's cards), and only while the shelf has cards; the companion's
+ * own region takes the rest. The stage arriving, and each new thing on it, come in on the spring. */
+[data-station-center] > [data-station-stage-cell]:has(> [data-station-stage='empty']) [data-station-stage-empty-message] { display: none; }
+[data-station-center] > [data-station-stage-cell]:has(> [data-station-stage='empty']):not(:has([data-station-shelf])) { display: none; }
+[data-station-center] > [data-station-stage-cell] > [data-station-stage]:not([data-station-stage='empty']) {
+  animation: ast-arrive var(--duration-lock) var(--ease-lock) both;
+}
+[data-station-center] [data-station-stage-body] { animation: ast-fade-in var(--duration-fade) ease both; }
+[data-station-center] > [data-station-slot='conversation'] { animation: ast-arrive var(--duration-lock) var(--ease-lock) both; }
+
+/* ---------- the held row: what the companion holds out for your word, at the center's foot over the dock ----------
+ * The held row opens to the held piece's height while it arrives and closes as it settles (a grid row from 0fr to 1fr), so
+ * the work above moves on the same spring the piece does and never jumps. */
+[data-station-held] {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-settle) var(--ease-settle);
+}
+[data-station-held]:has([data-arrival='arriving'], [data-arrival='live']) {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--duration-lock) var(--ease-lock);
+}
+[data-station-held] > * { min-height: 0; overflow: hidden; }
+/* Settled, the held piece's shadow may float past the row; it is clipped only while the row opens and closes. */
+[data-station-held] > [data-arrival='live'] { overflow: visible; }
+
+/* ---------- the bar's strip: there only while it has something to say ----------
+ * Before the week is read, and in a week with nothing landed, the strip takes no room; it arrives when the week does. */
+[data-station-bar] [data-station-slot='strip'] { animation: ast-fade-in var(--duration-fade) ease both; }
+[data-station-bar] [data-station-slot='strip']:has([data-station-strip='reading'], [data-station-strip='quiet']) { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-arrival='arriving'], [data-arrival='arriving'][data-spring='lobe'] { animation: ast-fade-in var(--duration-fade) ease both; }
+  [data-arrival='settling'] { animation: ast-fade-out var(--duration-fade) ease both; }
+  [data-station-rim], [data-station-rim]:has([data-station-true]) { transition: visibility 0s linear var(--duration-fade); }
+  [data-station-rim]:has([data-station-true]) { transition: visibility 0s; }
+  [data-station-rim-body], [data-station-rim]:has([data-station-true]) > [data-station-rim-body] {
+    transform: none;
+    transition: opacity var(--duration-fade) ease;
+  }
+  [data-station-center] > [data-station-stage-cell] > [data-station-stage]:not([data-station-stage='empty']),
+  [data-station-center] > [data-station-slot='conversation'] { animation: ast-fade-in var(--duration-fade) ease both; }
+  [data-station-held], [data-station-held]:has([data-arrival='arriving'], [data-arrival='live']) { transition: none; }
+}

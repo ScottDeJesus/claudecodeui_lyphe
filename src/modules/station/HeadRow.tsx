@@ -53,7 +53,7 @@ type HeadRowProps = {
  */
 export function HeadRow({ row, face, name, nameId, presence, controls, panelWidth, banner, herView, onHerView }: HeadRowProps) {
   const { t } = useTranslation();
-  const menuLabel = t('station.head.menu', { defaultValue: 'Her controls and CloudCLI' });
+  const menuLabel = t('station.head.menu', { defaultValue: 'Controls and CloudCLI' });
 
   return (
     <section data-station-head="row" data-station-head-sideways={row.sideways ? '' : undefined} aria-labelledby={nameId} className="flex min-w-0 flex-col px-3">

@@ -69,14 +69,15 @@ const FOOT_BOX =
  * one press away whatever the stage holds. It draws nothing while she has no cards.
  *
  * WITH NONE, a quiet `EmptyState`: "Nothing on the stage", and how to put something there. No head: there is nothing
- * to name, go back from or clear. Where her regions stand beside an empty stage, the shell folds it away, or, while the
- * shelf has cards, keeps the shelf alone (`StationShellView`, `data-station-stage-empty-message`).
+ * to name, go back from or clear. In the scene an empty stage gives the center to the companion: the shell folds it away,
+ * or, while the shelf has cards, keeps the shelf alone (`StationShellView`, `data-station-stage-empty-message`); the words
+ * stand only in the one-column arrangement's Stage section.
  *
  * THE TOUCH LAW. Back and ✕ are 44 px catches under a finger below 768 px. Their tooltips only repeat their names: the
  * press is the thing itself, so a finger, which never opens a tooltip, loses nothing.
  *
- * `data-station-stage` reads `empty` or the focus's kind, and `StationShellView` keys on `empty` to fold an empty
- * stage away where her own regions fill her column. A pure view: `StationStage` below binds it to the station's
+ * `data-station-stage` reads `empty` or the focus's kind, and the scene keys on it: `empty` folds the stage away, and the
+ * change from `empty` to a kind is the stage's arrival (`stationScene.css`). A pure view: `StationStage` below binds it to the station's
  * focus, and `.verify/kaylee-station-shots.mjs` draws it on the fixtures' pictures.
  */
 export function StationStageView({ focus, view, canGoBack, onBack, onClear, shelf, scrollRef }: StationStageViewProps) {
@@ -96,7 +97,7 @@ export function StationStageView({ focus, view, canGoBack, onBack, onClear, shel
           <EmptyState
             icon={Focus}
             title={t('station.stage.empty.title', { defaultValue: 'Nothing on the stage' })}
-            message={t('station.stage.empty.message', { defaultValue: 'Press anything, or ask her to show you something.' })}
+            message={t('station.stage.empty.message', { defaultValue: 'Press anything, or ask to see something.' })}
           />
         </div>
       </section>
