@@ -146,6 +146,8 @@ export async function companionQueryOptions(
     includePartialMessages: true,
     cwd,
     maxTurns: COMPANION_MAX_TURNS,
+    // The deepest reasoning the CLI offers, on any model she may run: sonnet, fable, opus and haiku all accept `max` (the CLI's model list, read 2026-11-09).
+    effort: 'max',
     // Last, so neither the house's environment nor the account's can switch her CLI's compaction back on.
     env: { ...userFacingEnv(), ...account.env, CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(COMPANION_WINDOW_TOKENS), DISABLE_COMPACT: '1' },
     ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),

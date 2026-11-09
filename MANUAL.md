@@ -5746,7 +5746,7 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 ## Options
 | option | value | why |
 |---|---|---|
-| `model` | `settings.model` (`sonnet` \| `opus` \| `haiku`) | read when the launch begins |
+| `model` | `settings.model` (`sonnet` \| `fable` \| `opus` \| `haiku`) | read when the launch begins |
 | `systemPrompt` | the prompt the session's plan composed and hashed, handed to the launch (`fillSystemPrompt(operatorName, readSoul(userId))`: her two soul pages, then the plumbing; MAN-9213), a plain string | never the Claude Code preset: no house rule, CLAUDE.md or skill reaches her |
 | `settingSources` | `[]` | nothing on disk widens what she may do |
 | `settings` | `{ autoMemoryEnabled: false }` | the CLI keys auto-memory (`MEMORY.md`, his standing rules) to the git root of the cwd; hers sits inside `~/.claude` |
@@ -5756,6 +5756,7 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 | `allowedTools` | each tool's name under `mcp__companion__` | exactly hers, so a tool is never one prompt away |
 | `includePartialMessages` | `true` | text deltas feed the sentence stream |
 | `maxTurns` | 30 | per turn of hers: one answer to him, every tool call inside it |
+| `effort` | `'max'` | the operator's ruling of 2026-11-09: the deepest reasoning the CLI offers, on every model she may run (each of `sonnet`, `fable`, `opus` and `haiku` lists `max` in the CLI's model list, read 2026-11-09). Fixed, not a setting; applies from her next launch |
 | `cwd` | `companionWorkingDirectory(userId)` | below |
 | `env` | `{ ...userFacingEnv(), ...(await launchAccountEnv()).env, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '500000', DISABLE_COMPACT: '1' }` | the account the house chose, on the subscription. `DISABLE_COMPACT=1` is LAST so no account or house env turns it back on: her CLI never summarizes her conversation, automatic or manual, and no `compact_boundary` reaches her. Her own closing is her compaction (MAN-9455). The 500k window (`COMPANION_WINDOW_TOKENS`) is what her CLI's reading measures her against and her closing counts back from; it is NOT a refusal point: with compaction off the CLI sends past it and refuses only at the model's own limit (measured 2026-11-01 on a 100,000 window: messages read at 99,982 and 100,122 tokens were both sent). The CLI reads its env at launch: a change applies from her next launch |
 | `pathToClaudeCodeExecutable` | `resolveClaudeCodeExecutablePath(CLAUDE_CLI_PATH)`; key absent when it does not resolve | |
