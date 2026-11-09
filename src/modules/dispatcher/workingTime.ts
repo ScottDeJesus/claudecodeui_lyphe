@@ -1,15 +1,24 @@
 import type { DispatcherArc, DispatcherPlan, DispatcherPlanner } from '@/shared/types';
 
 /**
- * Whether an outing of the lane's own list is OUT on `name` — a planner child at work whose `target` or
- * `plan` is that name, which are the rows `report_runtime` counts for it.
+ * Whether this outing is a planner child AT WORK: `out` in the store's word and not said by the house to be NOT RUNNING (`no_run`: it has
+ * had no process behind it for minutes and no dispatcher recorded its end). One that is has no process, so it is `out` in the store's word
+ * and at work in nobody's: its time does not tick, its pill does not light and the lane does not read as running, as `PlannerBadge` says it
+ * is not running. `no_run` is read by truthiness: a frame from a server older than the key carries none.
  *
- * An outing the house says is NOT RUNNING (`no_run`: it has had no process behind it for minutes and no dispatcher recorded its end) is
- * `out` in the store's word and at work in nobody's, so it does not count: its time does not tick and its pill does not light, as
- * `PlannerBadge` says it is not running. `no_run` is read by truthiness: a frame from a server older than the key carries none.
+ * THE ONE READING OF "AT WORK" FOR AN OUTING. `outingOut` asks it of the outings of one name, and `useDispatcherPlans` asks it of the whole
+ * lane for the tone the chat gutter's Runs badge wears, so a stuck outing cannot light the one while the other is dark.
+ */
+export function outingAtWork(outing: DispatcherPlanner): boolean {
+  return outing.state === 'out' && !outing.no_run;
+}
+
+/**
+ * Whether an outing of the lane's own list is OUT on `name` — a planner child at work (`outingAtWork`) whose `target` or `plan` is that
+ * name, which are the rows `report_runtime` counts for it.
  */
 function outingOut(planners: readonly DispatcherPlanner[], name: string): boolean {
-  return planners.some((outing) => outing.state === 'out' && !outing.no_run && (outing.target === name || outing.plan === name));
+  return planners.some((outing) => outingAtWork(outing) && (outing.target === name || outing.plan === name));
 }
 
 /**

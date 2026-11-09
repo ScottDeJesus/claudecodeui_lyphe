@@ -4,6 +4,7 @@ import { askIdentity } from '@/modules/dispatcher/askState';
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
 import { noteLaneClock, usePutAwayEntries } from '@/modules/dispatcher/hiddenPlans';
 import { planningLines } from '@/modules/dispatcher/planningLines';
+import { outingAtWork } from '@/modules/dispatcher/workingTime';
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
 import type { DispatcherArc, DispatcherAsk, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherPlanner, DispatcherRoute, PlanningLine, Tone } from '@/shared/types';
 
@@ -63,8 +64,9 @@ export function useDispatcherPlans(): {
   /**
    * The lane's mark, decided once here for the chat gutter's Runs badge: `warn` while a prompt waits
    * on the operator, `info` while an agent is at work (a drawn plan reading `live`, or a planner
-   * outing out), `positive` only once every drawn plan is `complete`, and `neutral` for work nobody
-   * is doing (stalled, paused, scheduled, parked). RUNNING OUTRANKS FINISHED: a lane still at work
+   * outing at work — `out` and not said by the house to be not running, `outingAtWork`), `positive` only
+   * once every drawn plan is `complete`, and `neutral` for work nobody is doing (stalled, paused,
+   * scheduled, parked, an outing the house says has no process). RUNNING OUTRANKS FINISHED: a lane still at work
    * never wears the green that says it is done — an epic in flight read as finished (operator,
    * 2026-10-08). `null` while nothing is drawn.
    */
@@ -132,8 +134,9 @@ export function useDispatcherPlans(): {
     // lock names every plan of its arc), and only the drawn ones count: a plan the operator has put
     // away shows no card his word could reach.
     const waiting = new Set(plans.map(planAsking).filter((ask): ask is DispatcherAsk => ask !== null).map(askIdentity)).size;
-    // Any outing out counts, carried or loose: every one is a line of the Planning card.
-    const running = plans.some((plan) => plan.status === 'live') || planners.some((outing) => outing.state === 'out');
+    // Any outing at work counts, carried or loose: every one is a line of the Planning card. One the house says is not running
+    // (`no_run`) is out in the store's word and at work in nobody's, so it does not (`outingAtWork`, which the cards' clocks read too).
+    const running = plans.some((plan) => plan.status === 'live') || planners.some(outingAtWork);
     const tone: Tone | null = plans.length === 0 ? null
       : waiting > 0 ? 'warn'
         : running ? 'info'
