@@ -1,19 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { currentVoiceProvider } from '@/modules/chat/hooks/useVoiceProvider';
 import { refusalSentence, transcribeVoice } from '@/shared/api';
 import { useMicRecorder } from '@/shared/hooks/useMicRecorder';
 import type { VoiceInputState } from '@/shared/types';
 import { recordingFileName } from '@/shared/utils';
 
 /**
- * Push-to-talk dictation. Records the mic (useMicRecorder), transcribes it through the account's provider as useVoiceProvider
- * last read it, at the moment the clip is sent (the OpenAI-compatible backend, posted to the browser's own endpoint or the
- * Express proxy, or, on Gemini, the server's own hearing through the proxy: its local speech-to-text service first, Gemini on the
- * server's key when that gives no words), and returns the transcript through onTranscript. Whichever
- * way it went, the transcript is the account's cleaned one (fillers out, house words corrected): `transcribeVoice` gets that from
- * the server's engine even when the clip never touched the server. A refusal from Gemini (no key, a refused key) is handed to
- * onError as the server's own sentence.
+ * Push-to-talk dictation. Records the mic (useMicRecorder), sends the clip to the server (`transcribeVoice`), which hears it on the
+ * account's home server first and on Gemini only when the home server cannot, and returns the transcript through onTranscript. The
+ * transcript is the account's cleaned one (fillers out, house words corrected), whichever transcriber heard it, and the account's
+ * read-aloud provider has no say in who transcribes. When Gemini stood in because the home server could not, the transcript is
+ * delivered and the server's one short line saying so ("Home server didn't answer; Gemini transcribed this") goes to onError, where
+ * the mic's errors show. A clip neither could hear, or a refusal (no Gemini key, a refused key), is handed to onError as the
+ * server's own sentence, which names both transcribers.
  */
 export function useVoiceInput(
   onTranscript: (text: string, send?: boolean) => void,
@@ -50,13 +49,11 @@ export function useVoiceInput(
     }
     setTranscribing(true);
     try {
-      // Read now, not when the recording began: the picker may have moved in between.
-      const clipProvider = currentVoiceProvider();
-      const res = await transcribeVoice(blob, recordingFileName(mimeType), clipProvider);
+      const res = await transcribeVoice(blob, recordingFileName(mimeType));
       if (!res.ok) {
-        // Gemini's refusals are sentences for the person ("No Gemini key: set one in Settings → Voice"), so they are
-        // shown as they came. The OpenAI-compatible branch keeps its status words.
-        const sentence = clipProvider === 'gemini' ? await refusalSentence(res) : null;
+        // The server's refusals are sentences for the person ("No Gemini key: set one in Settings → Voice", or the one that
+        // names the home server and Gemini both), so they are shown as they came. An answer with none keeps its status words.
+        const sentence = await refusalSentence(res);
         if (sentence) {
           if (!unmountedRef.current) handlersRef.current.onError?.(sentence);
           return;
@@ -66,8 +63,14 @@ export function useVoiceInput(
       const data = await res.json();
       if (unmountedRef.current) return;
       const text = String(data?.text || '').trim();
-      if (text) handlersRef.current.onTranscript(text, shouldSend);
-      else handlersRef.current.onError?.('No speech detected');
+      // Present only when Gemini heard the clip because the home server could not: the person is told, so he knows the box is down.
+      const notice = typeof data?.notice === 'string' ? data.notice.trim() : '';
+      if (text) {
+        handlersRef.current.onTranscript(text, shouldSend);
+        if (notice) handlersRef.current.onError?.(notice);
+      } else {
+        handlersRef.current.onError?.(notice ? `No speech detected. ${notice}` : 'No speech detected');
+      }
     } catch (e) {
       if (!unmountedRef.current) {
         handlersRef.current.onError?.(`Transcription failed: ${e instanceof Error ? e.message : String(e)}`);

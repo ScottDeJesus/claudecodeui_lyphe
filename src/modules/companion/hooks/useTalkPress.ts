@@ -63,8 +63,8 @@ type TalkVoice = { unlock: () => void; cutOff: () => Promise<void> | null; relea
  * press is never handed to it until the one before has finished.
  *
  * WHAT IS AN ERROR HERE is only what failed on the page itself: the mic refused, or the clip could not be sent. A hearing
- * that was refused or failed (no Gemini key, a refused key, a failed call) is the server's system line in her log, so the
- * state just goes back to idle. The error stays until the next press.
+ * that was refused or failed (neither the home server nor Gemini could hear it: no Gemini key, a refused key, a failed call) is the
+ * server's system line in her log, so the state just goes back to idle. The error stays until the next press.
  */
 export function useTalkPress(voice: TalkVoice, finishNamePress: () => void): TalkPressWithDoor {
   const { unlock, cutOff, release } = voice;

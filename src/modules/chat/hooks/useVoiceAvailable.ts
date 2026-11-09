@@ -28,19 +28,20 @@ function checkVoiceHealth(): Promise<boolean> {
  * Whether the voice control for `purpose` should be drawn: 'speak' is read-aloud (the default, MessageSpeakControl) and
  * 'dictate' is the composer's mic (ChatComposer).
  *
- * Both controls follow the account's provider. On Gemini the server transcribes (on its own speech-to-text service first, on its
- * Gemini key when that gives no words) and speaks on its key, so the browser needs
- * no backend: the mic is drawn whenever voice input is on, and read-aloud is drawn when the server's health says the account has a
- * Gemini key in reach (the browser's own base URL is never reached on Gemini, so it does not count). On the OpenAI-compatible
- * provider both answers are the browser's base URL or the proxy's configuration, which the server's health reports.
+ * The mic is drawn whenever voice input is on: the server transcribes every clip on its own (the account's home server, Gemini the
+ * backup), so the browser needs no backend and the account's provider has no say. Read-aloud follows the provider. On Gemini the
+ * server speaks on its own key, so it is drawn when the server's health says the account has a Gemini key in reach (the browser's
+ * own base URL is never reached on Gemini, so it does not count). On the OpenAI-compatible provider the answer is the browser's
+ * base URL or the proxy's configuration, which the server's health reports.
  */
 export function useVoiceAvailable(purpose: 'speak' | 'dictate' = 'speak'): boolean {
   // Read through the shared preferences owner. This used to re-parse the
   // preferences blob and register its own storage + sync listeners, once per
   // assistant message row.
   const { voiceEnabled: enabled } = useUiPreferences();
-  // Both controls read the provider, and only while voice is on: a page with voice off asks nothing.
-  const provider = useVoiceProvider(enabled);
+  // Only read-aloud follows the provider, and only while voice is on: a page with voice off, and the mic, ask the server nothing here.
+  const followsProvider = enabled && purpose === 'speak';
+  const provider = useVoiceProvider(followsProvider);
   // Whether the backend this account's provider names is ready: the base URL or the server's health. Settled by the effect below, from a request that cannot run while rendering.
   const [available, setAvailable] = useState(false);
 
@@ -49,7 +50,7 @@ export function useVoiceAvailable(purpose: 'speak' | 'dictate' = 'speak'): boole
     let requestId = 0;
 
     const check = async () => {
-      if (!enabled) {
+      if (!followsProvider) {
         setAvailable(false);
         return;
       }
@@ -73,8 +74,8 @@ export function useVoiceAvailable(purpose: 'speak' | 'dictate' = 'speak'): boole
       active = false;
       window.removeEventListener(VOICE_CONFIG_SYNC_EVENT, check);
     };
-  }, [enabled, provider]);
+  }, [followsProvider, provider]);
 
-  if (purpose === 'dictate' && provider === 'gemini') return enabled;
+  if (purpose === 'dictate') return enabled;
   return enabled && available;
 }

@@ -463,6 +463,14 @@ export default function ChatComposer({
       {/* The anchor is the input box's own column, not the shell: the shell also holds the pinned agents' strip and the
           activity tab, which would carry a guide's centre away from the box she is looking at. */}
       <div ref={anchorRef} className="relative mx-auto max-w-[54.25rem]">
+        {/* The mic's one line, a refusal's sentence or the note that Gemini stood in for the home server: above the form, never
+            inside it. The form clips whatever overflows it, and a sentence that names two transcribers is several lines, whose
+            first ones were cut off when this stood over the mic. Left-aligned, where the mic is, and wrapped inside the box's width. */}
+        {voiceShown && voiceError !== null && (
+          <span className="absolute bottom-full left-0 z-50 mb-2 w-max max-w-[min(24rem,100%)] rounded bg-red-600 px-2 py-1 text-xs text-white shadow-lg">
+            {voiceError}
+          </span>
+        )}
         {showFileDropdown && filteredFiles.length > 0 && (
           <div
             ref={fileDropdownRef}
@@ -566,7 +574,7 @@ export default function ChatComposer({
             </PromptInputButton>
 
             {voiceShown && (
-              <VoiceInputButton state={voiceState} onToggle={voiceToggle} errorMsg={voiceError} />
+              <VoiceInputButton state={voiceState} onToggle={voiceToggle} />
             )}
 
             {/* Below `md` the count rides the workspace header instead (WorkspaceHeader) — on a

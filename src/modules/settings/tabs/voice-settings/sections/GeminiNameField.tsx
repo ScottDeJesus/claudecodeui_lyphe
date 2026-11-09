@@ -23,6 +23,11 @@ type GeminiNameFieldProps = {
   saving: boolean;
   /** Stores the name, trimmed: called on leaving the field or on Enter, only when it changed and is one the server takes. */
   onSave: (name: string) => void;
+  /**
+   * The field stands under the label across the row's full width instead of beside it, as the key rows' fields do: for a value that
+   * is long and whose end matters (an address, whose port and path would be cut off in the narrow field). The narrow field is the default.
+   */
+  wide?: boolean;
 };
 
 /**
@@ -31,10 +36,12 @@ type GeminiNameFieldProps = {
  * amber with the ▲, announced. The field follows the stored value while he is not editing it. Enter and then leaving the
  * field send the name once: until the save is answered, the name sent is not sent again.
  *
- * Used by this folder's GeminiVoiceSection three times: the transcription model, the speech model and the voice. One
- * field for the three, because they are one control and three copies of it would drift.
+ * Used by this folder's GeminiVoiceSection three times: the backup transcription model, the speech model and the voice, and by its
+ * HomeServerSection once, for the home server's address (a `shape` that allows the empty field, which forgets the address). One
+ * field for all four, because they are one control and copies of it would drift. `hook` names the field's `data-gemini-<hook>-field`
+ * attribute, whichever section draws it. `wide` gives the address the row's full width under its label.
  */
-export function GeminiNameField({ label, help, invalid, stored, placeholder, shape, hook, saving, onSave }: GeminiNameFieldProps) {
+export function GeminiNameField({ label, help, invalid, stored, placeholder, shape, hook, saving, onSave, wide = false }: GeminiNameFieldProps) {
   const idBase = useId();
   // The field's words, saved when he leaves it.
   const [words, setWords] = useState(stored);
@@ -63,34 +70,38 @@ export function GeminiNameField({ label, help, invalid, stored, placeholder, sha
     onSave(trimmed);
   };
 
+  const field = (
+    <Input
+      className={wide ? 'w-full' : SETTINGS_FIELD_WIDTH}
+      value={words}
+      placeholder={placeholder}
+      autoComplete="off"
+      spellCheck={false}
+      aria-label={label}
+      aria-describedby={helpId}
+      invalid={refused}
+      {...{ [`data-gemini-${hook}-field`]: '' }}
+      onChange={(event) => setWords(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => { if (event.key === 'Enter') commit(); }}
+    />
+  );
+  const description = refused ? (
+    <span id={helpId} role="alert" data-tone="warn" className="font-medium text-tone-ink">
+      <span aria-hidden="true">▲ </span>
+      {invalid}
+    </span>
+  ) : (
+    <span id={helpId}>
+      {help}
+    </span>
+  );
+
+  if (!wide) return <SettingRow label={label} description={description}>{field}</SettingRow>;
   return (
-    <SettingRow
-      label={label}
-      description={refused ? (
-        <span id={helpId} role="alert" data-tone="warn" className="font-medium text-tone-ink">
-          <span aria-hidden="true">▲ </span>
-          {invalid}
-        </span>
-      ) : (
-        <span id={helpId}>
-          {help}
-        </span>
-      )}
-    >
-      <Input
-        className={SETTINGS_FIELD_WIDTH}
-        value={words}
-        placeholder={placeholder}
-        autoComplete="off"
-        spellCheck={false}
-        aria-label={label}
-        aria-describedby={helpId}
-        invalid={refused}
-        {...{ [`data-gemini-${hook}-field`]: '' }}
-        onChange={(event) => setWords(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => { if (event.key === 'Enter') commit(); }}
-      />
-    </SettingRow>
+    <div>
+      <SettingRow label={label} description={description} className="pb-3">{null}</SettingRow>
+      <div className="px-4 pb-4">{field}</div>
+    </div>
   );
 }

@@ -93,7 +93,8 @@ function operatorCore(core: string, keep: readonly string[]): string {
  * Used by `useDispatcherVerbs` for the toast that answers a press, by `useRoadmapWrites` (the roadmap
  * module, through this module's barrel) for the toast that answers a roadmap write's refusal, by
  * `PlanFace` for the posture its caption carries and by `PlannerBadge` for the cause a stalled
- * planner outing ended on. The events
+ * planner outing ended on, the reason a queued one waits (`waiting`) and the house's sentence for one
+ * it says is not running (`no_run`). The events
  * feed and the stage lines are not read through it; they show the dispatcher's words as written.
  */
 export function operatorWords(text: string, keep: readonly string[] = []): string {

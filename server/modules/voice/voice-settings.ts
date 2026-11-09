@@ -3,6 +3,7 @@ import { isRecord } from '@/shared/document-fields.js';
 import type { VocabularyEntry, VoiceProvider, VoiceSettings } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
+import { checkHomeServerAddress } from './home-server-address.js';
 import { checkVocabulary } from './vocabulary-check.js';
 
 /** The `user_preferences` key the account's voice settings live under. */
@@ -28,11 +29,11 @@ export const DEFAULT_SOUND_TAGS: readonly string[] = [
   'long pause',
 ];
 
-/** The provider an account holds until it chooses. */
+/** The read-aloud provider an account holds until it chooses. */
 const DEFAULT_PROVIDER: VoiceProvider = 'gemini';
 
 const DEFAULT_GEMINI_SETTINGS = {
-  // The house's transcriber role.
+  // The house's transcriber role: Gemini is the BACKUP transcriber, heard only when the home server cannot hear a clip.
   transcriptionModel: 'gemini-3.8-flash',
   speechModel: 'gemini-3.8-flash-tts',
   voice: 'Kore',
@@ -56,6 +57,9 @@ const SOUND_TAGS_LIMIT_SENTENCE = `1 to ${MAX_SOUND_TAGS} sound tags, each 1 to 
 /** The four fields a patch's `gemini` object may carry. */
 const GEMINI_FIELDS = ['transcriptionModel', 'speechModel', 'voice', 'soundTags'] as const;
 
+/** The one field a patch's `homeServer` object may carry. */
+const HOME_SERVER_FIELDS = ['address'] as const;
+
 /** What is stored: only the fields the account set, so a default the house later changes still reaches an account that never chose. */
 type StoredOverrides = {
   provider?: VoiceProvider;
@@ -64,9 +68,14 @@ type StoredOverrides = {
   speechModel?: string;
   voice?: string;
   soundTags?: string[];
+  /** The home server's address, already normalized by `checkHomeServerAddress`; absent is "none saved". */
+  homeServerAddress?: string;
   /** The account's house words (`vocabulary.ts` owns their meaning); an empty list is a choice, so `undefined` is the only "never saved". */
   vocabulary?: VocabularyEntry[];
 };
+
+/** What a patch's `homeServer` object carries after validation; `address: null` forgets the saved address. */
+type HomeServerPatch = { address?: string | null };
 
 /** What a patch's `gemini` object carries after validation; `soundTags: null` is the restore of the default. */
 type GeminiPatch = {
@@ -117,6 +126,10 @@ function storedOverrides(userId: number): StoredOverrides {
   if (typeof stored.cleanTranscripts === 'boolean') overrides.cleanTranscripts = stored.cleanTranscripts;
   const checkedVocabulary = checkVocabulary(stored.vocabulary);
   if ('entries' in checkedVocabulary) overrides.vocabulary = checkedVocabulary.entries;
+  if (isRecord(stored.homeServer)) {
+    const checkedAddress = checkHomeServerAddress(stored.homeServer.address);
+    if ('address' in checkedAddress) overrides.homeServerAddress = checkedAddress.address;
+  }
   if (isRecord(stored.gemini)) {
     const { transcriptionModel, speechModel, voice, soundTags } = stored.gemini;
     if (isModel(transcriptionModel)) overrides.transcriptionModel = transcriptionModel;
@@ -130,9 +143,10 @@ function storedOverrides(userId: number): StoredOverrides {
 
 function withDefaults(overrides: StoredOverrides): VoiceSettings {
   return {
-    // Gemini is the only speech service this house runs: an account that never chose is on it. An account that stored `openai` keeps it.
+    // Gemini is the only speech service this house runs: an account that never chose speaks through it. An account that stored `openai` keeps it.
     provider: overrides.provider ?? DEFAULT_PROVIDER,
     cleanTranscripts: overrides.cleanTranscripts ?? DEFAULT_CLEAN_TRANSCRIPTS,
+    homeServer: { address: overrides.homeServerAddress ?? null },
     gemini: {
       transcriptionModel: overrides.transcriptionModel ?? DEFAULT_GEMINI_SETTINGS.transcriptionModel,
       speechModel: overrides.speechModel ?? DEFAULT_GEMINI_SETTINGS.speechModel,
@@ -146,8 +160,9 @@ function withDefaults(overrides: StoredOverrides): VoiceSettings {
 /**
  * The account's voice settings, read fresh from the database on every call (never cached, so a saved change is
  * heard by the next press). A stored field that fails its limit reads as its default.
- * Consumed by `gemini-transcribe.ts` (the transcription model and `cleanTranscripts`), `local-transcribe.ts` (`cleanTranscripts`),
- * `gemini-speech.ts` (the speech model and the voice), `voice-provider.ts` (the provider and `cleanTranscripts`) and the settings routes. Exported through the voice
+ * Consumed by `speech-transcriber.ts` (the home server's address and `cleanTranscripts`), `gemini-transcribe.ts` (the backup's
+ * transcription model and `cleanTranscripts`), `gemini-speech.ts` (the speech model and the voice), `voice-provider.ts` (the
+ * provider, which chooses read-aloud) and the settings routes. Exported through the voice
  * barrel for the companion, which reads `gemini.soundTags` at the start of each turn (the parse) and at each push (the register),
  * and every setting for `read_settings`.
  */
@@ -167,6 +182,24 @@ function checkedCleanTranscripts(patch: Record<string, unknown>): boolean | unde
   if (!('cleanTranscripts' in patch)) return undefined;
   if (typeof patch.cleanTranscripts !== 'boolean') throw settingsInvalid('cleanTranscripts must be true or false.', 'cleanTranscripts');
   return patch.cleanTranscripts;
+}
+
+/** The patch's `homeServer` object with its address checked, or the 400 that names it. `undefined` means the patch does not carry `homeServer`; an `address` of `null` forgets the saved one. */
+function checkedHomeServer(patch: Record<string, unknown>): HomeServerPatch | undefined {
+  if (!('homeServer' in patch)) return undefined;
+  const homeServer = patch.homeServer;
+  if (!isRecord(homeServer)) throw settingsInvalid(`homeServer must be an object holding ${HOME_SERVER_FIELDS.join(', ')}.`, 'homeServer');
+
+  for (const field of Object.keys(homeServer)) {
+    if (!(HOME_SERVER_FIELDS as readonly string[]).includes(field)) {
+      throw settingsInvalid(`homeServer.${field.slice(0, 40)} is not a voice setting; the field is homeServer.address.`, `homeServer.${field.slice(0, 40)}`);
+    }
+  }
+  if (!('address' in homeServer)) return {};
+  if (homeServer.address === null) return { address: null };
+  const checked = checkHomeServerAddress(homeServer.address);
+  if ('problem' in checked) throw settingsInvalid(checked.problem, 'homeServer.address');
+  return { address: checked.address };
 }
 
 /** The patch's `gemini` object with every field it carries checked, or the 400 that names the first field that fails. `undefined` means the patch does not carry `gemini`. */
@@ -218,6 +251,7 @@ function storedDocument(next: StoredOverrides): Record<string, unknown> {
     ...(next.cleanTranscripts !== undefined ? { cleanTranscripts: next.cleanTranscripts } : {}),
     // Same reason: a stored `[]` is an account that emptied its list, and must not read back as the seed.
     ...(next.vocabulary !== undefined ? { vocabulary: next.vocabulary } : {}),
+    ...(next.homeServerAddress ? { homeServer: { address: next.homeServerAddress } } : {}),
     ...(Object.keys(gemini).length > 0 ? { gemini } : {}),
   };
 }
@@ -227,25 +261,29 @@ function storedDocument(next: StoredOverrides): Record<string, unknown> {
  * answers the settings as stored. An invalid field, or a field that is not a setting, throws AppError
  * `VOICE_SETTINGS_INVALID` (400) whose sentence names the field and its limit; nothing is written then.
  * `gemini.soundTags: null` drops the account's own list, so it reads as the shipped `DEFAULT_SOUND_TAGS` again. `cleanTranscripts`
- * is a boolean; `false` is stored and read back as `false`.
+ * is a boolean; `false` is stored and read back as `false`. `homeServer.address` is the home server's http(s) address
+ * (`checkHomeServerAddress`, stored normalized); `null` forgets it, which turns the home server off.
  * Consumed by the settings route (`PUT /api/voice/settings`).
  */
 export function saveVoiceSettings(userId: number, patch: unknown): VoiceSettings {
   if (!isRecord(patch)) throw settingsInvalid('The settings must be a JSON object.', 'settings');
 
   for (const field of Object.keys(patch)) {
-    if (field !== 'provider' && field !== 'cleanTranscripts' && field !== 'gemini') {
-      throw settingsInvalid(`${field.slice(0, 40)} is not a voice setting; the fields are provider, cleanTranscripts and gemini (${GEMINI_FIELDS.join(', ')}).`, field.slice(0, 40));
+    if (field !== 'provider' && field !== 'cleanTranscripts' && field !== 'homeServer' && field !== 'gemini') {
+      throw settingsInvalid(`${field.slice(0, 40)} is not a voice setting; the fields are provider, cleanTranscripts, homeServer (${HOME_SERVER_FIELDS.join(', ')}) and gemini (${GEMINI_FIELDS.join(', ')}).`, field.slice(0, 40));
     }
   }
   const provider = checkedProvider(patch);
   const cleanTranscripts = checkedCleanTranscripts(patch);
+  const homeServer = checkedHomeServer(patch);
   const gemini = checkedGemini(patch);
 
   // Read and write with no await between them, so two saves cannot both merge from the same stored value.
   const next: StoredOverrides = { ...storedOverrides(userId) };
   if (provider !== undefined) next.provider = provider;
   if (cleanTranscripts !== undefined) next.cleanTranscripts = cleanTranscripts;
+  if (homeServer?.address === null) delete next.homeServerAddress;
+  else if (homeServer?.address !== undefined) next.homeServerAddress = homeServer.address;
   if (gemini?.transcriptionModel !== undefined) next.transcriptionModel = gemini.transcriptionModel;
   if (gemini?.speechModel !== undefined) next.speechModel = gemini.speechModel;
   if (gemini?.voice !== undefined) next.voice = gemini.voice;

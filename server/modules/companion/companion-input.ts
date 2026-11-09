@@ -43,12 +43,12 @@ export function inputInvalid(sentence: string, field?: string): AppError {
 }
 
 /**
- * The refusal a Gemini call that came to nothing answers, from the voice module's `{ reason, sentence }`: 409
+ * The refusal a speech call that came to nothing answers, from the voice module's `{ reason, sentence }`: 409
  * `COMPANION_SPEECH_REFUSED` for a key that is missing or refused, 502 `COMPANION_SPEECH_FAILED` for a call that failed,
- * with the sentence as the message the panel shows. Consumed by `companion-press.ts` (a clip that could not be heard) and
- * `companion-speech.ts` (a sentence that could not be spoken).
+ * with the sentence as the message the panel shows. Consumed by `companion-press.ts` (a clip that neither the home server nor
+ * Gemini could hear) and `companion-speech.ts` (a sentence Gemini could not speak).
  */
-export function geminiRefusal(answer: { reason: 'no_key' | 'refused' | 'failed'; sentence: string }): AppError {
+export function speechRefusal(answer: { reason: 'no_key' | 'refused' | 'failed'; sentence: string }): AppError {
   const failed = answer.reason === 'failed';
   return new AppError(answer.sentence, {
     code: failed ? 'COMPANION_SPEECH_FAILED' : 'COMPANION_SPEECH_REFUSED',

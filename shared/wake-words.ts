@@ -1,6 +1,6 @@
 // Her name, in words. The page's ears decide on Moonshine's transcript and the server's press door strips the one its own
-// hearing made (this box's speech-to-text service, or Gemini when that gives no words), both with the rules below, so what her name
-// sounds like has one home.
+// hearing made (the account's home server, or Gemini when the home server cannot hear the clip), both with the rules below, so what
+// her name sounds like has one home.
 //
 // No recognizer separates "Kaylee" from "Kelly" by spelling (measured 2026-10-30 on 70 clips: Moonshine base wrote her
 // name as Kaylee, Kaley, Killy and Kelly; Gemini wrote one of his four real "Kaylee"s as "Gilly"). So her default name

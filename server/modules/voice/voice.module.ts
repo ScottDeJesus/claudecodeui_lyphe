@@ -1,5 +1,6 @@
 import multer from 'multer';
 
+import { createSpeechTranscriber } from './speech-transcriber.js';
 import { createVoiceProvider } from './voice-provider.js';
 import { createVoiceRouter } from './voice.routes.js';
 import { createVoiceService } from './voice.service.js';
@@ -22,6 +23,10 @@ const voiceService = createVoiceService({
   },
   timeoutMs: voiceTimeoutMs,
   fetchBackend: async (url, options) => {
+    // A call that brings its own deadline (a transcription: the whole exchange, body read included) is not given a second one
+    // that stops at the headers.
+    if (options.signal) return fetch(url, { redirect: 'manual', ...options });
+
     const abortController = new AbortController();
     const timeoutHandle = setTimeout(() => abortController.abort(), voiceTimeoutMs);
     try {
@@ -41,8 +46,14 @@ const audioUpload = multer({
   limits: { fileSize: 25 * 1024 * 1024 },
 });
 
+/**
+ * Hears one clip: the account's home server first, Gemini the backup (`speech-transcriber.ts`). The chat mic's route and the
+ * companion's press (through the voice barrel) both come through this one function, so they cannot hear differently.
+ */
+export const transcribeSpeech = createSpeechTranscriber(voiceService);
+
 /** Voice router assembled for the server entrypoint. */
 export const voiceRoutes = createVoiceRouter({
-  voiceProvider: createVoiceProvider(voiceService),
+  voiceProvider: createVoiceProvider(voiceService, transcribeSpeech),
   parseAudioUpload: audioUpload.single('audio'),
 });

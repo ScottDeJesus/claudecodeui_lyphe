@@ -1,4 +1,4 @@
-import type { DispatcherArc, DispatcherArcQueue, DispatcherArcStatus } from '@/shared/types.js';
+import type { DispatcherArc, DispatcherArcNoRun, DispatcherArcQueue, DispatcherArcStatus } from '@/shared/types.js';
 
 import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, isWholeFrom, modelSince, names, need, oneOf, planningPausedSince, textSince } from './dispatcher-state.transport.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
@@ -28,6 +28,9 @@ const QUEUE_TURNS: readonly DispatcherArcQueue['turn'][] = ['now', 'waiting', 'p
 /** A place in the queue is counted from 1, so `0` and `1.5` are refused where `isCount` would pass them. */
 const isPlace = isWholeFrom(1);
 
+/** A row of the epic's own log (`arc_events`) is counted from 1 and whole: the endings notifier keeps a mark on it, and a mark cannot sit on `0` or `1.5`. */
+const isRowId = isWholeFrom(1);
+
 /**
  * An arc's place in the queue (`report_arcs.arc_dict.queue`), or `null` — for an epic not in the queue
  * (`null`, its turn is over) and for a build OLDER than the field (absent). Both read the same on
@@ -41,6 +44,22 @@ function queueOf(value: unknown, name: string): DispatcherArcQueue | null {
   return {
     position: need(field(queue, 'position'), isPlace, `arc.queue.position of ${name}`),
     turn: oneOf(field(queue, 'turn'), QUEUE_TURNS, `arc.queue.turn of ${name}`),
+  };
+}
+
+/**
+ * An epic's OWN open `no-run` record (`report_arcs.arc_dict.no_run`, `run_record.open_arc_alert`), or `null` — for an epic none
+ * stands for, and for a build OLDER than the key (absent). Both read the same on purpose: an older dispatcher's epics push and draw
+ * nothing for it. A key that IS there and is neither `null` nor an `{id, at, detail}` of one whole id and two texts is refused by
+ * name, with the epic it came from, as `queueOf` refuses a place.
+ */
+function noRunOf(value: unknown, name: string): DispatcherArcNoRun | null {
+  if (value === undefined || value === null) return null;
+  const record = need(value, isRecord, `arc.no_run of ${name}`);
+  return {
+    id: need(field(record, 'id'), isRowId, `arc.no_run.id of ${name}`),
+    at: need(field(record, 'at'), isText, `arc.no_run.at of ${name}`),
+    detail: need(field(record, 'detail'), isText, `arc.no_run.detail of ${name}`),
   };
 }
 
@@ -120,6 +139,10 @@ export function arcOf(raw: unknown): DispatcherArc {
     // `line_gate.places`): carried as the document states it, `null` for an epic not in the queue and
     // for a build older than the key. The server never orders epics — the dispatcher's own store does.
     queue: queueOf(field(arc, 'queue'), name),
+    // The epic's OWN open `no-run` record (`report_arcs.arc_dict.no_run`): the house could not get a run behind an outing that names the
+    // epic itself — its design, its whole-arc cut. Carried as the document states it; `null` while none stands and for a build older than
+    // the key. The endings notifier pushes each record once from it, under a mark of its own on `id` and `at` (`dispatcher-arc-alerts.service.ts`).
+    no_run: noRunOf(field(arc, 'no_run'), name),
   };
 }
 

@@ -3,40 +3,35 @@ import type { VoiceAudioUpload, VoiceRequestOverrides, VoiceService, VoiceServic
 import { chatStatusForRefusal } from './gemini-errors.js';
 import { geminiKeyStatus } from './gemini-key.js';
 import { synthesizeReadAloud } from './gemini-read-aloud.js';
-import { transcribeSpeech } from './transcribe-speech.js';
-import { cleanTranscript } from './transcript-cleanup.js';
-import { whisperVocabularyPrompt } from './vocabulary-hints.js';
+import type { createSpeechTranscriber } from './speech-transcriber.js';
 import { readVocabulary } from './vocabulary.js';
 import { respellForSpeech } from './vocabulary-match.js';
 import { readVoiceSettings } from './voice-settings.js';
 
 /**
- * Builds the routes' one decision: which backend hears and speaks the chat for this account. The account's provider `gemini`
- * (the default) hears the composer's mic through `transcribeSpeech` (this box's own speech-to-text service first, Gemini when that
- * gives no words) and speaks read-aloud through the Gemini door; `openai` goes to the OpenAI-compatible
- * proxy exactly as it always did, still reading the browser's `x-voice-*` headers (`overrides`). The clip goes with the account's
- * vocabulary as Whisper's `prompt` (it takes no instruction), and its text comes back cleaned of fillers and repeats when the
- * account's `cleanTranscripts` is on and with every misheard house word corrected whatever that switch says (on `gemini`, whichever
- * door heard the clip, the local service or Gemini, does its own, once). A refusal on `gemini` is Gemini's and reaches the route only when the local
- * service gave no answer at all; its three are mapped to the status the route answers with (`chatStatusForRefusal`): no key and
- * a refused key are 409 (the person can fix both in Settings → Voice), a failed call is 502.
+ * Builds the routes' decisions about the chat's voice for this account.
  *
- * `synthesizeForChat` is read-aloud. On `gemini` the server speaks it (`synthesizeReadAloud`: Kaylee's speech door, in the account's
- * Gemini speech model and voice, the text respelled there by the vocabulary, answered as one WAV); on `openai` it is the proxy's
- * speech, asked for the text with each house word respelled the way it is said (`respellForSpeech`), so the person's screen keeps
- * the spelling. `healthForChat` answers `GET /api/voice/health`, the page's one reader being `useVoiceAvailable('speak')`: on
- * `gemini` whether the account has a Gemini key in reach (`geminiKeyStatus`), on `openai` the proxy's own `configured`.
+ * `transcribeForChat` is the composer's mic: the clip goes to the one try-then-backup transcriber (`speech-transcriber.ts`: the
+ * account's home server first, Gemini the backup), whatever the account's provider says; the provider no longer chooses who
+ * transcribes. A heard clip answers its cleaned `text` and, only when Gemini stood in because the home server could not, a `notice`
+ * (the one short line the composer shows where its mic's errors show). A clip neither could hear answers the sentence naming both,
+ * with the status the route gives it (`chatStatusForRefusal`): no key and a refused key are 409 (the person can fix both in Settings →
+ * Voice), a failed call is 502.
  *
- * The browser may hear and speak on its own OpenAI-compatible endpoint (`src/shared/api.ts`: `transcribeVoice`,
- * `synthesizeVoice`), a call this server never sees, and only for an account on `openai`. Three methods hand it the same engine
- * without a copy of it in the page: `transcribeHintsForChat` is the Whisper `prompt` the browser puts on its clip,
- * `cleanTranscriptForChat` is what a transcript passes through (the very `cleanTranscript` call the OpenAI branch above makes,
- * with the account's switch and vocabulary), and `speakableForChat` is the text respelled for speech. They also serve a standalone
- * dictation app that talks to its own backend. None of the three reaches a backend or reads a key.
+ * `synthesizeForChat` is read-aloud, and the provider chooses it: on `gemini` the server speaks it (`synthesizeReadAloud`: Kaylee's
+ * speech door, in the account's Gemini speech model and voice, the text respelled there by the vocabulary, answered as one WAV); on `openai` it is the
+ * proxy's speech, still reading the browser's `x-voice-*` headers (`overrides`), asked for the text with each house word respelled
+ * the way it is said (`respellForSpeech`), so the person's screen keeps the spelling. `healthForChat` answers `GET /api/voice/health`,
+ * the page's one reader being `useVoiceAvailable('speak')`: on `gemini` whether the account has a Gemini key in reach
+ * (`geminiKeyStatus`), on `openai` the proxy's own `configured`.
+ *
+ * The browser may speak on its own OpenAI-compatible endpoint (`src/shared/api.ts`: `synthesizeVoice`), a call this server never
+ * sees, and only for an account on `openai`. `speakableForChat` hands it the same respelling engine without a copy of it in the page:
+ * the text respelled for speech. It reaches no backend and reads no key.
  * Consumed by `voice.module.ts`, which hands it to the router for `GET /api/voice/health`, `POST /api/voice/transcribe`,
- * `POST /api/voice/tts`, `GET /api/voice/transcribe-hints`, `POST /api/voice/clean` and `POST /api/voice/speakable`.
+ * `POST /api/voice/tts` and `POST /api/voice/speakable`.
  */
-export function createVoiceProvider(voiceService: VoiceService) {
+export function createVoiceProvider(voiceService: VoiceService, transcribeSpeech: ReturnType<typeof createSpeechTranscriber>) {
   // One respelling for the proxy's read-aloud and for `POST /api/voice/speakable`, so the two cannot drift apart.
   const speakableText = (userId: number, text: string): string => respellForSpeech(text, readVocabulary(userId));
 
@@ -44,21 +39,10 @@ export function createVoiceProvider(voiceService: VoiceService) {
     async transcribeForChat(
       userId: number,
       audio: VoiceAudioUpload,
-      overrides: VoiceRequestOverrides,
-    ): Promise<VoiceServiceResult<{ text: string }>> {
-      const { provider, cleanTranscripts } = readVoiceSettings(userId);
-      if (provider !== 'gemini') {
-        const vocabulary = readVocabulary(userId);
-        const result = await voiceService.transcribe({ audio, overrides, prompt: whisperVocabularyPrompt(vocabulary) });
-        // Whisper has no instruction to give, so its text is cleaned and corrected here, after the service has answered.
-        return result.ok
-          ? { ok: true, value: { ...result.value, text: cleanTranscript(result.value.text, { removeFillers: cleanTranscripts, vocabulary }) } }
-          : result;
-      }
-
-      const answer = await transcribeSpeech(userId, audio);
-      if (answer.ok) return { ok: true, value: { text: answer.text } };
-      return { ok: false, status: chatStatusForRefusal(answer.reason), error: answer.sentence };
+    ): Promise<VoiceServiceResult<{ text: string; notice?: string }>> {
+      const heard = await transcribeSpeech(userId, audio);
+      if (!heard.ok) return { ok: false, status: chatStatusForRefusal(heard.reason), error: heard.sentence };
+      return { ok: true, value: heard.standIn === null ? { text: heard.text } : { text: heard.text, notice: heard.standIn } };
     },
 
     async synthesizeForChat(
@@ -76,16 +60,6 @@ export function createVoiceProvider(voiceService: VoiceService) {
       return readVoiceSettings(userId).provider === 'gemini'
         ? { configured: geminiKeyStatus(userId).source !== 'none' }
         : voiceService.getHealth();
-    },
-
-    // Read fresh per call, like every read of the vocabulary: a word saved in Settings applies on the next press.
-    transcribeHintsForChat(userId: number): { prompt: string } {
-      return { prompt: whisperVocabularyPrompt(readVocabulary(userId)) };
-    },
-
-    cleanTranscriptForChat(userId: number, text: string): string {
-      const { cleanTranscripts } = readVoiceSettings(userId);
-      return cleanTranscript(text, { removeFillers: cleanTranscripts, vocabulary: readVocabulary(userId) });
     },
 
     speakableForChat(userId: number, text: string): string {

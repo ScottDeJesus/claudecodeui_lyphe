@@ -57,18 +57,28 @@ export function planStatusTone(status: DispatcherPlanStatus): Tone {
 }
 
 /**
- * How a planner outing's state reaches the eye: `warn` for an ENDED one, `info` while a soul is out,
- * `neutral` while nothing has started.
+ * How a planner outing reaches the eye: `danger` for one the house says is NOT RUNNING, `warn` for an ENDED one, `info` while a soul is
+ * out, `neutral` while nothing has started.
+ *
+ * THE HOUSE'S OWN ALERT OUTRANKS THE STATE. An outing with a `no_run` sentence is one the house tried to mend and could not — its relaunch
+ * produced no run, or the launch was refused outright — and it has already told the operator so (`dispatcher.no_run`). Whatever the row's
+ * own state word is (a queued row no dispatcher took up, an ended one whose relaunch ended short), the badge wears the loudest tone this
+ * lane has, so the one outing that needs a hand is not drawn like the many that only wait.
  *
  * A WARNING IS FOR THE ONE STATE NOBODY ASKED FOR, and an ended outing the document carries is
  * exactly that: its work is still unfinished and the store is telling the operator a soul died before
  * finishing it (`report_planners.entries` carries no ending that did what it was for). Amber over a
  * queued outing would be the badge arguing with the operator's own press, and `out` is a soul at work
  * — the same `info` a running phase wears.
+ *
+ * Takes the whole outing and not its state, because the alert is a second fact about the same row. Used by `PlannerBadge` and by
+ * `PlanningCard`'s state word, so the two read one tone for one outing. `no_run` is read by truthiness: a frame from a server older than
+ * the key carries none (`DispatcherFeed.asPicture` does not check the keys of each outing), and an absent key is no alert.
  */
-export function plannerStatusTone(state: DispatcherPlanner['state']): Tone {
-  if (state === 'ended') return 'warn';
-  return state === 'out' ? 'info' : 'neutral';
+export function plannerStatusTone(outing: DispatcherPlanner): Tone {
+  if (outing.no_run) return 'danger';
+  if (outing.state === 'ended') return 'warn';
+  return outing.state === 'out' ? 'info' : 'neutral';
 }
 
 /**

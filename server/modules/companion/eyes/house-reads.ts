@@ -2,7 +2,7 @@ import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod';
 
 import { getMemoryCandidate, listMemoryCandidates } from '@/modules/memory-intake/index.js';
-import { geminiKeyStatus, readVoiceSettings } from '@/modules/voice/index.js';
+import { geminiKeyStatus, homeServerKeyStatus, readVoiceSettings } from '@/modules/voice/index.js';
 import { guardedToolResult, textResult, type ToolTextResult } from '@/shared/tool-text-result.js';
 
 import { modelOptions } from '../companion-picture.js';
@@ -25,12 +25,12 @@ import { companionSettingsLines, voiceSettingsLines } from './settings-lines.js'
  * tab's overview), `read_memory` (the memory proposals sessions made) and `read_settings` (her own settings and the voice's).
  * Each reads through the reader its panel uses, never a second copy: the git panel's `readGitStatus` and `readGitFileDiff`,
  * `house.cerberus()` (the tab's own overview), `listMemoryCandidates` and `getMemoryCandidate` (memory intake's barrel),
- * `readCompanionSettings` and the voice barrel's `readVoiceSettings` and `geminiKeyStatus`.
+ * `readCompanionSettings` and the voice barrel's `readVoiceSettings`, `geminiKeyStatus` and `homeServerKeyStatus`.
  *
  * EVERY READ TAKES A SCOPE and answers small: a list is one line per item and capped (`cappedLines`), and an answer past 2,000
  * characters is handed to a dactyl under the scope's fixed brief (`answerRead`). `panel: true` puts the whole answer on his panel
  * as a note. NO EYES TOOL MOVES HER FOCUS OR HER ACTIVITY: a read runs as `thinking`, so none of these calls `setFocus` or
- * `withActivity`. NOTHING IS EVER WRITTEN to his settings, and `read_settings` says a Gemini key by whose it is, never the key.
+ * `withActivity`. NOTHING IS EVER WRITTEN to his settings, and `read_settings` says a Gemini key by whose it is and the home server's by whether it is set, never a key.
  * NEVER SPEND (ruling 1): no renderer here reads a cost, a token count, a cap or a pacer window, and `read_cerberus` drops the
  * usage family of checks (a vendor's spend or usage, whose value is money) from every list before a scope is read.
  *
@@ -134,10 +134,10 @@ async function readSettings(deps: CompanionToolDeps, args: { scope: string }, si
     const label = (await modelOptions()).find((option) => option.value === settings.model)?.label ?? settings.model;
     lines = companionSettingsLines(settings, label, COMPANION_REGISTER_DEFAULT);
   } else if (scope === 'voice') {
-    // Only the key's `source` leaves this call: its last characters are not read.
-    lines = voiceSettingsLines(readVoiceSettings(deps.userId), geminiKeyStatus(deps.userId).source);
+    // Only each key's `source` leaves this call: their last characters are not read.
+    lines = voiceSettingsLines(readVoiceSettings(deps.userId), geminiKeyStatus(deps.userId).source, homeServerKeyStatus(deps.userId).source);
   } else {
-    return deps.refuse('read_settings reads companion (your own settings) or voice (the chat mic and your voice). Pass one of them as scope.');
+    return deps.refuse('read_settings reads companion (your own settings) or voice (how he is heard and your voice). Pass one of them as scope.');
   }
   return wholeOrDigest(deps, { text: lines.join('\n'), label: `settings-${scope}`, brief: SETTINGS_BRIEF, intro: '' }, signal);
 }
@@ -200,7 +200,7 @@ export function houseReads(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
       'read_settings',
       toolLine('read_settings'),
       {
-        scope: z.string().trim().min(1).max(SCOPE_MAX).describe("companion: your own settings (names, model, Live, delivery note, talk button, register). voice: the chat mic and your voice (models, voice, sounds, and whose Gemini key is in use, never the key)."),
+        scope: z.string().trim().min(1).max(SCOPE_MAX).describe("companion: your own settings (names, model, Live, delivery note, talk button, register). voice: how he is heard and your voice (whether his home server transcribes, with Gemini as the backup, the models, voice, sounds, and whose Gemini key is in use, never a key)."),
       },
       (args, extra) => guardedToolResult('read_settings', 'read the settings', () => readSettings(deps, args, signalOf(extra))),
       readOnly

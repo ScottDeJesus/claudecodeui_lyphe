@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, refusalSentence } from '@/shared/api';
-import type { GeminiKeyStatus, VoiceSettings, VoiceSettingsPatch } from '@/shared/types';
+import type { GeminiKeyStatus, HomeServerKeyStatus, VoiceSettings, VoiceSettingsPatch } from '@/shared/types';
 import { VOICE_CONFIG_SYNC_EVENT } from '@/shared/voiceConfig';
 
 /** What one call came to: its parsed answer, or the server's own sentence (null when it sent none) and a plain reason clause. */
@@ -9,8 +9,11 @@ type CallOutcome<TValue> =
   | { ok: true; value: TValue }
   | { ok: false; sentence: string | null; reason: string };
 
-/** `GET` and `PUT /api/voice/settings` answer the settings and the key's status together. */
-type SettingsAnswer = { settings: VoiceSettings; key: GeminiKeyStatus };
+/** `GET` and `PUT /api/voice/settings` answer the settings and both keys' statuses together. */
+type SettingsAnswer = { settings: VoiceSettings; key: GeminiKeyStatus; homeServerKey: HomeServerKeyStatus };
+
+/** What a server that predates the home server says of its key by saying nothing: no key, so the home server is off. */
+const NO_HOME_SERVER_KEY: HomeServerKeyStatus = { source: 'none', last4: null };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -24,6 +27,21 @@ function asKeyStatus(value: unknown): GeminiKeyStatus | null {
   return { source, last4 };
 }
 
+function asHomeServerKeyStatus(value: unknown): HomeServerKeyStatus | null {
+  if (!isRecord(value)) return null;
+  const { source, last4 } = value;
+  if ((source !== 'stored' && source !== 'none') || (last4 !== null && typeof last4 !== 'string')) return null;
+  return { source, last4 };
+}
+
+/** The home server's saved address, or null when none is saved. A server that predates the setting sends no `homeServer`, which reads as none. */
+function asHomeServerAddress(value: unknown): string | null | undefined {
+  if (value === undefined) return null;
+  if (!isRecord(value)) return undefined;
+  const { address } = value;
+  return typeof address === 'string' || address === null ? address : undefined;
+}
+
 function asVoiceSettings(value: unknown): VoiceSettings | null {
   if (!isRecord(value) || !isRecord(value.gemini)) return null;
   const { provider } = value;
@@ -33,7 +51,9 @@ function asVoiceSettings(value: unknown): VoiceSettings | null {
   if (provider !== 'openai' && provider !== 'gemini') return null;
   if (typeof transcriptionModel !== 'string' || typeof speechModel !== 'string' || typeof voice !== 'string') return null;
   if (!Array.isArray(soundTags) || !soundTags.every((tag) => typeof tag === 'string')) return null;
-  return { provider, cleanTranscripts, gemini: { transcriptionModel, speechModel, voice, soundTags } };
+  const address = asHomeServerAddress(value.homeServer);
+  if (address === undefined) return null;
+  return { provider, cleanTranscripts, homeServer: { address }, gemini: { transcriptionModel, speechModel, voice, soundTags } };
 }
 
 /**
@@ -44,12 +64,18 @@ function parseSettingsAnswer(body: unknown): SettingsAnswer | null {
   if (!isRecord(body)) return null;
   const settings = asVoiceSettings(body.settings);
   const key = asKeyStatus(body.key);
-  return settings && key ? { settings, key } : null;
+  const homeServerKey = body.homeServerKey === undefined ? NO_HOME_SERVER_KEY : asHomeServerKeyStatus(body.homeServerKey);
+  return settings && key && homeServerKey ? { settings, key, homeServerKey } : null;
 }
 
-/** The answer of a key save or clear: `{ key }` alone. */
+/** The answer of a Gemini key save or clear: `{ key }` alone. */
 function parseKeyAnswer(body: unknown): GeminiKeyStatus | null {
   return isRecord(body) ? asKeyStatus(body.key) : null;
+}
+
+/** The answer of a home server key save or clear: `{ homeServerKey }` alone. */
+function parseHomeServerKeyAnswer(body: unknown): HomeServerKeyStatus | null {
+  return isRecord(body) ? asHomeServerKeyStatus(body.homeServerKey) : null;
 }
 
 /**
@@ -90,6 +116,8 @@ type VoiceSettingsState = {
   settings: VoiceSettings | null;
   /** Which Gemini key the account uses, never the key itself; null until the first read lands. */
   keyStatus: GeminiKeyStatus | null;
+  /** Whether the account has a home server key (and its last four), never the key itself; null until the first read lands. */
+  homeServerKey: HomeServerKeyStatus | null;
   /** A save is out or queued behind one. */
   saving: boolean;
   /** The sentence for the last refused save; while `keyStatus` is still null, the reason the read failed. Null when none. */
@@ -99,20 +127,29 @@ type VoiceSettingsState = {
    * card that draws `error` sits two sections below the picker, off screen from it.
    */
   providerRefusal: string | null;
+  /**
+   * The sentence for the last refused save of the home server (its address or its key), else null. The home server's card draws it
+   * under itself, and `error` never holds it, so the Gemini card below does not repeat a refusal that is not its own.
+   */
+  homeServerRefusal: string | null;
   /** Merges a partial into the account's settings. A change of provider tells the open composers (VOICE_CONFIG_SYNC_EVENT) once the server has it. */
   saveSettings: (patch: VoiceSettingsPatch) => Promise<void>;
   /** Stores this as the account's Gemini key, replacing any earlier one, and tells the open message rows once the server has it. The key is passed through, never kept here. */
   saveKey: (key: string) => Promise<void>;
   /** Forgets the account's stored key, so the house's key serves again, and tells the open message rows once the server has done it. */
   clearKey: () => Promise<void>;
+  /** Stores this as the account's home server key, replacing any earlier one. The key is passed through, never kept here. */
+  saveHomeServerKey: (key: string) => Promise<void>;
+  /** Forgets the account's home server key, which turns the home server off: Gemini then transcribes alone. */
+  clearHomeServerKey: () => Promise<void>;
   /** Reads the settings again, for the Try again of a read that failed. */
   retry: () => Promise<void>;
 };
 
 /**
- * The one reader and writer of the account's voice settings and its Gemini key in `src/`: `GET`, `PUT /api/voice/settings`
- * and `PUT`, `DELETE /api/voice/gemini-key`. Used by the settings module's VoiceSettingsTab, which hands them to the
- * provider picker and the Gemini section.
+ * The one reader and writer of the account's voice settings and its two keys in `src/`: `GET`, `PUT /api/voice/settings`
+ * and `PUT`, `DELETE /api/voice/gemini-key` and `/api/voice/home-server-key`. Used by the settings module's VoiceSettingsTab, which
+ * hands them to the provider picker, the home server section and the Gemini section.
  *
  * Nothing is optimistic: what the page draws is the server's last answer, so a refused save leaves the old value
  * standing with the server's sentence under it. Saves run one at a time in the order they were made, so two quick picks
@@ -129,12 +166,16 @@ export function useVoiceSettings(): VoiceSettingsState {
   const [settings, setSettings] = useState<VoiceSettings | null>(null);
   // The key's source and last four, drawn by the Gemini section's key line. Null until the first answer.
   const [keyStatus, setKeyStatus] = useState<GeminiKeyStatus | null>(null);
+  // Whether the home server has a key, and its last four, drawn by the home server section's key line. Null until the first answer.
+  const [homeServerKey, setHomeServerKey] = useState<HomeServerKeyStatus | null>(null);
   // True from a save's request until its answer, so the section's buttons wait and "Saving…" shows.
   const [saving, setSaving] = useState(false);
   // The last refusal (or, before any read has landed, the failed read's reason), drawn under the Gemini card.
   const [error, setError] = useState<string | null>(null);
   // The same sentence when it was a provider save that was refused, so the picker can say why it snapped back.
   const [providerRefusal, setProviderRefusal] = useState<string | null>(null);
+  // The sentence of a refused home server save (address or key), drawn under the home server's card and nowhere else.
+  const [homeServerRefusal, setHomeServerRefusal] = useState<string | null>(null);
 
   // False once unmounted: a save outlives the tab that made it, and a closed tab has nothing to draw.
   const aliveRef = useRef(true);
@@ -158,6 +199,7 @@ export function useVoiceSettings(): VoiceSettingsState {
       if (outcome.ok) {
         setSettings(outcome.value.settings);
         setKeyStatus(outcome.value.key);
+        setHomeServerKey(outcome.value.homeServerKey);
         setError(null);
       } else {
         setError(outcome.sentence ?? outcome.reason);
@@ -174,11 +216,15 @@ export function useVoiceSettings(): VoiceSettingsState {
     await read();
   }, [read]);
 
-  /** Queues one save behind the earlier ones. Resolves with the server's taking it, or the sentence for why it did not. */
+  /**
+   * Queues one save behind the earlier ones. Resolves with the server's taking it, or the sentence for why it did not.
+   * `aboutHomeServer` sends a refusal to `homeServerRefusal` instead of `error`.
+   */
   const enqueueSave = useCallback(<TValue>(
     request: () => Promise<Response>,
     parse: (body: unknown) => TValue | null,
     apply: (value: TValue) => void,
+    aboutHomeServer = false,
   ): Promise<SaveOutcome> => {
     const queue = queueRef.current;
     queue.outstanding += 1;
@@ -186,6 +232,7 @@ export function useVoiceSettings(): VoiceSettingsState {
       setSaving(true);
       setError(null);
       setProviderRefusal(null);
+      setHomeServerRefusal(null);
     }
     const run = queue.tail.then(async (): Promise<SaveOutcome> => {
       const outcome = await callVoiceApi(request, parse);
@@ -194,6 +241,7 @@ export function useVoiceSettings(): VoiceSettingsState {
       const sentence = outcome.ok ? null : outcome.sentence ?? `Not saved: ${outcome.reason}.`;
       if (aliveRef.current) {
         if (outcome.ok) apply(outcome.value);
+        else if (aboutHomeServer) setHomeServerRefusal(sentence);
         else setError(sentence);
         setSaving(queue.outstanding > 0);
       }
@@ -207,10 +255,11 @@ export function useVoiceSettings(): VoiceSettingsState {
   const applySettingsAnswer = useCallback((answer: SettingsAnswer) => {
     setSettings(answer.settings);
     setKeyStatus(answer.key);
+    setHomeServerKey(answer.homeServerKey);
   }, []);
 
   const saveSettings = useCallback(async (patch: VoiceSettingsPatch) => {
-    const outcome = await enqueueSave(() => api.voice.saveSettings(patch), parseSettingsAnswer, applySettingsAnswer);
+    const outcome = await enqueueSave(() => api.voice.saveSettings(patch), parseSettingsAnswer, applySettingsAnswer, patch.homeServer !== undefined);
     if (patch.provider === undefined) return;
     if (!outcome.landed) {
       if (aliveRef.current) setProviderRefusal(outcome.sentence);
@@ -231,5 +280,16 @@ export function useVoiceSettings(): VoiceSettingsState {
     if (outcome.landed) window.dispatchEvent(new Event(VOICE_CONFIG_SYNC_EVENT));
   }, [enqueueSave]);
 
-  return { settings, keyStatus, saving, error, providerRefusal, saveSettings, saveKey, clearKey, retry };
+  const saveHomeServerKey = useCallback(async (key: string) => {
+    await enqueueSave(() => api.voice.saveHomeServerKey(key), parseHomeServerKeyAnswer, setHomeServerKey, true);
+  }, [enqueueSave]);
+
+  const clearHomeServerKey = useCallback(async () => {
+    await enqueueSave(() => api.voice.clearHomeServerKey(), parseHomeServerKeyAnswer, setHomeServerKey, true);
+  }, [enqueueSave]);
+
+  return {
+    settings, keyStatus, homeServerKey, saving, error, providerRefusal, homeServerRefusal,
+    saveSettings, saveKey, clearKey, saveHomeServerKey, clearHomeServerKey, retry,
+  };
 }

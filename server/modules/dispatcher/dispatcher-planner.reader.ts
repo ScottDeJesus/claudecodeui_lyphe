@@ -78,6 +78,13 @@ export function plannerOf(raw: unknown): DispatcherPlanner {
     // read its own `planning_paused` from — draw Resume planning once the pause has ended its outing. ABSENT reads
     // `false` (a build older than the key braked nothing).
     planning_paused: flagSince(field(planner, 'planning_paused'), `planner.planning_paused for ${target}`),
+    // WHY THIS OUTING IS NOT RUNNING, in the house's own words — the two sentences the dispatcher derives at every read and the
+    // badge draws (`report_planners._entry`, `planner_holds.mark_waiting`): `waiting` is the take-up's reason for passing a QUEUED
+    // row over (`""` on any other state), `no_run` the sentence of the open `no-run` record for the outing, whatever its state.
+    // Never derived here: a second reading of either would be a second answer. ABSENT reads `""` (a build older than the keys said
+    // nothing of either), and so does a `null`, as `pace_hold`'s does.
+    waiting: textSince(field(planner, 'waiting'), `planner.waiting for ${target}`) ?? '',
+    no_run: textSince(field(planner, 'no_run'), `planner.no_run for ${target}`) ?? '',
   };
 }
 

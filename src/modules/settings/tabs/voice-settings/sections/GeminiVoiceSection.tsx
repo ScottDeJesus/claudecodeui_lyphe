@@ -13,7 +13,7 @@ type GeminiVoiceSectionProps = {
    * the house's, or none. Null while the account's voice settings are still being read.
    */
   keyStatus: GeminiKeyStatus | null;
-  /** The Gemini model that transcribes, as stored: free text, 1-80 of letters, digits, `.`, `_` and `-`. */
+  /** The Gemini model that transcribes a clip when the home server cannot (the backup's), as stored: free text, 1-80 of letters, digits, `.`, `_` and `-`. */
   transcriptionModel: string;
   /** A save of the key or the model is out: Save, Replace and Clear wait for it. */
   saving: boolean;
@@ -54,28 +54,28 @@ type GeminiVoiceSectionProps = {
 
 /** A key the server takes: 20-200 printable ASCII characters, no whitespace (`saveGeminiKey`'s own rule: the key rides an HTTP header). */
 const KEY_SHAPE = /^[\x21-\x7e]{20,200}$/;
-/** A model name the server takes (`saveVoiceSettings`' own rule, `MODEL_PATTERN`), for the transcription and the speech model. */
+/** A model name the server takes (`saveVoiceSettings`' own rule, `MODEL_PATTERN`), for the backup transcription and the speech model. */
 const MODEL_SHAPE = /^[A-Za-z0-9._-]{1,80}$/;
 /** A voice name the server takes (`saveVoiceSettings`' own rule, `VOICE_PATTERN`). */
 const VOICE_SHAPE = /^[A-Za-z0-9_-]{1,40}$/;
 
 /**
- * Settings > Voice > Gemini, shown whatever the chat's voice provider, because Kaylee speaks through Gemini either way and
- * hears through it whenever this server's own speech-to-text service gives no words, and the chat's own mic and read-aloud do the
- * same when Gemini is the provider: the speech model and voice here speak both, and the transcription model hears when it is asked.
- * Composed for the settings module's VoiceSettingsTab, after the voice-input section and before her own;
+ * Settings > Voice > Gemini, shown whatever the chat's read-aloud provider. Gemini is the BACKUP transcriber: it hears a clip, for
+ * the chat's mic and Kaylee's press alike, only when the home server (the card above) cannot, and the model here is that backup's.
+ * It also speaks Kaylee, and the chat's read-aloud when it is the provider: the speech model and voice here speak both.
+ * Composed for the settings module's VoiceSettingsTab, after the home server section and before her own;
  * `.verify/kaylee-talk-scaffold.mjs` draws it for each key source, refused and waiting, and
  * `.verify/kaylee-voice-scaffold.mjs` with her voice's rows.
  *
- * THE KEY ROW leads, because whether Gemini works and on whose key is the first thing to know. Under "API key" its line
+ * THE KEY ROW leads, because whether Gemini works (as the backup and as her voice) and on whose key is the first thing to know. Under "API key" its line
  * says which key is in use: "✓ Using your key ending 1a2b", "✓ Using the house's key" (green: Gemini works), or
- * "▲ No key: Gemini is off" (amber: she cannot speak, and hears only what the local service can). Under that, the card's full width: a password field, then Save —
+ * "▲ No key: Gemini is off" (amber: she cannot speak, and hears only what the home server can). Under that, the card's full width: a password field, then Save —
  * Replace once his own key is stored — and Clear, only then. Enter saves too. The field empties the moment a key is sent,
  * so a key never stands in the page after its save, and is never shown back beyond the four characters the line names.
  * A key that cannot be one (under 20 characters, or with a space) says so under the field and is not sent. Clear asks
  * first, as Settings does before it deletes any stored key: a key forgotten here cannot be shown again.
  *
- * THE NAME ROWS, each a GeminiNameField: the transcription model (placeholder gemini-3.8-flash), then, given theirs, her
+ * THE NAME ROWS, each a GeminiNameField: the backup transcription model (placeholder gemini-3.8-flash), then, given theirs, her
  * voice's two — the speech model (placeholder gemini-3.8-flash-tts; its helper names gemini-3.8-flash-lite-tts as the
  * cheap choice) and the voice (placeholder Kore). Each is free text saved when the field is left or on Enter, only when
  * it changed and is a name the server takes; one that is not says why in place of its helper. Each follows the stored
@@ -102,7 +102,7 @@ export function GeminiVoiceSection({
 
   const title = t('voiceSettings.gemini.title', { defaultValue: 'Gemini' });
   const description = t('voiceSettings.gemini.description', {
-    defaultValue: "Kaylee speaks through Gemini, and hears through it whenever this server's own speech-to-text service can't give her the words. When Gemini is picked above, the chat's mic hears the same way and its read-aloud speaks through it.",
+    defaultValue: "The backup that hears a clip when the home server can't. Kaylee speaks through Gemini too, and so does the chat's read-aloud when it is picked above.",
   });
 
   if (keyStatus === null) {
@@ -213,8 +213,8 @@ export function GeminiVoiceSection({
             </form>
           </div>
           <GeminiNameField
-            label={t('voiceSettings.gemini.model', { defaultValue: 'Transcription model' })}
-            help={t('voiceSettings.gemini.modelHelp', { defaultValue: 'The Gemini model that writes down what is said, by its exact name.' })}
+            label={t('voiceSettings.gemini.model', { defaultValue: 'Backup transcription model' })}
+            help={t('voiceSettings.gemini.modelHelp', { defaultValue: "The Gemini model that writes down a clip when the home server can't, by its exact name." })}
             invalid={modelInvalid}
             stored={transcriptionModel}
             placeholder="gemini-3.8-flash"

@@ -383,7 +383,7 @@ export type DispatcherPhase = { key: string; position: number; title: string; as
 /** One line of a plan's log, oldest first in `DispatcherPlan.events`. `phase` is the phase's KEY or null — the table stores a phase id, and an id is not an address (INV-183). `detail` is free text and reaches the DOM as a text node. */
 export type DispatcherEvent = { id: number; at: string; phase: string | null; kind: string; detail: string | null };
 /** ONE planner outing: the soul the dispatcher's daemon has out on one piece of work, on one model, for one stretch of time — `store_planners`' row as `report_planners._entry` reads it. A planner is NOT a phase and not a stage: nothing in a session dispatches it, it rides the operator's Claude subscription (so `tokens` is the figure and `cost_usd` is `0`), and its liveness is the store's own `state` rather than a column a card has to derive. `target` is the bare name the outing is FOR — a plan's, or an ARC's for the arc's own design, its cut and its judgment — and `plan` is the name it lands in, equal to `target` except for a judgment, which targets its arc and lands in `<arc>--judgment`. `verb` is the work it is doing and `state` is the row's own: `queued` and `out` are LIVE (the rule owes each something), `ended` is the record that the child is gone. `stalled` is the document's ONE derived word and is true on exactly the endings whose work is still unfinished — every `ended` entry the document carries is one, so a reader never re-asks the question to tell them apart. `outcome` is what an ending left behind: `done` when it did what it was for, else the crash the launch's own `result.json` carried. `launch_id` names the launch, and `tokens`/`cost_usd` are read off that launch's result at report time and never stored (INV-172). `paid_vendor` is the label of those dollars, off the launch's own bill word. */
-export type DispatcherPlanner = { id: number; target: string; plan: string; soul: string; verb: 'design' | 'judge' | 'tell' | 'cut'; model: string; state: 'queued' | 'out' | 'ended'; stalled: boolean; launch_id: string | null; created_at: string; launched_at: string | null; ended_at: string | null; outcome: string | null; tokens: number; cost_usd: number; paid_vendor: string | null; /** The pacer's clause on THIS queued outing, with its `pace:` lead, or `''` (`report.snapshot` → `pace_report.mark_outings`, off the document's one walk): the words `dispatcher`'s `held planner …` line prints for it. The board draws it with an Override on the outing's Planning line only while its subject has neither a plan card nor a deck drawn on the screen (`PlanningCard`, `PlanningLine.drawn`: an epic's design before any plan of it exists, or a feature or epic the operator has put away); an outing whose card or deck is drawn is held on it (`plan.pace_hold`, `arc.pace_hold`), so each hold has one press. `''` against a dispatcher build older than the key (read tolerantly, `plannerOf`). */ pace_hold: string; /** Whether the outing's target carries the operator's override (`dispatcher override <name>`, a plan's or an epic's) — a lifted outing reads `pace_hold` `''` and a Planning line whose subject has no card or deck drawn then draws `Override on` with its Turn off. `false` against a build older than the key. */ overridden: boolean; /** Whether a standing planning pause HOLDS this outing — the feature's own or its epic's (`report_planners.mark_paused`, by `store_planning.holder`) — whatever the outing's `state`: queued, out, or the ENDED entry the pause itself left. The pause ends the outing in flight, and the ending stays in the document as a stalled entry while its work is short, so a loose Planning line (an epic's design with no feature yet, no epic on the lane to read its own `planning_paused` from) reads its own flag here: `true` draws Resume planning, `false` Pause planning (`loosePress`). `false` against a dispatcher build older than the key (read tolerantly, `plannerOf`). */ planning_paused: boolean };
+export type DispatcherPlanner = { id: number; target: string; plan: string; soul: string; verb: 'design' | 'judge' | 'tell' | 'cut'; model: string; state: 'queued' | 'out' | 'ended'; stalled: boolean; launch_id: string | null; created_at: string; launched_at: string | null; ended_at: string | null; outcome: string | null; tokens: number; cost_usd: number; paid_vendor: string | null; /** The pacer's clause on THIS queued outing, with its `pace:` lead, or `''` (`report.snapshot` → `pace_report.mark_outings`, off the document's one walk): the words `dispatcher`'s `held planner …` line prints for it. The board draws it with an Override on the outing's Planning line only while its subject has neither a plan card nor a deck drawn on the screen (`PlanningCard`, `PlanningLine.drawn`: an epic's design before any plan of it exists, or a feature or epic the operator has put away); an outing whose card or deck is drawn is held on it (`plan.pace_hold`, `arc.pace_hold`), so each hold has one press. `''` against a dispatcher build older than the key (read tolerantly, `plannerOf`). */ pace_hold: string; /** Whether the outing's target carries the operator's override (`dispatcher override <name>`, a plan's or an epic's) — a lifted outing reads `pace_hold` `''` and a Planning line whose subject has no card or deck drawn then draws `Override on` with its Turn off. `false` against a build older than the key. */ overridden: boolean; /** Whether a standing planning pause HOLDS this outing — the feature's own or its epic's (`report_planners.mark_paused`, by `store_planning.holder`) — whatever the outing's `state`: queued, out, or the ENDED entry the pause itself left. The pause ends the outing in flight, and the ending stays in the document as a stalled entry while its work is short, so a loose Planning line (an epic's design with no feature yet, no epic on the lane to read its own `planning_paused` from) reads its own flag here: `true` draws Resume planning, `false` Pause planning (`loosePress`). `false` against a dispatcher build older than the key (read tolerantly, `plannerOf`). */ planning_paused: boolean; /** Why a QUEUED outing has not been launched (`planner_holds.hold_of`, put on the list by `planner_holds.mark_waiting` off the document's one read-only pace context): the take-up's own reason for passing the row over, in the words its `held planner …` line ends with — `planning paused`, `queue: Pause all is on`, the pacer's clause with its `pace:` lead, `waits for its own outing to end`, `a launch of it is being recorded` — so a queued outing is never one a reader cannot account for. `''` for an outing that is not queued, for one nothing holds (the daemon takes it up at once), and against a dispatcher build older than the key (read tolerantly, `plannerOf`). The pacer's clause is also this outing's `pace_hold`, which the card draws with its Override: the badge says it there once and leaves it out of its own line. */ waiting: string; /** The sentence of the house's open `no-run` record for this outing (`report_planners._entry`, `run_record.open_alert`): the house could not get a run behind it — it could not heal the claim, or the launch was refused outright — and the sentence says what it tried and why, in plain words with no row or launch id. `''` while no record stands since the outing's latest stamp, and against a dispatcher build older than the key (read tolerantly, `plannerOf`). Read at every report and never stored (INV-172), so a later outing of the same work starts clean; the endings notifier pushed the same sentence once, as `dispatcher.no_run`, when the record was written. The badge draws it in the `danger` tone, in place of the outing's own state word. */ no_run: string };
 /** The two causes a phase's or a plan's `stalled` word carries (`report_stall`): `dispatcher_down` when no daemon holds the home, so nothing can record anything, and `ended_unrecorded` when one does and has not. Both are answered by Resume, which wakes or starts the daemon. */
 export type DispatcherStall = 'dispatcher_down' | 'ended_unrecorded';
 /** The plan's word, in ONE precedence: `complete`, `hidden`, `scheduled`, `paused`, `queued`, `stalled`, `live`, `parked`, else `idle`. `hidden` is a plan the operator hid (`DispatcherPlan.hidden` says since when): held out of the queue and paused until he Shows it, and it outranks every word below it — an hour armed for it fires into a refusal, so a card reading `scheduled` over it would promise a start nothing makes. `stalled` is a released plan (approved, unpaused) whose only running work has ENDED with nothing to record it — never `live`, because nothing is moving it; `DispatcherPlan.stalled` says why. `scheduled` outranks the pause flag on purpose — a paused plan with an hour set is going to start by itself, and calling it merely `paused` would hide the one fact the operator needs. `paused` and `queued` are told apart by whether a walk ever launched: a paused plan that has run is stopped mid-plan, one that never launched is still waiting at the gate. */
@@ -402,8 +402,12 @@ export type DispatcherPlan = { name: string; state: string; status: DispatcherPl
 export type DispatcherArcStatus = 'empty' | 'complete' | 'hidden' | 'judging' | 'stalled' | 'live' | 'scheduled' | 'paused' | 'queued' | 'designing';
 /** An epic's place in the queue (`report_arcs.arc_dict.queue`, from `line_gate.places`): `position` is its place counted from 1, top down — the run order the operator gave In flight — and `turn` says what that place means NOW: `now` (it is running, it is the first epic not started that can start with no epic above it able to, or a plan of it was let through the queue's order by its own press or by a wait of an epic in progress), `waiting` (its turn is behind an epic above it), `paused` (the dial's Pause all is on, so no epic starts) or `hidden` (every open plan of the epic is hidden: it keeps its place and is out of the line). Never a column and never the arc's status word (INV-172): the store holds only the place the operator gave and when, and membership and turns are derived at every read (`epic_line`, `line_gate`). Where an epic is NOT in the queue — its turn is over, or it has no open plan — the arc's `queue` is `null`, never a place. */
 export type DispatcherArcQueue = { position: number; turn: 'now' | 'waiting' | 'paused' | 'hidden' };
+/** An epic's open `no-run` record as the document states it: `id` is the record's row in the epic's own log (`arc_events`), a SEQUENCE OF ITS OWN — never an event id of a plan's log — so the endings notifier keeps a mark of its own for it (`dispatcher-arc-alerts.service.ts`) and pushes each record once; `at` is the record's store stamp, which the mark reads beside the `id` because the store hands an id out again once the row holding it is removed (`arc_events.id` has no AUTOINCREMENT) and a stamp only climbs, and `detail` the sentence that says why the house could not get a run behind the epic's outing and what it tried first. It stands while the epic's newest own outing has not moved past it. */
+export type DispatcherArcNoRun = { id: number; at: string; detail: string };
+/** The mark the endings notifier keeps on an EPIC's `no-run` alerts (`dispatcher-arc-alerts.service.ts`; `dispatcher.module.ts` stores it in `app_config`): the highest record `id` told and the latest record stamp `at` told, each the maximum of its own, so one pair stands for every alert told. It is a PAIR because the store hands an id out again — `arc_events.id` has no AUTOINCREMENT, so removing the epic that holds the newest row lets the next alert take the same id — and a record that took one is told apart by its stamp, which only climbs: a record is due when its `id` is above `id` or its `at` is after `at`. `at` is `null` for a mark stored before the stamp was kept (a bare id), which compares ids alone until the next announcement writes the pair. */
+export type DispatcherArcAlertMark = { id: number; at: string | null };
 /** One arc of the store (`report_arcs.arc_dict`): its words, its own model word, its derived status and the NAMES of its plans, in `store.arc_plans` order — the arc file's order, except for a member that pre-dated its arc — which is what a reader joins against `plans[].arc` in the same document. `model` is the ARC's own word, never one plan's effective one: it is what the arc's control draws and what `dispatcher model <arc> <word>` hands to every plan of the arc. `cost_usd`, the four token keys and `runtime_s` are the epic's books: the plan cards' figures in the same document (`report.plan_dict`'s own, a phase mid-walk counted as its card counts it) cut at the moment each feature JOINED the epic — a stage counts when it launched at or after it, a feature born in the epic counts whole — so an epic that took a finished feature in after it ran does not carry that feature's past, while the feature's own card keeps it (`report_arcs._books`, INV-4299). `paid_vendor` labels those dollars over the same cut. `walking`, `stopped` and `schedule` are its own verbs' readings, taken off the same document's plan rows — so the header and `dispatcher stop|resume|schedule <arc>` can never disagree about what a press reaches. */
-export type DispatcherArc = { name: string; goal: string | null; architecture: string | null; delivers: string | null; /** The epic's OWN model word (`report_arcs.arc_dict`), or `null` while it carries none and follows the house switch — never one of its plans' effective words. Pressing it hands the word to every plan of the epic (`store.set_arc_model`), and `default` clears the epic's and theirs. */ model: DispatcherModelWord | null; status: DispatcherArcStatus; /** Whether any of the arc's plans is LIVE (`report_arcs.walking` — the `live` ones): a walk is out on it, or it is approved and unpaused and so the rule's to take up when its waits are complete. This is what `dispatcher stop <arc>` acts on and the set the header draws Pause for — so Pause reaches the plans waiting their turn as well as the one in flight, and the next one cannot start the moment the walker of the one before it ends. */ walking: boolean; /** Whether any of the arc's plans is STOPPED — approved, paused and unfinished (`report_arcs.stopped`): `queued` at the gate, `paused` mid-walk, `scheduled` with an hour armed — never `hidden`, which waits for Show. It is the set a terminal's `dispatcher resume <arc>` and `dispatcher schedule <arc>` act on; the deck draws no press for the whole set (the plans held for their first Start are the board's Start's), only for `midwalk` and `stalled`. */ stopped: boolean; /** Whether any of the arc's plans is STOPPED MID-WALK (`report_arcs.midwalk`): a walk has gone out for it and it is not moving — `paused`, or `scheduled` with an hour armed after a walk. The deck draws Resume for it, beside `stalled`; a plan never launched (waiting for its first Start) is not one, so an epic whose waiting plans are all of that kind draws no Resume. */ midwalk: boolean; /** Whether any of the arc's plans is STALLED (`report_arcs.stalled`): released, with its only running work ended and nothing to record it (`report_stall`). It is what the deck draws Resume for beside `midwalk` — `dispatcher resume <arc>` takes these plans along with the stopped ones, waking the daemon — and it never replaces Pause: a stalled plan is released, so Pause still reaches it (`walking`). */ stalled: boolean; /** The ONE hour the arc's STOPPED plans are armed for, as the timer's own ISO stamp, or null (`report_arcs.hour`). Over the same set the arc's Cancel reaches — which is the set its Start reaches — whoever armed it. One stamp because one press wrote them all; null when none of them is armed, and when they were armed apart — the header then offers the press again rather than naming a time half its plans are not waiting for. */ schedule: string | null; /** How many of the arc's plans the "Accept when cut" press reaches now — `designed` and not yet armed (`report_arcs.armable`). The deck draws the press while this is above zero. */ armable: number; /** How many of the arc's plans carry an "Accept when cut" press (`report_arcs.armed`): what the deck's Cancel reaches. */ armed: number; plans: string[]; /** The one planner outing of the ARC — its design, its cut, its judgment (`report_planners.of_arc`: the newest live row whose `target` IS the arc, else its newest ending still short of a plan). A row naming one of the arc's plans is that PLAN's, and rides `plan.planner` instead, so the deck's header and a card inside it can never state one outing twice. `null` on an arc no planner is on, and against a dispatcher build older than the field. */ planner: DispatcherPlanner | null; /** The usage pacer's clause on the epic's OWN queued outings — the planner rows whose target IS the epic: its design before any plan of it exists, its whole-arc cut, a tell, its judgment (`report_arcs.arc_dict.pace_hold`, `pace_report.arc_hold`), with its `pace:` lead — or `''`. The deck draws it with the epic's Override, and a plan card never repeats it. `''` while `overridden` is true, and against a dispatcher build older than the key (read tolerantly, `arcOf`). */ pace_hold: string; /** Whether the operator has let the epic's own outings start past the pacer (`dispatcher override <arc>`, `store_override.overridden_arcs`) — the deck then draws `Override on` with its Turn off. Derived by the dispatcher from the epic's own log; `false` against a build older than the key. */ overridden: boolean; /** The operator's planning pause on THIS epic (`DispatcherPlanningPause`), or `null` while its own does not stand (`report_arcs.arc_dict`, `store_planning.arc_pause`): it holds the epic's design and cut and every outing of its features, the judgment's included, and ended the ones in flight. Each feature it holds carries `null` of its own — the epic's Planning line holds the one Resume planning that lifts it. `null` against a dispatcher build older than the key (read tolerantly, `planningPausedSince`). */ planning_paused: DispatcherPlanningPause | null; created_at: string; completed_at: string | null; cost_usd: number; paid_vendor: string | null; tokens: number; tokens_in: number; tokens_out: number; tokens_cache_read: number | null; /** How long at least one agent was out on the epic, in whole seconds (`report_arcs.arc_dict`): the UNION of its plans' intervals and the outings whose subject is the epic itself — its design, its cut, its judge — never its plans' `runtime_s` added, because features of one epic walk at the same time. Read like `DispatcherPlan.runtime_s`: derived, ticked between frames only while an agent is out, `0` against a build older than the field. */ runtime_s: number; /** The epic's place in the queue (`report_arcs.arc_dict.queue`, from `line_gate.places`), or `null` for an epic not in it — its turn is over, or no plan of it is open — and against a dispatcher build older than the field, where nothing is drawn of a queue. Read tolerantly (`arcOf`); a key that IS there and does not read is refused by name. */ queue: DispatcherArcQueue | null };
+export type DispatcherArc = { name: string; goal: string | null; architecture: string | null; delivers: string | null; /** The epic's OWN model word (`report_arcs.arc_dict`), or `null` while it carries none and follows the house switch — never one of its plans' effective words. Pressing it hands the word to every plan of the epic (`store.set_arc_model`), and `default` clears the epic's and theirs. */ model: DispatcherModelWord | null; status: DispatcherArcStatus; /** Whether any of the arc's plans is LIVE (`report_arcs.walking` — the `live` ones): a walk is out on it, or it is approved and unpaused and so the rule's to take up when its waits are complete. This is what `dispatcher stop <arc>` acts on and the set the header draws Pause for — so Pause reaches the plans waiting their turn as well as the one in flight, and the next one cannot start the moment the walker of the one before it ends. */ walking: boolean; /** Whether any of the arc's plans is STOPPED — approved, paused and unfinished (`report_arcs.stopped`): `queued` at the gate, `paused` mid-walk, `scheduled` with an hour armed — never `hidden`, which waits for Show. It is the set a terminal's `dispatcher resume <arc>` and `dispatcher schedule <arc>` act on; the deck draws no press for the whole set (the plans held for their first Start are the board's Start's), only for `midwalk` and `stalled`. */ stopped: boolean; /** Whether any of the arc's plans is STOPPED MID-WALK (`report_arcs.midwalk`): a walk has gone out for it and it is not moving — `paused`, or `scheduled` with an hour armed after a walk. The deck draws Resume for it, beside `stalled`; a plan never launched (waiting for its first Start) is not one, so an epic whose waiting plans are all of that kind draws no Resume. */ midwalk: boolean; /** Whether any of the arc's plans is STALLED (`report_arcs.stalled`): released, with its only running work ended and nothing to record it (`report_stall`). It is what the deck draws Resume for beside `midwalk` — `dispatcher resume <arc>` takes these plans along with the stopped ones, waking the daemon — and it never replaces Pause: a stalled plan is released, so Pause still reaches it (`walking`). */ stalled: boolean; /** The ONE hour the arc's STOPPED plans are armed for, as the timer's own ISO stamp, or null (`report_arcs.hour`). Over the same set the arc's Cancel reaches — which is the set its Start reaches — whoever armed it. One stamp because one press wrote them all; null when none of them is armed, and when they were armed apart — the header then offers the press again rather than naming a time half its plans are not waiting for. */ schedule: string | null; /** How many of the arc's plans the "Accept when cut" press reaches now — `designed` and not yet armed (`report_arcs.armable`). The deck draws the press while this is above zero. */ armable: number; /** How many of the arc's plans carry an "Accept when cut" press (`report_arcs.armed`): what the deck's Cancel reaches. */ armed: number; plans: string[]; /** The one planner outing of the ARC — its design, its cut, its judgment (`report_planners.of_arc`: the newest live row whose `target` IS the arc, else its newest ending still short of a plan). A row naming one of the arc's plans is that PLAN's, and rides `plan.planner` instead, so the deck's header and a card inside it can never state one outing twice. `null` on an arc no planner is on, and against a dispatcher build older than the field. */ planner: DispatcherPlanner | null; /** The usage pacer's clause on the epic's OWN queued outings — the planner rows whose target IS the epic: its design before any plan of it exists, its whole-arc cut, a tell, its judgment (`report_arcs.arc_dict.pace_hold`, `pace_report.arc_hold`), with its `pace:` lead — or `''`. The deck draws it with the epic's Override, and a plan card never repeats it. `''` while `overridden` is true, and against a dispatcher build older than the key (read tolerantly, `arcOf`). */ pace_hold: string; /** Whether the operator has let the epic's own outings start past the pacer (`dispatcher override <arc>`, `store_override.overridden_arcs`) — the deck then draws `Override on` with its Turn off. Derived by the dispatcher from the epic's own log; `false` against a build older than the key. */ overridden: boolean; /** The operator's planning pause on THIS epic (`DispatcherPlanningPause`), or `null` while its own does not stand (`report_arcs.arc_dict`, `store_planning.arc_pause`): it holds the epic's design and cut and every outing of its features, the judgment's included, and ended the ones in flight. Each feature it holds carries `null` of its own — the epic's Planning line holds the one Resume planning that lifts it. `null` against a dispatcher build older than the key (read tolerantly, `planningPausedSince`). */ planning_paused: DispatcherPlanningPause | null; created_at: string; completed_at: string | null; cost_usd: number; paid_vendor: string | null; tokens: number; tokens_in: number; tokens_out: number; tokens_cache_read: number | null; /** How long at least one agent was out on the epic, in whole seconds (`report_arcs.arc_dict`): the UNION of its plans' intervals and the outings whose subject is the epic itself — its design, its cut, its judge — never its plans' `runtime_s` added, because features of one epic walk at the same time. Read like `DispatcherPlan.runtime_s`: derived, ticked between frames only while an agent is out, `0` against a build older than the field. */ runtime_s: number; /** The epic's place in the queue (`report_arcs.arc_dict.queue`, from `line_gate.places`), or `null` for an epic not in it — its turn is over, or no plan of it is open — and against a dispatcher build older than the field, where nothing is drawn of a queue. Read tolerantly (`arcOf`); a key that IS there and does not read is refused by name. */ queue: DispatcherArcQueue | null; /** The epic's OWN open `no-run` record (`DispatcherArcNoRun`), or `null` while none stands (`report_arcs.arc_dict.no_run`, `run_record.open_arc_alert`): the house could not get a run behind an outing that names the epic itself — its design, its whole-arc cut. A record on a PLAN's log is that plan's, never the epic's (`DispatcherPlanner.no_run`, the plan's events). `null` against a dispatcher build older than the key (read tolerantly, `arcOf`). */ no_run: DispatcherArcNoRun | null };
 /** The week of the pacer's picture (`route.pace.week`), every figure a FRACTION 0..1 like the rest of the dispatcher's document: `used` the newest reading, `projected` the end of the window with the work committed so far, `ceiling` the point the pacer holds new starts under, and `resets_at` epoch SECONDS (multiply by 1000 before `new Date`). EACH FIGURE IS `null` WHEN THE PACER COULD NOT READ IT — the probe's `projected` until the account's cost is measured, a window with no reset behind it — never a reason to refuse the document: a reader that demanded a count kept the last good picture on the board through a probe (measured 2026-10-20). A projected end may stand above the ceiling, and above 1, and is drawn as it is. */
 export type DispatcherPaceWindow = { used: number | null; projected: number | null; ceiling: number | null; resets_at: number | null };
 /** The reading the pacer's picture was built on (`route.pace.reading`): its epoch SECONDS or `null`, its source word (`stream`, `meter`, `backfill`), and whether it is fresh enough to pace on. */
@@ -2066,13 +2070,13 @@ export type FileTreeListingServices = {
  * Per-request voice settings parsed from authenticated HTTP headers.
  *
  * The Voice routes create this value from the optional `x-voice-*` headers and
- * pass it to the Voice service. Empty values mean "use the server-configured
- * default"; the backend base URL is intentionally absent because clients must
- * never control the server's outbound destination.
+ * pass it to the Voice service's speech call (read-aloud on the `openai` provider). Empty values
+ * mean "use the server-configured default"; the backend base URL is intentionally absent because
+ * clients must never control the server's outbound destination. Transcription takes nothing from
+ * a request's headers: its endpoint and key are the account's own (`VoiceTranscribeInput`).
  */
 export type VoiceRequestOverrides = {
   apiKey?: string;
-  sttModel?: string;
   ttsModel?: string;
   ttsVoice?: string;
   ttsFormat?: string;
@@ -2115,21 +2119,68 @@ export type VoiceServiceResult<TValue> =
   | { ok: false; status: number; error: string };
 
 /**
- * Complete application-service surface for the OpenAI-compatible voice proxy.
+ * One clip sent to an OpenAI-compatible transcription endpoint: the account's home server.
+ *
+ * Unlike speech, the endpoint is not the server's environment default: `baseUrl` and `apiKey` are the
+ * account's own, read by the caller (`speech-transcriber.ts`) and handed in per call. `waitMs` is the whole
+ * time the endpoint has, connect to last byte, before the call counts as unanswered. `clean` and `vocabularyLine`
+ * are what the home server is asked beside the clip: whether to clean the transcript up, and the house words its
+ * cleanup should spell right.
+ */
+export type VoiceTranscribeInput = {
+  audio: VoiceAudioUpload;
+  /** The endpoint's base URL as the account saved it (`https://host:8095/v1`); the call goes to `<baseUrl>/audio/transcriptions`. */
+  baseUrl: string;
+  /** The account's key for it, sent as a bearer token and nowhere else. */
+  apiKey: string;
+  waitMs: number;
+  /** The account's Clean transcripts switch: `true` sends `clean=1` (the box removes um/uh, repeats and false starts and fixes punctuation), `false` sends `clean=0` (the box answers its raw words). */
+  clean: boolean;
+  /** The account's vocabulary as the one line the box takes in `prompt` ("Word1, Word2, Word3."); empty when the account has none, and then no `prompt` is sent. */
+  vocabularyLine: string;
+};
+
+/**
+ * How a transcription call failed: `unreachable` (the request could not be made or the connection failed),
+ * `timed_out` (no complete answer within `waitMs`), `rejected` (HTTP 401 or 403: the key was refused) and `failed`
+ * (any other status, or a 200 that holds no transcript). The caller words the notice and the log line from it.
+ */
+export type VoiceTranscribeFailureKind = 'unreachable' | 'timed_out' | 'rejected' | 'failed';
+
+/**
+ * What the home server says of its own cleanup of a transcript (the `tidy` field of its answer), read once where the answer
+ * enters. `tidied: true` is "tidied": the box cleaned the text it answers. `tidied: false` is "raw (...)", or an answer that
+ * does not say: the text is the box's raw words, and `reason` is the box's own reason as one short line with no key in it
+ * (`clean=0` when it was told not to clean, `tidy failed: TimeoutError` when its cleanup broke, `tidy rejected: 341 words
+ * heard, 120 returned` when its own guard refused the rewrite). The box also says "raw (clean=0)" for a clip with no speech,
+ * so a reason is only a failure of the box's cleanup when the text has words in it. Shared by `voice.service.ts` (reads it)
+ * and `speech-transcriber.ts` (decides from it whether the house still has to clean the text).
+ */
+export type HomeServerTidy =
+  | { tidied: true }
+  | { tidied: false; reason: string };
+
+/**
+ * What one transcription call came to, as a value: the words heard (an empty string is a clip with no speech in it) and
+ * the box's word on its cleanup of them, or the failure kind with a fragment fit to follow "Home server:" in a sentence.
+ * `detail` never holds the key, and is one line.
+ */
+export type VoiceTranscribeResult =
+  | { ok: true; text: string; tidy: HomeServerTidy }
+  | { ok: false; kind: VoiceTranscribeFailureKind; detail: string };
+
+/**
+ * Complete application-service surface for the OpenAI-compatible voice client.
  *
  * The composition root (`voice.module.ts`) supplies a concrete implementation with
- * environment configuration and an injected outbound HTTP adapter. It is consumed by
- * the voice provider (`voice-provider.ts`, the `openai` branch of the chat mic's
- * transcription and the proxy half of its `/health` answer) and by the HTTP router (`/tts`).
+ * environment configuration and an injected outbound HTTP adapter. `transcribe` is consumed by the one
+ * try-then-backup transcriber (`speech-transcriber.ts`: the account's home server); `synthesizeSpeech` and
+ * `getHealth` by the voice provider (`voice-provider.ts`, the `openai` branch of read-aloud and the proxy half
+ * of its `/health` answer) and the HTTP router (`/tts`).
  */
 export type VoiceService = {
   getHealth(): { configured: boolean };
-  transcribe(input: {
-    audio: VoiceAudioUpload;
-    overrides: VoiceRequestOverrides;
-    /** The names the clip may hold, as Whisper's `prompt` field (it takes no instruction): sent only when non-empty. */
-    prompt?: string;
-  }): Promise<VoiceServiceResult<{ text: string }>>;
+  transcribe(input: VoiceTranscribeInput): Promise<VoiceTranscribeResult>;
   synthesizeSpeech(input: {
     text: string;
     overrides: VoiceRequestOverrides;
@@ -2137,54 +2188,57 @@ export type VoiceService = {
 };
 
 /**
- * Which backend hears the chat composer's mic and speaks the chat's read-aloud for an account.
+ * Which backend speaks the chat's read-aloud for an account.
  *
- * `gemini` (the default) is the server's own hearing and the Gemini speech door: the mic is heard on this box's
- * own speech-to-text service first and by Gemini's transcription door when that gives no words
- * (`transcribe-speech.ts`), and read-aloud is spoken by the speech door. `openai` is the OpenAI-compatible
- * proxy (`voice.service.ts`), which an account that stored it keeps. The choice governs the chat alone: the
- * companion speaks through Gemini and hears the way `gemini` does (the local service first, Gemini after),
- * whatever this says. Read by `voice-settings.ts` (which validates it), `voice-provider.ts` (which
- * routes on it) and the settings routes (which answer it).
+ * `gemini` (the default) is the Gemini speech door. `openai` is the OpenAI-compatible proxy
+ * (`voice.service.ts`), which an account that stored it keeps. The choice governs read-aloud alone: it no
+ * longer chooses who transcribes (the home server first, Gemini the backup, for the chat mic and Kaylee's
+ * press alike), and the companion speaks through Gemini whatever this says. Read by `voice-settings.ts`
+ * (which validates it), `voice-provider.ts` (which routes read-aloud on it) and the settings routes (which answer it).
  */
 export type VoiceProvider = 'openai' | 'gemini';
 
 /**
  * One account's voice settings, the `voice` key of its `user_preferences`.
  *
- * `provider` defaults to `gemini` and `gemini.transcriptionModel` to `gemini-3.8-flash`, the
- * house's transcriber role; a stored field that fails its limit reads as its default.
- * `gemini.speechModel` (default `gemini-3.8-flash-tts`) and `gemini.transcriptionModel` are each
- * 1-80 characters of `[A-Za-z0-9._-]`; `gemini.voice` (default `Kore`) is 1-40 characters of
+ * `provider` defaults to `gemini`: it chooses who speaks the chat's read-aloud and nothing else. Every
+ * transcription goes to the account's home server first (`homeServer.address`, null until the account saves one;
+ * its key is a credential, never part of this document) with Gemini as the backup. `gemini.transcriptionModel`
+ * (default `gemini-3.8-flash`, the house's transcriber role) is the BACKUP's model. A stored field that fails
+ * its limit reads as its default. `gemini.speechModel` (default `gemini-3.8-flash-tts`) and `gemini.transcriptionModel`
+ * are each 1-80 characters of `[A-Za-z0-9._-]`; `gemini.voice` (default `Kore`) is 1-40 characters of
  * `[A-Za-z0-9_-]`. `gemini.soundTags` is the ONE allow-list of the sounds Kaylee may make: 1-30
  * tags, each 1-24 characters of lower-case letters with single spaces between words. The
  * register she is taught and the filter that strips her sentences both read it, so she is never
  * taught a sound the filter deletes; it defaults to the voice module's `DEFAULT_SOUND_TAGS` and
  * a save of `soundTags: null` restores that default. `cleanTranscripts` (default `true`, a boolean
  * either way) says whether a transcript has its disfluencies removed (um, uh, repeated words) before
- * anyone reads it, whichever provider heard the clip: it governs the chat mic and Kaylee's press
- * alike, and when `false` the Gemini instruction asks for a verbatim transcript. The value is read
+ * anyone reads it, whichever transcriber heard the clip: it governs the chat mic and Kaylee's press
+ * alike. It is what the home server is asked (`clean=1`, `clean=0`), and when `false` the Gemini
+ * instruction asks for a verbatim transcript. The value is read
  * fresh on every call and never cached, so a saved change is heard by the next press. Shared by
- * `voice-settings.ts` (reads and saves it), `gemini-transcribe.ts` (the model and the cleanup),
- * `voice-provider.ts` (the cleanup of the OpenAI branch), `gemini-speech.ts` (the speech model and the
- * voice), the settings routes (answer it) and, through the voice barrel's `readVoiceSettings`, the
- * companion (reads the sound tags and says the cleanup setting in `read_settings`).
+ * `voice-settings.ts` (reads and saves it), `speech-transcriber.ts` (the home server's address, the clean it is asked for, and the cleanup of its text when the box's own did not run),
+ * `gemini-transcribe.ts` (the backup's model and the cleanup), `gemini-speech.ts`
+ * (the speech model and the voice), `voice-provider.ts` (the provider), the settings routes (answer it) and, through
+ * the voice barrel's `readVoiceSettings`, the companion (reads the sound tags and says the transcription and cleanup
+ * settings in `read_settings`).
  */
 export type VoiceSettings = {
   provider: VoiceProvider;
   cleanTranscripts: boolean;
+  homeServer: { address: string | null };
   gemini: { transcriptionModel: string; speechModel: string; voice: string; soundTags: string[] };
 };
 
 /**
  * One house word in an account's vocabulary: how it is SPELLED, how it SOUNDS, and the spellings a transcriber is known to
  * give it instead. The account's `vocabulary` (`GET`/`PUT /api/voice/vocabulary`) is a list of these, and it serves three
- * jobs from one list: the transcribers are told the spellings up front (Gemini's instruction, Whisper's prompt), the shared
- * cleanup step replaces each `misheard` form with `spelling` (whole words, case-insensitive, `spelling` written exactly),
+ * jobs from one list: the transcribers are told the spellings up front (the home server as one line in its `prompt`, Gemini,
+ * the backup, in its instruction), the shared cleanup step replaces each `misheard` form with `spelling` (whole words, case-insensitive, `spelling` written exactly),
  * and Kaylee's speech is sent `pronunciation` in place of `spelling`. `pronunciation` equal to `spelling` (letters only,
  * case-blind) means "say it as written". Stored normalised: every text trimmed with inner spaces collapsed, `misheard`
  * deduplicated case-insensitively and without a form equal to `spelling`, no form listed under two entries.
- * Shared by `vocabulary.ts` (store, source hints), `vocabulary-check.ts` (validates it), `vocabulary-match.ts` (the
+ * Shared by `vocabulary.ts` (store), `vocabulary-hints.ts` (what the transcribers are told), `vocabulary-check.ts` (validates it), `vocabulary-match.ts` (the
  * replacements), `voice-settings.ts` (keeps it in the account's `voice` document) and `transcript-cleanup.ts`.
  */
 export type VocabularyEntry = {
@@ -2206,22 +2260,44 @@ export type VocabularyEntry = {
 export type GeminiKeyStatus = { source: 'stored' | 'house' | 'none'; last4: string | null };
 
 /**
- * What one transcription of a clip came to, as a value rather than a throw.
+ * Whether the account has a home server key, and the only part of it a page may see. `stored` is the account's own
+ * active `home_server_key` credential and `last4` its last four characters; `none` means the home server has no
+ * key and is therefore off. There is no house key: the home server is the account's own box. The key itself is
+ * never returned. Shared by `home-server-key.ts` (computes it), the settings routes (answer it) and, through the
+ * voice barrel, the companion's `read_settings`, which reads `source` alone.
+ */
+export type HomeServerKeyStatus = { source: 'stored' | 'none'; last4: string | null };
+
+/**
+ * What one Gemini transcription came to, as a value rather than a throw. Gemini is the BACKUP transcriber: this is the
+ * answer of its door (`transcribeWithGemini`), which the one try-then-backup transcriber calls when the home server could
+ * not hear a clip, or when the account has no home server.
  *
- * `ok: true` carries the trimmed words heard, from the local speech-to-text service or from
- * Gemini; an empty string is a success (nothing was said). `ok: false` is Gemini's, and only
- * when the local service gave no answer either (a clip it answered with no words keeps that
- * empty answer instead), and names why with a ready sentence for the person: `no_key` (no key
+ * `ok: true` carries the trimmed words heard; an empty string is a success (nothing was
+ * said). `ok: false` names why and carries a ready sentence for the person: `no_key` (no key
  * in reach; no request was made), `refused` (Google refused the key) and `failed` (anything
  * else: another status, a network error or timeout, an answer without text). Every sentence
- * has passed the key-shape redaction. Shared by
- * `gemini-transcribe.ts` and `transcribe-speech.ts` (build it), `voice-provider.ts` (maps it
- * to the chat mic's HTTP answer) and the companion's press door, which reads it through the
- * voice barrel's `transcribeSpeech`.
+ * has passed the key-shape redaction. Shared by `gemini-transcribe.ts` (builds it) and
+ * `speech-transcriber.ts` (reads it, and builds the failure variant of `HeardAnswer` from it).
  */
 export type TranscribeAnswer =
   | { ok: true; text: string }
   | { ok: false; reason: 'no_key' | 'refused' | 'failed'; sentence: string };
+
+/**
+ * What hearing one clip came to, from whichever transcriber heard it: the home server first, Gemini the backup.
+ *
+ * `ok: true` carries the cleaned words (an empty string is a clip with no speech) and `standIn`: the one short line
+ * for the person when Gemini transcribed BECAUSE the home server could not (`Home server didn't answer; Gemini
+ * transcribed this`), else null: the home server answered, or the account has no home server and nothing is down.
+ * `ok: false` is the failure variant of `TranscribeAnswer`, carrying the BACKUP's `reason` (the last transcriber tried,
+ * so `no_key` and `refused` still point at Settings) and a sentence that, once the home server was tried, names both
+ * transcribers and holds no key. Shared by `speech-transcriber.ts` (builds it), `voice-provider.ts` (maps it to the chat
+ * mic's HTTP answer) and the companion's press door, which reads it through the voice barrel's `transcribeSpeech`.
+ */
+export type HeardAnswer =
+  | { ok: true; text: string; standIn: string | null }
+  | Extract<TranscribeAnswer, { ok: false }>;
 
 /**
  * One piece of a spoken sentence: little-endian Int16 mono PCM at 24 kHz, always a whole number of

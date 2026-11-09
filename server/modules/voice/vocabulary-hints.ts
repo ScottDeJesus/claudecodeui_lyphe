@@ -1,18 +1,12 @@
 /**
- * What each transcriber is told about the account's vocabulary up front, so a house word is spelled right at the source and the
- * net under it (`vocabulary-match.ts`) has less to catch. Gemini takes instructions, so it gets the spellings with how they
- * sound; Whisper takes none, so it gets a prompt of the spellings alone. Pure text from a list, no storage.
+ * What each transcriber is told about the account's vocabulary up front, so a house word is spelled right at the source and the net
+ * under it (`vocabulary-match.ts`) has less to catch. The home server gets the spellings alone as one line, for its cleanup to
+ * respell sound-alikes by; Gemini, the backup, gets the spellings with how they sound. Pure text from a list, no storage.
  */
 
 import type { VocabularyEntry } from '@/shared/types.js';
 
 import { soundsAsWritten } from './vocabulary-match.js';
-
-/**
- * Whisper's `prompt` is limited to 224 tokens. Names tokenise badly, so the cap is counted in characters and set where even one
- * token per character stays under the limit.
- */
-const WHISPER_PROMPT_MAX_CHARS = 200;
 
 /**
  * The sentence appended to BOTH forms of Gemini's transcription instruction: the names that may be spoken, written exactly as
@@ -26,20 +20,27 @@ export function geminiVocabularyBlock(vocabulary: readonly VocabularyEntry[]): s
 }
 
 /**
- * Whisper's `prompt` for the account's vocabulary: the spellings as a short list of names, which steers its spelling of them
- * (it takes no instruction, only text to continue in the style of). Entries are dropped from the END, whole, until it fits
- * `WHISPER_PROMPT_MAX_CHARS`; empty for an empty vocabulary, and the caller then sends no prompt. Consumed by `voice-provider.ts` and
- * `local-transcribe.ts`, whose service reads the same list as the names to respell sound-alikes to.
+ * The longest `prompt` line the home server is sent. The box reads a new line once, and a longer line costs the first cleanup after it
+ * changes more: measured 2026-11-08, about 1.3 s plus 2 s per 1,000 characters (1.5 s for the seed's 79 characters, 5.6 s for 2,200, 14 to
+ * 15.5 s for the 6,199 the vocabulary check allows at most, which outlasts the 15 s wait), then 0.8 s while the box holds it. 2,000
+ * characters costs a first press some 5 s and holds some 100 words of 20 characters, far more than a house vocabulary is.
  */
-export function whisperVocabularyPrompt(vocabulary: readonly VocabularyEntry[]): string {
-  const names: string[] = [];
-  // The closing full stop counts.
-  let length = 1;
-  for (const { spelling } of vocabulary) {
-    const added = spelling.length + (names.length === 0 ? 0 : 2);
-    if (length + added > WHISPER_PROMPT_MAX_CHARS) break;
-    names.push(spelling);
-    length += added;
-  }
-  return names.length === 0 ? '' : `${names.join(', ')}.`;
+const MAX_VOCABULARY_LINE_CHARS = 2_000;
+
+/**
+ * The account's vocabulary as the one line the home server takes in its `prompt` field: the spellings as a list, "Word1, Word2, Word3.".
+ * The box's cleanup uses it to respell a word it heard as a sound-alike of one of these. Spellings only, in the account's order. A line
+ * that would pass `MAX_VOCABULARY_LINE_CHARS` is cut to its first whole entries (the rest are still corrected after the box, by their
+ * misheard forms), so a long list never makes the first press after an edit outlast the wait. Empty for an empty vocabulary, and the
+ * caller then sends no `prompt`. Consumed by `speech-transcriber.ts`.
+ */
+export function homeServerVocabularyLine(vocabulary: readonly VocabularyEntry[]): string {
+  const spellings = vocabulary.map((entry) => entry.spelling);
+  while (lineOf(spellings).length > MAX_VOCABULARY_LINE_CHARS) spellings.pop();
+  return lineOf(spellings);
+}
+
+/** The spellings as the box's one line, "Word1, Word2.", and `''` for none. */
+function lineOf(spellings: readonly string[]): string {
+  return spellings.length === 0 ? '' : `${spellings.join(', ')}.`;
 }

@@ -395,8 +395,8 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
   /**
    * THE DISPATCHER'S ENDINGS (`dispatcher-endings.service.ts`), read off the same `events` table
    * the plan's own card draws: a feature wraps up, a feature stops wanting a hand, a task the walk
-   * had left standing is taken up again, and an epic is finished. What is done out of how many, what
-   * it cost, and the one next move.
+   * had left standing is taken up again, a piece of planning has no run behind it and the house could not mend that, and an epic is
+   * finished. What is done out of how many, what it cost, and the one next move.
    *
    * A feature in no epic says each of these as it happens. A feature of an epic says only the first
    * of a wave of retries or of stops, and its copy names the epic and says the rest stay on the
@@ -470,6 +470,14 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
       ].filter((part): part is string => part !== null).join(' · '),
     };
   }],
+  // A piece of planning the house could not get a run behind — it tried to heal the claim and could not, or the launch was refused
+  // outright (`hooks/dispatcher/store_alerts.py`). `meta.detail` is the house's own sentence: it names the work, what was tried and why
+  // it did not run, so the body is that sentence and the one next move, and the title (`Not running · <name>`) names the feature or,
+  // for an epic's own outing, the epic. Said every time it is written: no wave of an epic's features hushes it.
+  ['dispatcher.no_run', ({ meta }) => ({
+    headline: 'Not running',
+    body: [readText(meta.detail), 'Open the Roadmap tab'].filter((part): part is string => part !== null).join(' · '),
+  })],
   ['push.enabled', () => ({ headline: 'Push notifications enabled', body: 'Push notifications are now enabled!' })],
 ]);
 
