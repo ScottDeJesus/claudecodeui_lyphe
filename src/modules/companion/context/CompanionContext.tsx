@@ -128,6 +128,8 @@ type CompanionContextValue = {
   level: () => number;
   /** The page player's `progress()`: the sounding sentence's seconds elapsed and, once its body has ended, its length — what picks the vowel of her mouth. Stable for the page's life. */
   progress: PcmPlayer['progress'];
+  /** The page player's `analyser()`: the tap her face's ear reads while she speaks (loudness, bands, pitch, onsets). Stable for the page's life. */
+  analyser: PcmPlayer['analyser'];
   /** The timed mouth shapes the page has heard for a sentence (`[]` for none yet): what her face's exact mouth looks up at the audio's place. Stable for the page's life. */
   mouth: CompanionFaceVoice['mouth'];
 };
@@ -487,11 +489,11 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
       picture, readFailure: picture === null ? readFailure : null, reread, open, clientId, setOpen, takeFloor, sendText, saveSettings, editDraft, sendDraft,
       clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear, talk,
       voice: speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
-      progress: speech.progress, mouth: speech.mouth,
+      progress: speech.progress, analyser: speech.analyser, mouth: speech.mouth,
     }),
     [
       picture, readFailure, reread, open, clientId, setOpen, takeFloor, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear,
-      talk, speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress, speech.mouth,
+      talk, speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress, speech.analyser, speech.mouth,
     ],
   );
 

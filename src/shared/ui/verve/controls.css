@@ -410,14 +410,31 @@
 @media (prefers-reduced-motion: reduce) { .vv-meter__arc { transition: none; } }
 
 /* ---------------------------------------------------------------- Spinner */
-.vv-spinner__ring {
-  border-radius: 50%;
-  border: 4px solid var(--surface2);
-  border-top-color: var(--accent);
-  box-sizing: border-box;
-  animation: vv-spin 1s linear infinite, vv-spin-hue 2.4s ease-in-out infinite;
+/* Astrolabe's thinking loop: a hairline ring broken into dashes that turn, the sign her face makes while she thinks. */
+.vv-spinner__ring { overflow: visible; }
+.vv-spinner__track { fill: none; stroke: var(--hairline); stroke-width: 1; }
+.vv-spinner__dashes {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  transform-origin: 22px 22px;
+  animation: vv-spin 2.4s linear infinite;
 }
-.vv-spinner__label { font-size: 13.5px; color: var(--ink-faint); }
+@media (prefers-reduced-motion: reduce) { .vv-spinner__dashes { animation: none; } }
+.vv-spinner__label { font-family: var(--font-mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-faint); }
+
+/* ---------------------------------------------------------------- SignalLoop */
+/* The loop in small: dashes that turn while an agent thinks, a whole ring that breathes while it works, a still ring at rest. */
+.vv-signal-loop { flex: none; overflow: visible; }
+.vv-signal-loop__track { fill: none; stroke: var(--hairline); stroke-width: 1; }
+.vv-signal-loop__ring { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: round; transform-origin: 8px 8px; }
+.vv-signal-loop[data-signal="secondary"] .vv-signal-loop__ring { stroke: var(--garnish); }
+.vv-signal-loop[data-state="idle"] .vv-signal-loop__ring { stroke: var(--status-idle); }
+.vv-signal-loop[data-state="thinking"] .vv-signal-loop__ring { animation: vv-spin 2.4s linear infinite; }
+.vv-signal-loop[data-state="working"] .vv-signal-loop__ring { animation: vv-loop-breathe 1.6s ease-in-out infinite; }
+@keyframes vv-loop-breathe { 0%, 100% { stroke-width: 1.2; opacity: .7; } 50% { stroke-width: 2.2; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .vv-signal-loop__ring { animation: none !important; } }
 
 /* ---------------------------------------------------------------- Field */
 .vv-field__label { font-size: 13.5px; font-weight: 500; color: var(--ink); }

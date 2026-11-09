@@ -1156,23 +1156,81 @@ export type CompanionSoundProgress = { turnId: string; index: number; elapsed: n
  * in seconds of the sentence; `[]` for none yet). The face looks a shape up at `progress().elapsed` on each animation frame, so a piece
  * that lands mid-sentence takes over at the next one. All three are functions, never props that change, so a level sixty times a second
  * never redraws React. Null where a face hears no voice (Settings' preview). Handed by the companion module's CompanionFace to
- * CompanionAvatar and on to CompanionPortrait.
+ * CompanionAvatar, whose instrument reads `analyser()` for her voice and `progress()` for the word she is on (it draws no mouth).
  */
 export type CompanionFaceVoice = {
   level: () => number;
   progress: () => CompanionSoundProgress | null;
   mouth: (turnId: string, index: number) => readonly CompanionMouthPiece[];
+  /** The analyser her face's ear reads while she speaks (the player's own tap), or null before the page has a graph. */
+  analyser: () => AnalyserNode | null;
 };
 
 /**
  * The sentences her face reads from her log: `playing` the one this page's player is sounding (its mood, text and sounds), `newest` the
  * newest of hers in the running turn, read only by a page that plays no voice, and `turnRunning` whether a turn is under way. Derived by
- * the companion module's `useFaceSentences`; handed through CompanionAvatar to CompanionPortrait.
+ * the companion module's `useFaceSentences`; handed to CompanionAvatar, which plates the word she is saying on the dial's ring.
  */
 export type CompanionFaceSentences = { playing: CompanionLogEntry | null; newest: CompanionLogEntry | null; turnRunning: boolean };
 
 /** Where the anchor she looks at lies from her disc's centre, in screen pixels (`dx` rightward, `dy` downward). Her face turns toward it. */
 export type CompanionFaceLook = { dx: number; dy: number };
+
+// ---------------------------
+
+//----------------- HER FACE: THE ASTROLABE INSTRUMENT ------------
+
+/**
+ * The material her face is drawn in, and the mood it carries (the Astrolabe design system's three personas): `mercury`, polished chrome
+ * beside the warm amber accent (the default); `tube`, amber vacuum-tube glass, for slow and reflective sessions; `wire`, a cyan
+ * wireframe, for fast debugging. Stored per user as the `companionMaterial` preference (the companion module's `useCompanionMaterial`),
+ * and read by its face and its Settings card.
+ */
+export type CompanionMaterial = 'mercury' | 'tube' | 'wire';
+
+/**
+ * One frame of what a voice is doing, as the companion module's ear (`astrolabeEar.ts`) hears it from an AnalyserNode: loudness (`rms`)
+ * and three bands, each normalised 0..1 against the voice itself; `f0` in Hz (0 while unvoiced) with its `voicing` confidence; and
+ * `onsets`, a running count of the hard consonants heard, with `onsetAmp` the strength of the latest. Her face's instrument reads one
+ * per animation frame.
+ */
+export type AstrolabeVoiceFrame = { rms: number; low: number; mid: number; high: number; f0: number; voicing: number; onsets: number; onsetAmp: number };
+
+/**
+ * How much of the instrument her face draws, chosen by the companion module's CompanionAvatar from the square it fills: `disc` (her
+ * button: the loop round a 2D chrome core), `core` (the raymarched WebGL core inside the loop) or `dial` (the station's portrait: the
+ * core inside the armillary rings, the bezel and the reticle).
+ */
+export type AstrolabeTier = 'disc' | 'core' | 'dial';
+
+/**
+ * What her face's instrument draws one frame from, as CompanionAvatar builds it from her presence: the instrument's own `state` (her
+ * fourteen presence words fold into these four), what her voice is doing (`voice`, null while nothing sounds), where she looks
+ * (`azimuth`, degrees counter-clockwise from the right; null lets the pointer drift), the reticle's words (`label`), the walk she is on
+ * (`walk`), whether her process failed (`failed`, the loop in the warn colour) or sleeps (`asleep`, dimmed and slowed), the word she
+ * is saying (`word`, plated on the middle ring) and the `material` she is drawn in.
+ */
+export type AstrolabeFrameInput = {
+  state: 'idle' | 'thinking' | 'speaking' | 'listening';
+  voice: AstrolabeVoiceFrame | null;
+  azimuth: number | null;
+  label: string | null;
+  walk: { at: number; total: number } | null;
+  failed: boolean;
+  asleep: boolean;
+  word: string | null;
+  material: CompanionMaterial;
+};
+
+/**
+ * Her face's instrument, as the companion module's `astrolabeInstrument.ts` builds it for CompanionAvatar: `frame` once per animation
+ * frame, `resize` when the square changes, and `destroy` on unmount, which releases its WebGL context.
+ */
+export type AstrolabeInstrument = {
+  frame: (dt: number, input: AstrolabeFrameInput) => void;
+  resize: (size: number) => void;
+  destroy: () => void;
+};
 
 // ---------------------------
 

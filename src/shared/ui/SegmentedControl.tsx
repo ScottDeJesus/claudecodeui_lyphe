@@ -18,7 +18,7 @@ type SegmentedControlProps<T extends string> = {
  * Used by the affected-areas module: the Tours · Mark · Tables sub-switch, the pano's layer switch and the
  * Mark screen's queue mode — Verve's §11 Plumbing "IconButton · SegmentedControl"; by the station module's
  * compact arrangement: its one switch between Conversation, Needs you, Where things stand and Stage; and by the
- * companion module's face card in Settings: the switch between the looks of hers that are made.
+ * companion module's material card in Settings: the switch between Mercury, Tube and Wire.
  *
  * A switch between a few views of the same thing, drawn as one tray with the chosen option lifted on its own
  * surface. It is a RADIO GROUP, not a tablist: it chooses a value and owns no panel (`Tabs` is the strip that

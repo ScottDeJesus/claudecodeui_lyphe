@@ -13,7 +13,7 @@ import {
   settleEntryPatch,
   unreflectedEntries,
 } from '@/shared/preferenceEntryPatch';
-import type { ClaudeSettings, PreferenceEntryPatch } from '@/shared/types';
+import type { ClaudeSettings, CompanionMaterial, PreferenceEntryPatch } from '@/shared/types';
 
 /**
  * The one reader and writer for the settings that used to live in browser
@@ -62,6 +62,8 @@ export type UserPreferences = {
   filesPins: unknown;
   /** When he last looked away from Kaylee Station, as an ISO stamp, or null before he ever has. Written WHOLE — the last look-away on any device wins, which is what "the last look" means — by the station's provider on each look-away (its document hidden, the page gone, its window blurring after a focus, the station route unmounting) and on his "<n> new" press, and never on a timer. A page that sat open while another device wrote it takes the server's stamp when it comes back (`adoptUserPreference`), if that stamp is the newer. A landing is new when its `at` is after this stamp; null makes every landing of the week new. See `modules/station/context/StationLandedContext.tsx`. */
   stationSeenAt: string | null;
+  /** The material Kaylee's face is drawn in — `mercury` (chrome, the default), `tube` (amber glass) or `wire` (cyan wireframe) — written WHOLE from her Settings card. See `modules/companion/hooks/useCompanionMaterial.ts`. */
+  companionMaterial: CompanionMaterial;
 };
 
 export type UserPreferenceKey = keyof UserPreferences;
@@ -112,6 +114,7 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string | null> = {
   roadmapSeen: null,
   filesPins: null,
   stationSeenAt: null,
+  companionMaterial: null,
 };
 
 const PREFERENCE_KEYS = Object.keys(LEGACY_STORAGE_KEYS) as UserPreferenceKey[];

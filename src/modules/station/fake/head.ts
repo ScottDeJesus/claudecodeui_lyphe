@@ -45,7 +45,7 @@ export const presenceOf = (state: CompanionPresenceState, about: Partial<Omit<Co
 
 /** Her face at a square, drawn on `presence` from `her`'s face id (none on a fixture's picture: her initial). Also `fake/portrait.ts`'s. */
 export const avatarOf = (her: CompanionPicture | null, presence: CompanionPresence) => (px: number) => createElement(CompanionAvatar, {
-  presence, faceId: her?.face.id ?? null, voice: null, sentences: null, look: null, name: her?.settings.name ?? 'Kaylee', size: px,
+  presence, voice: null, sentences: null, look: null, name: her?.settings.name ?? 'Kaylee', size: px,
 });
 
 /** Her head drawn from `her` (null: no picture yet) at `presence`, in her `herView` view. */

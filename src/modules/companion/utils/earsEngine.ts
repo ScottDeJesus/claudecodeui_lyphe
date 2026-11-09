@@ -10,6 +10,7 @@
 // eslint-disable-next-line import/default
 import earsWorkletUrl from '@/modules/companion/utils/earsCapture.worklet.ts?worker&url';
 import type { EarsFromWorker, EarsToWorker } from '@/modules/companion/utils/earsProtocol';
+import { publishListeningTap } from '@/modules/companion/utils/listeningTap';
 
 /** The ears' plumbing on the page: one worker for as long as the caller keeps the engine (its models loaded once), and a capture attached and detached as arming comes and goes. Used by `useEars`. */
 export type EarsEngine = {
@@ -37,7 +38,7 @@ export type EarsEngine = {
 };
 
 /** What `attach` built, so `detach` can take it apart. */
-type Capture = { source: MediaStreamAudioSourceNode; node: AudioWorkletNode };
+type Capture = { source: MediaStreamAudioSourceNode; node: AudioWorkletNode; tap: AnalyserNode };
 
 /**
  * Used by `useEars` (the page's ears) and the engine's showing; `onMessage` hears every message the worker sends, `ready` and
@@ -125,6 +126,7 @@ export function createEarsEngine(input: {
     capture.source.disconnect();
     capture.node.disconnect();
     capture.node.port.close();
+    publishListeningTap(null, capture.tap);
     capture = null;
   };
 
@@ -168,7 +170,15 @@ export function createEarsEngine(input: {
       framesForCapture = null;
       const source = context.createMediaStreamSource(stream);
       source.connect(node);
-      capture = { source, node };
+      // Her face listens on a branch of the same stream: an analyser with no output, so nothing of the microphone is ever played.
+      const tap = context.createAnalyser();
+      tap.fftSize = 2048;
+      tap.smoothingTimeConstant = 0;
+      tap.minDecibels = -100;
+      tap.maxDecibels = -10;
+      source.connect(tap);
+      capture = { source, node, tap };
+      publishListeningTap(tap);
       // A context made before the page's first touch is suspended; it plays on at the touch, and nothing here waits for it.
       if (context.state === 'suspended') context.resume().catch((error: unknown) => console.warn('[ears] the audio context would not resume', error));
     },

@@ -28,6 +28,8 @@ const RESTART_LEAD_SECONDS = 0.05;
 const JOIN_GUARD_SECONDS = 0.01;
 /** 1024 samples are 43 ms: short enough for a mouth to follow syllables, long enough to read a steady level. */
 const ANALYSER_FFT_SIZE = 1024;
+/** Her face's ear reads 85 ms windows: long enough for its pitch tracker to find a low voice, with no smoothing so onsets stay sharp. */
+const EAR_FFT_SIZE = 2048;
 /** Web Audio renders in blocks of this many frames: a source stopped now is silent from the next block, not from this instant. */
 const RENDER_QUANTUM_FRAMES = 128;
 
@@ -61,6 +63,11 @@ export type PcmPlayer = {
   onSentence(listener: (event: SentenceEvent) => void): () => void;
   /** Creates or resumes the AudioContext; call it inside a gesture, without awaiting anything first. */
   unlock(): Promise<void>;
+  /**
+   * The analyser her face's ear reads (the Astrolabe instrument: loudness, three bands, pitch and onsets), a second tap on the same gain
+   * as `level()`'s so neither changes the other's window; null until the graph exists. Read each frame, never held.
+   */
+  analyser(): AnalyserNode | null;
 };
 
 /** Where one run of a sentence's buffers began: `at` on the audio clock (context seconds) and `sample`, the sentence's own sample that sits there. */
@@ -92,7 +99,7 @@ type Sentence = {
   cancelled: boolean;
 };
 
-type Graph = { context: AudioContext; gain: GainNode; analyser: AnalyserNode; silentFrame: AudioBuffer; levelWindow: Float32Array<ArrayBuffer> };
+type Graph = { context: AudioContext; gain: GainNode; analyser: AnalyserNode; ear: AnalyserNode; silentFrame: AudioBuffer; levelWindow: Float32Array<ArrayBuffer> };
 
 /** Two little-endian bytes as one signed 16-bit sample, in -1..1. */
 function toSample(low: number, high: number): number {
@@ -182,8 +189,15 @@ export function createPcmPlayer(): PcmPlayer {
     analyser.fftSize = ANALYSER_FFT_SIZE;
     gain.connect(analyser);
     analyser.connect(context.destination);
+    // The face's ear: a branch off the gain that leads nowhere (an analyser needs no output to be read), so it hears exactly what sounds.
+    const ear = context.createAnalyser();
+    ear.fftSize = EAR_FFT_SIZE;
+    ear.smoothingTimeConstant = 0;
+    ear.minDecibels = -100;
+    ear.maxDecibels = -10;
+    gain.connect(ear);
     const silentFrame = context.createBuffer(1, 1, PCM_SAMPLE_RATE);
-    graph = { context, gain, analyser, silentFrame, levelWindow: new Float32Array(analyser.fftSize) };
+    graph = { context, gain, analyser, ear, silentFrame, levelWindow: new Float32Array(analyser.fftSize) };
     return graph;
   }
 
@@ -390,6 +404,8 @@ export function createPcmPlayer(): PcmPlayer {
         listeners.delete(listener);
       };
     },
+
+    analyser: () => (graph && graph.context.state === 'running' && graph.context.currentTime >= levelHiddenUntil ? graph.ear : null),
 
     async unlock() {
       // The context is made and `resume()` is called before the first await: both must happen inside the gesture's activation.

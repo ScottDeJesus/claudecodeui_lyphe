@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import { Shimmer } from '@/shared/ui';
+import { Shimmer, SignalLoop } from '@/shared/ui';
 import type { SessionActivity } from '@/shared/types';
 
 type ActivityIndicatorProps = {
@@ -24,7 +24,8 @@ const EXIT_ANIMATION_MS = 220;
 
 /**
  * Minimal response-in-progress indicator, in the spirit of the inline status
- * lines in Claude Code / Codex / OpenCode: a shimmering activity label, the
+ * lines in Claude Code / Codex / OpenCode: the agent's thinking loop (Astrolabe's
+ * `SignalLoop`), a shimmering activity word in the instrument's mono, the
  * elapsed time, and an interrupt affordance. Rendered only while the viewed
  * session has an entry in the processing map; it disappears the instant that
  * entry is removed.
@@ -94,9 +95,10 @@ export default function ActivityIndicator({ activity, onAbort, isInputFocused = 
     >
       <div className="flex items-end justify-between gap-2">
         <div className={`${tabSurfaceClassName} gap-2`}>
-          <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary" aria-hidden />
-          <Shimmer className="font-medium">{`${label}…`}</Shimmer>
-          <span className="tabular-nums text-muted-foreground/60">{elapsedLabel}</span>
+          {/* The agent's loop: dashes that turn while the turn is worked on, the same sign Kaylee's face makes when she thinks. */}
+          <SignalLoop state="thinking" size={13} />
+          <Shimmer className="font-mono text-[11px] uppercase tracking-[0.14em]">{`${label}…`}</Shimmer>
+          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{elapsedLabel}</span>
         </div>
 
         {renderedActivity.canInterrupt && onAbort && (

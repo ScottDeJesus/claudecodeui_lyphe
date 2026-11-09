@@ -219,7 +219,7 @@
 .vv-empty {
   gap: 8px;
   padding: 34px 24px;
-  border: 1.5px dashed var(--border-strong);
+  border: 1px dashed var(--border-strong);
   border-radius: var(--radius-card);
   text-align: center;
 }
@@ -237,7 +237,7 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
-.vv-empty__title { font-family: var(--font-display); font-size: 24px; font-style: italic; color: var(--ink-faint); }
+.vv-empty__title { font-family: var(--font-display); font-size: 20px; font-weight: 300; letter-spacing: -0.01em; color: var(--ink-muted); }
 .vv-empty__message { max-width: 260px; margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-faint); }
 /* The small size (`size="sm"`): one quiet line that keeps a place's room while it holds nothing yet. The frame slims, and the
  * title steps down from the display serif to the body's small size in the MUTED ink: the faint ink is under 4.5:1 on the

@@ -126,6 +126,10 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       favicon.setAttribute('href', href.replace(/favicon(?:-dark)?\.png$/, isDarkMode ? 'favicon-dark.png' : 'favicon.png'));
     }
 
+    // Astrolabe names its two themes Night and Day; `data-theme` carries that name beside the `.dark` class the tokens key on,
+    // for anything (the companion's face, a canvas) that reads the design system's own vocabulary.
+    document.documentElement.dataset.theme = isDarkMode ? 'night' : 'day';
+
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
 
@@ -137,7 +141,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
       const themeColorMeta = document.querySelector('meta[name="theme-color"]');
       if (themeColorMeta) {
-        themeColorMeta.setAttribute('content', '#101116'); // Verve --canvas, dark
+        themeColorMeta.setAttribute('content', '#08090b'); // Astrolabe --canvas, night
       }
     } else {
       document.documentElement.classList.remove('dark');
@@ -150,7 +154,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
       const themeColorMeta = document.querySelector('meta[name="theme-color"]');
       if (themeColorMeta) {
-        themeColorMeta.setAttribute('content', '#f7f7f9'); // Verve --canvas, light
+        themeColorMeta.setAttribute('content', '#edeff1'); // Astrolabe --canvas, day
       }
     }
   }, [isDarkMode]);

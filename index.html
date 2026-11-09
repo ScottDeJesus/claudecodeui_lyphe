@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Schibsted+Grotesk:wght@400;500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap"
       rel="stylesheet"
     />
 
@@ -28,7 +28,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
     
     <!-- Theme Color -->
-    <meta name="theme-color" content="#f7f7f9" />
+    <meta name="theme-color" content="#edeff1" />
     <meta name="msapplication-TileColor" content="#ffffff" />
     
     <!-- Prevent zoom on iOS -->
@@ -127,7 +127,7 @@
           var node = document.createElement('div');
           node.setAttribute(WATCHDOG_NODE_ATTRIBUTE, '');
           node.setAttribute('style', 'min-height:100vh;display:flex;align-items:center;justify-content:center;' +
-            'font-family:system-ui,-apple-system,sans-serif;background:#101116;color:#e7e7ea;padding:24px');
+            'font-family:system-ui,-apple-system,sans-serif;background:#08090b;color:#eef1f4;padding:24px');
           node.innerHTML =
             '<div style="max-width:22rem;text-align:center">' +
             '<div style="font-size:15px;font-weight:600;margin-bottom:6px">CloudCLI is not on screen</div>' +
@@ -136,7 +136,7 @@
             '<div style="font-size:13px;line-height:1.5;opacity:0.7;margin-bottom:16px">' +
             'The app did not finish drawing. The server may be mid-restart — reloading usually clears it.</div>' +
             '<button onclick="location.reload()" style="border:0;border-radius:8px;padding:8px 16px;' +
-            'background:#2fa876;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Reload</button>' +
+            'background:#f2a65a;color:#08090b;font-size:13px;font-weight:600;cursor:pointer">Reload</button>' +
             '</div>';
           root.appendChild(node);
         }

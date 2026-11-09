@@ -126,7 +126,7 @@
    * head past the panel and taking the ✕ with it. */
   overflow-wrap: anywhere;
 }
-.vv-sheet__accent { font-style: italic; color: var(--accent-ink); }
+.vv-sheet__accent { color: var(--accent-ink); }
 .vv-sheet__close {
   width: 32px;
   height: 32px;
@@ -309,7 +309,7 @@
   /* A check's key or a node's id is one unbroken token: it wraps rather than widening the title under the ✕. */
   overflow-wrap: anywhere;
 }
-.vv-dialogframe__accent { font-style: italic; color: var(--accent-ink); }
+.vv-dialogframe__accent { color: var(--accent-ink); }
 .vv-dialogframe__key { font-size: 0.62em; color: var(--accent-ink); }
 .vv-dialogframe__close {
   position: absolute;

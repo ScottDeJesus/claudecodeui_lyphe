@@ -1,80 +1,79 @@
-/* Verve design tokens — the app's ONE colour, type, space and motion source.
+/* The app's ONE colour, type, space and motion source — now the ASTROLABE design system.
  *
- * Copied BY VALUE from the Verve design system's own token files
- * ({colors,typography,spacing,motion,base}.css). Copied, not imported: the design source is
- * never loaded at runtime.
+ * Astrolabe is the visual language of a voice instrument: a near-black instrument face (Night) or a porcelain bench (Day),
+ * hairline geometry, Geist and Geist Mono, one warm live colour (amber) and a chrome core. Its tokens are written here BY
+ * VALUE under the names this app already speaks (Verve's: `--canvas`, `--surface`, `--ink`, `--accent`, the five tones …),
+ * so every Tailwind name in tailwind.config.js and every `.vv-*` rule follows without a call site changing. The design
+ * system itself (tokens, components, brand book) is the Astrolabe artifact; nothing of it is loaded at runtime.
  *
- * Four deliberate changes from the source, and only four:
- *   1. Verve's `.vv-dark, body.vv-dark` selector is written as `.dark` — the one dark selector
- *      this app already has (ThemeContext puts it on <html>). No `vv-dark` class exists here.
- *   2. `--on-accent` is added to both blocks. Verve has no token for the ink that sits ON the
- *      accent, and the primary button needs one: #ffffff on the light accent (#2fa876) and
- *      #101116 on the dark accent (#4cc493, where white would measure 2.18:1).
- *   3. `--on-danger` is added to both blocks, the same shape of gap. Verve's `.dark` block
- *      lightens almost everything but never redeclares `--danger`, so the destructive fill
- *      stays #b3373c in dark; pairing it with `--on-accent` put #101116 on that red and
- *      measured 3.17:1. `--on-danger` is #ffffff in BOTH modes — 5.95:1 on #b3373c either way —
- *      because inventing a lighter dark `--danger` would be choosing a colour Verve did not,
- *      which is the second palette D1 exists to forbid.
- *   4. `border-radius: var(--radius-input)` is DROPPED from the `:focus-visible` rule below.
- *      `border-radius` is a property of the ELEMENT, not of the ring, so the source rule
- *      reshapes whatever it lands on: measured across 26 Tab stops on the chat screen, a
- *      999px pill and an 8px button both snapped to 10px on focus and back on blur, and the
- *      footer link went 0px → 10px. `outline` already follows the element's own radius, so
- *      nothing is lost. It went unnoticed until Phase 2 removed `focus-visible:outline-none`
- *      from Button's cva, which had been hiding the ring that makes the jump visible.
+ * NAMES ARE VERVE'S, VALUES ARE ASTROLABE'S. Day is `:root`, Night is `.dark` (ThemeContext puts `.dark` on <html>; it
+ * also sets `data-theme="night" | "day"` for anything that reads the Astrolabe names). Astrolabe tokens with no Verve name
+ * (`--ink-strong`, `--hairline`, `--track`, `--status-idle`, the `--signal-*` graphics colours, the `--chrome-*` ramp and
+ * the three personas) are added below under their Astrolabe names.
  *
- * `fonts.css` is NOT copied — its Google Fonts `@import` is served by the <link> in index.html,
- * which preconnects and so lands the faces a round trip sooner.
+ * WHAT CHANGED FROM VERVE, deliberately:
+ *   1. Colour: the green accent became Astrolabe's amber (`#f2a65a` by night, `#964800` by day, darkened until accent
+ *      text clears 4.5:1 on the ground and on its own tint). The accent still means one thing: this is happening now —
+ *      actions, focus and live state, never decoration. Garnish (Verve's warm second accent) is now Astrolabe's ice, the
+ *      cool second signal, so it stays clear of the accent. Warn moved from amber to gold so it can never be read as live.
+ *   2. `--on-accent` is near-black on the night amber (9.8:1) and white on the day amber (6.5:1). `--on-danger` is white on
+ *      one `--danger` fill shared by both themes (5.3:1).
+ *   3. Type: Geist for everything read, Geist Mono for everything the instrument reports (labels, numbers, code). The
+ *      display face is Geist at light weight with tight tracking; nothing is bold for emphasis.
+ *   4. Shape: machined, not soft — 2px controls and inputs, 4px cards, 6px screens; pills and true circles stay round.
+ *   5. Depth: no resting shadows. Things rest on hairlines; only what floats (menus, panels, dialogs) carries a shadow,
+ *      and each of those carries its hairline inside the shadow so it reads on either ground.
+ *   6. Focus: a 1px solid accent outline, 2px outside — at least 3:1 on every ground and surface in both themes.
  *
- * This file is imported by src/main.tsx BEFORE index.css, so index.css's `@tailwind base`
- * (and every Tailwind utility mapped onto these tokens in tailwind.config.js) resolves against
- * tokens that are already declared.
+ * Every text ink below holds 4.5:1 on `--canvas`, `--surface` and `--surface2` in its theme (`--ink-faint` included);
+ * `--border-strong`, the edge of every field, holds 3:1 on `--canvas`.
+ *
+ * This file is imported by src/main.tsx BEFORE index.css, so index.css's `@tailwind base` (and every Tailwind utility
+ * mapped onto these tokens in tailwind.config.js) resolves against tokens that are already declared.
  */
 
-/* ---------- colours ---------- */
+/* ---------- colours: DAY ---------- */
 :root {
-  /* base — light */
-  --canvas:#f7f7f9;
-  --surface:#ffffff;
-  --surface2:#f0f0f4;
-  --ink:#17181d;
-  --ink-mid:#4a4c58;
-  --ink-muted:#6b6e7c;
-  --ink-faint:#8a8c99;
-  --border:#e4e5ec;
-  --border-strong:#d8d9e2;
-  /* accent — one green, used sparingly: actions and focus only */
-  --accent:#2fa876;
-  --accent-deep:#22855c;
-  --accent-ink:#1c7d54;
-  --accent-soft:#e3f4ec;
-  --accent-soft-hover:#d2ecdf;
-  /* the inks that sit ON a filled accent / danger surface (see the header note) */
+  /* base */
+  --canvas:#edeff1;
+  --surface:#fbfcfc;
+  --surface2:#e3e6e9;
+  --ink:#14171a;
+  --ink-mid:#3a4148;
+  --ink-muted:#555d65;
+  --ink-faint:#5c646c;
+  --border:#d3d7db;
+  --border-strong:#848a90;
+  /* accent — one amber, the live colour: actions, focus and what is happening now */
+  --accent:#964800;
+  --accent-deep:#7a3a00;
+  --accent-ink:#8a4200;
+  --accent-soft:#f1e3d4;
+  --accent-soft-hover:#e9d4bd;
   --on-accent:#ffffff;
   --on-danger:#ffffff;
-  /* garnish — orange accent, never a wall */
-  --garnish:#e0713a;
-  --garnish-soft:#fdeee4;
-  /* five tones — soft fill + deep ink. Errors are amber; red only for destructive or denied */
-  --neutral-dot:#8a8c99;--neutral-soft:#f0f0f4;--neutral-ink:#6b6e7c;
-  --info-dot:#3aa6b9;--info-soft:#e3f2f5;--info-ink:#22707f;
-  --pos-dot:#2fa876;--pos-soft:#e3f4ec;--pos-ink:#1c7d54;
-  --warn-dot:#d9a64a;--warn-soft:#faf1de;--warn-ink:#8a6620;
-  --danger-dot:#b3373c;--danger-soft:#fdecec;--danger-ink:#b3373c;
-  --danger:#b3373c;--danger-deep:#992f33;
-  /* two kinds — soft fill + deep ink, swapped in by [data-kind] (see "kind" below) */
-  --epic-soft:#efe9fb;--epic-ink:#6b3fc8;
-  --feature-soft:#e6eefc;--feature-ink:#2f5bb7;
-  --success-dot:#4ade80;
-  /* water — drying gauge fill */
-  --water:#3aa6b9;
-  /* charts — series order: accent first, then garnish, then cools */
-  --chart-1:#2fa876;
-  --chart-2:#e8a23a;
-  --chart-3:#3aa6b9;
-  --chart-4:#6fd0a8;
-  --chart-5:#8a94a8;
+  /* garnish — Astrolabe's cool second signal (ice); a mark, never a wall */
+  --garnish:#3b88a3;
+  --garnish-soft:#dce8ed;
+  /* five tones — soft fill + deep ink + dot. Warn is gold (never the live amber); red only for destructive or denied */
+  --neutral-dot:#7b848d;--neutral-soft:#e3e6e9;--neutral-ink:#555d65;
+  --info-dot:#3b88a3;--info-soft:#dce8ed;--info-ink:#1d6580;
+  --pos-dot:#2f8f6a;--pos-soft:#dbebe3;--pos-ink:#1c6a4c;
+  --warn-dot:#a37900;--warn-soft:#f0e7cb;--warn-ink:#6b5200;
+  --danger-dot:#c43a2f;--danger-soft:#f6dfdc;--danger-ink:#a52f25;
+  --danger:#c43a2f;--danger-deep:#a52f25;
+  /* two kinds — identity, not state */
+  --epic-soft:#e8e3f2;--epic-ink:#5a449e;
+  --feature-soft:#dde6f2;--feature-ink:#2c5a9e;
+  --success-dot:#2f8f6a;
+  /* water — drying gauge fill (ice) */
+  --water:#3b88a3;
+  /* charts — series order: accent first, then ice, then the cools and the chrome */
+  --chart-1:#b35f12;
+  --chart-2:#3b88a3;
+  --chart-3:#2f8f6a;
+  --chart-4:#8c939b;
+  --chart-5:#6a5aa8;
   /* semantic aliases */
   --text-heading:var(--ink);
   --text-body-color:var(--ink-mid);
@@ -82,75 +81,133 @@
   --text-faint:var(--ink-faint);
   --surface-card:var(--surface);
   --surface-page:var(--canvas);
+
+  /* Astrolabe-only names */
+  --ink-strong:#000000;
+  --hairline:rgba(8, 9, 11, 0.16);
+  --track:rgba(8, 9, 11, 0.08);
+  --status-idle:#7b848d;
+  --focus:var(--accent);
+  /* the instrument's graphics colours (canvas only, never text), for the default Mercury material */
+  --signal-a:#c4650f;
+  --signal-b:#3b88a3;
+  --signal-loop:#252b31;
+  --signal-halo:#6c879e;
+  /* the other two materials, which the companion's face swaps in */
+  --tube:#a33a00;--tube-tint:rgba(163, 58, 0, 0.12);--tube-ground:#f1ede7;
+  --tube-signal-a:#c2540e;--tube-signal-b:#b4813f;--tube-signal-loop:#3a2a1f;--tube-signal-halo:#c46a2a;
+  --wire:#00657a;--wire-tint:rgba(0, 101, 122, 0.12);--wire-ground:#e9eff2;
+  --wire-signal-a:#0a8aab;--wire-signal-b:#4a9fb3;--wire-signal-loop:#123642;--wire-signal-halo:#2a98b8;
 }
+
+/* ---------- colours: NIGHT ---------- */
 .dark {
-  --canvas:#101116;
-  --surface:#1a1b22;
-  --surface2:#24252f;
-  --ink:#f0f0f4;
-  --ink-mid:#c8cad4;
-  --ink-muted:#a6a9b8;
-  --ink-faint:#7c7f8e;
-  --border:#2a2b35;
-  --border-strong:#3a3c4a;
-  --accent:#4cc493;
-  --accent-deep:#6fd0a8;
-  --accent-ink:#a9e8cb;
-  --accent-soft:#1b3a2d;
-  --accent-soft-hover:#234a39;
-  --on-accent:#101116;
+  --canvas:#08090b;
+  --surface:#0e1013;
+  --surface2:#161a1e;
+  --ink:#eef1f4;
+  --ink-mid:#c9ced3;
+  --ink-muted:#959da6;
+  --ink-faint:#7d858e;
+  --border:#1d2126;
+  --border-strong:#5e6368;
+  --accent:#f2a65a;
+  --accent-deep:#f8bd7f;
+  --accent-ink:#f6b877;
+  --accent-soft:#291e14;
+  --accent-soft-hover:#35271a;
+  --on-accent:#08090b;
   --on-danger:#ffffff;
-  --garnish:#f2c076;
-  --garnish-soft:#3b2a18;
-  --neutral-soft:#24252f;--neutral-ink:#a6a9b8;
-  --info-soft:#152e35;--info-ink:#7ecbdc;
-  --pos-soft:#143026;--pos-ink:#6fd0a8;
-  --warn-soft:#3b2f16;--warn-ink:#e3b96b;
-  --danger-soft:#3a1c1e;--danger-ink:#e58a8e;
-  --epic-soft:#2a2140;--epic-ink:#c4b1f5;
-  --feature-soft:#1a2640;--feature-ink:#9dbcf7;
+  --garnish:#9ed3e6;
+  --garnish-soft:#13242b;
+  --neutral-dot:#59616a;--neutral-soft:#161a1e;--neutral-ink:#a7aeb6;
+  --info-dot:#9ed3e6;--info-soft:#12232a;--info-ink:#a9dbec;
+  --pos-dot:#6fd6ab;--pos-soft:#10261e;--pos-ink:#8fe0bd;
+  --warn-dot:#e8c45a;--warn-soft:#2a2310;--warn-ink:#ecd07a;
+  --danger-dot:#ff7b6b;--danger-soft:#2c1513;--danger-ink:#ff9d90;
+  --epic-soft:#1f1a2c;--epic-ink:#c2b5ea;
+  --feature-soft:#141e2c;--feature-ink:#a8c2ee;
+  --success-dot:#6fd6ab;
+  --water:#9ed3e6;
+  --chart-1:#f2a65a;
+  --chart-2:#9ed3e6;
+  --chart-3:#6fd6ab;
+  --chart-4:#8c939b;
+  --chart-5:#b4a8d8;
+
+  --ink-strong:#ffffff;
+  --hairline:rgba(255, 255, 255, 0.14);
+  --track:rgba(255, 255, 255, 0.08);
+  --status-idle:#59616a;
+  --signal-a:#f2a65a;
+  --signal-b:#9ed3e6;
+  --signal-loop:#ecf2f7;
+  --signal-halo:#96b4cd;
+  --tube:#ffb066;--tube-tint:rgba(255, 176, 102, 0.14);--tube-ground:#0d0906;
+  --tube-signal-a:#ff9e3e;--tube-signal-b:#ffd6a0;--tube-signal-loop:#ffe4c4;--tube-signal-halo:#ff8c32;
+  --wire:#5fe3ff;--wire-tint:rgba(95, 227, 255, 0.14);--wire-ground:#030608;
+  --wire-signal-a:#46e2ff;--wire-signal-b:#d6faff;--wire-signal-loop:#c8f8ff;--wire-signal-halo:#3cd2ff;
+}
+
+/* the chrome ramp: the Mercury material's five stops, the same under any light */
+:root {
+  --chrome-highlight:#ffffff;
+  --chrome-light:#dce1e6;
+  --chrome-mid:#8c939b;
+  --chrome-dark:#3b4046;
+  --chrome-rim:#b9c1c9;
 }
 
 /* ---------- type ----------
-   Instrument Serif for display/headings (italic for emphasis, NEVER bold);
-   Schibsted Grotesk for everything else; tabular-nums wherever numbers stack. */
+   Geist for what is read, Geist Mono for what the instrument reports. The display face is Geist, light and tight;
+   tabular-nums wherever numbers stack. */
 :root {
-  --font-display:'Instrument Serif',serif;
-  --font-body:'Schibsted Grotesk',sans-serif;
-  --font-mono:ui-monospace,Menlo,monospace;
-  --text-display:56px;   /* hero display, serif */
-  --text-h1:34px;        /* section heading, serif */
-  --text-h2:20px;        /* card/panel titles, grotesk 700, -0.01em */
-  --text-body:15.5px;
+  --font-display:'Geist',ui-sans-serif,system-ui,sans-serif;
+  --font-body:'Geist',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --text-display:52px;   /* hero display, Geist 300 */
+  --text-h1:30px;        /* section heading, Geist 300 */
+  --text-h2:19px;        /* card/panel titles, Geist 500, -0.01em */
+  --text-body:15px;
   --text-small:13.5px;
-  --text-caption:12px;   /* uppercase, .14em tracking, ink-faint */
-  --leading-body:1.65;
+  --text-caption:11px;   /* Geist Mono, uppercase, .14em tracking, ink-faint */
+  --leading-body:1.6;
   --leading-tight:1.1;
 }
 .vv-tabular{font-variant-numeric:tabular-nums}
+/* The display face is Geist at light weight; a heading that asks for a weight of its own still gets it (utilities load later). */
+.font-serif{font-weight:300;letter-spacing:-0.015em}
+/* Astrolabe sets no italics: Geist has none (a browser would slant it), and emphasis is weight or the accent ink. A Verve screen
+   that asked for an italic display line gets the upright light face; quotes and asides in the body keep their italic. */
+.font-serif.italic,.font-serif .italic,.font-serif em,.font-serif i{font-style:normal}
 
 /* ---------- space & shape ----------
-   4px grid, airy by default. Shadows are whispers. */
+   4px grid, airy by default. Corners are machined; depth is a hairline. */
 :root {
   --space-1:8px;    /* inside controls */
   --space-2:16px;   /* between related items */
   --space-3:24px;   /* card padding */
   --space-4:40px;   /* between groups */
   --space-5:96px;   /* between page sections */
-  --radius-control:8px;   /* buttons ~10px in practice; inputs 10px */
-  --radius-input:10px;
-  --radius-card:12px;
-  --radius-screen:16px;
+  --radius-control:2px;
+  --radius-input:2px;
+  --radius-card:4px;
+  --radius-screen:6px;
   --radius-pill:999px;
-  --shadow-rest:0 1px 3px rgba(32,26,20,.06),0 1px 2px rgba(32,26,20,.04);
-  --shadow-hover:0 8px 24px rgba(32,26,20,.10);
-  --shadow-lift:0 18px 36px rgba(32,26,20,.13);
-  --shadow-overlay:0 16px 44px rgba(32,26,20,.15);
-  --shadow-modal:0 24px 64px rgba(23,24,29,.28);
+  --shadow-rest:none;
+  --shadow-hover:0 0 0 1px var(--hairline);
+  --shadow-lift:0 0 0 1px var(--hairline),0 18px 40px rgba(8,9,11,.14);
+  --shadow-overlay:0 0 0 1px var(--hairline),0 16px 40px rgba(8,9,11,.16);
+  --shadow-modal:0 0 0 1px var(--hairline),0 28px 72px rgba(8,9,11,.26);
+}
+.dark {
+  --shadow-lift:0 0 0 1px var(--hairline),0 18px 48px rgba(0,0,0,.55);
+  --shadow-overlay:0 0 0 1px var(--hairline),0 16px 44px rgba(0,0,0,.6);
+  --shadow-modal:0 0 0 1px var(--hairline),0 28px 80px rgba(0,0,0,.7);
 }
 
 /* ---------- motion ----------
-   Springs, not tweens. */
+   Springs, not tweens. Everything that moves in the instrument is driven by the voice or by time. */
 :root {
   --ease-enter:cubic-bezier(.22,1,.36,1); /* entries, lifts, page-ins */
   --ease-spring:cubic-bezier(.34,1.8,.5,1); /* pops, knobs, checkmarks */
@@ -165,10 +222,10 @@
 @keyframes vv-pagein{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes vv-pulse{0%,100%{opacity:.5}50%{opacity:1}}
 @keyframes vv-spin{to{transform:rotate(360deg)}}
-@keyframes vv-spin-hue{0%,100%{border-top-color:var(--accent)}50%{border-top-color:#e0713a}}
+@keyframes vv-spin-hue{0%,100%{border-top-color:var(--accent)}50%{border-top-color:var(--garnish)}}
 @keyframes vv-shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
 @keyframes vv-swirl{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes vv-ring{0%{box-shadow:0 0 0 0 rgba(47,168,118,.35)}100%{box-shadow:0 0 0 9px rgba(47,168,118,0)}}
+@keyframes vv-ring{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 35%,transparent)}100%{box-shadow:0 0 0 9px color-mix(in srgb,var(--accent) 0%,transparent)}}
 @keyframes vv-toast-out{to{opacity:0;filter:blur(8px);transform:translateY(-16px) scale(1.06)}}
 @keyframes vv-drift{0%{transform:translate(0,0) scale(1)}33%{transform:translate(60px,-40px) scale(1.15)}66%{transform:translate(-40px,30px) scale(0.95)}100%{transform:translate(0,0) scale(1)}}
 @keyframes vv-drift2{0%{transform:translate(0,0) scale(1)}50%{transform:translate(-70px,50px) scale(1.2)}100%{transform:translate(0,0) scale(1)}}
@@ -176,10 +233,9 @@
 /* vv-meter-grow has no to-frame: a meter's end state is its inline transform: scaleX(p) (Meter.tsx), and a to{transform:none} with fill would pin every bar at full width. */
 @keyframes vv-meter-grow{from{transform:scaleX(0)}}
 @media screen and (prefers-reduced-motion: no-preference){[data-vv-enter] .vv-meter__fill{animation:vv-meter-grow var(--dur-move) var(--ease-enter) backwards}}
-.vv-skeleton{border-radius:6px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:400px 100%;animation:vv-shimmer 1.4s infinite linear}
-/* The one keyframe a screen names directly: a live status mark breathing. Verve spends it on a
-   conversation that is working right now (prototype :101). It carries NO colour — the element
-   keeps its own ink — so this stays a motion utility beside vv-skeleton, not a second palette. */
+.vv-skeleton{border-radius:var(--radius-control);background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:400px 100%;animation:vv-shimmer 1.4s infinite linear}
+/* The one keyframe a screen names directly: a live status mark breathing. Spent on a conversation that is working right
+   now. It carries NO colour — the element keeps its own ink — so this stays a motion utility beside vv-skeleton. */
 .vv-pulse{animation:vv-pulse 2s infinite}
 /* ⚠ This sets `transition … !important` on EVERY element. It is added for the half second
    around a light/dark switch (ThemeContext.toggleDarkMode) and never left on. */
@@ -187,15 +243,18 @@ body.vv-anim,body.vv-anim *{transition:background-color var(--dur-theme) ease,co
 
 /* ---------- base ----------
    body reset, links, focus ring, scrollbars */
-body{margin:0;background:var(--canvas);color:var(--ink);font-family:var(--font-body);font-size:var(--text-body);line-height:var(--leading-body)}
-a{color:var(--accent);text-decoration:none}
-a:hover{color:var(--accent-ink)}
-button:focus-visible,input:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:root{color-scheme:light}
+.dark{color-scheme:dark}
+body{margin:0;background:var(--canvas);color:var(--ink);font-family:var(--font-body);font-size:var(--text-body);line-height:var(--leading-body);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+code,kbd,samp,pre{font-family:var(--font-mono)}
+a{color:var(--accent-ink);text-decoration:none}
+a:hover{color:var(--accent)}
+button:focus-visible,input:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:1px solid var(--focus);outline-offset:2px}
 *{scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}
 *::-webkit-scrollbar{width:8px;height:8px}
 *::-webkit-scrollbar-track{background:transparent}
-*::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:999px;border:2px solid transparent;background-clip:padding-box}
-*::-webkit-scrollbar-thumb:hover{background:var(--accent);background-clip:padding-box}
+*::-webkit-scrollbar-thumb{background:var(--border);border-radius:999px;border:2px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:var(--border-strong);background-clip:padding-box}
 ::selection{background:var(--accent-soft);color:var(--accent-ink)}
 
 /* ---------- tone ----------
@@ -215,8 +274,7 @@ button:focus-visible,input:focus-visible,a:focus-visible,[tabindex]:focus-visibl
    epic or a feature must not read as `info` or `positive`. Setting `data-kind` on an element swaps
    `--kind-soft` / `--kind-ink` exactly as `data-tone` swaps the tone pair, so the kit's `Badge` paints
    a kind through `.vv-badge[data-kind]` and no component adds a colour rule of its own. §6 holds here
-   too: a kind is always drawn with a glyph and its word, so it survives greyscale. The hues stay at
-   least 25° clear of every tone's ink and of each other. These two ARE the vocabulary. */
+   too: a kind is always drawn with a glyph and its word, so it survives greyscale. These two ARE the vocabulary. */
 [data-kind="epic"]{--kind-soft:var(--epic-soft);--kind-ink:var(--epic-ink)}
 [data-kind="feature"]{--kind-soft:var(--feature-soft);--kind-ink:var(--feature-ink)}
 

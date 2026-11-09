@@ -1,166 +1,237 @@
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import '@/modules/companion/CompanionAvatar.css';
-import { CompanionPortrait } from '@/modules/companion/CompanionPortrait';
-import { useFaceAtlas } from '@/modules/companion/hooks/useFaceAtlas';
+import { hearVoice } from '@/modules/companion/utils/astrolabeEar';
+import { createAstrolabeInstrument } from '@/modules/companion/utils/astrolabeInstrument';
+import { listeningTap } from '@/modules/companion/utils/listeningTap';
 import { presenceWords } from '@/modules/companion/utils/presenceWords';
-import type { CompanionFaceLook, CompanionFaceSentences, CompanionFaceVoice, CompanionPresence } from '@/shared/types';
-import { Avatar } from '@/shared/ui';
+import type {
+  AstrolabeFrameInput,
+  AstrolabeTier,
+  AstrolabeVoiceFrame,
+  CompanionFaceLook,
+  CompanionFaceSentences,
+  CompanionFaceVoice,
+  CompanionMaterial,
+  CompanionPresence,
+} from '@/shared/types';
 
 type CompanionAvatarProps = {
-  /** What she is doing: the portrait takes her face from `state`, the marks their accents from it and the walk ring from `walk`; the chat and files give the accessible name its subject. */
+  /** What she is doing: the instrument takes its state from `state`, the reticle its words and target from what she reads, and the walk arc from `walk`. */
   presence: CompanionPresence;
-  /** The face to draw: her `picture.face.id`. Null on a box with no face made yet, where the disc draws her initial instead. */
-  faceId: string | null;
   /**
-   * The page's voice, read by the portrait's loop while she speaks (`mouth()` for the timed shapes her mouth takes where a piece holds the
-   * audio's place, `level()` for how far it opens and `progress()` for the vowel it shapes where none does): functions, never props that
-   * change, so a level sixty times a second redraws nothing in React, and a piece landing mid-sentence is read at the next frame. Null where no voice sounds.
+   * The page's voice, read by the instrument's loop each frame: `analyser()` for what her voice is doing (loudness, bands, pitch, onsets)
+   * and `progress()` for the word she is on. Functions, never props that change, so a frame sixty times a second redraws nothing in React.
+   * Null where no voice sounds (Settings' preview, an idle fixture).
    */
   voice: CompanionFaceVoice | null;
-  /** The sentences she says, for her mood and her vowels; null where there are none (Settings' preview, an idle fixture). */
+  /** The sentences she says, for the word plated on the dial's middle ring; null where there are none. */
   sentences: CompanionFaceSentences | null;
-  /** Where the anchor she looks at lies from her; null when no look holds. Her head turns toward it. */
+  /** Where the anchor she looks at lies from her; null when no look holds. The pointer slews toward it and locks. */
   look: CompanionFaceLook | null;
+  /** The material she is drawn in (her `companionMaterial` preference); Mercury where none is given. */
+  material?: CompanionMaterial;
   /** Her name as he set it; the default stands in while a page has not read it. */
   name?: string;
-  /**
-   * The square she fills, in CSS pixels. Her initial's `Avatar` (a box with no face yet) takes it, and so does `useFaceAtlas`, which fetches the smallest
-   * tier of her face that is sharp at this size on the screen's pixel ratio. The portrait and the marks fill their square by CSS, so they follow the
-   * disc's own size frame by frame.
-   */
+  /** The square she fills, in CSS pixels: it picks the tier (disc under 120 px, core under 260 px, the whole dial above). The canvases follow the square's own box frame by frame. */
   size: number;
 };
 
-/** The sentences of a face with none to read: it keeps its own faces, blinks and glances, and says nothing. */
-const NO_SENTENCES: CompanionFaceSentences = { playing: null, newest: null, turnRunning: false };
+/** Her fourteen presence words, as the four states the instrument knows. Reading, drafting and walking are her working: the instrument thinks. */
+const INSTRUMENT_STATE: Record<CompanionPresence['state'], AstrolabeFrameInput['state']> = {
+  idle: 'idle',
+  cut: 'idle',
+  loading: 'idle',
+  asleep: 'idle',
+  failed: 'idle',
+  listening: 'listening',
+  speaking: 'speaking',
+  transcribing: 'thinking',
+  thinking: 'thinking',
+  waking: 'thinking',
+  reading_session: 'thinking',
+  reading_code: 'thinking',
+  drafting: 'thinking',
+  walking: 'thinking',
+};
 
-/** The walk ring's radius in the 100-unit square: it runs near the disc's edge, inside the square's, whose stroke the stylesheet sets. */
-const RING_RADIUS = 45;
+/** An idle face draws every other frame: its breath is slow enough that 30 frames a second loses nothing. */
+const IDLE_FRAME_STRIDE = 2;
+
+/** Where a subject (a chat, a file) sits on the dial: a stable bearing hashed from its name, so the pointer returns to the same place for the same thing. */
+function bearingOf(subject: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < subject.length; i++) {
+    hash ^= subject.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return ((hash >>> 0) % 3600) / 10;
+}
+
+/** What her voice is doing when the page's analyser is not there yet: the player's level alone, shaped into bands. */
+function frameFromLevel(level: number, previous: AstrolabeVoiceFrame | null): AstrolabeVoiceFrame {
+  const rms = Math.min(1, level * 3);
+  const rising = previous !== null && rms - previous.rms > 0.25;
+  return { rms, low: rms * 0.9, mid: rms * 0.7, high: rms * 0.4, f0: 0, voicing: 0, onsets: (previous?.onsets ?? 0) + (rising ? 1 : 0), onsetAmp: rising ? 0.7 : previous?.onsetAmp ?? 0 };
+}
 
 /**
- * Kaylee's face, "the light that guides this project": her portrait, the one photographed face the bake made and the page plays
- * from memory (`CompanionPortrait`), with her marks drawn over it in code (SVG and CSS on Verve's tokens), so the marks follow the
- * theme and scale without blur. Used by this module's CompanionFace (the provider-bound face that the button's floating disc
- * and the station's head draw), by Settings' face card, and by the station module's fixtures, which draw her on fixture
- * presences; the face fills the square it is given and owns no chrome.
+ * Kaylee's face: the Astrolabe instrument — a chrome ferrofluid core, the breathing loop and, on the station, the armillary dial whose
+ * pointer slews to what she is reading and locks. It replaces her photographed portrait. Used by this module's CompanionFace (the
+ * provider-bound face that her button's disc and the station's head and portrait draw), by Settings' material card, and by the station
+ * module's fixtures, which draw her on fixture presences; the face fills the square it is given and owns no chrome.
  *
- * LAYERS, bottom to top: the disc's own ground (the button's, which shows until the sheets are decoded and then gives way to her
- * face fading in); the portrait; the marks. A box with no face made yet (`faceId` null) draws her initial in the kit's `Avatar`
- * where the portrait would be.
+ * TIERS by the square: under 120 px (her button) the loop round a 2D chrome core; under 260 px the raymarched WebGL core inside the loop;
+ * above, the whole dial. The instrument owns its canvases (`astrolabeInstrument.ts`); this component feeds it once per animation frame
+ * from refs, so her voice redraws nothing in React. A face off screen or in a hidden tab draws nothing.
  *
- * ONE SVG OF MARKS, KEYED BY `data-state`. Each state turns on its own accent (her ears pulsing, three dots turning, a page, a
- * pencil, the walk ring); the portrait draws the state's face, and the stylesheet beside this file holds every accent and every keyframe.
- * A state's LOOK is its still frame and its MOVEMENT is added only under `prefers-reduced-motion: no-preference`, so reduced motion
- * keeps each look and drops the movement.
+ * WHAT DRAWS WHAT. Speaking: her player's analyser drives the lobes, the spikes where the core extrudes, the shocks on hard consonants
+ * and the loop's ripple. Listening: the ears' microphone tap draws the loop in. Thinking, reading, drafting and walking: the loop breaks
+ * into turning dashes and the pointer sweeps, then locks on what she is looking at (the anchor his button points to, else a bearing
+ * hashed from the chat or file she reads), with its words on the reticle's plate. A walk fills an accent arc round the loop. Failed draws
+ * the loop in the warn colour; asleep dims and slows her.
  *
- * WHICH STATE DRAWS WHICH LOOK. `data-state` carries the presence state as it is, fourteen words. Ten have an accent or a face of
- * their own (idle, listening, transcribing, thinking, speaking, reading_session, reading_code, drafting, walking, cut) and `failed`
- * is the eleventh: she is still, her stopped face with the status line's amber, `--warn-dot`, as a ring round it. The other three
- * share a look: `asleep` and `loading` draw idle's, and `waking` draws thinking's (a word is on its way).
- *
- * She walks a result on a ring at `walk.at / walk.total` whose numbers show while the face is hovered or its button focused.
- *
- * Her accessible name is her name and the state in words ("Kaylee, reading Bugfixes"), which a button around her may replace
- * with a label of its own. The portrait is for the eye alone: the marks' svg carries the name.
+ * Her accessible name is her name and the state in words ("Kaylee, reading Bugfixes"), which a button around her may replace with a label
+ * of its own; the canvases are for the eye alone.
  */
-export function CompanionAvatar({ presence, faceId, voice, sentences, look, name, size }: CompanionAvatarProps) {
+export function CompanionAvatar({ presence, voice, sentences, look, material = 'mercury', name, size }: CompanionAvatarProps) {
   const { t } = useTranslation();
   const her = name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
-  const { state, walk } = presence;
-  const atlas = useFaceAtlas(faceId, size);
-  const count = walk ? `${walk.at}/${walk.total}` : '';
-  // The numbers shrink a little and their pill widens with the digits ("12/40"), so it stays inside the head's width. They
-  // stop shrinking at 12 units (a walk of a thousand items), and the digits of a longer walk are squeezed to fit the pill.
-  const countSize = Math.max(12, 22 - Math.max(0, count.length - 3) * 3);
-  const countNatural = count.length * countSize * 0.64;
-  const countWidth = Math.min(68, countNatural + 14);
-  const countSqueezed = countNatural + 14 > countWidth;
-  // A walk with no items has nowhere to fill: the track alone. At 0 of n ("set up, not begun") the arc is empty too.
-  const filled = walk && walk.total > 0 ? Math.min(1, Math.max(0, walk.at / walk.total)) : 0;
+  const tier: AstrolabeTier = size < 120 ? 'disc' : size < 260 ? 'core' : 'dial';
+  const frameRef = useRef<HTMLDivElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
+
+  // What the reticle's plate says while she works: short words, the chat or file it concerns.
+  const label = (() => {
+    const chat = presence.session?.name;
+    const file = presence.files?.[0]?.split('/').pop();
+    switch (presence.state) {
+      case 'reading_code': return file ? t('companion.face.readingFile', { defaultValue: 'Reading {{file}}', file }) : t('companion.face.readingCode', { defaultValue: 'Reading code' });
+      case 'reading_session': return chat ? t('companion.face.readingChat', { defaultValue: 'Reading {{chat}}', chat }) : t('companion.face.reading', { defaultValue: 'Reading' });
+      case 'drafting': return t('companion.face.drafting', { defaultValue: 'Drafting' });
+      case 'walking': return presence.walk ? t('companion.face.walk', { defaultValue: 'Item {{at}} of {{total}}', at: presence.walk.at, total: presence.walk.total }) : t('companion.face.walking', { defaultValue: 'Walkthrough' });
+      default: return null;
+    }
+  })();
+
+  // The latest of what the loop reads, kept off React's render path: a frame reads these, and each commit replaces them.
+  const latest = useRef({ presence, voice, sentences, look, material, label });
+  useLayoutEffect(() => {
+    latest.current = { presence, voice, sentences, look, material, label };
+  });
+
+  useEffect(() => {
+    const host = hostRef.current;
+    const frameBox = frameRef.current;
+    if (!host || !frameBox) return undefined;
+    const instrument = createAstrolabeInstrument(host, tier, latest.current.material);
+    let side = 0;
+    const fitSquare = () => {
+      const box = frameBox.getBoundingClientRect();
+      const next = Math.max(16, Math.floor(Math.min(box.width, box.height)));
+      if (next === side) return;
+      side = next;
+      host.style.width = `${side}px`;
+      host.style.height = `${side}px`;
+      instrument.resize(side);
+    };
+    fitSquare();
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fitSquare);
+    resizeObserver?.observe(frameBox);
+    let visible = true;
+    const intersectionObserver = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver((entries) => {
+      visible = entries.some((entry) => entry.isIntersecting);
+    });
+    intersectionObserver?.observe(frameBox);
+
+    let raf = 0;
+    let last = performance.now();
+    let frameCount = 0;
+    let levelFrame: AstrolabeVoiceFrame | null = null;
+    let reported = false;
+    const loop = () => {
+      raf = requestAnimationFrame(loop);
+      const now = performance.now();
+      if (!visible || document.hidden) {
+        last = now;
+        return;
+      }
+      const current = latest.current;
+      const state = INSTRUMENT_STATE[current.presence.state];
+      frameCount += 1;
+      if (state === 'idle' && frameCount % IDLE_FRAME_STRIDE !== 0) return;
+      const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
+      last = now;
+      try {
+        // Her voice: the player's tap while she speaks, the ears' microphone while she listens.
+        let heard: AstrolabeVoiceFrame | null = null;
+        if (state === 'speaking' && current.voice) {
+          const analyser = current.voice.analyser();
+          if (analyser) heard = hearVoice(analyser);
+          else {
+            levelFrame = frameFromLevel(current.voice.level(), levelFrame);
+            heard = levelFrame;
+          }
+        } else if (state === 'listening') {
+          const tap = listeningTap();
+          if (tap) heard = hearVoice(tap);
+        }
+        // The word she is on: the sounding sentence's words at the place its audio has reached.
+        let word: string | null = null;
+        const playing = current.sentences?.playing;
+        const progress = state === 'speaking' ? current.voice?.progress() : null;
+        if (tier === 'dial' && playing && progress && progress.turnId === playing.turnId) {
+          const words = playing.text.split(/\s+/).filter(Boolean);
+          const at = progress.duration ? progress.elapsed / progress.duration : progress.elapsed / Math.max(1, words.length / 2.6);
+          const index = Math.min(words.length - 1, Math.max(0, Math.floor(at * words.length)));
+          word = words[index]?.toLowerCase().replace(/[^\p{L}\p{N}'’-]/gu, '') || null;
+        }
+        const { look: anchor, presence: p } = current;
+        const subject = p.session?.sessionId ?? p.files?.[0] ?? null;
+        const working = p.state === 'reading_code' || p.state === 'reading_session' || p.state === 'drafting' || p.state === 'walking';
+        const azimuth = anchor && (anchor.dx !== 0 || anchor.dy !== 0)
+          ? (Math.atan2(-anchor.dy, anchor.dx) * 180) / Math.PI
+          : working ? bearingOf(subject ?? p.state) : null;
+        instrument.frame(dt, {
+          state,
+          voice: heard,
+          azimuth,
+          label: current.label,
+          walk: p.walk,
+          failed: p.state === 'failed',
+          asleep: p.state === 'asleep',
+          word,
+          material: current.material,
+        });
+      } catch (error) {
+        // One bad frame must not take the page down: report it once and keep drawing.
+        if (!reported) {
+          reported = true;
+          console.error('[astrolabe] her face could not draw a frame', error);
+        }
+      }
+    };
+    raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      resizeObserver?.disconnect();
+      intersectionObserver?.disconnect();
+      instrument.destroy();
+    };
+  }, [tier]);
 
   return (
-    <div className="kaylee-avatar">
-      {atlas !== null && <CompanionPortrait atlas={atlas} presence={state} voice={voice} sentences={sentences ?? NO_SENTENCES} look={look} />}
-      {faceId === null && (
-        // Decorative: the marks' svg beside it carries her name.
-        <span aria-hidden="true" className="contents">
-          <Avatar initials={Array.from(her)[0]?.toUpperCase() ?? ''} size={size} />
-        </span>
-      )}
-      <svg className="kaylee" data-state={state} viewBox="0 0 100 100" role="img" aria-label={presenceWords(t, her, presence)}>
-        {/* Listening: sound arriving at her ears, a pair of arcs a side, pulsing in toward her. */}
-        <g className="kaylee__ears">
-          <path className="kaylee__ear kaylee__ear--near" d="M 11 39 Q 7 50 11 61" />
-          <path className="kaylee__ear kaylee__ear--far" d="M 6 33 Q 1 50 6 67" />
-          <path className="kaylee__ear kaylee__ear--near kaylee__ear--right" d="M 89 39 Q 93 50 89 61" />
-          <path className="kaylee__ear kaylee__ear--far kaylee__ear--right" d="M 94 33 Q 99 50 94 67" />
-        </g>
-
-        {/* Transcribing and thinking: three dots turning around her, each smaller than the one before it. */}
-        <g className="kaylee__dots">
-          <circle className="kaylee__dot" cx="50" cy="6" r="6.4" />
-          <circle className="kaylee__dot" cx="88.1" cy="72" r="5" />
-          <circle className="kaylee__dot" cx="11.9" cy="72" r="3.8" />
-        </g>
-
-        {/* Reading a chat: a speech bubble held at her side. */}
-        <g className="kaylee__bubble">
-          <path className="kaylee__paper" d="M 63 60 H 86 a 4 4 0 0 1 4 4 V 78 a 4 4 0 0 1 -4 4 H 77 L 70 90 V 82 H 63 a 4 4 0 0 1 -4 -4 V 64 a 4 4 0 0 1 4 -4 Z" />
-          <path className="kaylee__line" d="M 64 67.5 H 85" />
-          <path className="kaylee__line" d="M 64 74 H 78" />
-        </g>
-
-        {/* Reading code: a small page, its lines indented like code, held where her eyes can sweep across it. */}
-        <g className="kaylee__page">
-          <rect className="kaylee__paper" x="60" y="56" width="29" height="34" rx="4" />
-          <path className="kaylee__line kaylee__line--a" d="M 65 64 H 78" />
-          <path className="kaylee__line kaylee__line--b" d="M 69 70 H 83" />
-          <path className="kaylee__line kaylee__line--c" d="M 69 76 H 76" />
-          <path className="kaylee__line kaylee__line--a" d="M 65 82 H 80" />
-        </g>
-
-        {/* Drafting: a pencil writing a stroke; the stroke is drawn from its left end and the pencil rides its tip. */}
-        <g className="kaylee__draft">
-          <path className="kaylee__stroke" d="M 36 92 q 5 -6 10 0 t 10 0 t 10 0" pathLength="1" />
-          <g className="kaylee__pencil">
-            <path className="kaylee__pencil-body" d="M 0 0 L 5 -4.2 L 25 -24.5 L 30 -19.8 L 9.6 0.6 Z" />
-            <path className="kaylee__pencil-tip" d="M 0 0 L 5 -4.2 L 9.6 0.6 Z" />
-            <path className="kaylee__pencil-end" d="M 25 -24.5 L 27.4 -27 L 32.4 -22.2 L 30 -19.8 Z" />
-          </g>
-        </g>
-
-        {/* Walking a result: a ring around her face, filled to item k of n. */}
-        <g className="kaylee__walk">
-          <circle className="kaylee__track" cx="50" cy="50" r={RING_RADIUS} />
-          {filled > 0 && (
-            <circle
-              className="kaylee__progress"
-              cx="50"
-              cy="50"
-              r={RING_RADIUS}
-              pathLength="1"
-              strokeDasharray={`${filled} 1`}
-            />
-          )}
-          {walk && (
-            <g className="kaylee__count">
-              <rect x={50 - countWidth / 2} y="56" width={countWidth} height="30" rx="15" />
-              <text
-                x="50"
-                y="71.5"
-                textAnchor="middle"
-                dominantBaseline="central"
-                style={{ fontSize: countSize }}
-                textLength={countSqueezed ? countWidth - 14 : undefined}
-                lengthAdjust={countSqueezed ? 'spacingAndGlyphs' : undefined}
-              >
-                {count}
-              </text>
-            </g>
-          )}
-        </g>
-      </svg>
+    <div
+      ref={frameRef}
+      className="relative grid size-full place-items-center"
+      data-state={presence.state}
+      data-tier={tier}
+      data-material={material}
+      role="img"
+      aria-label={presenceWords(t, her, presence)}
+    >
+      {/* The instrument's canvases go in here; React gives it no children. */}
+      <div ref={hostRef} aria-hidden="true" className="relative" />
     </div>
   );
 }

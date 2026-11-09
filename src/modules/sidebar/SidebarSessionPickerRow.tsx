@@ -1,10 +1,11 @@
-import { Check, Loader2 } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/shared/utils';
 import type { SessionPickerRow } from '@/shared/types';
 import { SimpleChatIconGlyph } from '@/modules/sidebar/SidebarSessionIcon';
 import { chatMarks } from '@/modules/sidebar/utils/simpleChatMarks';
+import { SignalLoop } from '@/shared/ui';
 
 // File-local: read only by SidebarSessionPickerMenu, which renders one of these per conversation.
 type SidebarSessionPickerRowProps = {
@@ -111,7 +112,7 @@ export default function SidebarSessionPickerRow({ row, standalone, isCurrent, on
           title={t('simpleList.running')}
           className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-muted-foreground"
         >
-          <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+          <SignalLoop state="thinking" size={13} />
         </span>
       )}
 
@@ -122,7 +123,7 @@ export default function SidebarSessionPickerRow({ row, standalone, isCurrent, on
           title={t('simpleList.subagentsRunning')}
           className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
         >
-          <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-purple-500 dark:bg-purple-400" />
+          <SignalLoop state="working" signal="secondary" size={12} />
         </span>
       )}
 

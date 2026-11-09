@@ -3,7 +3,7 @@ import type { KeyboardEvent } from 'react';
 import { Check, CheckSquare, Copy, Edit2, GitBranch, Loader2, MoreHorizontal, Pin, PinOff, Square, Trash2, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
-import { ActionMenu, Badge, Dialog, DialogContent, DialogTitle, LLMProviderLogo, Tooltip, buttonVariants } from '@/shared/ui';
+import { ActionMenu, Badge, buttonVariants, Dialog, DialogContent, DialogTitle, LLMProviderLogo, SignalLoop, Tooltip } from '@/shared/ui';
 import { cn,copyTextToClipboard } from '@/shared/utils';
 import { LLM_PROVIDER_LABELS, PAGE_ANCHOR } from '@/shared/constants';
 import type { LLMProvider, Project, ProjectSession, SessionWithProvider } from '@/shared/types';
@@ -84,7 +84,7 @@ function SessionRunIndicator({
       ) : (
         <Tooltip content={t('tooltips.processingSessionIndicator', 'Processing session')} position="top">
           <span className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
+            <SignalLoop state="thinking" size={13} />
           </span>
         </Tooltip>
       ))}
@@ -97,7 +97,7 @@ function SessionRunIndicator({
             className="flex h-5 w-5 items-center justify-center"
           >
             {/* The pinned strip's own running mark, in its own ink. */}
-            <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-purple-500 dark:bg-purple-400" />
+            <SignalLoop state="working" signal="secondary" size={12} />
           </span>
         </Tooltip>
       )}

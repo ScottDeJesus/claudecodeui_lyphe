@@ -94,8 +94,8 @@ const isFaceAvatar = (value: unknown): boolean =>
   isRecord(value) && isText(value.key) && isText(value.label) && orNull(isText)(value.faceId) && orNull(isBake)(value.bake);
 /**
  * The portrait draws from `id` (a face's id, `null` before any face exists) and the settings card from `avatar` (the key he picked) and `avatars` (the looks he may wear); a face without them is refused.
- * Consumed by this file's picture check and reducer, and by the Settings section's two hooks (useCompanionSettings, useCompanionFaceSettings), which
- * judge the face of a read, an answer and a frame by this one rule.
+ * Consumed by this file's picture check and reducer, which judge the face of a read and a frame by this one rule (the server still
+ * keeps her face; the page draws the Astrolabe instrument instead and reads none of it).
  */
 export const isFace = (value: unknown): value is CompanionFace =>
   isRecord(value) && orNull(isText)(value.id) && isText(value.avatar) && Array.isArray(value.avatars) && value.avatars.every(isFaceAvatar);

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { CompanionFaceSettings } from '@/modules/companion/CompanionFaceSettings';
+import { CompanionMaterialSettings } from '@/modules/companion/CompanionMaterialSettings';
 import { CompanionMemorySettings } from '@/modules/companion/CompanionMemorySettings';
 import { CompanionSettingsForm } from '@/modules/companion/CompanionSettingsForm';
 import { TalkBindingField } from '@/modules/companion/TalkBindingField';
@@ -24,9 +24,9 @@ type CompanionSettingsViewProps = {
    */
   talkBinding?: ReactNode;
   /**
-   * Her face card (CompanionFaceSettings), drawn directly after the talk button's card once her fields are read: how she
-   * looks comes right after how he reaches her. It draws its own card, its question and its lightbox, so this view only
-   * places it. Absent, nothing is drawn for it.
+   * Her face card (CompanionMaterialSettings), drawn directly after the talk button's card once her fields are read: how she
+   * looks comes right after how he reaches her. It draws its own card (the live instrument and its material), so this view
+   * only places it. Absent, nothing is drawn for it.
    */
   face?: ReactNode;
   /**
@@ -85,10 +85,10 @@ export function CompanionSettingsView({ settings, loadFailed, onRetry, onSave, t
 /**
  * Her Settings section, self-contained: what the settings module's VoiceSettingsTab renders after its own sections,
  * whether or not voice is on. It does its own read and its own save, so it works wherever Settings renders, and hands
- * both to CompanionSettingsView. Her face card is mounted with the face that same read carried, once both are known.
+ * both to CompanionSettingsView. Her face card (the instrument's material) is mounted once her name is read.
  */
 export function CompanionSettingsSection() {
-  const { settings, face, loadFailed, retry, save } = useCompanionSettings();
+  const { settings, loadFailed, retry, save } = useCompanionSettings();
   // Bind's capture: the next key or mouse button is saved as `talkBinding` through this section's own save, or its refusal is shown.
   const capture = useTalkBindingCapture((talkBinding) => save({ talkBinding }));
 
@@ -108,7 +108,7 @@ export function CompanionSettingsSection() {
           onCancel={capture.cancel}
         />
       }
-      face={settings && face && <CompanionFaceSettings name={settings.name} face={face} />}
+      face={settings && <CompanionMaterialSettings name={settings.name} />}
       memory={settings && <CompanionMemorySettings name={settings.name} />}
     />
   );

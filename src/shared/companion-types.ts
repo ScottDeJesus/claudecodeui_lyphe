@@ -330,8 +330,8 @@ export type CompanionFaceBlink = { half: number; closed: number };
  * Every frame of a face and where each sits: the file a bake writes (`manifest.json` in the face's folder) and a page plays.
  * The frames are cut `frameSize` pixels square and packed onto `sheets` (at most 8 × 8 cells each); `largerTiers` are the same
  * frames again at larger sizes, smallest first, packed the same way, so `frames[n]` says which sheet, column and row frame `n`
- * is on in EVERY tier. A page draws the smallest tier whose `frameSize` covers the pixels it is drawn at (`useFaceAtlas`), so a
- * phone's small head never fetches the large sheets. A manifest with no `largerTiers` (a face made before they existed) has the one
+ * is on in EVERY tier. (The page no longer draws these frames — her face is the Astrolabe instrument — but the server still bakes
+ * and serves them.) A manifest with no `largerTiers` (a face made before they existed) has the one
  * tier. Everything else is an index into `frames`: each mood has its
  * seven mouths and its half-closed and closed blink, `blinks` are the same blink for her listening face, each gaze and each
  * turned pose, `brows` are each mood's closed face with her brows lifted, `gaze` and `poses` are the neutral face looking or turned, `states`

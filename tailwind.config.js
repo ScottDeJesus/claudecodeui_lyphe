@@ -16,9 +16,12 @@ export default {
       },
     },
     extend: {
+      // Astrolabe's two faces (tokens.css): Geist for what is read, Geist Mono for what the instrument reports. `serif` is
+      // the display role the Verve screens already spell (`font-serif`): it is Geist too, set light and tight by tokens.css.
       fontFamily: {
-        sans: ['"Schibsted Grotesk"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
-        serif: ['"Instrument Serif"', 'Georgia', 'serif'],
+        sans: ['Geist', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
+        serif: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       // The rendered-transcript text scale: four named sizes plus the tool anchor. Every one is
       // `em`, so a framed shape follows the chat text size the reader set and never a fixed px.
@@ -92,10 +95,9 @@ export default {
         "accent-ink": "color-mix(in srgb, var(--accent-ink) calc(<alpha-value> * 100%), transparent)",
         "accent-soft": "color-mix(in srgb, var(--accent-soft) calc(<alpha-value> * 100%), transparent)",
         "accent-soft-hover": "color-mix(in srgb, var(--accent-soft-hover) calc(<alpha-value> * 100%), transparent)",
-        // Verve's warm accent ("Orange is a garnish, never a wall"): Kaylee Station's warm marks, its shapes (the "new" dot, the last
-        // look's dashed rule, a new landing's edge). A shape in it is `bg-garnish` or `border-garnish`. No new colour: tokens.css's
-        // `--garnish`, which reads 3:1 on the light canvas and 11:1 on the dark one — enough for a shape, not for a word: a warm WORD
-        // is `text-warn-ink`, which reads at AA on both.
+        // The second signal (Astrolabe's ice; Verve's garnish): the station's marks, its shapes (the "new" dot, the last look's
+        // dashed rule, a new landing's edge). A shape in it is `bg-garnish` or `border-garnish`. No new colour: tokens.css's
+        // `--garnish`, which reads at least 3:1 on both grounds — enough for a shape, not for a word.
         garnish: "color-mix(in srgb, var(--garnish) calc(<alpha-value> * 100%), transparent)",
         // The tone swap's own properties (tokens.css, the `[data-tone]` rules), named. A container
         // that sets `data-tone` hands `--tone-soft`, `--tone-ink` and `--tone-dot` to everything inside
@@ -107,10 +109,16 @@ export default {
         "tone-ink": "color-mix(in srgb, var(--tone-ink) calc(<alpha-value> * 100%), transparent)",
         "tone-dot": "color-mix(in srgb, var(--tone-dot) calc(<alpha-value> * 100%), transparent)",
       },
+      // Machined corners (Astrolabe): every rung of Tailwind's radius scale resolves to a token, so the 140-odd
+      // `rounded-xl` / `rounded-2xl` sites follow the system too. `rounded-full` stays round for dots, pills and avatars.
       borderRadius: {
+        sm: "var(--radius-control)",
+        DEFAULT: "var(--radius-control)",
+        md: "var(--radius-control)",
         lg: "var(--radius-input)",
-        md: "calc(var(--radius-input) - 2px)",
-        sm: "calc(var(--radius-input) - 4px)",
+        xl: "var(--radius-card)",
+        "2xl": "var(--radius-screen)",
+        "3xl": "var(--radius-screen)",
       },
       // Verve's elevation ladder (tokens.css's `--shadow-*`), named so a screen spells a rung — `shadow-lift`
       // — and never `var(--shadow-lift)`. Names over tokens tokens.css already declares, as the colours above

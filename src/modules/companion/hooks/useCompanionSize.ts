@@ -11,9 +11,8 @@ import type { CompanionPresence, CompanionPresenceState } from '@/shared/types';
 const ACTIVE_MIN_PX = 48;
 
 /**
- * The largest it grows to. At twice the pixel density 120 px is 240 device pixels, which the 256 px tier of her portrait still covers
- * (`useFaceAtlas` picks the tier from this size and the ratio), so a 1x or 2x screen draws her grown disc from the small sheets; a 3x
- * screen's 345 to 360 px takes the 448 px tier. A layout choice, not a sharpness limit.
+ * The largest it grows to. Her face is drawn in code (the Astrolabe instrument), so any size is sharp: at 120 px the disc is still
+ * the instrument's smallest tier (the loop round a 2D chrome core), which keeps her always-on button cheap. A layout choice.
  */
 const ACTIVE_MAX_PX = 120;
 
