@@ -261,7 +261,7 @@ export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
             <span
               data-radial-label={sides[index] ?? 'right'}
               className={cn(
-                'absolute left-1/2 top-1/2 flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-1 text-xs font-medium leading-4',
+                'absolute left-1/2 top-1/2 flex items-center gap-1.5 whitespace-nowrap rounded border px-2 py-1 text-xs font-medium leading-4',
                 'transition-colors duration-200 motion-reduce:transition-none',
                 'border-input bg-card text-foreground shadow-[var(--shadow-rest)]',
                 'group-focus-visible:border-[var(--accent)] group-focus-visible:bg-[var(--accent-soft)] [@media(hover:hover)]:group-hover:border-[var(--accent)]',

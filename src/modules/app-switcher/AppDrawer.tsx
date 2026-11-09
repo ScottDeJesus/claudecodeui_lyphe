@@ -176,7 +176,7 @@ export function AppDrawer() {
                   isActive={nextSide === 'left'}
                   aria-pressed={nextSide === 'left'}
                   onClick={() => handleChooseSide('left')}
-                  className="min-h-[34px] rounded-full px-3.5 py-1.5 text-[12.5px]"
+                  className="min-h-[34px] px-3.5 py-1.5 text-[12.5px]"
                 >
                   {t('applications.left')}
                 </Pill>
@@ -184,7 +184,7 @@ export function AppDrawer() {
                   isActive={nextSide === 'right'}
                   aria-pressed={nextSide === 'right'}
                   onClick={() => handleChooseSide('right')}
-                  className="min-h-[34px] rounded-full px-3.5 py-1.5 text-[12.5px]"
+                  className="min-h-[34px] px-3.5 py-1.5 text-[12.5px]"
                 >
                   {t('applications.right')}
                 </Pill>

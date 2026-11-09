@@ -22,7 +22,7 @@ function SoundMark({ tag }: { tag: string }) {
     <Tooltip content={tag} position="top">
       <span
         data-companion-sound={tag}
-        className="mx-0.5 inline-flex h-4 items-center rounded-full bg-accent-soft px-1 align-[-2px] text-accent-ink"
+        className="mx-0.5 inline-flex h-4 items-center rounded bg-accent-soft px-1 align-[-2px] text-accent-ink"
       >
         <AudioWaveform aria-hidden="true" className="size-3" strokeWidth={2} />
         <span className="sr-only">({tag})</span>

@@ -154,7 +154,7 @@ export function CerberusHeader({ overview, stale, wardens, onEnroll, onUpdateWar
 function ClockPill({ live, now }: { live: boolean; now: number }) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[12.5px] tabular-nums text-muted-foreground">
+    <div className="flex items-center gap-2 rounded border border-border bg-card px-3 py-1.5 text-[12.5px] tabular-nums text-muted-foreground">
       <span
         aria-hidden
         data-tone={live ? 'positive' : 'neutral'}

@@ -515,7 +515,7 @@ export default function SidebarContent({
                   </div>
                 </div>
                 <span
-                  className="rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] tabular-nums text-muted-foreground"
+                  className="rounded border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] tabular-nums text-muted-foreground"
                   title={visibleArchivedItemsCount !== archivedSessionsCount
                     ? `${visibleArchivedItemsCount} of ${archivedSessionsCount}`
                     : undefined}

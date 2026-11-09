@@ -128,7 +128,7 @@
   margin-left: 6px;
   padding: 1px 7px;
   display: inline-block;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   background: var(--tone-soft);
   color: var(--tone-ink);
   font-size: 11.5px;

@@ -20,10 +20,13 @@
  *      one `--danger` fill shared by both themes (5.3:1).
  *   3. Type: Geist for everything read, Geist Mono for everything the instrument reports (labels, numbers, code). The
  *      display face is Geist at light weight with tight tracking; nothing is bold for emphasis.
- *   4. Shape: machined, not soft — 2px controls and inputs, 4px cards, 6px screens; pills and true circles stay round.
+ *   4. Shape: machined, not soft — 2px controls, inputs, badges, chips, counts and switches; 4px cards; 6px screens;
+ *      meters square-ended and flat. Only true circles (dots, discs, avatars) stay round.
  *   5. Depth: no resting shadows. Things rest on hairlines; only what floats (menus, panels, dialogs) carries a shadow,
  *      and each of those carries its hairline inside the shadow so it reads on either ground.
  *   6. Focus: a 1px solid accent outline, 2px outside — at least 3:1 on every ground and surface in both themes.
+ *   7. Stock Tailwind colours that older screens still spell (`bg-blue-600`, `dark:bg-gray-800` …) are retuned onto these
+ *      hues at their own luminance in tailwind.config.js (`ASTROLABE_STOCK`), so they sit inside the palette too.
  *
  * Every text ink below holds 4.5:1 on `--canvas`, `--surface` and `--surface2` in its theme (`--ink-faint` included);
  * `--border-strong`, the edge of every field, holds 3:1 on `--canvas`.
@@ -196,12 +199,11 @@
   --radius-pill:999px;
   --shadow-rest:none;
   --shadow-hover:0 0 0 1px var(--hairline);
-  --shadow-lift:0 0 0 1px var(--hairline),0 18px 40px rgba(8,9,11,.14);
+  --shadow-lift:var(--shadow-overlay); /* Astrolabe has ONE floating shadow (shadow-float): a carried card and a docked panel float as a menu does */
   --shadow-overlay:0 0 0 1px var(--hairline),0 16px 40px rgba(8,9,11,.16);
   --shadow-modal:0 0 0 1px var(--hairline),0 28px 72px rgba(8,9,11,.26);
 }
 .dark {
-  --shadow-lift:0 0 0 1px var(--hairline),0 18px 48px rgba(0,0,0,.55);
   --shadow-overlay:0 0 0 1px var(--hairline),0 16px 44px rgba(0,0,0,.6);
   --shadow-modal:0 0 0 1px var(--hairline),0 28px 80px rgba(0,0,0,.7);
 }

@@ -1,5 +1,40 @@
 const plugin = require('tailwindcss/plugin')
 
+// Tailwind's STOCK palettes, retuned to Astrolabe. Seventy-odd older screens still spell stock classes (`bg-blue-600`,
+// `dark:bg-gray-800`, `text-emerald-700` …), which drew stock Tailwind blues, greens, violets and navy greys beside the
+// instrument. Rather than repaint ~1,300 call sites, each stock shade is replaced by the colour with the SAME relative
+// luminance — so every contrast ratio those screens had still holds — the hue of the Astrolabe tone it stands for, and a
+// chroma no stronger than that tone's own: greens → positive, reds and roses → danger, ambers, yellows and oranges → warn
+// (gold, never the live amber), blues, skies and cyans → info (ice), indigo → the feature blue, violets, purples and
+// fuchsias → the epic violet; pink keeps its hue, quieted. Greys become the instrument's neutral steel, and their dark
+// end IS the Night ground: 950 canvas, 900 surface, 800 surface2, 700 one hover rung above it. Generated from
+// tailwindcss/colors and tokens.css. New work reads the tokens (`bg-background`, `text-muted-foreground`, `--pos-ink` …),
+// never these; they exist so old screens stop shouting.
+const ASTROLABE_STOCK = {
+  gray: { 50: '#f9fafb', 100: '#f3f4f6', 200: '#e4e7eb', 300: '#d0d5db', 400: '#9ba4ad', 500: '#6b737b', 600: '#4d555d', 700: '#2b3035', 800: '#161a1e', 900: '#0e1013', 950: '#08090b' },
+  slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e1e8f0', 300: '#ccd5de', 400: '#9aa3ac', 500: '#6c747c', 600: '#4d555d', 700: '#2b3035', 800: '#161a1e', 900: '#0e1013', 950: '#08090b' },
+  zinc: { 50: '#fafafa', 100: '#f3f4f5', 200: '#e2e5e7', 300: '#d2d5d8', 400: '#9ca3aa', 500: '#6c737a', 600: '#4d545b', 700: '#2b3035', 800: '#161a1e', 900: '#0e1013', 950: '#08090b' },
+  neutral: { 50: '#fafafa', 100: '#f5f5f5', 200: '#e5e5e5', 300: '#d4d4d4', 400: '#a3a3a3', 500: '#737373', 600: '#525252', 700: '#2b3035', 800: '#161a1e', 900: '#0e1013', 950: '#08090b' },
+  stone: { 50: '#f9fafb', 100: '#f4f5f6', 200: '#e4e6e7', 300: '#d1d4d6', 400: '#9fa4a9', 500: '#6d7379', 600: '#505459', 700: '#2b3035', 800: '#161a1e', 900: '#0e1013', 950: '#08090b' },
+  green: { 50: '#effdf6', 100: '#d9fceb', 200: '#b4f8d8', 300: '#87edc1', 400: '#71d7ac', 500: '#57be94', 600: '#339f77', 700: '#047f5a', 800: '#036547', 900: '#005339', 950: '#002e1e' },
+  emerald: { 50: '#ecfdf4', 100: '#d1fae6', 200: '#a7f3d0', 300: '#7ee5b9', 400: '#67cea3', 500: '#4db58b', 600: '#25956d', 700: '#0c7855', 800: '#0e5f43', 900: '#0f4e37', 950: '#072c1e' },
+  lime: { 50: '#effff7', 100: '#dafeec', 200: '#aefed9', 300: '#8ff5c8', 400: '#80e6ba', 500: '#65cba0', 600: '#3aa47b', 700: '#057f5a', 800: '#036547', 900: '#00563c', 950: '#003120' },
+  teal: { 50: '#f1fdf7', 100: '#d2fbe7', 200: '#a6f5d1', 300: '#82e8bc', 400: '#6ad1a6', 500: '#4eb68d', 600: '#379470', 700: '#2d7659', 800: '#265e47', 900: '#214e3b', 950: '#0f2f22' },
+  red: { 50: '#fef2f0', 100: '#fee2de', 200: '#fecbc3', 300: '#fca69a', 400: '#f87363', 500: '#e05547', 600: '#cb4135', 700: '#b32820', 800: '#991c16', 900: '#7f1e17', 950: '#450a07' },
+  rose: { 50: '#fff1ef', 100: '#ffe5e0', 200: '#fecec6', 300: '#fda699', 400: '#fc7464', 500: '#e35749', 600: '#cd4337', 700: '#b52b22', 800: '#a01712', 900: '#891611', 950: '#4d0705' },
+  amber: { 50: '#fefbf1', 100: '#fff2d2', 200: '#ffe4a1', 300: '#fad36a', 400: '#ebc45b', 500: '#d3ac41', 600: '#b18b10', 700: '#8a6b01', 800: '#6e5504', 900: '#5b4602', 950: '#322501' },
+  yellow: { 50: '#fffbf1', 100: '#fff6e1', 200: '#ffecbf', 300: '#ffdd86', 400: '#f4cc64', 500: '#deb74d', 600: '#b8921d', 700: '#8b6c04', 800: '#715702', 900: '#5e4902', 950: '#342701' },
+  orange: { 50: '#fcf8ec', 100: '#faefd4', 200: '#f1dca6', 300: '#e6c469', 400: '#cea83c', 500: '#bc9623', 600: '#a78307', 700: '#876903', 800: '#6c5301', 900: '#584401', 950: '#2e2200' },
+  blue: { 50: '#ebf7fc', 100: '#d2edf8', 200: '#afe0f3', 300: '#7fcbe8', 400: '#60acc8', 500: '#428fa9', 600: '#257690', 700: '#08647d', 800: '#025268', 900: '#034659', 950: '#002d3a' },
+  sky: { 50: '#eff9fe', 100: '#def3fb', 200: '#b7e7fa', 300: '#87d3ef', 400: '#6fbbd7', 500: '#59a5c0', 600: '#3987a1', 700: '#186c86', 800: '#035c74', 900: '#014c61', 950: '#003241' },
+  cyan: { 50: '#f4fcff', 100: '#e1f6fe', 200: '#c1edfe', 300: '#96e1fd', 400: '#7fcbe7', 500: '#64b0cc', 600: '#418fa9', 700: '#22738d', 800: '#145e75', 900: '#124e61', 950: '#033442' },
+  indigo: { 50: '#ebf3ff', 100: '#dbe9ff', 200: '#bcd5fd', 300: '#90b9fb', 400: '#6896e0', 500: '#4b77bf', 600: '#345fa5', 700: '#265094', 800: '#174183', 900: '#0d3779', 950: '#05204b' },
+  violet: { 50: '#f5f3ff', 100: '#ede9fe', 200: '#ddd6fe', 300: '#c4b5fd', 400: '#a58eef', 500: '#846cca', 600: '#7057b2', 700: '#6248a2', 800: '#533891', 900: '#472a82', 950: '#300f64' },
+  purple: { 50: '#f7f6ff', 100: '#edeaff', 200: '#dfd8ff', 300: '#c8bafe', 400: '#a890f2', 500: '#8971cf', 600: '#735bb7', 700: '#6349a3', 800: '#553a93', 900: '#472a82', 950: '#320e68' },
+  fuchsia: { 50: '#f7f6fe', 100: '#efecff', 200: '#dfd8fe', 300: '#c8baff', 400: '#ae96f8', 500: '#937bda', 600: '#7c64c1', 700: '#6950ab', 800: '#583e97', 900: '#4c3089', 950: '#321465' },
+  pink: { 50: '#fdf2f8', 100: '#fce7f3', 200: '#fbcfe8', 300: '#f9a8d4', 400: '#e57eb1', 500: '#ce6693', 600: '#bb5276', 700: '#a63e5f', 800: '#922b4e', 900: '#821b43', 950: '#500724' },
+}
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["class"],
@@ -41,6 +76,7 @@ export default {
       // substitutes `<alpha-value>` textually (1 for `bg-primary`, 0.1 for `bg-primary/10`),
       // which a bare `var(--accent)` could not do.
       colors: {
+        ...ASTROLABE_STOCK,
         border: "color-mix(in srgb, var(--border) calc(<alpha-value> * 100%), transparent)",
         input: "color-mix(in srgb, var(--border-strong) calc(<alpha-value> * 100%), transparent)",
         ring: "color-mix(in srgb, var(--accent) calc(<alpha-value> * 100%), transparent)",

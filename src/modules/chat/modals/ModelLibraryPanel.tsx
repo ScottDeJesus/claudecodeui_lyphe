@@ -304,7 +304,7 @@ export default function ModelLibraryPanel({
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="truncate text-sm font-semibold text-foreground">{option.label}</p>
-                            <Badge className="rounded-full px-2 py-0 text-[9px]">Custom</Badge>
+                            <Badge className="px-2 py-0 text-[9px]">Custom</Badge>
                           </div>
                           <p className="mt-1 break-all font-mono text-[11px] text-muted-foreground">{option.value}</p>
                         </div>
