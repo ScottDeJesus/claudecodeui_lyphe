@@ -10512,21 +10512,6 @@ probe-key: db35e1860cc9a42bfb49a131c15baa02104185cf
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
 
-## INV-9446 — probe — LOW — when the claim file cannot be written, a `tell` in the fork window prints AMENDED over a body the fork never reads (a `drop` there would delete the row under a forked child)
-
-LOW — when the claim file cannot be written, a `tell` in the fork window prints AMENDED over a body the fork never reads (a `drop` there would delete the row under a forked child)
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/claim_unwritable.sh
-echo "[probe exit $?]"
-expect: the door does not print AMENDED while no claim stands (today: `claim file during the fork window: []`, AMENDED, `the forked outing read the body: False`)
-```
-
-measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding L2, LOW
-probe-key: 66717b08870e4a1875036280772c03300db8cd8c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
-
 ## INV-9447 — probe — LOW — three statements the change made false stay in the docs
 
 LOW — three statements the change made false stay in the docs
@@ -16047,50 +16032,6 @@ echo "[probe exit $?]"
 
 measured 2026-10-28 by chain chain-kaylee-followups-epics-20261028-132957-e46b, finding M1, MEDIUM
 probe-key: 4b63c99a20610bbe21f1392cdaf4938a72fe7672
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
-
-## INV-10077 — probe — MEDIUM — a stamped epic is judged against its FIRST stamp, which predates its real finish by 1.3 to 44.7 hours (and by days for a re-finished epic)
-
-MEDIUM — a stamped epic is judged against its FIRST stamp, which predates its real finish by 1.3 to 44.7 hours (and by days for a re-finished epic)
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/q.mts" <<'TS'
-import { execFileSync } from 'node:child_process';
-import { closuresForArc } from '@/modules/followups/followups-completion-rule.service.js';
-const doc = JSON.parse(execFileSync(`${process.env.HOME}/.claude/scripts/dispatcher`, ['status', '--json'], { encoding: 'utf8', maxBuffer: 1 << 26 }));
-const finish = new Map<string, string>(doc.plans.filter((p: any) => p.completed_at).map((p: any) => [p.name, p.completed_at]));
-const rows: string[] = [];
-for (const arc of doc.arcs.filter((a: any) => a.status === 'complete' && a.completed_at)) {
-  const last = arc.plans.map((n: string) => finish.get(n) ?? '').sort().pop() ?? '';
-  const hours = ((Date.parse(last) - Date.parse(arc.completed_at)) / 3600e3).toFixed(1);
-  const filed = new Date(Date.parse(arc.completed_at) + 60e3).toISOString(); // one minute after the stamp, while the last plan still walked
-  const closed = closuresForArc(arc, [{ id: 1, text: `press Queue on ${arc.name}`, updated_at: filed }]).length;
-  rows.push(`${arc.name.padEnd(40)} stamp ${arc.completed_at} | last plan finished +${hours} h | item filed 1 min after the stamp closes at the epic's finish: ${closed === 1}`);
-}
-console.log(rows.length ? rows.join('\n') : 'no complete, stamped epic in the dispatcher document today');
-const k = doc.arcs.find((a: any) => a.name === 'kaylee');
-if (k) {
-  const asComplete = { name: k.name, status: 'complete', completed_at: k.completed_at };
-  const filed = '2026-10-28T10:00:00.000Z';
-  console.log(`kaylee (${k.status} now, stamp ${k.completed_at}) read as complete after eyes lands: item filed ${filed} "the kaylee epic: check the eyes" closes: ${closuresForArc(asComplete, [{ id: 2, text: 'the kaylee epic: check the eyes', updated_at: filed }]).length === 1}`);
-}
-process.exit(0);
-TS
-cat > "$D/p.sh" <<'EOF'
-D=$(cd "$(dirname "$0")" && pwd)
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/q.mts" 2>&1 | head -20
-EOF
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
-echo "[probe exit $?]"
-# expect: while the defect stands, every line ends `closes at the epic's finish: false` with a `+h` gap above 1, and the kaylee line ends `closes: false`; cured (finish time = the epic's latest plan stamp), every line ends `true`
-```
-
-measured 2026-10-28 by chain chain-kaylee-followups-epics-20261028-132957-e46b, finding M2, MEDIUM
-probe-key: a4e30247f839be9cf36ca575a192d1fabfe6823f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
