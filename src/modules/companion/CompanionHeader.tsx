@@ -34,9 +34,9 @@ type CompanionHeaderProps = {
   /** The station button beside her close: the door into Kaylee Station (`CompanionPanel` binds `openStation`). Absent, no button is drawn. */
   onOpenStation?: () => void;
   /**
-   * Given while her panel floats (from lg, under a fine pointer): a press on the header's empty space moves the panel
-   * (`useCompanionPanelPlace`, which refuses a press on any of the header's controls), and the header wears the grab cursor.
-   * Absent — her sheet on a phone — the header is only a header.
+   * Given while her panel floats (from lg, where a mouse or a pen drives the page): a press on the header's empty space moves
+   * the panel (`useCompanionPanelPlace`, which refuses a press on any of the header's controls), and the header wears the grab
+   * cursor and takes a finger's drag (`touch-none`). Absent — her sheet on a phone — the header is only a header.
    */
   onMovePress?: (event: PointerEvent<HTMLElement>) => void;
 };
@@ -68,8 +68,10 @@ export function CompanionHeader({
   const focus = picture?.focus ?? null;
 
   return (
-    <div data-companion-header="" onPointerDown={onMovePress} className={cn('shrink-0 border-b border-border bg-card', onMovePress && 'cursor-grab')}>
-      <div className="flex items-center gap-2.5 py-2.5 pl-3 pr-2">
+    // While it is the move handle it takes the touch too (`touch-none`): a finger's drag on it is the panel's, and not the browser's pan, which would take the pointer away (`pointercancel`) after the first few pixels.
+    <div data-companion-header="" onPointerDown={onMovePress} className={cn('shrink-0 border-b border-border bg-card', onMovePress && 'cursor-grab touch-none')}>
+      {/* While the panel floats under a finger-sized grip (12px strips where the browser names touch its primary pointer), the row keeps 12px at its right, so the close button's whole box stands clear of the right edge's strip. */}
+      <div className={cn('flex items-center gap-2.5 py-2.5 pl-3 pr-2', onMovePress && '[@media(pointer:coarse)]:pr-3')}>
         <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-ink">
           <AudioLines className="size-4" strokeWidth={1.75} />
         </span>

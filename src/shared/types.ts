@@ -1229,7 +1229,7 @@ export type CompanionPresence = {
 //----------------- COMPANION PANEL, FLOATING ------------
 
 /**
- * Her panel's box where it floats (from lg, under a fine pointer), in CSS pixels from the workspace shell's top-left corner:
+ * Her panel's box where it floats (from lg, where a mouse or a pen drives the page), in CSS pixels from the workspace shell's top-left corner:
  * the panel is `absolute` in that shell. What he last dragged it to is kept per browser under `companion-panel`
  * (`companionPanelStorage.ts`) and drawn held inside the shell (`clampPanelRect`); the companion module's
  * `companionPanelGeometry.ts` moves and resizes it and `useCompanionPanelPlace` draws it.

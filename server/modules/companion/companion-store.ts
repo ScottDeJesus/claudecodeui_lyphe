@@ -18,6 +18,7 @@ import type {
 import { isList, isRecord, isText, isWholeFrom } from '@/shared/document-fields.js';
 
 import { isAttachmentList, toAttachmentRecords } from './attachments/attachment-shape.js';
+import type { CompanionDraftEnd } from './companion-draft-end.js';
 import { isStoredPending, withoutPin } from './companion-pending.js';
 import type { CompanionStoredPending } from './companion-pending.js';
 import { isUnansweredList, type UnansweredMessage } from './companion-unanswered.js';
@@ -43,6 +44,10 @@ import { isUnansweredList, type UnansweredMessage } from './companion-unanswered
  *
  * A JSON column that does not read as its shape (a hand edit, a later build's shape) is dropped
  * with a warning that names the account and column, never thrown: the picture must still load.
+ *
+ * HOW THE DRAFT LAST ENDED is the one thing here kept in memory and not in a column (`CompanionDraftEnd`, `companion-draft-end.ts`). A draft
+ * comes down only through `endDraft`, which says how, so the send that finds none can tell his take-down from a send; a new draft (`setDraft`)
+ * and Clear drop the record. A restart loses it, and that send is then refused plainly, as for a draft never written.
  *
  * Consumer: `companion.service.ts`, which makes one store per account and serves the conversation's
  * callbacks and her tools from it: the picture, the verbs behind the routes, the alert and focus feeds.
@@ -128,8 +133,16 @@ export type CompanionStore = {
   setFloor(floor: string | null): void;
   /** `companion_focus`. */
   setFocus(focus: CompanionSessionRef | null): void;
-  /** `companion_draft`, with the stored draft (stamped now) or `null`. Answers what was stored. */
-  setDraft(draft: CompanionDraftInput | null): CompanionDraft | null;
+  /** `companion_draft`, with the stored draft (stamped now). The draft replaces whatever was held, and the record of how the last one ended with it. Answers what was stored. */
+  setDraft(draft: CompanionDraftInput): CompanionDraft;
+  /**
+   * `companion_draft` with `null`: the draft comes down and `ended` says how (`readDraftEnd`). The frame is sent whether or not a draft was held, so a page
+   * still showing one that is gone hears that it is; the record is written only when one was held, so a second × on a draft already gone (the other page
+   * took it down first, or it was sent) does not rewrite how that draft ended.
+   */
+  endDraft(ended: CompanionDraftEnd): void;
+  /** How the draft last ended, or `null` when nothing is on record: none has ended since the server started or since Clear, or a new draft has been written since. No frame. */
+  readDraftEnd(): CompanionDraftEnd | null;
   /** `companion_pending`, with the action WITHOUT its pin, or `null`. Writes `pending_json` with the pin. Answers what was sent. Her record of actions (`companion_actions`) is the caller's. */
   setPending(next: CompanionStoredPending | null): CompanionPendingAction | null;
   /** `companion_walk`, with the stored walk (stamped now) or `null`. Answers what was stored. */
@@ -197,6 +210,12 @@ function readJsonColumn<T>(userId: number, column: string, raw: string | null, i
   }
   return null;
 }
+
+/**
+ * How each account's draft last ended (`readDraftEnd`), in memory only: the draft is a column and this is not, so a restart forgets it. Keyed by
+ * account and not held by a store, because the row it describes is the account's and every store of the account reads that row.
+ */
+const draftEnds = new Map<number, CompanionDraftEnd>();
 
 function toStoredState(userId: number, row: CompanionStateRow | null): CompanionStoredState {
   return {
@@ -302,11 +321,22 @@ export function createCompanionStore(userId: number): CompanionStore {
     },
 
     setDraft(input) {
-      const draft: CompanionDraft | null = input && { ...input, updatedAt: new Date().toISOString() };
-      companionDb.writeState(userId, { draft_json: draft && JSON.stringify(draft) });
+      const draft: CompanionDraft = { ...input, updatedAt: new Date().toISOString() };
+      companionDb.writeState(userId, { draft_json: JSON.stringify(draft) });
+      // A draft is held again: how the last one ended is no longer what a send needs to know.
+      draftEnds.delete(userId);
       send({ kind: 'companion_draft', draft });
       return draft;
     },
+
+    endDraft(ended) {
+      const wasHeld = toStoredState(userId, companionDb.readState(userId)).draft !== null;
+      companionDb.writeState(userId, { draft_json: null });
+      if (wasHeld) draftEnds.set(userId, ended);
+      send({ kind: 'companion_draft', draft: null });
+    },
+
+    readDraftEnd: () => draftEnds.get(userId) ?? null,
 
     setPending(next) {
       companionDb.writeState(userId, { pending_json: next === null ? null : JSON.stringify(next) });
@@ -374,6 +404,7 @@ export function createCompanionStore(userId: number): CompanionStore {
 
     clearAccount() {
       companionDb.clearAccount(userId);
+      draftEnds.delete(userId);
       send({ kind: 'companion_cleared' });
     },
   };

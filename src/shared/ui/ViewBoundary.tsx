@@ -22,7 +22,9 @@ type ViewBoundaryProps = {
  * again, so a retry button would answer nothing. Its gutter is the view's own.
  *
  * Used by the cerberus module's `KeptView`, around the Tours view (`AffectedAreasView`) and the Bulletins view
- * (`BulletinsView`): two feature modules' lazy views, one surround, the view's name given by the view it surrounds.
+ * (`BulletinsView`): two feature modules' lazy views, one surround, the view's name given by the view it surrounds. And by the
+ * companion module's `CompanionPanelBoundary`, around her panel, which is not lazy: there the surround holds a fault while she
+ * draws, so it takes only her panel and not the page.
  */
 export function ViewBoundary({ view, children }: ViewBoundaryProps) {
   const { t } = useTranslation();

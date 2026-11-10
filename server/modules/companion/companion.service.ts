@@ -40,6 +40,8 @@ import { stationLanded } from './station/station-landed.js';
  *     his words (or the empty press) are logged and pushed in arrival order; a hearing that fails pushes nothing;
  *   - `sendDraft` is the panel's Send: the draft goes to its target (a turn, or folded into the running one) and the
  *     pressing page takes the floor, so the chat opens where he pressed;
+ *   - `clearDraft` is the × on the draft card: the draft comes down as HIS take-down, and her next send of it is refused with his answer
+ *     (`companion-draft-end.ts`), never as a glitch with a fix;
  *   - `cancelAction` is the × on the action card: the one action waiting for his word comes off his panel and its row in her
  *     record of actions ends `cancelled`, lapsed or not; with none standing it changes nothing;
  *   - `speech` and `cut` are her voice (`companion-speech.ts`): the audio of one sentence for the floor page, and the
@@ -246,13 +248,16 @@ function createCompanionService() {
       const { store } = accountOf(userId);
       const held = store.readState().draft;
       if (held === null) throw noDraft();
-      const stored = store.setDraft({ target: held.target, text });
-      if (stored === null) throw new Error('The store answered no draft for a draft it was given');
-      return stored;
+      return store.setDraft({ target: held.target, text });
     },
 
+    /**
+     * His × on the draft card (`DELETE /draft`): the draft comes down, and the store keeps that it was he who took it down, so a send of it
+     * that finds none is refused with his answer and not told to write it again. A × on a draft already gone (the other page's, or one that
+     * was sent) changes nothing about how that draft ended.
+     */
     clearDraft(userId: number): void {
-      accountOf(userId).store.setDraft(null);
+      accountOf(userId).store.endDraft({ kind: 'taken_down_by_him' });
     },
 
     /**

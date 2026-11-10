@@ -273,90 +273,6 @@ probe-key: e58ba3ce7986fa70dd0c73b2c22e54aaf33ebec4
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSidebarController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/sidebarProjectFormatting.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/sessionRecency.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
-## INV-5932 — probe — (MED) — a sign-out caused by emptied storage leaves no client trace
-
-(MED) — a sign-out caused by emptied storage leaves no client trace
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/signed-out/athena-probes/storage-wiped-no-trace.mjs
-expect: page trace records: 1 or more, naming why the session ended (measured: 0)
-```
-
-measured 2026-09-29 by chain chain-signed-out-20260929-173238-19f4, finding M2, MEDIUM
-probe-key: 311bc0c067d615548137dc72e0fde468dc5582e2
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/context/AuthContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/hooks/useSharedSessionFollower.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-tree/hooks/useFileTreeUpload.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signout-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-signed-out.mjs
-
-## INV-5935 — probe — . `host-window-home.mjs`: the useDeviceSettings row cannot fail
-
-. `host-window-home.mjs`: the useDeviceSettings row cannot fail
-
-```probe
-/home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--seam-kit/mutants/run-mutant.sh host-window-home '[{"glob":"**/src/shared/hooks/useDeviceSettings.ts*","from":"hostWindow.innerWidth < mobileBreakpoint","to":"false"}]' | tail -1
-expect: ALL PASS (with useDeviceSettings forced to "wide" at 390px; a discriminating row prints a FAIL)
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--seam-kit-20260929-183302-c8d1, finding M1, MEDIUM
-probe-key: 98c1cc42df5145720d91e3b31dd510aff5469a3b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
-
-## INV-5936 — probe — . `host-window-kit.mjs`: reverting four of its subjects leaves it on ALL PASS
-
-. `host-window-kit.mjs`: reverting four of its subjects leaves it on ALL PASS
-
-```probe
-/home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--seam-kit/mutants/run-mutant.sh host-window-kit '[{"glob":"**/src/shared/ui/Dialog.tsx*","from":"hostWindow.requestAnimationFrame(","to":"requestAnimationFrame("},{"glob":"**/src/shared/ui/Dialog.tsx*","from":"hostWindow.cancelAnimationFrame(","to":"cancelAnimationFrame("},{"glob":"**/src/shared/ui/Tooltip.tsx*","from":"isNodeLike(target) && ","to":"(target instanceof Node) && "},{"glob":"**/src/shared/ui/useZoomPan.ts*","from":"resizeObserverIn(hostWindow, ","to":"((cb) => new ResizeObserver(cb))("}]' | tail -1
-expect: ALL PASS (with the Dialog frame back on the global window, Tooltip's isNodeLike reverted to instanceof, and useZoomPan's observer built by the opener's constructor)
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--seam-kit-20260929-183302-c8d1, finding M2, MEDIUM
-probe-key: 4a7f025d87c8f4d794b09113c7f4a5aaddedba01
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
-
-## INV-5937 — probe — . `useZoomPan`: a press held across a move poisons the next click
-
-. `useZoomPan`: a press held across a move poisons the next click
-
-```probe
-cd /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--seam-kit/athena-scaffold && node lightbox.mjs 2>&1 | grep '^VIOLATED L9'
-expect: a line reading VIOLATED L9 (adversarial) … {"stillThere":true}  (fixed: HELD L9 … {"stillThere":false})
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--seam-kit-20260929-183302-c8d1, finding L3, LOW
-probe-key: f8df98b1c8786e0e6655fa9ebfafeaa4fc4c2d14
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
-
-## INV-5954 — probe — Two of `CommandMenu`'s three viewport reads survive a mutant in the window probe (a 420-px window cannot reach line 117)
-
-Two of `CommandMenu`'s three viewport reads survive a mutant in the window probe (a 420-px window cannot reach line 117)
-
-```probe
-cd /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--seam-chat-surfaces/athena-probes && MUT='[{"glob":"**/src/modules/chat/composer/CommandMenu.tsx*","from":"hostWindow.innerWidth - 440","to":"innerWidth - 440"}]' node --import ./preload.mjs /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs | grep -E "FAIL|all checks"
-expect: a "[FAIL] the command menu is placed against the window's width" line; today "all checks passed" (the same mutant against `node wide.mjs` — the probe with a 700-px window — prints that FAIL with "right":740)
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--seam-chat-surfaces-20260929-193540-fce5, finding L1, LOW
-probe-key: 95e3498d7f6051f22800fe42cb35dc9607a8140b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs
-
-## INV-6002 — probe — The updated proof script cannot fail for the regression it names, and nothing in it guards H1
-
-The updated proof script cannot fail for the regression it names, and nothing in it guards H1
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--float-panel/probes/guard-vacuous.mjs
-expect: the mutant line (`hidden`, display none) does not read the same assertionValue as the as-built line (today both read "assertionValue":0, with display flex vs none)
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--float-panel-20260929-224731-39b9, finding M1, MEDIUM
-probe-key: 3d2505355b432dfaed5d0ad22452cf30cffe063d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPlaceholder.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-panel.mjs
-
 ## INV-6010 — WorkspaceFrame's reportCovered is a layout effect — a passive one loses the race with a reply
 
 `WorkspaceFrame`'s `CoverReporter` reports whether the main region is covered (an application up over it, or Kaylee Station on screen over the whole frame) with `useLayoutEffect(() => reportCovered(covered), [covered, reportCovered])`. Keep it a layout effect.
@@ -366,20 +282,6 @@ why: chat-host's unread rule judges a frame against `covered`. A passive effect 
 Proof: `.verify/fab-radial-door.mjs`, dot leg (MAN-7481). The rule: MAN-7482.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx
-
-## INV-6011 — probe — a double activation of a radial item inside the close fade runs the act twice (Open in a new tab: two pages; Reload: two document requests)
-
-a double activation of a radial item inside the close fade runs the act twice (Open in a new tab: two pages; Reload: two document requests)
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--radial-fill/athena-radial-dblclick.mjs
-expect: every row prints newPages 1 (today: gapMs 0, 30, 60 print newPages 2)
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--radial-fill-20260930-002344-4ad4, finding L1, LOW
-probe-key: d0acbb8cd3549ac83ed13eaec368502feb5d83e0
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useUnreadReply.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs
 
 ## INV-6017 — probe — a window closed between the browser making it and the app attaching its `pagehide` listener strands the tab: placement `'window'`, no window, the door dead, sometimes the chat lost in the dead document
 
@@ -461,62 +363,6 @@ expect: exit 1 with `VIOLATED: in simple-list mode the deep link is replaced by 
 ```
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatProject.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs
-
-## INV-6047 — probe — "no console error while signed in, in the tab or in the window" cannot fail for a server 5xx or a failed resource load
-
-"no console error while signed in, in the tab or in the window" cannot fail for a server 5xx or a failed resource load
-
-```probe
-/home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes/mut500.sh
-expect: two " 500 GET /api/providers/sessions/<id>/token-usage" lines, "console errors while signed in (404s, aborted fetches and blocked font loads aside): 0", then "ALL CHECKS PASS" and "exit=0"
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--whole-20260930-040206-0899, finding M1, MEDIUM
-probe-key: b0dffed85ca37351871965ac08b685cb19ac0254
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
-
-## INV-6049 — probe — `windowGone` has no timeout: a window that does not close hangs the run for ever
-
-`windowGone` has no timeout: a window that does not close hangs the run for ever
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes/probe-d-windowgone.mjs
-expect: "windowGone on a window that stays open: STILL PENDING after 45000ms"
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--whole-20260930-040206-0899, finding L2, LOW
-probe-key: 9426e39b720c75b3d77ebd412488b5115a12a877
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
-
-## INV-6050 — probe — `simple-list-deep-link.mjs` prints "held" while it exits 1, and exits 0 when tree mode is the one that lost the link
-
-`simple-list-deep-link.mjs` prints "held" while it exits 1, and exits 0 when tree mode is the one that lost the link
-
-```probe
-cd /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes && ./deeplink-stub.sh / / ; ./deeplink-stub.sh /session/x /
-expect: first prints "held: the deep link survives a late session lookup in both modes" with exit=1; second prints the same line with exit=0 although tree mode lost the link
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--whole-20260930-040206-0899, finding L3, LOW
-probe-key: fa3d7358fd45ad38453c886d20d1e4b9f0f4a61c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
-
-## INV-6052 — probe — a run that is killed leaves its scratch chat behind
-
-a run that is killed leaves its scratch chat behind
-
-```probe
-/home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes/kill-midrun.sh
-expect: "scratch chat deleted: false" and "threw: page.waitForTimeout: Target page, context or browser has been closed"; afterwards `DELETE /api/providers/sessions/<the printed id>?force=true` answers 200 (the chat was still there)
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--whole-20260930-040206-0899, finding L5, LOW
-probe-key: 464b0f3ffa93fc62ef8bc40bedd7f4b1551de8ae
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
 
 ## INV-6053 — probe — the harness's Google Fonts accommodation hides an 8.4 s blank window, and the report does not flag it
 
@@ -10512,21 +10358,6 @@ probe-key: db35e1860cc9a42bfb49a131c15baa02104185cf
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
 
-## INV-9446 — probe — LOW — when the claim file cannot be written, a `tell` in the fork window prints AMENDED over a body the fork never reads (a `drop` there would delete the row under a forked child)
-
-LOW — when the claim file cannot be written, a `tell` in the fork window prints AMENDED over a body the fork never reads (a `drop` there would delete the row under a forked child)
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/claim_unwritable.sh
-echo "[probe exit $?]"
-expect: the door does not print AMENDED while no claim stands (today: `claim file during the fork window: []`, AMENDED, `the forked outing read the body: False`)
-```
-
-measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding L2, LOW
-probe-key: 66717b08870e4a1875036280772c03300db8cd8c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
-
 ## INV-9447 — probe — LOW — three statements the change made false stay in the docs
 
 LOW — three statements the change made false stay in the docs
@@ -12671,59 +12502,6 @@ cd / && case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
 
 measured 2026-10-26 by chain chain-kaylee--companion--drafting-20261026-184416-a293, finding L2, LOW
 probe-key: 653cd399b3a47bee24208872690aa52595801a7d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/draft-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-draft-tools.mjs
-
-## INV-9793 — probe — LOW — `update_draft` moves the focus before the write that can fail
-
-LOW — `update_draft` moves the focus before the write that can fail
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-#!/usr/bin/env bash
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-: > "$1/auth.db"
-cat > "$1/p.mts" <<'MTS'
-import { z } from 'zod';
-const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
-const { initializeDatabase, getConnection } = await import(`${R}/database/index.ts`);
-const { createCompanionStore } = await import(`${R}/companion/companion-store.ts`);
-const { createToolDeps } = await import(`${R}/companion/tools/tool-deps.ts`);
-const { THINKING_ACTIVITY } = await import(`${R}/companion/session/companion-turns.ts`);
-const { draftTools } = await import(`${R}/companion/tools/draft-tools.ts`);
-const { stateEnvelope } = await import(`${R}/companion/session/companion-envelopes.ts`);
-await initializeDatabase();
-const db = getConnection();
-db.prepare("INSERT INTO users(id,username,password_hash) VALUES (987,'p','x')").run();
-db.prepare("INSERT INTO projects(project_id,project_path,custom_project_name) VALUES ('pa','/opt/ap-a','Alpha project')").run();
-db.prepare("INSERT INTO sessions(session_id,provider,project_path,custom_name,isArchived,created_at,updated_at) VALUES ('aaaaaaaa-1300-4000-8000-000000000001','claude','/opt/ap-a','alpha chat',0,'2026-10-26T10:00:00Z','2026-10-26T10:00:00Z')").run();
-const real = createCompanionStore(987);
-const make = (over: object = {}) => {
-  const store: any = { ...real, ...over };
-  let current: any = THINKING_ACTIVITY;
-  const deps = createToolDeps({ userId: 987, store, runtime: {} as any, activity: { current: () => current, set: (n: any) => { current = n; } } });
-  const tools: any = Object.fromEntries(draftTools(deps).map((t) => [t.name, t]));
-  return async (tool: string, args: object) => {
-    const parsed = z.object(tools[tool].inputSchema).safeParse(args);
-    if (!parsed.success) return { schema: parsed.error.issues.map((i) => i.message).join('; ') } as any;
-    const r = await tools[tool].handler(parsed.data, {});
-    return { text: r.content[0].text as string, isError: r.isError === true } as any;
-  };
-};
-const call = make();
-const failing = make({ setDraft() { throw new Error('SQLITE_BUSY: database is locked'); } });
-const r = await failing('update_draft', { session: 'alpha chat', text: 'brief' });
-console.log('P5 answer:', r.text.slice(0, 50), '| focus afterwards:', real.readState().focus?.name ?? 'none', '| draft afterwards:', real.readState().draft ? 'held' : 'none');
-MTS
-DATABASE_PATH="$1/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$1/p.mts" 2>&1 | grep -E '^P5'
-EOF
-bash "$D/p.sh" "$D"
-cd / && case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
-```
-
-measured 2026-10-26 by chain chain-kaylee--companion--drafting-20261026-184416-a293, finding L3, LOW
-probe-key: eb8dc380dcc21571bdf1fe3924ac84b5e2186273
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/draft-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-draft-tools.mjs
 
@@ -16047,50 +15825,6 @@ echo "[probe exit $?]"
 
 measured 2026-10-28 by chain chain-kaylee-followups-epics-20261028-132957-e46b, finding M1, MEDIUM
 probe-key: 4b63c99a20610bbe21f1392cdaf4938a72fe7672
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
-
-## INV-10077 — probe — MEDIUM — a stamped epic is judged against its FIRST stamp, which predates its real finish by 1.3 to 44.7 hours (and by days for a re-finished epic)
-
-MEDIUM — a stamped epic is judged against its FIRST stamp, which predates its real finish by 1.3 to 44.7 hours (and by days for a re-finished epic)
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/q.mts" <<'TS'
-import { execFileSync } from 'node:child_process';
-import { closuresForArc } from '@/modules/followups/followups-completion-rule.service.js';
-const doc = JSON.parse(execFileSync(`${process.env.HOME}/.claude/scripts/dispatcher`, ['status', '--json'], { encoding: 'utf8', maxBuffer: 1 << 26 }));
-const finish = new Map<string, string>(doc.plans.filter((p: any) => p.completed_at).map((p: any) => [p.name, p.completed_at]));
-const rows: string[] = [];
-for (const arc of doc.arcs.filter((a: any) => a.status === 'complete' && a.completed_at)) {
-  const last = arc.plans.map((n: string) => finish.get(n) ?? '').sort().pop() ?? '';
-  const hours = ((Date.parse(last) - Date.parse(arc.completed_at)) / 3600e3).toFixed(1);
-  const filed = new Date(Date.parse(arc.completed_at) + 60e3).toISOString(); // one minute after the stamp, while the last plan still walked
-  const closed = closuresForArc(arc, [{ id: 1, text: `press Queue on ${arc.name}`, updated_at: filed }]).length;
-  rows.push(`${arc.name.padEnd(40)} stamp ${arc.completed_at} | last plan finished +${hours} h | item filed 1 min after the stamp closes at the epic's finish: ${closed === 1}`);
-}
-console.log(rows.length ? rows.join('\n') : 'no complete, stamped epic in the dispatcher document today');
-const k = doc.arcs.find((a: any) => a.name === 'kaylee');
-if (k) {
-  const asComplete = { name: k.name, status: 'complete', completed_at: k.completed_at };
-  const filed = '2026-10-28T10:00:00.000Z';
-  console.log(`kaylee (${k.status} now, stamp ${k.completed_at}) read as complete after eyes lands: item filed ${filed} "the kaylee epic: check the eyes" closes: ${closuresForArc(asComplete, [{ id: 2, text: 'the kaylee epic: check the eyes', updated_at: filed }]).length === 1}`);
-}
-process.exit(0);
-TS
-cat > "$D/p.sh" <<'EOF'
-D=$(cd "$(dirname "$0")" && pwd)
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/q.mts" 2>&1 | head -20
-EOF
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
-echo "[probe exit $?]"
-# expect: while the defect stands, every line ends `closes at the epic's finish: false` with a `+h` gap above 1, and the kaylee line ends `closes: false`; cured (finish time = the epic's latest plan stamp), every line ends `true`
-```
-
-measured 2026-10-28 by chain chain-kaylee-followups-epics-20261028-132957-e46b, finding M2, MEDIUM
-probe-key: a4e30247f839be9cf36ca575a192d1fabfe6823f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups-completion-rule.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/FollowupRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
@@ -23919,131 +23653,6 @@ probe-key: 08290df78a3ed665bcf1ab278e1050298363f70d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosisVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-auto-diagnosis-switch-shot.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-auto-panel-shot.mjs
 
-## INV-10826 — probe — MEDIUM — at its least height the dock is a 17px strip: an action card waiting for his word (and the draft, walkthrough and notes) is out of sight
-
-MEDIUM — at its least height the dock is a 17px strip: an action card waiting for his word (and the draft, walkthrough and notes) is out of sight
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  await page.evaluate(() => { localStorage.setItem('companion-panel', JSON.stringify({ left: 300, top: 8, width: 320, height: 100 })); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('actionAnswer'); });
-  await page.waitForTimeout(600);
-  const r = await page.evaluate(() => {
-    const p = document.querySelector('[data-companion-panel]'); const d = p.querySelector('[data-companion-dock]').getBoundingClientRect(); const a = p.querySelector('[data-companion-action]').getBoundingClientRect();
-    const seen = Math.max(0, Math.min(a.bottom, d.bottom) - Math.max(a.top, d.top));
-    const buttons = [...p.querySelectorAll('[data-companion-action] button')];
-    return { panelHeight: Math.round(p.getBoundingClientRect().height), dockHeight: Math.round(d.height), actionHeight: Math.round(a.height), actionPxInSight: Math.round(seen), buttonsInSight: buttons.filter((b) => { const x = b.getBoundingClientRect(); return x.top >= d.top && x.bottom <= d.bottom; }).length, buttons: buttons.length };
-  });
-  await page.evaluate(() => localStorage.removeItem('companion-panel'));
-  console.log('at its least height with an action waiting:', JSON.stringify(r));
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: `actionPxInSight` of the whole card and `buttonsInSight` equal to `buttons` (cured, a dock that shows the card at the least height); today {"panelHeight":259,"dockHeight":17,"actionHeight":399,"actionPxInSight":4,"buttonsInSight":0,"buttons":2}
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-move-resize-notes-fold-20261104-102647-b803, finding M1, MEDIUM
-probe-key: 31d056f9b2ca05c2a37c3ee840e70261dcba0632
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ResizeGrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
-
-## INV-10827 — probe — MEDIUM — the right edge's 6px grip sits over 7 of the 10px of the log's and the notes' scrollbars: a press on the thumb's edge resizes the panel instead of scrolling
-
-MEDIUM — the right edge's 6px grip sits over 7 of the 10px of the log's and the notes' scrollbars: a press on the thumb's edge resizes the panel instead of scrolling
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false, launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } });
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  await page.evaluate(() => { localStorage.removeItem('companion-panel'); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
-  await page.waitForTimeout(600);
-  const info = await page.evaluate(() => {
-    const p = document.querySelector('[data-companion-panel]'); const right = p.getBoundingClientRect().right;
-    const log = p.querySelector('[role="log"]').parentElement; const r = log.getBoundingClientRect(); const y = Math.round((r.top + r.bottom) / 2);
-    const who = (inset) => { const e = document.elementFromPoint(right - inset, y); const g = e && e.closest('[data-companion-grip]'); return g ? `grip:${g.getAttribute('data-companion-grip')}` : 'scroller'; };
-    return { scrollbarPx: log.offsetWidth - log.clientWidth, answers: Object.fromEntries([2, 5, 7, 10, 14].map((i) => [`${i}px in`, who(i)])), right, y, width: Math.round(p.getBoundingClientRect().width), scrollTop: log.scrollTop };
-  });
-  await page.mouse.move(info.right - 3, info.y); await page.mouse.down(); await page.mouse.move(info.right - 123, info.y, { steps: 8 }); await page.mouse.up(); await page.waitForTimeout(300);
-  const after = await page.evaluate(() => ({ width: Math.round(document.querySelector('[data-companion-panel]').getBoundingClientRect().width) }));
-  await page.evaluate(() => localStorage.removeItem('companion-panel'));
-  console.log('scrollbar', info.scrollbarPx + 'px; who answers a press', JSON.stringify(info.answers), '| a press 3px in dragged 120px left: panel width', info.width, '->', after.width);
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: every `px in` up to the scrollbar's own width answers `scroller` and the width stays 400 (cured); today `scrollbar 10px; who answers a press {"2px in":"grip:right","5px in":"grip:right","7px in":"grip:right","10px in":"scroller","14px in":"scroller"} | … panel width 400 -> 320`
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-move-resize-notes-fold-20261104-102647-b803, finding M2, MEDIUM
-probe-key: d50692ab6a45af8dac15937ab42c6a2960759a8b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ResizeGrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
-
-## INV-10828 — probe — LOW — the keyboard grip changes corner and drops the focus in the middle of a keyboard resize; no key moves the panel
-
-LOW — the keyboard grip changes corner and drops the focus in the middle of a keyboard resize; no key moves the panel
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  await page.evaluate(() => { localStorage.setItem('companion-panel', JSON.stringify({ left: 500, top: 50, width: 400, height: 600 })); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
-  await page.waitForTimeout(600);
-  await page.locator('[data-companion-panel] button.vv-resize-grip').focus();
-  const out = [];
-  for (let i = 1; i <= 4; i++) {
-    await page.keyboard.press('ArrowRight'); await page.waitForTimeout(120);
-    out.push(await page.evaluate((n) => { const a = document.activeElement; const r = document.querySelector('[data-companion-panel]').getBoundingClientRect(); return `#${n} width ${Math.round(r.width)} centre ${Math.round(r.left + r.width / 2)} focus ${a === document.body ? 'BODY' : a.getAttribute('aria-label')}`; }, i));
-  }
-  await page.evaluate(() => localStorage.removeItem('companion-panel'));
-  console.log(out.join(' | '));
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: every step's focus reads `Resize Kaylee's panel` (cured); today `#3 width 448 centre 724 focus BODY` and #4 stays at 448
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-move-resize-notes-fold-20261104-102647-b803, finding L1, LOW
-probe-key: 0b44738ba9d665d994f741be2dff7bdb28551747
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ResizeGrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
-
 ## INV-10830 — probe — `--mode off` presses the switch even when it already reads OFF, turning it ON (live write, no guard)
 
 `--mode off` presses the switch even when it already reads OFF, turning it ON (live write, no guard)
@@ -24211,189 +23820,6 @@ probe-key: 1ae234167ecbffe5ffc9769a83f0e86654f66cbd
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-results.db.ts
 
-## INV-10845 — probe — on a short floating panel the draft's fold leaves the panel's floor stale: folding GROWS the panel, reopening leaves Send out of sight
-
-on a short floating panel the draft's fold leaves the panel's floor stale: folding GROWS the panel, reopening leaves Send out of sight
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
-const FOLD = '[data-companion-panel] [data-companion-draft] [data-card-fold]';
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  await page.evaluate(() => { for (const k of ['companion-notes-fold', 'companion-draft-fold']) localStorage.removeItem(k); localStorage.setItem('companion-panel', JSON.stringify({ left: 700, top: 20, width: 400, height: 520 })); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
-  await page.waitForTimeout(600);
-  const read = () => page.evaluate(() => { const p = document.querySelector('[data-companion-panel]'); const d = p.querySelector('[data-companion-dock]'); const s = p.querySelector('[data-companion-draft] [data-companion-send]')?.getBoundingClientRect(); const db = d.getBoundingClientRect(); return `panel ${Math.round(p.getBoundingClientRect().height)}px, dock scrolls ${d.scrollHeight - d.clientHeight}px, Send in sight: ${s ? s.top >= db.top && s.bottom <= db.bottom + 1 : 'folded'}`; });
-  const open = await read();
-  await page.locator(FOLD).click(); await page.waitForTimeout(600); const folded = await read();
-  await page.locator(FOLD).click(); await page.waitForTimeout(600); const reopened = await read();
-  await page.evaluate(() => localStorage.removeItem('companion-panel'));
-  console.log(`draft open   : ${open}\ndraft folded : ${folded}\ndraft reopened: ${reopened}`);
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -4
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: cured when the folded panel is no taller than the open one and the reopened one reads `dock scrolls 0px, Send in sight: true`; today `draft open   : panel 637px, dock scrolls 0px, Send in sight: true`, `draft folded : panel 701px, …` and `draft reopened: panel 520px, dock scrolls 112px, Send in sight: false`
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-draft-fold-20261104-143026-0f02, finding M1, MEDIUM
-probe-key: 0e23bf7c8e17a8db43267f50d8bdaf11a2c8048d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFoldMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDraftFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/usePanelFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
-
-## INV-10846 — probe — a keyboard fold of the draft drops the focus to the page's body; the notes' chevron keeps it
-
-a keyboard fold of the draft drops the focus to the page's body; the notes' chevron keeps it
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
-const DRAFT = '[data-companion-panel] [data-companion-draft] [data-card-fold]';
-const NOTES = '[data-companion-panel] [data-companion-notes-count] [data-card-fold]';
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  await page.evaluate(() => { for (const k of ['companion-panel', 'companion-notes-fold', 'companion-draft-fold']) localStorage.removeItem(k); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
-  await page.waitForTimeout(600);
-  const focus = () => page.evaluate(() => { const a = document.activeElement; return a === document.body ? 'BODY' : `${a.tagName} "${a.getAttribute('aria-label')}"`; });
-  for (const [name, sel] of [['notes', NOTES], ['draft', DRAFT]]) {
-    await page.locator(sel).focus(); await page.keyboard.press('Enter'); await page.waitForTimeout(450);
-    const folded = await focus();
-    await page.keyboard.press('Enter'); await page.waitForTimeout(450);
-    console.log(`${name} chevron, Enter to fold -> focus on ${folded}; Enter again -> focus on ${await focus()}`);
-  }
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: cured when the draft line reads like the notes line (`BUTTON "Expand draft"` then `BUTTON "Collapse draft"`, as the notes' `BUTTON "Expand notes"` then `BUTTON "Collapse notes"`); today `draft chevron, Enter to fold -> focus on BODY; Enter again -> focus on BODY` (the second Enter presses nothing) while the notes line keeps its chevron focused
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-draft-fold-20261104-143026-0f02, finding M2, MEDIUM
-probe-key: 5ace777a8d32e440616b2b4ac982f29feb1cf1e8
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFoldMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDraftFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/usePanelFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
-
-## INV-10848 — probe — a save the server refused is invisible while the draft is folded, and the folded line presents the unsaved words as the draft
-
-a save the server refused is invisible while the draft is folded, and the folded line presents the unsaved words as the draft
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit, SHELL } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  // The panel's own view on the dense fixture, with a draft verb the server refuses (the kit's verbs never refuse a save).
-  await page.evaluate(async (shell) => {
-    for (const k of ['companion-panel', 'companion-notes-fold', 'companion-draft-fold']) localStorage.removeItem(k);
-    window.__companionKit.unmountAll();
-    const { h, importModule, readSpecifier, mount } = window.__mountReact;
-    const { CompanionPanelView } = await importModule('/src/modules/companion/CompanionPanel.tsx');
-    const { presenceOf } = await importModule('/src/modules/companion/hooks/useCompanionPresence.ts');
-    const { FAKE_PANEL } = await importModule('/src/modules/companion/companion-fake.ts');
-    const { ToastProvider } = await importModule(await readSpecifier('/src/modules/companion/CompanionControls.tsx', /from "([^"]*\/ToastContext[^"]*)"/));
-    const fake = FAKE_PANEL.dense; const noop = async () => {};
-    const verbs = { onClose: () => {}, onSendText: noop, onModelChange: noop, onLiveChange: noop, onInterrupt: noop, onClear: noop, onEditDraft: async () => { throw new Error('the server is down'); }, onSendDraft: noop, onClearDraft: noop, onDismissNote: noop, onWithdraw: noop };
-    const { root, host } = await mount('companion-panel', null, 'display:contents');
-    document.querySelector(shell).appendChild(host);
-    root.render(h(ToastProvider, null, h(CompanionPanelView, { ...fake, ...verbs, presence: presenceOf(fake.picture, 'idle', false, false) })));
-    await window.__mountReact.settle();
-  }, SHELL);
-  await page.waitForTimeout(500);
-  await page.locator('[data-companion-panel] [data-companion-draft] textarea').click();
-  await page.keyboard.press('Control+End'); await page.keyboard.type(' UNSAVED');
-  await page.keyboard.press('Shift+Tab'); await page.waitForTimeout(300);   // the chevron; the blur's save is refused
-  await page.keyboard.press('Enter'); await page.waitForTimeout(500);       // fold
-  console.log(await page.evaluate(() => {
-    const card = document.querySelector('[data-companion-draft]'); const alert = card.querySelector('[role="alert"]');
-    return `fold: ${card.getAttribute('data-companion-draft-fold')} | line ends: "${card.querySelector('[data-companion-draft-line]')?.textContent.replace(/\s+/g, ' ').slice(-24)}" | refusal: ${alert ? `"${alert.textContent.trim()}" ${alert.closest('[inert]') ? 'INSIDE the folded body (inert, unheard)' : 'in sight'}` : 'none'} | mark: ${card.querySelector('[data-companion-draft-mark]')?.textContent ?? 'none'}`;
-  }));
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: cured when a refused save is not hidden by the fold (the line or a mark says it, or the refusal is in sight); today `fold: folded | line ends: "…UNSAVED" | refusal: "▲Your edit wasn't saved: the server is down" INSIDE the folded body (inert, unheard) | mark: none`
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-draft-fold-20261104-143026-0f02, finding L2, LOW
-probe-key: 6ad45992e8837cc4bb6e039ef3fb227c46f00957
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFoldMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDraftFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/usePanelFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
-
-## INV-10849 — probe — `useDraftFold`'s `ownWords` never expires, so words he once saved can come back from her unmarked
-
-`useDraftFold`'s `ownWords` never expires, so words he once saved can come back from her unmarked
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  await page.evaluate(() => { for (const k of ['companion-panel', 'companion-notes-fold', 'companion-draft-fold']) localStorage.removeItem(k); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
-  await page.waitForTimeout(600);
-  const setText = (t) => page.evaluate((t) => window.__companionKit.updatePanel((p) => ({ draft: { ...p.draft, text: t, updatedAt: new Date().toISOString() } })), t);
-  const line = () => page.evaluate(() => `${document.querySelector('[data-companion-draft-brief]')?.textContent} | mark: ${document.querySelector('[data-companion-draft-mark]')?.textContent ?? 'none'}`);
-  // He writes his brief and it is saved (a Tab blurs the field), and the save comes back.
-  await page.locator('[data-companion-panel] [data-companion-draft] textarea').click();
-  await page.keyboard.press('Control+A'); await page.keyboard.type('HIS BRIEF X'); await page.keyboard.press('Tab'); await page.waitForTimeout(200);
-  await setText('HIS BRIEF X'); await page.waitForTimeout(200);
-  // She rewrites it to Y; he reads Y and folds the draft.
-  await setText('HER BRIEF Y'); await page.waitForTimeout(200);
-  await page.locator('[data-companion-panel] [data-companion-draft] [data-card-fold]').click(); await page.waitForTimeout(400);
-  console.log('folded on her words      :', await line());
-  await setText('HIS BRIEF X'); await page.waitForTimeout(250);   // while folded she puts back the very words he saved
-  console.log('she restores his words   :', await line());
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: cured when the last line ends `mark: Edited`; today `she restores his words   : · HIS BRIEF X | mark: none` (the words on the line changed from Y to X and nothing says so)
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-draft-fold-20261104-143026-0f02, finding L3, LOW
-probe-key: 42c8befed6e355102000a88f948dbdc2af10fc2d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFoldMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDraftFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/usePanelFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
-
 ## INV-10853 — probe — LOW — no standing proof fails if a toggle loses its name; the one check on it was retired with the cure
 
 LOW — no standing proof fails if a toggle loses its name; the one check on it was retired with the cure
@@ -24413,26 +23839,6 @@ echo "[probe exit $?]"
 
 measured 2026-11-04 by chain chain-kaylee-fold-toggle-names-20261104-155809-0f36, finding L1, LOW
 probe-key: da04be768e9647e9169f90fe47fbdce3ad0bacec
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/CardFold.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
-
-## INV-10854 — probe — LOW — INV-10846's `expect:` line quotes the names this build replaced; the builder saw it and left it
-
-LOW — INV-10846's `expect:` line quotes the names this build replaced; the builder saw it and left it
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-docstore get INV-10846 --text 2>/dev/null | grep -c 'BUTTON "Expand"' || true
-EOF
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: `1` while the expect line quotes the bare names; `0` once it quotes "Expand draft" / "Collapse draft" or the row is retired
-```
-
-measured 2026-11-04 by chain chain-kaylee-fold-toggle-names-20261104-155809-0f36, finding L2, LOW
-probe-key: d78bff865772e7fe8d248838ea2730398691fa37
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/CardFold.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
 
@@ -25482,13 +24888,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/package-lock.json, /home/lyphe/.
 ## INV-11536 — A planner outing's `waiting` and `no_run` are read by truthiness — an editor of the badge, its tone, the Planning line or the working time must not break it
 
 Reference: MAN-9732 (the alert), MAN-6788 (the badge), MAN-9671 (the Planning line).
-1. **`outing.waiting` and `outing.no_run` are tested for truthiness, never compared with `''`.** `PlannerBadge` (`waitingWords`, `workWord`, `stuck`), `plannerStatusTone`, `PlanningLineRow` (`noRun`) and `outingOut` in `workingTime.ts` read them as `outing.no_run` or `!outing.waiting`. why: the client draws whatever frame arrives (`DispatcherFeed.asPicture` checks a list of outings, not each outing's keys), and a frame from a server older than the keys carries neither; `undefined !== ''` throws in `operatorWords` and paints every outing `danger`.
+1. **`outing.waiting` and `outing.no_run` are tested for truthiness, never compared with `''`.** `PlannerBadge` (`waitingWords`, `workWord`, `stuck`), `plannerStatusTone`, `PlanningLineRow` (`noRun`) and `outingAtWork` in `workingTime.ts` (the working time's `outingOut` and the lane tone's `running` both ask it) read them as `outing.no_run` or `!outing.waiting`. why: the client draws whatever frame arrives (`DispatcherFeed.asPicture` checks a list of outings, not each outing's keys), and a frame from a server older than the keys carries neither; `undefined !== ''` throws in `operatorWords` and paints every outing `danger`.
 2. **`no_run` outranks the state word and draws no clock**, on the badge and on the Planning line, for a queued, an out and an ended outing alike. why: nothing is happening to tick for.
 3. **A planning pause outranks it on the Planning line.** A subject whose own pause stands reads `Planning paused` whatever `no_run` says. why: the pause is what holds the outing.
-4. **A `no_run` outing is not counted as out for the working time.** `outingOut` skips it, so the plan card's and the deck's working time and pill stop. `useDispatcherPlans`' `running` (the lane's tone) still counts any `out` outing.
+4. **A `no_run` outing is not at work, for the working time and for the lane's tone alike.** `outingAtWork` (`workingTime.ts`) is the one reading of it. `outingOut` asks it of one name's outings, so the plan card's and the deck's working time and pill stop; `useDispatcherPlans`' `running` asks it of the whole lane, so the lane's tone never reads `info` for it. The lane's tone otherwise ignores such an outing: a lane whose every drawn plan is `complete` still reads `positive`, as it does for a queued outing.
 5. **One tone for one outing.** `plannerStatusTone(outing)` takes the whole outing; the badge and the Planning line both call it. why: a second reading of the row is a second answer.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlannerBadge.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/workingTime.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlannerBadge.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/workingTime.ts
 
 ## INV-11537 — probe — MEDIUM — the epic alert's mark rides an id the store hands out again, so the next alert after a removal is swallowed
 
@@ -25957,3 +25363,277 @@ measured 2026-11-08 by chain chain-home-transcription-box-cleanup-20261108-14163
 probe-key: 79d0641404afd4623242eb4e8dc9227fc70901ef
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-hints.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean.mjs
+
+## INV-11595 — probe — LOW — the `sent` sentence is given for any send that finds no draft, including a send of words that never went
+
+LOW — the `sent` sentence is given for any send that finds no draft, including a send of words that never went
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { execFileSync } from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe';
+const D = process.argv[2];
+execFileSync('sqlite3', ['-readonly', path.join(os.homedir(), '.cloudcli', 'auth.db'), `.backup '${path.join(D, 'auth.db')}'`]);
+process.env.DATABASE_PATH = path.join(D, 'auth.db');
+process.env.CERBERUS_DB_PATH = path.join(D, 'cerberus.db');
+process.env.CLOUDCLI_SESSIONS_DIR = path.join(D, 'sessions');
+const { PROBE_PROJECT, ensureProbeProject } = await import(`${R}/.verify/lib/probe-project.mjs`);
+const { probeHouse } = await import(`${R}/.verify/lib/probe-house.mjs`);
+ensureProbeProject();
+const { sessionsDb } = await import(`${R}/server/modules/database/index.ts`);
+const { sessionsService } = await import(`${R}/server/modules/providers/index.ts`);
+const { companionService } = await import(`${R}/server/modules/companion/companion.service.ts`);
+const { createCompanionStore } = await import(`${R}/server/modules/companion/companion-store.ts`);
+const { buildCompanionTools } = await import(`${R}/server/modules/companion/tools/companion-tools.ts`);
+const { createToolDeps } = await import(`${R}/server/modules/companion/tools/tool-deps.ts`);
+const { IDLE_ACTIVITY } = await import(`${R}/server/modules/companion/session/companion-turns.ts`);
+const runtime = { hasRuntime: () => true, async run() { return undefined; }, abort: async () => false, steer: async () => 'not_running', activity: () => ({ live: false, busy: false, why: null }), resolveToolApproval: () => {}, getPendingApprovalsForSession: () => [] };
+companionService.attachRuntime(runtime, probeHouse);
+const store = createCompanionStore(1);
+let activity = IDLE_ACTIVITY;
+const deps = createToolDeps({ userId: 1, store, runtime, house: probeHouse, activity: { current: () => activity, set: (next) => { activity = next; } } });
+const tools = Object.fromEntries(buildCompanionTools(deps).map((tool) => [tool.name, tool]));
+const call = async (name, args) => { const r = await tools[name].handler(args, {}); return `${r.isError ? '[refused] ' : ''}${r.content.map((b) => b.text).join(' ')}`; };
+const made = sessionsService.createAppSession('claude', PROBE_PROJECT, 'Bugfixes', true);
+sessionsDb.updateSessionCustomName(made.sessionId, 'Bugfixes');
+await companionService.clear(1);
+await call('update_draft', { session: made.sessionId, text: 'First brief: fix the export retry.' });
+console.log('first brief sent        :', await call('send_to_session', { session: made.sessionId, text: 'First brief: fix the export retry.', mode: 'turn' }));
+console.log('NEW words, no new draft :', await call('send_to_session', { session: made.sessionId, text: 'Second brief: rename the Download button.', mode: 'turn' }));
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /tmp && timeout 150 cloudcli-tsx "$1/p.mjs" "$1" 2>&1 | grep -E '^(first brief|NEW words)'
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `first brief sent        : Started a new turn in Bugfixes.` then `NEW words, no new draft : [refused] That draft already went to Bugfixes, so nothing was sent twice.` while the sentence ignores the request; cured when the second line is today's sentence (it names update_draft) or the sentence tells her to write other words with update_draft first
+```
+
+measured 2026-11-09 by chain chain-kaylee-draft-takedown-20261109-135254-6458, finding L1, LOW
+probe-key: 449ddc59999ff999086330fc4ca4a1224ea55fcf
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-draft-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-draft-takedown.mjs
+
+## INV-11596 — probe — LOW — the showing cannot tell the effort constant from a literal `max` on the settings side
+
+LOW — the showing cannot tell the effort constant from a literal `max` on the settings side
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "the showing reads settings-lines.ts's source: $(grep -c 'settings-lines' .verify/kaylee-draft-takedown.mjs)"
+echo "settings-lines.ts interpolates the constant: $(grep -c 'Her effort: ${COMPANION_EFFORT}' server/modules/companion/eyes/settings-lines.ts)"
+echo "[probe exit $?]"
+# expect: `…source: 0` and `…constant: 1` while the showing cannot see a literal on the settings side; cured when the first count is 1 or more
+```
+
+measured 2026-11-09 by chain chain-kaylee-draft-takedown-20261109-135254-6458, finding L2, LOW
+probe-key: 9d3dc17a905153f08a13fcf4edb9a3c069cd36a3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-draft-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-draft-takedown.mjs
+
+## INV-11597 — probe — LOW — the docs the split and the edit touched are left short in four places
+
+LOW — the docs the split and the edit touched are left short in four places
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "providers manual still points at a section the split moved out of MAN-9072 ('MAN-9072 §Options'): $(grep -c 'MAN-9072 §Options' server/modules/providers/MANUAL.md)"
+printf 'rows serving an edit of the takedown showing, with how often their body (not their governs line) names it:'
+for t in $(docstore govern "$PWD/.verify/kaylee-draft-takedown.mjs" --touch write --text | cut -d' ' -f1); do printf ' %s=%s' "$t" "$(docstore get "$t" --text | grep -v '^governs:' | grep -c 'kaylee-draft-takedown')"; done; echo
+echo "MAN-9147's readDraftEnd row names a handover as a way the record is lost: $(docstore get MAN-9147 --text | grep 'readDraftEnd()' | grep -c -i handover)"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `…(\'MAN-9072 §Options\'): 1`, `…names it: MAN-9072=0` and `…is lost: 0` while the docs are short; cured when the first is 0, the serving row's count is 1 or more, and the last is 1
+```
+
+measured 2026-11-09 by chain chain-kaylee-draft-takedown-20261109-135254-6458, finding L3, LOW
+probe-key: d45ea59bd1b27f41595213f3af6957b44618ad97
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-draft-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-draft-takedown.mjs
+
+## INV-11598 — src/modules/companion — a pointer media query cannot say a mouse drives the page: useFinePointer reads it off the pointer events
+
+On a Windows touchscreen computer that Windows reports as used as a tablet, Chromium answers `pointer: coarse` and `hover: none`, and no query says a mouse is attached, while the mouse works.
+- `IsDeviceUsedAsATablet()` gives `{POINTER_TYPE_COARSE, HOVER_TYPE_NONE}`; the mouse is never asked (`ui/base/pointer/pointer_device_win.cc`).
+- The primary pointer is fine whenever any fine pointer is available (`GetPrimaryPointerType`, `ui/base/pointer/pointer_device.cc`), so a coarse primary makes `(any-pointer: fine)` false too: `(pointer: fine)`, `(any-pointer: fine)` and a change from one to the other all answer no.
+- The mouse still sends pointer events of type `mouse`. `useFinePointer` (`hooks/useFinePointer.ts`) is true when `(any-pointer: fine)` is, or from the page's first `pointerdown` or `pointermove` of type `mouse` or `pen`, and stays true for the life of the page.
+- Measured, his recording of 2026-11-09 13:28: 44px controls and the `hover: none` words drawn, no grab cursor on her header, no grips, a drag on the header selecting the page's text.
+
+| when | do |
+|---|---|
+| a gate asks whether a mouse or a pen drives the page: the panel floats and moves (`useCompanionPanelPlace`), the talk button's "or press F8" line (`CompanionTalkButton`), her composer taking the focus as she opens (`mayFocusFieldOnOpen`) | `useFinePointer` (`mayFocusFieldOnOpen` for the focus); never `(pointer: fine)`, `(any-pointer: fine)` or `(hover: hover)` |
+| a gate asks whether a phone's or tablet's OS runs the page: the PDF preview (`canShowPdf` and `onPhoneOrTabletOs`, `useFilePreview.ts`, MAN-5899) | the OS; never a pointer query |
+| sizes and words for a finger: 44px catches, `finger:`, the `hover: none` words | the browser's own classification, as the touch law has it (INV-10275); his whole UI draws at touch size, by design |
+
+Proof: `node .verify/kaylee-panel-move-mouse-on-touch.mjs` launches Chromium with those answers (`--blink-settings`) and a real mouse (MAN-9062).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFinePointer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-mouse-on-touch.mjs
+
+## INV-11599 — probe — HIGH — the cure floats her under touch sizing, and there a draft aimed at a running chat takes the whole app down once the panel is shorter than its content
+
+HIGH — the cure floats her under touch sizing, and there a draft aimed at a running chat takes the whole app down once the panel is shorter than its content
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+// Athena: the REAL app tree (no kit), his coarse state, a real mouse click on her door. The server's answers are stubbed so her picture carries a draft aimed at a chat that is working
+// (the house's `dense` fixture picture) — nothing is written anywhere.
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { reloadApp } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs';
+const APP = 'http://127.0.0.1:5183';
+const COARSE_ONLY = '--blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=1,availableHoverTypes=1';
+const [state = 'his', height = '620'] = process.argv.slice(2);
+// 1. the fixture picture, read out of the dev client
+const probe = await openConsole({ appUrl: APP, hotUpdates: false });
+const picture = await probe.page.evaluate(async () => { const m = await import('/src/modules/companion/companion-fake.ts'); return JSON.parse(JSON.stringify(m.FAKE_PANEL.dense.picture)); });
+await probe.browser.close();
+const sessionId = picture.draft.target.session.sessionId;
+// 2. the real app, stubbed answers
+const { browser, page, errors } = await openConsole({ appUrl: APP, hotUpdates: false, viewport: { width: 1440, height: Number(height) },
+  launchOptions: state === 'his' ? { args: [COARSE_ONLY] } : {}, contextOptions: { deviceScaleFactor: state === 'his' ? 1.5 : 1 } });
+await page.route(/\/api\/companion$/, (route) => (route.request().method() === 'GET' ? route.fulfill({ json: picture }) : route.continue()));
+await page.route(/\/api\/providers\/sessions\/running/, (route) => route.fulfill({ json: { data: { sessions: [{ sessionId, startedAt: Date.now(), statusText: 'working', canInterrupt: true, provider: 'claude', projectPath: '/tmp/x', projectDisplayName: 'x', sessionTitle: 'busy chat', lastActivity: new Date().toISOString() }], subagentSessionIds: [], awaitingInputSessionIds: [] } } }));
+await page.evaluate(() => localStorage.removeItem('companion-panel'));
+await reloadApp(page); await page.waitForTimeout(1500);
+const pt = await page.evaluate(() => { const d = [...document.querySelectorAll('[data-companion-door], [data-companion-fab] > .vv-fab')].find((e) => e.checkVisibility({ visibilityProperty: true })); if (!d) return null; const r = d.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+if (!pt) { console.log('no door visible'); await browser.close(); process.exit(0); }
+if (process.argv[4] === 'mouse-first') { await page.mouse.move(pt.x + 300, pt.y - 200); await page.waitForTimeout(500); }
+await page.evaluate(() => { const d = [...document.querySelectorAll('[data-companion-door], [data-companion-fab] > .vv-fab')].find((e) => e.checkVisibility({ visibilityProperty: true })); d.click(); }); // a synthetic click: no pointer event reaches the page
+await page.waitForTimeout(1500);
+const before = { loops: errors.filter((e) => /Maximum update depth/.test(e)).length, panel: await page.evaluate(() => { const p = document.querySelector('[data-companion-panel]'); if (!p) return null; const r = p.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }), grips: await page.evaluate(() => document.querySelectorAll('[data-companion-grip]').length) };
+console.log(`${state.padEnd(5)} opened with no mouse heard yet -> panel ${JSON.stringify(before.panel)}, grips ${before.grips}, update-depth errors ${before.loops}`);
+await page.mouse.move(pt.x + 300, pt.y - 200); await page.waitForTimeout(2000); // the first mouse move of the page
+const text = (await page.evaluate(() => document.body.innerText)).replace(/\n+/g, ' | ').slice(0, 90);
+const loops = errors.filter((e) => /Maximum update depth/.test(e)).length;
+const panel = await page.evaluate(() => { const p = document.querySelector('[data-companion-panel]'); if (!p) return null; const r = p.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; });
+const gripsAfter = await page.evaluate(() => document.querySelectorAll('[data-companion-grip]').length);
+console.log(`${state.padEnd(5)} real app tree, window 1440x${height}, after its first mouse move -> grips ${gripsAfter}, panel ${JSON.stringify(panel)} | "Maximum update depth" errors: ${loops} | page now reads: ${text}`);
+await browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+for st in his plain; do timeout 150 node "$1/p.mjs" $st 620 column-first 2>&1 | grep -E '^(his|plain)' | cut -c1-300; done
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: his: `opened with no mouse heard yet -> panel [1028,12,400,596], grips 0, update-depth errors 0`, then `after its first mouse move -> grips 0, panel null | "Maximum update depth" errors: 2 | page now reads: CloudCLI hit an error | The screen it was drawing could not finish…` while the defect stands; plain: the panel stays drawn, errors 0, the page reads the app's own text. Cured when his second line reads like plain's. Dev client :5183 (the probe reads the fixture from /src); about 90 s; nothing is written (server answers stubbed).
+```
+
+measured 2026-11-09 by chain chain-kaylee-panel-drag-root-cause-20261109-135843-6350, finding H1, HIGH
+probe-key: 1928741d1f006c45175d18e9694f9fffbf47261e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFinePointer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ViewBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-mouse-on-touch.mjs
+
+## INV-11600 — probe — MEDIUM — task item 2 ("every page and window where the same cause bites") is not done: two `(pointer: fine)` readers are left, and in his state one shows on her own panel the moment she floats
+
+MEDIUM — task item 2 ("every page and window where the same cause bites") is not done: two `(pointer: fine)` readers are left, and in his state one shows on her own panel the moment she floats
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+// Athena: where the focus lands when a person opens her panel with a real mouse click — his state vs a plain desktop.
+import { reloadApp } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const COARSE_ONLY = '--blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=1,availableHoverTypes=1';
+for (const state of ['his', 'plain']) {
+  const { browser, page } = await openConsole({ appUrl: 'http://127.0.0.1:5184', hotUpdates: false, viewport: { width: 1707, height: 960 },
+    launchOptions: state === 'his' ? { args: [COARSE_ONLY] } : {}, contextOptions: { deviceScaleFactor: 1.5 } });
+  await page.evaluate(() => localStorage.removeItem('companion-panel'));
+  await reloadApp(page); await page.waitForTimeout(600);
+  const pt = await page.evaluate(() => { const d = [...document.querySelectorAll('[data-companion-door], [data-companion-fab] > .vv-fab')].find((e) => e.checkVisibility({ visibilityProperty: true })); const r = d.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.move(pt.x, pt.y); await page.mouse.down(); await page.mouse.up(); await page.waitForTimeout(900);
+  const r = await page.evaluate(() => ({ pointerFine: matchMedia('(pointer: fine)').matches, panelFloats: document.querySelectorAll('[data-companion-panel] [data-companion-grip]').length === 8, focus: document.activeElement === document.body ? 'BODY' : `${document.activeElement.tagName}${document.activeElement.hasAttribute('data-companion-composer-field') ? ' (her typing box)' : ''}` }));
+  console.log(`${state.padEnd(6)} real click on her door -> ${JSON.stringify(r)}`);
+  await browser.close();
+}
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+grep -n "matchMedia('(pointer: fine)')" src/modules/companion/CompanionPanel.tsx src/modules/chat/transcript/shapes/useFilePreview.ts | cut -c1-140 || echo none
+timeout 140 node "$1/p.mjs" 2>&1 | grep -E '^(his|plain)' | cut -c1-200
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: the two reader lines (CompanionPanel.tsx:177 and useFilePreview.ts:41), then `his … {"pointerFine":false,"panelFloats":true,"focus":"BUTTON"}` and `plain … {"pointerFine":true,"panelFloats":true,"focus":"TEXTAREA (her typing box)"}` while the defect stands; cured when his focus reads TEXTAREA (her typing box). Live prod client :5184; about 60 s; nothing is written.
+```
+
+measured 2026-11-09 by chain chain-kaylee-panel-drag-root-cause-20261109-135843-6350, finding M1, MEDIUM
+probe-key: 47bef3e7b37a42131964b212db3dfc12eba90168
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFinePointer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ViewBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-mouse-on-touch.mjs
+
+## INV-11601 — probe — LOW — the rows the builder rewrote are out of reach of editors of the files they describe, and the new standing proof is governed by no row
+
+LOW — the rows the builder rewrote are out of reach of editors of the files they describe, and the new standing proof is governed by no row
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+R=/home/lyphe/.claude/claudecodeui_lyphe
+for f in src/modules/companion/hooks/useCompanionPanelPlace.ts src/modules/companion/CompanionHeader.tsx src/modules/companion/CompanionPanel.tsx src/modules/companion/CompanionPanelGrips.tsx src/modules/companion/CompanionTalkButton.tsx src/modules/companion/hooks/useFinePointer.ts .verify/kaylee-panel-move-mouse-on-touch.mjs; do
+  printf '%-62s ' "$f"; ~/.claude/scripts/docstore govern "$R/$f" --touch write --limit 3 --text | cut -d' ' -f1 | tr '\n' ' '; echo
+done
+for t in INV-10826 INV-10827 INV-10828 INV-10845 INV-10846 INV-10848 INV-10849; do ~/.claude/scripts/docstore get "$t" >/dev/null 2>&1 && printf '%s filed | ' "$t" || printf '%s retired | ' "$t"; done; echo
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: INV rows only for the place hook, header, panel, grips and talk button (`useFinePointer.ts` prints `MAN-9062`), `(no` for the standing proof, and seven `filed` while it stands; cured when `MAN-9062` is among the three for the place hook, the panel, the header and the grips, the proof is governed, and the seven cured rows read `retired`
+```
+
+measured 2026-11-09 by chain chain-kaylee-panel-drag-root-cause-20261109-135843-6350, finding L1, LOW
+probe-key: 39a4ab04cec2706cf24fa46739bc6239e942745e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFinePointer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ViewBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-mouse-on-touch.mjs
+
+## INV-11602 — probe — LOW — `MAN-9062` states the fine-pointer grip sizes as fact, and the coarse floating state this diff creates draws others
+
+LOW — `MAN-9062` states the fine-pointer grip sizes as fact, and the coarse floating state this diff creates draws others
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+// Athena: the sizes of the eight grips in HIS state vs a plain desktop, and what each covers of the header and the composer.
+import { reloadApp } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const COARSE_ONLY = '--blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=1,availableHoverTypes=1';
+const state = process.argv[2] ?? 'his';
+const { browser, page } = await openConsole({ appUrl: 'http://127.0.0.1:5184', hotUpdates: false, viewport: { width: 1707, height: 960 },
+  launchOptions: state === 'his' ? { args: [COARSE_ONLY] } : {}, contextOptions: { deviceScaleFactor: 1.5 } });
+await page.evaluate(() => localStorage.removeItem('companion-panel'));
+await reloadApp(page); await page.waitForTimeout(600);
+const pt = await page.evaluate(() => { const d = [...document.querySelectorAll('[data-companion-door], [data-companion-fab] > .vv-fab')].find((e) => e.checkVisibility({ visibilityProperty: true })); const r = d.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+await page.mouse.move(pt.x, pt.y); await page.mouse.down(); await page.mouse.up(); await page.waitForTimeout(900);
+const out = await page.evaluate(() => {
+  const p = document.querySelector('[data-companion-panel]'); const pr = p.getBoundingClientRect();
+  return [...p.querySelectorAll('[data-companion-grip]')].map((g) => { const r = g.getBoundingClientRect(); return `${g.getAttribute('data-edge') ?? g.getAttribute('data-corner')}${g.hasAttribute('data-pointer-only') ? '' : '(kbd)'}: ${Math.round(r.width)}x${Math.round(r.height)} at ${Math.round(r.left - pr.left)},${Math.round(r.top - pr.top)}`; });
+});
+console.log(`== ${state}`); for (const l of out) console.log('  ', l);
+await browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "MAN-9062 says '6px strips between the corners': $(~/.claude/scripts/docstore get MAN-9062 --text | grep -c '6px strips between the corners')"
+for s in his plain; do timeout 100 node "$1/p.mjs" $s 2>&1 | cut -c1-90; done
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `…: 1`, then for `his` edge strips `374x12` / `12x910`, corners `12x12` and the keyboard glyph `24x24`, and for `plain` `374x6` / `6x910`, `12x12`, `16x16` (the label column reads `null(kbd)` for every grip: only the sizes matter); cured when the row names the touch-state numbers or says 6px under a fine pointer and 12px under a coarse one. Live prod client :5184; about 40 s.
+```
+
+measured 2026-11-09 by chain chain-kaylee-panel-drag-root-cause-20261109-135843-6350, finding L2, LOW
+probe-key: bc4b3dd014ba540017a12e5cb20812a395391928
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFinePointer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ViewBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-mouse-on-touch.mjs
