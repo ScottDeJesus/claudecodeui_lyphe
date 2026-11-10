@@ -43,8 +43,8 @@ import type { CompanionSettings } from '@/shared/companion-types.js';
  * It is a Claude launch like any other, so it starts on the account the house chose, on the subscription.
  *
  * Consumers: `session/companion-session.ts` (every launch and relaunch), `session/companion-handover.ts` (where the thread of a
- * conversation she drops is filed) and `tools/companion-tools.ts` (which re-exports `COMPANION_MCP_SERVER_NAME`, the one name her tools
- * are registered under).
+ * conversation she drops is filed), `tools/companion-tools.ts` (which re-exports `COMPANION_MCP_SERVER_NAME`, the one name her tools
+ * are registered under) and `eyes/settings-lines.ts` (which says `COMPANION_EFFORT` in `read_settings`).
  */
 
 /**
@@ -56,6 +56,13 @@ export const COMPANION_MCP_SERVER_NAME = 'companion';
 
 /** One of her turns may run at most this many model round-trips (tool calls included) before the CLI ends it. */
 const COMPANION_MAX_TURNS = 30;
+
+/**
+ * The reasoning effort of every launch of hers: the deepest the CLI offers, on any model she may run (sonnet, fable, opus and haiku all accept `max`:
+ * the CLI's model list, read 2026-11-09). Fixed here and no setting of his, so it applies from her next launch. Consumed by `companionQueryOptions`
+ * below and by `eyes/settings-lines.ts`, which says it in `read_settings` from this same constant, so what she is told and what she runs cannot drift.
+ */
+export const COMPANION_EFFORT = 'max' satisfies Options['effort'];
 
 /**
  * Her window: 500k tokens, half her models' 1M. With the CLI's compaction off (`DISABLE_COMPACT`, below) the CLI does not refuse at it — it sends past it —
@@ -146,8 +153,7 @@ export async function companionQueryOptions(
     includePartialMessages: true,
     cwd,
     maxTurns: COMPANION_MAX_TURNS,
-    // The deepest reasoning the CLI offers, on any model she may run: sonnet, fable, opus and haiku all accept `max` (the CLI's model list, read 2026-11-09).
-    effort: 'max',
+    effort: COMPANION_EFFORT,
     // Last, so neither the house's environment nor the account's can switch her CLI's compaction back on.
     env: { ...userFacingEnv(), ...account.env, CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(COMPANION_WINDOW_TOKENS), DISABLE_COMPACT: '1' },
     ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
