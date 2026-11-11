@@ -12,6 +12,7 @@ import { readHealCycle, writeHealCycle } from './heal-cycle-switch.js';
 import { readHealCap, readHealMaster, writeHealCap, writeHealMaster } from './heal-switch.js';
 import { getGeminiPlanCapState, setGeminiPlanCapState } from './gemini-plan-cap.js';
 import { getParkAtPeakState, setParkAtPeakState } from './park-at-peak-switch.js';
+import { getCpuLimitState, setCpuLimitState } from './cpu-limit.js';
 import { getWeeklyStopState, setWeeklyStopState } from './weekly-stop.js';
 
 /**
@@ -314,6 +315,17 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       // nothing was written, so no kick rides on a press that never moved the file.
       void kickDispatcher();
       return state;
+    },
+    /**
+     * How full the box's CPU may be before a new agent waits, in whole percent of its cores or null for off. Both bodies live
+     * in `cpu-limit.ts`, beside the file's own reader and writer, for the reason the weekly-stop pair above does. No kick: the
+     * gate re-reads the file at each agent's own check, and the dispatcher holds nothing for the CPU.
+     */
+    async getCpuLimit() {
+      return getCpuLimitState();
+    },
+    async setCpuLimit(percentInput: unknown) {
+      return setCpuLimitState(percentInput);
     },
     /**
      * The heal reflex's MASTER switch: whether the reflex may LAUNCH at all, over and above the cap

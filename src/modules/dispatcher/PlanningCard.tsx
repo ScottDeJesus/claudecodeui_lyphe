@@ -5,6 +5,7 @@ import { epochOf, plannerStatusTone } from '@/modules/dispatcher/dispatcherState
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { KindTag } from '@/modules/dispatcher/LaneCardHead';
 import { operatorWords, soulWord } from '@/modules/dispatcher/operatorWords';
+import { CpuWaitOverride } from '@/modules/dispatcher/CpuWaitOverride';
 import { PaceOverride } from '@/modules/dispatcher/PaceOverride';
 import { PlanningPausedLine, PlanningPausePress } from '@/modules/dispatcher/PlanningPause';
 import { useElapsed } from '@/shared/hooks/useElapsed';
@@ -100,6 +101,9 @@ function PlanningLineRow({ line }: { line: PlanningLine }) {
         {!line.drawn && outing !== null && (outing.pace_hold || outing.overridden) && (
           <PaceOverride name={line.name} hold={outing.pace_hold} overridden={outing.overridden} scope={line.scope} />
         )}
+        {/* The outing's agent waiting for the box's CPU, with its Override — on this line only while the subject has no card or deck
+            on screen, as the pace hold is: a drawn card or deck carries it (`plan.cpu_wait`, `arc.cpu_wait`), so each wait has one press. */}
+        {!line.drawn && outing !== null && outing.cpu_wait && <CpuWaitOverride wait={outing.cpu_wait} />}
       </div>
       {line.press !== null && <PlanningPausePress name={line.name} press={line.press} scope={line.scope} />}
     </li>

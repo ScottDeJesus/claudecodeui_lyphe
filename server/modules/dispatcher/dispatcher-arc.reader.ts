@@ -1,6 +1,6 @@
 import type { DispatcherArc, DispatcherArcNoRun, DispatcherArcQueue, DispatcherArcStatus } from '@/shared/types.js';
 
-import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, isWholeFrom, modelSince, names, need, oneOf, planningPausedSince, textSince } from './dispatcher-state.transport.js';
+import { countOrNullSince, countSince, cpuWaitSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, isWholeFrom, modelSince, names, need, oneOf, planningPausedSince, textSince } from './dispatcher-state.transport.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
 /**
@@ -114,6 +114,9 @@ export function arcOf(raw: unknown): DispatcherArc {
     // deck then draws no Override.
     pace_hold: textSince(field(arc, 'pace_hold'), `arc.pace_hold of ${name}`) ?? '',
     overridden: flagSince(field(arc, 'overridden'), `arc.overridden of ${name}`),
+    // THE EPIC'S OWN PLANNER OUTING THAT WAITS FOR CPU (`report_arcs.arc_dict.cpu_wait`, `cpu_report.of_outings`): `{launch, since, words}` or `null`.
+    // None of its plans' agents is this one's: a plan's wait is its own card's. ABSENT reads `null` (a build older than the key held nothing back).
+    cpu_wait: cpuWaitSince(field(arc, 'cpu_wait'), `arc.cpu_wait of ${name}`),
     // The operator's planning pause on THIS epic's own planning — `{at, by}` while it stands, else `null`
     // (`report_arcs.arc_dict.planning_paused`, `store_planning.arc_pause`). The dispatcher's own reading of the epic's
     // log; each feature it holds carries `null` of its own. ABSENT reads `null`, as the plan's does.

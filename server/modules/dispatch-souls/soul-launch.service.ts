@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { SoulLaunchSnapshot, SoulLaunchState } from '@/shared/types.js';
 
 import { isDispatcherWork, readDispatcherChainLaunchIds } from './dispatcher-work.service.js';
+import { readCpuWaitMarker, type CpuWaitMarker } from './cpu-wait.transport.js';
 import { listLaunchDirs, readLaunchFiles, type SoulLaunchFiles } from './soul-launch.transport.js';
 
 /**
@@ -178,12 +179,18 @@ function receiptTokens(
  * (`readDispatcherChainLaunchIds`), which settles `dispatcher_work` for a launch written before the
  * mark existed. A caller that reads only a launch's state (`running-launchers.service.ts`) omits it
  * and the flag then answers from the spec alone.
+ *
+ * `cpuWait` is the launch's marker in the pacer's `cpu-wait/` folder, when it has one. A launch that waits for the
+ * box's CPU is still `running` — its launcher is alive and owes a receipt — and says so in `cpu_wait` besides: set
+ * only while that launcher is PROVED alive and its soul has not started, because a launcher killed outright leaves
+ * its marker behind and a pin must not say "Waiting" over a corpse. A caller that reads only the state omits it.
  */
 export function classifyLaunch(
   files: SoulLaunchFiles,
   now: number,
   keepS: number = DEFAULT_ENDED_KEEP_S,
   dispatcherChainLaunchIds?: ReadonlySet<string>,
+  cpuWait: CpuWaitMarker | null = null,
 ): SoulLaunchSnapshot | null {
   const { spec, result } = files;
   const startedAt = readNumberOrNull(field(spec, 'started_at'));
@@ -228,6 +235,10 @@ export function classifyLaunch(
     // DeepSeek refused this soul or never answered it: the receipt says why, and nothing ran on
     // Claude instead (the launcher never re-routes a soul).
     blocked: readString(field(result, 'provider_blocked')) !== '',
+    cpu_wait:
+      state === 'running' && cpuWait !== null && files.launcherAlive && !files.childAlive
+        ? { launch: files.launchId, since: cpuWait.since, words: cpuWait.words }
+        : null,
     state,
     status,
     cause: readString(field(result, 'cause')),
@@ -265,6 +276,9 @@ export function classifyLaunch(
  * `servedModelByLaunchId` is the lane's memory of the model each child's log announced, owned by the
  * composition root: a log is read once per launch, not every poll, and the walk drops the ids the lane
  * no longer carries. Omitted, no child's log is read.
+ *
+ * `cpuWaitDir` is the pacer's `cpu-wait/` folder, where a launch that is waiting for the box's CPU keeps its marker
+ * (`cpu-wait.transport.ts`); read for a launch that has no receipt yet, and omitted by a caller that asks no such thing.
  */
 export function snapshotLaunches(
   stateDir: string,
@@ -272,6 +286,7 @@ export function snapshotLaunches(
   keepS: number = DEFAULT_ENDED_KEEP_S,
   onLaunchError?: (dir: string, message: string) => void,
   servedModelByLaunchId?: Map<string, string>,
+  cpuWaitDir?: string,
 ): SoulLaunchSnapshot[] {
   const launches: SoulLaunchSnapshot[] = [];
   // One pass over the dispatcher's chains for the whole walk, not one per launch. It reaches back as
@@ -283,7 +298,8 @@ export function snapshotLaunches(
     const dir = path.join(stateDir, name);
     try {
       const files = readLaunchFiles(dir, name, servedModelByLaunchId);
-      const snapshot = classifyLaunch(files, now, keepS, dispatcherChainLaunchIds);
+      const cpuWait = cpuWaitDir === undefined || files.result !== null ? null : readCpuWaitMarker(cpuWaitDir, name);
+      const snapshot = classifyLaunch(files, now, keepS, dispatcherChainLaunchIds, cpuWait);
       if (snapshot !== null) launches.push(snapshot);
     } catch (error) {
       // ONE unreadable launch never costs the others their reading — but it must not vanish in

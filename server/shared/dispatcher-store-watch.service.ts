@@ -2,6 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { watchDirectory, type DirectoryWatch } from './directory-watch.service.js';
+import { pacerHomeDir } from './utils.js';
 
 /**
  * What tells the dispatcher's two lanes (`dispatcher_state`, `roadmap_state`) that their picture may
@@ -36,6 +37,10 @@ import { watchDirectory, type DirectoryWatch } from './directory-watch.service.j
  *   status only        `pacer/readings.sqlite`(`-wal`),        the pacer's picture. SLOW (`PACER_SETTLE_MS`):
  *                      `pacer/rates.json`                       every agent step appends a reading, so this
  *                                                                 input is busy whenever any agent works
+ *   status only        `pacer/cpu-wait/<launch>.json`          an agent waiting for CPU appearing, its words moving or
+ *                                                                 it starting (`cpu_wait`): the runner writes the marker with no
+ *                                                                 store write at all, and the card's "Waiting for CPU" is read
+ *                                                                 off it. Quiet: a marker moves only when its words do
  *   status only        a `dispatcher-*.timer` unit under       an armed hour appearing, firing or being
  *                      systemd's transient directory            stopped by hand
  *
@@ -103,6 +108,9 @@ const FLAG_FILES: ReadonlySet<string> = new Set(['park_at_peak.flag', 'weekly_st
 const ACCOUNT_FILES: ReadonlySet<string> = new Set(['accounts.json', 'chosen.json']);
 const PACER_FILES: ReadonlySet<string> = new Set(['readings.sqlite', 'readings.sqlite-wal', 'rates.json']);
 const CHAIN_FILES: ReadonlySet<string> = new Set(['chain.json', 'walker.pid']);
+/** The folder of the agents waiting for CPU, inside the pacer's home (`cpu_marker.WAIT_DIR`), and the one extension its markers carry. */
+const CPU_WAIT_DIR = 'cpu-wait';
+const CPU_WAIT_MARKER_EXT = '.json';
 
 /** An explicit home when the dispatcher's own code takes one (`PLAN_RUNNER_*_HOME`), else a folder of the state root. */
 function overrideOr(env: NodeJS.ProcessEnv, name: string, fallback: string): string {
@@ -120,7 +128,7 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
   const storeDir = explicitHome && explicitHome.trim() ? explicitHome : path.join(os.homedir(), '.claude', 'state', 'dispatcher');
   const stateRoot = path.dirname(storeDir);
   const chainsRoot = path.join(stateRoot, 'dispatch-chains');
-  const pacerDir = overrideOr(env, 'PLAN_RUNNER_PACER_HOME', path.join(stateRoot, 'pacer'));
+  const pacerDir = pacerHomeDir(stateRoot, env);
   const accountDir = overrideOr(env, 'PLAN_RUNNER_CLAUDE_ACCOUNT_HOME', path.join(stateRoot, 'claude_account'));
   // The dial is `epics.flag` in the state root (`epic_dial.flag_path`); the other flags are read from fixed `~/.claude/state/*.flag`
   // paths. A probe's per-flag override is not followed. On the live home both are one directory, and one watch serves them.
@@ -230,6 +238,11 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
           if (name !== 'rates.json' && kind !== 'change') return null;
           return { lanes: STATUS_LANE, settleMs: PACER_SETTLE_MS };
         }),
+        // The agents waiting for CPU: a marker appearing is an agent held back, its removal that agent starting. Only the
+        // `.json` markers count: the fifo beside each is the Override's door and the atomic writes leave `.tmp` scratch names.
+        open(path.join(pacerDir, CPU_WAIT_DIR), (_kind, name) =>
+          name.endsWith(CPU_WAIT_MARKER_EXT) ? quickly(STATUS_LANE) : null,
+        ),
         open(transientDir, (_kind, name) =>
           name.startsWith('dispatcher-') && name.endsWith('.timer') ? quickly(STATUS_LANE) : null,
         ),

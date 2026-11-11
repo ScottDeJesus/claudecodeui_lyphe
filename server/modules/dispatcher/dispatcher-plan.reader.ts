@@ -1,6 +1,6 @@
 import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage } from '@/shared/types.js';
 
-import { each, countOrNullSince, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, planningPausedSince, stallSince, textSince } from './dispatcher-state.transport.js';
+import { cpuWaitSince, each, countOrNullSince, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, planningPausedSince, stallSince, textSince } from './dispatcher-state.transport.js';
 import { askingSince } from './dispatcher-ask.reader.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
@@ -208,6 +208,10 @@ export function planOf(raw: unknown): DocumentPlan {
     // `false` (`flagSince`): a build older than the key has no override to show, and the card then
     // draws only what the pace hold alone says.
     overridden: flagSince(field(plan, 'overridden'), `plan.overridden of ${name}`),
+    // THE AGENT OF THIS PLAN THAT WAITS FOR THE BOX'S CPU (`report.plan_dict.cpu_wait`, `cpu_report.of_plan`): `{launch, since, words}` or `null`.
+    // A fact about an AGENT and not a hold on the plan, so it never rides `pace_hold` or `overridden`. ABSENT reads `null` (a build older than
+    // the key held nothing back), and the card then draws no wait.
+    cpu_wait: cpuWaitSince(field(plan, 'cpu_wait'), `plan.cpu_wait of ${name}`),
     // The operator's planning pause on THIS plan alone — `{at, by}` while its own stands, never its epic's
     // (`report.plan_dict.planning_paused`, `store_planning.plan_pause`) — read as the dispatcher's own reading of
     // its log, never derived here. ABSENT reads `null` (`planningPausedSince`): a build older than the key never
