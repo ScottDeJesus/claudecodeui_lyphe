@@ -1,4 +1,10 @@
-import { runDispatcherCommand, type DispatcherCommandResult } from './dispatcher-command.js';
+import { performance } from 'node:perf_hooks';
+
+import {
+  runDispatcherCommand,
+  type DispatcherCommandDependencies,
+  type DispatcherCommandResult,
+} from './dispatcher-command.js';
 
 /**
  * The board counter, and the gate the store watch asks before it pokes the dispatcher's lanes for a write to the
@@ -36,7 +42,8 @@ const BOARD_VERSION_VERB = 'board-version';
 /**
  * How long one `board-version` may take. The verb is the dispatcher's own start-up and one row read, about 0.15 s;
  * this is a bound on a wedged one, short enough that a check which never answers delays the pokes it gates by
- * seconds and not by the lanes' backstop.
+ * seconds and not by the lanes' backstop. A check past it is killed with SIGKILL, not asked to stop: the gate stays
+ * shut for as long as a check is out, so a child that ignored SIGTERM must not be waited on until it chose to die.
  */
 const BOARD_VERSION_TIMEOUT_MS = 5000;
 
@@ -93,7 +100,11 @@ export function createBoardVersionReader(commands: {
   bin: string;
   env: NodeJS.ProcessEnv;
 }): () => Promise<BoardReading> {
-  const dependencies = { ...commands, timeoutMs: BOARD_VERSION_TIMEOUT_MS };
+  const dependencies: DispatcherCommandDependencies = {
+    ...commands,
+    timeoutMs: BOARD_VERSION_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
+  };
   return async () => readingOf(await runDispatcherCommand([BOARD_VERSION_VERB], dependencies));
 }
 
@@ -130,8 +141,12 @@ export function createBoardGate(dependencies: BoardGateDependencies): BoardGate 
   let lastPoked: number | null = null;
   let waiting: NodeJS.Timeout | null = null;
   let checking = false;
-  /** When the last check ended, for the gap the next one keeps from it; 0 before the first. */
-  let lastCheckEndedAt = 0;
+  /**
+   * When the last check ended, for the gap the next one keeps from it. On the monotonic clock (`performance.now()`),
+   * never `Date.now()`: a step of the wall clock back would stretch the gap by the whole step and leave the board
+   * unchecked for that long. Before the first check there is nothing to keep a gap from.
+   */
+  let lastCheckEndedAt = Number.NEGATIVE_INFINITY;
   /** A write landed while a check was out: that check may have read the counter before it. */
   let writtenDuringCheck = false;
   let stopped = false;
@@ -145,7 +160,7 @@ export function createBoardGate(dependencies: BoardGateDependencies): BoardGate 
 
   const schedule = (): void => {
     if (waiting !== null) return;
-    const wait = Math.max(GATHER_MS, lastCheckEndedAt + minGapMs - Date.now());
+    const wait = Math.max(GATHER_MS, lastCheckEndedAt + minGapMs - performance.now());
     waiting = setTimeout(() => {
       waiting = null;
       void check();
@@ -166,7 +181,7 @@ export function createBoardGate(dependencies: BoardGateDependencies): BoardGate 
     writtenDuringCheck = false;
     const reading = await readSafely();
     checking = false;
-    lastCheckEndedAt = Date.now();
+    lastCheckEndedAt = performance.now();
     if (stopped) return;
 
     if (!reading.ok) {

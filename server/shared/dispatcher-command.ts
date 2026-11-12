@@ -76,6 +76,13 @@ export type DispatcherCommandDependencies = {
   door?: string;
   /** Wall-clock ceiling for one command. A verb may kick the daemon and print its answer once that has been asked for. */
   timeoutMs: number;
+  /**
+   * The signal that stops a command whose `timeoutMs` ran out: `SIGTERM` when absent, which is what every lane that
+   * composes these relies on. A caller whose answer gates other work says `SIGKILL` (the store watch's board-counter
+   * check): that work stays shut while the command is out, and a child that ignored SIGTERM would hold it shut until
+   * it chose to die. Both `runDispatcherCommand` and `readDispatcherJson` honor it.
+   */
+  killSignal?: NodeJS.Signals;
   /** The child's environment, composed once by the lane's module — the dispatcher's own wake path looks `systemctl --user` up on `PATH`, and this server's unit may have been handed none. */
   env: NodeJS.ProcessEnv;
 };
@@ -150,6 +157,7 @@ export async function runDispatcherCommand(
   try {
     const result = await execFileAsync(dependencies.bin, [...argv], {
       timeout: dependencies.timeoutMs,
+      ...(dependencies.killSignal ? { killSignal: dependencies.killSignal } : {}),
       maxBuffer: VERB_MAX_BUFFER,
       env: dependencies.env,
       cwd: os.homedir(),
@@ -253,6 +261,7 @@ export async function readDispatcherJson(
   try {
     const answer = await execFileAsync(dependencies.bin, [...argv], {
       timeout: dependencies.timeoutMs,
+      ...(dependencies.killSignal ? { killSignal: dependencies.killSignal } : {}),
       maxBuffer,
       env: dependencies.env,
       cwd: os.homedir(),
