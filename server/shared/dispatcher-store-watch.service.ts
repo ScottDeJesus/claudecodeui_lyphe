@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 
+import { createBoardGate, type BoardGate, type BoardReading } from './dispatcher-board-gate.service.js';
 import { watchDirectory, type DirectoryWatch } from './directory-watch.service.js';
 import { pacerHomeDir } from './utils.js';
 
@@ -14,7 +15,10 @@ import { pacerHomeDir } from './utils.js';
  * Both documents are built by the dispatcher's own commands (`dispatcher status --json`,
  * `dispatcher roadmap show --json`), so what they read was measured with strace, not assumed:
  *
- *   status + roadmap   `dispatcher.db`, `dispatcher.db-wal`    the store: every commit writes the WAL
+ *   status + roadmap   `dispatcher.db`, `dispatcher.db-wal`    the store: every commit writes the WAL. Asked of the
+ *                                                                 board counter first (`dispatcher-board-gate.service.ts`):
+ *                                                                 a case run, which no board picture reads, pokes nobody,
+ *                                                                 so the roadmap's case standing follows its backstop
  *   status + roadmap   `daemon.lock`, `wake.sock`              the daemon coming up (the lock is rewritten
  *                                                                 with its pid) and going down (it unlinks
  *                                                                 its wake socket on the way out). The
@@ -57,8 +61,11 @@ import { pacerHomeDir } from './utils.js';
 
 export type StoreWatchLane = 'status' | 'roadmap';
 
-/** What one event is worth: which lanes to poke, and how long to let a burst gather first. */
-type Interest = { lanes: readonly StoreWatchLane[]; settleMs: number };
+/** A poke for these lanes, once a burst has gathered for this long. */
+type Poke = { kind: 'poke'; lanes: readonly StoreWatchLane[]; settleMs: number };
+
+/** What one event is worth: a poke, or — a write to the store's database files — a question for the board counter first. */
+type Interest = Poke | { kind: 'store-write' };
 
 export type DispatcherStoreWatch = {
   /** Registers a lane's poke; the returned function removes it. */
@@ -76,6 +83,8 @@ export type DispatcherStoreWatch = {
 
 export type DispatcherStoreWatchDependencies = {
   logError: (message: string) => void;
+  /** One reading of the dispatcher's board counter (`createBoardVersionReader`): what a write to the store's database is asked before it pokes. */
+  readBoardVersion: () => Promise<BoardReading>;
   env?: NodeJS.ProcessEnv;
 };
 
@@ -100,7 +109,12 @@ const PACER_SETTLE_MS = 10_000;
 const BOTH_LANES: readonly StoreWatchLane[] = ['status', 'roadmap'];
 const STATUS_LANE: readonly StoreWatchLane[] = ['status'];
 
-const STORE_FILES: ReadonlySet<string> = new Set(['dispatcher.db', 'dispatcher.db-wal', 'daemon.lock']);
+/** The database and its WAL: written by every commit, a regression case's run among them. */
+const DATABASE_FILES: ReadonlySet<string> = new Set(['dispatcher.db', 'dispatcher.db-wal']);
+/** The daemon's claim of its home, rewritten with its pid when it comes up. */
+const DAEMON_LOCK_FILE = 'daemon.lock';
+/** A write to the database files: the board gate pokes the lanes for it only if the board counter moved. */
+const STORE_WRITE: Interest = { kind: 'store-write' };
 /** The dial (Pause all): in the state root, which `$DISPATCHER_HOME` moves, as every record of the dispatcher is. */
 const DIAL_FILE = 'epics.flag';
 /** The other switches the document reports: read from fixed `~/.claude/state/*.flag` paths. */
@@ -119,7 +133,7 @@ function overrideOr(env: NodeJS.ProcessEnv, name: string, fallback: string): str
 }
 
 export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDependencies): DispatcherStoreWatch {
-  const { logError } = dependencies;
+  const { logError, readBoardVersion } = dependencies;
   const env = dependencies.env ?? process.env;
 
   // Where the dispatcher's own code looks (`store.home()`, `plan_runner.state.state_root`): the store
@@ -157,7 +171,7 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
    * mid-read is a whole extra read. A slow source never delays a quick one: a window already open for
    * longer than a new event asks is shortened to it.
    */
-  const mark = (interest: Interest): void => {
+  const mark = (interest: Poke): void => {
     const due = Date.now() + interest.settleMs;
     for (const lane of interest.lanes) {
       const held = pending.get(lane);
@@ -172,14 +186,26 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
     }
   };
 
-  const quickly = (lanes: readonly StoreWatchLane[]): Interest => ({ lanes, settleMs: SETTLE_MS });
+  const quickly = (lanes: readonly StoreWatchLane[]): Poke => ({ kind: 'poke', lanes, settleMs: SETTLE_MS });
 
-  /** A directory this watch keeps armed; its events are classified by `classify` and gathered by `mark`. */
+  /**
+   * The gate a write to the store's database files is asked of: made by `start` and spent by `stop`, so every start
+   * begins knowing nothing and its first check pokes. Absent, a write to those files is no concern of anyone's.
+   */
+  let gate: BoardGate | null = null;
+
+  /** Where an event goes: a poke is gathered by `mark`, a write to the database files is the gate's to ask about. */
+  const gather = (interest: Interest): void => {
+    if (interest.kind === 'poke') mark(interest);
+    else gate?.noteStoreWrite();
+  };
+
+  /** A directory this watch keeps armed; its events are classified by `classify` and gathered by `gather`. */
   const open = (dir: string, classify: (kind: 'change' | 'rename', name: string) => Interest | null): DirectoryWatch =>
     watchDirectory({
       dir,
       classify,
-      onInterest: mark,
+      onInterest: gather,
       // A watch that was blind may have missed anything: both lanes read once more.
       onRearm: () => mark(quickly(BOTH_LANES)),
       logError: (message) => logError(`[dispatcher store watch] ${message}`),
@@ -216,12 +242,21 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
 
     start(): void {
       if (sources.length > 0) return;
+      gate = createBoardGate({
+        read: readBoardVersion,
+        onMoved: () => mark(quickly(BOTH_LANES)),
+        minGapMs: SETTLE_MS,
+        logError: (message) => logError(`[dispatcher store watch] ${message}`),
+      });
       sources = [
         // The store directory. SQLite files on `change` only (see the head of this file); the daemon's
         // socket on any event, since its creation is the daemon starting and its unlinking is the daemon going.
+        // The database and its WAL are not poked for directly: the board gate asks the counter first.
         open(storeDir, (kind, name) => {
           if (name === 'wake.sock') return quickly(BOTH_LANES);
-          return kind === 'change' && STORE_FILES.has(name) ? quickly(BOTH_LANES) : null;
+          if (kind !== 'change') return null;
+          if (name === DAEMON_LOCK_FILE) return quickly(BOTH_LANES);
+          return DATABASE_FILES.has(name) ? STORE_WRITE : null;
         }),
         open(flagsDir, (_kind, name) =>
           FLAG_FILES.has(name) || (dialWithFlags && name === DIAL_FILE) ? quickly(STATUS_LANE) : null,
@@ -236,7 +271,7 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
           // The readings database is a WAL one and its readers' open/close shows up as renames and as
           // `-shm` churn (see the head); only a write to the database or its WAL is a reading.
           if (name !== 'rates.json' && kind !== 'change') return null;
-          return { lanes: STATUS_LANE, settleMs: PACER_SETTLE_MS };
+          return { kind: 'poke', lanes: STATUS_LANE, settleMs: PACER_SETTLE_MS };
         }),
         // The agents waiting for CPU: a marker appearing is an agent held back, its removal that agent starting. Only the
         // `.json` markers count: the fifo beside each is the Override's door and the atomic writes leave `.tmp` scratch names.
@@ -250,6 +285,8 @@ export function createDispatcherStoreWatch(dependencies: DispatcherStoreWatchDep
     },
 
     stop(): void {
+      gate?.stop();
+      gate = null;
       for (const watch of sources) watch.close();
       for (const watch of chains.values()) watch.close();
       for (const { timer } of pending.values()) clearTimeout(timer);

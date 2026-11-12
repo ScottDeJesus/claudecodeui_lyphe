@@ -2,6 +2,8 @@ import { execFile } from 'node:child_process';
 import os from 'node:os';
 import { promisify } from 'node:util';
 
+import { expandHome } from './utils.js';
+
 /**
  * Running the dispatcher's own command: the one subprocess every lane that talks to the dispatcher
  * goes through — a relayed verb (`runDispatcherCommand`) or a JSON document it printed
@@ -39,6 +41,21 @@ const VERB_MAX_BUFFER = 1024 * 1024;
 
 /** How much of the dispatcher's own line a refusal carries: one line names the cause, and the rest is a traceback's tail. */
 const FAILURE_LINE_CHARS = 200;
+
+/** Where the house installs the dispatcher's entry point, written the way an operator writes it on a shell. */
+const DEFAULT_DISPATCHER_BIN = '~/.claude/scripts/dispatcher';
+
+/**
+ * The dispatcher's entry point, absolute: `~/.claude/scripts/dispatcher` unless `DISPATCHER_BIN` moved it (a probe's
+ * stand-in). Every caller that runs the dispatcher reads it here and nowhere else, because a copy in each lane drifts:
+ * the day one of them learns another place, it is the only one that knows.
+ *
+ * Consumed by the dispatcher and roadmap modules (their lanes' commands), the settings module's `kickDispatcher` (a
+ * switch flip) and `server/index.ts` (the store watch's board-counter check).
+ */
+export function dispatcherBin(env: NodeJS.ProcessEnv = process.env): string {
+  return expandHome(env.DISPATCHER_BIN || DEFAULT_DISPATCHER_BIN);
+}
 
 /**
  * What the dispatcher is run with: the lane's one composition, built once by its module and handed in.

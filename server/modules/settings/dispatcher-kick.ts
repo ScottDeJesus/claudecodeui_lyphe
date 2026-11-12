@@ -1,15 +1,9 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { expandHome } from '@/shared/utils.js';
+import { dispatcherBin } from '@/shared/dispatcher-command.js';
 
 const execFileAsync = promisify(execFile);
-
-/**
- * The dispatcher's own front door (`~/.claude/scripts/dispatcher`), as the plan-runner lanes resolve
- * theirs. `DISPATCHER_BIN` moves it for a probe; the default is where the house installs it.
- */
-const DEFAULT_BIN = '~/.claude/scripts/dispatcher';
 
 /**
  * How long a kick may take before it is given up on. `kick` is a datagram to a live daemon, or a
@@ -62,7 +56,7 @@ function text(value: unknown): string {
  * with exactly four names of its own (`wake._env`), so nothing of this process's reaches a walker.
  */
 export async function kickDispatcher(): Promise<void> {
-  const bin = expandHome(process.env.DISPATCHER_BIN || DEFAULT_BIN);
+  const bin = dispatcherBin();
   try {
     const { stdout } = await execFileAsync(bin, ['kick'], { timeout: KICK_TIMEOUT_MS });
     // The answer is said on every kick rather than deduped with the failures below: it is one line

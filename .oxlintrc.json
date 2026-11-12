@@ -82,6 +82,7 @@
           "server/shared/polled-lane.service.ts",
           "server/shared/directory-watch.service.ts",
           "server/shared/dispatcher-store-watch.service.ts",
+          "server/shared/dispatcher-board-gate.service.ts",
           "server/shared/kanban-types.ts",
           "server/shared/app-types.ts",
           "server/shared/toolset-types.ts",

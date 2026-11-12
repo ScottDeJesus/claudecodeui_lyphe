@@ -81,6 +81,9 @@ import { createJevModule } from './modules/jev/index.js';
 import { createAffectedAreasModule } from './modules/affected-areas/index.js';
 import { createCarrierBulletinsModule } from './modules/carrier-bulletins/index.js';
 import { createDispatcherModule } from './modules/dispatcher/index.js';
+import { sessionlessEnv } from './shared/child-env.js';
+import { createBoardVersionReader } from './shared/dispatcher-board-gate.service.js';
+import { dispatcherBin } from './shared/dispatcher-command.js';
 import { createDispatcherStoreWatch } from './shared/dispatcher-store-watch.service.js';
 import { createRoadmapModule } from './modules/roadmap/index.js';
 import { createUniverseModule } from './modules/universe/index.js';
@@ -356,9 +359,11 @@ app.use('/api/deepseek', authenticateToken, createDeepseekModule());
 // the lane behind its websocket frame is started after `listen` and stopped on shutdown, so the
 // module has to be something both can name. The store watch is the one both dispatcher lanes read
 // from — what pokes them when the store (or a file beside it) is written — so it is built here and
-// handed to each.
+// handed to each. A write to the store's database is asked of the dispatcher's board counter before it
+// pokes, so the watch is handed the way to ask: the dispatcher's own verb, run as the lanes run theirs.
 const dispatcherStoreWatch = createDispatcherStoreWatch({
   logError: (message) => console.error(message),
+  readBoardVersion: createBoardVersionReader({ bin: dispatcherBin(), env: sessionlessEnv() }),
 });
 const dispatcher = createDispatcherModule(dispatcherStoreWatch);
 app.use('/api/dispatcher', authenticateToken, dispatcher.router);

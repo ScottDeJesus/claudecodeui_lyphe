@@ -7,7 +7,7 @@ import type { RelayAnswer, RelayOrder } from '@/shared/relayed-press-types.js';
 import type { DispatcherArc, DispatcherStateEvent, DispatcherVerb } from '@/shared/types.js';
 import { sessionlessEnv } from '@/shared/child-env.js';
 import type { DispatcherStoreWatch } from '@/shared/dispatcher-store-watch.service.js';
-import { expandHome } from '@/shared/utils.js';
+import { dispatcherBin } from '@/shared/dispatcher-command.js';
 
 import { createDispatcherAnswerRouter } from './dispatcher-answer.routes.js';
 import { readCardText, type DispatcherCardText } from './dispatcher-card-text.service.js';
@@ -42,9 +42,6 @@ import { createDispatcherWatcher } from './dispatcher-watcher.service.js';
  * lets the document's classification be proven against a fixture body with no dispatcher in
  * existence.
  */
-
-/** The dispatcher's entry point, unless the operator moved it. */
-const DEFAULT_BIN = '~/.claude/scripts/dispatcher';
 
 /**
  * How long the lane goes without reading when nothing has poked it. The document is read when
@@ -211,7 +208,7 @@ function runningChainIds(picture: DispatcherPicture): string[] {
 
 /** `storeWatch` is the one watch both dispatcher lanes share; the server entrypoint builds it and starts it before either lane. */
 export function createDispatcherModule(storeWatch: DispatcherStoreWatch): DispatcherModule {
-  const bin = expandHome(process.env.DISPATCHER_BIN || DEFAULT_BIN);
+  const bin = dispatcherBin();
   // The lane's child environment: the server's own, minus the names that say whose Claude session a verb runs in.
   const env = sessionlessEnv();
 
