@@ -52,10 +52,10 @@ import { createDispatcherWatcher } from './dispatcher-watcher.service.js';
  * (`route.peak_until`, `offpeak_at`), the pacer's projection drifting on its own clock.
  *
  * Sixty seconds because every one of those is a minute-scale fact — the shortest is that grace — and a
- * reading costs seconds of CPU (`status --json` walks every plan's chain record and asks systemd about
- * each one's armed hour): a shorter backstop would buy nothing a reader could see at the price of a
- * continuous load. It is measured from the last reading that settled, so a lane that is being poked
- * often never fires it.
+ * reading costs over a second of CPU (`status --json` walks every plan's chain record and asks systemd
+ * once for every plan's armed hour): a shorter backstop would buy nothing a reader could see at the
+ * price of a continuous load. It is measured from the last reading that settled, so a lane that is
+ * being poked often never fires it.
  */
 const BACKSTOP_MS = 60_000;
 
