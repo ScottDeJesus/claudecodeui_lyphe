@@ -9,6 +9,7 @@ import { putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useRiseOnce } from '@/modules/dispatcher/hooks/useFirstSight';
 import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
+import { CpuWaitOverride } from '@/modules/dispatcher/CpuWaitOverride';
 import { PaceOverride } from '@/modules/dispatcher/PaceOverride';
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanControls } from '@/modules/dispatcher/PlanControls';
@@ -188,7 +189,7 @@ export function PlanCard({
                 {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
                     what the PLAN is (`designing`), the badge who is doing something about it; the wait is
                     a fact about THIS plan ("before this, that"). Neither draws anything when absent. */}
-                {(plan.planner || waitsOn.length > 0 || plan.queue_hold || paceHold || plan.overridden || plan.stalled || pausedVia !== null) && (
+                {(plan.planner || waitsOn.length > 0 || plan.queue_hold || paceHold || plan.overridden || plan.cpu_wait || plan.stalled || pausedVia !== null) && (
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     {plan.planner && <PlannerBadge planner={plan.planner} />}
                     {pausedVia !== null && <PlanningPausedLine via={pausedVia} />}
@@ -208,6 +209,10 @@ export function PlanCard({
                     {(paceHold || plan.overridden) && (
                       <PaceOverride name={plan.name} hold={paceHold} overridden={plan.overridden} />
                     )}
+                    {/* The agent of this plan the runner holds back while the box's CPU is full, with its own Override: that one
+                        agent starts now and the check stays on. A fact about the agent, so it stands beside the pacer's hold and
+                        never in place of it. */}
+                    {plan.cpu_wait && <CpuWaitOverride wait={plan.cpu_wait} />}
                     {plan.stalled && (
                       <span data-plan-stalled={plan.stalled} className="min-w-0 break-words text-xs text-foreground">
                         {t(`dispatcher.stalled.${plan.stalled}`)}

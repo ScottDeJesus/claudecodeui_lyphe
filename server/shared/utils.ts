@@ -1657,6 +1657,33 @@ export function dispatchSoulsStateDir(): string {
   return expandHome(process.env.DISPATCH_SOULS_STATE_DIR || '~/.claude/state/dispatch-souls');
 }
 
+/**
+ * The pacer's door binary: the `PACER_BIN` probe seam, else the house's wrapper (`~/.claude/scripts/pacer`,
+ * in `scripts/launch-table`'s shape). Read on every call rather than at module load, so a probe that sets the
+ * seam after import redirects the door it gets.
+ *
+ * Consumers: `accounts/pacer-door.ts` (the readings it files and the projection it reads back) and the
+ * dispatch-souls module's CPU Override (`pacer cpu-release`), which are two doors of one binary.
+ */
+export function pacerBin(): string {
+  return process.env.PACER_BIN || path.join(os.homedir(), '.claude', 'scripts', 'pacer');
+}
+
+/**
+ * The pacer's home directory, by the rule the Python side keeps (`hooks/plan_runner/pacer/readings.py:home`):
+ * `PLAN_RUNNER_PACER_HOME` when set and non-blank, made absolute, else `pacer` inside the state root — which a
+ * scratch `$DISPATCHER_HOME` moves, so a probe's pacer is never the live one. `stateRoot` is the directory that
+ * holds the dispatcher's records (`dispatch-souls`, `dispatch-chains`, `pacer`); `env` is injectable for the
+ * watch that takes its environment as a dependency.
+ *
+ * Consumers: `dispatcher-store-watch.service.ts` (the readings and the waiting-agent markers it follows) and the
+ * dispatch-souls module (the marker a pin's "Waiting for CPU" is read off).
+ */
+export function pacerHomeDir(stateRoot: string, env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = (env.PLAN_RUNNER_PACER_HOME ?? '').trim();
+  return explicit ? path.resolve(expandHome(explicit)) : path.join(stateRoot, 'pacer');
+}
+
 // ---------------------------
 //----------------- DISPATCHER MODEL WORD UTILITIES ------------
 

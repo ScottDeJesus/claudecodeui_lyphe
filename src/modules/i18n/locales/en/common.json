@@ -1761,6 +1761,14 @@
     "diagram": "Diagram",
     "diagramOpen": "Open diagram full screen"
   },
+  "cpuWait": {
+    "waiting": "Waiting for CPU",
+    "line": "Waiting for CPU · {{clause}}",
+    "overrideTitle": "Start this agent now, even though the box's CPU is full. The check stays on for every other agent.",
+    "released": "Started now",
+    "notWaiting": "Already started — it was no longer waiting for CPU",
+    "refused": "Not started"
+  },
   "gutters": {
     "runner": {
       "title": "Runs"

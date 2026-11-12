@@ -45,23 +45,32 @@ export function PaceLine({ pace }: { pace?: DispatcherPace | null }) {
  * clause in the dispatcher's words, on the same rule as the queue's: the card says "Held by pace"
  * itself, so the `pace:` lead is stripped and never read twice.
  *
+ * `kind="cpu"` IS THE SAME LINE FOR THE OTHER HOLD ON A START, the box's CPU being full (`CpuWaitOverride`): the card says
+ * "Waiting for CPU" itself and the clause is the gate's own words (`cpu_wait.words`: `12.6 of 12 cores busy over the last minute`).
+ * One line and one press beside it for both, so a wait for CPU reads as a hold does everywhere on the board — muted, never an error.
+ *
  * The card draws whichever of the two holds arrived, both when both did (a plan the queue holds can carry the clause of a
  * planner outing aimed at it); a hold that is absent (an older dispatcher), empty, or only a lead draws nothing at all.
  *
- * `children` is the press that sits beside the clause (`PaceOverride`'s Override): the clause and its
+ * `children` is the press that sits beside the clause (`PaceOverride`'s Override, `CpuWaitOverride`'s): the clause and its
  * press are one unbreakable pair in the card's wrapping row, and a hold that draws nothing draws no press.
  *
- * Handles: `data-plan-pace-hold` on the line.
+ * Handles: `data-plan-pace-hold` on the line, or `data-plan-cpu-wait` on a CPU wait's.
  *
- * Used by `PaceOverride` (this module), which `PlanCard` draws after its queue line.
+ * Used by `PaceOverride` and `CpuWaitOverride` (this module), which `PlanCard`, `DispatchArcDeck` and `PlanningCard` draw.
  */
-export function PaceHoldLine({ hold, children }: { hold?: string | null; children?: ReactNode }) {
+export function PaceHoldLine({ hold, kind = 'pace', children }: { hold?: string | null; kind?: 'pace' | 'cpu'; children?: ReactNode }) {
   const { t } = useTranslation();
   const clause = (hold ?? '').replace(/^pace:\s*/, '').trim();
   if (!clause) return null;
   const line = (
-    <span data-plan-pace-hold="" className="min-w-0 break-words text-xs text-muted-foreground">
-      {t('dispatcher.paceHold', { clause, defaultValue: 'Held by pace · {{clause}}' })}
+    <span
+      {...(kind === 'cpu' ? { 'data-plan-cpu-wait': '' } : { 'data-plan-pace-hold': '' })}
+      className="min-w-0 break-words text-xs text-muted-foreground"
+    >
+      {kind === 'cpu'
+        ? t('cpuWait.line', { clause, defaultValue: 'Waiting for CPU · {{clause}}' })
+        : t('dispatcher.paceHold', { clause, defaultValue: 'Held by pace · {{clause}}' })}
     </span>
   );
   if (!children) return line;

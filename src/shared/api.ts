@@ -708,6 +708,8 @@ export const api = {
     // same read-back answer: `percent` is the whole number the file holds, 50 to 99, 95 when none is set.
     weeklyStop: () => get('/api/settings/weekly-stop'),
     saveWeeklyStop: (state: { percent: number }) => put('/api/settings/weekly-stop', state),
+    cpuLimit: () => get('/api/settings/cpu-limit'),
+    saveCpuLimit: (state: { percent: number | null }) => put('/api/settings/cpu-limit', state),
 
     // The dispatcher's park-at-peak switch — the fourth flag file on this host, and the same shape
     // as the three above for the same reason: a file the dispatcher's own process re-reads, not a
@@ -1553,9 +1555,12 @@ export const api = {
 
   // The launcher souls a session started by hand with `plan-runner soul`, read off the launcher's own
   // state root. One plain read, for the seed the `soul_launch_state` frame cannot cover: the frame
-  // is sent only on a CHANGE, so a page mounting while nothing moves has nothing to paint.
+  // is sent only on a CHANGE, so a page mounting while nothing moves has nothing to paint. `cpuRelease` is the
+  // Override of ONE launch the runner is holding back because the box's CPU is full: it starts that agent now and
+  // leaves the check on. It answers in the dispatcher verbs' own body (`stdout`), so `useVerbSend` relays it.
   dispatchSouls: {
     launches: () => get('/api/dispatch-souls/launches'),
+    cpuRelease: (launchId: string) => post(`/api/dispatch-souls/launches/${encodeURIComponent(launchId)}/cpu-release`, {}),
   },
 
   // The estate map: every tracked file in the four crawled repos, with every index the crawler
