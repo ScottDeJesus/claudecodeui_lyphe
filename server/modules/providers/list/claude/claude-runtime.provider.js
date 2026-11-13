@@ -53,6 +53,7 @@ import { chosenAccount } from '@/modules/accounts/index.js';
 import { armKeepaliveSpawn, keepaliveReadopt, mainThreadRequestOf } from './session-host/index.js';
 import { launchAccountEnv, recordLaunch } from './claude-launch-account.js';
 import { noteTerminalCommands } from './claude-command-catalog.js';
+import { noteModelRanAs } from './claude-model-catalog.js';
 import {
   createIdleCloser,
   createPromptQueue,
@@ -1770,6 +1771,14 @@ async function spawnProcess(command, options, initialWs, context, launchWhy = 'n
           // never gets one); the command catalog keeps it under the CLI version that sent it. Not awaited.
           if (Array.isArray(message.terminal_slash_commands)) {
             void noteTerminalCommands(message.claude_code_version, message.terminal_slash_commands);
+          }
+          // The frame also says which model this process's model word runs as (`fable` →
+          // `claude-fable-5-2`), which no catalog read states for a family the CLI lists by pinned id
+          // only; the model catalog keeps it under the CLI version that sent it, so the picker names
+          // that generation. A re-adopted process whose launch profile is unknown has no word to name,
+          // and a process pointed at another endpoint is not answering for Anthropic's word. Not awaited.
+          if (profile && !profile.unknown && !sdkOptions?.env?.ANTHROPIC_BASE_URL) {
+            void noteModelRanAs(message.claude_code_version, profile.model, message.model);
           }
         } else if (message.type === 'assistant') {
           turnInFlight = true;

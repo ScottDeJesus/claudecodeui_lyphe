@@ -17,7 +17,12 @@
  * - A family's ALIAS entry (`opus`, `sonnet`, `haiku` — a value that is the family's own name) is
  *   the CLI's pointer at that family's current model, so it wins whenever the catalog has one.
  * - A family with no alias (Fable) is offered through its newest PINNED entry, one whose value is
- *   the model id it runs, with or without the `[1m]` context suffix (`claude-fable-5-1[1m]`).
+ *   the model id it runs, with or without the `[1m]` context suffix (`claude-fable-5-1[1m]`). When
+ *   the house runs that family under its own word (`CLAUDE_MODEL_VALUE_BY_ALIAS`), the pinned entry
+ *   lends the row its family name and description only: the word need not run the pinned model
+ *   (2026-11-13: the catalog listed `claude-fable-5-1[1m]` while `fable` ran `claude-fable-5-2`), so
+ *   the row names the generation a chat's `init` frame reported for the word (`ranAsExtraOf`), and
+ *   the family alone until one has.
  * - Everything else is dropped: the older pinned versions, and `default`, which names a policy
  *   ("the recommended model") and duplicates a family's own entry (`POLICY_SELECTORS`).
  * A family the catalog gains appears on its own, in the catalog's order.
@@ -148,6 +153,37 @@ function compareVersions(left: readonly number[], right: readonly number[]): num
   return 0;
 }
 
+/** The key prefix under which the model catalog keeps, among its extras, what one of the house's model words ran as. */
+const RAN_AS_KEY_PREFIX = 'ranAs:';
+
+/**
+ * The model catalog extra that records what one of the house's model words ran as, built from a chat's
+ * `init` frame: `fable` reported as `claude-fable-5-2` gives `{ 'ranAs:fable': 'claude-fable-5-2' }`.
+ *
+ * Null unless `word` is a value of `CLAUDE_MODEL_VALUE_BY_ALIAS` and `reportedId` names a generation of
+ * that word's own family: a chat started on a pinned id says nothing about a word, and an id of another
+ * family (a self-hosted model answering under the house's word) is not that word's model.
+ *
+ * consumer: claude-model-catalog.ts (`noteModelRanAs`, which keeps it under the CLI version that sent the frame)
+ */
+export function ranAsExtraOf(word: unknown, reportedId: unknown): Record<string, string> | null {
+  if (typeof word !== 'string' || typeof reportedId !== 'string') return null;
+  if (!(Object.values(CLAUDE_MODEL_VALUE_BY_ALIAS) as string[]).includes(word)) return null;
+  const family = identityOf(word.replace(ONE_MILLION_SUFFIX, ''))?.family;
+  const modelId = reportedId.trim().replace(ONE_MILLION_SUFFIX, '');
+  const reported = identityOf(modelId);
+  if (!family || !reported || reported.family !== family || reported.version.length === 0) return null;
+  return { [`${RAN_AS_KEY_PREFIX}${word}`]: modelId };
+}
+
+/** What `word` ran as under this catalog's CLI version, read back from the extras: the id and its generation, or null when no chat has reported one of `family`. */
+function ranAsOf(extras: Readonly<Record<string, unknown>>, word: string, family: string): { modelId: string; version: number[] } | null {
+  const kept = extras[`${RAN_AS_KEY_PREFIX}${word}`];
+  if (typeof kept !== 'string') return null;
+  const identity = identityOf(kept);
+  return identity && identity.family === family && identity.version.length > 0 ? { modelId: kept, version: identity.version } : null;
+}
+
 /** A catalog entry this module can read at all: a value and a name, both non-empty strings. */
 const isReadableEntry = (entry: unknown): entry is ModelInfo => {
   const candidate = entry as Partial<ModelInfo> | null;
@@ -159,14 +195,21 @@ const isReadableEntry = (entry: unknown): entry is ModelInfo => {
  * The picker's definition, built from one catalog answer, or null when the answer offers nothing the
  * picker can show (the caller treats that exactly like a failed read).
  *
+ * `extras` is what the model catalog keeps beside that answer for the same CLI version: what each of the
+ * house's model words ran as (`ranAsExtraOf`). A row offered through a pinned entry yet run under the
+ * house's word takes its generation from there, never from the pinned entry's own text.
+ *
  * `LABELS_BY_MODEL_ID` carries the picker's name (`shownNameOf`) for every concrete model id the catalog
  * lists, offered or not, so a stored turn is captioned with the generation its model has:
  * `claude-sonnet-5-5` reads "Sonnet 5.5" and the `claude-sonnet-5` that answered earlier turns reads
- * "Sonnet 5".
+ * "Sonnet 5". It also carries the id a house word ran as, under the name its row shows.
  *
- * consumer: claude-model-catalog.ts (on every fresh read, and on every catalog loaded from disk)
+ * consumer: claude-model-catalog.ts (on every fresh read, on every catalog loaded from disk, and whenever an extra is kept)
  */
-export function buildClaudeModelsDefinition(catalog: readonly unknown[]): ProviderModelsDefinition | null {
+export function buildClaudeModelsDefinition(
+  catalog: readonly unknown[],
+  extras: Readonly<Record<string, unknown>> = {},
+): ProviderModelsDefinition | null {
   // Insertion order is first appearance in the catalog, and a newer entry replacing an older one
   // keeps its family's place — so the rows come out in the CLI's own order.
   const newestByFamily = new Map<string, {
@@ -200,12 +243,25 @@ export function buildClaudeModelsDefinition(catalog: readonly unknown[]): Provid
     if (replaces) newestByFamily.set(identity.family, { entry, shown, version: identity.version, isAlias });
   }
 
-  const options: ProviderModelOption[] = [...newestByFamily].map(([family, { entry, shown }]) => ({
-    value: storedValueOf(family) ?? entry.value,
-    label: shown.label,
-    ...(shown.description ? { description: shown.description } : {}),
-    ...effortFor(entry.supportsEffort ? entry.supportedEffortLevels ?? [] : []),
-  }));
+  const options: ProviderModelOption[] = [...newestByFamily].map(([family, { entry, shown, isAlias }]) => {
+    const value = storedValueOf(family) ?? entry.value;
+    // A row offered through a PINNED entry yet run under the house's word: the entry's text names the
+    // pinned model's generation, which the word need not run. The row keeps the entry's family name and
+    // description, and its generation is the one a chat reported for the word — none until one has.
+    let named = shown;
+    if (!isAlias && value !== entry.value) {
+      const familyName = /\d/.test(entry.displayName) ? family.charAt(0).toUpperCase() + family.slice(1) : entry.displayName;
+      const ranAs = ranAsOf(extras, value, family);
+      named = { label: ranAs ? `${familyName} ${ranAs.version.join('.')}` : familyName, description: shown.description };
+      if (ranAs) labelsByModelId[ranAs.modelId] ??= named.label;
+    }
+    return {
+      value,
+      label: named.label,
+      ...(named.description ? { description: named.description } : {}),
+      ...effortFor(entry.supportsEffort ? entry.supportedEffortLevels ?? [] : []),
+    };
+  });
   if (options.length === 0) return null;
 
   return {
