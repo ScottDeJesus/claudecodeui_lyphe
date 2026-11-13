@@ -2965,7 +2965,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.mjs, /
 | In flight, read after an 800 ms settle | decks in the served order; each deck's note `<position> · <turn word>`; dial readout `<running> running`; no sideways overflow |
 
 ## fails when
-- The live box is paused, or `route.epics` carries a key beyond `paused` and `running`: `route.epics is exactly paused and running, and the live box is not paused` is the check; the header's readout is then compared with the served census.
+- The live box is paused, or `route.epics` carries a key beyond `paused`, `planning_through` and `running`: `route.epics is exactly paused, planning_through and running, and the live box is not paused` is the check; the header's readout is then compared with the served census.
 - The live queue is empty.
 - `dispatcher queue`'s line shape changes (`listedQueue` parses `N. <name>.arc — <its turn|waiting|paused> — `).
 
@@ -3760,6 +3760,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/Affec
 - Refusal remedy for the total-size reason: blank shelf → "the file is empty, so there is no entry to trim — shorten this body."; shelf with content → "trim an entry before adding another."
 - Landing mode: the `rules`, `requirements` and `claude` steps carry `readOnly` (`memory-plan.ts`), and `memory-assert.ts::atomicWrite` sets the temp file to 0444 BEFORE the rename — the shelf never exists writable at its real path, so a stray `> RULES.md` fails with "Permission denied". The rename needs only the directory's write bit, so the door passes over the 0444 file it replaces. Memory notes and the project `MEMORY.md` keep a plain write's mode. `hooks/shelf_health.py` re-applies 0444 at every main session start (`SHELF_MODE` there, `SHELF_FILE_MODE` here: one number in two languages).
 - Restore a wiped shelf: queue its full text as ONE `rules` / `requirements` card, before any other entry, with no line reworded. `commands/remember.md` §2 gives the same instruction to the proposing session.
+- Reach after landing: `rules` and `requirements` entries reach main sessions through the SessionStart loader (MAN-803). A `requirements` entry also reaches the planner Eupalinos at his next launch: the Approve is a rename inside this server and no hook sees it, so the dispatcher regenerates his shim when the shelf is newer (MAN-9720).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-assert.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-caps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-compose.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-plan.ts, /home/lyphe/.claude/commands/remember.md
 

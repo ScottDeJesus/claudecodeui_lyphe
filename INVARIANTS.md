@@ -24389,13 +24389,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-do
 ## INV-11297 — The Planning card — what an editor of its files must not break
 
 Reference: MAN-9671 (the card, its words and its two standing proofs).
-1. **The planning press has one home: a line of the Planning card.** `PlanCard`, `DispatchArcDeck`, `PlanControls` and `ArcControls` say `Planning paused` (`PlanningPausedLine`) and draw no Pause planning or Resume planning. why: the operator asked for one place to look and to press.
+1. **The planning press has one home: a line of the Planning card.** `PlanCard`, `DispatchArcDeck`, `PlanControls` and `ArcControls` say `Planning paused` (`PlanningPausedLine`) and draw no Pause planning or Resume planning. why: the operator asked for one place to look and to press. THE HOUSE-WIDE PRESS has one home too: the strip under the card's title (`PlanningDialPress`, drawn from `dialPress`), which lets planning through Pause all and holds it again for the whole house; it is never drawn on a line and a line's press is never drawn in it, because the two brake different things (Pause all's planning, and one subject's planning).
 2. **A line keeps its place.** Lines stand in the order their subjects were made (`created_at`, then name), loose epics last; never in the outings' order. why: Resume planning sends an outing back as a NEW row and would move the line just pressed.
 3. **The whole lane is asked.** `planningLines` takes the frame's own `plans` and `arcs`, never the drawn lists. why: a hidden feature's designer is still out.
 4. **A feature held only by its epic's pause has no line.** The epic's line says `Planning paused` and holds the one Resume; the dispatcher refuses the feature's own lift, naming the epic's.
 5. **A hold has one press.** A line draws its outing's pace hold and Override only while `PlanningLine.drawn` is false (the subject has no card or deck on this screen); a drawn card or deck draws its own.
 6. **An epic is owed Pause planning only for an outing of its own** (`arc.planner`). Features being planned with nothing of the epic's own out leave no line and no epic-wide press; each feature's line is the brake.
-7. **A press is a reading of the document, never chosen on the client.** `featurePress`, `epicPress`, `loosePress` and `planningPausedVia` read `planning_paused` by truthiness (an absent key is no pause) and draw a press only where the dispatcher would take it. why: a press drawn where it would refuse.
+7. **A press is a reading of the document, never chosen on the client.** `featurePress`, `epicPress`, `loosePress` and `planningPausedVia` read `planning_paused` by truthiness (an absent key is no pause) and draw a press only where the dispatcher would take it. `dialPress` reads `route.epics` the same way: `null` or `paused` false draws none (the dispatcher refuses both dial words with Pause all off), `planning_through` is read by truthiness (an absent key is planning held), and Resume planning is drawn only while a QUEUED outing waits on the pause (`!line.paused`; a line's own pause has its own Resume). why: a press drawn where it would refuse.
 8. **A put-away subject keeps its press.** `featurePress` and `epicPress` carry no `hidden` clause: a hide holds the walk and not the planning, the dispatcher refuses neither verb on a hidden plan, and the Planning card lists its outing. A parked feature is read off `plan.state`, never `status`, because a hide outranks `parked` in the status word. why: a hidden feature that is paused would read `Planning paused` with no Resume until it was shown; a status-read `parked` would give a put-away parked feature a Pause planning with nothing being planned.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningLines.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningPause.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts
@@ -25581,3 +25581,31 @@ measured 2026-11-09 by chain chain-kaylee-panel-drag-root-cause-20261109-135843-
 probe-key: bc4b3dd014ba540017a12e5cb20812a395391928
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFinePointer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ViewBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-mouse-on-touch.mjs
+
+## INV-11805 — probe — (MEDIUM) The rule this build adds is in 22 manual rows, and none of them reaches an editor of the two files that own it
+
+(MEDIUM) The rule this build adds is in 22 manual rows, and none of them reaches an editor of the two files that own it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# For each code file this build changed: which three rows does the edit hook serve on a first write-touch, and do any of them say planning can be let through Pause all?
+S=~/.claude/scripts/docstore
+R=/home/lyphe/.claude
+for f in hooks/dispatcher/epic_dial.py hooks/dispatcher/planner_holds.py hooks/dispatcher/planner_rule.py hooks/dispatcher/pace_demand.py claudecodeui_lyphe/server/modules/dispatcher/dispatcher-epics.reader.ts claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts; do
+  served=$($S govern "$R/$f" --touch write --limit 3 --text | cut -d' ' -f1)
+  says=""
+  for t in $served; do $S get "$t" --text | grep -q -E 'planning_through|run-planning|holds_planners|planning exception' && says="$says $t"; done
+  printf '%-72s served: %s | say the exception:%s\n' "$f" "$(echo $served)" "${says:- none}"
+done
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today every one of the six lines ends `say the exception: none`; cured when `epic_dial.py` and `planner_holds.py` each list a row (the new invariant) that names `planning_through` or `holds_planners` among their three
+```
+
+measured 2026-11-12 by chain chain-resume-planning-under-pause-all-20261112-192137-efc1, finding M1, MEDIUM
+probe-key: 84f30dbd60464c6fd1a4c80734f87c4e59d83ae5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningPause.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/planning-dial-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/planning-dial-press/press.mjs

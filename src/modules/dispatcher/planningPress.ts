@@ -1,4 +1,12 @@
-import type { DispatcherArc, DispatcherPlan, DispatcherPlanner, PlanningPausedVia, PlanningPress } from '@/shared/types';
+import type {
+  DispatcherArc,
+  DispatcherPlan,
+  DispatcherPlanner,
+  DispatcherRoute,
+  PlanningLine,
+  PlanningPausedVia,
+  PlanningPress,
+} from '@/shared/types';
 
 /**
  * Whose planning pause stands on this feature: its own (`own`), else its epic's (`epic` — the feature carries `null` of its own then, and the
@@ -81,4 +89,25 @@ export function epicPress(arc: DispatcherArc): PlanningPress | null {
  */
 export function loosePress(planner: DispatcherPlanner): PlanningPress {
   return planner.planning_paused ? 'resume' : 'pause';
+}
+
+/**
+ * Which press the Planning card's HEAD draws for PAUSE ALL'S PLANNING EXCEPTION (`route.epics`, `dispatcher epics run-planning` /
+ * `hold-planning`) — one press for the whole house, apart from the lines' own per-subject brake, and a reading of the frame like the
+ * others here:
+ *
+ * - none while Pause all is off (`epics.paused` false: planning already runs, and the dispatcher refuses either word) and against a
+ *   dispatcher older than the census (`epics` null: the controls are not drawn);
+ * - Pause planning while planning is let through (`planning_through`), whether or not anything is being planned: the exception is a
+ *   standing fact the operator must be able to see and take back;
+ * - Resume planning while Pause all holds planning AND a line is waiting on it — a QUEUED outing whose subject's own planning pause is
+ *   not what holds it (that line says `Planning paused` and has its own Resume). An outing already out finishes under Pause all, an
+ *   ended one is the stalled card's, and a card with nothing queued has nothing to resume.
+ *
+ * Used by `PlanningCard`, for the strip under its title.
+ */
+export function dialPress(epics: DispatcherRoute['epics'], lines: readonly PlanningLine[]): PlanningPress | null {
+  if (epics === null || !epics.paused) return null;
+  if (epics.planning_through) return 'pause';
+  return lines.some((line) => !line.paused && line.outing?.state === 'queued') ? 'resume' : null;
 }

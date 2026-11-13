@@ -61,11 +61,21 @@ function queueArgs(body: unknown): string[] | null {
   return null;
 }
 
-/** The seven words the epic dial takes (`hooks/dispatcher/epic_dial.py:WORDS`): a limit of `1` to `5`, and the pause. The only `word` values the epics route relays. */
-const EPIC_WORDS: readonly string[] = ['pause', 'resume'];
+/**
+ * The four words the epic dial takes (`hooks/dispatcher/epic_dial.py:WORDS`): Pause all and Resume all, and the pair that
+ * lets planning through Pause all and holds it again. The only `word` values the epics route relays.
+ */
+const EPIC_WORDS: readonly string[] = ['pause', 'resume', 'run-planning', 'hold-planning'];
 
-/** The 400 sentence the epics route answers with when the body names neither word. */
-const EPICS_BODY_ERROR = 'word must be one of pause or resume';
+/**
+ * The two dial words that are the Planning card's press (`dispatcher epics run-planning|hold-planning`): the card
+ * is their door, so the route spells `--by app:card` itself — a request can neither pick the door nor leave it out.
+ * Pause all and Resume all take no `--by` and keep the argv they always had.
+ */
+const PLANNING_EPIC_WORDS: readonly string[] = ['run-planning', 'hold-planning'];
+
+/** The 400 sentence the epics route answers with when the body names none of the four words. */
+const EPICS_BODY_ERROR = 'word must be one of pause, resume, run-planning or hold-planning';
 
 /** The 400 sentence the start route answers with when a body names anything: the board's Start takes none. */
 const START_BODY_ERROR = 'the board\'s Start takes no body';
@@ -165,7 +175,7 @@ function statusForVerb(result: DispatcherVerbResult): number {
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
  * word from the closed set of eighteen verbs, and — where the verb takes one — a word from the three
- * model words, the queue's three moves or the epic dial's seven words.
+ * model words, the queue's three moves or the epic dial's four words.
  *
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
  * first: the two together are what keep a handover from being drawn as an empty plan list.
@@ -424,8 +434,9 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // An epic moved in the queue (`dispatcher queue <arc> --before <arc> | --last | --at N`): In flight's drag.
   router.post('/arcs/:name/queue', arcRelay('queue', queueArgs, QUEUE_BODY_ERROR));
 
-  // The epic dial's one word (`dispatcher epics <pause|resume>`): a BOARD verb, so it names
+  // The epic dial's one word (`dispatcher epics <pause|resume|run-planning|hold-planning>`): a BOARD verb, so it names
   // no plan and no arc and the name the relay is handed is empty (`runDispatcherVerb` leaves it out of the argv).
+  // The Planning card's two words travel with `--by app:card` (`PLANNING_EPIC_WORDS`); Pause all's two do not.
   // THE BODY IS EXACTLY `{ "word": … }`, as the queue's is exactly one move: a body carrying another key is
   // not one this route knows, and is a 400 like any other.
   router.post('/epics', async (request, response, next) => {
@@ -438,7 +449,8 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
       return;
     }
     try {
-      const result = await dependencies.runVerb('epics', '', [word]);
+      const verbArgs = PLANNING_EPIC_WORDS.includes(word) ? [word, '--by', 'app:card'] : [word];
+      const result = await dependencies.runVerb('epics', '', verbArgs);
       response.status(statusForVerb(result)).json(result);
     } catch (error) {
       next(error); // one this lane has no word for: the app's error handler, as every route here

@@ -1382,6 +1382,14 @@
       "paused": "Planning paused",
       "pausedWithEpic": "Planning paused with its epic"
     },
+    "planningDial": {
+      "held": "Pause all is holding planning. Resume planning lets it run; tasks and the queue stay held.",
+      "runs": "Planning runs under Pause all. Tasks and the queue stay held.",
+      "resumeTitle": "Let designing and planning run while Pause all is on. Tasks and the queue stay held, and Resume all drops this.",
+      "pauseTitle": "Hold planning again under Pause all. Outings already out finish.",
+      "done": "Planning",
+      "refused": "Planning not changed"
+    },
     "planning": {
       "title": "Planning",
       "empty": "Nothing being planned",

@@ -1316,8 +1316,9 @@ export const api = {
     // queue); nothing is optimistic, and the next `dispatcher_state` frame draws the order the store holds.
     arcQueue: (name: string, move: DispatcherQueueMove) =>
       post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/queue`, move),
-    // The epic dial's one word (`dispatcher epics <word>`): a limit of `1` to `5`, or `pause` /
-    // `resume` — a BOARD verb that names no plan and no arc, so its route has no name in it.
+    // The epic dial's one word (`dispatcher epics <word>`): `pause` / `resume` (Pause all), or `run-planning` /
+    // `hold-planning` (planning let through Pause all, and held again) — a BOARD verb that names no plan and no arc,
+    // so its route has no name in it.
     epics: (word: DispatcherEpicsWord) => post('/api/dispatcher/epics', { word }),
     // The board's one Start (`dispatcher start`): every plan held for its first Start let go at once, the
     // queue and the dial then ordering them. A BOARD verb like `epics`, with no name and no body.
