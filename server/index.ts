@@ -80,6 +80,7 @@ import { createAgentLaunchModule } from './modules/agent-launch/index.js';
 import { createJevModule } from './modules/jev/index.js';
 import { createAffectedAreasModule } from './modules/affected-areas/index.js';
 import { createCarrierBulletinsModule } from './modules/carrier-bulletins/index.js';
+import { createUploadRunsModule } from './modules/upload-runs/index.js';
 import { createDispatcherModule } from './modules/dispatcher/index.js';
 import { sessionlessEnv } from './shared/child-env.js';
 import { createBoardVersionReader } from './shared/dispatcher-board-gate.service.js';
@@ -402,6 +403,15 @@ app.use('/api/affected-areas', authenticateToken, affectedAreas.router);
 // secret. Read-only — four GET routes, and an id is checked before a byte leaves.
 const carrierBulletins = createCarrierBulletinsModule();
 app.use('/api/carrier-bulletins', authenticateToken, carrierBulletins.router);
+
+// Upload runs — shadow-connector's `/api/upload-agent-runs`, what each upload run did and the feed that tells
+// of it as it happens, forwarded over loopback (protected). The same one hop as the two lanes above, for the
+// same reason: that surface is internal-caller gated (R-CAP-11) and the browser never holds the secret.
+// Read-only — five GET routes, an id is checked before a byte leaves, and two of them are event streams the
+// lane relays as they arrive and closes when the browser goes (an EventSource's `?token=` is read by
+// `authenticateToken` here and never forwarded).
+const uploadRuns = createUploadRunsModule();
+app.use('/api/upload-runs', authenticateToken, uploadRuns.router);
 
 // The launcher souls a session started by hand — the poll behind the `soul_launch_state` frame that
 // pins each one in its own chat's rows (protected). Built out here for the same

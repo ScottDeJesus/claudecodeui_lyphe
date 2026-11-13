@@ -45,6 +45,7 @@ const VIEWS: readonly { id: CerberusView; labelKey: string; hintKey: string }[] 
   { id: 'history', labelKey: 'cerberus.fleet.tabs.history', hintKey: 'cerberus.fleet.tabs.historyHint' },
   { id: 'tours', labelKey: 'cerberus.tours.tab', hintKey: 'cerberus.tours.tabHint' },
   { id: 'bulletins', labelKey: 'cerberus.bulletins.tab', hintKey: 'cerberus.bulletins.tabHint' },
+  // FILL: uploads-row
 ];
 
 /** A view arriving: Verve's page entrance at the prototype's .45 s. It plays again each time a view is shown. */
@@ -249,6 +250,7 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
             <KeptView id="bulletins" view={view} shownOnce={shownOnce} label={t('cerberus.bulletins.tab')}>
               <BulletinsView />
             </KeptView>
+            {/* FILL: uploads-panel — mounted on first show inside a KeptView, handed shown */}
           </>
         )}
       </ScrollArea>

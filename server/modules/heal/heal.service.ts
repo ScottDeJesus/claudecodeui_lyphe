@@ -22,12 +22,26 @@ const execFileAsync = promisify(execFile);
  * worker rejects rather than a second command.
  */
 
+const BYTES_PER_MIB = 1024 * 1024;
+
 /**
  * How much the worker may say. `--status` is one JSON object of tallies and `--ignore-add` is one
- * line, so this is thousands of times the real output; it is stated rather than left to the default
- * so the number is visible beside the payload that has to reason about overflowing it.
+ * line, so this is thousands of times the real output of the doors that use it; it is stated rather
+ * than left to the default so the number is visible beside the payload that has to reason about
+ * overflowing it. The sessions door's answer grows with the rows it is asked for, so it has its own
+ * ceiling below.
  */
-const OUTPUT_MAX_BYTES = 4 * 1024 * 1024;
+const OUTPUT_MAX_BYTES = 4 * BYTES_PER_MIB;
+
+/**
+ * How much the sessions door may say. Its answer grows with the rows of the sessions asked, not with the tab: the 200 busiest
+ * sessions of the ledger measured 7.7 MB on 2026-11-13 (5,858 rows, a row's `detail` averaging 869 characters), and the 4 MiB
+ * above answered that legal request with a 503 that named nothing. 32 MiB is four times it; past it the failure names the size.
+ */
+const SESSIONS_OUTPUT_MAX_BYTES = 32 * BYTES_PER_MIB;
+
+/** The code `execFile` rejects with when the worker said more than `maxBuffer`: it kills the worker and leaves stderr empty. */
+const OUTPUT_OVERFLOW_CODE = 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER';
 
 /** Wall-clock ceiling for the summary. The worker opens its ledger and prints. */
 const STATUS_TIMEOUT_MS = 20_000;
@@ -37,6 +51,13 @@ const IGNORE_TIMEOUT_MS = 20_000;
 
 /** Wall-clock ceiling for one kind's rows: a bounded read off the ledger, newest row first. */
 const KIND_TIMEOUT_MS = 20_000;
+
+/**
+ * Wall-clock ceiling for the rows and heals of a set of claude sessions. The worker reads the ledger once and builds a card
+ * per heal, and when a row of theirs is still live it asks the whole-ledger regression read as well, which measured 1.1 s to
+ * 2.7 s on a busy box. Its own number beside the kind's, because the two reads change independently.
+ */
+const SESSIONS_TIMEOUT_MS = 20_000;
 
 /**
  * Wall-clock ceiling for a cycle door. Both doors run the worker's own bounded wait for the ledger's
@@ -60,7 +81,8 @@ export type HealIgnoreAdd = { added: number; swept: number };
  * Why a heal question went unanswered.
  *
  *  - `unreachable`  the worker never answered: not on this host, or torn down before it spoke.
- *  - `unreadable`   the worker answered, and it was not the one JSON object its contract promises.
+ *  - `unreadable`   the worker answered, and the answer could not be carried: not the one JSON object its
+ *                   contract promises, or more of it than this lane takes.
  */
 export type HealFault = 'unreachable' | 'unreadable';
 
@@ -78,6 +100,13 @@ export type HealResult<T> =
  */
 export type HealCycleAnswer = Record<string, unknown>;
 
+/**
+ * What `--sessions` answers, carried WHOLE: `{ sessions, items, heals }` — the friction rows a set of claude sessions filed and the
+ * heals that took or cured them. Not reshaped here, for `HealSummary`'s reason: the Uploads view reads it by the names the
+ * worker printed, and a second place that wrote the shape down would be a second place for it to drift.
+ */
+type HealSessionsAnswer = Record<string, unknown>;
+
 export type HealServiceDependencies = {
   /** The worker's entry point, absolute — `~/.claude/scripts/heal-reflex` unless the env moved it. */
   bin: string;
@@ -88,6 +117,8 @@ export type HealService = {
   summary(): Promise<HealResult<HealSummary>>;
   /** The rows filed under one door's word, newest first, as the worker's own kind door answers them. */
   kind(kind: string): Promise<HealResult<unknown>>;
+  /** The rows a set of claude sessions filed and the heals that took or cured them, as the worker's sessions door answers. */
+  sessions(ids: readonly string[]): Promise<HealResult<HealSessionsAnswer>>;
   /** The ignore table, seeded rows included. */
   ignore(): Promise<HealResult<unknown>>;
   /** Add one ignore row, and sweep the live rows its pattern already matches. */
@@ -110,17 +141,26 @@ async function ask(
   bin: string,
   argv: string[],
   timeoutMs: number,
+  maxBytes: number = OUTPUT_MAX_BYTES,
 ): Promise<HealResult<Record<string, unknown>>> {
   let stdout: string;
   try {
     stdout = (await execFileAsync(bin, argv, {
       timeout: timeoutMs,
-      maxBuffer: OUTPUT_MAX_BYTES,
+      maxBuffer: maxBytes,
       env: userFacingEnv(),
       cwd: os.homedir(),
     })).stdout;
   } catch (error) {
-    const failure = error as { stderr?: unknown };
+    const failure = error as { stderr?: unknown; code?: unknown };
+    if (failure.code === OUTPUT_OVERFLOW_CODE) {
+      // A worker that talked past the bound has nothing on stderr to name it, so the size is named here.
+      return {
+        ok: false,
+        reason: 'unreadable',
+        message: `the heal worker's answer passed the ${maxBytes / BYTES_PER_MIB} MiB this lane carries`,
+      };
+    }
     const said = typeof failure.stderr === 'string' ? failure.stderr.trim() : '';
     return {
       ok: false,
@@ -152,6 +192,12 @@ export function createHealService({ bin }: HealServiceDependencies): HealService
     // The kind is the key the caller asked by, handed to the worker as ONE argument (the argv array
     // is the boundary: a kind name is not a trusted token and never becomes a shell string).
     kind: (kind: string) => ask(bin, ['--kind', kind], KIND_TIMEOUT_MS),
+
+    // The ids travel as ONE argument, comma-joined, and the argv array is the boundary again. The route has already held them
+    // to 1 to 200 lowercase uuids; the worker holds them to the same and exits 2 on anything else, and on a ledger it could not
+    // read (which would otherwise answer as "no friction"), and `ask` reports its sentence.
+    sessions: (ids: readonly string[]) =>
+      ask(bin, ['--sessions', ids.join(',')], SESSIONS_TIMEOUT_MS, SESSIONS_OUTPUT_MAX_BYTES),
 
     /**
      * The ignore table, sliced off ONE summary read rather than a second transport: the payload the

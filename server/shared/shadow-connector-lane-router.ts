@@ -2,13 +2,15 @@ import express from 'express';
 
 import { relayBudgetOf } from './gemini-budget-relay.js';
 import type { LaneAnswer, ShadowConnectorLane } from './shadow-connector-lane.js';
+import { hangUpSignal, relayEventStream } from './shadow-connector-lane-stream.js';
 
 /**
  * The routes of a lane to shadow-connector — the one allowlist router every lane's routes file hands its
- * table to. Consumers: the `affected-areas` module (the Tours lane, `/api/affected-areas`) and the
- * `carrier-bulletins` module (the bulletins lane, `/api/carrier-bulletins`). Each module owns its table,
- * its id rules and its upstream prefix; this file owns what the two lanes would otherwise each write the
- * same way, so the rules below hold for both and cannot drift apart:
+ * table to. Consumers: the `affected-areas` module (the Tours lane, `/api/affected-areas`), the
+ * `carrier-bulletins` module (the bulletins lane, `/api/carrier-bulletins`) and the `upload-runs` module
+ * (the upload runs' lane, `/api/upload-runs`). Each module owns its table, its id rules and its upstream
+ * prefix; this file owns what the lanes would otherwise each write the same way, so the rules below hold
+ * for all of them and cannot drift apart:
  *
  *  - A method-and-path pair that is not a row of the table never reaches shadow-connector: the lane answers
  *    its own 404, so the request is neither forwarded nor handed to the app's catch-all.
@@ -17,6 +19,9 @@ import type { LaneAnswer, ShadowConnectorLane } from './shadow-connector-lane.js
  *    dot or an escape, which is why filling them into the path is safe).
  *  - An upstream answer keeps its status and its JSON untouched; only the lane's own faults carry a body of
  *    the lane's making, and that is `{ error }`.
+ *  - A `stream` row is an event stream: the lane's `stream` opens it and this router writes it, as it
+ *    arrives. Only the row's declared query keys are forwarded, so the `token` an `EventSource` carries
+ *    (it cannot set a header) never leaves this server.
  *
  * Routes here validate and translate and do nothing else: no secret is read, no socket is opened. The
  * forwarder (`./shadow-connector-lane`) owns the one transport and the secret behind it.
@@ -61,18 +66,23 @@ export const SHA256_RULE: LaneRule = patternRule(/^[0-9a-f]{64}$/, '64 lowercase
  */
 export type LaneImage = { contentType: string; noun: string; signature: Buffer };
 
-/**
- * One row of a lane's allowlist. Consumers: the `affected-areas` and `carrier-bulletins` routes, each of
- * which declares its whole contract as a list of these.
- */
-export type LaneRoute = {
-  method: 'get' | 'post' | 'put';
+/** What every row of a lane's allowlist declares, whatever it answers. */
+type LaneRowBase = {
   /** The route in Express's own form; the upstream path is this with each `:name` filled by its checked id. */
   route: string;
+  /**
+   * The bound on the call. On a `stream` row it bounds connecting, and reading any answer that is not an event
+   * stream; an open event stream has no bound.
+   */
   timeoutMs: number;
-  expect: 'json' | 'bytes';
   /** Query keys that are forwarded, each with its rule. Any other key is dropped here, not forwarded. */
   query?: Record<string, LaneRule>;
+};
+
+/** A row answered once: a JSON document, or the bytes of an image. */
+type LaneForwardedRoute = LaneRowBase & {
+  method: 'get' | 'post' | 'put';
+  expect: 'json' | 'bytes';
   /** `object`: the request's JSON object is forwarded. `none`: the route reads no body and none is sent. */
   body: 'object' | 'none';
   /**
@@ -84,8 +94,20 @@ export type LaneRoute = {
 };
 
 /**
- * What a lane's routes file hands `createLaneRouter`. Consumers: `affected-areas.routes.ts` and
- * `carrier-bulletins.routes.ts`.
+ * A row answered by an event stream, held open and relayed as it arrives. GET with no body, because that is
+ * all an `EventSource` can send; the browser's `Last-Event-ID` rides along when it is a whole number.
+ */
+type LaneStreamRoute = LaneRowBase & { method: 'get'; expect: 'stream'; body: 'none' };
+
+/**
+ * One row of a lane's allowlist. Consumers: the `affected-areas`, `carrier-bulletins` and `upload-runs`
+ * routes, each of which declares its whole contract as a list of these.
+ */
+export type LaneRoute = LaneForwardedRoute | LaneStreamRoute;
+
+/**
+ * What a lane's routes file hands `createLaneRouter`. Consumers: `affected-areas.routes.ts`,
+ * `carrier-bulletins.routes.ts` and `upload-runs.routes.ts`.
  */
 export type LaneRouterDefinition = {
   /** The lane's name in its own 404 sentence: `not a route of the <lane> lane`. */
@@ -97,11 +119,14 @@ export type LaneRouterDefinition = {
   allowlist: LaneRoute[];
   /** The forwarder's `forward`. */
   forward: ShadowConnectorLane['forward'];
+  /** The forwarder's `stream`. A lane with a `stream` row hands it in; a table with one and no `stream` is refused when the router is built. */
+  stream?: ShadowConnectorLane['stream'];
   /**
    * The image type this lane's `bytes` routes answer unless a row names its own (`LaneRoute.image`): see `LaneImage`
-   * for what a different Content-Type or signature makes of a 2xx.
+   * for what a different Content-Type or signature makes of a 2xx. A lane with no `bytes` row names none; a `bytes`
+   * row that has neither this nor its own is refused when the router is built.
    */
-  image: LaneImage;
+  image?: LaneImage;
   /**
    * Upstream response headers a JSON answer carries back to the browser, named in lower case (the
    * forwarder's `LaneRequest.passHeaders`). Absent carries none, so a lane reads only what it names: the
@@ -168,13 +193,47 @@ function forwardedQuery(spec: LaneRoute, request: express.Request): Record<strin
   return query;
 }
 
+/** What both modes send about a request that passed its checks: where, with which query, from whom, under which budget. */
+type TranslatedRequest = {
+  path: string;
+  query: Record<string, string>;
+  actingUser: string | null;
+  budget: string | null;
+};
+
+function translated(spec: LaneRoute, upstreamPrefix: string, request: express.Request): TranslatedRequest {
+  // The ids passed their rules, so filling them in cannot add a segment, a dot or an escape.
+  const path = spec.route.replace(/:(\w+)/g, (_match, name: string) => String(request.params[name]));
+  return {
+    path: `${upstreamPrefix}${path}`,
+    query: forwardedQuery(spec, request),
+    actingUser: actingUserOf(request),
+    // Judged here, off the request's own socket and headers, so a caller that reaches the tailnet
+    // listener directly from off this box, or through a reverse proxy's front, is `production`
+    // whatever header it sent.
+    budget: relayBudgetOf(request),
+  };
+}
+
+/**
+ * The browser's `Last-Event-ID` when the engine can use it: the whole number of the last frame the browser saw.
+ * Anything else is dropped rather than forwarded — an `EventSource` cannot be asked to fix a header, and the
+ * engine ignores a value that is not a number.
+ */
+const LAST_EVENT_ID = /^\d{1,10}$/;
+
+function lastEventIdOf(request: express.Request): string | null {
+  const value = request.headers['last-event-id'];
+  return typeof value === 'string' && LAST_EVENT_ID.test(value) ? value : null;
+}
+
 /**
  * One answer, written. An upstream answer keeps its status and its JSON untouched — the lane never
  * reshapes a body, so the browser reads exactly what the engine wrote — and carries back the headers
  * the lane named (`passHeaders`), none otherwise. A 2xx image is relayed as bytes, under the one type
  * the route expects (its row's own `image`, else the lane's) and a year's cache (it is keyed by the sha256 of what it shows).
  */
-function emit(response: express.Response, answer: LaneAnswer, image: LaneImage): void {
+function emit(response: express.Response, answer: LaneAnswer, image: LaneImage | undefined): void {
   if (!answer.ok) {
     response.status(STATUS_FOR_FAULT[answer.reason]).json({ error: answer.message });
     return;
@@ -185,11 +244,13 @@ function emit(response: express.Response, answer: LaneAnswer, image: LaneImage):
   }
   // An image route that answers 2xx with anything but the expected type, or with bytes that are not that
   // format (an error page stamped `image/png`), is a server this lane has no word for: nothing is cached.
+  // A row with no image type is refused when the router is built, so `image` is missing here only for the types' sake.
   if (
+    image === undefined ||
     !answer.contentType.toLowerCase().startsWith(image.contentType) ||
     !answer.body.subarray(0, image.signature.length).equals(image.signature)
   ) {
-    response.status(STATUS_FOR_FAULT.unreadable).json({ error: `shadow-connector did not answer with ${image.noun}` });
+    response.status(STATUS_FOR_FAULT.unreadable).json({ error: `shadow-connector did not answer with ${image?.noun ?? 'an image'}` });
     return;
   }
   response
@@ -200,12 +261,46 @@ function emit(response: express.Response, answer: LaneAnswer, image: LaneImage):
 
 //----------------- THE ROUTER ------------
 
+type StreamLane = Pick<LaneRouterDefinition, 'upstreamPrefix' | 'pathRules'> & {
+  stream: NonNullable<LaneRouterDefinition['stream']>;
+};
+
+/**
+ * The handler of one `stream` row: check, open the upstream, and write what came back — a live stream as it
+ * arrives, anything else as `emit` writes it. A browser that has gone is not a fault and is written nothing:
+ * its hang-up has already closed the upstream.
+ */
+function streamHandler(spec: LaneStreamRoute, { upstreamPrefix, pathRules, stream }: StreamLane): express.RequestHandler {
+  return async (request, response, next) => {
+    try {
+      const refusal = refusalFor(spec, pathRules, request);
+      if (refusal !== null) {
+        response.status(422).json({ error: refusal });
+        return;
+      }
+      const hangUp = hangUpSignal(response);
+      const answer = await stream({
+        ...translated(spec, upstreamPrefix, request),
+        lastEventId: lastEventIdOf(request),
+        connectTimeoutMs: spec.timeoutMs,
+        hangUp,
+      });
+      if (answer.ok && answer.kind === 'stream') relayEventStream(response, answer.body);
+      else if (!hangUp.aborted) emit(response, answer, undefined);
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
 /**
  * Builds a lane's router from its table. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
- * Every row becomes one handler: check, fill the path, forward, write the answer. Then two tails, in
- * order: the lane's own 404 for every other path under the mount, and the 422 for a malformed escape.
- * Consumers: `createAffectedAreasRouter` and `createCarrierBulletinsRouter`.
+ * Every row becomes one handler: check, fill the path, forward (or open the stream), write the answer. Then
+ * two tails, in order: the lane's own 404 for every other path under the mount, and the 422 for a malformed
+ * escape. A table that cannot be served — a `stream` row with no `stream`, a `bytes` row with no image type —
+ * is refused here, when the server starts, and not on the first request that finds out.
+ * Consumers: `createAffectedAreasRouter`, `createCarrierBulletinsRouter` and `createUploadRunsRouter`.
  */
 export function createLaneRouter({
   lane,
@@ -213,12 +308,22 @@ export function createLaneRouter({
   pathRules,
   allowlist,
   forward,
+  stream,
   image,
   passHeaders,
 }: LaneRouterDefinition): express.Router {
   const router = express.Router();
 
   for (const spec of allowlist) {
+    if (spec.expect === 'stream') {
+      if (stream === undefined) throw new Error(`the ${lane} lane has a stream row (${spec.route}) and was given no stream`);
+      router.get(spec.route, streamHandler(spec, { upstreamPrefix, pathRules, stream }));
+      continue;
+    }
+    const rowImage = spec.image ?? image;
+    if (spec.expect === 'bytes' && rowImage === undefined) {
+      throw new Error(`the ${lane} lane has a bytes row (${spec.route}) with no image type`);
+    }
     router[spec.method](spec.route, async (request, response, next) => {
       try {
         const refusal = refusalFor(spec, pathRules, request);
@@ -226,25 +331,17 @@ export function createLaneRouter({
           response.status(422).json({ error: refusal });
           return;
         }
-        // The ids passed their rules, so filling them in cannot add a segment, a dot or an escape.
-        const path = spec.route.replace(/:(\w+)/g, (_match, name: string) => String(request.params[name]));
         emit(
           response,
           await forward({
             method: spec.method.toUpperCase() as 'GET' | 'POST' | 'PUT',
-            path: `${upstreamPrefix}${path}`,
-            query: forwardedQuery(spec, request),
+            ...translated(spec, upstreamPrefix, request),
             body: spec.body === 'object' ? request.body : undefined,
-            actingUser: actingUserOf(request),
-            // Judged here, off the request's own socket and headers, so a caller that reaches the tailnet
-            // listener directly from off this box, or through a reverse proxy's front, is `production`
-            // whatever header it sent.
-            budget: relayBudgetOf(request),
             timeoutMs: spec.timeoutMs,
             expect: spec.expect,
             passHeaders,
           }),
-          spec.image ?? image,
+          rowImage,
         );
       } catch (error) {
         // The forwarder resolves every fault it can name, so reaching here means something this lane

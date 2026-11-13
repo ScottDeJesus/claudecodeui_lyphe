@@ -36,7 +36,7 @@ function expandHome(value: string): string {
 export type HealModule = { router: Router; service: HealService };
 
 /**
- * Builds the heal lane for the server entrypoint: the six routes and the one worker behind them.
+ * Builds the heal lane for the server entrypoint: the seven routes and the one worker behind them.
  *
  * This is the whole composition — no watcher, no timer, no socket. The reflex runs on its own, fired
  * by events outside this server — the harness's endings, a heal walker's exit, and the nightly slot's
@@ -55,6 +55,7 @@ export function createHealModule(): HealModule {
     router: createHealRouter({
       summary: () => service.summary(),
       kind: (kind) => service.kind(kind),
+      sessions: (ids) => service.sessions(ids),
       ignore: () => service.ignore(),
       addIgnore: (tool, pattern, reason) => service.addIgnore(tool, pattern, reason),
       cycle: () => service.cycle(),

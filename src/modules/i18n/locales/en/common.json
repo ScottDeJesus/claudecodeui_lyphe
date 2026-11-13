@@ -2655,6 +2655,442 @@
         "how": "Tried {{when}}. It waits in this file until the file or the instructions change, and no automatic pull tries it again. A manual pull of {{carrier}} reads it again, then settles the carrier:"
       }
     },
+    "uploads": {
+      "tab": "Uploads",
+      "tabHint": "What happens when someone uses the Uploads page",
+      "loading": "Reading the upload runs…",
+      "head": {
+        "eyebrow": "Upload runs",
+        "running": "An upload is",
+        "runningAccent": "running",
+        "waiting": "An upload is",
+        "waitingAccent": "waiting on a person",
+        "hiccups_one": "One run",
+        "hiccups_other": "{{count}} runs",
+        "hiccupsAccent_one": "hit a hiccup",
+        "hiccupsAccent_other": "hit a hiccup",
+        "clean": "All",
+        "cleanAccent": "clean",
+        "none": "No upload",
+        "noneAccent": "yet",
+        "summary": {
+          "none": "No upload ran in the last {{days}} days.",
+          "runs_one": "{{count}} run in {{days}} days",
+          "runs_other": "{{count}} runs in {{days}} days",
+          "runsMore_one": "more than {{count}} run in {{days}} days",
+          "runsMore_other": "more than {{count}} runs in {{days}} days",
+          "clean": "{{count}} clean",
+          "hiccups_one": "{{count}} hiccup",
+          "hiccups_other": "{{count}} hiccups",
+          "last": "last run {{ago}} by {{who}}",
+          "cleanMore": "at least {{count}} clean",
+          "hiccupsMore_one": "at least {{count}} hiccup",
+          "hiccupsMore_other": "at least {{count}} hiccups",
+          "noneScoped": {
+            "by": "{{who}} pressed no upload in the last {{days}} days.",
+            "account": "Account {{account}} has no upload in the last {{days}} days.",
+            "both": "{{who}} pressed no upload in account {{account}} in the last {{days}} days."
+          }
+        },
+        "window": "How far back",
+        "days": "{{count}} days",
+        "refresh": "Refresh",
+        "hiccupsMore_one": "At least one run",
+        "hiccupsMore_other": "At least {{count}} runs",
+        "cleanMore": "The newest {{count}} are",
+        "noneScopedAccent": "in this view",
+        "scope": {
+          "by": "Only runs pressed by {{who}}",
+          "account": "Only account {{account}}",
+          "both": "Only runs pressed by {{who}} in account {{account}}"
+        },
+        "scopeClear": {
+          "by": "Show everyone",
+          "account": "Show all accounts",
+          "both": "Show everyone, every account"
+        }
+      },
+      "pills": {
+        "label": "Upload vitals",
+        "runs": "Runs",
+        "runsTitle": "Uploads started in this window. Test runs are not counted.",
+        "hiccups": "Hiccups",
+        "hiccupsTitle": "Runs in this window that did not go clean",
+        "live": "Live now",
+        "liveNone": "none",
+        "liveWorking": "working",
+        "liveWaiting": "waiting on a person",
+        "liveTitle": "The upload running right now, if there is one",
+        "lastRun": "Last run",
+        "lastRunNone": "none in this window",
+        "lastRunNoneTitle": "No upload ran in this window",
+        "healed": "Healed",
+        "healedUnread": "not read",
+        "healedNone": "none",
+        "healedLanded": "{{count}} landed",
+        "healedBoth": "{{landed}} landed · {{running}} running",
+        "healedTitle": "Heals that took up what tripped the agent in this window's runs",
+        "healedUnreadTitle": "The heal ledger could not be read, so this is not known",
+        "atLeast": "{{count}}+"
+      },
+      "live": {
+        "title": "Live now",
+        "working": "Working",
+        "waiting": "Waiting on a person",
+        "elapsedTitle": "How long it has been running",
+        "open": "Open",
+        "pressed": "pressed by {{who}} at {{at}}",
+        "newest": "Newest step",
+        "newestNone": "Nothing yet",
+        "walk": "Flow step",
+        "soFar": "So far",
+        "turns_one": "{{count}} turn",
+        "turns_other": "{{count}} turns",
+        "toolCalls_one": "{{count}} tool call",
+        "toolCalls_other": "{{count}} tool calls"
+      },
+      "sections": {
+        "types": "By upload type",
+        "typesHint": "clean and hiccup runs, and which way hiccups are heading",
+        "often": "How often",
+        "oftenHint": "presses by day and by hour, in your own clock",
+        "runs": "Runs",
+        "runsHint": "newest first; press one to open it",
+        "runsWithTests_one": "{{uploads}} + {{count}} test",
+        "runsWithTests_other": "{{uploads}} + {{count}} tests"
+      },
+      "types": {
+        "toggle": "Show the runs of {{type}}",
+        "none": "no run in this window",
+        "clean": "{{count}} clean",
+        "hiccups_one": "{{count}} hiccup",
+        "hiccups_other": "{{count}} hiccups",
+        "running": "running",
+        "trendTitle": "Hiccup runs in the last 7 days against the 7 before",
+        "regression": "⚠ a healed stumble came back",
+        "last": "last {{ago}}",
+        "noRuns": "No run of this type in the window.",
+        "moreInRuns_one": "{{count}} more is in Runs.",
+        "moreInRuns_other": "{{count}} more are in Runs.",
+        "regressionTitle": "One of this type's runs tripped on something a heal had already fixed. Open that run: its sheet names the stumble under The agent's own friction.",
+        "regressionUnread": "The heal ledger could not be read, so a stumble that came back would not be marked here."
+      },
+      "often": {
+        "noDay": "No run on any day of this window.",
+        "busiestDay_one": "Busiest day: {{day}}, with {{count}} run.",
+        "busiestDay_other": "Busiest day: {{day}}, with {{count}} runs.",
+        "daysLabel": "Runs on each of the last {{count}} days",
+        "dayTitle": "{{day}}: {{clean}} clean, {{hiccup}} hiccup",
+        "legend": {
+          "clean": "clean",
+          "hiccup": "hiccup",
+          "test": "test"
+        },
+        "today": "today",
+        "noHour": "No press at any hour of this window.",
+        "busiestHour_one": "Busiest hour: {{hour}}, with {{count}} press.",
+        "busiestHour_other": "Busiest hour: {{hour}}, with {{count}} presses.",
+        "hoursLabel": "Presses by hour of the day",
+        "hourTitle_one": "{{hour}}: {{count}} press",
+        "hourTitle_other": "{{hour}}: {{count}} presses",
+        "dayTitleTests": "{{day}}: {{clean}} clean, {{hiccup}} hiccup, {{test}} test"
+      },
+      "runs": {
+        "open": "Open the run: {{verdict}}, {{job}}, {{when}}",
+        "noLength": "length not recorded",
+        "moreReasons": "+{{count}}",
+        "friction_one": "{{count}} stumble",
+        "friction_other": "{{count}} stumbles",
+        "frictionHealed_one": "{{count}} stumble · healed",
+        "frictionHealed_other": "{{count}} stumbles · healed",
+        "frictionOpen_one": "{{count}} stumble · {{open}} open",
+        "frictionOpen_other": "{{count}} stumbles · {{open}} open",
+        "frictionTitle": "What tripped the agent in this run, from the heal ledger",
+        "imported": "imported",
+        "importedTitle": "Read back from the log on disk. The answers typed and the server's own notes were not kept.",
+        "filters": "Narrow the runs",
+        "everyone": "Everyone",
+        "hiccupsOnly": "Hiccups only",
+        "tests": "Test runs",
+        "testsTitle": "Also list dry runs. A test run is never counted clean or hiccup.",
+        "allAccounts": "All accounts",
+        "account": "Account {{id}}",
+        "frictionUnread": "The heal ledger could not be read, so these rows do not show what tripped the agent.",
+        "truncated": "This window holds more runs than one answer carries. These are the newest {{count}}.",
+        "noMatch": "No run matches these filters",
+        "clear": "Show every run",
+        "more": "Show {{count}} more",
+        "moreOf": "Show {{count}} more of {{rest}}"
+      },
+      "verdict": {
+        "live": "Running",
+        "test": "Test run",
+        "clean": "Clean",
+        "hiccup": "Hiccup",
+        "waiting": "Waiting on a person"
+      },
+      "who": {
+        "unknown": "nobody on record"
+      },
+      "type": {
+        "initial": "Initial upload",
+        "final": "Final upload",
+        "none": "No upload type"
+      },
+      "flow": {
+        "none": "no flow named"
+      },
+      "job": {
+        "none": "No job"
+      },
+      "duration": {
+        "s": "{{s}} s",
+        "ms": "{{m}} m {{s}} s",
+        "hm": "{{h}} h {{m}} m"
+      },
+      "reasons": {
+        "did_not_start": {
+          "chip": "Never started",
+          "sentence": "It never started.",
+          "detail": "It never started: {{detail}}."
+        },
+        "failed": {
+          "chip": "Failed",
+          "sentence": "The agent's turn failed.",
+          "detail": "The agent's turn failed: {{detail}}."
+        },
+        "process_died": {
+          "chip": "Process died",
+          "sentence": "Its process died without a report.",
+          "detail": "Its process died. It said: {{detail}}"
+        },
+        "ended_without_result": {
+          "chip": "No result",
+          "sentence": "It ended without reporting a result."
+        },
+        "server_restarted": {
+          "chip": "Server restarted",
+          "sentence": "The server restarted under it and cut it off."
+        },
+        "survived_restart": {
+          "chip": "Outlived a restart",
+          "sentence": "It outlived a server restart, so nothing watched how it ended."
+        },
+        "ran_too_long": {
+          "chip": "Ran too long",
+          "sentence": "It ran too long and was stopped automatically."
+        },
+        "idle_too_long": {
+          "chip": "Idle too long",
+          "sentence": "It sat idle too long and was stopped automatically."
+        },
+        "stopped_by_person": {
+          "chip": "Stopped by a person",
+          "sentence": "A person stopped it.",
+          "detail": "{{detail}} stopped it."
+        },
+        "stopped_automatically": {
+          "chip": "Stopped automatically",
+          "sentence": "It was stopped automatically.",
+          "detail": "It was stopped automatically: {{detail}}."
+        },
+        "ending_not_recorded": {
+          "chip": "Ending not recorded",
+          "sentence": "How it ended was not recorded: it is not running, and no ending was written."
+        },
+        "asked_you": {
+          "chip": "Asked {{count}}×",
+          "sentence_one": "It stopped once to ask a person a question.",
+          "sentence_other": "It stopped {{count}} times to ask a person a question."
+        },
+        "went_quiet": {
+          "chip": "Went quiet {{count}}×",
+          "sentence_one": "It went quiet once.",
+          "sentence_other": "It went quiet {{count}} times."
+        },
+        "rate_limited": {
+          "chip": "Rate limited {{count}}×",
+          "sentence_one": "It was rate limited once.",
+          "sentence_other": "It was rate limited {{count}} times."
+        },
+        "stream_trouble": {
+          "chip": "Stream trouble {{count}}×",
+          "sentence_one": "Its stream had trouble once.",
+          "sentence_other": "Its stream had trouble {{count}} times."
+        },
+        "walk_halted": {
+          "chip": "Flow halted",
+          "sentence_one": "A walk of the flow, made for real, halted.",
+          "sentence_other": "{{count}} walks of the flow, made for real, halted."
+        },
+        "walk_bumpy": {
+          "chip": "Bumpy flow",
+          "sentence_one": "A walk of the flow, made for real, was bumpy.",
+          "sentence_other": "{{count}} walks of the flow, made for real, were bumpy."
+        },
+        "events_not_kept": {
+          "chip": "{{count}} events not kept",
+          "sentence_one": "One event was not kept: the record's queue was full.",
+          "sentence_other": "{{count}} events were not kept: the record's queue was full."
+        }
+      },
+      "ending": {
+        "live": "It is still running.",
+        "notRecorded": "How it ended was not recorded.",
+        "unnamed": "It ended, and the record does not say how.",
+        "stopped": "A person stopped it.",
+        "stoppedBy": "{{who}} stopped it.",
+        "tooLong": "It ran too long and was stopped automatically.",
+        "idle": "It sat idle too long and was stopped automatically.",
+        "automatic": "It was stopped automatically ({{ending}}).",
+        "restart": "The server restarted under it and cut it off.",
+        "orphaned": "It outlived a server restart and was settled afterwards.",
+        "released": "It never started: {{why}}.",
+        "exited": "It exited with code {{rc}} and said nothing.",
+        "exitedSaying": "It exited with code {{rc}}: {{line}}",
+        "finished": "It finished on its own.",
+        "other": "It ended: {{ending}}.",
+        "waiting": "It is waiting on a person to answer on the Uploads page."
+      },
+      "events": {
+        "source": {
+          "server": "Server",
+          "agent": "Agent",
+          "tool": "Tool"
+        },
+        "started": "The run started",
+        "brief": "The brief it was given",
+        "briefHint": "Press to read it",
+        "init": "The agent came up on {{model}}",
+        "initTools_one": "{{count}} tool in hand",
+        "initTools_other": "{{count}} tools in hand",
+        "injected": "A note the system handed the agent",
+        "answered": "Answered: {{text}}",
+        "toolOk": "worked",
+        "toolFailed": "failed",
+        "toolNoResult": "no result on this page",
+        "rateChecked": "Rate limit checked",
+        "rateLimited": "Rate limited",
+        "turnEnd": "A turn ended",
+        "turnEndAsk": "A turn ended on a question",
+        "asked": "It stopped to ask a person",
+        "state": "Moved from {{from}} to {{to}}",
+        "quiet": "It went quiet for {{seconds}} s",
+        "streamError": "The stream had trouble",
+        "replayGap": "Some lines were skipped here",
+        "dropped": "This screen fell behind and rejoined",
+        "ended": "The run ended",
+        "unknown": "An event this screen has no words for"
+      },
+      "sheet": {
+        "heading": {
+          "reading": "Reading the run",
+          "live": "This run is still going",
+          "waiting": "This run is waiting on a person",
+          "test": "A test run",
+          "clean": "This run ran clean",
+          "hiccup": "This run hit a hiccup"
+        },
+        "facts": {
+          "pressed": "Pressed by",
+          "job": "Job",
+          "upload": "Upload",
+          "model": "Model",
+          "modelNone": "not reported",
+          "took": "Took",
+          "tookNone": "not recorded",
+          "tookSoFar": "{{length}} so far"
+        },
+        "testNote": "A test of the launch path. Nothing was uploaded, and it is not counted clean or hiccup.",
+        "stage": {
+          "title": "How far this upload got",
+          "walked": "Walked for real",
+          "confirmed": "Confirmed",
+          "pressed": "Pressed"
+        },
+        "trouble": "This run can't be read",
+        "bumps": {
+          "title": "Speed bumps",
+          "none": "It ran clean: nothing stands against it.",
+          "noneYet": "Nothing stands against it so far.",
+          "noneTest": "Nothing stood against it."
+        },
+        "events": {
+          "title": "Inside the run",
+          "label": "The run's events, oldest first",
+          "count_one": "{{count}} event",
+          "count_other": "{{count}} events",
+          "showing": "The newest {{shown}} of {{total}} events",
+          "following": "Following the newest line",
+          "importedNote": "Read back from the log on disk: the answers a person typed and the server's own notes were never in that log, so they are not shown here.",
+          "none": "No event is on record for this run.",
+          "noneYet": "Nothing has happened yet.",
+          "showEarlier": "Show earlier"
+        },
+        "walks": {
+          "title": "The flow it walked",
+          "none": "It walked no flow.",
+          "noneYet": "It has not walked a flow yet.",
+          "preview": "Preview",
+          "armed": "For real",
+          "inProgress": "In progress",
+          "inProgressAt": "In progress · at {{step}}",
+          "outcomeTitle": "How the walk ended, in the engine's own word",
+          "bumpy": "Bumpy",
+          "smooth": "Smooth",
+          "notScored": "Not scored",
+          "noSteps": "It wrote no step.",
+          "steps_one": "Its {{count}} step, in order",
+          "steps_other": "Its {{count}} steps, in order",
+          "unreadableStep": "a step that could not be read",
+          "noReason": "It gave no reason.",
+          "cleared": "Retired by hand on {{when}}."
+        },
+        "after": {
+          "title": "After the run",
+          "notYet": "Not confirmed yet.",
+          "nothing": "No walk was made for real, so there was nothing to confirm.",
+          "confirmedBy": "Confirmed by {{who}}",
+          "noTime": "time not recorded",
+          "through": "through {{via}}",
+          "pressed": "Pressed",
+          "revoked": "Revoked",
+          "replaced": "Replaced",
+          "standing": "Waiting for the press",
+          "pressedAt": "The upload was pressed on {{when}}.",
+          "pressedAtEnded": "The upload was pressed on {{when}}. The press ended:",
+          "revokedAt": "Taken back on {{when}}:",
+          "expires": "It stands until {{when}}."
+        },
+        "friction": {
+          "title": "The agent's own friction",
+          "unread": "The heal ledger could not be read, so what tripped the agent is not known.",
+          "noSession": "The agent never came up in this run, so there is no session to look up.",
+          "none": "Nothing tripped the agent in this run.",
+          "noHeal": "No heal has taken these up yet.",
+          "claimed_one": "This heal took up {{count}} of this run's rows",
+          "claimed_other": "This heal took up {{count}} of this run's rows",
+          "cured_one": "cured {{count}}",
+          "cured_other": "cured {{count}}",
+          "fix": "What the fix was:",
+          "noFix": "Its builder left no line about what the fix was.",
+          "cameBack": "Came back {{ago}}, after a heal had closed it.",
+          "closedBy": "The heal that had closed it:",
+          "shape": "The shape that returned:"
+        }
+      },
+      "trouble": {
+        "title": "The upload runs can't be read",
+        "stale": "The upload runs can't be read. Showing the last answer, from {{ago}}.",
+        "retry": "Try again"
+      },
+      "empty": {
+        "title": "No upload ran in the last {{days}} days",
+        "message": "Nobody pressed Start upload in this window.",
+        "messageTests": "Nobody pressed Start upload in this window, and no test ran.",
+        "wider": "Look back {{days}} days"
+      }
+    },
     "errors": {
       "unreachable": "Cerberus can't be reached",
       "retry": "Try again",

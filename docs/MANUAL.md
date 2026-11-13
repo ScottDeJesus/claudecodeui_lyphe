@@ -3616,7 +3616,7 @@ handles `data-spend-pills` and `data-spend-pill="paid|in|out|tokens"`) over ONE 
 `$4.47 billed by DeepSeek` under the whale, `$4.21 billed by Claude API` under Claude's mark, and a plain
 `CircleDollarSign` with `$4.49 billed` for a mix (the dispatcher's `""`). `SpendPills` takes the word as its required
 `vendor` prop and each caller passes its own — a plan's, a phase's and a stage's `paid_vendor`, an arc's; `SoulLaunchPinRow`
-passes `DeepSeek` for a DeepSeek-painted pin and `""` for a Claude one (its figure is tokens alone), and `HealCardList` passes `DeepSeek` (a heal's dollars are DeepSeek's by construction). There is no constant to fall back to: a wrong vendor on a figure is a
+passes `DeepSeek` for a DeepSeek-painted pin and `""` for a Claude one (its figure is tokens alone), and `HealCardView` passes `DeepSeek` (a heal's dollars are DeepSeek's by construction). There is no constant to fall back to: a wrong vendor on a figure is a
 false bill; the token half is `20.6M in` (↓) and `206k out` (↑) where
 the record's split IS its total, else one `⛁ 216M tokens` pill; a half that does not exist draws no pill (never `$0.00`),
 and a record with neither draws nothing. The `in` pill ends in its CACHE SHARE, `3.9M in (97% cache)` (`cachePercent`: cache

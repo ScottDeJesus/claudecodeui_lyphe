@@ -15,7 +15,8 @@
  * pass in which Chiron ranks the live friction and heals walk his list. The tab renders the
  * worker's own words for it: `cycle_state.text`, `item.label`, the worker's rank. It chooses nothing.
  *
- * These shapes are the tab's reading of the worker's `--status` payload. Nothing here fetches.
+ * These shapes are the tab's reading of the worker's `--status` payload, and of its `--sessions` answer
+ * (`HealSessionsAnswer`). Nothing here fetches.
  */
 
 import type { HealRule } from '@/modules/heal/healRuleTypes';
@@ -294,6 +295,28 @@ export type HealSummary = {
   rules?: HealRule[];
   /** How many rules the summary did not send. Absent reads as zero. */
   rules_more?: number;
+};
+
+/**
+ * The worker's answer for a set of Claude sessions — `heal-reflex --sessions`, relayed whole by `GET /api/heal/sessions`
+ * and read by Cerberus's Uploads view for the sessions its runs ran in. Rows are reported as stored: nothing here is a
+ * count of what is live (that is `kinds` in the summary, and only there).
+ */
+export type HealSessionsAnswer = {
+  /** The session ids the answer is for, as the worker echoed them. */
+  sessions: string[];
+  /**
+   * Every friction row filed in one of those sessions, newest first, the ignored ones too: the tab's own row plus the
+   * session it was filed in, the id of the heal that claimed it (null while none has) and the returning shape that marks
+   * it (null when none does).
+   */
+  items: (HealItem & { session: string; claimed_by: string | null; regression: HealRegression | null })[];
+  /**
+   * Every heal that claimed one of those rows or cured one: the tab's own card plus the ids of the rows above it
+   * claimed (`claimed_here`) and cured (`cured_here`), and its builder's line of what the fix was (`fix_said`, null
+   * when its chain recorded none).
+   */
+  heals: (HealCard & { claimed_here: number[]; cured_here: number[]; fix_said: string | null })[];
 };
 
 /** What the screen is showing: the three facts a reader can be told, never conflated. */

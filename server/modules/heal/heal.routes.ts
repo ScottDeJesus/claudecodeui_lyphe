@@ -30,6 +30,20 @@ function text(value: unknown): string | null {
 }
 
 /**
+ * A claude session id as the CLI mints it — the canonical lowercase uuid — and how many one read may name. The worker holds the
+ * same two rules (`heal_sessions_read.parse_ids`) and exits 2 on anything else; this fence answers 422 before a process starts.
+ */
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const SESSIONS_MAX = 200;
+
+/** The ids a `?ids=` names — ONE comma-joined value — or null when it is anything but 1 to `SESSIONS_MAX` lowercase uuids. */
+function sessionIds(value: unknown): string[] | null {
+  if (typeof value !== 'string') return null;
+  const ids = value.split(',');
+  return ids.length <= SESSIONS_MAX && ids.every((id) => SESSION_ID.test(id)) ? ids : null;
+}
+
+/**
  * How a refused question becomes a status, in the shape of the dispatcher lane's `statusForVerb`.
  *
  * A refusal is not a server fault: the worker is a separate thing on this host, and each reason says
@@ -38,7 +52,7 @@ function text(value: unknown): string | null {
  */
 const STATUS_FOR_FAULT: Record<HealFault, number> = {
   unreachable: 503,   // the worker is not on this host, or was torn down before it answered
-  unreadable: 502,    // the worker answered, and not with the object its contract promises
+  unreadable: 502,    // the worker answered, and not with an object this lane can carry
 };
 
 /**
@@ -54,14 +68,14 @@ function emit<T>(response: express.Response, answer: HealResult<T>): void {
 }
 
 /**
- * The heal lane's six routes. Auth is the mount's `authenticateToken`, in `server/index.ts`.
+ * The heal lane's seven routes. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: no store is opened here, no path is
  * named here, and no route hands the worker a string it did not first hold to a token shape. The
  * service owns the one transport, and it is a process — the worker's own command.
  */
 export function createHealRouter(
-  dependencies: Pick<HealService, 'summary' | 'kind' | 'ignore' | 'addIgnore' | 'cycle' | 'stopCycle'>,
+  dependencies: Pick<HealService, 'summary' | 'kind' | 'sessions' | 'ignore' | 'addIgnore' | 'cycle' | 'stopCycle'>,
 ): express.Router {
   const router = express.Router();
 
@@ -102,6 +116,21 @@ export function createHealRouter(
     } catch (error) {
       next(error);
     }
+  });
+
+  /**
+   * What the ledger holds for a set of claude sessions — the rows they filed and the heals that took or cured them — keyed on
+   * the session ids the caller already has (an upload run's claude session): `?ids=<comma-joined lowercase uuids, 1 to 200>`.
+   * A list that is anything else is refused here with 422, before a worker runs, so the worker's own exit 2 for a malformed
+   * list is never reached. Its exit 2 for a ledger it could not read is: that comes back as `emit`'s 503 with the worker's sentence.
+   */
+  router.get('/sessions', (request, response, next) => {
+    const ids = sessionIds(request.query.ids);
+    if (ids === null) {
+      response.status(422).json({ error: `ids must be 1 to ${SESSIONS_MAX} comma-joined lowercase uuids` });
+      return;
+    }
+    void relay(() => dependencies.sessions(ids))(request, response, next);
   });
 
   /** The ignore table: what is deliberately not pain, seeded rows included. */

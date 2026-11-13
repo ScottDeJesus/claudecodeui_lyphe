@@ -3942,7 +3942,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-
 
 ## MAN-8863 — The shadow-connector lane forwarder — createShadowConnectorLane, the one read of EIS_INTERNAL_SECRET (server/shared)
 
-`server/shared/shadow-connector-lane.ts` is the one forwarder every CloudCLI lane to shadow-connector goes through, and the one place `EIS_INTERNAL_SECRET` is read. shadow-connector's `/api/*` surfaces are internal-caller gated (R-CAP-11: `X-Internal-Secret` required even from loopback); this server authenticates the operator, so the secret stays on this side and the browser never holds it. Exported from `server/shared/index.ts`. The routes of a lane are `server/shared/shadow-connector-lane-router.ts` (MAN-8908), which calls this file's `forward`.
+`server/shared/shadow-connector-lane.ts` is the one forwarder every CloudCLI lane to shadow-connector goes through, and the one place `EIS_INTERNAL_SECRET` is read. shadow-connector's `/api/*` surfaces are internal-caller gated (R-CAP-11: `X-Internal-Secret` required even from loopback); this server authenticates the operator, so the secret stays on this side and the browser never holds it. Exported from `server/shared/index.ts`. The routes of a lane are `server/shared/shadow-connector-lane-router.ts` (MAN-8908), which calls this file's `forward` and, for a `stream` row, its `stream` — the event-stream mode, a sibling file (`shadow-connector-lane-stream.ts`, MAN-9896). What a call carries out (the headers, the URL) and how a failure reads is `shadow-connector-lane-wire.ts`, shared by both verbs; this file hands the stream its ONE read of the secret.
 
 Consumers (each owns its allowlist, id rules and image type; none owns a transport):
 
@@ -3950,11 +3950,13 @@ Consumers (each owns its allowlist, id rules and image type; none owns a transpo
 |---|---|---|
 | `server/modules/affected-areas/` (MAN-8559) | `/api/affected-areas`, the Tours lane | `affected-areas` |
 | `server/modules/carrier-bulletins/` (MAN-8909) | `/api/carrier-bulletins`, the bulletins lane | `carrier-bulletins` |
+| `server/modules/upload-runs/` (MAN-9897) | `/api/upload-runs`, the upload runs' lane (the first with event streams) | `upload-runs` |
 
 | export | does |
 |---|---|
 | `createShadowConnectorLane({ baseUrl, envFile, label })` | builds a forwarder; the module that calls it is the ONLY reader of `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` for its lane, and passes the values down |
-| `ShadowConnectorLane` | `{ forward(LaneRequest): Promise<LaneAnswer> }`; a router takes `Pick<ShadowConnectorLane, 'forward'>` |
+| `ShadowConnectorLane` | `{ forward(LaneRequest): Promise<LaneAnswer>, stream(LaneStreamRequest): Promise<LaneStreamAnswer> }`; a router takes `Pick<ShadowConnectorLane, 'forward'>`, or `'forward' \| 'stream'` for a lane with a `stream` row |
+| `LaneStreamRequest`, `LaneStreamAnswer`, `LaneStream` | the stream mode's request, answer and verb (MAN-9896) |
 | `ShadowConnectorLaneDependencies` | `{ baseUrl, envFile, label }`; `label` is the one word the log warning leads with |
 | `LaneRequest` | `{ method: GET\|POST\|PUT, path, query?, body?, actingUser, budget: string\|null, timeoutMs, expect: json\|bytes, passHeaders? }`; the route has already validated every part. `passHeaders` names (lower case) the upstream response headers a JSON answer carries back; absent or empty carries none |
 | `LaneAnswer` | `{ ok: true, status, kind: json, body, headers }` (`headers`: the `passHeaders` the engine sent, lower-case keys, `{}` when none), `{ ok: true, status, kind: bytes, body: Buffer, contentType }` (no headers carried), or `{ ok: false, reason: unreachable\|unreadable\|no_secret, message }` |
@@ -3974,10 +3976,13 @@ section: The shadow-connector lane forwarder — createShadowConnectorLane, the 
 | Header | Value |
 |---|---|
 | `X-Internal-Secret` | the secret |
-| `Accept` | `application/json`, or `image/*` for a bytes route |
+| `Accept` | `application/json`, `image/*` for a bytes route, or `text/event-stream` for a stream row (MAN-9896) |
 | `Content-Type` | `application/json` when a body is sent |
 | `X-Acting-User` | signed-in username, non-printable → `?`, trimmed, ≤ 64 chars; absent when none. Display only: the engine derives `origin` itself (R-CAP-21) |
 | `X-Gemini-Budget-Plan` | `LaneRequest.budget` when it is a string; absent when null. What the router computed from the request (below) |
+| `Last-Event-ID` | a stream row only: the browser's, when the router found it to be 1 to 10 digits; absent otherwise (MAN-9896) |
+
+`forward` and `stream` build the first four from one function, `laneHeaders` in `shadow-connector-lane-wire.ts`.
 
 A bytes route asks for `image/*` and not one type because the Tours lane's images are JPEGs and the bulletins lane's are PNGs; the forwarder does not know which, so it asks for any image, and each lane's router enforces its own type on the answer's Content-Type. Changed from `image/jpeg` on 2026-10-22 (the engine answers a PNG whatever `Accept` says, so this made the request truthful and changed no answer: a Tours image was byte-identical before and after).
 
@@ -4009,8 +4014,8 @@ Rules (they bind the file; INV-8633 holds them for both lanes)
 2. Nothing is forwarded without it: a missing, empty, padded, non-ASCII or unclosed-quote secret answers `no_secret` (`CloudCLI could not read shadow-connector's internal secret`) and sends no request.
 3. Nothing throws. A lane fault is a RESULT; an upstream answer (404, 422, a refusal) is a RESULT carried whole.
 4. `fetch` runs `redirect: 'manual'`, so the secret header never follows a `Location`.
-5. `describeFailure` uses only an error's NAME and its cause's CODE, never its message: a transport error can quote the request, and the request carries the secret.
-6. `X-Acting-User` is display only (the engine derives `origin` itself, R-CAP-21): non-printable characters become `?`, trimmed, at most 64 characters, absent when none.
+5. `describeFailure` (in `shadow-connector-lane-wire.ts`, used by `forward` and `stream`) uses only an error's NAME and its cause's CODE, never its message: a transport error can quote the request, and the request carries the secret.
+6. `X-Acting-User` is display only (the engine derives `origin` itself, R-CAP-21): non-printable characters become `?`, trimmed, at most 64 characters, absent when none. Built by `laneHeaders` in the wire file.
 7. `X-Gemini-Budget-Plan` is `LaneRequest.budget` and nothing else: the forwarder never reads `process.env` for it, so a lane never spends under this server's own name (the agent sessions this server spawns inherit its environment).
 
 Traps
@@ -4019,7 +4024,8 @@ Traps
 | state is per forwarder | each `createShadowConnectorLane` call holds its own parse of the env file and its own last-reported cause: two lanes log one line per distinct cause EACH, and each warning leads with its own `[<label>]`. A lane built without a distinct label is indistinguishable in the journal |
 | the label is the log's only lane word | the Tours warning reads `[affected-areas] no usable internal secret in <file>: <cause>`, the bulletins warning `[carrier-bulletins] …`; everything else the forwarder logs or answers is identical for every lane |
 | a response header travels only when the lane names it | `LaneRequest.passHeaders`; the bulletins lane names `x-left-out` (the overview's left-out carriers, MAN-8906) and `cache-control` (MAN-8909), the Tours lane none. An engine header no lane names is dropped here, by design: never carry one on a hunch, and never `Set-Cookie` |
-| a new top-level `server/shared/*.ts` file | joins `.oxlintrc.json`'s `backend-shared-utils` list (INV-6548); `shadow-connector-lane.ts`, `shadow-connector-lane-router.ts` and `gemini-budget-relay.ts` are listed |
+| a new top-level `server/shared/*.ts` file | joins `.oxlintrc.json`'s `backend-shared-utils` list (INV-6548); `shadow-connector-lane.ts`, `shadow-connector-lane-router.ts`, `shadow-connector-lane-stream.ts`, `shadow-connector-lane-wire.ts` and `gemini-budget-relay.ts` are listed |
+| `stream` is `forward`'s sibling, not its mode flag | `LaneRequest.expect` stays `json \| bytes`; an event stream is `ShadowConnectorLane.stream` with its own request and answer (MAN-9896), because its bound, its answer and its end all differ. The rules above hold for it too: it takes the secret from `currentSecret`, runs `redirect: 'manual'` and fails as a RESULT |
 | measured 2026-10-21 | with a missing env file, an empty one and an unreachable engine, `forward` answers `no_secret`, `no_secret` and `unreachable` (`CloudCLI could not reach shadow-connector`), and a repeated cause logs one warning, not two; `GET /api/affected-areas/tours?limit=3` and `GET /api/affected-areas/images/<sha>` through the dev API (:3011) answer 200 with the same body sha256 as before the forwarder moved here |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js
@@ -4146,7 +4152,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/
 
 ## MAN-8908 — The lane router — createLaneRouter, the allowlist both lanes to shadow-connector share (server/shared)
 
-`server/shared/shadow-connector-lane-router.ts` is the allowlist router both lanes to shadow-connector hand their tables to: `createLaneRouter(definition)` returns an Express router that checks, forwards and answers. The forwarder beside it (`shadow-connector-lane.ts`, MAN-8863) owns the transport and the secret; this file owns what the two lanes' routes would otherwise each write the same way, so the rules below hold for both and cannot drift. Exported from `server/shared/index.ts`; listed in `.oxlintrc.json`'s `backend-shared-utils` pattern (INV-6548).
+`server/shared/shadow-connector-lane-router.ts` is the allowlist router the lanes to shadow-connector hand their tables to: `createLaneRouter(definition)` returns an Express router that checks, forwards (or opens a stream) and answers. The forwarder beside it (`shadow-connector-lane.ts`, MAN-8863) owns the transport and the secret; this file owns what the lanes' routes would otherwise each write the same way, so the rules below hold for all of them and cannot drift. Exported from `server/shared/index.ts`; listed in `.oxlintrc.json`'s `backend-shared-utils` pattern (INV-6548).
 
 Consumers (each declares a table and its id shapes; neither writes a handler):
 
@@ -4154,11 +4160,12 @@ Consumers (each declares a table and its id shapes; neither writes a handler):
 |---|---|---|---|
 | `server/modules/affected-areas/` (MAN-8559) | `/api/affected-areas` | `affected-areas` | `image/jpeg` |
 | `server/modules/carrier-bulletins/` | `/api/carrier-bulletins` | `carrier-bulletins` | `image/png` |
+| `server/modules/upload-runs/` (MAN-9897) | `/api/upload-runs` | `upload-runs` | none (no bytes row) |
 
 | export | does |
 |---|---|
-| `createLaneRouter({ lane, upstreamPrefix, pathRules, allowlist, forward, image, passHeaders? })` | one handler per allowlist row (check, fill the path, forward, answer), then the lane's own 404, then the malformed-escape 422. `image` is `{ contentType, noun, signature }` (`LaneImage`): the image type the lane's bytes routes answer unless a row names its own, how the 502 names it, and the magic number its bytes begin with (PNG `89504e470d0a1a0a`, JPEG `ffd8ff`). `passHeaders` names the upstream response headers a JSON answer carries back (none when absent) |
-| `LaneRoute` | one row: `{ method, route, timeoutMs, expect: json\|bytes, query?, body: object\|none, image? }`; `route` is in Express's form, `:name` is filled from the checked id; `image` is a `bytes` row's OWN image type, which wins over the lane's |
+| `createLaneRouter({ lane, upstreamPrefix, pathRules, allowlist, forward, stream?, image?, passHeaders? })` | one handler per allowlist row (check, fill the path, forward or open the stream, answer), then the lane's own 404, then the malformed-escape 422. `stream` is the forwarder's `stream` (MAN-9896): a table with a `stream` row and no `stream` throws when the router is built. `image` is `{ contentType, noun, signature }` (`LaneImage`): the image type the lane's bytes routes answer unless a row names its own, how the 502 names it, and the magic number its bytes begin with (PNG `89504e470d0a1a0a`, JPEG `ffd8ff`); a lane with no bytes row names none, and a bytes row with neither its own nor the lane's throws when the router is built. `passHeaders` names the upstream response headers a JSON answer carries back (none when absent) |
+| `LaneRoute` | one row, a union on `expect`: `{ method, route, timeoutMs, expect: json\|bytes, query?, body: object\|none, image? }`, or a stream row `{ method: get, route, timeoutMs, expect: stream, body: none, query? }`; `route` is in Express's form, `:name` is filled from the checked id; `image` is a `bytes` row's OWN image type, which wins over the lane's. A stream row's `timeoutMs` bounds the connect only |
 | `LaneImage` | `{ contentType, noun, signature }`: the type of `createLaneRouter`'s `image` and of a row's `image` |
 | `LaneRule` / `patternRule(regex, expects)` | a check on one id or query value; `expects` is the half of the 422 sentence after the field's name |
 | `LOWERCASE_UUID_SOURCE`, `LOWERCASE_UUID_RULE`, `SHA256_RULE` | the id shapes the two lanes share: a lowercase hyphenated uuid, 64 lowercase hex |
@@ -4171,7 +4178,8 @@ Rules (they bind the file; a lane that needs different behaviour changes the def
 5. A `bytes` route is relayed only on a 2xx, under its row's `image` when it names one (the Tours lane's plan drawing: an SVG) and the lane's `image` otherwise, and `Cache-Control: private, max-age=31536000, immutable` (the id is the sha256 of the bytes, so it never changes). A 2xx whose Content-Type is not that type, or whose first bytes are not `image.signature`, is `unreadable` (502 `shadow-connector did not answer with <image.noun>`). why: the Content-Type is the engine's word, and the bytes are what a browser would keep for a year. A non-2xx image answer is the engine's JSON, passed through (the forwarder reads bytes only on success).
 6. The acting user is read from `request.user.username` (the mount's `authenticateToken` set it) and sent as `X-Acting-User`, display only.
 7. The Gemini budget is `relayBudgetOf` over the request's own socket, front stamp and `X-Gemini-Budget-Plan` header, set as `LaneRequest.budget` here and nowhere else, so both lanes carry it and a caller that reaches the API's tailnet listener from off the box is judged by the same rule as the Vite proxy's, and so is one that came through a reverse proxy's front (MAN-8863, "The budget carried").
-8. Routes here validate and translate and do nothing else: no secret read, no socket, no cache, no model call.
+8. Routes here validate and translate and do nothing else: no secret read, no upstream socket, no cache, no model call.
+9. A `stream` row is GET with no body (all an `EventSource` can send). The router builds the stream request (path, declared query, acting user, budget, the browser's `Last-Event-ID` when it is 1 to 10 digits, the row's `timeoutMs` as the connect bound, and `hangUpSignal(response)`), and writes what comes back: a live stream through `relayEventStream` (200, `text/event-stream`, `no-cache`, `X-Accel-Buffering: no`, flushed, the upstream's bytes unchanged), anything else as `emit` writes it (status and JSON; the lane's faults at their fixed statuses), and nothing at all to a browser that has gone. why: a non-200 makes an `EventSource` fail for good where a 200 that closes arms its retry loop; and the browser's `?token=` is no row's query key, so it never leaves. The behaviour and its probes are MAN-9896.
 
 Traps
 | trap | fact |
@@ -17071,3 +17079,328 @@ One timer (`longPressTimerRef`, `LONG_PRESS_MS` 500, armed on the window the com
 - Strings: `input.steer.*` and `sendMenu.*` in `chat.json`, English and German.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ChatComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SendMenuPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/SteeredMessageCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSteeredMessages.ts
+
+## MAN-9880 — server/modules/heal — the heal lane at /api/heal: the routes, the worker command behind each, the faults and bounds, and GET /sessions
+
+`createHealModule()` (`heal.module.ts`) returns `{ router, service }`; `server/index.ts` mounts the router at `/api/heal` behind `authenticateToken`. `heal.routes.ts` validates and translates; `heal.service.ts` owns the one transport: `execFile` of the worker `HEAL_REFLEX_BIN` (default `~/.claude/scripts/heal-reflex`, `~` expanded), `cwd` the home, `env` `userFacingEnv()`, the argv an array, so a value never becomes a shell string. This server opens no ledger and writes no row. `service` is also handed to the companion's house, narrowed to `summary` and `kind` (MAN-9142).
+
+## routes
+| route | fence | runs | ceiling |
+|---|---|---|---|
+| `GET /summary` | | `--status` | 20 s |
+| `GET /kind/:kind` | `:kind` matches `^[a-z0-9][a-z0-9_-]{0,63}$`, else 404 `{error: "no such kind"}` | `--kind <kind>` | 20 s |
+| `GET /sessions?ids=` | § GET /sessions | `--sessions <ids>` | 20 s, 32 MiB |
+| `GET /ignore` | | `--status`, the `ignore` array sliced off it | 20 s |
+| `POST /ignore` | body `tool` (`*` or a name of 1 to 64 chars), `pattern`, `reason`: each non-blank text of at most 400 chars, else 400 `{error}` | `--ignore-add <tool> <pattern> <reason>` | 20 s |
+| `POST /cycle` | | `--cycle now` | 90 s |
+| `POST /cycle/stop` | | `--cycle stop` | 90 s |
+- A cycle's refusal is the worker's ANSWER, 200 `{started: false, why, …}`: only a fault is a 5xx. `CYCLE_TIMEOUT_MS` clears the worker's own lock wait (`LOCK_WAIT_S`, 45 s).
+
+## GET /sessions?ids=<ids>
+- `ids` is ONE comma-joined query value: 1 to 200 (`SESSIONS_MAX`) lowercase uuids (`SESSION_ID`, anchored). Anything else answers 422 `{error: "ids must be 1 to 200 comma-joined lowercase uuids"}` in the route, before a worker starts: missing, empty, repeated (`?ids=a&ids=b`), uppercase, a trailing comma or newline, 201 ids. The worker holds the same two rules (`heal_sessions_read.parse_ids`), so its exit 2 for a malformed list is not reached through the route.
+- 200: the worker's object WHOLE, `{sessions, items, heals}` (MAN-9879), never reshaped here (`HealSessionsAnswer = Record<string, unknown>`): one place writes the shape down.
+- The worker's exit 2 for an unreadable ledger (INV-11810) is a non-zero exit: 503 below, its sentence in `error`.
+- No cache: one worker spawn per request.
+
+## faults — `HealFault` → status, body `{ error: <message> }`
+| fault | status | when | message |
+|---|---|---|---|
+| `unreachable` | 503 | the worker exits non-zero (the unreadable ledger's exit 2 included), is not on this host, or passes its ceiling | `the heal worker could not be asked (<its stderr>)` |
+| `unreadable` | 502 | the worker's stdout is not one JSON object, lacks the field a door slices off it (`ignore`'s array, `addIgnore`'s two counts), or passes `maxBuffer` | `the heal worker did not answer with a JSON object`; `the heal worker's answer passed the <N> MiB this lane carries` |
+- `maxBuffer`: `OUTPUT_MAX_BYTES` 4 MiB for every door, `SESSIONS_OUTPUT_MAX_BYTES` 32 MiB for `/sessions`, whose answer grows with the rows of the sessions asked. `execFile` kills the worker on overflow and leaves stderr empty, so `ask()` names the size itself (`ERR_CHILD_PROCESS_STDIO_MAXBUFFER`).
+- Measured 2026-11-13: the 200 busiest sessions answer 7.7 MB (5,858 rows); 4 MiB refused that legal request with a 503 that named nothing.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/heal/heal.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/heal/heal.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/heal/heal.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/heal/index.ts
+
+## MAN-9881 — src/modules/heal — the second surface: HealCardView, HealItemRow, their two presses, HealSessionsAnswer and trendMark
+
+The Inbox's Heal section (`HealPanel`, MAN-9013) and Cerberus's Uploads view draw the same heals and friction rows from the same pieces, so the two tabs cannot word one heal or one row differently. The Uploads view (`src/modules/upload-runs`, MAN-9891) draws the heals and rows filed in a run's Claude session in its sheet's `RunFrictionSection`; the read through `api.heal.sessions` (MAN-9882) is its fill's, and until then it draws fixtures of that shape. The panel stays lazy; the pieces below are static exports of `src/modules/heal/index.ts`.
+
+## Exports
+| export | file | what | the caller hands it |
+|---|---|---|---|
+| `HealCardView({ heal, onOpenChain })` | `HealCardView.tsx` | one heal as a whole card: kind, who fired and built it, status and clock, Athena's verdict, rows closed, spend, shapes claimed, and Open brief where its chain launched. Handles `data-heal-card`, `data-heal-id`, `data-heal-status`, `data-heal-open-chain` | `onOpenChain`: `useOpenHealBrief()` |
+| `HealItemRow({ item, onOpen })` | `HealItemRow.tsx` | one friction row as ONE `<li>` (`data-heal-item`); the caller owns the `<ul>`. A row with a transcript carries the press `<file>.jsonl:<line>` | `onOpen`: `useOpenFrictionLine()` |
+| `useOpenHealBrief()` | `hooks/useOpenHealBrief.ts` | `(heal) => void`: opens `state/heal_reflex/briefs/<heal id>.md` at line 1; nothing for a heal whose `chain_id` is `null` | |
+| `useOpenFrictionLine()` | `hooks/useOpenFrictionLine.ts` | `(item) => void`: opens the row's `transcript` at its `transcript_line`; nothing for a row with none | |
+| `HealCard`, `HealItem`, `HealSessionsAnswer` | `healTypes.ts` | the types the two components and the verb speak | |
+First surface: `HealCardList` draws the cards, `HealKindList` the rows and their trend. The card's text keys are `heal.cards.*`, the row's `heal.kinds.*`. The card's spend line is INV-4893's: it names `DeepSeek` itself.
+
+## Rules an editor must not break
+- `HealCardView` and `HealItemRow` draw on two tabs: a change to either changes the Heal tab and the Uploads view, so a layout change is judged at both. why: one drawing is what the export is for.
+- A press hook lives in `hooks/`, never in a component's file. why: `react/only-export-components` warns on a hook exported from a `.tsx` component file.
+- A press does nothing, and says nothing, where no workspace has registered its opener: outside `PaletteOpsProvider` (the app's one layout mounts it) or before `WorkspaceMain` has registered. A card or row drawn in a root of its own must stand under the provider.
+- A press brings the Files view forward: it leaves the tab it was made in.
+- `HealItemRow`'s transcript press never outgrows its row (`min-w-0 max-w-full` on the button): the file name gives way with an ellipsis and the `:line` after it never does, since the line is what the reader came for. Keep the two as separate spans. The press's `innerText` breaks between the name and the `:line` (two block-level flex items) and its `textContent` does not: a probe reads `textContent` (2026-11-13, headless Chromium: `<name>.jsonl\n:42` against `<name>.jsonl:42`). Measured 2026-11-13: at 390 px none of the 400 presses in the live Heal tab's opened kinds ends past its row, and the Uploads view's run sheet, mounted from its fixtures on the live client, does not pan sideways; at 1440 px every press is drawn whole, as before.
+- Open defect, 2026-11-13: `HealItem.soul` and `.ignored` are typed `boolean`, but the worker's `--kind` answer prints the stored 0/1 (MAN-9879), and `HealItemRow` draws `{item.soul && …}` and `{item.ignored && …}`: a row holding `0` draws a stray `0` in the Heal tab. Of the newest 200 `tool-error` rows `ignored` is `0` on 161 and `soul` is `0` on 4. `--sessions` sends booleans, so the Uploads view's rows draw none. The cure is the worker's `--kind` answer (`heal_reflex.py`, outside this repo) or the row's two conditions.
+
+## `HealSessionsAnswer` — `healTypes.ts`
+The worker's `heal-reflex --sessions` answer (MAN-9879), relayed whole by `GET /api/heal/sessions`; the lane types it `Record<string, unknown>` (MAN-9880), so this type is the one place the browser writes the shape down. Rows are reported as stored: nothing in it counts what is live (that is `kinds` in the summary, and only there).
+| key | holds |
+|---|---|
+| `sessions` | the ids asked for, as the worker echoed them |
+| `items` | every friction row filed in one of those sessions, newest first, the ignored too: a `HealItem` plus `session`, `claimed_by` (the claiming heal's id, `null` while none) and `regression` (the returning shape, `null` when none) |
+| `heals` | every heal that claimed or cured one of those rows: a `HealCard` plus `claimed_here` and `cured_here` (row ids) and `fix_said` (the builder's line of what the fix was; `null` when its chain recorded none) |
+- A heal can arrive thin: `cured_here: []`, `fix_said: null` and builder `—` when its chain directory is gone (2026-11-13: `heal-tool-error-20261008-030237-22b0`). Draw it as claimed, not cured, with no builder's line.
+- 2026-11-13: the real worker's answer matched the type key for key, for one session and for 200.
+
+## `trendMark(trend)` — `src/shared/trend.ts`
+`'up' | 'down' | 'flat' | null` → `{ glyph, word, tone }`.
+| trend | glyph | word | tone |
+|---|---|---|---|
+| `up` | ↑ | rising | warn |
+| `down` | ↓ | falling | positive |
+| `flat` | → | steady | neutral |
+| `null` | — | no trend | neutral |
+A null trend says so and never draws an arrow. A rising count reads as the worse direction: use it for counts of trouble (friction rows, hiccup runs), never for counts of successes. It is a file of its own in `shared/` so the Heal tab's kind rows (`HealKindList`) and the Uploads view's type counts (`UploadTypeCounts.trend`) say rising, steady and falling in the same words. `trend.ts` joins `.oxlintrc.json`'s `frontend-shared-file` list (INV-5890).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealCardList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealCardView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealItemRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealKindList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/healTypes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/hooks/useOpenFrictionLine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/hooks/useOpenHealBrief.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/trend.ts
+
+## MAN-9882 — Upload-runs client wire — src/shared/upload-runs-types.ts, api.uploadRuns and api.heal.sessions
+
+The browser's typed view of the upload-runs lane (`/api/upload-runs`, the Uploads view of the Cerberus tab): one wire-type file and one `api` block, on the Bulletins precedent (MAN-8865). The one home of every body is shadow-connector's `core/upload_engine/agent_sessions/`; the types follow it key for key, and the header of `upload-runs-types.ts` states the two stream framings.
+
+## Files
+| file | holds |
+|---|---|
+| `src/shared/upload-runs-types.ts` | 11 object types — `UploadRunsOverview`, `UploadTypeCounts`, `UploadRunSummary`, `UploadRunReason`, `UploadRunWhole`, `UploadWalk`, `UploadWalkStep`, `UploadConfirmation`, `UploadRunEvent`, `UploadRunEventsPage`, `UploadRunsFrame` — and 6 unions: `UploadType`, `UploadRunsWindowDays`, `UploadRunVerdict`, `UploadRunTone`, `UploadRunReasonTone`, `UploadRunReasonCode`. Imports nothing from `server/`. |
+| `src/shared/api.ts` | `api.uploadRuns`, 5 verbs, beside `api.carrierBulletins`; `api.heal.sessions`, beside `api.heal.summary` |
+| `.oxlintrc.json` | `upload-runs-types.ts` in the `frontend-shared-file` list (INV-5890) |
+
+## Verbs
+Every verb is a GET: the view is read-only. A session id goes through `encodeURIComponent` inside the verb. A failure arrives as `{ error }` from the lane, or `{ detail }` passed through from shadow-connector.
+| verb | route | answer |
+|---|---|---|
+| `uploadRuns.overview({ days?, by?, tests?, account? }, options?)` | `GET /api/upload-runs/overview` | `UploadRunsOverview`; `days` 7, 30 or 90 (30 left out); `by` one `generated_by`; `tests: true` goes out as `tests=1` and brings dry runs in |
+| `uploadRuns.run(sid, options?)` | `GET …/runs/:sid` | `UploadRunWhole`; 404 no such run |
+| `uploadRuns.events(sid, { after?, limit? }, options?)` | `GET …/runs/:sid/events` | `UploadRunEventsPage`; `after` the last `seq` held (0 for the first page); `limit` 500 left out, at most 1000 |
+| `uploadRuns.streamUrl(sid, from?)` | `GET …/runs/:sid/stream` | a URL for `EventSource`: `bubble` events, each an `UploadRunEvent`, after `from`; non-200 for a run that is not live (410 for an ended run the engine still holds, else 404) |
+| `uploadRuns.feedUrl()` | `GET …/feed` | a URL for `EventSource`: an `UploadRunsFrame` per `message` event |
+| `heal.sessions(ids, options?)` | `GET /api/heal/sessions?ids=<comma-joined>` | `HealSessionsAnswer` (MAN-9881); 1 to 200 lowercase uuids, else 422 `{ error }`; the lane is MAN-9880, the worker's shape MAN-9879 |
+The two URLs carry the stored token as `?token=`, because an `EventSource` cannot send an Authorization header: `authenticateToken` reads it there, and the lane must not forward it upstream.
+
+## Rules an editor must not break
+- A body changes in the engine first; the mirror moves in the same change. why: a key renamed on one side is a screen that stops reading.
+- The cursor is the last `seq` HELD, for `events` (`after`) and for `streamUrl` (`from`, and the browser's `Last-Event-ID`): the engine replays `seq > from` (`routes_stream.py`, `registry.replay`), and `Last-Event-ID` wins over `?from=`. Pass `streamUrl(sid, lastSeq)`, never `lastSeq + 1`: that skips event `lastSeq + 1`. `from` 0 replays what the run's ring still holds; a ring that overflowed sends a `replay_gap` event first.
+- An `EventSource` that gets a non-200 fails for good and never re-dials: for a run that is not live, read the stored run (`run`, `events`) and do not retry `streamUrl`.
+- A run's stream sends the NAMED SSE event `bubble` (an `EventSource` listens with `addEventListener('bubble', …)`); the feed sends the default `message`. `replay_gap` and `subscriber_dropped` carry `seq: 0` and no `id:`.
+- `UploadRunEvent.truncated` is absent, `true` or `null`: test it as truthy, never `=== true`. why: the engine builds the `brief` and `operator_text` bubbles by hand with `"truncated": cut or None`.
+- Closed unions: verdict, tone, reason tone, reason code. Open text: `state`, `role`, `mode`, `outcome`, a step's `status`, an event's `kind`. A screen draws a word it does not know as a neutral line with the word as data.
+- A walk is armed when `armed` says so: read `armed`, never `mode` (`mode` holds old values such as `armed` and `dry`). A step is in trouble when its `status` says so, never because `reason` is set: a step that went fine can carry one.
+- `null` means "not known", never "clean": `bumpy` and `refused_count` on a walk the engine never scored, `ended_at` on an open run. A body field is always present; the keys left out when a thing has none are a reason's `count` and `detail` and a bubble's own fields.
+- `UploadConfirmation.bookkeeping_revoke` `false` does not say a person withdrew the confirmation (MAN-3555).
+- Keys are the wire's snake_case; datetimes are ISO text; ids are text.
+
+## Standing of the other side
+- 2026-11-13: no lane module under `server/modules/`; `runs_read.py` and `run_verdict.py`, which the header names for the overview, the run and the verdict, are not in `core/upload_engine/agent_sessions/`. `runs_feed.py` and `routes_stream.py` are, and `UploadRunsFrame` and the stream framing were checked against them. Nothing calls `api.uploadRuns` or `api.heal.sessions`; the wire types are read only by `src/modules/upload-runs` (MAN-9891).
+- `UploadRunsOverview.filters.tests` is typed `boolean`; the design does not say whether the engine echoes a boolean or `0|1`. Change the type to match when `runs_read.py` lands.
+
+## Measured
+- 2026-11-13, against the live engine: `UploadRunEvent` on 1,221 bubbles of the 359 upload-agent logs on disk (`normalize.to_bubbles`), and `UploadWalk` with `UploadWalkStep` on 1,871 `upload_flow_runs` rows (37,709 steps) through `runs_lookup.walks_by_ids`: no key or value outside the type.
+- 2026-11-13: `bumpy` is null on 124 of the 128 armed walks, so a verdict that reads only the stored `bumpy` gives `walk_bumpy` to almost none of the imported history.
+- 2026-11-13: `upload_action_grants` holds 22 grants and none pins a walk's run (`scope.confirmed_run_id`): no real `UploadConfirmation` has been read; all 22 pass `confirmation_from` with each field typed as the type says.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/upload-runs-types.ts
+
+## MAN-9891 — src/modules/upload-runs — the Uploads view, scaffolded over fixtures: its state, files, the root's contract and its words
+
+The Uploads view of the Cerberus tab: what happens when a person uses Restorly's Uploads page, run by run. A RUN is one press of Start upload that took the slot. It is the tab's sixth view, after Bulletins (MAN-7868). Plan `uploads-in-cerberus`: the scaffold (this module) draws every state over fixtures; the fill reads real data and mounts the view. Wire types and verbs: MAN-9882. The heal row and heal card it draws: MAN-9881. What an edit to it must keep: INV-11822. The fill's markers, the fixtures and the tab wiring: MAN-9892.
+
+## State — 2026-11-13
+| fact | holds |
+|---|---|
+| mounted | no. Nothing outside the module imports `@/modules/upload-runs`. `uploads` is in none of `CerberusView` (`src/shared/types.ts`), `KEPT_VIEWS` (`src/modules/cerberus/hooks/useKeptViews.ts`), `VIEWS` or the panel's `KeptView`s. `CerberusPanel.tsx` holds two `FILL:` comments, `uploads-row` and `uploads-panel` (MAN-7867) |
+| reads | none. No `api.uploadRuns` or `api.heal.sessions` call exists; the root takes its reads and its clock from `fakeScene()` |
+| presses | every one is `unwired()`: it changes nothing |
+| words | `cerberus.uploads.*`, 332 strings in 22 groups (below) |
+| gate | 20 fixture scenes × light and dark × 1440 and 390 px: 392 checks, 0 failed, no console error, 192 pictures; `npm run typecheck` and `npm run lint` exit 0. The script is `/tmp/iris-uploads-work/uploads-scaffold.mjs`, outside the repo (it mounts the view through `.verify/lib/mountReact.mjs` and `console.mjs`) |
+
+## Files — `src/modules/upload-runs/`
+| file | draws or holds |
+|---|---|
+| `index.ts` | the barrel: `UploadsView`, `lazy`, its own chunk |
+| `UploadsView.tsx` | the root `UploadsView({ shown })`: holds the window, the filters, the open run's session id and the pill last pressed; every state; `PILL_TARGET`; the `FILL:` markers |
+| `UploadsHead.tsx` | eyebrow, headline with a tone accent, scope line and the press that lifts it, summary, window switch (7, 30, 90), Refresh |
+| `UploadsPills.tsx` | five pills: Runs, Hiccups, Live now, Last run, Healed; each carries the reader to a section |
+| `LiveNow.tsx` | the one live run: working or waiting on a person, its newest step, turns and tool calls, Open |
+| `UploadsBody.tsx` | the two columns once the view itself is 48rem wide (it is a size container; the window never decides): By upload type and How often, then Runs. Section ids `uploads-types`, `uploads-often`, `uploads-runs` |
+| `UploadTypeList.tsx` | Initial and Final, one row each in the heal tab's kind-row anatomy: clean, hiccups, trend (`trendMark`, `src/shared/trend.ts`), regression mark; a row opens to its runs, hiccups first |
+| `HowOften.tsx` | by day (a column a day, today last) and by hour (24 cells) |
+| `RunList.tsx` | Runs: chips (people, Hiccups only, Test runs, accounts once two have runs), the list's states, 25 rows then Show more |
+| `RunRow.tsx` | one run as one `<li>`; the caller owns the `<ul>` |
+| `RunSheet.tsx` | one run in the shared `Sheet`, five sections in order; drawn only while the view is shown |
+| `RunSheetHead.tsx` | the sheet's head: verdict, ending sentence, facts, a strip of three steps (walked for real, confirmed, pressed) |
+| `RunBumps.tsx`, `RunEvents.tsx`, `RunWalks.tsx`, `RunAfter.tsx`, `RunFrictionSection.tsx` | the five sections: Speed bumps, Inside the run, The flow it walked, After the run, The agent's own friction (`HealItemRow` and `HealCardView` through `@/modules/heal`) |
+| `utils/uploadsModel.ts` | the contract, types only: `UploadsWindow`, `UploadsFilters`, `RunFriction`, `DayBucket`, `LiveStep`, `UploadsRead`, `RunSheetRead`, `UploadsPillKey`, `UploadsTally` |
+| `utils/uploadsWords.ts` | pure words, each taking `t` and data: a verdict's look, ages, durations, a reason's sentence, the ending sentence, an event's line |
+| `uploads-fake.ts`, `uploads-fake-runs.ts`, `uploads-fake-sheets.ts` | the fixtures (MAN-9892) |
+
+## The root and what it is handed
+- The root holds the window (`UploadsWindow`), the filters (`UploadsFilters`), the open run's session id and the pill last pressed. `RunList` holds one more, how many rows are drawn; `RunEvents` holds the open line by its event id.
+- Everything else arrives as `UploadsRead` (the window) and `RunSheetRead` (the open run), plus the clock `now` in epoch ms. A part draws what it is given.
+- Derived in the composition: the head's tally (armed runs of `overview.runs`) and Hiccups only (filters the answer in hand, in the body, so the Runs badge and the rows are one number).
+- `friction: null` with `frictionFailed: false` is "still out"; `null` with `true` is "could not be read". Neither is "no friction".
+- `onFilter` re-reads for a change of `by`, `tests` or `account`; `hiccupsOnly` alone re-reads nothing.
+- A probe selects by `data-uploads-*` and `data-upload-*` attributes (40 names: `grep -rho "data-upload[a-z-]*" src/modules/upload-runs | sort -u`); `data-uploads-view` on the root reads `loading`, `trouble`, `ready` or `stale`.
+
+## Words — `cerberus.uploads.*`
+`src/modules/i18n/locales/en/common.json`, under `cerberus`, after `bulletins`. English only; a login, customer, flow, step name, reason detail or tool summary is data, never a key (MAN-7870).
+| group | n | holds |
+|---|---|---|
+| `tab`, `tabHint`, `loading` | 3 | the strip's name and hint (read by the fill's `VIEWS` row), the spinner label |
+| `head` | 41 | headline states with their accents, scope and its clear press, summary, window switch, Refresh |
+| `pills` | 21 | the five pills and their titles |
+| `live` | 14 | the Live now card |
+| `sections` | 8 | the three sections' titles and hints |
+| `types` | 14 | By upload type |
+| `often` | 16 | How often |
+| `runs` | 25 | the Runs list: chips, friction marks, empty and Show more |
+| `verdict`, `who`, `type`, `flow`, `job`, `duration` | 14 | words `uploadsWords.ts` composes |
+| `reasons` | 48 | one sentence per reason code, 18 codes |
+| `ending` | 16 | the ending sentences |
+| `events` | 26 | one line per event kind, and `unknown` |
+| `sheet` | 79 | `heading`, `facts`, `testNote`, `stage`, `trouble`, `bumps`, `events`, `walks`, `after`, `friction` |
+| `trouble`, `empty` | 7 | the first-read fault and its retry; the empty window |
+
+## Open
+- `UploadsRead.regression` is a boolean per type: nothing points a type's regression mark at the run that earned it. The mark's hint sends the reader to the run's sheet, under The agent's own friction, on the row that came back.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/
+
+## MAN-9892 — src/modules/upload-runs — the fill's work: the FILL: markers, the fixture scenes the fill deletes, the tab wiring and the departures from the plan's design
+
+What the fill (plan `uploads-in-cerberus`, after the scaffold) replaces, deletes and keeps in `src/modules/upload-runs`. The module: MAN-9891. Rules: INV-11822. `grep -rn "FILL:" src/modules/upload-runs` lists every marker; each comment says what its fill is.
+
+## The markers — 2026-11-13: 21 comments, 20 names
+| kind | n | markers | file |
+|---|---|---|---|
+| data hooks | 3 | `useUploadsRead`, `useLiveRun`, `useRunSheet` | `UploadsView.tsx` |
+| pure fills | 4 | `joinFriction`, `typeRegression`, `bucketDays`, `bucketHours`; `useUploadsRead` hands their results over inside `read` | `UploadsView.tsx` |
+| the clock | 1 | `now`: epoch ms; a tick a second only while a run is live and the view is shown | `UploadsView.tsx` |
+| handlers | 10 | `onWindow`, `onRefresh`, `onFilter`, `onOpenRun`, `onCloseRun`, `onShowEarlier`, `onRetry`, `onPill`, `onOpenFriction`, `onOpenBrief` | `UploadsView.tsx` |
+| fixtures | 2 | `fake`: the import of `uploads-fake`, and the `fakeScene()` line with the three initial states | `UploadsView.tsx` |
+| events pane | 1 | `followNewest`: a ref on the pane, for the live case alone; the layout already rests the pane at its foot and holds the reader's line when Show earlier prepends | `RunEvents.tsx` |
+- `useLiveRun`'s answer is `read.live`: `useUploadsRead` composes it, so the root reads it once. `onOpenFriction` is `useOpenFrictionLine()` and `onOpenBrief` is `useOpenHealBrief()`, both from the heal barrel (MAN-9881).
+- `RunEvents` draws two Show earlier presses (`data-uploads-show-earlier` `head` and `pane`) over the one `onShowEarlier`: wire one handler.
+- The sheet's first events read is the newest 500, and Show earlier reads the 500 before the first on screen. Reading from seq 0 opens the pane on the run's oldest page.
+
+## In the Cerberus tab
+- `uploads` is named in none of four places the fill adds it to: `CerberusView` (`src/shared/types.ts`), `KEPT_VIEWS` (`src/modules/cerberus/hooks/useKeptViews.ts`), `VIEWS` and a `KeptView` mount (`CerberusPanel.tsx`; the last two are where the `FILL:` comments `uploads-row` and `uploads-panel` stand).
+- At the fill, delete both comments, and edit what says otherwise: MAN-7867 (two `FILL:` comments stand in `src/modules/cerberus`), MAN-7868's map row for the view (not mounted) and its rule on the two modules the root reaches (a third).
+
+## The fixtures
+- A scene is everything the root holds or is handed at one moment: the clock, the window, the filters, the open run and the two reads. The root draws `fakeScene()`; a fixture script names a scene with `setFakeScene(name)` and mounts the view again. The app never calls `setFakeScene`.
+- 20 scenes (`FAKE_SCENES`), each with a comment in `SCENES`. Anchors: `sheet1007` is the 2026-10-07 run (imported, stopped by a person after 4 m 48 s, one tool-error row and the heal that claimed it, no fix line); `sheetDense` is a run of 1,500 events with the newest 500 on screen; `sheetEvery` holds every reason, a halted walk and a revoked confirmation; `tests` lists test runs under two accounts.
+- Shapes, ids, timings and endings follow the real record; the names are invented. No real customer name, login or email goes into source: the real history holds homeowners' names and the operator's email.
+- The fill deletes `uploads-fake.ts`, `uploads-fake-runs.ts`, `uploads-fake-sheets.ts` and the one import in `UploadsView.tsx`; `unwired` goes with them. The scaffold split one fixture file into three to stay under 300 lines.
+
+## Departures from the plan's design (SEAM 12), each deliberate
+- A run waiting on a person turns the head's headline, the Live now pill and the Live now card to the warn tone, not info.
+- "N hiccups" on a type is red only while hiccups outnumber clean runs, amber otherwise.
+- A type row starts closed even with a regression; opened, its runs list hiccups first.
+- The sheet's head adds a strip of three steps (walked for real, confirmed, pressed), counted from the run's walks and confirmations.
+- A test run's mark and reason chips are grey in the list.
+- The Hiccups pill is grey, not green, when the window holds no run.
+- The head's scope press for a person plus an account reads "Show everyone, every account"; the list's "Show every run" clears more.
+- Each heal card in a sheet carries its heal's id over it with this run's part (claimed, cured): a came-back line names a heal by id.
+- `Meter` is used nowhere.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/
+
+## MAN-9896 — The shadow-connector lane's stream mode — stream, relayEventStream, hangUpSignal and the wire (server/shared)
+
+`server/shared/shadow-connector-lane-stream.ts` is the lane's second verb, `stream`, beside the forwarder's `forward` (MAN-8863): it opens one of shadow-connector's event streams with the internal secret, and the lane router (MAN-8908) writes it to the browser as it arrives. `server/shared/shadow-connector-lane-wire.ts` is what both verbs send and say alike (the headers, the URL, a failure's sentence). Both files are listed in `.oxlintrc.json`'s `backend-shared-utils` (INV-6548); the stream's types are exported from `server/shared/index.ts`.
+
+**Why a stream mode.** A view that is TOLD of every change (the upload runs' feed, a live run's bubbles) holds an event stream open. shadow-connector's surface is internal-caller gated (R-CAP-11: `X-Internal-Secret` even from loopback) and the browser never holds the secret, so this server is the one hop that can. Consumer: the `upload-runs` lane (its `/feed` and `/runs/:sid/stream` rows are `expect: 'stream'`). The two lanes that stood before it never touch this file's code path.
+
+| export | does |
+|---|---|
+| `createLaneStream({ origin, currentSecret, label })` | built by `createShadowConnectorLane`, which hands it ITS `currentSecret`: the stream reads no env file of its own (INV-8633 rule 1). Returns `stream` |
+| `LaneStreamRequest` | `{ path, query?, actingUser, budget, lastEventId, connectTimeoutMs, hangUp }`; the router has validated every part. `lastEventId` is a whole number or null; `hangUp` is an `AbortSignal` |
+| `LaneStreamAnswer` | `{ ok: true, kind: 'stream', body: Readable }` (a 200 `text/event-stream`; destroying `body` closes the upstream), or any `LaneAnswer` but bytes: `{ kind: 'json', status, body, headers: {} }` for every other answer, or a fault (`unreachable`, `unreadable`, `no_secret`) |
+| `hangUpSignal(response)` | an `AbortSignal` that fires when the browser's connection ends before the response finished (`response` `close` with `!writableFinished`; a finished response closes too, and that is no hang-up) |
+| `relayEventStream(response, body)` | writes `200`, `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`, flushes the headers, and `pipeline`s the upstream's bytes to the response unchanged |
+| wire: `laneHeaders`, `upstreamUrl`, `describeFailure`, `NO_SECRET_MESSAGE` | the secret header (a PARAMETER there: it is read in `shadow-connector-lane.ts` only), `Accept`, `X-Acting-User`, `X-Gemini-Budget-Plan`; the URL built with `searchParams`; a failure's sentence from an error's NAME and its cause's CODE only |
+
+Rules (they bind both files; INV-8633 holds them for every lane):
+1. The connect is bounded by the row's `timeoutMs`; an open stream is not. The bound is its own `AbortController` and timer, cleared when the answer is decided, and NOT `AbortSignal.timeout` (which would cut the stream at that mark too). A non-stream answer keeps the bound through its body, so a JSON answer that stalls after its headers is `unreachable` (503 `shadow-connector did not answer within N s`), not a hung request.
+2. The browser hanging up aborts the upstream at any point from the connect to the last byte: the `hangUp` signal is on the `fetch` for its whole life, and `pipeline` destroys the body when the response closes. A hang-up while connecting writes nothing (there is nobody to write to); a live body that arrives after the hang-up is destroyed; a browser already gone when the stream is asked for (it left while the mount checked its token) gets a signal that is already aborted, so no upstream is opened for it.
+3. Only a 200 whose Content-Type is `text/event-stream` is a stream. Every other answer is relayed with its status and its JSON (a 410 for an ended run carries the run's summary; a 503 for a full feed) and never turned into a stream, because a browser's `EventSource` FAILS on a non-200 and never dials again, while a 200 that closes arms its ~3 s retry loop. A 200 that is not JSON is `unreadable` (502).
+4. The bytes are the upstream's, unchanged and unbuffered: a frame reaches the browser when the engine sent it. `X-Accel-Buffering: no` asks a reverse proxy to do the same.
+5. The upstream request carries `X-Internal-Secret`, `Accept: text/event-stream`, `X-Acting-User` (display only), `X-Gemini-Budget-Plan` (the REQUEST's, from `relayBudgetOf`) and the browser's `Last-Event-ID`. The router forwards `Last-Event-ID` only when it is 1 to 10 digits; anything else is dropped (the engine ignores a value that is not a number, and an `EventSource` cannot be asked to fix a header). `fetch` runs `redirect: 'manual'` (INV-8633 rule 6).
+6. The browser's `?token=` is read by the mount's `authenticateToken` and is not a row's query key, so it is dropped by `forwardedQuery` and never leaves this server.
+7. An upstream that breaks mid-stream (a restart, a reset) ends the browser's stream, which makes its `EventSource` dial again; one line is logged: `[<label>] an open event stream broke: CloudCLI could not reach shadow-connector (<code>)`. Never logged: the browser going (that is the hang-up), the secret, an error's message.
+8. A `stream` row is GET with no body, and the router refuses a table with a `stream` row and no `stream`, or a `bytes` row with no image type, when the router is built (the server does not start), not on the first request.
+
+Traps
+| trap | fact |
+|---|---|
+| `fetch` refuses some low ports | undici answers `bad port` (no `code`) for port 1, 7, 9, 11 and the like, so a probe of "engine down" against `127.0.0.1:1` shows `CloudCLI could not reach shadow-connector` without `(ECONNREFUSED)`. A closed port that was just free shows the code |
+| `req.on('close')` is not "the browser went" | on Node 16+ it fires when the request has been read, which for a GET is at once. The hang-up is `response.on('close')` with `!response.writableFinished` (the house's `voice.routes.ts` does the same) |
+| the HTTP client times a silent body out at 300 s | undici's `bodyTimeout`; the engine's `: keepalive` comment every 15 s keeps a live stream under it, and a dead upstream ends the stream by it |
+| HEAD on a stream row | Express hands it to the GET handler, so the stream opens upstream and closes with the browser; it holds nothing a GET would not |
+
+Measured 2026-11-13 on the live system (dev API :3011 → shadow-connector :8001):
+- A dry launch on :8001's internal door while the lane's `/feed` and the engine's own `/feed` were both held open: both captures were byte-identical (513 bytes: `: connected`, then the `opened`, `state` ×2 and `ended` frames).
+- A live run's `/runs/:sid/stream` through the lane against the engine's own: from 0, with `Last-Event-ID: 2` and with a garbage `Last-Event-ID` (dropped) — byte-identical (3142 and 1837 bytes; ids 1-9 and 3-9). The ended run's stream answered 410 with the run's summary, an unknown run 404, `limit=5000` the engine's 422, each identical to the engine's own.
+- The CloudCLI server's connections to :8001 (by its pid, `ss -tnp`): 0 before, 1 while a browser held the feed, 0 after it hung up.
+- The same feed through the fronts a browser uses — Vite dev :5183, `vite preview` :5184 — beside the lane :3011 and the engine, all held open across one dry launch: all four captures byte-identical (513 bytes), the server holding 3 connections to :8001 for the 3 browsers and 0 after they hung up.
+- A scratch engine (a stand-in HTTP server, the lane built on it): the secret, `Accept`, `Last-Event-ID`, budget and acting user arrive and `token` does not; a stream that outlasts the bound is relayed as it arrives (first byte at 25 ms, the next at 1527 ms against a 500 ms bound); a silent engine is a 503 inside the bound; a hang-up while connecting and one mid-stream each close the engine's side; a break mid-stream ends the browser's stream with one log line holding no secret; 200 JSON, 410, 200 HTML (502) and 302 (502, not followed) are relayed as above; no secret is 503 with nothing sent; a json row through the same lane is unchanged. 24 of 24 checks.
+- The Tours and bulletins lanes, before and after: bodies and headers identical for a JSON read, a bytes read (PNG sha256 equal), a 422, a 404 and a malformed escape.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-wire.ts
+
+## MAN-9897 — The upload-runs lane — /api/upload-runs forwarded to shadow-connector's run record (two of its five routes are event streams)
+
+`server/modules/upload-runs/` is the third lane between the browser and shadow-connector's internal-caller gate (R-CAP-11: `X-Internal-Secret` required even from loopback), in the carrier-bulletins lane's shape (MAN-8909) and the first with event streams. It relays the five GET routes of `/api/upload-agent-runs` — what each upload run did, and the feed that tells of every run's edge and walk step as it happens — and nothing else. Mounted in `server/index.ts` at `/api/upload-runs` behind `authenticateToken`, beside the bulletins lane. The browser never holds the secret; the Cerberus tab's Uploads view is its caller.
+
+**Why a lane.** The engine's surface demands the internal secret and a browser must not hold it. CloudCLI's server already authenticates the operator, so the lane is the one hop: it reads the secret from shadow-connector's own env file per call (the shared forwarder, MAN-8863) and forwards. The view is TOLD of changes by the feed and, for an open live run, by that run's own stream, so the lane relays an event stream as it arrives (the stream mode, MAN-9896) and closes the upstream when the browser goes. The lane is read-only because the view is: it takes no action.
+
+| File | Holds |
+|---|---|
+| `upload-runs.module.ts` | `createUploadRunsModule()`; the ONLY reader of the environment for this lane |
+| `upload-runs.routes.ts` | `createUploadRunsRouter({ forward, stream })`: the five-row table and the rules; the shared router (MAN-8908) does the rest |
+| `index.ts` | barrel the entrypoint imports |
+
+## Configuration (none added)
+| Variable | Default | Meaning |
+|---|---|---|
+| `SHADOW_CONNECTOR_URL` | `http://127.0.0.1:8001` | engine origin |
+| `SHADOW_CONNECTOR_ENV_FILE` | `/opt/shadow-connector/.env` | file holding `EIS_INTERNAL_SECRET=` |
+
+The forwarder is built with `label: 'upload-runs'`, so its log warnings read `[upload-runs] no usable internal secret in <file>: <cause>` and `[upload-runs] an open event stream broke: <sentence>`.
+
+## Allowlist (5 rows in `ALLOWLIST`, GET only)
+A method+path not in the table is the lane's own 404 `{ error: 'not a route of the upload-runs lane' }`; it never reaches :8001. A query key that is not a row's is dropped, not forwarded (so an EventSource's `?token=` never leaves).
+
+| Method path | Query keys, each held to its rule | Bound | Reply |
+|---|---|---|---|
+| `GET /overview` | `days` 7\|30\|90; `by` `^[a-z_]+:[^\s]{1,160}$`; `tests` 0\|1; `account` a lowercase uuid | 30 s | json |
+| `GET /feed` | none | 10 s to connect | stream |
+| `GET /runs/:sid` | none | 30 s | json |
+| `GET /runs/:sid/events` | `after`, `limit`: 1 to 10 digits | 30 s | json |
+| `GET /runs/:sid/stream` | `from`: 1 to 10 digits | 10 s to connect | stream |
+
+`:sid` is `^[0-9a-f]{12}$` (the registry's `uuid4().hex[:12]`). The numbers' bounds are the engine's (a `seq` up to 2^31-1, a page of 1 to 1000): the lane only keeps a value from being anything but a number in the URL, and an out-of-range one is the engine's own 422 passed through.
+
+## Checks before forwarding (a failure is the lane's 422 `{ error: '<name> must be <expects>' }`, nothing sent)
+A bad `sid` (short, uppercase, 13 characters), `days=14`, `tests=2`, an uppercase `account`, a `by` with a space or with no `kind:`, a doubled `?days=7&days=30`, `after=-1`, `limit=abc`, `from=1x`, and a malformed percent-escape in the path are each a 422. An upload agent's own credential is refused by the engine (403), not here.
+
+## Status mapping and the streams
+An upstream answer passes through with its status and JSON untouched: the overview, a run whole, an events page, the engine's 404 (no such run), its 410 for `/runs/:sid/stream` of a run that is not live (the body carries the run's summary: `{ code: 'AGENT_SESSION_GONE', run: {…} }`), its 503 (feed full, run record unavailable) and its 422. The lane's own faults are `{ error }`: unreachable 503, unreadable 502, no secret 503 (MAN-8908 rule 4).
+
+The two stream rows write `200 text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`, flush, and pipe the engine's bytes through (MAN-9896). The feed's frames have no `id:` line, so a watcher re-reads the record on every open; a run's stream carries `id: <seq>` and the browser's `Last-Event-ID` is forwarded.
+
+## Rules an editor must not break
+1. **GET only.** No POST/PUT/DELETE row, no body forwarded. why: the view takes no action; a verb here would re-open that decision.
+2. **An id is checked before a byte leaves.** why: a malformed id is a 422 here and never a request, a journal line or a subscriber at the engine.
+3. **No timer, no cache, no model call.** The lane forwards per request; the only sockets it keeps are the open streams, one per watching browser, each closed with the browser that opened it.
+4. **The secret is not read here.** It stays in the forwarder (INV-8633).
+5. **A stream row's bound is its connect.** Do not give it a "generous" overall timeout: an open feed is meant to outlast any timeout.
+
+## Probes (2026-11-13, through the dev API :3011 with the dev login)
+- `GET /overview?days=90&tests=1` → 200, 102 runs, equal to the engine's own answer but for its `generated_at`/`window` stamps; `GET /runs/241c09797b5b` → 200, equal to the engine's.
+- 24 refusals: 15 of 422 (the list above), 7 of 404 (the unlisted `/nope`, `/runs`, `/runs/:sid/transcript`, the mount root, `POST /overview`, `DELETE /runs/:sid`, a bulletins path) and 2 of 401 (no token on a read and on the feed). `journalctl -u shadow-connector` showed 0 `upload-agent-runs` lines for them and one for a valid control call placed after.
+- `curl -sN '…/api/upload-runs/feed?token=…'` held open while a dry launch was made on :8001's internal door printed the `opened`, `state` (running), `state` (complete) and `ended` frames, byte-identical to the engine's own feed.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/upload-runs/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/upload-runs/upload-runs.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/upload-runs/upload-runs.routes.ts

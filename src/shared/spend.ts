@@ -36,7 +36,7 @@ import type { SpendParts } from '@/shared/types';
  * drawn two ways from that one answer: as pills by the dispatcher's `SpendPills` (every phase row and
  * stage line of a plan card, the card's own total, and its arc deck's books), and as a sentence by
  * {@link spendText} — whose remaining readers are the chat strip's launcher-soul pins
- * (`SoulLaunchPinRow`), the heal cards (`HealCardList`) and the dispatcher's Delete dialog
+ * (`SoulLaunchPinRow`), the heal cards (`HealCardView`) and the dispatcher's Delete dialog
  * (`DeletePlanDialog`), which names what a drop takes. Each screen draws the same figure from a
  * different record, and each of them feeding its own template literals is how one app ends up saying
  * `$0.41` on one screen and `0.41 USD` on the next — or a split on one and a total on the next. Every

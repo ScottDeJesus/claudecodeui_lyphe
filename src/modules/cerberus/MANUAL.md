@@ -19,6 +19,7 @@ The Cerberus tab: the fleet's health, on the views rail's house run. One provide
 | History | MAN-7877 (feed MAN-7888, lookup card MAN-7889, banner MAN-7890) | `history/*.tsx`, `hooks/useActivityFeed.ts`, `UnreachableBanner.tsx` |
 | Tours, the strip's fourth view, after History: the code is the module `src/modules/affected-areas` (`cloudcli:src/modules/affected-areas`), which the root imports through its barrel; drawn once center's overview has answered, mounted on its first show and kept `hidden` after | MAN-8575 (row map and numbers MAN-8576, rules MAN-8577); the root's side MAN-7891 | `CerberusPanel.tsx` (`VIEWS`, `KeptView`), `src/modules/affected-areas/*` |
 | the Bulletins view, the strip's fifth view, after Tours: the code is the module `src/modules/carrier-bulletins` (`cloudcli:.`), which the root imports through its barrel; read-only; drawn once center's overview has answered, mounted on its first show and kept `hidden` after, as Tours is | MAN-8880 (its wire MAN-8865; the root's side MAN-7891; the surround both views share MAN-8917) | `CerberusPanel.tsx` (`VIEWS`, `KeptView`), `src/modules/carrier-bulletins/*` |
+| the Uploads view, the strip's sixth view, after Bulletins: the code is the module `src/modules/upload-runs` (`cloudcli:.`); scaffolded over fixtures and not mounted yet (nothing imports its barrel; `uploads` is in no view list); read-only | MAN-9891 (the fill's work MAN-9892, its rules INV-11822; its wire MAN-9882, the heal pieces it draws MAN-9881; the root's side, the two `FILL:` comments: MAN-7867) | `CerberusPanel.tsx` (`VIEWS`, after the Bulletins `KeptView`: the two `FILL:` comments), `src/modules/upload-runs/*` |
 | the Mute and Enroll dialogs | MAN-7884 (Mute MAN-7892, Enroll MAN-7893, install step MAN-7894) | `modals/*.tsx`, `hooks/useEnrollmentStatus.ts`, `utils/enrollAsk.ts` |
 | the slots later plans fill, and the `FILL:` markers a scaffolded screen leaves for its fill | MAN-7867 | `SLOT:` and `FILL:` comments, `VIEWS` in `CerberusPanel.tsx` |
 | the fixes screen, live: Catalog view, a Needs-you card's fix, Fix output, the sheet's fixes, the run reads | MAN-7906 | `catalog/CatalogView.tsx`, `fleet/NeedFix.tsx`, `sheet/FixOutput.tsx`, `sheet/CheckFixes.tsx`, `hooks/useRunOutput.ts`, `hooks/useRunLastLine.ts`, `hooks/useCatalogRead.ts` |
@@ -36,7 +37,7 @@ The Cerberus tab: the fleet's health, on the views rail's house run. One provide
 - Layout of the module: `context/` (provider), `hooks/`, `utils/` (pure), `fleet/`, `sheet/`, `history/`, `catalog/` (the Catalog view), `modals/` (the dialogs).
 - Colour: no hex, `rgba(` or `var(--` in a className or style under `src/modules/cerberus/` (2026-10-06: none outside one comment). Tone reaches paint only as `data-tone` plus a `tone-*` name (MAN-739 rule 3); the set stays five, so denied is `danger` (MAN-739 rule 4).
 - A status is painted from one table, `STATUS_TABLE` (MAN-7873), and a state that speaks in colour also carries its icon or word (MAN-578).
-- Words: every sentence is a `cerberus.*` key through `t()`, English only; a label, reason, node name or description is data, never a key (MAN-7870). The Tours strip's two words are `cerberus.*` (`cerberus.tours.tab`, `cerberus.tours.tabHint`); the Tours view's own are `affectedAreas.*` (MAN-8575).
+- Words: every sentence is a `cerberus.*` key through `t()`, English only; a label, reason, node name or description is data, never a key (MAN-7870). The Tours strip's two words are `cerberus.*` (`cerberus.tours.tab`, `cerberus.tours.tabHint`); the Tours view's own are `affectedAreas.*` (MAN-8575). The Uploads view's, its strip name included, are `cerberus.uploads.*` (MAN-9891).
 - No unit tests: each seam is shown on the real app against the live center.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/
@@ -75,7 +76,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/Comm
 
 ## MAN-7867 — Cerberus — the slots later plans fill: every `SLOT:` and `FILL:` comment, the `VIEWS` table and `activityEvents`
 
-Where a plan plugs into the tab (the fixes plan's places are filled and live: MAN-7906, and so are the updates plan's: MAN-7934, the diagnosis plan's: MAN-7932, the auto-diagnosis plan's: MAN-9535, the tours plan's: MAN-8575, and the bulletins plan's: MAN-8880). No `FILL:` comment stands in `src/modules/cerberus`, and the rings-key row below is the one slot left. A plan whose screen is scaffolded and not yet filled marks its places `FILL:` (`grep -rn "FILL:" src/modules/cerberus`): each names what its fill mounts there, and the fill replaces it. Row map: MAN-7868.
+Where a plan plugs into the tab (the fixes plan's places are filled and live: MAN-7906, and so are the updates plan's: MAN-7934, the diagnosis plan's: MAN-7932, the auto-diagnosis plan's: MAN-9535, the tours plan's: MAN-8575, and the bulletins plan's: MAN-8880). Two `FILL:` comments stand in `src/modules/cerberus`, both in `CerberusPanel.tsx` and both the uploads plan's (uploads-in-cerberus): `uploads-row` in `VIEWS` and `uploads-panel` after the Bulletins `KeptView`; its fill replaces them with the Uploads view's row and its `KeptView`. The view's own markers are in `src/modules/upload-runs` (MAN-9892). The rings-key row below is the one `SLOT:` left. A plan whose screen is scaffolded and not yet filled marks its places `FILL:` (`grep -rn "FILL:" src/modules/cerberus`): each names what its fill mounts there, and the fill replaces it. Row map: MAN-7868.
 
 ## Rules
 - A slot is a comment (or a table row) and draws nothing: no placeholder, no empty container, no flag.
@@ -113,13 +114,18 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/tailwind.config.js
 
 ## MAN-7870 — The Cerberus screen's words — the cerberus block of en/common.json
 
-Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/modules/i18n/locales/en/common.json`, between `notes` and `applications`, plus `tabs.cerberus` (`Cerberus`, after `tabs.notes`). Wire shapes: MAN-7807; the REST surface the screen reads: MAN-7802; the module: MAN-7815. Sibling words row: MAN-7634.
+Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/modules/i18n/locales/en/common.json`, between `notes` and `applications`, plus `tabs.cerberus` (`Cerberus`, after `tabs.notes`). Wire shapes: MAN-7807; the REST surface the screen reads: MAN-7802; the module: MAN-7815. Sibling words row: MAN-7634. The group table: MAN-9893; the rules: MAN-9894, MAN-9895.
 
 ## Shape
 
 - `en` only (`fallbackLng: 'en'`, `src/modules/i18n/config.ts`): the other ten locales hold no `cerberus` block and no `tabs.cerberus`.
 - Read by the files under `src/modules/cerberus` (MAN-7871).
 - Nested multi-line objects, the file's own 2-space indentation.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+
+## MAN-9893 — The Cerberus screen's words — the cerberus block of en/common.json — `loading`
+section: The Cerberus screen's words — the cerberus block of en/common.json/001 `loading`
 
 | group | keys | holds |
 |---|---|---|
@@ -141,7 +147,16 @@ Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/
 | `mute` | 17 | the mute dialog and its toast |
 | `enroll` | 31 | the three-step enroll flow |
 | `updates` | 23 | the updates plan's dialog and header button (MAN-7934): `button.update` / `.updating` / `.upToDate` (the header's three states), `title` + `titleAccent`, `note`, `kept_*`, `versions`, `node`, `current`, `queued`, `updated`, `rolledBack`, `cancel`, `start_*`, `running`, `close`, `done`, `missed_*`, `finish` |
+| `uploads` | 332 | the Uploads view's words, read by `src/modules/upload-runs` and not by `src/modules/cerberus`: groups and counts in MAN-9891 |
 | `time` | 13 | spans and relative times |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+
+## MAN-9894 — The Cerberus screen's words — the cerberus block of en/common.json — `errors`
+section: The Cerberus screen's words — the cerberus block of en/common.json/002 `errors`
+
+| group | keys | holds |
+|---|---|---|
 | `errors` | 4 | `unreachable`, `retry`, `lastAnswer` (the banner's second line over a kept answer), `writeFailed` (the warn toast's title for a refused mute, lift or label write, and the Enroll dialog's banner title for a refused ask) |
 
 ## Rules
@@ -161,6 +176,12 @@ Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/
 - `activity.fix.*`, `activity.catalog.*`, `activity.source.fix` and `.source.catalog` are read by `fixEvent` and `catalogEvent` in `utils/activityEvents.ts`. The feed's `fix` line carries a result and the seconds it took but no exit code, so a failure reads `activity.fix.failed` ("Failed"); the exit code is said by `fix.strip.failedExit` and `fix.output.failedExit`, which read the run.
 - A name, label or command in the fixes' words is a `{{name}}` / `{{cmd}}` variable drawn through `t()`, never `Trans`: `Trans` escapes `<` in a label (MAN-7906).
 - `catalog.count_*`, `catalog.stats.allOk_*` / `someOk_*` and `catalog.auto.on_*` are plural pairs on `count`; `catalog.auto.on_hour_*` / `on_day_*` pick by `context` (`hour` or `day`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+
+## MAN-9895 — The Cerberus screen's words — the cerberus block of en/common.json — `promote.from_*` and `promote.perHour_*` are plural pairs on `count`; `promote.autoOn` picks
+section: The Cerberus screen's words — the cerberus block of en/common.json/003 `promote.from_*` and `promote.perHour_*` are plural pairs on `count`; `promote.autoOn` picks
+
 - `promote.from_*` and `promote.perHour_*` are plural pairs on `count`; `promote.autoOn` picks `autoOn_warn` by `context` (the entry's `when`), and falls back to `autoOn` for `failing`. `diagnosis.steps_*` is a plural pair on `count`, with `{{from}}` and `{{to}}` (the first and last step's `hms()`; `_one` has no range). `diagnosis.ready`, `.proposal.ranOnce`, `.proposal.refused`, `.proposal.expired` and `promote.from_*` take `{{time}}` as `hms()`; `.proposal.unpublished` takes `{{node}}`. `promote.generalized`'s `{{used}}` and `{{saved}}` are spans of the proposal's two commands, `saved` read through `promote.last` + `time.minutes` / `time.hours` when it is a relative window (MAN-7932). A summary, a piece of evidence, an error and a command are data, never keys.
 - `updates.kept_*`, `updates.start_*` and `updates.missed_*` are plural pairs on `count`; `kept_*` counts the versions kept for rollback, its `{{from}}` one version or `updates.versions` joining several. A version, a release note, a node's id and a warden's step sentence are data, never keys; `note` drops the release note's own trailing full stop. The ✓ before `updated` and `done`, the ✕ before `rolledBack`, the ▲ before a failed step's sentence and before `missed_*`, and the running ● stay in code (MAN-7934). `activity.warden.*` (8: `started`, `startedSummary_*`, `updated`, `updatedKept`, `rolledBack`, `rolledBackUnknown`, `failed`) and `activity.source.warden` are the warden update's lines of What happened.
 - `diagnosis.proposal.ranOnce`'s `{{result}}` is `proposal.result.*` (`ok`, `failed`, `timedOut`), so a run that did not succeed never says "succeeded"; a refusal never started, so it is `proposal.refused`, never "Ran once"; the ↳ before a piece of evidence, and the ✓ before `promotedOff` / `promotedOn` stay in code; the `diagnosis.failed` pill draws `RUN_LOOK.failed`'s icon before the word.
