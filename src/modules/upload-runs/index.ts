@@ -1,6 +1,6 @@
 import { lazy } from 'react';
 
-// The upload-runs module's public surface: the Uploads view. Its parts, its fixtures and its utils stay inside the module;
+// The upload-runs module's public surface: the Uploads view. Its parts, its hooks and its utils stay inside the module;
 // each file there imports its siblings by path, never through this barrel.
 
 // The Uploads view, mounted by src/modules/cerberus (CerberusPanel, through its `KeptView`, which keeps it mounted) as the

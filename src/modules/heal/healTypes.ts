@@ -313,10 +313,10 @@ export type HealSessionsAnswer = {
   items: (HealItem & { session: string; claimed_by: string | null; regression: HealRegression | null })[];
   /**
    * Every heal that claimed one of those rows or cured one: the tab's own card plus the ids of the rows above it
-   * claimed (`claimed_here`) and cured (`cured_here`), and its builder's line of what the fix was (`fix_said`, null
-   * when its chain recorded none).
+   * claimed (`claimed_here`) and cured (`cured_here`, null when the heal never recorded which rows it cured: a silence,
+   * not a zero), and its builder's line of what the fix was (`fix_said`, null when its chain recorded none).
    */
-  heals: (HealCard & { claimed_here: number[]; cured_here: number[]; fix_said: string | null })[];
+  heals: (HealCard & { claimed_here: number[]; cured_here: number[] | null; fix_said: string | null })[];
 };
 
 /** What the screen is showing: the three facts a reader can be told, never conflated. */

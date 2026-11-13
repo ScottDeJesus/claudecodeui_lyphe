@@ -30,7 +30,8 @@ type RunFrictionSectionProps = {
  *
  * DRAWN WITH THE HEAL TAB'S OWN PIECES (`HealItemRow`, `HealCardView`, through the heal barrel), so a row and a heal read
  * the same here as there and the two tabs cannot word one thing two ways. Over each card, the heal's own id and this
- * run's part in it: how many of this run's rows the heal claimed and how many it cured; under it, its builder's own line
+ * run's part in it: how many of this run's rows the heal claimed and how many it cured (or that it never recorded which: a
+ * silence is not a count of none); under it, its builder's own line
  * of what the fix was (or that the builder recorded none). The card itself shows no id, and a came-back line names a heal
  * by its id, so the id over each card is how a reader sees whether that heal is one of these or an older one.
  *
@@ -104,7 +105,8 @@ export function RunFrictionSection({ friction, frictionFailed, noSession, now, o
             <li key={heal.id} className="flex min-w-0 flex-col gap-2" data-upload-heal={heal.id}>
               <p className="m-0 flex min-w-0 flex-col gap-0.5 text-[13px] leading-snug text-foreground">
                 <span className="min-w-0 break-words font-mono text-xs text-muted-foreground">{heal.id}</span>
-                <span>{t(`${f}.claimed`, { count: heal.claimed_here.length })} · {t(`${f}.cured`, { count: heal.cured_here.length })}</span>
+                {/* A heal that never recorded which rows it cured has said nothing of them: that is not a count of none. */}
+                <span>{t(`${f}.claimed`, { count: heal.claimed_here.length })} · {heal.cured_here === null ? t(`${f}.curedNotRecorded`) : t(`${f}.cured`, { count: heal.cured_here.length })}</span>
               </p>
               <HealCardView heal={heal} onOpenChain={onOpenBrief} />
               <p className="m-0 min-w-0 break-words text-[13px] leading-relaxed text-muted-foreground" data-upload-heal-fix={heal.fix_said === null ? 'none' : 'said'}>

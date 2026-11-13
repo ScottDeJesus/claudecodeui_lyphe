@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import type { LiveStep } from '@/modules/upload-runs/utils/uploadsModel';
-import { clockWord, durationWord, flowWord, jobWord, typeWord, whoWord } from '@/modules/upload-runs/utils/uploadsWords';
+import { clockWord, durationWord, flowWord, jobWord, testLook, typeWord, whoWord } from '@/modules/upload-runs/utils/uploadsWords';
 import type { UploadRunSummary } from '@/shared/upload-runs-types';
 import { Badge, Button, Card, CardContent, Shimmer } from '@/shared/ui';
 
@@ -28,6 +28,9 @@ type LiveNowProps = {
  * the card turns from the info tone to the warn tone and says so in words. Cerberus only watches: there is no answer box
  * and no Stop here.
  *
+ * A DRY RUN IS LIVE LIKE ANY RUN, AND SAYS WHAT IT IS: the Test run mark the Runs list gives it stands beside Live now, so
+ * a card of "No job" and "No upload type" is read as a test of the launch path and not as a record that lost its job.
+ *
  * The agent's words and a tool's summary are the vendor's own text and reach the page as text, never as markup.
  *
  * Used by this module's root, `UploadsView`, between the pills and the body.
@@ -36,6 +39,7 @@ export function LiveNow({ run, step, now, onOpenRun }: LiveNowProps) {
   const { t } = useTranslation();
   const l = 'cerberus.uploads.live';
   const waiting = step === null ? run.state === 'awaiting_input' : !step.working;
+  const test = run.dry_run ? testLook(t) : null;
   const elapsed = durationWord(t, now - Date.parse(run.started_at));
   const turns = step?.turns ?? run.counts.turns;
   const toolCalls = step?.toolCalls ?? run.counts.tool_calls;
@@ -49,6 +53,12 @@ export function LiveNow({ run, step, now, onOpenRun }: LiveNowProps) {
               <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-tone-dot motion-safe:animate-pulse" aria-hidden="true" />
               {t(`${l}.title`)}
             </Badge>
+            {test !== null && (
+              <Badge as="span" tone={test.tone}>
+                <test.Icon className="mr-1 h-3 w-3" aria-hidden="true" />
+                {test.word}
+              </Badge>
+            )}
             {/* The state in a word, never the dot alone: a working run shimmers, a waiting one stands still in the warn ink. */}
             {waiting
               ? <span className="text-sm font-medium text-tone-ink">{t(`${l}.waiting`)}</span>

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { RunRow } from '@/modules/upload-runs/RunRow';
+import { TestRunsChip } from '@/modules/upload-runs/TestRunsChip';
 import type { RunFriction, UploadsFilters } from '@/modules/upload-runs/utils/uploadsModel';
 import { whoWord } from '@/modules/upload-runs/utils/uploadsWords';
 import type { UploadRunSummary, UploadRunsOverview } from '@/shared/upload-runs-types';
@@ -72,7 +73,7 @@ export function RunList({ overview, runs, filters, friction, frictionFailed, now
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <Chip size="sm" className="finger:min-h-11" selected={filters.hiccupsOnly} onClick={() => set({ hiccupsOnly: !filters.hiccupsOnly })}>{t(`${r}.hiccupsOnly`)}</Chip>
-          <Chip size="sm" className="finger:min-h-11" selected={filters.tests} onClick={() => set({ tests: !filters.tests })} title={t(`${r}.testsTitle`)}>{t(`${r}.tests`)}</Chip>
+          <TestRunsChip selected={filters.tests} onToggle={() => set({ tests: !filters.tests })} />
         </div>
         {overview.accounts.length >= 2 && (
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">

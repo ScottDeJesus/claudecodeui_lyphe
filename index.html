@@ -38,6 +38,243 @@
     <div id="root"></div>
 
     <!--
+      The boot reporter: what a page that did not draw tells the server about itself. Until it existed the server never
+      heard — a card or a reload left a trace in one browser and nowhere else, and why a page failed on a machine nobody
+      could open stayed a guess. It is the watchdog's ear and mouth, and plain inline script for the watchdog's reason: it
+      has to work when nothing from /src does, so it comes first and listens from the first byte.
+
+      It records the errors and rejections the page caught, the same-origin files that failed or crawled, the long tasks,
+      and what the browser and the origin's storage look like. `window.cloudcliBootReport(kind, facts)` posts all of that
+      beside the caller's own facts (the watchdog's state, the app's root error boundary's message) to /api/boot-report: no
+      token needed, the account named when one is held, one journal line per report. Everything is capped and a page sends
+      at most MAX_REPORTS_PER_PAGE, so a page that fails in a loop cannot flood the door.
+
+      The outbox: the server or the dev proxy being down at that very moment is the failure most worth hearing, and the
+      one a post cannot report. So the last report waits in sessionStorage until a post is confirmed, and the next load of
+      the tab posts it again (the server ignores an id it already logged). Of the origin's storage a report carries key
+      NAMES and SIZES only, never contents, and every URL in it is cut before its query string.
+    -->
+    <script>
+      (function () {
+        var REPORT_URL = '/api/boot-report';
+        var OUTBOX_KEY = 'cloudcli:boot-outbox';
+        var TOKEN_KEY = 'auth-token';
+        var MAX_REPORTS_PER_PAGE = 4;
+        var MAX_EVENTS = 8;
+        var MAX_FAILED = 10;
+        /** Under the server door's 16 kB parser with room to spare. */
+        var MAX_BODY_CHARS = 12000;
+
+        var events = [];
+        var eventTotal = 0;
+        var failed = [];
+        var slowest = [];
+        var files = { count: 0, kb: 0, lastAtMs: 0, lastUrl: '' };
+        var longTasks = { count: 0, maxMs: 0 };
+        var sent = 0;
+        var scriptStartMs = Math.round(performance.now());
+
+        function clip(value, max) {
+          var text = String(value === null || value === undefined ? '' : value);
+          return text.length > max ? text.slice(0, max) + '…' : text;
+        }
+
+        function safe(read) {
+          try { return read(); } catch (error) { return undefined; }
+        }
+
+        // A path, never a URL with its query: a query can carry a token (an event stream's `?token=`), and a report holds none.
+        function pathOf(url) {
+          return clip(String(url || '').split('?')[0].split('#')[0].replace(window.location.origin, ''), 200);
+        }
+
+        // The last MAX_EVENTS, with the count of all: what a page threw late in its life matters more than its first noise.
+        function note(entry) {
+          eventTotal += 1;
+          events.push(entry);
+          if (events.length > MAX_EVENTS) events.shift();
+        }
+
+        window.addEventListener('error', function (event) {
+          var target = event.target;
+          if (target && target !== window && target.tagName) {
+            note({ at: Math.round(performance.now()), type: 'element', tag: target.tagName, url: pathOf(target.src || target.href) });
+          } else {
+            note({ at: Math.round(performance.now()), type: 'error', message: clip(event.message, 300), file: pathOf(event.filename), line: event.lineno, col: event.colno });
+          }
+        }, true);
+
+        // Recorded only. Acting on a rejection is the watchdog's one refusal (its note on unhandledrejection), and it stands.
+        window.addEventListener('unhandledrejection', function (event) {
+          var reason = event.reason;
+          note({ at: Math.round(performance.now()), type: 'rejection', message: clip(reason && reason.message ? reason.message : reason, 300) });
+        });
+
+        // Every resource the page finished, in the observer's own buffer: the browser's resource-timing buffer holds 250 and the dev
+        // server hands over ~1,100 modules, so reading it at report time would see the first fifth of the boot.
+        if (typeof PerformanceObserver === 'function') {
+          try {
+            new PerformanceObserver(function (list) {
+              var entries = list.getEntries();
+              for (var i = 0; i < entries.length; i += 1) {
+                var entry = entries[i];
+                var name = entry.name || '';
+                // The door's own answers (a 429 is one) are not evidence about the boot.
+                if (name.indexOf(REPORT_URL) !== -1) continue;
+                var sameOrigin = name.indexOf(window.location.origin + '/') === 0;
+                var isApi = name.indexOf('/api/') !== -1;
+                var label = sameOrigin ? pathOf(name) : clip(name.split('?')[0], 120);
+                // The page's own files, as the watchdog counts progress: an API call is the app's business, and a page polling one is not a boot.
+                if (sameOrigin && !isApi) {
+                  files.count += 1;
+                  files.kb += (entry.encodedBodySize || 0) / 1024;
+                  files.lastAtMs = Math.round(entry.responseEnd);
+                  files.lastUrl = label;
+                }
+                // A file with status 0 and no body never got an answer. An API call with status 0 is the app's own abort (a navigation, an unmount), so only a refusal counts for it.
+                if ((entry.responseStatus >= 400 || (sameOrigin && !isApi && entry.responseStatus === 0 && !entry.decodedBodySize)) && failed.length < MAX_FAILED) {
+                  failed.push({ url: label, status: entry.responseStatus, ms: Math.round(entry.duration) });
+                }
+                slowest.push({ url: label, ms: Math.round(entry.duration), startMs: Math.round(entry.startTime) });
+                slowest.sort(function (a, b) { return b.ms - a.ms; });
+                if (slowest.length > 3) slowest.length = 3;
+              }
+            }).observe({ type: 'resource', buffered: true });
+          } catch (error) { /* no observer — the report goes without a file tally */ }
+          try {
+            new PerformanceObserver(function (list) {
+              list.getEntries().forEach(function (entry) {
+                longTasks.count += 1;
+                if (entry.duration > longTasks.maxMs) longTasks.maxMs = Math.round(entry.duration);
+              });
+            }).observe({ type: 'longtask', buffered: true });
+          } catch (error) { /* a browser without long-task timing */ }
+        }
+
+        function media(query) {
+          return safe(function () { return window.matchMedia(query).matches; });
+        }
+
+        // NAMES and SIZES of a storage's keys, largest first. Never a value. `read` fetches the storage INSIDE the guard: in a browser that
+        // blocks site data the property read `window.localStorage` itself throws, and a report that dies on its own evidence says nothing.
+        function overview(read) {
+          try {
+            var storage = read();
+            var rows = [];
+            var total = 0;
+            for (var i = 0; i < storage.length; i += 1) {
+              var key = storage.key(i);
+              var size = (storage.getItem(key) || '').length;
+              total += size;
+              rows.push([clip(key, 48), size]);
+            }
+            rows.sort(function (a, b) { return b[1] - a[1]; });
+            return { keys: rows.length, chars: total, top: rows.slice(0, 40).map(function (row) { return row[0] + ':' + row[1]; }).join(' ') };
+          } catch (error) {
+            return { error: clip(error && error.name, 40) };
+          }
+        }
+
+        function describePage() {
+          var nav = safe(function () { return performance.getEntriesByType('navigation')[0]; });
+          return {
+            host: window.location.host,
+            path: window.location.pathname,
+            viewport: window.innerWidth + 'x' + window.innerHeight,
+            screen: safe(function () { return window.screen.width + 'x' + window.screen.height; }),
+            dpr: window.devicePixelRatio,
+            pointer: media('(pointer: fine)') ? 'fine' : media('(pointer: coarse)') ? 'coarse' : 'none',
+            hover: media('(hover: hover)') ? 'hover' : 'none',
+            ua: clip(navigator.userAgent, 240),
+            lang: navigator.language,
+            online: navigator.onLine,
+            visibility: document.visibilityState,
+            ready: document.readyState,
+            connection: safe(function () { var c = navigator.connection; return c.effectiveType + ' rtt=' + c.rtt + 'ms down=' + c.downlink + 'Mbps' + (c.saveData ? ' save-data' : ''); }),
+            serviceWorker: safe(function () {
+              var controller = navigator.serviceWorker && navigator.serviceWorker.controller;
+              return controller ? 'controlled ' + pathOf(controller.scriptURL) + ' ' + controller.state : navigator.serviceWorker ? 'none' : 'unsupported';
+            }),
+            nav: nav && { type: nav.type, status: nav.responseStatus, ttfbMs: Math.round(nav.responseStart), interactiveMs: Math.round(nav.domInteractive), domReadyMs: Math.round(nav.domContentLoadedEventEnd), loadMs: Math.round(nav.loadEventEnd), bytes: nav.transferSize },
+            htmlAttributes: safe(function () { return document.documentElement.getAttributeNames().join(','); }),
+            bodyTags: safe(function () { return Array.prototype.map.call(document.body.children, function (element) { return element.tagName.toLowerCase() + (element.id ? '#' + element.id : ''); }).slice(0, 14).join(','); })
+          };
+        }
+
+        function readToken() {
+          try { return window.localStorage.getItem(TOKEN_KEY); } catch (error) { return null; }
+        }
+
+        // `keepalive` lets the request outlive the page that sent it (the watchdog reloads right after reporting); the beacon is the
+        // same promise for a browser without it. Only the fetch can carry the token, in the header every API call uses.
+        function post(json, token, onConfirmed) {
+          try {
+            if (typeof fetch === 'function' && typeof Request === 'function' && 'keepalive' in Request.prototype) {
+              var headers = { 'Content-Type': 'application/json' };
+              if (token) headers.Authorization = 'Bearer ' + token;
+              fetch(REPORT_URL, { method: 'POST', headers: headers, body: json, keepalive: true }).then(function (response) {
+                // 400 and 413 are answers too: a body the server will never take is not worth sending again.
+                if ((response.ok || response.status === 400 || response.status === 413) && onConfirmed) onConfirmed();
+              }, function () { /* the outbox keeps it for the next load */ });
+              return;
+            }
+          } catch (error) { /* no fetch — the beacon below */ }
+          // A beacon that was QUEUED is not one that was answered, so it never empties the outbox: the next load posts the report again, and
+          // the server's id check makes one that did arrive a no-op.
+          try {
+            if (navigator.sendBeacon) navigator.sendBeacon(REPORT_URL, new Blob([json], { type: 'application/json' }));
+          } catch (error) { /* nothing left to try; the outbox keeps it */ }
+        }
+
+        function forget(id) {
+          try {
+            var kept = JSON.parse(sessionStorage.getItem(OUTBOX_KEY) || 'null');
+            if (kept && kept.id === id) sessionStorage.removeItem(OUTBOX_KEY);
+          } catch (error) { /* storage is blocked: there is no outbox to clear */ }
+        }
+
+        window.cloudcliBootReport = function (kind, facts) {
+          if (sent >= MAX_REPORTS_PER_PAGE) return;
+          sent += 1;
+          try {
+            var body = { id: Math.random().toString(36).slice(2, 10) + Date.now().toString(36), kind: kind, v: 1, bootMs: Math.round(performance.now()), scriptStartMs: scriptStartMs };
+            for (var key in facts || {}) if (Object.prototype.hasOwnProperty.call(facts, key)) body[key] = facts[key];
+            // The server writes keys in this order and cuts a line that is too long at its END, so the device comes first and the bulky,
+            // least telling things (what the origin stores) come last.
+            body.page = describePage();
+            body.events = events;
+            body.eventTotal = eventTotal;
+            body.failed = failed;
+            body.files = files;
+            body.slowest = slowest;
+            body.longTasks = longTasks;
+            body.storage = overview(function () { return window.localStorage; });
+            body.session = overview(function () { return window.sessionStorage; });
+            var json = JSON.stringify(body);
+            if (json.length > MAX_BODY_CHARS) {
+              delete body.storage;
+              delete body.session;
+              delete body.page.bodyTags;
+              json = JSON.stringify(body);
+            }
+            if (json.length > MAX_BODY_CHARS) json = JSON.stringify({ id: body.id, kind: kind, tooBigChars: json.length });
+            try { sessionStorage.setItem(OUTBOX_KEY, json); } catch (error) { /* no outbox without storage; the post still goes */ }
+            post(json, readToken(), function () { forget(body.id); });
+          } catch (error) { /* a report that cannot be built must never stand in front of what asked for it */ }
+        };
+
+        // The previous load's report, when it was never confirmed.
+        try {
+          var kept = JSON.parse(sessionStorage.getItem(OUTBOX_KEY) || 'null');
+          if (kept && typeof kept === 'object' && kept.id) {
+            kept.late = true;
+            post(JSON.stringify(kept), readToken(), function () { forget(kept.id); });
+          }
+        } catch (error) { /* unreadable or unavailable — nothing waiting */ }
+      })();
+    </script>
+
+    <!--
       The boot watchdog. Plain inline script on purpose: it is the one thing that has to keep
       working when the bundle does NOT, and anything imported from /src is exactly what may
       have failed. An empty #root is otherwise a black page with no message and no way out —
@@ -49,9 +286,15 @@
       and "the bundle ran" was itself only ever "a module body started". The honest signal is
       the one thing that cannot be faked: whether #root holds something the APP put there.
 
-      Reloading is capped twice — once per broken run, and a hard ceiling per tab that no
-      amount of elapsed health refunds. A per-run cap alone still looped forever on a crash
-      whose period outlived the healthy window (measured: 4 loads in 4 minutes at a 70s crash).
+      Reloading is capped twice — once per broken run, and per tab for as long as the tab has not
+      been healthy. A per-run cap alone still looped forever on a crash whose period outlived the
+      healthy window (measured: 4 loads in 4 minutes at a 70s crash); the tab's cap ends that loop,
+      and no crash loop of under 30 minutes can earn the way out of it. Only THIS script's own
+      reloads can loop, so only they are counted across a boot: it stamps its count just before
+      `location.reload()`, and a page that finds the stamp is the retry in flight. Any other load
+      of the tab — F5, a hard refresh, the browser's reload button, the card's Reload, a typed
+      address, the dev server's own full reload — is somebody asking for another go, and gets the
+      whole budget back. So does a tab that has stayed drawn for 30 continuous minutes.
     -->
     <script>
       (function () {
@@ -59,14 +302,24 @@
         var WATCHDOG_NODE_ATTRIBUTE = 'data-cloudcli-watchdog';
         /** Per broken run. */
         var MAX_AUTOMATIC_RELOADS = 1;
-        /** Per tab, ever. The stop that a decaying counter cannot provide. */
+        /** Per tab, until a person reloads it or it has been drawn for HEALTHY_TAB_MS. The stop the per-run count, which decays, cannot provide. */
         var MAX_LIFETIME_RELOADS = 3;
         /** Long enough that no plausible crash period hides under it. */
         var HEALTHY_RUN_MS = 600000;
+        /** Drawn this long without a break, the tab's lifetime count is forgotten too: longer than any crash loop this watchdog has measured. */
+        var HEALTHY_TAB_MS = 1800000;
+        /** How far from its stamp a navigation may begin and still be the reload the stamp announced: it begins the instant `location.reload()` runs, so this only has to outlast a clock stepped in between. */
+        var AUTOMATIC_RELOAD_REACH_MS = 60000;
         var BOOT_DEADLINE_MS = 10000;
         /** A boot is only dead once its files stop arriving for this long. */
         var BOOT_STALL_MS = 8000;
         var WATCH_INTERVAL_MS = 2000;
+        /** A recovered page is reported once the app has stayed on screen this long: past the empty-root moment a slow boot can show. */
+        var RECOVERED_REPORT_MS = 20000;
+        /** A page left undrawn after this long is reported; shorter is a navigation, not a boot that did not finish. */
+        var ABANDONED_AFTER_MS = 4000;
+        /** A boot whose app first drew this late is reported though nothing failed: the near miss, measured, before the card is the only word on it. */
+        var SLOW_BOOT_MS = 10000;
 
         var startedAt = Date.now();
         var lastProgressAt = startedAt;
@@ -74,8 +327,13 @@
         var healthySince = 0;
         var hasEverMounted = false;
         var runCountCleared = false;
+        var lifetimeRefunded = false;
         var reloading = false;
         var timer = null;
+        var firstMountAt = 0;
+        var blanks = [];
+        var recoveredTold = false;
+        var cardShown = false;
 
         // sessionStorage can THROW rather than return null — blocked site data, private
         // browsing, a full quota. The count is what makes a reload SAFE, and it has to survive
@@ -87,10 +345,15 @@
           try {
             var parsed = JSON.parse(sessionStorage.getItem(RETRY_KEY));
             if (parsed && Number.isFinite(parsed.n)) {
-              return { n: parsed.n, total: Number.isFinite(parsed.total) ? parsed.total : parsed.n };
+              return {
+                n: parsed.n,
+                total: Number.isFinite(parsed.total) ? parsed.total : parsed.n,
+                // When this script last stamped a reload of its own; 0 when it has not, or the stamp was consumed.
+                at: Number.isFinite(parsed.at) ? parsed.at : 0
+              };
             }
           } catch (error) { /* unreadable or unavailable — treated as no attempts yet */ }
-          return { n: 0, total: 0 };
+          return { n: 0, total: 0, at: 0 };
         }
 
         /** True only when the next attempt is recorded somewhere a reload cannot forget. */
@@ -103,10 +366,48 @@
           }
         }
 
-        /** Forgets the per-run count after a long healthy stretch; the lifetime cap stands. */
+        /** Forgets the per-run count after a long healthy stretch; the lifetime count waits for the longer one. */
         function decayRunCount(state) {
           persistState({ n: 0, total: state.total });
         }
+
+        /** The two counts without the stamp: what a report says about the tab's budget. */
+        function counts(state) {
+          return { n: state.n, total: state.total };
+        }
+
+        function navigationType() {
+          try {
+            var entry = performance.getEntriesByType('navigation')[0];
+            if (entry && entry.type) return entry.type;
+            return ['navigate', 'reload', 'back_forward'][performance.navigation.type] || 'navigate';
+          } catch (error) {
+            return 'navigate';
+          }
+        }
+
+        // Only this script's own reloads can loop, so only they are counted across a boot. Just before `location.reload()` it stamps the time
+        // beside its count; a page whose navigation began within reach of the stamp is the retry that stamp announced, so the count stands and
+        // the stamp is consumed (a later reload must not find it). Every other load of the tab is a person asking for another go — F5, a hard
+        // refresh, the browser's reload button, the card's Reload, a typed address — or the dev server's own full reload, which this script
+        // cannot tell from one and need not: neither can loop. It gets the whole budget back, so the retry a fresh tab would have had is not
+        // withheld from the tab that has been through the most. Returns why the budget was given back, '' when it was not.
+        function settleRetryBudget(found) {
+          if (found.n === 0 && found.total === 0) return '';
+          var navigatedAt = performance.timeOrigin || (Date.now() - performance.now());
+          if (found.at > 0 && Math.abs(navigatedAt - found.at) <= AUTOMATIC_RELOAD_REACH_MS) {
+            persistState(counts(found));
+            return '';
+          }
+          persistState({ n: 0, total: 0 });
+          return navigationType() === 'reload' ? 'reload' : 'navigation';
+        }
+
+        var foundAtBoot = readState();
+        /** What the tab had spent when this page began, AS FOUND — before this boot gave any of it back: a report says whether this boot is a first try, a retry, or a person's reload of a tab that had run out. */
+        var retryAtBoot = counts(foundAtBoot);
+        /** Why the tab's budget was given back: `reload` or `navigation` at boot, `refund` after a long healthy stretch; '' while it has not been. */
+        var retryReset = settleRetryBudget(foundAtBoot);
 
         // The app's own children only. The card is a child of #root too, and counting it as a
         // mount let a permanently dead page look healthy, start the healthy clock, and be
@@ -121,9 +422,10 @@
           return count;
         }
 
+        // True only when this call put the card up, so a card that is already there is reported once, not every tick.
         function card() {
           var root = document.getElementById('root');
-          if (!root || root.querySelector('[' + WATCHDOG_NODE_ATTRIBUTE + ']')) return;
+          if (!root || root.querySelector('[' + WATCHDOG_NODE_ATTRIBUTE + ']')) return false;
           var node = document.createElement('div');
           node.setAttribute(WATCHDOG_NODE_ATTRIBUTE, '');
           node.setAttribute('style', 'min-height:100vh;display:flex;align-items:center;justify-content:center;' +
@@ -139,25 +441,68 @@
             'background:#2fa876;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Reload</button>' +
             '</div>';
           root.appendChild(node);
+          cardShown = true;
+          return true;
         }
 
-        function recover() {
+        // The tree's own history at the resolution the browser reports it. The tick below takes one sample every two seconds, and a
+        // tree that unmounts and comes back between two samples looks, to it, like one that never left. Evidence for the report only:
+        // nothing here decides a recovery.
+        function watchRoot() {
+          var root = document.getElementById('root');
+          if (!root || typeof MutationObserver !== 'function') return;
+          new MutationObserver(function () {
+            var at = Math.round(performance.now());
+            var open = blanks.length > 0 && !blanks[blanks.length - 1][1];
+            if (appChildren() > 0) {
+              if (!firstMountAt) {
+                firstMountAt = at;
+                if (at >= SLOW_BOOT_MS) tell('slow-boot', '', readState(), '');
+              } else if (open) {
+                blanks[blanks.length - 1][1] = at;
+              }
+            } else if (firstMountAt) {
+              // The tree left, however briefly: a streak of health starts over, so the 30 minutes that give the tab its budget back are continuous.
+              healthySince = 0;
+              if (!open && blanks.length < 8) blanks.push([at, 0]);
+            }
+          }).observe(root, { childList: true });
+        }
+
+        // What this page tells the server about a recovery; the reporter above adds the page, the files and the errors.
+        function tell(kind, trigger, before, why) {
+          if (typeof window.cloudcliBootReport !== 'function') return;
+          try {
+            window.cloudcliBootReport(kind, {
+              trigger: trigger,
+              why: why,
+              mounted: hasEverMounted || firstMountAt > 0,
+              firstMountMs: firstMountAt,
+              onScreenMs: healthySince ? Date.now() - healthySince : 0,
+              lastFileAgoMs: Date.now() - lastProgressAt,
+              retry: { atBoot: retryAtBoot, reset: retryReset, before: counts(before), after: counts(readState()) },
+              blanks: blanks
+            });
+          } catch (error) { /* a report that cannot be built never stands in front of a recovery */ }
+        }
+
+        function recover(trigger) {
           if (reloading || appChildren() > 0) return;
 
           var state = readState();
-          if (
-            state.n < MAX_AUTOMATIC_RELOADS
-            && state.total < MAX_LIFETIME_RELOADS
-            && persistState({ n: state.n + 1, total: state.total + 1 })
-          ) {
+          var mayReload = state.n < MAX_AUTOMATIC_RELOADS && state.total < MAX_LIFETIME_RELOADS;
+          // The stamp goes in the same write as the count, so the page that comes back can tell this reload from a person's.
+          if (mayReload && persistState({ n: state.n + 1, total: state.total + 1, at: Date.now() })) {
             // The interval keeps running through a navigation that may take seconds; without
             // this the next tick would paint a failure over a recovery already in flight.
             reloading = true;
+            tell('reload', trigger, state, '');
             location.reload();
             return;
           }
 
-          card();
+          // Why the card and no reload, for the report: this run's one reload is spent, the tab's three are, or storage cannot hold a count.
+          if (card()) tell('card', trigger, state, !mayReload ? (state.n >= MAX_AUTOMATIC_RELOADS ? 'run-reload-spent' : 'lifetime-cap') : 'storage-blocked');
         }
 
         function tick() {
@@ -174,11 +519,24 @@
             // The app is on screen — including over the card, which React will have replaced.
             hasEverMounted = true;
             if (!healthySince) healthySince = Date.now();
+            // Told once, and only of a boot that follows a spent reload: the page that came back and STAYED, which is the proof a retry worked.
+            if (!recoveredTold && retryAtBoot.n > 0 && Date.now() - healthySince >= RECOVERED_REPORT_MS) {
+              recoveredTold = true;
+              tell('recovered', '', readState(), '');
+            }
             if (!runCountCleared && Date.now() - healthySince >= HEALTHY_RUN_MS) {
               var state = readState();
               // Latched: without it this branch re-reads storage every two seconds forever.
               runCountCleared = true;
               if (state.n > 0) decayRunCount(state);
+            }
+            if (!lifetimeRefunded && Date.now() - healthySince >= HEALTHY_TAB_MS) {
+              // Latched like the one above. Drawn this long, the tab has earned back what its past recoveries spent.
+              lifetimeRefunded = true;
+              if (readState().total > 0) {
+                persistState({ n: 0, total: 0 });
+                retryReset = 'refund';
+              }
             }
             return;
           }
@@ -187,7 +545,7 @@
 
           // Empty AFTER it was up: the tree unmounted, and nothing else is coming.
           if (hasEverMounted) {
-            recover();
+            recover('empty-after-mount');
             return;
           }
 
@@ -207,7 +565,7 @@
           // hangs forever reaches the card later on a slow link (~50 s at 80 ms, measured),
           // because each attempt first runs as far as the link lets it.
           var now = Date.now();
-          if (now - startedAt >= BOOT_DEADLINE_MS && now - lastProgressAt >= BOOT_STALL_MS) recover();
+          if (now - startedAt >= BOOT_DEADLINE_MS && now - lastProgressAt >= BOOT_STALL_MS) recover('boot-stalled');
         }
 
         // Progress is a same-origin file finishing, API calls excepted: those are the app's
@@ -236,7 +594,7 @@
           if (!target || target === window || target.tagName !== 'SCRIPT') return;
           var source = target.src || '';
           if (source && source.indexOf(window.location.origin + '/') !== 0) return;
-          recover();
+          recover('script-error');
         }, true);
 
         // A module that failed to import says so in the message. Anything else that throws is
@@ -244,13 +602,20 @@
         window.addEventListener('error', function (event) {
           var message = (event && event.message) || '';
           if (/dynamically imported module|error loading|Importing a module script failed/i.test(message)) {
-            recover();
+            recover('import-error');
           }
         });
 
-        // Deliberately NOT listening for unhandledrejection: a rejected API call during a slow
+        // Deliberately NOT acting on unhandledrejection: a rejected API call during a slow
         // boot is normal, and reloading on it turned a four-second server into a reload loop
-        // (measured).
+        // (measured). The reporter above records them, as evidence only.
+        // A person who sees nothing press-reloads long before the 18 seconds this watchdog needs to judge a boot, and a page left that
+        // way never speaks: so one that is left before it ever drew, with no card up and no reload of its own under way, says so.
+        window.addEventListener('pagehide', function () {
+          if (reloading || cardShown || firstMountAt || appChildren() > 0 || performance.now() < ABANDONED_AFTER_MS) return;
+          tell('abandoned', 'left-undrawn', readState(), '');
+        });
+        watchRoot();
         timer = setInterval(tick, WATCH_INTERVAL_MS);
       })();
     </script>

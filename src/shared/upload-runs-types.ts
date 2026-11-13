@@ -171,7 +171,7 @@ export type UploadTypeCounts = {
 export type UploadRunsOverview = {
   generated_at: string;
   window: { days: UploadRunsWindowDays; from: string; to: string };
-  filters: { by: string | null; tests: boolean; account: string | null };
+  filters: { by: string | null; tests: 0 | 1; account: string | null };
   live: UploadRunSummary | null;
   types: [UploadTypeCounts, UploadTypeCounts];
   runs: UploadRunSummary[];

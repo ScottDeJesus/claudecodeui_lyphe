@@ -2,7 +2,7 @@ import type { TFunction } from 'i18next';
 import { CircleCheckIcon, FlaskConicalIcon, HourglassIcon, OctagonAlertIcon, RadioIcon, TriangleAlertIcon } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-import type { TimelineEvent, Tone } from '@/shared/types';
+import type { AffectedAreasTrouble, TimelineEvent, Tone } from '@/shared/types';
 import type { UploadRunEvent, UploadRunReason, UploadRunSummary, UploadType } from '@/shared/upload-runs-types';
 import { firstLine } from '@/shared/utils';
 
@@ -18,8 +18,8 @@ const K = 'cerberus.uploads';
 /** A verdict as it is drawn: its tone, its word and its icon, so the colour never stands alone. */
 export type VerdictLook = { tone: Tone; word: string; Icon: LucideIcon };
 
-/** The state the registry gives a live run while it waits on a person's answer. */
-const AWAITING = 'awaiting_input';
+/** The state the registry gives a live run while it waits on a person's answer. Used by `useLiveRun` too, to tell working from waiting. */
+export const AWAITING = 'awaiting_input';
 
 /**
  * The verdict's word, tone and icon. A run still going is live whatever else it is, and a live run that waits on a person
@@ -31,11 +31,16 @@ const AWAITING = 'awaiting_input';
 export function verdictLook(t: TFunction, run: Pick<UploadRunSummary, 'verdict' | 'tone' | 'dry_run' | 'state'>): VerdictLook {
   if (run.verdict === 'live' && run.state === AWAITING) return { tone: 'warn', word: t(`${K}.verdict.waiting`), Icon: HourglassIcon };
   if (run.verdict === 'live') return { tone: 'info', word: t(`${K}.verdict.live`), Icon: RadioIcon };
-  if (run.dry_run) return { tone: 'neutral', word: t(`${K}.verdict.test`), Icon: FlaskConicalIcon };
+  if (run.dry_run) return testLook(t);
   if (run.verdict === 'clean') return { tone: 'positive', word: t(`${K}.verdict.clean`), Icon: CircleCheckIcon };
   return run.tone === 'danger'
     ? { tone: 'danger', word: t(`${K}.verdict.hiccup`), Icon: OctagonAlertIcon }
     : { tone: 'warn', word: t(`${K}.verdict.hiccup`), Icon: TriangleAlertIcon };
+}
+
+/** The mark a dry run wears wherever it is drawn, finished or live: neutral, with a flask, so it is never taken for an upload. */
+export function testLook(t: TFunction): VerdictLook {
+  return { tone: 'neutral', word: t(`${K}.verdict.test`), Icon: FlaskConicalIcon };
 }
 
 /**
@@ -152,6 +157,15 @@ export function endingSentence(
   }
   if (ending === 'sentinel' || run.terminal_reason === 'completed') return t(`${e}.finished`);
   return t(`${e}.other`, { ending });
+}
+
+/**
+ * The sentence for a read the lane could not answer: CloudCLI has no secret to ask with, the engine did not answer, answered
+ * what CloudCLI cannot read, refused, or has no such record. `subject` names what was being read, so a missing run says the
+ * run is not on file and a missing route says the engine may be part way through an update.
+ */
+export function troubleSentence(t: TFunction, trouble: AffectedAreasTrouble, subject: 'overview' | 'run'): string {
+  return t(`${K}.trouble.cause.${trouble}`, { context: subject });
 }
 
 /** A text field of an event's `meta`, or '' when it holds none: `meta` is the kind's own facts, typed loosely on the wire. */

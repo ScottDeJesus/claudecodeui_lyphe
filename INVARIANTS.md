@@ -8155,11 +8155,11 @@ Rules for the lanes to shadow-connector — `server/modules/affected-areas/` (ma
 6. `fetch` keeps `redirect: 'manual'`. why: the secret header must not follow a `Location`.
 7. A lane's routes do not copy the router's loop, its tails or its fault-to-status map: a lane that needs different behaviour changes `LaneRouterDefinition`. why: two copies of the checks drift, and a check that is weaker in one lane is an id the engine sees.
 8. The Gemini budget a lane carries is the REQUEST's, from the router's `relayBudgetOf` (MAN-8863, "The budget carried"), and never `process.env`. why: the server's own environment is no one's budget, and the agent sessions it spawns inherit it; a lane that read it would spend under the server's name.
-9. An event stream is the lane's `stream`, not a longer `forward`, and it holds rules 1 to 8 as `forward` does (the secret from the forwarder's own read, `redirect: 'manual'`, the request's budget, a table row for every path, a declared query only). It adds two: its connect is bounded and its read is not, and the browser hanging up closes the upstream. why: an open feed outlasts any timeout, so a bound on the read would cut a live view; and a stream no one is reading holds a subscriber at the engine. The browser's `?token=` is no row's query key and never leaves this server (MAN-9896).
+9. An event stream is the lane's `stream`, not a longer `forward`, and it holds rules 1 to 8 as `forward` does (the secret from the forwarder's own read, `redirect: 'manual'`, the request's budget, a table row for every path, a declared query only). It adds two: its connect is bounded and its read is not, and the browser hanging up closes the upstream. why: an open feed outlasts any timeout, so a bound on the read would cut a live view; and a stream no one is reading holds a subscriber at the engine. The browser's `?token=` is no row's query key and never leaves this server (MAN-9896). A retiring server ends its open streams as its HTTP drain starts (`endOpenEventStreams`, called by the shutdown path in `server/index.ts`): a stream nobody ends holds the drain for its whole bound and is journalled as a cut request.
 
 Trap: a unit that exports `EIS_INTERNAL_SECRET` in its own environment overrides `.env` for the engine (`main.py` calls `load_dotenv()` with its default `override=False`, so the process environment wins) but not for the lanes, which read only the file: the two then disagree and every forward is the engine's 403. Read from the code 2026-10-17; not reproduced.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/upload-runs/upload-runs.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/upload-runs/upload-runs.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-wire.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/upload-runs/upload-runs.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/upload-runs/upload-runs.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-wire.ts
 
 ## INV-8644 — probe — LOW — The gallery tag is 3.55:1 over a white photo, and neither the sheet nor the report says so
 
@@ -10185,78 +10185,6 @@ measured 2026-10-21 by chain chain-usage-limits--account-switch--whole-20261021-
 probe-key: cea89c710a67633226d57a865016753d0f04adef
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-passes.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch.sh, /home/lyphe/.claude/hooks/enforce_claude_api_secret.py, /home/lyphe/.claude/hooks/plan_runner/claude_account/route.py
-
-## INV-9404 — probe — MEDIUM — the lane drops every response header, so the engine's `X-Left-Out` never reaches the browser, and the requirement was deleted instead of met
-
-MEDIUM — the lane drops every response header, so the engine's `X-Left-Out` never reaches the browser, and the requirement was deleted instead of met
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-lo.XXXXXX) || exit 1
-cat > "$D/p.mts" <<'EOF'
-import http from 'node:http'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import express from 'express';
-const eng = http.createServer((_q, r) => { r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store, max-age=0', 'x-left-out': '[{"carrier":"State Farm","reason":"unplannable"}]' }); r.end('[{"carrier":"Hanover Insurance"}]'); });
-await new Promise<void>((res) => eng.listen(0, '127.0.0.1', res));
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'athena-lo-env-')); const env = path.join(tmp, 'env'); fs.writeFileSync(env, 'EIS_INTERNAL_SECRET=scratch-secret\n');
-process.env.SHADOW_CONNECTOR_URL = `http://127.0.0.1:${(eng.address() as any).port}`; process.env.SHADOW_CONNECTOR_ENV_FILE = env;
-const { createCarrierBulletinsModule } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts');
-const app = express(); app.use('/api/carrier-bulletins', createCarrierBulletinsModule().router);
-const lane = http.createServer(app); await new Promise<void>((res) => lane.listen(0, '127.0.0.1', res));
-const rs = await fetch(`http://127.0.0.1:${(lane.address() as any).port}/api/carrier-bulletins/overview`);
-console.log('lane answers', rs.status, '| x-left-out=' + rs.headers.get('x-left-out'), '| cache-control=' + rs.headers.get('cache-control'), '| body=' + (await rs.text()));
-process.exit(0);
-EOF
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/p.mts"
-expect: lane answers 200 | x-left-out=null | cache-control=null | body=[{"carrier":"Hanover Insurance"}]
-```
-
-measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding M1, MEDIUM
-probe-key: 48e4e43024f75119b9a380d59beed15149ae8d4f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
-
-## INV-9405 — probe — LOW — "a 2xx that is not a PNG is the lane's unreadable" is held by the Content-Type header alone
-
-LOW — "a 2xx that is not a PNG is the lane's unreadable" is held by the Content-Type header alone
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-png.XXXXXX) || exit 1
-cat > "$D/p.mts" <<'EOF'
-import http from 'node:http'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import express from 'express';
-const eng = http.createServer((_q, r) => { r.writeHead(200, { 'content-type': 'image/png' }); r.end('<html>an error page, not a PNG</html>'); });
-await new Promise<void>((res) => eng.listen(0, '127.0.0.1', res));
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'athena-png-env-')); const env = path.join(tmp, 'env'); fs.writeFileSync(env, 'EIS_INTERNAL_SECRET=scratch-secret\n');
-process.env.SHADOW_CONNECTOR_URL = `http://127.0.0.1:${(eng.address() as any).port}`; process.env.SHADOW_CONNECTOR_ENV_FILE = env;
-const { createCarrierBulletinsModule } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts');
-const app = express(); app.use('/api/carrier-bulletins', createCarrierBulletinsModule().router);
-const lane = http.createServer(app); await new Promise<void>((res) => lane.listen(0, '127.0.0.1', res));
-const sha = 'a'.repeat(64);
-const rs = await fetch(`http://127.0.0.1:${(lane.address() as any).port}/api/carrier-bulletins/files/${sha}/pages/1/image`);
-const b = Buffer.from(await rs.arrayBuffer());
-console.log('lane answers', rs.status, '| content-type=' + rs.headers.get('content-type'), '| cache-control=' + rs.headers.get('cache-control'), '| PNG signature=' + (b.subarray(0, 8).toString('hex') === '89504e470d0a1a0a'), '| first bytes=' + JSON.stringify(b.subarray(0, 12).toString('latin1')));
-process.exit(0);
-EOF
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/p.mts"
-expect: lane answers 200 | content-type=image/png | cache-control=private, max-age=31536000, immutable | PNG signature=false | first bytes="<html>an err"   (cured: 502 and no cache-control)
-```
-
-measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding L1, LOW
-probe-key: 34b30e90d6daa6cf7193349afd1df8abc6a3d5b0
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
-
-## INV-9406 — probe — LOW — rows lost: the move out of MAN-8559 dropped three facts that no row carries now
-
-LOW — rows lost: the move out of MAN-8559 dropped three facts that no row carries now
-
-```probe
-for t in MAN-8863 INV-8633 MAN-8908 MAN-8909 MAN-8559; do echo "$t begins-with-quote=$(docstore get $t --text | grep -c -i 'begins with') next(error)=$(docstore get $t --text | grep -c 'next(error)')"; done; docstore history MAN-8559 --limit 1 --diff --text | grep -c 'really begins with'
-expect: every row prints begins-with-quote=0 next(error)=0, and the last line prints 1 (the clause sits in the before-image of MAN-8559's 17:03 write)
-```
-
-measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding L2, LOW
-probe-key: f0bf3cac0de8086c7847e20ea4216170a1db7b88
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
 
 ## INV-9443 — probe — MEDIUM — the card's Delete is never drawn for a plan whose design is waiting, so "the card's Delete relays this verb, so it withdraws too, with no app change" is false
 
@@ -25616,9 +25544,44 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/use
 `src/modules/upload-runs` is the Cerberus tab's Uploads view. It watches; the Restorly Uploads page is where a person acts. An edit to the module keeps all five.
 
 - **Read-only.** No Start, no answer box and no Stop, on the view or in a run's sheet. A press changes what is read or shown and writes nothing. why: Cerberus watches; the page is where a person acts.
-- **A test run is never clean or hiccup.** A dry run (`dry_run`) is listed only while Test runs is on, wears the neutral "Test run" mark with grey reason chips, and is in none of the head's or the pills' figures. why: a dry run is not an upload.
+- **A test run is never clean or hiccup.** A dry run (`dry_run`) is listed only while Test runs is on, wears the neutral "Test run" mark with grey reason chips, and is in none of the head's or the pills' figures. Live, it is worded as a test too: the head ("A test run is running"), the Live now pill and the Live now card (`LiveStatus.test`, MAN-9891). why: a dry run is not an upload.
 - **Not read is never none.** A heal answer still out shows a dash; one that could not be read says "not read" (`frictionFailed`); neither draws "no friction". A wire `null` is "not known", never clean (MAN-9882). why: a monitor that cannot see must never look quiet.
 - **The vendor's words are text and data.** The agent's words, a tool's summary, a step's reason, a customer, a login, a flow and a reason's detail reach the page as React text nodes: never markup, never an i18n key. The view's own sentences are `cerberus.uploads.*` (MAN-7870).
 - **Colour never stands alone.** A tone reaches paint as `data-tone` plus a `tone-*` name, and a state that speaks in colour also carries its icon or word (MAN-739, MAN-578).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/
+
+## INV-11831 — The Uploads events pane sets overflow-anchor: none because useFollowNewest moves the scroll itself — the browser's anchoring and the hook's move add up
+
+The events pane of a run's sheet (`RunEvents.tsx`, `data-uploads-events-pane`) carries `overflow-anchor: none`, and `useFollowNewest` (`hooks/useFollowNewest.ts`) moves the pane's `scrollTop` itself when a line arrives at the foot while the reader has scrolled up. They are one rule in two places.
+- The browser's own scroll anchoring moves the offset too. With both on, the shift of the reader's line went from 97 px to 372 px (measured 2026-11-13, Chromium).
+- Safari has no scroll anchoring, so the hook's move is what holds there; the property is what keeps Chromium from adding its own.
+- Keep both. why: without the property Chromium adds its move to the hook's; without the hook the reader slides on every engine, since the property turns the browser's own move off.
+- Shown by `.verify/uploads-fill-states.mjs` stage `follow` (MAN-9914). The pane's behaviour: MAN-9913.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/RunEvents.tsx
+
+## INV-11832 — the boot-report door stays above the body parsers and the API-key check in server/index.ts
+
+`app.use('/api/boot-report', createBootReportModule())` sits right after `cors` and ahead of `express.json({ limit: '50mb' })`, `express.urlencoded` and `app.use('/api', validateApiKey)`. The page that posts is the one that did not draw, so it holds no session and no API key.
+
+| mount moved below | what happens |
+|---|---|
+| `validateApiKey` | with `API_KEY` set every report is a 401 (the page sends no `x-api-key`); the page keeps it in its outbox and the journal never hears of a failed page. `.env` sets no `API_KEY` today, so nothing shows until one is set |
+| `express.json({ limit: '50mb' })` | the 50 MB parser reads the body first and the door's own 16 kB parser stands down (body-parser skips a parsed body): a caller with no token makes the API parse 50 MB |
+
+- the door bounds itself because it is public: 16 kB parser, 30 reports a minute per source and 60 in all, one line per report of at most 14,000 characters (MAN-9909).
+- a middleware meant for every `/api` path goes below the door, not above it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/boot-report/
+
+## INV-11833 — vite.config.js never imports a file builders save: server/shared/gemini-budget-relay.ts is read at run time by vite-plugins/budgetRelay.js
+
+A file `vite.config.js` imports is a config dependency: Vite restarts the whole dev server, every open page with it, on each save of one. `server/shared/gemini-budget-relay.ts`, which builders edit, was one.
+
+- symptom: a save of the relay prints `… changed, restarting server…` in `journalctl -u cloudcli-client-dev`; every open page reloads onto a cold module graph, and the HTTPS front's dial to :5183 is refused while Vite comes back (2026-11-13: two restarts inside one second at 08:19:40, the front refused at 08:19:44).
+- fix: `vite.config.js` imports only `vite-plugins/budgetRelay.js`, which loads the relay at RUN time with a computed specifier that esbuild does not follow. The dev server swaps a saved relay in (`budget relay reloaded, no restart`); `vite preview` reads it once, at start. Another server file the proxy needs is read the same way, never imported.
+- the relay stays loadable by Node's own type stripping: erasable TypeScript only (no `enum`, no `namespace`) and `node:` built-ins only, because no build step stands between a save and the running rule. A file that will not load leaves the proxy naming no budget, so the connector refuses a call that reaches Gemini; a save that does not parse keeps the previous rule.
+- measured 2026-11-13: Vite's `loadConfigFromFile` listed the relay as a config dependency before and does not after; a whitespace-only save of the relay left 0 `restarting server` lines and one `budget relay reloaded, no restart`, and the proxy's three header cases (box with a header, box with none, the HTTPS front with a forged header) answered the same before the save, after it and after its restore. Mechanism and rows: MAN-9523.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/budgetRelay.js

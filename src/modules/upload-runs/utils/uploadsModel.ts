@@ -72,6 +72,12 @@ export type RunSheetRead = {
   trouble: string | null;
 };
 
+/**
+ * The live run as the head and the pills say it: whether it works or waits on a person, and whether it is a test. A dry run
+ * can be live like any run, and it is never said to be an upload.
+ */
+export type LiveStatus = { state: 'working' | 'waiting'; test: boolean };
+
 /** The five pills, in the order drawn: each carries the reader to the section its figure counted. */
 export type UploadsPillKey = 'runs' | 'hiccups' | 'live' | 'lastRun' | 'healed';
 

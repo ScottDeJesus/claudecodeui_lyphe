@@ -2,7 +2,7 @@ import { RefreshCw } from 'lucide-react';
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { UploadsFilters, UploadsTally, UploadsWindow } from '@/modules/upload-runs/utils/uploadsModel';
+import type { LiveStatus, UploadsFilters, UploadsTally, UploadsWindow } from '@/modules/upload-runs/utils/uploadsModel';
 import { agoWord, whoWord } from '@/modules/upload-runs/utils/uploadsWords';
 import type { Tone } from '@/shared/types';
 import { Badge, Button, SegmentedControl } from '@/shared/ui';
@@ -12,8 +12,8 @@ type UploadsHeadProps = {
   days: UploadsWindow;
   /** The window's armed runs, counted, as the server narrowed them to the person and the account asked for. */
   tally: UploadsTally;
-  /** Whether a run is live, and if so whether it works or waits on a person; null with none. */
-  live: 'working' | 'waiting' | null;
+  /** The live run: whether it works or waits on a person and whether it is a test; null with none. */
+  live: LiveStatus | null;
   /** The window held more runs than one answer carries, so every figure here is a floor. */
   truncated: boolean;
   /** What the view is narrowed to: a person or an account re-scopes every figure of the head, and the head says so. */
@@ -39,7 +39,8 @@ const WINDOWS: UploadsWindow[] = [7, 30, 90];
  *
  * WHAT IS HAPPENING NOW LEADS. A live run takes the headline from the window's hiccups: one waiting on a person is the
  * one thing here somebody may have to go and do, so it wears the warn ink, and one working wears the info ink. The hiccup
- * count is still in the summary and the pills.
+ * count is still in the summary and the pills. A live DRY run leads in its own words ("A test run is running"): it is
+ * never "an upload", least of all over a summary that says no upload ran.
  *
  * A NARROWED VIEW SAYS SO, RIGHT UNDER THE HEADLINE IT CHANGED. One person's chip or one account's re-scopes every figure
  * here, and the chips are a column away (two screens below on a phone) on a view that keeps its filters between visits.
@@ -64,15 +65,17 @@ export function UploadsHead({ days, tally, live, truncated, filters, now, onWind
   const scope = who !== null && account !== null ? 'both' : who !== null ? 'by' : account !== null ? 'account' : null;
   const more = truncated ? 'More' : '';
 
-  const headline: { lead: string; accent: string; tone: Tone } = live === 'waiting'
-    ? { lead: t(`${h}.waiting`), accent: t(`${h}.waitingAccent`), tone: 'warn' }
-    : live === 'working'
-      ? { lead: t(`${h}.running`), accent: t(`${h}.runningAccent`), tone: 'info' }
-      : tally.hiccups > 0
-        ? { lead: t(`${h}.hiccups${more}`, { count: tally.hiccups }), accent: t(`${h}.hiccupsAccent`, { count: tally.hiccups }), tone: 'warn' }
-        : tally.runs === 0
-          ? { lead: t(`${h}.none`), accent: t(scope === null ? `${h}.noneAccent` : `${h}.noneScopedAccent`), tone: 'neutral' }
-          : { lead: t(`${h}.clean${more}`, { count: tally.runs }), accent: t(`${h}.cleanAccent`), tone: 'positive' };
+  const headline: { lead: string; accent: string; tone: Tone } = live !== null
+    ? {
+      lead: live.test ? t(`${h}.testLead`) : t(live.state === 'waiting' ? `${h}.waiting` : `${h}.running`),
+      accent: t(live.state === 'waiting' ? `${h}.waitingAccent` : `${h}.runningAccent`),
+      tone: live.state === 'waiting' ? 'warn' : 'info',
+    }
+    : tally.hiccups > 0
+      ? { lead: t(`${h}.hiccups${more}`, { count: tally.hiccups }), accent: t(`${h}.hiccupsAccent`, { count: tally.hiccups }), tone: 'warn' }
+      : tally.runs === 0
+        ? { lead: t(`${h}.none`), accent: t(scope === null ? `${h}.noneAccent` : `${h}.noneScopedAccent`), tone: 'neutral' }
+        : { lead: t(`${h}.clean${more}`, { count: tally.runs }), accent: t(`${h}.cleanAccent`), tone: 'positive' };
 
   // The summary's parts. Each is held whole while it fits and wraps inside itself only when it is wider than the VIEW
   // (never the window: the view can be 490 px in an 820 px window), so the head breaks between parts and a long sentence is never cut at the edge.

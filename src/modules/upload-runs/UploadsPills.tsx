@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import type { UploadsPillKey, UploadsRead, UploadsTally } from '@/modules/upload-runs/utils/uploadsModel';
+import type { LiveStatus, UploadsPillKey, UploadsRead, UploadsTally } from '@/modules/upload-runs/utils/uploadsModel';
 import { agoWord, verdictLook, whoWord } from '@/modules/upload-runs/utils/uploadsWords';
 import type { Tone } from '@/shared/types';
 import { Badge, Pill, PillBar } from '@/shared/ui';
@@ -11,8 +11,8 @@ type UploadsPillsProps = {
   tally: UploadsTally;
   /** The window held more runs than one answer carries, so the count is a floor. */
   truncated: boolean;
-  /** Whether a run is live, and if so whether it works or waits on a person; null with none. */
-  live: 'working' | 'waiting' | null;
+  /** The live run: whether it works or waits on a person and whether it is a test; null with none. */
+  live: LiveStatus | null;
   /** The heals that claimed this window's friction; null while the heal answer is out or could not be read. */
   healed: UploadsRead['healed'];
   /** The heal answer could not be read: the Healed pill says so, and never reads as "none". */
@@ -33,8 +33,8 @@ type PillSpec = { key: UploadsPillKey; label: string; value: string; tone: Tone;
  * THE VIEW'S VITALS, five pills in the heal tab's grammar: a label and a figure in the tone that says whether to look.
  * Runs is the window's count. Hiccups is amber above none and green at none (grey when the window holds no run at all,
  * since nothing ran clean either). Live now is blue while a run works, amber
- * while it waits on a person, quiet otherwise. Last run is its age and who pressed, in its verdict's tone. Healed is the
- * heals that claimed this window's friction, landed and still running.
+ * while it waits on a person, quiet otherwise; a dry run says "test run" first, as it is never an upload. Last run is its
+ * age and who pressed, in its verdict's tone. Healed is the heals that claimed this window's friction, landed and still running.
  *
  * EACH PILL IS A PRESS that carries the reader to the section its figure counted. A phone reads all five before
  * anything scrolls: the bar wraps, since a row that scrolled sideways would hide the one figure that says "look". A pill
@@ -50,6 +50,7 @@ export function UploadsPills({ tally, truncated, live, healed, frictionFailed, n
   const { t } = useTranslation();
   const p = 'cerberus.uploads.pills';
   const last = tally.last;
+  const liveWord = live === null ? t(`${p}.liveNone`) : t(live.state === 'working' ? `${p}.liveWorking` : `${p}.liveWaiting`);
 
   const pills: PillSpec[] = [
     {
@@ -71,9 +72,9 @@ export function UploadsPills({ tally, truncated, live, healed, frictionFailed, n
     {
       key: 'live',
       label: t(`${p}.live`),
-      value: live === null ? t(`${p}.liveNone`) : t(live === 'working' ? `${p}.liveWorking` : `${p}.liveWaiting`),
-      tone: live === null ? 'neutral' : live === 'working' ? 'info' : 'warn',
-      title: t(`${p}.liveTitle`),
+      value: live !== null && live.test ? t(`${p}.liveTest`, { state: liveWord }) : liveWord,
+      tone: live === null ? 'neutral' : live.state === 'working' ? 'info' : 'warn',
+      title: t(live !== null && live.test ? `${p}.liveTestTitle` : `${p}.liveTitle`),
       wrap: true,
     },
     {

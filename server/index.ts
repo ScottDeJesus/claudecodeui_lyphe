@@ -65,6 +65,7 @@ import { readClaudeActivity } from './modules/claude-activity/index.js';
 import { createClaudeUpdatesModule } from './modules/claude-updates/index.js';
 import { createRestartHoldRoutes, followChatRuns, restartHold } from './modules/restart-hold/index.js';
 import { createCliVersionModule } from './modules/cli-version/index.js';
+import { createBootReportModule } from './modules/boot-report/index.js';
 import { createDeepseekModule } from './modules/deepseek/index.js';
 import { createKanbanModule } from './modules/kanban/index.js';
 import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanban-metis/index.js';
@@ -86,6 +87,7 @@ import { sessionlessEnv } from './shared/child-env.js';
 import { createBoardVersionReader } from './shared/dispatcher-board-gate.service.js';
 import { dispatcherBin } from './shared/dispatcher-command.js';
 import { createDispatcherStoreWatch } from './shared/dispatcher-store-watch.service.js';
+import { endOpenEventStreams } from './shared/shadow-connector-lane-stream.js';
 import { createRoadmapModule } from './modules/roadmap/index.js';
 import { createUniverseModule } from './modules/universe/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
@@ -166,6 +168,9 @@ createWebSocketServer(server, {
 const drainHttpServer = armHttpDrain(server);
 
 app.use(cors({ exposedHeaders: ['X-Refreshed-Token', 'X-Auth-Error'] }));
+// Where a page that did not draw says why (the inline boot reporter in index.html). PUBLIC, and above the body parsers and the
+// API-key check on purpose: that page holds no session and no key to show, and its own 16 kB parser stands in for the 50 MB one below.
+app.use('/api/boot-report', createBootReportModule());
 app.use(express.json({
     limit: '50mb',
     type: (req) => {
@@ -408,8 +413,8 @@ app.use('/api/carrier-bulletins', authenticateToken, carrierBulletins.router);
 // of it as it happens, forwarded over loopback (protected). The same one hop as the two lanes above, for the
 // same reason: that surface is internal-caller gated (R-CAP-11) and the browser never holds the secret.
 // Read-only — five GET routes, an id is checked before a byte leaves, and two of them are event streams the
-// lane relays as they arrive and closes when the browser goes (an EventSource's `?token=` is read by
-// `authenticateToken` here and never forwarded).
+// lane relays as they arrive, closes when the browser goes and ends when this server retires (the shutdown
+// below) — an EventSource's `?token=` is read by `authenticateToken` here and never forwarded.
 const uploadRuns = createUploadRunsModule();
 app.use('/api/upload-runs', authenticateToken, uploadRuns.router);
 
@@ -878,6 +883,10 @@ async function startServer() {
             cerberus.stop();
             // Stop accepting first and close idle sockets; websockets stay open until the exit (http-drain.ts).
             const drained = drainHttpServer();
+            // An event stream (the upload runs' feed) never finishes by itself, so the drain would wait out its whole bound for
+            // it, and the successor's takeover with it. Ended here, its browser dials the successor and the drain is over as
+            // soon as the last response has closed.
+            endOpenEventStreams();
             // Both start new work — a watcher-driven DB sync, a queued send — and the successor
             // already runs its own; neither may keep going on a process that is leaving.
             closeSessionsWatcher().catch((err: unknown) => {

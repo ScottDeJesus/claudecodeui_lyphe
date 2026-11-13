@@ -1,16 +1,18 @@
 import { CalendarSearchIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { HealCard, HealItem } from '@/modules/heal';
+import { useOpenFrictionLine, useOpenHealBrief } from '@/modules/heal';
+import { useRunSheet } from '@/modules/upload-runs/hooks/useRunSheet';
+import { useUploadsClock } from '@/modules/upload-runs/hooks/useUploadsClock';
+import { useUploadsRead } from '@/modules/upload-runs/hooks/useUploadsRead';
 import { LiveNow } from '@/modules/upload-runs/LiveNow';
 import { RunSheet } from '@/modules/upload-runs/RunSheet';
-// FILL: fake — this import leaves with the three uploads-fake*.ts files, which the fill deletes: the reads, the clock and the presses below take its place.
-import { fakeScene, unwired } from '@/modules/upload-runs/uploads-fake';
+import { TestRunsChip } from '@/modules/upload-runs/TestRunsChip';
 import { UploadsBody } from '@/modules/upload-runs/UploadsBody';
 import { UploadsHead } from '@/modules/upload-runs/UploadsHead';
 import { UploadsPills } from '@/modules/upload-runs/UploadsPills';
-import type { RunSheetRead, UploadsFilters, UploadsPillKey, UploadsRead, UploadsTally, UploadsWindow } from '@/modules/upload-runs/utils/uploadsModel';
+import type { LiveStatus, UploadsFilters, UploadsPillKey, UploadsTally, UploadsWindow } from '@/modules/upload-runs/utils/uploadsModel';
 import { agoWord } from '@/modules/upload-runs/utils/uploadsWords';
 import { Banner, Button, EmptyState } from '@/shared/ui';
 
@@ -55,56 +57,64 @@ const PILL_TARGET: Record<UploadsPillKey, string> = {
  */
 export function UploadsView({ shown }: UploadsViewProps) {
   const { t } = useTranslation();
-  // FILL: fake — the scene the three initial values, the two reads and the clock below are taken from. With the fill the window starts at 30, the filters at none and no run is open.
-  const scene = fakeScene();
 
   // The window on screen, in days. Held here so it survives a visit to another view of the tab, and so both reads follow one value.
-  const [days, setDays] = useState<UploadsWindow>(scene.days);
+  const [days, setDays] = useState<UploadsWindow>(30);
   // What the Runs list is narrowed to. Held at the root, not in the list: three of the four are asked of the server, so the read needs them.
-  const [filters, setFilters] = useState<UploadsFilters>(scene.filters);
+  const [filters, setFilters] = useState<UploadsFilters>({ by: null, tests: false, hiccupsOnly: false, account: null });
   // The run the sheet is open on, by session id; null while it is closed. Held beside the reads, since it names what the sheet's read asks for and comes back with the view.
-  const [openSid, setOpenSid] = useState<string | null>(scene.openSid);
+  const [openSid, setOpenSid] = useState<string | null>(null);
   // The pill last pressed, whose section the reader was carried to; null until one is, so no pill reads as a filter in force.
   const [activePill, setActivePill] = useState<UploadsPillKey | null>(null);
+  // The view's own element, where keyboard focus is looked for again, and whether Test runs was pressed and its answer has not landed.
+  const root = useRef<HTMLDivElement>(null);
+  const testsPressed = useRef(false);
 
   // ── The reads: on show, on a press and on a feed frame; never on a timer, never while hidden. ──
-  // FILL: useUploadsRead — useUploadsRead(shown, days, filters): UploadsRead. On every show: the overview, then the heal answer for its runs' Claude session ids (200 a read). While shown: the feed open, any frame (coalesced over one second) re-reads both, every (re)open of the feed re-reads the overview, and a change in the heal context's heals re-reads the heal answer. A failed read after a good one keeps `overview` and sets `stale`. Hidden: the feed closed, nothing read.
-  const read: UploadsRead = scene.read;
-  // FILL: useLiveRun — useLiveRun(shown ? read.overview?.live?.session_id ?? null : null): LiveStep | null. The live run's own stream, read for its newest step, its turns and tool calls, and the walk step of the feed's newest walk frame for it. Its answer is what `read.live` holds: `useUploadsRead` composes it, so the root reads it once.
-  // FILL: useRunSheet — useRunSheet(shown ? openSid : null): RunSheetRead. The run and its newest 500 events (the pane opens at its foot; Show earlier reads the 500 before the first one on screen, never from seq 0, which would open on the run's oldest page); on a live run its stream from the last seq read plus one; a `session_ended` event or a walk frame for this run re-reads the run; the heal answer for its one Claude session. Closing the sheet or hiding the view closes the stream.
-  const sheet: RunSheetRead = scene.sheet;
-  // FILL: now — the clock every age and the live run's elapsed time are counted from, epoch ms: one tick a second only while a run is live and the view is shown, and a fresh reading at each read otherwise.
-  const now: number = scene.now;
-
-  // ── The pure fills, each a function of an answer in hand; `useUploadsRead` hands their results over inside `read`. ──
-  // FILL: joinFriction — joinFriction(answer: HealSessionsAnswer): Map<claude session id, RunFriction>. Per session: its rows that are not ignored, how many a landed heal took (`claimed_by` names a heal whose status is done), how many stand open. Feeds `read.friction`, and `read.healed` (the heals of the answer, landed and running).
-  // FILL: typeRegression — typeRegression(answer, runs): Record<'initial' | 'final', boolean>. True for a type when one of its runs' sessions holds an item whose `regression` is not null. Feeds `read.regression`.
-  // FILL: bucketDays — bucketDays(runs, days, now): DayBucket[]. One bucket per local day of the window, oldest first, the last one today; a dry run counts as `test`, a live run in none. Feeds `read.days`.
-  // FILL: bucketHours — bucketHours(runs): number[24]. Presses by the local hour of `started_at`. Feeds `read.hours`.
+  // The window's runs, the feed they are told by, the heal answer joined to them and the live run's newest step.
+  const { read, feed, readAt, refresh, retry } = useUploadsRead({ shown, window: days, filters });
+  // The open run and its events; the sheet is drawn only while the view is shown, so a hidden view has its stream closed.
+  const { sheet, showEarlier, retry: retrySheet } = useRunSheet(shown ? openSid : null, feed);
+  // The clock every age and the live run's elapsed time are counted from: read afresh at every show and at every settled read (failures too, so the stale strip's age is true), and ticking only while a run is live.
+  const now = useUploadsClock(shown, read.overview !== null && read.overview.live !== null, readAt);
 
   // ── The presses. None writes: they change what is read and what is shown. ──
-  // FILL: onWindow — the window switch: setDays(next), which re-reads the overview.
-  const onWindow: (next: UploadsWindow) => void = unwired(setDays);
-  // FILL: onRefresh — Refresh: re-reads the overview and the heal answer, keeping the screen as it is until the new answer lands.
-  const onRefresh: () => void = unwired();
-  // FILL: onFilter — a filter chip: setFilters(next). A change of `by`, `tests` or `account` re-reads the overview; `hiccupsOnly` alone re-reads nothing.
-  const onFilter: (next: UploadsFilters) => void = unwired(setFilters);
-  // FILL: onOpenRun — a run's row, a type's row of runs, or Live now's Open: setOpenSid(sessionId).
-  const onOpenRun: (sessionId: string) => void = unwired(setOpenSid);
-  // FILL: onCloseRun — the sheet's Escape, its ✕ and its scrim: setOpenSid(null).
-  const onCloseRun: () => void = unwired(setOpenSid);
-  // FILL: onShowEarlier — the sheet's Show earlier: reads the page of events before the oldest on screen and puts it above them.
-  const onShowEarlier: () => void = unwired();
-  // FILL: onRetry — Try again, on the view's banner, its stale strip, the sheet's banner and the two "heal ledger could not be read" banners (the Runs list's and the sheet's): re-reads what failed.
-  const onRetry: () => void = unwired();
-  // FILL: onPill — a pill: setActivePill(key), then the section `PILL_TARGET[key]` scrolled into view (`scrollIntoView`, instant under prefers-reduced-motion), as the heal panel carries its reader (`heal/HealPanel.tsx` :73).
-  const onPill: (key: UploadsPillKey) => void = unwired(setActivePill, PILL_TARGET);
-  // FILL: onOpenFriction — a friction row's transcript press: `useOpenFrictionLine()` from the heal barrel.
-  const onOpenFriction: (item: HealItem) => void = unwired();
-  // FILL: onOpenBrief — a heal card's Open brief: `useOpenHealBrief()` from the heal barrel.
-  const onOpenBrief: (heal: HealCard) => void = unwired();
+  // The window and the filters are part of the overview's key, so changing them reads it again; Hiccups only alone is the browser's own and reads nothing.
+  const onWindow = setDays;
+  const onFilter = (next: UploadsFilters) => {
+    // Test runs is the one filter that moves a control: the answer decides whether the chip stands under the empty state or among the Runs list's chips.
+    if (next.tests !== filters.tests) testsPressed.current = true;
+    setFilters(next);
+  };
+  const onRefresh = refresh;
+  const onOpenRun = setOpenSid;
+  const onCloseRun = () => setOpenSid(null);
+  const onShowEarlier = showEarlier;
+  const onRetry = () => {
+    retry();
+    retrySheet();
+  };
+  // A pill carries the reader to its section, as the heal panel carries its reader: instant for a reader who asked for less motion.
+  const onPill = (key: UploadsPillKey) => {
+    setActivePill(key);
+    document.getElementById(PILL_TARGET[key])?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  };
+  // The workspace's own openers: a friction row's transcript line, and a heal's brief.
+  const onOpenFriction = useOpenFrictionLine();
+  const onOpenBrief = useOpenHealBrief();
 
   const overview = read.overview;
+
+  // The answer to a press on Test runs landed (or the view was hidden before it did): the chip may have moved, and the button
+  // that was pressed went with its old home, which drops keyboard focus to the page. Focus follows the chip to its new place.
+  useEffect(() => {
+    if (!testsPressed.current) return;
+    testsPressed.current = false;
+    if (shown && document.activeElement === document.body) root.current?.querySelector<HTMLElement>('[data-uploads-tests-chip] button')?.focus();
+  }, [overview, shown]);
 
   if (overview === null) {
     return (
@@ -141,7 +151,9 @@ export function UploadsView({ shown }: UploadsViewProps) {
     last: armed.find((run) => run.verdict !== 'live') ?? null,
   };
   const liveRun = overview.live;
-  const liveState = liveRun === null ? null : (read.live === null ? liveRun.state !== 'awaiting_input' : read.live.working) ? 'working' : 'waiting';
+  const liveStatus: LiveStatus | null = liveRun === null
+    ? null
+    : { state: (read.live === null ? liveRun.state !== 'awaiting_input' : read.live.working) ? 'working' : 'waiting', test: liveRun.dry_run };
   // The window holds no run at all, and no person or account was asked for: an empty window, not a filter that matched nothing.
   const emptyWindow = overview.runs.length === 0 && filters.by === null && filters.account === null;
   // Whether each pill has somewhere to carry the reader: none of them over an empty window (it has no section), and Live now's only while a run is live.
@@ -152,9 +164,9 @@ export function UploadsView({ shown }: UploadsViewProps) {
 
   return (
     // The view is its own size container: the body's two columns follow the view's width, never the window's.
-    <div className="min-w-0 max-w-[1180px] px-[clamp(16px,4cqi,32px)] pb-7 pt-5" data-uploads-view={read.stale ? 'stale' : 'ready'}>
+    <div ref={root} className="min-w-0 max-w-[1180px] px-[clamp(16px,4cqi,32px)] pb-7 pt-5" data-uploads-view={read.stale ? 'stale' : 'ready'}>
       <div className={`flex min-w-0 flex-col gap-5 [container-type:inline-size] ${ENTER}`}>
-        <UploadsHead days={days} tally={tally} live={liveState} truncated={overview.truncated} filters={filters} now={now} onWindow={onWindow} onRefresh={onRefresh} onFilter={onFilter} />
+        <UploadsHead days={days} tally={tally} live={liveStatus} truncated={overview.truncated} filters={filters} now={now} onWindow={onWindow} onRefresh={onRefresh} onFilter={onFilter} />
 
         {read.stale && (
           // STATE: A READ FAILED AFTER A GOOD ONE. The last answer stays on screen, and this strip says it is the last answer,
@@ -165,21 +177,30 @@ export function UploadsView({ shown }: UploadsViewProps) {
           </div>
         )}
 
-        <UploadsPills tally={tally} truncated={overview.truncated} live={liveState} healed={read.healed} frictionFailed={read.frictionFailed} now={now} canGo={canGo} activePill={activePill} onSelect={onPill} />
+        <UploadsPills tally={tally} truncated={overview.truncated} live={liveStatus} healed={read.healed} frictionFailed={read.frictionFailed} now={now} canGo={canGo} activePill={activePill} onSelect={onPill} />
 
         {/* STATE: A RUN IS LIVE. Drawn only while the registry holds one: with none, nothing stands in its place. */}
         {liveRun !== null && <LiveNow run={liveRun} step={read.live} now={now} onOpenRun={onOpenRun} />}
 
         {emptyWindow ? (
           // STATE: NO RUN IN THE WINDOW. The head says so beside the window switch; here the same fact with the next step,
-          // a wider window, as the press. At ninety days there is no wider one, so it is a statement.
-          <EmptyState
-            icon={CalendarSearchIcon}
-            title={t('cerberus.uploads.empty.title', { days })}
-            message={t(filters.tests ? 'cerberus.uploads.empty.messageTests' : 'cerberus.uploads.empty.message')}
-            actionLabel={wider === undefined ? undefined : t('cerberus.uploads.empty.wider', { days: wider })}
-            onAction={wider === undefined ? undefined : () => onWindow(wider)}
-          />
+          // a wider window, as the press. At ninety days there is no wider one, so it is a statement. Test runs stands
+          // under it: the list that carries that chip is not drawn here, and a window whose only runs are dry ones
+          // (a new account's first) would otherwise hold runs no press could show. What it says of test runs is of the answer
+          // in hand, not of the chip just pressed: until the read for the press lands, the answer is the one without them.
+          <div className="flex min-w-0 flex-col gap-3">
+            <EmptyState
+              icon={CalendarSearchIcon}
+              title={t('cerberus.uploads.empty.title', { days })}
+              message={t(overview.filters.tests ? 'cerberus.uploads.empty.messageTests' : 'cerberus.uploads.empty.message')}
+              actionLabel={wider === undefined ? undefined : t('cerberus.uploads.empty.wider', { days: wider })}
+              onAction={wider === undefined ? undefined : () => onWindow(wider)}
+            />
+            <div className="flex min-w-0 flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+              <TestRunsChip selected={filters.tests} onToggle={() => onFilter({ ...filters, tests: !filters.tests })} />
+              <span>{t('cerberus.uploads.runs.testsTitle')}</span>
+            </div>
+          </div>
         ) : (
           // STATE: THE WINDOW HAS RUNS (or a filter narrowed it to none, which the Runs list says under its own chips).
           <UploadsBody overview={overview} read={read} filters={filters} now={now} onFilter={onFilter} onOpenRun={onOpenRun} onRetry={onRetry} />

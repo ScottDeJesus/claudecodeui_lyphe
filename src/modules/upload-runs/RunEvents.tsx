@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useFollowNewest } from '@/modules/upload-runs/hooks/useFollowNewest';
 import { eventLines } from '@/modules/upload-runs/utils/uploadsWords';
 import type { UploadRunEvent } from '@/shared/upload-runs-types';
 import { Badge, Button, Timeline } from '@/shared/ui';
@@ -39,7 +40,8 @@ type RunEventsProps = {
  * IT OPENS AT ITS FOOT, the newest line: the ending of a run that is over, the line just written of one that is live.
  * That is the pane's own layout and no script: it is a reversed column around one block in reading order, and a reversed
  * column rests at its end. So a run of 1,500 events opens on how it ended, never on event 1,001, and a page that Show
- * earlier puts above leaves the reader's line where it was.
+ * earlier puts above leaves the reader's line where it was. While the run is live, a reader at the foot follows the lines
+ * that arrive by the same layout, and one who has scrolled up is held where they are (`useFollowNewest`).
  *
  * THE OPEN LINE IS REMEMBERED BY ITS EVENT, never by its place. The Timeline keeps a position, and positions move here:
  * Show earlier puts a page above, a live run adds lines below, and a result arriving folds into its call's line. So this
@@ -51,6 +53,8 @@ export function RunEvents({ events, total, hasEarlier, live, imported, onShowEar
   const { t } = useTranslation();
   const e = 'cerberus.uploads.sheet.events';
   const lines = useMemo(() => eventLines(t, events), [t, events]);
+  // The pane keeps a reader who scrolled up where they are while a live run's lines arrive at the foot; a reader at the foot is followed by the layout itself.
+  const { paneRef, onScroll } = useFollowNewest(lines.length === 0 ? '' : lines[lines.length - 1].id);
   // The event whose line is open, by its id; null with none open. Held here, since the Timeline can only keep a position and this feed's positions move.
   const [openId, setOpenId] = useState<string | null>(null);
   const openAt = openId === null ? -1 : lines.findIndex((line) => line.id === openId);
@@ -72,12 +76,13 @@ export function RunEvents({ events, total, hasEarlier, live, imported, onShowEar
         <p className="m-0 rounded-lg border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground">{t(live ? `${e}.noneYet` : `${e}.none`)}</p>
       ) : (
         <div
-          className="flex max-h-[min(30rem,60vh)] min-w-0 flex-col-reverse overflow-y-auto rounded-lg border border-border px-3 py-1"
+          className="flex max-h-[min(30rem,60vh)] min-w-0 flex-col-reverse overflow-y-auto rounded-lg border border-border px-3 py-1 [overflow-anchor:none]"
           tabIndex={0}
           role="log"
           aria-label={t(`${e}.label`)}
           data-uploads-events-pane
-          // FILL: followNewest — a ref on this pane. Its layout already rests it at its foot when it opens (live or ended) and holds the reader's line when Show earlier prepends a page; what is left for the fill is the live case alone: once the reader has scrolled up, lines that arrive must not move what they are reading (the Fix output pane's rule, `cerberus/sheet/FixOutput.tsx` :156-160).
+          ref={paneRef}
+          onScroll={onScroll}
         >
           {/* One block in reading order inside the reversed column: the column only sets where the scroll rests. */}
           <div className="min-w-0">

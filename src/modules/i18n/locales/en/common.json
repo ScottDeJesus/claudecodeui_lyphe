@@ -2665,6 +2665,7 @@
         "runningAccent": "running",
         "waiting": "An upload is",
         "waitingAccent": "waiting on a person",
+        "testLead": "A test run is",
         "hiccups_one": "One run",
         "hiccups_other": "{{count}} runs",
         "hiccupsAccent_one": "hit a hiccup",
@@ -2720,7 +2721,9 @@
         "liveNone": "none",
         "liveWorking": "working",
         "liveWaiting": "waiting on a person",
+        "liveTest": "test run · {{state}}",
         "liveTitle": "The upload running right now, if there is one",
+        "liveTestTitle": "A test run is going: a dry run of the launch path, never an upload",
         "lastRun": "Last run",
         "lastRunNone": "none in this window",
         "lastRunNoneTitle": "No upload ran in this window",
@@ -2779,7 +2782,7 @@
         "noDay": "No run on any day of this window.",
         "busiestDay_one": "Busiest day: {{day}}, with {{count}} run.",
         "busiestDay_other": "Busiest day: {{day}}, with {{count}} runs.",
-        "daysLabel": "Runs on each of the last {{count}} days",
+        "daysLabel": "Runs on each of the {{count}} days this window touches",
         "dayTitle": "{{day}}: {{clean}} clean, {{hiccup}} hiccup",
         "legend": {
           "clean": "clean",
@@ -3072,6 +3075,7 @@
           "claimed_other": "This heal took up {{count}} of this run's rows",
           "cured_one": "cured {{count}}",
           "cured_other": "cured {{count}}",
+          "curedNotRecorded": "cure not recorded",
           "fix": "What the fix was:",
           "noFix": "Its builder left no line about what the fix was.",
           "cameBack": "Came back {{ago}}, after a heal had closed it.",
@@ -3082,7 +3086,16 @@
       "trouble": {
         "title": "The upload runs can't be read",
         "stale": "The upload runs can't be read. Showing the last answer, from {{ago}}.",
-        "retry": "Try again"
+        "retry": "Try again",
+        "cause": {
+          "no_secret": "CloudCLI could not read the upload engine's internal secret, so nothing here can be read until its env file holds it.",
+          "unreachable": "The upload engine did not answer in time. It may be restarting.",
+          "unreadable": "The upload engine sent an answer CloudCLI can't read. It may be part way through an update.",
+          "gone": "The upload engine has no record route to read. It may be part way through an update.",
+          "gone_run": "This run is not on file any more.",
+          "failed": "The upload engine refused the read. Try again in a moment; if it keeps failing, the engine's log says why.",
+          "failed_run": "The upload engine refused to read this run. Try again in a moment; if it keeps failing, the engine's log says why."
+        }
       },
       "empty": {
         "title": "No upload ran in the last {{days}} days",

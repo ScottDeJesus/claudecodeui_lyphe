@@ -107,7 +107,8 @@
           "server/shared/relayed-press-types.ts",
           "server/shared/relay-record.ts",
           "server/shared/sayable-name.ts",
-          "server/shared/word-edges.ts"
+          "server/shared/word-edges.ts",
+          "server/shared/request-source.ts"
         ],
         "mode": "file"
       },

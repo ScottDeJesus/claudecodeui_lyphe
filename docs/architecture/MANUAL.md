@@ -144,20 +144,20 @@ section: 01-websocket-transport/005 Authentication at the upgrade
 **RULE: `verifyClient` runs before the `connection` event, so an unauthenticated socket
 never reaches a route handler. Failure is an upgrade rejection, not a close frame.**
 
-`verifyWebSocketClient` (`websocket-auth.service.ts:18`) logs the attempt with the token
-redacted (`:25-29`, added by `14ddbc7c`) and then splits:
+`verifyWebSocketClient` (`websocket-auth.service.ts`) logs the attempt with the token
+redacted (added by `14ddbc7c`) and then splits:
 
 | Mode | What it does |
 | --- | --- |
-| Platform (`isPlatform`) | Calls `authenticateWebSocket(null)`, which returns the first user in the database, and **ignores tokens entirely** (`:32-42`) |
-| OSS | Takes the JWT from the `token` query parameter, falling back to `Authorization: Bearer` (`:45-48`), and verifies it plus the user row (`auth.middleware.ts:118-155`) |
+| Platform (`isPlatform`) | Calls `authenticateWebSocket(null)`, which returns the first user in the database, and **ignores tokens entirely** |
+| OSS | Takes the JWT from the `token` query parameter, falling back to `Authorization: Bearer`, and verifies it plus the user row (`authenticateWebSocket` in `auth.middleware.ts`) |
 
 On success the user is attached as `request.user` and the upgrade proceeds; on failure the
 function returns `false` and the client sees a failed handshake.
 
 The two modes return *different user shapes* — platform returns `{ id, userId, username }`,
 OSS returns `{ userId, username }` with no `id` — which is why the chat handler reads the
-id through `readRequestUserId` (`chat-websocket.service.ts:89-106`) instead of touching
+id through `readRequestUserId` (`chat-websocket.service.ts`) instead of touching
 `user.id` directly.
 
 Only `/ws` and `/desktop-notifications` read `request.user` at all. `/shell` and

@@ -3,12 +3,13 @@ import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { CerberusView } from '@/shared/types';
 
 /**
- * The views the tab keeps mounted (`hidden`) once shown, as Fleet is: Tours and Bulletins hold a place a person left (the
- * open tour, pano and face; the open carrier and page) and read on open and on a press, never on a timer or while hidden,
- * so left mounted they cost nothing. Fleet is kept too, but it is always mounted and keeps its place in the document.
- * History and Catalog hold no place and are mounted only while they show.
+ * The views the tab keeps mounted (`hidden`) once shown, as Fleet is: Tours, Bulletins and Uploads hold a place a person left
+ * (the open tour, pano and face; the open carrier and page; the window, the filters and the open run) and read on open and
+ * on a press, never on a timer or while hidden, so left mounted they cost nothing. Uploads reads a third way too, when its
+ * feed tells it a run moved, and only while it is shown. Fleet is kept too, but it is always mounted and keeps its place in
+ * the document. History and Catalog hold no place and are mounted only while they show.
  */
-const KEPT_VIEWS: readonly CerberusView[] = ['tours', 'bulletins'];
+const KEPT_VIEWS: readonly CerberusView[] = ['tours', 'bulletins', 'uploads'];
 
 /**
  * What the Cerberus panel's kept views need from the panel: which views have been shown at least once, and where each

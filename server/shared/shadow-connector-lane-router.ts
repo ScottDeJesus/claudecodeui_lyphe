@@ -32,11 +32,11 @@ import { hangUpSignal, relayEventStream } from './shadow-connector-lane-stream.j
 /**
  * A check one id or one query value is held to before anything is forwarded. `expects` is the half of the
  * 422 sentence that follows the field's name: `<name> must be <expects>`. Consumers: the id tables of the
- * `affected-areas` and `carrier-bulletins` routes, and this file's router.
+ * `affected-areas`, `carrier-bulletins` and `upload-runs` routes, and this file's router.
  */
 export type LaneRule = { test: (value: string) => boolean; expects: string };
 
-/** A rule that a value must match whole. Consumers: the `affected-areas` and `carrier-bulletins` routes, for each id shape they accept. */
+/** A rule that a value must match whole. Consumers: the `affected-areas`, `carrier-bulletins` and `upload-runs` routes, for each id shape they accept. */
 export const patternRule = (regex: RegExp, expects: string): LaneRule => ({
   test: (value) => regex.test(value),
   expects,
@@ -49,7 +49,7 @@ export const patternRule = (regex: RegExp, expects: string): LaneRule => ({
  */
 export const LOWERCASE_UUID_SOURCE = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 
-/** A lowercase uuid. Consumers: the `affected-areas` routes (`region`, `read`) and the `carrier-bulletins` routes (`bulletin`). */
+/** A lowercase uuid. Consumers: the `affected-areas` routes (`region`, `read`), the `carrier-bulletins` routes (`bulletin`) and the `upload-runs` routes (the overview's `account`). */
 export const LOWERCASE_UUID_RULE: LaneRule = patternRule(new RegExp(`^${LOWERCASE_UUID_SOURCE}$`), 'a lowercase uuid');
 
 /** The sha256 of a file's bytes: 64 lowercase hex characters. Consumers: the `affected-areas` routes (`/images/:sha`) and the `carrier-bulletins` routes (`/files/:sha/...`). */

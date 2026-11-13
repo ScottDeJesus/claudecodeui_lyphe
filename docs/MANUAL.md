@@ -5206,7 +5206,7 @@ Either way that turn is a child of the API and dies with the next restart, so st
 again does not rescue what is already running in-process: only turns spawned after it comes back
 go to the tmux server.
 
-Known and left: the API's fall-through redirect (`server/index.ts:255`) sends a LAN browser to
+Known and left: the API's fall-through redirect (`server/index.ts`) sends a LAN browser to
 `http://localhost:5183` on an unmatched route (only reachable on routes the client never calls);
 API responses carry `access-control-allow-origin: *` (bearer auth, so a foreign origin reads
 nothing authed); the fork's source is readable unauthenticated on :5183 as on every Vite dev
@@ -5235,7 +5235,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home
 section: kanban/000
 
 Forty-one routes under `/api/kanban`, behind `authenticateToken` on the MOUNT
-(`server/index.ts:227` — no route file imports the guard), wired in `kanban.module.ts`, plus one
+(`server/index.ts` — no route file imports the guard), wired in `kanban.module.ts`, plus one
 websocket frame — `kind: 'kanban_event'` — sent to every open `/ws` socket on every write and
 never on a read.
 
@@ -5900,7 +5900,7 @@ and "this board has spent its relaunch attempts" all look the same from outside,
 different fix. The last two are the SAME predicates the spawn path asks, so the route cannot explain
 a board differently from the way the tick treats it.
 
-The eight routes, all behind `authenticateToken` on the mount (`server/index.ts:230`):
+The eight routes, all behind `authenticateToken` on the mount (`server/index.ts`):
 
 ```
 GET  /api/kanban-metis/sessions                          -> { sessions, at }
@@ -6182,7 +6182,7 @@ derivable, so a process that lost that list can still re-read `list_active_build
 is its own.
 
 **The second door, and the child's credential.** `app.use('/api/kanban-pm', kanbanMetisSecretGuard,
-createKanbanModule(kanbanReadings))` at `server/index.ts:242` mounts the board's own router a second time, so the
+createKanbanModule(kanbanReadings))` in `server/index.ts` mounts the board's own router a second time, so the
 child reaches the same services over the same verbs behind a different door, and NO verb is
 duplicated for it. The credential is derived, never stored:
 

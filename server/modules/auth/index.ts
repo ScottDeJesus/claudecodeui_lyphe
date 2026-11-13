@@ -9,3 +9,6 @@ export { authenticateWebSocket } from './auth.middleware.js';
 export { validateApiKey } from './auth.middleware.js';
 // JWT_SECRET: used by the toolsets module to derive each chat's tool-set credential.
 export { JWT_SECRET } from './auth.middleware.js';
+// readTokenUsername: used by the boot-report module to name the account behind a page that did not draw; it verifies the
+// signature, ignores expiry and logs nothing.
+export { readTokenUsername } from './auth.middleware.js';
