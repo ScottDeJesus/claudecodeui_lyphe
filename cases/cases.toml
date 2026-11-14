@@ -1,0 +1,17 @@
+# The regression suite: cases/<area>/<name><ext> are the scripts, cases/lib/ their shared helpers.
+[suite]
+name = "lyphecli"
+
+[run]
+timeout_s = 120
+width = 4
+build_max = 40
+
+[run.commands]
+".mjs" = ["node"]
+".ts" = ["cloudcli-tsx"]
+
+[areas]
+server = "the API of the running server"
+shell = "the app frame in a browser"
+modules = "server code with no route, imported by a .ts case"
