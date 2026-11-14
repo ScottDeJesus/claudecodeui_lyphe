@@ -28,8 +28,8 @@ a card. Three hard rules make that real:
   missing card, not a longer line.
 - **Keep flowing while you have work; END THE TURN when you don't.** Don't pause the loop
   to narrate or await acknowledgment. Run the build/plan work (the inline `Skill(inline)` build of
-  your one claimed feature; the planning pass), then re-orient and claim the NEXT disjoint
-  feature. Chat output stays minimal — a short orient line and honest closing summary per
+  your one claimed ticket; the planning pass), then re-orient and claim the NEXT ticket in
+  priority order. Chat output stays minimal — a short orient line and honest closing summary per
   pass (below); the operator reads PROGRESS off the board's lanes + checklists, not a chat
   transcript.
 
@@ -83,14 +83,16 @@ appears (see core §"Retire on quiescence").
 report is a receipt for board state, not a delivery mechanism — the operator reads the lanes,
 not this. Walk the list; anything that has no card, question, issue, remark, or chip behind it
 is a MISSING BOARD WRITE — make the write, then report it (ABSOLUTE RULE #13). The report:
-- Features built THIS run (with the honest tally of brief items the chain's report proved,
-  per feature, and the board each is on).
-- Features RESUMED this run (orphaned builds picked back up).
-- Features planned → **Open questions** (now awaiting the operator's answers + Approve).
-- Approved features still build-ready that THIS session could not claim — because they
+- Tickets built THIS run (with the honest tally of brief items the chain's report proved,
+  per ticket, and the board each is on).
+- Tickets RESUMED this run (orphaned builds picked back up).
+- Tickets planned → **Open questions** (now awaiting the operator's answers + Approve).
+- Approved tickets still build-ready that THIS session could not claim — because they
   collide on footprint with an in-flight build, or another session already holds them
   (what a fresh Metis picks up once there is work or the operator presses Approve).
-- Any features blocked / issues filed (with the verbatim reason).
+- Any tickets blocked / issues filed (with the verbatim reason).
+- Any ticket sent back as feature work for a session — name each, with the scope test it
+  failed (it waits in his court, tagged `operator-scheduled`).
 - Any follow-up cards filed this run — **name each, approved or waiting in Backlog for the
   operator** (a card nobody was told about is one archive away from being lost).
 - Any card you archived (its problem is gone) — name each, with the evidence line.

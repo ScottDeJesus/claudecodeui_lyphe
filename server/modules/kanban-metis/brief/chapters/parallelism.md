@@ -1,6 +1,6 @@
 # Metis chapter — Parallelism: solo inline builds, sessions the driver runs
 
-> **What this is.** How a Metis session builds its ONE claimed feature SOLO INLINE,
+> **What this is.** How a Metis session builds its ONE claimed ticket SOLO INLINE,
 > and how several sessions run concurrently WITHOUT colliding — the footprint-disjoint
 > discipline, the per-file concurrency arbiter, the concurrency dial, and the operational
 > guardrails for concurrent sessions. **Core routes here** from BUILD step c + ABSOLUTE
@@ -14,8 +14,9 @@
 ## Parallelism — solo inline builds, sessions the board's driver runs (footprint-preferred)
 
 **Each Metis session is a SOLO, dynamic Metis.** On each orient a session claims AT MOST
-ONE feature that is build-ready AND footprint-disjoint from every in-flight build (its own
-preference — nothing on this board enforces it), builds
+ONE ticket — the top build-ready one, since the board orders `buildable[]` by priority — and,
+where tickets of that same priority offer a choice, one footprint-disjoint from every in-flight
+build (its own preference — nothing on this board enforces it), builds
 it SOLO INLINE, then loops to claim the next. **Parallelism is the BOARD'S DRIVER running
 several sessions at once** — a Metis per board, each launched with its own board id and its
 own session uuid; they run concurrently, natively. There is **no `N`, no slider read, no
@@ -38,13 +39,13 @@ card in front of you.
 **One main loop per session, never workflows.** **A subagent CANNOT invoke a Skill**:
 `Skill(inline)` is main-loop-only and runs *inline*, walking the `plan-runner chain` out of the
 main loop. A Metis session IS a main loop, so it runs natively there, and **parallelism comes
-from MULTIPLE sessions, each building its OWN one feature through `Skill(inline)`** — never from
+from MULTIPLE sessions, each building its OWN one ticket through `Skill(inline)`** — never from
 one main loop fanning out pipelines. `Skill(inline)` launches the chain, which runs the REAL
 souls: a separate builder and an independent Athena with real-data verify. The forbidden
 anti-pattern is a single agent doing build + self-review + self-verify; `/inline` is the
 OPPOSITE of that — the full multi-soul pipeline.
 
-**How a session builds its ONE claimed feature.** Write the feature's BRIEF
+**How a session builds its ONE claimed ticket.** Write the ticket's BRIEF
 (`~/.claude/plans/briefs/<slug>.brief.md`, PLAN & QUESTION step 1) and run `Skill(inline)` on it.
 `/inline` fires ONE `plan-runner chain`, and the detached walker puts the work through the
 same multi-stage pipeline every other build uses:
@@ -60,7 +61,7 @@ same multi-stage pipeline every other build uses:
 5. **Prometheus** — a doc sweep over what the change touched.
 
 Then the walker prints its own report, and **the chain's report IS the completeness
-record**: the feature greens ONLY when Athena's tally carries no standing BLOCKING/HIGH and
+record**: the ticket greens ONLY when Athena's tally carries no standing BLOCKING/HIGH and
 the fix-pass closed what she found. The session reads that report — never the code — and
 mirrors it on the card's CHECKLIST (`set_checklist_item(<k-N>, 'active')` for the piece in
 flight, `'done'` the moment the report proves that piece with real evidence). An `open:`
@@ -78,7 +79,7 @@ before).
 
 **One in-flight build per session; concurrency is more sessions the driver ran.** A solo
 session builds
-exactly ONE feature at a time. Concurrent builds happen because the driver had several
+exactly ONE ticket at a time. Concurrent builds happen because the driver had several
 sessions alive — the cap on real parallelism is
 what that board's own dial allowed, and there is nothing in the session that reads it.
 
@@ -97,20 +98,24 @@ record (`~/.claude/state/dispatch-chains/<chain-id>/`) is the resume substrate. 
 CONDUCTOR to reconcile against — the session that claimed the
 lease is the session that briefs it, rules on it, and writes its board.
 
-Because **nothing commits** (the operator commits manually), the old commit-barrier
-is gone. The parallel-safety mechanism is **disjoint-file claiming** — each session
-picks a feature whose files don't collide with any in-flight build, comparing the files
-they will touch:
+Because **nothing commits** (the operator commits manually), there is no commit-barrier.
+The parallel-safety mechanism is **disjoint-file claiming** — among tickets of the same
+priority, each session picks one whose files don't collide with any in-flight build,
+comparing the files they will touch:
 
 - **Every brief declares a `Footprint:` line** — the top-level file/dir paths that
   build will touch (e.g. `Footprint: core/foo/, api/foo.py, installation_guides/foo.sql`).
   Metis writes it into the brief herself (PLAN & QUESTION step 1); it is what she records in her
   in-flight ledger and what the card's drawer shows the operator.
-- **Pick a feature — PREFER footprint-disjoint (the PRE-CLAIM coordination).** Before
-  claiming a feature to build, compare its footprint against EVERY in-flight build's
+- **Pick a ticket — priority FIRST, then PREFER footprint-disjoint (the PRE-CLAIM
+  coordination).** `buildable[]` arrives in priority order (high, then medium, then low, then
+  the hand order), and **a lower priority is never taken ahead of a higher one that is
+  buildable.** The footprint preference applies only AMONG TICKETS OF THE SAME PRIORITY as the
+  top one: before claiming, compare each one's footprint against EVERY in-flight build's
   (live AND resumed — the ledger you rebuilt on orient step 2, which spans builds in
-  THIS session AND, via `list_active_builds`, builds owned by OTHER live sessions).
-  **PREFER a disjoint feature.** An overlap is **PERMITTED** — the per-file
+  THIS session AND, via `list_active_builds`, builds owned by OTHER live sessions), and
+  **PREFER a disjoint ticket.** When the top ticket is alone at its priority, or every ticket
+  at that priority overlaps, take the top one. An overlap is **PERMITTED** — the per-file
   arbiter serializes + merges same-file writes — so take the overlapping card and work the
   disjoint regions of your footprint first, Reading the other build's brief before touching a
   shared file.
@@ -128,11 +133,11 @@ they will touch:
   (`Footprint: core/foo/` vs `Footprint: core/foo/bar.py` conflict, even though a naive
   string set-intersection misses it because the strings differ). When in doubt whether one
   path nests inside another, treat it as overlapping (the safe default).
-- **Features on another board are usually disjoint** — different boards are usually
+- **Tickets on another board are usually disjoint** — different boards are usually
   different projects touching different paths, so a Metis on one board and a Metis on
-  another parallelize freely. Two features on the same board are likelier to overlap; check
+  another parallelize freely. Two tickets on the same board are likelier to overlap; check
   their footprints, don't assume.
-- **Another board is a READ, never a claim.** `list_features_all(status?, tag?)` answers every
+- **Another board is a READ, never a claim.** `list_tickets_all(status?, tag?)` answers every
   NON-ARCHIVED board's cards with each card's own `board {id, name}` — it is how you see the
   whole estate: what else is moving, and what is already claimed there. Its use here is
   **ordering and awareness**: your own board is the one the operator is watching, so keep
@@ -148,7 +153,7 @@ they will touch:
   are genuinely CROSS-SESSION — exactly the case the user-global concurrency
   arbiter (keyed on `session_id`) was built to serialize. So:
   - **Footprint-disjointness is the PRE-CLAIM discipline — yours to keep, with nothing
-    enforcing it.** Sessions pick NON-colliding features up front, so in the common case
+    enforcing it.** Sessions pick NON-colliding tickets up front, so in the common case
     builds never touch the same file and the arbiter never has to intervene. Nothing
     checks this for you and nothing warns you; it holds only because you do it.
   - **The per-file concurrency arbiter is the RUNTIME serializer** — when two sessions do
@@ -157,7 +162,7 @@ they will touch:
     non-overlapping edits, AI arbitration for genuine overlaps (and rare environmental
     fallbacks — non-UTF-8 files, a missing merge base). Same-file contention
     is routine and safe. Footprint disjointness remains the planning doctrine because
-    disjoint *features* avoid semantic entanglement — not because same-file writes are
+    disjoint *tickets* avoid semantic entanglement — not because same-file writes are
     dangerous.
     A real two-session same-file edit carries TWO distinct `session_id`s, so the arbiter
     sees and serializes it.
@@ -171,7 +176,7 @@ from colliding or, worse, deploying half-built work to a live surface:
 
 - **Each session's verifier uses a UNIQUE PORT** and sets its data source INLINE —
   `VITE_DATA_SOURCE=mock` on the command (or a uniquely-named mode env file, e.g.
-  `.env.<feature>.local`). **NEVER edit the shared `.env` / `.env.local`** — a verifier
+  `.env.<slug>.local`). **NEVER edit the shared `.env` / `.env.local`** — a verifier
   that rewrites the shared env file races every other session and leaves the operator's
   env mutated after the run.
 - **NEVER run `npm run build` / rebuild `dist/` during a build.** That deploys to the

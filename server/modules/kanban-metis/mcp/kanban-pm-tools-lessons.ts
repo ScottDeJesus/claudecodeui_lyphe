@@ -125,7 +125,7 @@ export function createLessonTools(client: KanbanPmClient): ToolTable {
               'workflow_discovered.',
           },
           tags: TAGS_ARGUMENT,
-          feature_id: {
+          ticket_id: {
             type: 'string',
             description:
               "Optional: the card this lesson came from (e.g. 'c-3'), kept as provenance. The " +
@@ -209,10 +209,10 @@ export function createLessonTools(client: KanbanPmClient): ToolTable {
           trigger,
           body: typeof args.body === 'string' ? args.body : '',
           tags: (args.tags as string[] | undefined) ?? [],
-          // The tool's `feature_id` argument is this board's `cardId`: the name is the one the
+          // The tool's `ticket_id` argument is this board's `cardId`: the name is the one the
           // brief was written against, translated at the one boundary that can — the route names a
           // card the way this board's schema does.
-          cardId: args.feature_id as string | undefined,
+          cardId: args.ticket_id as string | undefined,
           kind,
         });
 

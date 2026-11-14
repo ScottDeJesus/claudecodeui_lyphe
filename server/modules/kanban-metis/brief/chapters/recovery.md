@@ -13,9 +13,9 @@ that were `active` in the store but have no live session driving them. The **bui
 LEASE** makes them resumable, and the **RESUME read** detects them. Because several
 Metis sessions may be alive at once — one per board the driver has running — 
 `list_active_builds` shows the `active` cards of THIS board with their raw lease
-facts, so this read is also how a session sees which features
+facts, so this read is also how a session sees which tickets
 OTHER live sessions are building (their leases are FRESH + FOREIGN — never touch them).
-Do this at the TOP of every orient (orient step 2), BEFORE claiming any new feature:
+Do this at the TOP of every orient (orient step 2), BEFORE claiming any new ticket:
 
 1. **Read `list_active_builds(stale_secs=40)`** — every `status='active'` card on this
    board with its raw lease facts (`build_owner`, `lease_age_secs`, `is_stale`,
@@ -62,9 +62,9 @@ Do this at the TOP of every orient (orient step 2), BEFORE claiming any new feat
       `active` spinner with no live builder is a lie. Items already `done` stay
       `done` (the chain's report proved those — recorded as `done` on the card's checklist).
    b. **Reconstruct its footprint** by re-reading the `Footprint:` line from the
-      card's BRIEF (the attached path — `get_feature_plan(id)`). Add it to the in-flight
+      card's BRIEF (the attached path — `get_ticket_plan(id)`). Add it to the in-flight
       ledger NOW — so a resumed build
-      never has its files double-claimed by a feature THIS session is about to claim.
+      never has its files double-claimed by a ticket THIS session is about to claim.
    c. **Re-claim it (atomic CAS) and resume its BUILD** — the brief it was built from,
       and the CHAIN that was walking it. First `set_status(id,'active')` to re-claim —
       this is the atomic compare-and-set: a stale/orphaned lease re-stamps to THIS
@@ -91,10 +91,10 @@ Do this at the TOP of every orient (orient step 2), BEFORE claiming any new feat
       operator's answers** (BUILD step 0) in case they answered while the build was orphaned —
       an answer that changes scope is a re-brief BEFORE the resume, never a resume that
       ignores it.
-      (One feature per orient still holds — resuming an orphan IS this session's one build
+      (One ticket per orient still holds — resuming an orphan IS this session's one build
       for the pass.)
 4. **Establish the disjoint-file ledger from ALL in-flight footprints (yours, other live
-   sessions', and any you just resumed) BEFORE claiming any NEW feature.** Comparing a
+   sessions', and any you just resumed) BEFORE claiming any NEW ticket.** Comparing a
    candidate's footprint against this full ledger (chapter **parallelism.md**) is what keeps
    a resume — or another session's build — from being clobbered by your fresh claim landing
    on the same files. Nothing on this board checks that comparison for you; the discipline
@@ -124,7 +124,7 @@ as step a of the BUILD ladder does for a fresh build.
   FIELD you must read.** This is the cross-session lock that lets several solo Metis
   sessions run without double-claiming:
   the loser of a race re-evaluates against the winner's just-committed row, misses, and
-  picks another feature (the single guarded UPDATE that closes the decide-then-write
+  picks another ticket (the single guarded UPDATE that closes the decide-then-write
   window is why two sessions reaching for the same free card cannot both be told they
   have it).
 - **The MCP heartbeat refreshes the lease** (`build_lease_at` re-stamped to now) every
@@ -139,7 +139,7 @@ as step a of the BUILD ladder does for a fresh build.
 - **`done` / `file_issue` (and any move off `active`) clears the lease** — both
   `build_lease_at` and `build_owner` go NULL.
   A cleared lease is the correct "not building" state.
-- **NEVER resume or steal a feature whose lease is FRESH + owned by ANOTHER live
+- **NEVER resume or steal a ticket whose lease is FRESH + owned by ANOTHER live
   session** (`is_mine == false AND not is_stale`). The lease is advisory-with-
   staleness, not a hard mutex: stealing a fresh foreign lease double-builds an
   overlapping reconnect. Only orphans (`build_owner is null OR is_stale`) resume.
@@ -157,7 +157,7 @@ as step a of the BUILD ladder does for a fresh build.
   mid-build (a crash, a usage-limit cutoff), the heartbeat stops, the lease goes stale (40s),
   and a later orient (this session restarted, or ANOTHER session) reads it as ORPHANED →
   resumable: the intended recovery path. After the build completes, the session re-orients and
-  claims the next disjoint feature; at QUIESCENCE it simply ends the turn (it does NOT idle or
+  claims the next ticket in priority order; at QUIESCENCE it simply ends the turn (it does NOT idle or
   poll) — a session with no in-flight build that exits leaks nothing (its lease was already
   cleared at `done`/`file_issue`).
 
@@ -178,7 +178,7 @@ mid-build. Durable state lives in FIVE places and re-orienting reconciles from t
   RESUME SUBSTRATE for an interrupted build. `plan-runner chain --status <chain-id>` is the
   stage table (and names a dead walker); `plan-runner chain --resume <chain-id>` re-runs the
   stage that failed and never one that already passed. So resuming an interrupted build is
-  re-claiming the feature (atomic CAS) and resuming its chain — never re-briefing it,
+  re-claiming the ticket (atomic CAS) and resuming its chain — never re-briefing it,
   never a fresh chain on a slug whose chain still holds it (a second chain on a live slug
   is refused).
 - **The card's BUILD CHECKLIST in the board's store** — the progress MIRROR the operator
@@ -187,7 +187,7 @@ mid-build. Durable state lives in FIVE places and re-orienting reconciles from t
   `done` item is evidence already seen, never the place a resumed build reads its
   instructions from.
 - **The card's lane in the board's store** — a card the operator moved (answered + approved, or
-  reopened by a filed issue) is re-read fresh on EVERY orient. A feature
+  reopened by a filed issue) is re-read fresh on EVERY orient. A ticket
   whose operator files an issue MID-BUILD yanks back to **To do**; Metis notices the
   lane change on her next re-orient and stops greening that build rather than racing
   the operator. (The chain is NOT yanked — a chain already walking keeps its own record;

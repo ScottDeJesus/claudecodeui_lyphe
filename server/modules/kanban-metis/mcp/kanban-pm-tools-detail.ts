@@ -39,14 +39,14 @@ export function createDetailTools(client: KanbanPmClient): ToolTable {
     {
       name: 'open_design_questions',
       description:
-        "List a feature's UNANSWERED design questions — the open decisions still awaiting the " +
+        "List a ticket's UNANSWERED design questions — the open decisions still awaiting the " +
         'operator. Read-only.',
       inputSchema: toolSchema({ id: CARD_ID_ARGUMENT }, ['id']),
     },
     {
       name: 'post_design_questions',
       description:
-        'Post design questions on a feature and move it to the Questions lane. Each question is ' +
+        'Post design questions on a ticket and move it to the Questions lane. Each question is ' +
         "{text, multi(bool), options(string[])}. Returns the minted questions (ids 'q-N').",
       inputSchema: toolSchema(
         {
@@ -102,8 +102,8 @@ export function createDetailTools(client: KanbanPmClient): ToolTable {
     {
       name: 'file_issue',
       description:
-        'File an issue against a feature. Reopens it to To Do, clears its plan and extinguishes ' +
-        'the building pill.',
+        'File an issue against a ticket. Reopens it to To Do unapproved, clears its plan and ' +
+        'cached body, and extinguishes the building pill.',
       inputSchema: toolSchema(
         { id: CARD_ID_ARGUMENT, text: { type: 'string', description: 'The issue text.' } },
         ['id', 'text']
@@ -119,7 +119,7 @@ export function createDetailTools(client: KanbanPmClient): ToolTable {
     {
       name: 'set_checklist',
       description:
-        "Replace a feature's BUILD CHECKLIST with these items — one per piece of work the " +
+        "Replace a ticket's BUILD CHECKLIST with these items — one per piece of work the " +
         'card\'s brief asks for, in order. ' +
         'Every item starts pending. This is the build-progress mirror the panel draws; only ' +
         'Metis writes it. Returns the minted items.',
@@ -156,11 +156,11 @@ export function createDetailTools(client: KanbanPmClient): ToolTable {
       ),
     },
     {
-      name: 'approve_feature',
+      name: 'approve_ticket',
       description:
-        'Set the approval gate on a feature card. A Metis session calls it only on a follow-up ' +
+        'Set the approval gate on a ticket card. A Metis session calls it only on a follow-up ' +
         "she filed that clears her brief's 'When it goes to the operator' rule; every other " +
-        "approval is Harmonia's or the operator's. A Backlog (not_ready) card is promoted to To " +
+        "approval is the operator's. A Backlog (not_ready) card is promoted to To " +
         'do in the same statement. The board refuses only a card with an open question or with ' +
         'no plan, body or description.',
       inputSchema: toolSchema({ id: CARD_ID_ARGUMENT }, ['id']),
@@ -229,10 +229,14 @@ export function createDetailTools(client: KanbanPmClient): ToolTable {
         const cardId = args.id as string;
         const filed = await client.post<IssueEnvelope>(`/cards/${cardId}/issues`, { text: args.text });
 
-        // The card is handed back to the To Do lane with its plan cleared: an issue is the board's
-        // way of saying this work is not planned any more, and a card that kept its plan would
-        // read as build-ready to the next session that scanned the lane.
-        await client.patch(`/cards/${cardId}`, { plan: '' });
+        // The card is handed back to the To Do lane unapproved, with its plan and cached body
+        // cleared: an issue is the board's way of saying this work is not ready any more. A card
+        // that kept its approval would sit in `buildable` again — at the top of it, for a high
+        // ticket — and the next session would spend another chain on the work that just failed;
+        // one that kept its plan or body would read as planned. The approval goes FIRST, so a
+        // later write that fails can never leave an approved card back in To Do.
+        await client.post(`/cards/${cardId}/unapprove`, {});
+        await client.patch(`/cards/${cardId}`, { plan: '', body: '' });
         await client.post(`/cards/${cardId}/move`, { status: 'todo' });
 
         // The plan is cleared above, so any plan claim this session holds is a claim on a plan
@@ -276,7 +280,7 @@ export function createDetailTools(client: KanbanPmClient): ToolTable {
           ).item
         ),
 
-      approve_feature: async (args) =>
+      approve_ticket: async (args) =>
         textResult(
           (await client.post<{ card: unknown }>(`/cards/${args.id as string}/approve`, {})).card
         ),

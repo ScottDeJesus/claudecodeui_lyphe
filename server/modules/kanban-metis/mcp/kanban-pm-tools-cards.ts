@@ -13,12 +13,11 @@ import {
 } from './mcp-protocol.js';
 
 /**
- * The nine card tools: the feature's own lifecycle, over the board's card routes.
+ * The nine card tools: a ticket's own lifecycle, over the board's card routes.
  *
- * The names are FIXED, because the brief a Metis child is handed and the hook matchers around her
- * are written against them — a brief asking for `create_feature` must not find a tool called
- * `create_feature_card`. The only word that changes is the server prefix
- * (`mcp__kanban-pm__create_feature`).
+ * The names are FIXED, because the brief a Metis child is handed is written against them — a
+ * brief asking for `create_ticket` must not find a tool called `create_ticket_card`. The only word
+ * that changes is the server prefix (`mcp__kanban-pm__create_ticket`).
  *
  * Consumers: `kanban-pm-mcp.ts`, which assembles this table with the other two and starts the
  * transport over it.
@@ -49,42 +48,42 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
 
   const tools = [
     {
-      name: 'list_features',
+      name: 'list_tickets',
       description:
-        'List feature cards on THIS board, optionally filtered by status (not_ready | todo | ' +
+        'List ticket cards on THIS board, optionally filtered by status (not_ready | todo | ' +
         "questions | active | done) and/or a single tag. 'not_ready' is the operator's pre-To-do " +
         "staging lane — ignore it; your queue is status='todo'. Lean rows: title, status, " +
         'priority, tags and the counts. Read-only.',
       inputSchema: toolSchema({ status: STATUS_ARGUMENT, tag: TAG_ARGUMENT }, []),
     },
     {
-      name: 'list_features_all',
+      name: 'list_tickets_all',
       description:
-        'List feature cards across EVERY non-archived board, optionally filtered by status ' +
+        'List ticket cards across EVERY non-archived board, optionally filtered by status ' +
         'and/or a single tag. Each row carries its owning board {id, name}. Read-only — it does ' +
         'not change which board is current.',
       inputSchema: toolSchema({ status: STATUS_ARGUMENT, tag: TAG_ARGUMENT }, []),
     },
     {
-      name: 'get_feature_plan',
+      name: 'get_ticket_plan',
       description:
-        "Fetch one feature's full spec: title, plan, cached plan body, description, tags, design " +
+        "Fetch one ticket's full spec: title, plan, cached plan body, description, tags, design " +
         'questions, issues, the approval gate and the derived counts. Read-only.',
       inputSchema: toolSchema({ id: CARD_ID_ARGUMENT }, ['id']),
     },
     {
-      name: 'create_feature',
+      name: 'create_ticket',
       description:
-        'Create a feature card in the Backlog (not_ready) lane, unapproved. ' +
+        'Create a ticket card in the Backlog (not_ready) lane, unapproved. ' +
         "Put the operator's PRIMARY INTENT in 'description' — it is the durable why/what and " +
         "attach_plan never overwrites it. Returns the minted card (id like 'c-N').",
       inputSchema: toolSchema(
         {
-          title: { type: 'string', description: 'The feature title.' },
+          title: { type: 'string', description: 'The ticket title.' },
           priority: {
             type: 'string',
             enum: [...KANBAN_PRIORITIES],
-            description: 'low | medium | high (defaults to medium).',
+            description: 'low | medium | high (defaults to medium) — the order the board builds tickets in.',
           },
           tags: TAGS_ARGUMENT,
           description: { type: 'string', description: "The operator's primary intent." },
@@ -99,7 +98,7 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
     {
       name: 'attach_plan',
       description:
-        "Attach a brief to a feature: set its brief file path and cache the brief's markdown body " +
+        "Attach a brief to a ticket: set its brief file path and cache the brief's markdown body " +
         'on the card. Overwrites any body already there.',
       inputSchema: toolSchema(
         {
@@ -116,7 +115,7 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
     {
       name: 'set_status',
       description:
-        'Move a feature to a lane (not_ready | todo | questions | active | done). Moving to ' +
+        'Move a ticket to a lane (not_ready | todo | questions | active | done). Moving to ' +
         "'active' ALSO claims the build lease for this session, so no other session can take the " +
         'card while you build it. The lease verdict is returned beside the card.',
       inputSchema: toolSchema({ id: CARD_ID_ARGUMENT, status: STATUS_ARGUMENT }, ['id', 'status']),
@@ -124,14 +123,14 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
     {
       name: 'set_tags',
       description:
-        "Replace a feature's tag set WHOLESALE with the given list — a tag you leave out is " +
+        "Replace a ticket's tag set WHOLESALE with the given list — a tag you leave out is " +
         'removed. Returns the card as the board normalized it.',
       inputSchema: toolSchema({ id: CARD_ID_ARGUMENT, tags: TAGS_ARGUMENT }, ['id', 'tags']),
     },
     {
-      name: 'archive_feature',
+      name: 'archive_ticket',
       description:
-        "Archive a feature (hide it from the board's active lanes). Extinguishes the building " +
+        "Archive a ticket (hide it from the board's active lanes). Extinguishes the building " +
         'pill if it was building. A Metis session calls it only on a card whose problem no ' +
         'longer exists, after set_closing_remarks names the evidence.',
       inputSchema: toolSchema({ id: CARD_ID_ARGUMENT }, ['id']),
@@ -139,7 +138,7 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
     {
       name: 'set_closing_remarks',
       description:
-        'Record CLOSING REMARKS on a feature card after a build completes — a short, HONEST ' +
+        'Record CLOSING REMARKS on a ticket card after a build completes — a short, HONEST ' +
         'summary of what shipped and any follow-ups. Call it as the FINAL build step, only on a ' +
         'real ship (or to name the evidence before archiving a card whose problem is gone). ' +
         'Open with one plain-prose TL;DR line, then any needs-the-operator lines.',
@@ -156,12 +155,12 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
   return {
     tools,
     handlers: {
-      list_features: async (args) => {
+      list_tickets: async (args) => {
         const cards = await scanLaneCards(client, client.boardId, statusesFor(args.status));
         return textResult(withTag(cards, args.tag as string | undefined));
       },
 
-      list_features_all: async (args) => {
+      list_tickets_all: async (args) => {
         const boards = await listBoards(client);
         const tag = args.tag as string | undefined;
         const rows: Array<KanbanCardSummary & { board: { id: string; name: string } }> = [];
@@ -177,9 +176,9 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
         return textResult(rows);
       },
 
-      get_feature_plan: async (args) => textResult(await openCard(args.id as string)),
+      get_ticket_plan: async (args) => textResult(await openCard(args.id as string)),
 
-      create_feature: async (args) => {
+      create_ticket: async (args) => {
         const created = await client.post<CardEnvelope>(`/boards/${client.boardId}/cards`, {
           title: args.title,
           priority: args.priority as KanbanPriority | undefined,
@@ -259,7 +258,7 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
         return textResult(card);
       },
 
-      archive_feature: async (args) =>
+      archive_ticket: async (args) =>
         textResult((await client.post<CardEnvelope>(`/cards/${args.id as string}/archive`)).card),
 
       set_closing_remarks: async (args) =>

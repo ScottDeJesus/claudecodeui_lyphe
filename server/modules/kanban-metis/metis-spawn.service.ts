@@ -76,6 +76,13 @@ const BRIEF_CHAPTERS = [
   'recovery',
 ] as const;
 
+/**
+ * The longest single argv string execve accepts on Linux — `MAX_ARG_STRLEN`, 32 pages — less the
+ * terminating NUL. Counted in 4 KiB pages, the smallest page size, so the bound is never too high.
+ * The composed brief is passed to the child as one such string.
+ */
+const MAX_ARGV_STRING_BYTES = 32 * 4096 - 1;
+
 /** What the composition root hands the spawner: where, and with what. Nothing here reads the env. */
 export type MetisSpawnDependencies = {
   registry: MetisRegistry;
@@ -402,6 +409,16 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
 
     const startedAt = Date.now();
     const brief = readMetisBrief();
+    // A brief past one argv string's limit would fail at execve with E2BIG, naming nothing; refuse
+    // it here, by name, before the board's flag is written or a child is started.
+    const briefBytes = Buffer.byteLength(brief.text, 'utf8');
+    if (briefBytes > MAX_ARGV_STRING_BYTES) {
+      throw new AppError(
+        `The Metis brief is ${briefBytes} bytes; one command-line argument holds at most ` +
+          `${MAX_ARGV_STRING_BYTES}. Prune ${brief.filePath} or its chapters before the next spawn.`,
+        { statusCode: 500, code: 'METIS_BRIEF_TOO_LARGE' }
+      );
+    }
     const cwd = path.join(BOARD_CWD_ROOT, board.id);
     fs.mkdirSync(cwd, { recursive: true });
     // Written at every spawn, from the board's own row: the child's plan-runners read this file

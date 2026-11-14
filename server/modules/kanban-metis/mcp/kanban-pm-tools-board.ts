@@ -51,7 +51,9 @@ export function createBoardTools(client: KanbanPmClient): ToolTable {
         'The COMPACT orient queue — what needs doing, bucketed, with no plan bodies. Returns ' +
         "'to_plan' (todo, not build-ready yet: claim_plan FIRST, then author and post questions), " +
         "'buildable' (todo, approved, no open questions), 'awaiting_you' (the questions lane, plus " +
-        "any todo card tagged operator-scheduled) and 'active'. Every row carries its lease facts. " +
+        "any todo card tagged operator-scheduled) and 'active'. Every bucket is ordered this board " +
+        'first, then priority (high, medium, low), then the hand order — the top buildable row is the ' +
+        'ticket to take. Every row carries its lease facts. ' +
         "The 'lessons' key carries the APPROVED lesson index (newest first, at most 50) — the " +
         'corpus the operator has signed off. It is estate-wide: a lesson belongs to no board.',
       inputSchema: toolSchema(
@@ -67,7 +69,7 @@ export function createBoardTools(client: KanbanPmClient): ToolTable {
     {
       name: 'list_active_builds',
       description:
-        'List every ACTIVE feature card on this board with its raw BUILD-LEASE facts: ' +
+        'List every ACTIVE ticket card on this board with its raw BUILD-LEASE facts: ' +
         'build_owner, lease_age_secs, is_stale and is_mine. This is the RESUME read — after a ' +
         'disconnect a new session calls it and classifies each card off is_mine plus is_stale.',
       inputSchema: toolSchema(
@@ -110,7 +112,7 @@ export function createBoardTools(client: KanbanPmClient): ToolTable {
             type: 'array',
             items: { type: 'string', enum: [...SEARCH_KINDS] },
             description:
-              'Optional: restrict to a subset of feature | decision | issue | lesson. The ' +
+              'Optional: restrict to a subset of ticket | decision | issue | lesson. The ' +
               'default is all four.',
           },
           limit: {
