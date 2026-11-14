@@ -7,7 +7,8 @@ import { KindTag } from '@/modules/dispatcher/LaneCardHead';
 import { operatorWords, soulWord } from '@/modules/dispatcher/operatorWords';
 import { CpuWaitOverride } from '@/modules/dispatcher/CpuWaitOverride';
 import { PaceOverride } from '@/modules/dispatcher/PaceOverride';
-import { PlanningPausedLine, PlanningPausePress } from '@/modules/dispatcher/PlanningPause';
+import { PlanningDialPress, PlanningPausedLine, PlanningPausePress } from '@/modules/dispatcher/PlanningPause';
+import { dialPress } from '@/modules/dispatcher/planningPress';
 import { useElapsed } from '@/shared/hooks/useElapsed';
 import { useModelName } from '@/shared/hooks/useModelName';
 import { Badge, Card } from '@/shared/ui';
@@ -123,24 +124,39 @@ function PlanningLineRow({ line }: { line: PlanningLine }) {
  * IT IS ALWAYS DRAWN, so the area is always where he looks for it: with nothing being planned and nothing paused it reads one quiet line,
  * `Nothing being planned`. It draws no count: the lines are few, and the empty line says zero in words.
  *
+ * PAUSE ALL'S PLANNING EXCEPTION HAS A STRIP UNDER THE TITLE, drawn only while Pause all is on (`dialPress`, from `route.epics`): while
+ * the pause holds a planner it says so and offers `Resume planning` (the planner outings run; tasks and the queue stay held), and once
+ * planning is let through it says planning runs under Pause all and offers `Pause planning` to hold it again. It is the HOUSE's press, one
+ * for every line — the lines' own `Pause planning` / `Resume planning` brake one subject — so it sits once in the head, never per line.
+ *
  * THE SAME COMPOSITION IN BOTH HOMES, and it owns no position: the In flight face draws it first in its scroll body, in a measure of its
  * own so a line's name and its press are never a wall apart, and the Runs widget draws it under the master controller, in the same measure.
  * Its lines come off the bus, so it paints on its first render with the retained picture; the one thing it asks for is the model names,
  * the Claude catalog once per page (`useModelName`), and a line shows the store's own word until that answers.
  *
- * Handles: `data-planning-card` on the root (valued with the number of lines), `data-planning-empty` on the quiet line.
+ * Handles: `data-planning-card` on the root (valued with the number of lines), `data-planning-empty` on the quiet line,
+ * `data-planning-dial` on the strip (valued `held` or `runs`) with its press's `data-planning-dial-press`.
  *
  * Used by the runner-tab module, through this module's barrel: `RunnerPanel` (In flight) and `RunnerWidgetBody` (the Runs widget).
  */
 export function PlanningCard() {
   const { t } = useTranslation();
-  const { planning } = useDispatcherPlans();
+  const { planning, route } = useDispatcherPlans();
+  const press = dialPress(route?.epics ?? null, planning);
   return (
     <Card className="min-w-0" data-planning-card={planning.length}>
       <div className="flex min-w-0 items-center gap-2 px-4 pb-2 pt-3">
         <DraftingCompass className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <h3 className="text-sm font-medium">{t('dispatcher.planning.title')}</h3>
       </div>
+      {press !== null && (
+        <div data-planning-dial={press === 'resume' ? 'held' : 'runs'} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-3">
+          <p className="min-w-0 flex-1 basis-56 break-words text-xs text-muted-foreground">
+            {t(press === 'resume' ? 'dispatcher.planningDial.held' : 'dispatcher.planningDial.runs')}
+          </p>
+          <PlanningDialPress press={press} />
+        </div>
+      )}
       {planning.length === 0 ? (
         <p data-planning-empty className="px-4 pb-3 text-xs text-muted-foreground">{t('dispatcher.planning.empty')}</p>
       ) : (

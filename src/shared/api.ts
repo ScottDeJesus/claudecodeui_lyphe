@@ -11,6 +11,7 @@ import type { CompanionSettings } from '@/shared/companion-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
 import type { StationAskAnswer } from '@/shared/station-types';
+import type { UploadRunsWindowDays } from '@/shared/upload-runs-types';
 import { IS_PLATFORM, companionClientId, recordingFileName } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 import { synthesizeOnOwnEndpoint } from '@/shared/voiceDirect';
@@ -1243,6 +1244,34 @@ export const api = {
       get(`/api/carrier-bulletins/files/${encodeURIComponent(sha)}/pages/${encodeURIComponent(page)}/image`, options),
   },
 
+  // The upload-runs lane (the Uploads view of the Cerberus tab; wire shapes in `@/shared/upload-runs-types`): the upload agent's
+  // runs — a window's overview, one run whole and its events — forwarded to shadow-connector by CloudCLI. READ-ONLY: every verb is
+  // a GET, and nothing here starts, answers or stops a run. Every JSON answer is its wire shape BARE, in snake_case. A failure
+  // arrives as `carrierBulletins`' do: `{ error: string }` from the lane, `{ detail: string }` passed through from shadow-connector
+  // (404: no such run). The answer of each verb is named beside it. A session id is encoded here, so a caller passes it as it holds it.
+  // The two URLs are for `EventSource`, which cannot send an Authorization header, so the token rides along as a query parameter, as
+  // `searchConversationsUrl`'s does; `authenticateToken` reads it there, and the lane never forwards it upstream.
+  uploadRuns: {
+    // → UploadRunsOverview. `days` is the window (the lane takes 7, 30 or 90, and 30 when it is left out), `by` one `generated_by`
+    // stamp, `account` one account id, and `tests` brings the dry runs in, which the overview leaves out otherwise.
+    overview: (
+      { days, by, tests, account }: { days?: UploadRunsWindowDays; by?: string; tests?: boolean; account?: string } = {},
+      options: ApiRequestOptions = {},
+    ) => get(`/api/upload-runs/overview${query({ days, by, tests: tests ? 1 : undefined, account })}`, options),
+    // → UploadRunWhole (404: no such run)
+    run: (sid: string, options: ApiRequestOptions = {}) => get(`/api/upload-runs/runs/${encodeURIComponent(sid)}`, options),
+    // → UploadRunEventsPage. `after` is the last `seq` held (0 for the first page) and `limit` the page's size (500 when left out, at most 1000).
+    events: (sid: string, { after, limit }: { after?: number; limit?: number } = {}, options: ApiRequestOptions = {}) =>
+      get(`/api/upload-runs/runs/${encodeURIComponent(sid)}/events${query({ after, limit })}`, options),
+    // The live run's own stream, for `EventSource`: its events AFTER `seq` `from`, as `bubble` events. `from` is the last `seq` the caller already
+    // holds — the cursor `events` calls `after` — so pass that `seq` and never the next one wanted: the stream replays `seq > from`, and
+    // `streamUrl(sid, last + 1)` would skip event `last + 1`. 0 replays all its ring still holds. The lane answers 410 for a run that is not live.
+    streamUrl: (sid: string, from?: number) =>
+      `/api/upload-runs/runs/${encodeURIComponent(sid)}/stream${query({ from, token: getStoredAuthToken() })}`,
+    // The feed, for `EventSource`: an `UploadRunsFrame` each time a run opens, moves or ends and each time a walk of one writes progress.
+    feedUrl: () => `/api/upload-runs/feed${query({ token: getStoredAuthToken() })}`,
+  },
+
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the
   // verbs the plan cards, the arc header and In flight's queue press. The picture is `dispatcher status
   // --json` relayed whole, and the verbs are relayed to the dispatcher's own binary by argv, never by a shell.
@@ -1323,8 +1352,9 @@ export const api = {
     // queue); nothing is optimistic, and the next `dispatcher_state` frame draws the order the store holds.
     arcQueue: (name: string, move: DispatcherQueueMove) =>
       post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/queue`, move),
-    // The epic dial's one word (`dispatcher epics <word>`): a limit of `1` to `5`, or `pause` /
-    // `resume` — a BOARD verb that names no plan and no arc, so its route has no name in it.
+    // The epic dial's one word (`dispatcher epics <word>`): `pause` / `resume` (Pause all), or `run-planning` /
+    // `hold-planning` (planning let through Pause all, and held again) — a BOARD verb that names no plan and no arc,
+    // so its route has no name in it.
     epics: (word: DispatcherEpicsWord) => post('/api/dispatcher/epics', { word }),
     // The board's one Start (`dispatcher start`): every plan held for its first Start let go at once, the
     // queue and the dial then ordering them. A BOARD verb like `epics`, with no name and no body.
@@ -1373,6 +1403,11 @@ export const api = {
   heal: {
     summary: () => get('/api/heal/summary'),
     byKind: (kind: string) => get(`/api/heal/kind/${encodeURIComponent(kind)}`),
+    // → HealSessionsAnswer (`@/modules/heal`): a second surface's read, never the poll's — the rows filed in a set of Claude sessions and
+    // the heals that touched them, which Cerberus's Uploads view draws for its runs. `ids` are 1 to 200 lowercase session uuids; the
+    // route answers 422 `{ error }` for any other list.
+    sessions: (ids: readonly string[], options: ApiRequestOptions = {}) =>
+      get(`/api/heal/sessions${query({ ids: ids.join(',') })}`, options),
     ignore: () => get('/api/heal/ignore'),
     addIgnore: (body: { tool: string; pattern: string; reason: string }) =>
       post('/api/heal/ignore', body),

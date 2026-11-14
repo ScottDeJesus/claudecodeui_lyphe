@@ -571,34 +571,6 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts
 
-## INV-6336 — probe — a fresh chain owns nothing until its first stage has a spec; the dot is dark for seconds
-
-a fresh chain owns nothing until its first stage has a spec; the dot is dark for seconds
-
-```probe
-python3 /home/lyphe/.claude/state/pipeline-reviews/purple-dot-souls/athena-probes/chain-start-lag.py
-expect: `chains 200 | seconds with a chain running and no stage launch to name an owner: median 4.8 p90 17.1 max 62.2` (figures drift a little; median several seconds, max a minute)
-```
-
-measured 2026-10-02 by chain chain-purple-dot-souls-20261002-043723-dbad, finding L1, LOW
-probe-key: a74ae0c43e064715765e05748c71d907c75ecf68
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
-
-## INV-6337 — probe — the reader's id fence is tighter than the launcher's: a chain id over 120 characters is never counted
-
-the reader's id fence is tighter than the launcher's: a chain id over 120 characters is never counted
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/purple-dot-souls/athena-probes/long-chain-id.mjs
-expect: `id length 127: launcher walker_alive=True | dot reader counts it=false` — and `id length 32: … counts it=true`
-```
-
-measured 2026-10-02 by chain chain-purple-dot-souls-20261002-043723-dbad, finding L2, LOW
-probe-key: 9686bb9886de60f111e500376e0adfb69f7376ff
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
-
 ## INV-6340 — probe — A page that has been open a while never sees another device's draft, and its first keystroke replaces that draft whole
 
 A page that has been open a while never sees another device's draft, and its first keystroke replaces that draft whole
@@ -610,34 +582,6 @@ expect: `[FAIL] LONG-LIVED phone page, 8 s after the desktop saved: shows the de
 
 measured 2026-10-02 by chain chain-ask-drafts-20261002-042748-c2a8, finding L1, LOW
 probe-key: d0db172d5740b6438abd2c8c598432ab72545a8f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/AskDraftPrune.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useAskDraft.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-ask-drafts.mjs
-
-## INV-6341 — probe — The prune deletes a draft on the first frame without its ask, but an open ask can leave the lane and come back under the same identity; two comments say it cannot
-
-The prune deletes a draft on the first frame without its ask, but an open ask can leave the lane and come back under the same identity; two comments say it cannot
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/ask-drafts/athena-probes/gap.sh && node /home/lyphe/.claude/state/pipeline-reviews/ask-drafts/athena-probes/s9.mjs
-expect: `asking while the outing is live: null`, then `SAME identity as before the gap: true`; then `entries while the ask was off the lane: 0; after the SAME ask (910001-2026-10-01T12:00:00Z) returned: entries=0, notes field=null`
-```
-
-measured 2026-10-02 by chain chain-ask-drafts-20261002-042748-c2a8, finding L2, LOW
-probe-key: 72ec8cd169ddae4ac49fef2a4430c3e93cf8b51f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/AskDraftPrune.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useAskDraft.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-ask-drafts.mjs
-
-## INV-6342 — probe — The builder's probe writes whole lists to the shared account, which wipes any concurrent writer's entries (INV-4406 says never whole)
-
-The builder's probe writes whole lists to the shared account, which wipes any concurrent writer's entries (INV-4406 says never whole)
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/ask-drafts/athena-probes/s11.mjs
-expect: `bystander entry present before: true`, then `bystander entry present after the probe's whole-list write: false`
-```
-
-measured 2026-10-02 by chain chain-ask-drafts-20261002-042748-c2a8, finding L3, LOW
-probe-key: 0b072066a79008946c0e4064ce981cff325817f1
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/AskDraftPrune.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useAskDraft.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-ask-drafts.mjs
 
@@ -8201,20 +8145,21 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/cl
 
 ## INV-8633 — The lanes to shadow-connector read the secret from its env file at call time and copy it nowhere; an allowlist is the only door
 
-Rules for the two lanes to shadow-connector — `server/modules/affected-areas/` (manual: MAN-8559) and `server/modules/carrier-bulletins/` (manual: MAN-8909) — the forwarder they share, `server/shared/shadow-connector-lane.ts` (manual: MAN-8863), and the allowlist router beside it, `server/shared/shadow-connector-lane-router.ts` (manual: MAN-8908):
+Rules for the lanes to shadow-connector — `server/modules/affected-areas/` (manual: MAN-8559), `server/modules/carrier-bulletins/` (manual: MAN-8909) and `server/modules/upload-runs/` (manual: MAN-9897) — the forwarder they share, `server/shared/shadow-connector-lane.ts` (manual: MAN-8863) with its event-stream sibling and its wire (`shadow-connector-lane-stream.ts`, `shadow-connector-lane-wire.ts`; manual: MAN-9896), and the allowlist router beside it, `server/shared/shadow-connector-lane-router.ts` (manual: MAN-8908):
 
 1. `EIS_INTERNAL_SECRET` is read in `server/shared/shadow-connector-lane.ts` and nowhere else, and is never written to `process.env`, this server's `.env`, a log line or an error message. why: a copy drifts on rotation, and the agent sessions this server spawns inherit its environment. A lane imports the forwarder; it does not parse the env file itself.
 2. `describeFailure` uses only an error's NAME and its cause's CODE, never its message. why: a transport error can quote the request, and the request carries the secret.
-3. Only a lane's own module (`affected-areas.module.ts`, `carrier-bulletins.module.ts`) reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` for its lane, and passes the values to `createShadowConnectorLane` with its own distinct `label`. why: a scratch engine or an empty env file is proven by setting the variable before `createAffectedAreasModule()` / `createCarrierBulletinsModule()`; a shared label would make two lanes' journal lines indistinguishable.
+3. Only a lane's own module (`affected-areas.module.ts`, `carrier-bulletins.module.ts`, `upload-runs.module.ts`) reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` for its lane, and passes the values to `createShadowConnectorLane` with its own distinct `label`. why: a scratch engine or an empty env file is proven by setting the variable before `createAffectedAreasModule()` / `createCarrierBulletinsModule()` / `createUploadRunsModule()`; a shared label would make two lanes' journal lines indistinguishable.
 4. A new engine route reaches the browser only as a row of its lane's `ALLOWLIST` with its id rules, query rules and body kind, answered by `createLaneRouter`. why: an unlisted path is the lane's own 404 and a bad id a 422 before any byte leaves; the lane never forwards a caller-invented path or query key. The bulletins lane's table is GET rows only, because its surface is read-only (INV-9382 in shadow-connector).
-5. The lane never reshapes an upstream body: status and JSON pass through whole; only lane faults carry `{ error }`. An upstream response header travels only when the lane names it (`passHeaders`); the Tours lane names none, the bulletins lane `x-left-out` and `cache-control`. An image is relayed only if its bytes begin with the lane's format signature as well as carrying its Content-Type.
+5. The lane never reshapes an upstream body: status and JSON pass through whole; only lane faults carry `{ error }`. An upstream response header travels only when the lane names it (`passHeaders`); the Tours lane names none, the bulletins lane `x-left-out` and `cache-control`, the upload-runs lane none. An image is relayed only if its bytes begin with the lane's format signature as well as carrying its Content-Type.
 6. `fetch` keeps `redirect: 'manual'`. why: the secret header must not follow a `Location`.
 7. A lane's routes do not copy the router's loop, its tails or its fault-to-status map: a lane that needs different behaviour changes `LaneRouterDefinition`. why: two copies of the checks drift, and a check that is weaker in one lane is an id the engine sees.
 8. The Gemini budget a lane carries is the REQUEST's, from the router's `relayBudgetOf` (MAN-8863, "The budget carried"), and never `process.env`. why: the server's own environment is no one's budget, and the agent sessions it spawns inherit it; a lane that read it would spend under the server's name.
+9. An event stream is the lane's `stream`, not a longer `forward`, and it holds rules 1 to 8 as `forward` does (the secret from the forwarder's own read, `redirect: 'manual'`, the request's budget, a table row for every path, a declared query only). It adds two: its connect is bounded and its read is not, and the browser hanging up closes the upstream. why: an open feed outlasts any timeout, so a bound on the read would cut a live view; and a stream no one is reading holds a subscriber at the engine. The browser's `?token=` is no row's query key and never leaves this server (MAN-9896). A retiring server ends its open streams as its HTTP drain starts (`endOpenEventStreams`, called by the shutdown path in `server/index.ts`): a stream nobody ends holds the drain for its whole bound and is journalled as a cut request.
 
 Trap: a unit that exports `EIS_INTERNAL_SECRET` in its own environment overrides `.env` for the engine (`main.py` calls `load_dotenv()` with its default `override=False`, so the process environment wins) but not for the lanes, which read only the file: the two then disagree and every forward is the engine's 403. Read from the code 2026-10-17; not reproduced.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/upload-runs/upload-runs.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/upload-runs/upload-runs.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-wire.ts
 
 ## INV-8644 — probe — LOW — The gallery tag is 3.55:1 over a white photo, and neither the sheet nor the report says so
 
@@ -10240,78 +10185,6 @@ measured 2026-10-21 by chain chain-usage-limits--account-switch--whole-20261021-
 probe-key: cea89c710a67633226d57a865016753d0f04adef
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-passes.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch.sh, /home/lyphe/.claude/hooks/enforce_claude_api_secret.py, /home/lyphe/.claude/hooks/plan_runner/claude_account/route.py
-
-## INV-9404 — probe — MEDIUM — the lane drops every response header, so the engine's `X-Left-Out` never reaches the browser, and the requirement was deleted instead of met
-
-MEDIUM — the lane drops every response header, so the engine's `X-Left-Out` never reaches the browser, and the requirement was deleted instead of met
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-lo.XXXXXX) || exit 1
-cat > "$D/p.mts" <<'EOF'
-import http from 'node:http'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import express from 'express';
-const eng = http.createServer((_q, r) => { r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store, max-age=0', 'x-left-out': '[{"carrier":"State Farm","reason":"unplannable"}]' }); r.end('[{"carrier":"Hanover Insurance"}]'); });
-await new Promise<void>((res) => eng.listen(0, '127.0.0.1', res));
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'athena-lo-env-')); const env = path.join(tmp, 'env'); fs.writeFileSync(env, 'EIS_INTERNAL_SECRET=scratch-secret\n');
-process.env.SHADOW_CONNECTOR_URL = `http://127.0.0.1:${(eng.address() as any).port}`; process.env.SHADOW_CONNECTOR_ENV_FILE = env;
-const { createCarrierBulletinsModule } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts');
-const app = express(); app.use('/api/carrier-bulletins', createCarrierBulletinsModule().router);
-const lane = http.createServer(app); await new Promise<void>((res) => lane.listen(0, '127.0.0.1', res));
-const rs = await fetch(`http://127.0.0.1:${(lane.address() as any).port}/api/carrier-bulletins/overview`);
-console.log('lane answers', rs.status, '| x-left-out=' + rs.headers.get('x-left-out'), '| cache-control=' + rs.headers.get('cache-control'), '| body=' + (await rs.text()));
-process.exit(0);
-EOF
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/p.mts"
-expect: lane answers 200 | x-left-out=null | cache-control=null | body=[{"carrier":"Hanover Insurance"}]
-```
-
-measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding M1, MEDIUM
-probe-key: 48e4e43024f75119b9a380d59beed15149ae8d4f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
-
-## INV-9405 — probe — LOW — "a 2xx that is not a PNG is the lane's unreadable" is held by the Content-Type header alone
-
-LOW — "a 2xx that is not a PNG is the lane's unreadable" is held by the Content-Type header alone
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-png.XXXXXX) || exit 1
-cat > "$D/p.mts" <<'EOF'
-import http from 'node:http'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import express from 'express';
-const eng = http.createServer((_q, r) => { r.writeHead(200, { 'content-type': 'image/png' }); r.end('<html>an error page, not a PNG</html>'); });
-await new Promise<void>((res) => eng.listen(0, '127.0.0.1', res));
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'athena-png-env-')); const env = path.join(tmp, 'env'); fs.writeFileSync(env, 'EIS_INTERNAL_SECRET=scratch-secret\n');
-process.env.SHADOW_CONNECTOR_URL = `http://127.0.0.1:${(eng.address() as any).port}`; process.env.SHADOW_CONNECTOR_ENV_FILE = env;
-const { createCarrierBulletinsModule } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts');
-const app = express(); app.use('/api/carrier-bulletins', createCarrierBulletinsModule().router);
-const lane = http.createServer(app); await new Promise<void>((res) => lane.listen(0, '127.0.0.1', res));
-const sha = 'a'.repeat(64);
-const rs = await fetch(`http://127.0.0.1:${(lane.address() as any).port}/api/carrier-bulletins/files/${sha}/pages/1/image`);
-const b = Buffer.from(await rs.arrayBuffer());
-console.log('lane answers', rs.status, '| content-type=' + rs.headers.get('content-type'), '| cache-control=' + rs.headers.get('cache-control'), '| PNG signature=' + (b.subarray(0, 8).toString('hex') === '89504e470d0a1a0a'), '| first bytes=' + JSON.stringify(b.subarray(0, 12).toString('latin1')));
-process.exit(0);
-EOF
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/p.mts"
-expect: lane answers 200 | content-type=image/png | cache-control=private, max-age=31536000, immutable | PNG signature=false | first bytes="<html>an err"   (cured: 502 and no cache-control)
-```
-
-measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding L1, LOW
-probe-key: 34b30e90d6daa6cf7193349afd1df8abc6a3d5b0
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
-
-## INV-9406 — probe — LOW — rows lost: the move out of MAN-8559 dropped three facts that no row carries now
-
-LOW — rows lost: the move out of MAN-8559 dropped three facts that no row carries now
-
-```probe
-for t in MAN-8863 INV-8633 MAN-8908 MAN-8909 MAN-8559; do echo "$t begins-with-quote=$(docstore get $t --text | grep -c -i 'begins with') next(error)=$(docstore get $t --text | grep -c 'next(error)')"; done; docstore history MAN-8559 --limit 1 --diff --text | grep -c 'really begins with'
-expect: every row prints begins-with-quote=0 next(error)=0, and the last line prints 1 (the clause sits in the before-image of MAN-8559's 17:03 write)
-```
-
-measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding L2, LOW
-probe-key: f0bf3cac0de8086c7847e20ea4216170a1db7b88
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
 
 ## INV-9443 — probe — MEDIUM — the card's Delete is never drawn for a plan whose design is waiting, so "the card's Delete relays this verb, so it withdraws too, with no app change" is false
 
@@ -24445,13 +24318,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-do
 ## INV-11297 — The Planning card — what an editor of its files must not break
 
 Reference: MAN-9671 (the card, its words and its two standing proofs).
-1. **The planning press has one home: a line of the Planning card.** `PlanCard`, `DispatchArcDeck`, `PlanControls` and `ArcControls` say `Planning paused` (`PlanningPausedLine`) and draw no Pause planning or Resume planning. why: the operator asked for one place to look and to press.
+1. **The planning press has one home: a line of the Planning card.** `PlanCard`, `DispatchArcDeck`, `PlanControls` and `ArcControls` say `Planning paused` (`PlanningPausedLine`) and draw no Pause planning or Resume planning. why: the operator asked for one place to look and to press. THE HOUSE-WIDE PRESS has one home too: the strip under the card's title (`PlanningDialPress`, drawn from `dialPress`), which lets planning through Pause all and holds it again for the whole house; it is never drawn on a line and a line's press is never drawn in it, because the two brake different things (Pause all's planning, and one subject's planning).
 2. **A line keeps its place.** Lines stand in the order their subjects were made (`created_at`, then name), loose epics last; never in the outings' order. why: Resume planning sends an outing back as a NEW row and would move the line just pressed.
 3. **The whole lane is asked.** `planningLines` takes the frame's own `plans` and `arcs`, never the drawn lists. why: a hidden feature's designer is still out.
 4. **A feature held only by its epic's pause has no line.** The epic's line says `Planning paused` and holds the one Resume; the dispatcher refuses the feature's own lift, naming the epic's.
 5. **A hold has one press.** A line draws its outing's pace hold and Override only while `PlanningLine.drawn` is false (the subject has no card or deck on this screen); a drawn card or deck draws its own.
 6. **An epic is owed Pause planning only for an outing of its own** (`arc.planner`). Features being planned with nothing of the epic's own out leave no line and no epic-wide press; each feature's line is the brake.
-7. **A press is a reading of the document, never chosen on the client.** `featurePress`, `epicPress`, `loosePress` and `planningPausedVia` read `planning_paused` by truthiness (an absent key is no pause) and draw a press only where the dispatcher would take it. why: a press drawn where it would refuse.
+7. **A press is a reading of the document, never chosen on the client.** `featurePress`, `epicPress`, `loosePress` and `planningPausedVia` read `planning_paused` by truthiness (an absent key is no pause) and draw a press only where the dispatcher would take it. `dialPress` reads `route.epics` the same way: `null` or `paused` false draws none (the dispatcher refuses both dial words with Pause all off), `planning_through` is read by truthiness (an absent key is planning held), and Resume planning is drawn only while a QUEUED outing waits on the pause (`!line.paused`; a line's own pause has its own Resume). why: a press drawn where it would refuse.
 8. **A put-away subject keeps its press.** `featurePress` and `epicPress` carry no `hidden` clause: a hide holds the walk and not the planning, the dispatcher refuses neither verb on a hidden plan, and the Planning card lists its outing. A parked feature is read off `plan.state`, never `status`, because a hide outranks `parked` in the status word. why: a hidden feature that is paused would read `Planning paused` with no Resume until it was shown; a status-read `parked` would give a put-away parked feature a Pause planning with nothing being planned.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningLines.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningPause.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts
@@ -25637,3 +25510,78 @@ measured 2026-11-09 by chain chain-kaylee-panel-drag-root-cause-20261109-135843-
 probe-key: bc4b3dd014ba540017a12e5cb20812a395391928
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFinePointer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ViewBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-mouse-on-touch.mjs
+
+## INV-11805 — probe — (MEDIUM) The rule this build adds is in 22 manual rows, and none of them reaches an editor of the two files that own it
+
+(MEDIUM) The rule this build adds is in 22 manual rows, and none of them reaches an editor of the two files that own it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# For each code file this build changed: which three rows does the edit hook serve on a first write-touch, and do any of them say planning can be let through Pause all?
+S=~/.claude/scripts/docstore
+R=/home/lyphe/.claude
+for f in hooks/dispatcher/epic_dial.py hooks/dispatcher/planner_holds.py hooks/dispatcher/planner_rule.py hooks/dispatcher/pace_demand.py claudecodeui_lyphe/server/modules/dispatcher/dispatcher-epics.reader.ts claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts; do
+  served=$($S govern "$R/$f" --touch write --limit 3 --text | cut -d' ' -f1)
+  says=""
+  for t in $served; do $S get "$t" --text | grep -q -E 'planning_through|run-planning|holds_planners|planning exception' && says="$says $t"; done
+  printf '%-72s served: %s | say the exception:%s\n' "$f" "$(echo $served)" "${says:- none}"
+done
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today every one of the six lines ends `say the exception: none`; cured when `epic_dial.py` and `planner_holds.py` each list a row (the new invariant) that names `planning_through` or `holds_planners` among their three
+```
+
+measured 2026-11-12 by chain chain-resume-planning-under-pause-all-20261112-192137-efc1, finding M1, MEDIUM
+probe-key: 84f30dbd60464c6fd1a4c80734f87c4e59d83ae5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningPause.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/planning-dial-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/planning-dial-press/press.mjs
+
+## INV-11822 — The Uploads view is read-only and says only what it read: five rules an edit to src/modules/upload-runs keeps
+
+`src/modules/upload-runs` is the Cerberus tab's Uploads view. It watches; the Restorly Uploads page is where a person acts. An edit to the module keeps all five.
+
+- **Read-only.** No Start, no answer box and no Stop, on the view or in a run's sheet. A press changes what is read or shown and writes nothing. why: Cerberus watches; the page is where a person acts.
+- **A test run is never clean or hiccup.** A dry run (`dry_run`) is listed only while Test runs is on, wears the neutral "Test run" mark with grey reason chips, and is in none of the head's or the pills' figures. Live, it is worded as a test too: the head ("A test run is running"), the Live now pill and the Live now card (`LiveStatus.test`, MAN-9891). why: a dry run is not an upload.
+- **Not read is never none.** A heal answer still out shows a dash; one that could not be read says "not read" (`frictionFailed`); neither draws "no friction". A wire `null` is "not known", never clean (MAN-9882). why: a monitor that cannot see must never look quiet.
+- **The vendor's words are text and data.** The agent's words, a tool's summary, a step's reason, a customer, a login, a flow and a reason's detail reach the page as React text nodes: never markup, never an i18n key. The view's own sentences are `cerberus.uploads.*` (MAN-7870).
+- **Colour never stands alone.** A tone reaches paint as `data-tone` plus a `tone-*` name, and a state that speaks in colour also carries its icon or word (MAN-739, MAN-578).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/
+
+## INV-11831 — The Uploads events pane sets overflow-anchor: none because useFollowNewest moves the scroll itself — the browser's anchoring and the hook's move add up
+
+The events pane of a run's sheet (`RunEvents.tsx`, `data-uploads-events-pane`) carries `overflow-anchor: none`, and `useFollowNewest` (`hooks/useFollowNewest.ts`) moves the pane's `scrollTop` itself when a line arrives at the foot while the reader has scrolled up. They are one rule in two places.
+- The browser's own scroll anchoring moves the offset too. With both on, the shift of the reader's line went from 97 px to 372 px (measured 2026-11-13, Chromium).
+- Safari has no scroll anchoring, so the hook's move is what holds there; the property is what keeps Chromium from adding its own.
+- Keep both. why: without the property Chromium adds its move to the hook's; without the hook the reader slides on every engine, since the property turns the browser's own move off.
+- Shown by `.verify/uploads-fill-states.mjs` stage `follow` (MAN-9914). The pane's behaviour: MAN-9913.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/RunEvents.tsx
+
+## INV-11832 — the boot-report door stays above the body parsers and the API-key check in server/index.ts
+
+`app.use('/api/boot-report', createBootReportModule())` sits right after `cors` and ahead of `express.json({ limit: '50mb' })`, `express.urlencoded` and `app.use('/api', validateApiKey)`. The page that posts is the one that did not draw, so it holds no session and no API key.
+
+| mount moved below | what happens |
+|---|---|
+| `validateApiKey` | with `API_KEY` set every report is a 401 (the page sends no `x-api-key`); the page keeps it in its outbox and the journal never hears of a failed page. `.env` sets no `API_KEY` today, so nothing shows until one is set |
+| `express.json({ limit: '50mb' })` | the 50 MB parser reads the body first and the door's own 16 kB parser stands down (body-parser skips a parsed body): a caller with no token makes the API parse 50 MB |
+
+- the door bounds itself because it is public: 16 kB parser, 30 reports a minute per source and 60 in all, one line per report of at most 14,000 characters (MAN-9909).
+- a middleware meant for every `/api` path goes below the door, not above it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/boot-report/
+
+## INV-11833 — vite.config.js never imports a file builders save: server/shared/gemini-budget-relay.ts is read at run time by vite-plugins/budgetRelay.js
+
+A file `vite.config.js` imports is a config dependency: Vite restarts the whole dev server, every open page with it, on each save of one. `server/shared/gemini-budget-relay.ts`, which builders edit, was one.
+
+- symptom: a save of the relay prints `… changed, restarting server…` in `journalctl -u cloudcli-client-dev`; every open page reloads onto a cold module graph, and the HTTPS front's dial to :5183 is refused while Vite comes back (2026-11-13: two restarts inside one second at 08:19:40, the front refused at 08:19:44).
+- fix: `vite.config.js` imports only `vite-plugins/budgetRelay.js`, which loads the relay at RUN time with a computed specifier that esbuild does not follow. The dev server swaps a saved relay in (`budget relay reloaded, no restart`); `vite preview` reads it once, at start. Another server file the proxy needs is read the same way, never imported.
+- the relay stays loadable by Node's own type stripping: erasable TypeScript only (no `enum`, no `namespace`) and `node:` built-ins only, because no build step stands between a save and the running rule. A file that will not load leaves the proxy naming no budget, so the connector refuses a call that reaches Gemini; a save that does not parse keeps the previous rule.
+- measured 2026-11-13: Vite's `loadConfigFromFile` listed the relay as a config dependency before and does not after; a whitespace-only save of the relay left 0 `restarting server` lines and one `budget relay reloaded, no restart`, and the proxy's three header cases (box with a header, box with none, the HTTPS front with a forged header) answered the same before the save, after it and after its restore. Mechanism and rows: MAN-9523.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/budgetRelay.js

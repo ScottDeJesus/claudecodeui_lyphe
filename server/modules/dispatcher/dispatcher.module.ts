@@ -7,7 +7,7 @@ import type { RelayAnswer, RelayOrder } from '@/shared/relayed-press-types.js';
 import type { DispatcherArc, DispatcherStateEvent, DispatcherVerb } from '@/shared/types.js';
 import { sessionlessEnv } from '@/shared/child-env.js';
 import type { DispatcherStoreWatch } from '@/shared/dispatcher-store-watch.service.js';
-import { expandHome } from '@/shared/utils.js';
+import { dispatcherBin } from '@/shared/dispatcher-command.js';
 
 import { createDispatcherAnswerRouter } from './dispatcher-answer.routes.js';
 import { readCardText, type DispatcherCardText } from './dispatcher-card-text.service.js';
@@ -43,9 +43,6 @@ import { createDispatcherWatcher } from './dispatcher-watcher.service.js';
  * existence.
  */
 
-/** The dispatcher's entry point, unless the operator moved it. */
-const DEFAULT_BIN = '~/.claude/scripts/dispatcher';
-
 /**
  * How long the lane goes without reading when nothing has poked it. The document is read when
  * something it is read from is WRITTEN (`dispatcher-store-watch.service.ts` pokes the lane); this is
@@ -55,10 +52,10 @@ const DEFAULT_BIN = '~/.claude/scripts/dispatcher';
  * (`route.peak_until`, `offpeak_at`), the pacer's projection drifting on its own clock.
  *
  * Sixty seconds because every one of those is a minute-scale fact — the shortest is that grace — and a
- * reading costs seconds of CPU (`status --json` walks every plan's chain record and asks systemd about
- * each one's armed hour): a shorter backstop would buy nothing a reader could see at the price of a
- * continuous load. It is measured from the last reading that settled, so a lane that is being poked
- * often never fires it.
+ * reading costs over a second of CPU (`status --json` walks every plan's chain record and asks systemd
+ * once for every plan's armed hour): a shorter backstop would buy nothing a reader could see at the
+ * price of a continuous load. It is measured from the last reading that settled, so a lane that is
+ * being poked often never fires it.
  */
 const BACKSTOP_MS = 60_000;
 
@@ -211,7 +208,7 @@ function runningChainIds(picture: DispatcherPicture): string[] {
 
 /** `storeWatch` is the one watch both dispatcher lanes share; the server entrypoint builds it and starts it before either lane. */
 export function createDispatcherModule(storeWatch: DispatcherStoreWatch): DispatcherModule {
-  const bin = expandHome(process.env.DISPATCHER_BIN || DEFAULT_BIN);
+  const bin = dispatcherBin();
   // The lane's child environment: the server's own, minus the names that say whose Claude session a verb runs in.
   const env = sessionlessEnv();
 

@@ -83,6 +83,7 @@
           "server/shared/polled-lane.service.ts",
           "server/shared/directory-watch.service.ts",
           "server/shared/dispatcher-store-watch.service.ts",
+          "server/shared/dispatcher-board-gate.service.ts",
           "server/shared/kanban-types.ts",
           "server/shared/app-types.ts",
           "server/shared/toolset-types.ts",
@@ -99,6 +100,8 @@
           "server/shared/station-types.ts",
           "server/shared/shadow-connector-lane.ts",
           "server/shared/shadow-connector-lane-router.ts",
+          "server/shared/shadow-connector-lane-stream.ts",
+          "server/shared/shadow-connector-lane-wire.ts",
           "server/shared/gemini-budget-relay.ts",
           "server/shared/prompt-stream.ts",
           "server/shared/tool-call-hint.ts",
@@ -106,7 +109,8 @@
           "server/shared/relayed-press-types.ts",
           "server/shared/relay-record.ts",
           "server/shared/sayable-name.ts",
-          "server/shared/word-edges.ts"
+          "server/shared/word-edges.ts",
+          "server/shared/request-source.ts"
         ],
         "mode": "file"
       },
@@ -138,6 +142,7 @@
           "src/shared/chatDrafts.ts",
           "src/shared/solarSchedule.ts",
           "src/shared/spend.ts",
+          "src/shared/trend.ts",
           "src/shared/modelLabels.ts",
           "src/shared/deepseekPeakHours.ts",
           "src/shared/syntaxHighlighter.ts",
@@ -154,6 +159,7 @@
           "src/shared/affected-areas-types.ts",
           "src/shared/affected-areas-layout-types.ts",
           "src/shared/carrier-bulletins-types.ts",
+          "src/shared/upload-runs-types.ts",
           "src/shared/sessionRecency.ts",
           "src/shared/projectNameHints.ts"
         ],

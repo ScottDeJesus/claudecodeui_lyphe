@@ -2,7 +2,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { getConnectableHost, normalizeLoopbackHost } from './shared/networkHosts.js'
-import { BUDGET_HEADER, relayBudgetOf } from './server/shared/gemini-budget-relay.ts'
+import { createBudgetRelay } from './vite-plugins/budgetRelay.js'
 import keepPageOnReconnect from './vite-plugins/keepPageOnReconnect.js'
 import compressResponses from './vite-plugins/compressResponses.js'
 import precompressedAssets from './vite-plugins/precompressedAssets.js'
@@ -16,9 +16,11 @@ import accentPalette from './vite-plugins/accentPalette.js'
 // baked in. A one-time read here served the old version until the config itself changed.
 import pkg from './package.json'
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ mode }) => {
   // Load env file based on `mode` in the current working directory.
   const env = loadEnv(mode, process.cwd(), '')
+  // Read at run time, never imported: a file this config imports is a config dependency, and Vite restarts the dev server on every save of one.
+  const budgetRelay = await createBudgetRelay()
 
   const configuredHost = env.HOST || '0.0.0.0'
   // if the host is not a loopback address, it should be used directly. 
@@ -38,8 +40,9 @@ export default defineConfig(({ mode }) => {
     // envelope; a save still lands through HMR exactly as before.
     // precompressedAssets: the production client on :5184 (`vite preview`) — Brotli twins written at
     // build time, served with a year's cache on hashed assets.
+    // budgetRelay.plugin: a saved `server/shared/gemini-budget-relay.ts` becomes the running rule without a restart.
     // accentPalette: this box's accent colour from VITE_ACCENT; unset leaves the page green.
-    plugins: [react(), keepPageOnReconnect(), compressResponses(), precompressedAssets(), accentPalette(env.VITE_ACCENT)],
+    plugins: [react(), keepPageOnReconnect(), compressResponses(), precompressedAssets(), budgetRelay.plugin, accentPalette(env.VITE_ACCENT)],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version)
     },
@@ -98,11 +101,7 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: `http://${proxyHost}:${serverPort}`,
           changeOrigin: true,
-          configure: (proxy) => proxy.on('proxyReq', (proxyReq, req) => {
-            const budget = relayBudgetOf(req)
-            if (budget === null) proxyReq.removeHeader(BUDGET_HEADER)
-            else proxyReq.setHeader(BUDGET_HEADER, budget)
-          })
+          configure: (proxy) => proxy.on('proxyReq', budgetRelay.relayTo)
         },
         '/ws': {
           target: `ws://${proxyHost}:${serverPort}`,

@@ -81,14 +81,6 @@ export function projectNamer(projects: readonly Pick<Project, 'displayName' | 'f
   return (slug) => nameBySlug.get(slug) ?? slug;
 }
 
-/** The trend glyph and its word. Null trend prints a dash and SAYS "no trend" — never a fabricated arrow. */
-export function trendMark(trend: HealKindRow['trend']): { glyph: string; word: string; tone: Tone } {
-  if (trend === 'up') return { glyph: '↑', word: 'rising', tone: 'warn' };
-  if (trend === 'down') return { glyph: '↓', word: 'falling', tone: 'positive' };
-  if (trend === 'flat') return { glyph: '→', word: 'steady', tone: 'neutral' };
-  return { glyph: '—', word: 'no trend', tone: 'neutral' };
-}
-
 /**
  * Triage order: a regression first (a SHAPE a heal claimed came BACK), then the most live rows, then
  * the all-ignored kinds last — they are by-design refusals and read grey for a reason.

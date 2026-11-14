@@ -2,6 +2,7 @@ import type { Router } from 'express';
 
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import { sessionlessEnv } from '@/shared/child-env.js';
+import { dispatcherBin } from '@/shared/dispatcher-command.js';
 import type { DispatcherStoreWatch } from '@/shared/dispatcher-store-watch.service.js';
 import { createPolledLane } from '@/shared/polled-lane.service.js';
 import type { RoadmapAct, RoadmapPicture, RoadmapStateEvent } from '@/shared/roadmap-types.js';
@@ -33,9 +34,6 @@ import { createRoadmapRouter } from './roadmap.routes.js';
  * The composition root is the only place here that reads the environment, names a binary or touches
  * a socket; the services under it spawn the process, and take what they need as an argument.
  */
-
-/** The dispatcher's entry point, unless the operator moved it (the dispatcher lane's own default). */
-const DEFAULT_BIN = '~/.claude/scripts/dispatcher';
 
 /** The regression cases' one door, unless the operator moved it (`CASES_BIN`). */
 const DEFAULT_CASES_BIN = '~/.claude/scripts/cases';
@@ -79,7 +77,7 @@ export type RoadmapModule = {
 /** `storeWatch` is the one watch both dispatcher lanes share; the server entrypoint builds it and starts it before either lane. */
 export function createRoadmapModule(storeWatch: DispatcherStoreWatch): RoadmapModule {
   const dependencies = {
-    bin: expandHome(process.env.DISPATCHER_BIN || DEFAULT_BIN),
+    bin: dispatcherBin(),
     timeoutMs: READ_TIMEOUT_MS,
     // The lane's child environment: the server's own, minus the names that say whose Claude session a command runs in.
     env: sessionlessEnv(),

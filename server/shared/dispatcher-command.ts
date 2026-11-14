@@ -2,6 +2,8 @@ import { execFile } from 'node:child_process';
 import os from 'node:os';
 import { promisify } from 'node:util';
 
+import { expandHome } from './utils.js';
+
 /**
  * Running the dispatcher's own command: the one subprocess every lane that talks to the dispatcher
  * goes through — a relayed verb (`runDispatcherCommand`) or a JSON document it printed
@@ -40,6 +42,21 @@ const VERB_MAX_BUFFER = 1024 * 1024;
 /** How much of the dispatcher's own line a refusal carries: one line names the cause, and the rest is a traceback's tail. */
 const FAILURE_LINE_CHARS = 200;
 
+/** Where the house installs the dispatcher's entry point, written the way an operator writes it on a shell. */
+const DEFAULT_DISPATCHER_BIN = '~/.claude/scripts/dispatcher';
+
+/**
+ * The dispatcher's entry point, absolute: `~/.claude/scripts/dispatcher` unless `DISPATCHER_BIN` moved it (a probe's
+ * stand-in). Every caller that runs the dispatcher reads it here and nowhere else, because a copy in each lane drifts:
+ * the day one of them learns another place, it is the only one that knows.
+ *
+ * Consumed by the dispatcher and roadmap modules (their lanes' commands), the settings module's `kickDispatcher` (a
+ * switch flip) and `server/index.ts` (the store watch's board-counter check).
+ */
+export function dispatcherBin(env: NodeJS.ProcessEnv = process.env): string {
+  return expandHome(env.DISPATCHER_BIN || DEFAULT_DISPATCHER_BIN);
+}
+
 /**
  * What the dispatcher is run with: the lane's one composition, built once by its module and handed in.
  * Consumed by the dispatcher module (its verb relay and its status read) and by the roadmap module (its
@@ -59,6 +76,13 @@ export type DispatcherCommandDependencies = {
   door?: string;
   /** Wall-clock ceiling for one command. A verb may kick the daemon and print its answer once that has been asked for. */
   timeoutMs: number;
+  /**
+   * The signal that stops a command whose `timeoutMs` ran out: `SIGTERM` when absent, which is what every lane that
+   * composes these relies on. A caller whose answer gates other work says `SIGKILL` (the store watch's board-counter
+   * check): that work stays shut while the command is out, and a child that ignored SIGTERM would hold it shut until
+   * it chose to die. Both `runDispatcherCommand` and `readDispatcherJson` honor it.
+   */
+  killSignal?: NodeJS.Signals;
   /** The child's environment, composed once by the lane's module — the dispatcher's own wake path looks `systemctl --user` up on `PATH`, and this server's unit may have been handed none. */
   env: NodeJS.ProcessEnv;
 };
@@ -133,6 +157,7 @@ export async function runDispatcherCommand(
   try {
     const result = await execFileAsync(dependencies.bin, [...argv], {
       timeout: dependencies.timeoutMs,
+      ...(dependencies.killSignal ? { killSignal: dependencies.killSignal } : {}),
       maxBuffer: VERB_MAX_BUFFER,
       env: dependencies.env,
       cwd: os.homedir(),
@@ -236,6 +261,7 @@ export async function readDispatcherJson(
   try {
     const answer = await execFileAsync(dependencies.bin, [...argv], {
       timeout: dependencies.timeoutMs,
+      ...(dependencies.killSignal ? { killSignal: dependencies.killSignal } : {}),
       maxBuffer,
       env: dependencies.env,
       cwd: os.homedir(),

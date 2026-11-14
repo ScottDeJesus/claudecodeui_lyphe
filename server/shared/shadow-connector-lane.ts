@@ -1,14 +1,18 @@
 import fs from 'node:fs/promises';
 
-import { BUDGET_HEADER } from './gemini-budget-relay.js';
+import { createLaneStream } from './shadow-connector-lane-stream.js';
+import type { LaneStream } from './shadow-connector-lane-stream.js';
+import { NO_SECRET_MESSAGE, describeFailure, laneHeaders, upstreamUrl } from './shadow-connector-lane-wire.js';
 
 /**
  * Relaying a request to shadow-connector's internal-caller-gated surface — the one forwarder every
  * lane to shadow-connector goes through. Consumers: the `affected-areas` module (the Tours lane,
- * `/api/affected-areas`) and the `carrier-bulletins` module (the bulletins lane,
- * `/api/carrier-bulletins`, the second lane to shadow-connector). Each module owns its allowlist and
- * its status mapping; this file owns the transport and the secret behind it, so there is one copy of
- * both.
+ * `/api/affected-areas`), the `carrier-bulletins` module (the bulletins lane,
+ * `/api/carrier-bulletins`) and the `upload-runs` module (the upload runs' lane, `/api/upload-runs`).
+ * Each module owns its allowlist and its status mapping; this file owns the transport and the secret
+ * behind it, so there is one copy of both. The lane has two verbs: `forward` (a JSON or image answer)
+ * and `stream` (an event stream, relayed as it arrives — `./shadow-connector-lane-stream`); what a call
+ * carries out and how a failure reads is `./shadow-connector-lane-wire`, shared by both.
  *
  * This server keeps no view of what shadow-connector answers and never opens its disk or database: it
  * makes the HTTP call and carries the answer back, so a lane keeps working the day this server leaves
@@ -30,16 +34,6 @@ import { BUDGET_HEADER } from './gemini-budget-relay.js';
  * can choose the status; an upstream answer — a 404, a 422, a refusal — is a RESULT too, carried whole.
  */
 
-/** The one sentence a missing, unreadable or unusable secret earns. The cause goes to the server log. */
-const NO_SECRET_MESSAGE = "CloudCLI could not read shadow-connector's internal secret";
-
-/** The header shadow-connector's gate reads (`core/capabilities/_auth.py`). */
-const SECRET_HEADER = 'X-Internal-Secret';
-
-/** Display only: shadow-connector derives `origin` from the channel itself (R-CAP-21). */
-const ACTING_USER_HEADER = 'X-Acting-User';
-const ACTING_USER_MAX_CHARS = 64;
-
 /**
  * The line this lane is after. `export ` is allowed because a `.env` is often sourced by a shell too;
  * the last matching line wins, as it does for the dotenv loader shadow-connector starts with.
@@ -55,12 +49,9 @@ const SECRET_LINE = /^\s*(?:export\s+)?EIS_INTERNAL_SECRET\s*=(.*)$/;
  */
 const USABLE_SECRET = /^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/;
 
-/** Everything outside printable ASCII, for the acting user's header. */
-const NOT_PRINTABLE_ASCII = /[^\x20-\x7e]/g;
-
 /**
- * One forwarded call. Consumers: the routes of the `affected-areas` and `carrier-bulletins` modules,
- * each of which builds it from a request it has validated against its own allowlist.
+ * One forwarded call. Consumers: the routes of the `affected-areas`, `carrier-bulletins` and `upload-runs`
+ * modules, each of which builds it from a request it has validated against its own allowlist.
  */
 export type LaneRequest = {
   method: 'GET' | 'POST' | 'PUT';
@@ -89,7 +80,9 @@ export type LaneRequest = {
 
 /**
  * What a forwarded call came back as: the engine's own answer, or why the lane has none. Consumers: the
- * routes of the `affected-areas` and `carrier-bulletins` modules, which turn it into a response.
+ * lane router (`createLaneRouter`), which turns it into a response for the `affected-areas`,
+ * `carrier-bulletins` and `upload-runs` routes, and the event-stream transport, which answers in the same
+ * shapes when a stream is not what came back.
  *
  * Why a question went unanswered by the lane itself:
  *
@@ -104,8 +97,9 @@ export type LaneAnswer =
   | { ok: false; reason: 'unreachable' | 'unreadable' | 'no_secret'; message: string };
 
 /**
- * What a module hands `createShadowConnectorLane`. Consumers: `affected-areas.module.ts` and the
- * `carrier-bulletins` module, each the one place its own lane reads the environment.
+ * What a module hands `createShadowConnectorLane`. Consumers: `affected-areas.module.ts`, the
+ * `carrier-bulletins` module and the `upload-runs` module, each the one place its own lane reads the
+ * environment.
  */
 export type ShadowConnectorLaneDependencies = {
   /** shadow-connector's origin, e.g. `http://127.0.0.1:8001`. */
@@ -117,11 +111,13 @@ export type ShadowConnectorLaneDependencies = {
 };
 
 /**
- * The lane's one verb. Consumers: the `affected-areas` and `carrier-bulletins` modules (each builds
- * one) and their routes (each calls `forward`).
+ * The lane's two verbs. Consumers: the `affected-areas`, `carrier-bulletins` and `upload-runs` modules
+ * (each builds one) and their routes (each hands the router the verbs its table uses: `forward` for a
+ * `json` or `bytes` row, `stream` for a `stream` row).
  */
 export type ShadowConnectorLane = {
   forward(request: LaneRequest): Promise<LaneAnswer>;
+  stream: LaneStream;
 };
 
 /**
@@ -154,29 +150,11 @@ function parseSecret(envText: string): string | null {
   return USABLE_SECRET.test(value) ? value : null;
 }
 
-/** A header value shadow-connector can read: printable ASCII only, trimmed, bounded. Null when nothing is left. */
-function sanitiseActingUser(actingUser: string | null): string | null {
-  if (actingUser === null) return null;
-  const clean = actingUser.replace(NOT_PRINTABLE_ASCII, '?').trim().slice(0, ACTING_USER_MAX_CHARS).trim();
-  return clean === '' ? null : clean;
-}
-
 /**
- * A sentence for a request that never got an answer. Only the error's NAME and its cause's CODE are
- * used, never its message: a transport error can quote the request, and the request carries the secret.
- */
-function describeFailure(error: unknown, timeoutMs: number): string {
-  if (error instanceof Error && error.name === 'TimeoutError') {
-    return `shadow-connector did not answer within ${timeoutMs / 1000} s`;
-  }
-  const code = (error as { cause?: { code?: unknown } } | null)?.cause?.code;
-  return `CloudCLI could not reach shadow-connector${typeof code === 'string' ? ` (${code})` : ''}`;
-}
-
-/**
- * Builds a forwarder. Consumers: `affected-areas.module.ts` and the `carrier-bulletins` module, so each
- * lane's environment is read in its own module and passed down, and each lane holds its own parse of the
- * file and its own last-reported cause (one log line per distinct cause, per lane).
+ * Builds a forwarder. Consumers: `affected-areas.module.ts`, the `carrier-bulletins` module and the
+ * `upload-runs` module, so each lane's environment is read in its own module and passed down, and each
+ * lane holds its own parse of the file and its own last-reported cause (one log line per distinct cause,
+ * per lane).
  */
 export function createShadowConnectorLane({
   baseUrl,
@@ -219,16 +197,10 @@ export function createShadowConnectorLane({
     const secret = await currentSecret();
     if (secret === null) return { ok: false, reason: 'no_secret', message: NO_SECRET_MESSAGE };
 
-    const headers: Record<string, string> = {
-      [SECRET_HEADER]: secret,
-      // `image/*`, not one type: the Tours lane's images are JPEGs and the bulletins lane's are PNGs, and a
-      // route that names the type it wants would refuse the other lane's. Which type a lane accepts is the
-      // lane's to enforce on the answer (its router checks the Content-Type), not this transport's.
-      Accept: request.expect === 'bytes' ? 'image/*' : 'application/json',
-    };
-    const actingUser = sanitiseActingUser(request.actingUser);
-    if (actingUser !== null) headers[ACTING_USER_HEADER] = actingUser;
-    if (request.budget !== null) headers[BUDGET_HEADER] = request.budget;
+    // `image/*`, not one type: the Tours lane's images are JPEGs and the bulletins lane's are PNGs, and a
+    // route that names the type it wants would refuse the other lane's. Which type a lane accepts is the
+    // lane's to enforce on the answer (its router checks the Content-Type), not this transport's.
+    const headers = laneHeaders(secret, request.expect === 'bytes' ? 'image/*' : 'application/json', request);
     if (request.body !== undefined) headers['Content-Type'] = 'application/json';
 
     let status: number;
@@ -237,12 +209,10 @@ export function createShadowConnectorLane({
     let text = '';
     const passed: Record<string, string> = {};
     try {
-      const url = new URL(`${origin}${request.path}`);
-      for (const [key, value] of Object.entries(request.query ?? {})) url.searchParams.set(key, value);
       // `redirect: 'manual'` keeps the secret header from following a Location anywhere: the surface
       // never redirects, so a 3xx is a server this lane does not know. One with no JSON body falls out as
       // unreadable; one that carries JSON is relayed like any other answer, and its Location is not.
-      const response = await fetch(url, {
+      const response = await fetch(upstreamUrl(origin, request.path, request.query), {
         method: request.method,
         headers,
         body: request.body === undefined ? undefined : JSON.stringify(request.body),
@@ -271,5 +241,5 @@ export function createShadowConnectorLane({
     }
   }
 
-  return { forward };
+  return { forward, stream: createLaneStream({ origin, currentSecret, label }) };
 }
