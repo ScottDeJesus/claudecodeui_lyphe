@@ -15,3 +15,4 @@ build_max = 40
 server = "the API of the running server"
 shell = "the app frame in a browser"
 modules = "server code with no route, imported by a .ts case"
+suites = "the kit's door as another suite on this box holds it (the EIS app's cases/lib/case.mjs), judged from outside that suite by scratch scripts run as child processes (lib/suite_helper.mjs)"

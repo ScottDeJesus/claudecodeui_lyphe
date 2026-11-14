@@ -7,7 +7,7 @@
 //   import { api, apiWithNoToken, withPage } from "../lib/app.mjs";
 //   const { status, json, text } = await api("/api/claude-updates");               // signed in
 //   const refused = await apiWithNoToken("/api/claude-updates", { judge401: false }); // the case whose promise IS the 401
-//   const page = await withPage(t, { viewport: { width: 1440, height: 900 } });      // signed in, past the boot screen
+//   const page = await withPage(t, { viewport: { width: 1440, height: 900 } });      // the signed-in app, or CANNOT RUN
 //
 // `api` and `apiWithNoToken` are the kit's door (node/http.mjs: its options, its answer, and its three
 // CANNOT RUN sentences) on the server's origin, the first carrying `Authorization: Bearer <the checks
@@ -22,10 +22,15 @@
 // Every case signs in with this token and no other way. No case fills the sign-in form.
 //
 // A 401 or a sign-in screen is never evidence of anything but a missing credential (MAN-7477). So the door
-// ends a 401 CANNOT RUN unless the call says `judge401: false`, and `withPage` ends a page that shows the
-// sign-in screen CANNOT RUN. A case cannot turn either into BROKEN. `withPage` also asks the server who the
-// token is before it starts a browser: a server that is down ends the case there, in the door's own words,
-// where the page would stand on its boot screen for 25 s and then draw a frame with nothing in it.
+// ends a 401 CANNOT RUN unless the call says `judge401: false`, and `withPage` hands back the signed-in app
+// or nothing: the sign-in screen, the "Can't reach the server" screen and the onboarding screen each end
+// the case CANNOT RUN (`pastTheBootScreen`). A case cannot turn any of them into BROKEN. `withPage` also asks
+// the server who the token is before it starts a browser: a server that is down, or that answers anything
+// but 200, ends the case there, where the page would stand on its boot screen for 25 s first.
+//
+// THE CHECKS BROWSER IS NOBODY'S SCREEN. The token is a real person's account, and the app's page tells the
+// server over its socket that the account has a visible, focused page (`chat.presence`), which the server
+// reads as "what is on his screen". `withPage` hands the socket on whole but for that one frame.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -34,7 +39,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { CannotRun, KIT } from "./case.mjs";
 
-const { door } = await import(pathToFileURL(`${KIT}/node/http.mjs`).href);
 
 const REPO = fileURLToPath(new URL("../../", import.meta.url)); // this file is <repo>/cases/lib/app.mjs
 const ENV_FILE = path.join(REPO, ".env");
@@ -48,6 +52,11 @@ const TOKEN_LIFE = "10m";
 const AUTH_TOKEN_KEY = "auth-token"; // src/shared/authToken.ts's AUTH_TOKEN_KEY, where the page keeps its session
 
 const IDENTITY_ROUTE = "/api/auth/user"; // behind authenticateToken: answers who the token is, changes nothing
+const ONBOARDING_ROUTE = "/api/user/onboarding-status";
+/** The requests the page's boot check picks its screen from (AuthContext.tsx, checkAuthStatus). */
+const BOOT_CHECK_ROUTES = [IDENTITY_ROUTE, ONBOARDING_ROUTE];
+const APP_SOCKET = /\/ws(\?|$)/; // WebSocketContext.tsx's one socket; the dev server's own is at "/"
+const PRESENCE_FRAME = "chat.presence";
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
 const BOOT_TIMEOUT_MS = 30000;
 // Read off the live page 2026-11-14 in its three states: the boot check held open, no token, the checks token.
@@ -66,23 +75,31 @@ export async function api(requestPath, call) {
 
 /** apiWithNoToken — the same request carrying no credential, for the case that checks a route refuses the signed-out. */
 export async function apiWithNoToken(requestPath, call) {
+  const door = await kitDoor();
   return door(originOf("SERVER_PORT"), { name: SERVER_NAME })(requestPath, call);
 }
 
 /**
- * withPage — a Chromium page on the app's dev server, signed in with the checks token and past the boot
- * screen. The browser is the repo's own `playwright`, closed by a cleanup deferred on `t` the moment it exists.
+ * withPage — a Chromium page on the app's dev server showing the signed-in app, signed in with the checks
+ * token. Any other screen of the app ends the case CANNOT RUN. The browser is the repo's own `playwright`,
+ * closed by a cleanup deferred on `t` the moment it exists.
  * @param {{ defer: (cleanup: () => unknown) => void }} t the case's `t`, from `runCase`
  * @param {{ viewport?: { width: number, height: number } }} [options]
  */
 export async function withPage(t, { viewport = DEFAULT_VIEWPORT } = {}) {
   const token = await checksToken();
   const uiOrigin = originOf("VITE_PORT");
-  await api(IDENTITY_ROUTE); // CANNOT RUN here, by the door, when the server is down or refuses the token
+  // The door ends the case here when the server is down or refuses the token; any other answer but 200 ends it too.
+  const identity = await api(IDENTITY_ROUTE);
+  if (identity.status !== 200) {
+    throw new CannotRun(`${SERVER_NAME} answered ${identity.status} when asked who the checks token is — never a finding`);
+  }
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   t.defer(() => browser.close());
   const page = await browser.newPage({ viewport });
+  const bootAnswers = watchBootCheck(page);
+  await page.routeWebSocket(APP_SOCKET, handOnWithoutPresence);
   // Before the app's first script, so its boot check finds a session. An init script also runs in every
   // frame the page opens: the origin test keeps the token out of the storage of any other origin's frame.
   await page.addInitScript(
@@ -96,19 +113,68 @@ export async function withPage(t, { viewport = DEFAULT_VIEWPORT } = {}) {
   } catch (error) {
     throw new CannotRun(`${UI_NAME} did not answer — ${firstLine(error)}`);
   }
-  await pastTheBootScreen(page);
+  await pastTheBootScreen(page, bootAnswers);
   return page;
 }
 
 /**
- * Wait until the app has drawn something that is not its boot screen, then refuse the sign-in screen.
- * A wait that runs out is Playwright's own `Timeout <n>ms exceeded`, which the runner reads as a wait and
- * looks at a second time (hooks/cases/run.py, WAITED_OUT).
+ * The last answer the page's own boot check got on each of its routes, kept as it arrives. Called before
+ * `goto`. The boot screen leaves only after both have answered, so the map is whole once it has left.
+ * @returns {Map<string, import("playwright").Response>}
  */
-async function pastTheBootScreen(page) {
+function watchBootCheck(page) {
+  const answers = new Map();
+  page.on("response", (response) => {
+    const route = new URL(response.url()).pathname;
+    if (BOOT_CHECK_ROUTES.includes(route)) answers.set(route, response);
+  });
+  return answers;
+}
+
+/**
+ * Wait until the app has drawn something that is not its boot screen, then refuse every screen that is not
+ * the signed-in app. Past its boot screen ProtectedRoute.tsx draws one of four. The sign-in form is read
+ * off the page. The "Can't reach the server" and onboarding screens carry no mark but their wording, so
+ * they are read from what decides them, the answers the page's boot check got: the app is signed in only
+ * on an identity answer of 200 that names a user, and shows onboarding on an answer that does not say it
+ * is finished. A wait that runs out is Playwright's own `Timeout <n>ms exceeded`, which the runner reads as
+ * a wait and looks at a second time (hooks/cases/run.py, WAITED_OUT).
+ */
+async function pastTheBootScreen(page, bootAnswers) {
   await page.locator(PAST_THE_BOOT_SCREEN).first().waitFor({ state: "attached", timeout: BOOT_TIMEOUT_MS });
   if ((await page.locator(SIGN_IN_SCREEN).count()) > 0) {
     throw new CannotRun("the app showed its sign-in screen — a missing credential, never a finding");
+  }
+  const identity = bootAnswers.get(IDENTITY_ROUTE);
+  const signedInAs = identity?.status() === 200 ? (await jsonBodyOf(identity))?.user : null;
+  if (!signedInAs) {
+    const got = identity ? `answered ${identity.status()}` : "got no answer";
+    throw new CannotRun(`${SERVER_NAME} did not answer the page — its identity check ${got}, naming no user: never a finding`);
+  }
+  const onboarding = bootAnswers.get(ONBOARDING_ROUTE);
+  if (onboarding?.ok() && !(await jsonBodyOf(onboarding))?.hasCompletedOnboarding) {
+    throw new CannotRun("the app showed its onboarding screen — the checks user has not finished onboarding, never a finding");
+  }
+}
+
+/** A page response's body as JSON; null when it is not JSON or cannot be read, which the page takes as no verdict too. */
+const jsonBodyOf = (response) => response.json().catch(() => null);
+
+/** The app's socket, every frame handed on both ways but the page's presence reports (see the header). */
+function handOnWithoutPresence(socket) {
+  const server = socket.connectToServer();
+  socket.onMessage((frame) => {
+    if (!isPresenceReport(frame)) server.send(frame);
+  });
+}
+
+function isPresenceReport(frame) {
+  if (typeof frame !== "string") return false;
+  try {
+    return JSON.parse(frame)?.type === PRESENCE_FRAME;
+  } catch (error) {
+    if (error instanceof SyntaxError) return false;
+    throw error;
   }
 }
 
@@ -157,10 +223,21 @@ function checksToken() {
 }
 
 function signedInDoor() {
-  signingIn ??= checksToken().then((token) =>
+  signingIn ??= Promise.all([kitDoor(), checksToken()]).then(([door, token]) =>
     door(originOf("SERVER_PORT"), { name: SERVER_NAME, headers: { Authorization: `Bearer ${token}` } }),
   );
   return signingIn;
+}
+
+let loadingDoor = null;
+
+/**
+ * The kit's `door` (node/http.mjs), loaded at the first request and not at the top, for the reason the two
+ * packages below are: a kit file that will not load ends the case CANNOT RUN through `runCase`.
+ */
+function kitDoor() {
+  loadingDoor ??= import(pathToFileURL(`${KIT}/node/http.mjs`).href).then((kit) => kit.door);
+  return loadingDoor;
 }
 
 /**

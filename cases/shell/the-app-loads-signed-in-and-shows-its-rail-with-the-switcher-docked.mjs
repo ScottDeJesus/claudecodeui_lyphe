@@ -29,7 +29,7 @@ async function appears(locator) {
 }
 
 runCase(async (t) => {
-  const page = await withPage(t, { viewport: DESKTOP }); // past the boot screen, and not the sign-in screen
+  const page = await withPage(t, { viewport: DESKTOP }); // the signed-in app: any other screen has ended the case CANNOT RUN
   const seconds = WAIT_MS / 1000;
 
   const rail = page.locator(RAIL);
