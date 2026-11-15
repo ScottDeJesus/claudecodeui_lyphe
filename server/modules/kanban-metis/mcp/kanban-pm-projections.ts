@@ -4,6 +4,7 @@ import {
   type KanbanBoard,
   type KanbanCardDetail,
   type KanbanCardSummary,
+  type KanbanPriority,
   type KanbanStatus,
 } from '@/shared/kanban-types.js';
 
@@ -45,7 +46,7 @@ export type ActionableRow = {
   title: string;
   status: KanbanStatus;
   board: { id: string; name: string };
-  priority: string;
+  priority: KanbanPriority;
   sort_order: number;
   approved: boolean;
   open_questions: number;
@@ -92,6 +93,15 @@ export function leaseFacts(
     plan_is_mine: card.planOwner === owner,
   };
 }
+
+/**
+ * The rank a priority sorts at inside one bucket: high first, then medium, then low.
+ *
+ * The order IS the pick: a session takes the top buildable ticket, so a lower priority is never
+ * built ahead of a higher one that is buildable. Typed over `KanbanPriority`, so a priority added to
+ * the board's CHECK fails to compile here instead of sorting nowhere.
+ */
+const PRIORITY_RANK: Record<KanbanPriority, number> = { high: 0, medium: 1, low: 2 };
 
 /**
  * The compact orient queue: `to_plan` + `buildable` + `awaiting_you` PARTITION the todo lane, and
@@ -144,12 +154,14 @@ export async function buildActionableQueue(
     }
   }
 
-  // Current-board cards first, then the board's own order, then id — so the top of a bucket is
-  // the card the operator would point at, and two sessions reading it pick the same one.
+  // Current-board cards first, then priority (high, medium, low), then the operator's hand order
+  // inside one priority, then id — so the top of a bucket is the ticket to take, and two sessions
+  // reading it pick the same one.
   for (const rows of Object.values(queue)) {
     rows.sort(
       (left, right) =>
         Number(left.board.id !== client.boardId) - Number(right.board.id !== client.boardId) ||
+        PRIORITY_RANK[left.priority] - PRIORITY_RANK[right.priority] ||
         left.sort_order - right.sort_order ||
         left.id.localeCompare(right.id)
     );

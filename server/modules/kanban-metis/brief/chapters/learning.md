@@ -11,7 +11,7 @@
 you only READ the other.**
 
 - **Lessons — you stage them at RETRO, the operator reviews them.**
-  `stage_lesson(name, summary, body?, trigger, tags?, feature_id?, kind?)` files a durable
+  `stage_lesson(name, summary, body?, trigger, tags?, ticket_id?, kind?)` files a durable
   lesson for the operator to review: a resolved error's fix, an operator's correction, a
   workflow you discovered, or how you handled a complex task. `trigger` is one of
   `complex_task | error_resolved | operator_correction | workflow_discovered`, `summary` is
@@ -47,7 +47,7 @@ you only READ the other.**
   so it is bounded by the board rather than by a page, and its tag filter matches a
   decision's own snapshot tags OR its card's tags as they stand.
   **Metis still does NOT auto-apply them** — there is no pre-fill, no skip, no pre-selected
-  answer carried from a past pick; every feature gets its real open questions, FRESH. The
+  answer carried from a past pick; every ticket gets its real open questions, FRESH. The
   tool is awareness — the seam for a future "pre-align" upgrade — and the standing
   instruction holds: do not build taste-injection until the operator asks for it.
 

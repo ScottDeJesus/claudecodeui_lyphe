@@ -6093,8 +6093,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/meti
 section: kanban/013 The kanban-pm MCP surface
 
 A Metis works her board through `kanban-pm`: the server name is `kanban-pm`, the client-facing
-prefix is `mcp__kanban-pm__<tool>`, and the twenty-five tool names are fixed — the brief's prose and
-the hook matchers name them literally.
+prefix is `mcp__kanban-pm__<tool>`, and the twenty-five tool names are fixed — the brief's prose
+names them literally.
 
 **It is a LEAF.** `kanban-pm-mcp.ts` is a `#!/usr/bin/env node` stdio program, with its tools under
 `server/modules/kanban-metis/mcp/`, and it hand-rolls newline-delimited JSON-RPC 2.0 over
@@ -6127,12 +6127,12 @@ from `server/modules/kanban/`.
 
 | Tool | Board verb |
 |---|---|
-| `list_features` | `GET /boards/:b/cards?status=…` across the five statuses, `+ GET /cards/:id` for tags |
-| `list_features_all` | the same, once per non-archived board from `GET /boards` |
-| `get_feature_plan` | `GET /cards/:id` |
+| `list_tickets` | `GET /boards/:b/cards?status=…` across the five statuses, `+ GET /cards/:id` for tags |
+| `list_tickets_all` | the same, once per non-archived board from `GET /boards` |
+| `get_ticket_plan` | `GET /cards/:id` |
 | `open_design_questions` | `GET /cards/:id`, its `questions` |
 | `get_learned_selections` | `GET /cards/:id` decisions, filtered by `tags`/`q` |
-| `list_actionable` | `GET /boards/:b/lanes` + the `todo` / `questions` / `active` pages; `lessons` is the approved index, `GET /lessons?status=approved&limit=50` |
+| `list_actionable` | `GET /boards/:b/lanes` + the `todo` / `questions` / `active` pages; `lessons` is the approved index, `GET /lessons?status=approved&limit=50`; every bucket sorts this board first, then `priority` (`high`, `medium`, `low` — `PRIORITY_RANK`, `kanban-pm-projections.ts`), then `sort_order`, then `id` |
 | `list_active_builds` | `GET /boards/:b/cards?status=active`, `is_stale` from `leaseState`, `is_mine` from the owner |
 | `search_history` | `GET /events?boardId=` + a substring pass over card titles, descriptions, bodies and closing remarks, and — when `lesson` is among the kinds asked for — `GET /lessons` then one `GET /lessons/:id` per hit, capped at the caller's own `limit` |
 | `list_lessons` · `get_lesson` | `GET /lessons?status=&limit=` · `GET /lessons/:id` |
@@ -6141,27 +6141,27 @@ Writes:
 
 | Tool | Board verb |
 |---|---|
-| `create_feature` | `POST /boards/:b/cards` then `POST /cards/:id/tags` per tag |
+| `create_ticket` | `POST /boards/:b/cards` then `POST /cards/:id/tags` per tag |
 | `attach_plan` | `PATCH /cards/:id { plan, body }` |
 | `post_design_questions` | `POST /cards/:id/questions` per question, then `POST /cards/:id/move { status: 'questions' }` |
 | `answer_design_question` | `POST /questions/:qid/answer { selected, other }` |
 | `set_status` | `POST /cards/:id/move { status }`, and on `active` also `POST /cards/:id/build-lease/claim { owner }` |
 | `set_tags` | `GET /cards/:id`, then `DELETE`/`POST /cards/:id/tags` to reach the named set |
-| `file_issue` | `POST /cards/:id/issues`, then `PATCH /cards/:id { plan: '' }` and `POST /cards/:id/move { status: 'todo' }` |
+| `file_issue` | `POST /cards/:id/issues`, then `POST /cards/:id/unapprove`, `PATCH /cards/:id { plan: '', body: '' }` and `POST /cards/:id/move { status: 'todo' }` — unapprove first, so a failed later write never leaves an approved card in To Do |
 | `resolve_issue` | `POST /issues/:iid/resolve` |
-| `archive_feature` | `POST /cards/:id/archive` |
+| `archive_ticket` | `POST /cards/:id/archive` |
 | `set_checklist` | `DELETE /checklist/:k` for each existing item, then `POST /cards/:id/checklist` per text |
 | `set_checklist_item` | `PATCH /checklist/:k { state, note }` |
 | `set_closing_remarks` | `PATCH /cards/:id { closingRemarks }` |
-| `approve_feature` | `POST /cards/:id/approve` |
+| `approve_ticket` | `POST /cards/:id/approve` |
 | `claim_plan` | `POST /cards/:id/plan-lease/claim { owner }` |
 | `stage_lesson` | `POST /lessons` |
 
-**The one cross-board read — and what it does not grant.** `list_features_all` is the only tool whose
+**The one cross-board read — and what it does not grant.** `list_tickets_all` is the only tool whose
 reach exceeds the board the child was launched on: it reads `GET /boards` and then every NON-ARCHIVED
 board's lane pages, pushing each card with its own `board { id, name }`, so she can put her own board
 first and see what else is moving. The widening is sight, never REACH — no tool takes a board id, and
-every write (`create_feature`, `set_status`, `claim_plan` and the rest) addresses `client.boardId`, the
+every write (`create_ticket`, `set_status`, `claim_plan` and the rest) addresses `client.boardId`, the
 single board in `KANBAN_PM_BOARD_ID`. A card on another board can be read and is never claimed from
 here, because her `cwd` and her one `--add-dir` are her board's (§"A board's Metis, launched"). The
 descriptor says the rest: read-only, and it does not change which board is current.
@@ -6208,7 +6208,7 @@ the row's deletion is an audit line, the file is simply gone, and no lease CAS u
 and uploading an attachment stay open on both mounts. The operator's own authenticated mount still
 carries all three verbs.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/mcp-command.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/mcp/kanban-pm-mcp.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/mcp/kanban-pm-projections.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/mcp/kanban-pm-recall.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/mcp/kanban-pm-tools-board.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/mcp/kanban-pm-tools-cards.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/mcp/kanban-pm-tools-detail.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/mcp/kanban-pm-tools-lessons.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/mcp-command.ts
 
 ## MAN-595 — The brief
 section: kanban/014 The brief
@@ -6223,6 +6223,12 @@ concatenated under their own headings into ONE string and handed over as a singl
 brief from disk, so a resumed Metis runs the board as it stands now rather than as it stood when she
 was first launched. The board has its own brief, its own chapters and its own home.
 
+**Size ceiling: 131,071 bytes** (`MAX_ARGV_STRING_BYTES`, `metis-spawn.service.ts`: Linux's
+`MAX_ARG_STRLEN`, 32 × 4 KiB pages, less the NUL). `prepare` measures the composed brief at every
+spawn, resume and reply; past the ceiling it throws 500 `METIS_BRIEF_TOO_LARGE`, naming the byte
+count and `METIS.md`, before the cwd, the board's flag or a child exist. why: `execve` would refuse
+with an `E2BIG` that names nothing. 2026-11-14: 118,594 bytes, 90.5% of the ceiling.
+
 **The brief is the same for every board; what is true of ONE project is not in it.** A database
 connection, the vendor systems a build must not write to, who receives a notification, which repos
 a checkpoint covers — these reach a Metis as `CLAUDE.md` files, from two places. The board's
@@ -6232,7 +6238,7 @@ CLI read the `CLAUDE.md` of an added directory. And her cwd, `~/.claude/kanban-m
 is read the way any cwd is: a `CLAUDE.md` placed there is that board's own file, outside this
 repository. A board with no project and no such file runs on the brief alone.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/METIS.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/autonomy-cadence.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/learning.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/mcp-fallback.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/parallelism.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/recovery.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/METIS.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-spawn.service.ts
 
 ## MAN-596 — Seclusion
 section: kanban/015 Seclusion
