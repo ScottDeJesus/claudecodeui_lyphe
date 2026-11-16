@@ -4317,7 +4317,7 @@ never leave another conversation's transcript on screen. `src/modules/chat/subag
 layering `usePinnedSubagentRows` over `useSubagentSource` — swaps its own body for the view;
 `PinnedSubagents.tsx`, having no room, opens it in a `Dialog` over the chat. Closing any `Dialog` with
 Escape never stops the running turn: the shared `Dialog` marks the key from a window capture listener,
-which runs before `ChatInterface`'s document-level stop-on-Escape. The view reads the subagent's own file on
+which runs before `useEscapeToAbortSession`'s document-level stop-on-Escape. The view reads the subagent's own file on
 disk — never `ChatMessage.subagentActivity`, which the history path caps at 200 entries from the head
 and a launcher soul carries none of at all — through `useSubagentTranscript`
 (`hooks/useSubagentTranscript.ts`), which re-reads it every two seconds while the row is running or
@@ -4505,7 +4505,7 @@ entry in one call. That batch is why `handlePermissionDecision` takes an array o
 `AskUserQuestionPanel` is a keyboard-first stepper, drawn from the same `QuestionText` and `QuestionOptionRow` as the answered card so a question reads the same before and after: number keys pick options, `0` toggles a
 free-text "Other", `Enter` advances or submits on the last question, `Escape` skips — from a
 window-level capture listener that acts only when the key was pressed inside the panel: it marks
-the event so `ChatInterface`'s document-level abort gate, gated on `defaultPrevented`, leaves the
+the event so `useEscapeToAbortSession`'s document-level abort gate, gated on `defaultPrevented`, leaves the
 run alive, and skips unless the focus was in the panel's own "Other" field, where Escape is
 "back out of this field" and nothing more. Elsewhere on the page Escape keeps its app-wide
 meaning. On mount the panel takes focus unless a text field holds a draft, so a person mid-sentence

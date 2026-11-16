@@ -249,7 +249,7 @@ section: accounts/006 The rules that bite
    a raw 79.6 used to print "80% used" over a calm green bar.
 
 3. **Escape marks the event; it does not stop it.** The panel closes on a window-level CAPTURE
-   listener that calls `preventDefault()` and nothing else. `ChatInterface` aborts a running turn
+   listener that calls `preventDefault()` and nothing else. `useEscapeToAbortSession` (mounted by `ChatInterface`) aborts a running turn
    from a document-level capture listener gated on `defaultPrevented`, and window-capture runs
    first — so closing this panel mid-run no longer kills the run. `stopPropagation()` is
    deliberately absent: this panel is not modal, an overlay opened over it sits in front, and
@@ -291,9 +291,10 @@ section: accounts/007 What is left standing
   server half is MAN-518.
 - **`ProviderLoginModal` has no Escape handler.** It is a plain fixed overlay rather than the
   library `Dialog`: this panel's own dismissals stand down while it is up, and nothing takes their
-  place, so an Escape there reaches `ChatInterface`'s abort gate unmarked and would end a turn
-  running behind it. It neither traps focus nor hands it back on close either. Pre-existing and
-  shared with that modal's other callers — a follow-up outside this module.
+  place. It neither traps focus nor hands it back on close. A turn running behind it is safe: it is
+  a `role="dialog"` with `aria-modal="true"`, and the chat's stop-on-Escape steps aside while one is
+  open (`useEscapeToAbortSession`). Pre-existing and shared with that modal's other callers — a
+  follow-up outside this module.
 - **One Escape dismisses the frontmost overlay AND this panel behind it.** Marking rather than
   stopping is what lets the overlay have its key; the panel's own handler still fires on the same
   event. Measured, and the lesser of the two costs.
@@ -10985,7 +10986,7 @@ Types in `src/shared/types.ts`: `HostWindowValue` = `{ hostWindow: Window; subsc
 - No provider ⇒ the global `window`. At home nothing changed.
 - `useHostMove` writes its latest-listener ref in a LAYOUT effect declared before the subscribing one. why: a move is emitted from a layout effect; a passive write leaves the ref one render stale at `'before'`.
 - The value is set in one place: chat-host's `moveTo`.
-- Escape order, in either window: `Dialog` and `Sheet` bind Escape on the host window's capture phase and mark the event; `ChatInterface` stops the running turn from the host document's capture listener unless the event is marked; window capture runs first. Panels carry `OWNS_ESCAPE`.
+- Escape order, in either window: `Dialog` and `Sheet` bind Escape on the host window's capture phase and mark the event; `useEscapeToAbortSession` (mounted by `ChatInterface`) stops the running turn from the host document's capture listener unless the event is marked, the focused element is a text field other than the composer, or an open layer matching `ESCAPE_LAYER_SELECTOR` (`[data-owns-escape], [aria-modal="true"], [role="menu"]`, `src/shared/constants.ts`) stands in the host document; window capture runs first. Panels carry `OWNS_ESCAPE`.
 - `otherOverlayHoldsEscape(doc: Document)` (`overlayEscape.ts`): whether a modal dialog or an `OWNS_ESCAPE` panel that is not a fullscreen surface is in front, in the document handed in. Each caller passes its host document (`WidgetFrame`, `ChatGutterLayout`: `hostWindow.document`). why: a panel open in the picture-in-picture window is in that window's document.
 - `overlayInFrontHoldsEscape(content, doc)` and `modalInFrontHoldsEscape(content, doc)` (`overlayEscape.ts`): whether an `OWNS_ESCAPE` panel (the second also a modal dialog) is drawn in front of `content`; asked by `Dialog` and `Sheet` (the second by `Sheet` only) with `hostWindow.document`. Rules: MAN-490.
 

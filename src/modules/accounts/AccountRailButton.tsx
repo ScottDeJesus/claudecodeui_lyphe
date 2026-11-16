@@ -38,8 +38,8 @@ export function AccountRailButton() {
   // Escape closes it without moving the pointer, handing focus back to the trigger.
   //
   // ⚠ Escape is claimed at WINDOW in the CAPTURE phase and marked with preventDefault, and with
-  // preventDefault ALONE. ChatInterface aborts the running turn from a document-level capture
-  // listener gated on `defaultPrevented` (`ChatInterface.tsx`'s stop-on-Escape effect), and window-capture runs
+  // preventDefault ALONE. The chat aborts the running turn from a document-level capture
+  // listener gated on `defaultPrevented` (`useEscapeToAbortSession`), and window-capture runs
   // before document-capture — so the mark is already on the event by the time that gate reads
   // it, and closing this panel mid-run no longer kills the run.
   //
