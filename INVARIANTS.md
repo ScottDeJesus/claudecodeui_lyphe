@@ -25585,3 +25585,58 @@ A file `vite.config.js` imports is a config dependency: Vite restarts the whole 
 - measured 2026-11-13: Vite's `loadConfigFromFile` listed the relay as a config dependency before and does not after; a whitespace-only save of the relay left 0 `restarting server` lines and one `budget relay reloaded, no restart`, and the proxy's three header cases (box with a header, box with none, the HTTPS front with a forged header) answered the same before the save, after it and after its restore. Mechanism and rows: MAN-9523.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/budgetRelay.js
+
+## INV-11858 — Chat app regression cases — `cases/<area>/<name>.mjs|.ts` on `cases/lib/`: the checks-token doors, the header, the verdict line, `writes: none` or scratch the case made, no test framework
+
+The chat app's regression cases are plain scripts on the running app: no framework, no test-runner config, no `*.test.*` name, no `tests/` directory. The suite's one config is `cases/cases.toml` (suite `lyphecli`); `~/.claude/scripts/cases` registers, runs and records the cases. The runner's contract: MAN-7652. The kit: MAN-9924.
+
+## Where a case lives
+- `cases/<area>/<name>.<ext>`. `<name>` is the promise said as a name: the intent's name in the dispatcher's store, registered first (`cases add <name> --suite lyphecli --sentence -`). `<area>` is a key of `[areas]`.
+- `<ext>` is `.mjs` (`node`) or `.ts` (`cloudcli-tsx`). A `.ts` case judges server code with no route: it imports the module by path inside the body (`await import("../../server/modules/…")`).
+- A case reaches the running app, the browser and the kit through `../lib/` only: never `playwright`, a raw `fetch` of the app, or a kit file by path. why: each door keeps its credential and its CANNOT RUN rules in one file.
+
+## The lib — each file's head comment is its Usage
+| file | exports | does |
+|---|---|---|
+| `cases/lib/case.mjs` | `runCase` `held` `broken` `cannotRun` `CannotRun` `KIT` | the kit's door: the bytes of `kit/node/door.mjs`, never edited here |
+| `cases/lib/app.mjs` | `api(path, call)`, `apiWithNoToken(path, call)`, `withPage(t, { viewport })` | the running app through the checks token (below) |
+| `cases/lib/scratch.mjs` | `scratchDir(t, label)` | the kit's scratch folder, loaded through `KIT` at the call |
+| `cases/lib/suite_helper.mjs` | `helperOf`, `repoOf`, `writeScript`, `runScript`, `startScript`, `runnerEnv`, `handEnv`, `describe`, `OWN_HELPER`, `KIT_DOOR` | another suite's `cases/lib/case.mjs` judged from outside it, by scratch scripts run as child processes (area `suites`) |
+
+## Where a case looks
+| to read | door | origin and rule |
+|---|---|---|
+| the API | `api(path)` | the server on `SERVER_PORT` from the repo's `.env`, every request carrying `Authorization: Bearer <the checks token>` |
+| the refusal itself | `apiWithNoToken(path, { judge401: false })` | the same origin, no credential: for the case whose promise IS the 401 |
+| the screen | `withPage(t, { viewport })` | Chromium from the repo's own `playwright` on `VITE_PORT`, signed in with the checks token, closed by a cleanup deferred on `t` |
+- The checks token is minted in the case's process as `scripts/universe-token.mjs` mints one: the app's own secret, read and never made, ten minutes of life, nothing written to disk.
+- A 401 is CANNOT RUN unless the call says `judge401: false` (MAN-7477). The sign-in screen, the "Can't reach the server" screen and the onboarding screen each end `withPage` CANNOT RUN. No case fills the sign-in form.
+- No origin is a number written in a case or the lib: both ports come from `.env`.
+
+## Header — `//` comments in the case's first 30 lines
+| line | holds |
+|---|---|
+| `// protects:` | comma-separated paths, relative to the repo or absolute, a directory ending `/`, or a glob; the line may repeat |
+| `// writes:` | `none`, stated exactly once |
+- With them, a comment saying the promise.
+
+## Verdict — the last line on stdout, and the exit code
+| line | exit | meaning |
+|---|---|---|
+| `HELD: <saw>` | 0 | the promise holds |
+| `BROKEN: <saw>` | 1 | it does not; `<saw>` is what was seen instead |
+| `CANNOT RUN: <why>` | 2 | the case could not judge; never read as held or broken |
+- The body returns `held(saw)`, `broken(saw)` or `cannotRun(why)`, or throws `CannotRun`. Diagnostics go to stderr.
+
+## `writes: none`
+- Every case says `writes: none`. A case that must write writes only on scratch it made, gone when it ends: `scratchDir(t, label)`; a file there named by the variable the module reads (`GEMINI_PLAN_CAP_FILE`, `DATABASE_PATH` set before the module loads), never the live file or database.
+- No case calls a model, or a route that calls one.
+
+## Run
+| when | do |
+|---|---|
+| one case, recorded | `~/.claude/scripts/cases run <name> --suite lyphecli` |
+| an area, the suite | `cases run --suite lyphecli --area <area>` · `cases run --suite lyphecli --all` |
+| one case, no record | `node cases/<area>/<name>.mjs` or `cloudcli-tsx cases/<area>/<name>.ts` from `/home/lyphe/.claude/claudecodeui_lyphe`, with `cases` on PATH or `CASES_KIT` set |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/cases/
