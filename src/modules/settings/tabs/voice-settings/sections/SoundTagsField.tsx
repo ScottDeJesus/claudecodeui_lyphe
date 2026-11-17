@@ -1,4 +1,4 @@
-import { RotateCcw, X } from 'lucide-react';
+import { Plus, RotateCcw, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -130,9 +130,18 @@ export function SoundTagsField({ tags, saving, onChange }: SoundTagsFieldProps) 
         })}
         className="pb-3"
       >
-        <Button variant="outline" size="sm" busy={saving} onClick={() => setConfirmingRestore(true)} data-gemini-sound-tags-restore="">
+        <Button
+          variant="outline"
+          size="sm"
+          busy={saving}
+          onClick={() => setConfirmingRestore(true)}
+          data-gemini-sound-tags-restore=""
+          aria-label={t('voiceSettings.gemini.soundTagsRestore', { defaultValue: "Restore Google's set" })}
+          title={t('voiceSettings.gemini.soundTagsRestore', { defaultValue: "Restore Google's set" })}
+          className="finger:h-11 finger:w-11 finger:px-0"
+        >
           <RotateCcw aria-hidden="true" />
-          {t('voiceSettings.gemini.soundTagsRestore', { defaultValue: "Restore Google's set" })}
+          <span className="finger:hidden">{t('voiceSettings.gemini.soundTagsRestore', { defaultValue: "Restore Google's set" })}</span>
         </Button>
       </SettingRow>
       <div className="flex flex-col gap-3 px-4 pb-4">
@@ -170,8 +179,17 @@ export function SoundTagsField({ tags, saving, onChange }: SoundTagsFieldProps) 
             onChange={(event) => setTyped(event.target.value)}
             className="min-w-0 flex-1 basis-48"
           />
-          <Button type="submit" size="sm" busy={saving} disabled={full || tag.length === 0 || problem !== null}>
-            {t('voiceSettings.gemini.soundTagAdd', { defaultValue: 'Add' })}
+          <Button
+            type="submit"
+            size="sm"
+            busy={saving}
+            disabled={full || tag.length === 0 || problem !== null}
+            aria-label={t('voiceSettings.gemini.soundTagAdd', { defaultValue: 'Add' })}
+            title={t('voiceSettings.gemini.soundTagAdd', { defaultValue: 'Add' })}
+            className="finger:h-11 finger:w-11 finger:px-0"
+          >
+            <Plus aria-hidden="true" />
+            <span className="finger:hidden">{t('voiceSettings.gemini.soundTagAdd', { defaultValue: 'Add' })}</span>
           </Button>
           {problem !== null ? (
             <p id={`${idBase}-sound-tag-line`} role="alert" data-tone="warn" className="basis-full text-xs font-medium text-tone-ink">

@@ -125,7 +125,7 @@ function ClaudePermissions({
         </div>
         <p className="text-sm text-muted-foreground">{t('permissions.allowedTools.description')}</p>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-2 finger:flex-row sm:flex-row">
           <Input
             value={newAllowedTool}
             onChange={(event) => setNewAllowedTool(event.target.value)}
@@ -142,10 +142,11 @@ function ClaudePermissions({
             onClick={() => handleAddAllowedTool(newAllowedTool)}
             disabled={!newAllowedTool.trim()}
             size="sm"
-            className="h-10 px-4"
+            className="h-10 px-4 finger:h-11 finger:w-11 finger:px-0"
+            aria-label={t('permissions.actions.add')}
+            title={t('permissions.actions.add')}
           >
-            <Plus className="mr-2 h-4 w-4 sm:mr-0" />
-            <span className="sm:hidden">{t('permissions.actions.add')}</span>
+            <Plus aria-hidden="true" className="h-4 w-4" />
           </Button>
         </div>
 
@@ -198,7 +199,7 @@ function ClaudePermissions({
         </div>
         <p className="text-sm text-muted-foreground">{t('permissions.blockedTools.description')}</p>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-2 finger:flex-row sm:flex-row">
           <Input
             value={newDisallowedTool}
             onChange={(event) => setNewDisallowedTool(event.target.value)}
@@ -215,10 +216,11 @@ function ClaudePermissions({
             onClick={() => handleAddDisallowedTool(newDisallowedTool)}
             disabled={!newDisallowedTool.trim()}
             size="sm"
-            className="h-10 px-4"
+            className="h-10 px-4 finger:h-11 finger:w-11 finger:px-0"
+            aria-label={t('permissions.actions.add')}
+            title={t('permissions.actions.add')}
           >
-            <Plus className="mr-2 h-4 w-4 sm:mr-0" />
-            <span className="sm:hidden">{t('permissions.actions.add')}</span>
+            <Plus aria-hidden="true" className="h-4 w-4" />
           </Button>
         </div>
 
@@ -336,7 +338,7 @@ function CursorPermissions({
         </div>
         <p className="text-sm text-muted-foreground">{t('permissions.allowedCommands.description')}</p>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-2 finger:flex-row sm:flex-row">
           <Input
             value={newAllowedCommand}
             onChange={(event) => setNewAllowedCommand(event.target.value)}
@@ -353,10 +355,11 @@ function CursorPermissions({
             onClick={() => handleAddAllowedCommand(newAllowedCommand)}
             disabled={!newAllowedCommand.trim()}
             size="sm"
-            className="h-10 px-4"
+            className="h-10 px-4 finger:h-11 finger:w-11 finger:px-0"
+            aria-label={t('permissions.actions.add')}
+            title={t('permissions.actions.add')}
           >
-            <Plus className="mr-2 h-4 w-4 sm:mr-0" />
-            <span className="sm:hidden">{t('permissions.actions.add')}</span>
+            <Plus aria-hidden="true" className="h-4 w-4" />
           </Button>
         </div>
 
@@ -409,7 +412,7 @@ function CursorPermissions({
         </div>
         <p className="text-sm text-muted-foreground">{t('permissions.blockedCommands.description')}</p>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-2 finger:flex-row sm:flex-row">
           <Input
             value={newDisallowedCommand}
             onChange={(event) => setNewDisallowedCommand(event.target.value)}
@@ -426,10 +429,11 @@ function CursorPermissions({
             onClick={() => handleAddDisallowedCommand(newDisallowedCommand)}
             disabled={!newDisallowedCommand.trim()}
             size="sm"
-            className="h-10 px-4"
+            className="h-10 px-4 finger:h-11 finger:w-11 finger:px-0"
+            aria-label={t('permissions.actions.add')}
+            title={t('permissions.actions.add')}
           >
-            <Plus className="mr-2 h-4 w-4 sm:mr-0" />
-            <span className="sm:hidden">{t('permissions.actions.add')}</span>
+            <Plus aria-hidden="true" className="h-4 w-4" />
           </Button>
         </div>
 

@@ -1,4 +1,4 @@
-import { HeartPulseIcon } from 'lucide-react';
+import { HeartPulseIcon, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { useDeepSeekFlashSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
@@ -83,8 +83,16 @@ export default function RunnerModelContent() {
           // switch with no position cannot be moved, so what the slot holds is the one act that can
           // be honoured — ask again. Without it a persistent read failure left the row dead until
           // the reader closed Settings and reopened it, which is a way out only if they guess it.
-          <Button variant="outline" size="sm" onClick={() => void refresh()}>
-            {t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void refresh()}
+            aria-label={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+            title={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+            className="finger:h-11 finger:w-11 finger:px-0"
+          >
+            <RefreshCw aria-hidden="true" />
+            <span className="finger:hidden">{t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}</span>
           </Button>
         ) : (
           <SettingsToggle
@@ -141,8 +149,16 @@ export default function RunnerModelContent() {
               })}
       >
         {healUnknown ? (
-          <Button variant="outline" size="sm" onClick={() => void refreshHeal()}>
-            {t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void refreshHeal()}
+            aria-label={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+            title={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+            className="finger:h-11 finger:w-11 finger:px-0"
+          >
+            <RefreshCw aria-hidden="true" />
+            <span className="finger:hidden">{t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}</span>
           </Button>
         ) : (
           <SettingsToggle

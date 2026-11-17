@@ -156,8 +156,9 @@ export default function McpServers({ selectedProvider, currentProjects }: McpSer
           // The trigger is the panel's first row and nothing here scrolls it near the panel's
           // bottom edge, so the in-place menu has no ancestor to be clipped by.
           portal={false}
-          className="w-full sm:w-auto"
-          triggerClassName={`w-full sm:w-auto ${MCP_PROVIDER_BUTTON_CLASSES[selectedProvider]}`}
+          className="w-full finger:w-auto sm:w-auto"
+          triggerClassName={`w-full sm:w-auto finger:h-11 finger:w-auto ${MCP_PROVIDER_BUTTON_CLASSES[selectedProvider]}`}
+          labelClassName="finger:hidden"
           items={[
             {
               key: 'global',

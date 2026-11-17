@@ -1,4 +1,4 @@
-import { GaugeIcon } from 'lucide-react';
+import { GaugeIcon, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { WEEKLY_STOP_CHOICES, useWeeklyStop } from '@/modules/settings/hooks/useWeeklyStop';
@@ -50,8 +50,16 @@ export default function RunnerWeeklyStopRow() {
           })}
     >
       {unknown ? (
-        <Button variant="outline" size="sm" onClick={() => void refresh()}>
-          {t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void refresh()}
+          aria-label={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+          title={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+          className="finger:h-11 finger:w-11 finger:px-0"
+        >
+          <RefreshCw aria-hidden="true" />
+          <span className="finger:hidden">{t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}</span>
         </Button>
       ) : (
         // `aria-busy` while a write is in flight: the dropdown stays live (a real `disabled` would make

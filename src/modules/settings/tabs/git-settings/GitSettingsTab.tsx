@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react';
+import { Check, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { useGitSettings } from '@/modules/settings/hooks/useGitSettings';
@@ -62,8 +62,12 @@ export default function GitSettingsTab() {
               <Button
                 onClick={saveGitConfig}
                 disabled={isSaving || !gitName.trim() || !gitEmail.trim()}
+                aria-label={isSaving ? t('git.actions.saving') : t('git.actions.save')}
+                title={isSaving ? t('git.actions.saving') : t('git.actions.save')}
+                className="finger:h-11 finger:w-11 finger:px-0"
               >
-                {isSaving ? t('git.actions.saving') : t('git.actions.save')}
+                <Save aria-hidden="true" />
+                <span className="finger:hidden">{isSaving ? t('git.actions.saving') : t('git.actions.save')}</span>
               </Button>
 
               {saveStatus === 'success' && (

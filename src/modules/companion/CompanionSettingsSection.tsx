@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -63,7 +64,22 @@ export function CompanionSettingsView({ settings, loadFailed, onRetry, onSave, t
     );
   } else if (loadFailed) {
     body = (
-      <Banner tone="warn" action={<Button variant="outline" size="sm" onClick={onRetry}>{t('voiceSettings.companion.retry')}</Button>}>
+      <Banner
+        tone="warn"
+        action={(
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            aria-label={t('voiceSettings.companion.retry')}
+            title={t('voiceSettings.companion.retry')}
+            className="finger:h-11 finger:w-11 finger:px-0"
+          >
+            <RefreshCw aria-hidden="true" />
+            <span className="finger:hidden">{t('voiceSettings.companion.retry')}</span>
+          </Button>
+        )}
+      >
         {t('voiceSettings.companion.loadFailed')}
       </Banner>
     );

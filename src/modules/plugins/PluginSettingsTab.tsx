@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   Terminal,
   Trash2,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -301,11 +302,27 @@ function PluginCard({
                   {t('pluginSettings.confirmUninstallMessage', { name: plugin.displayName })}
                 </span>
                 <div className="flex gap-1.5">
-                  <Button variant="outline" size="sm" className="h-8 finger:h-11" onClick={onCancelUninstall}>
-                    {t('pluginSettings.cancel')}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 finger:h-11 finger:w-11 finger:px-0"
+                    onClick={onCancelUninstall}
+                    aria-label={t('pluginSettings.cancel')}
+                    title={t('pluginSettings.cancel')}
+                  >
+                    <X aria-hidden="true" />
+                    <span className="finger:hidden">{t('pluginSettings.cancel')}</span>
                   </Button>
-                  <Button variant="destructive" size="sm" className="h-8 finger:h-11" onClick={onUninstall}>
-                    {t('pluginSettings.remove')}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-8 finger:h-11 finger:w-11 finger:px-0"
+                    onClick={onUninstall}
+                    aria-label={t('pluginSettings.remove')}
+                    title={t('pluginSettings.remove')}
+                  >
+                    <Trash2 aria-hidden="true" />
+                    <span className="finger:hidden">{t('pluginSettings.remove')}</span>
                   </Button>
                 </div>
               </div>
@@ -406,9 +423,17 @@ function PluginRecommendationCard({
           </div>
         )}
       >
-        <Button variant="outline" size="sm" className="flex-shrink-0 gap-1.5 finger:h-11" onClick={onInstall} disabled={disabled}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-shrink-0 gap-1.5 finger:h-11 finger:w-11 finger:px-0"
+          onClick={onInstall}
+          disabled={disabled}
+          aria-label={installing ? t('pluginSettings.installing') : t(`pluginSettings.${recommendation.translationKey}.install`)}
+          title={installing ? t('pluginSettings.installing') : t(`pluginSettings.${recommendation.translationKey}.install`)}
+        >
           {installing ? <Loader2 aria-hidden="true" className="animate-spin" /> : <Download aria-hidden="true" />}
-          {installing ? t('pluginSettings.installing') : t(`pluginSettings.${recommendation.translationKey}.install`)}
+          <span className="finger:hidden">{installing ? t('pluginSettings.installing') : t(`pluginSettings.${recommendation.translationKey}.install`)}</span>
         </Button>
       </SettingRow>
     </div>
@@ -555,8 +580,15 @@ export default function PluginSettingsTab() {
             if (e.key === 'Enter') void handleInstall();
           }}
         />
-        <Button className="flex-shrink-0" onClick={handleInstall} disabled={installing || !gitUrl.trim()}>
-          {installing ? <Loader2 aria-hidden="true" className="animate-spin" /> : t('pluginSettings.installButton')}
+        <Button
+          className="flex-shrink-0 finger:h-11 finger:w-11 finger:px-0"
+          onClick={handleInstall}
+          disabled={installing || !gitUrl.trim()}
+          aria-label={t('pluginSettings.installButton')}
+          title={t('pluginSettings.installButton')}
+        >
+          {installing ? <Loader2 aria-hidden="true" className="animate-spin" /> : <Download aria-hidden="true" />}
+          {!installing && <span className="finger:hidden">{t('pluginSettings.installButton')}</span>}
         </Button>
       </div>
 

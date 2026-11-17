@@ -1,4 +1,4 @@
-import { FolderOpen, Globe, X } from 'lucide-react';
+import { FolderOpen, Globe, Save, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -394,19 +394,38 @@ export default function McpServerFormModal({
           )}
 
           <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
-              {t('mcpForm.actions.cancel')}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              aria-label={t('mcpForm.actions.cancel')}
+              title={t('mcpForm.actions.cancel')}
+              className="finger:h-11 finger:w-11 finger:px-0"
+            >
+              <X aria-hidden="true" />
+              <span className="finger:hidden">{t('mcpForm.actions.cancel')}</span>
             </Button>
             <Button
               type="submit"
               disabled={isSubmitting || !canSubmit}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {isSubmitting
+              className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 finger:h-11 finger:w-11 finger:px-0"
+              aria-label={isSubmitting
                 ? t('mcpForm.actions.saving')
                 : isEditing
                 ? t('mcpForm.actions.updateServer')
                 : addButtonLabel}
+              title={isSubmitting
+                ? t('mcpForm.actions.saving')
+                : isEditing
+                ? t('mcpForm.actions.updateServer')
+                : addButtonLabel}
+            >
+              <Save aria-hidden="true" />
+              <span className="finger:hidden">{isSubmitting
+                ? t('mcpForm.actions.saving')
+                : isEditing
+                ? t('mcpForm.actions.updateServer')
+                : addButtonLabel}</span>
             </Button>
           </div>
         </form>

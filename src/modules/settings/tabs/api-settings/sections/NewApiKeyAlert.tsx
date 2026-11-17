@@ -36,8 +36,16 @@ export default function NewApiKeyAlert({
           {copiedKey === 'new' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
         </Button>
       </div>
-      <Button size="sm" variant="ghost" className="mt-3" onClick={onDismiss}>
-        {t('apiKeys.newKey.iveSavedIt')}
+      <Button
+        size="sm"
+        variant="ghost"
+        className="mt-3 finger:h-11 finger:w-11 finger:px-0"
+        onClick={onDismiss}
+        aria-label={t('apiKeys.newKey.iveSavedIt')}
+        title={t('apiKeys.newKey.iveSavedIt')}
+      >
+        <Check aria-hidden="true" />
+        <span className="finger:hidden">{t('apiKeys.newKey.iveSavedIt')}</span>
       </Button>
     </div>
   );

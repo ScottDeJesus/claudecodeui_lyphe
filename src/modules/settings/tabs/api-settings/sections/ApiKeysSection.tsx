@@ -1,4 +1,4 @@
-import { ExternalLink, Key, Plus, Trash2 } from 'lucide-react';
+import { Check, ExternalLink, Key, Plus, ToggleLeft, ToggleRight, Trash2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button, Input } from '@/shared/ui';
@@ -37,9 +37,15 @@ export default function ApiKeysSection({
           <Key className="h-5 w-5" />
           <h3 className="text-lg font-semibold">{t('apiKeys.title')}</h3>
         </div>
-        <Button size="sm" onClick={() => onShowNewKeyFormChange(!showNewKeyForm)}>
-          <Plus className="mr-1 h-4 w-4" />
-          {t('apiKeys.newButton')}
+        <Button
+          size="sm"
+          onClick={() => onShowNewKeyFormChange(!showNewKeyForm)}
+          aria-label={t('apiKeys.newButton')}
+          title={t('apiKeys.newButton')}
+          className="finger:h-11 finger:w-11 finger:px-0"
+        >
+          <Plus className="mr-1 h-4 w-4 finger:mr-0" />
+          <span className="finger:hidden">{t('apiKeys.newButton')}</span>
         </Button>
       </div>
 
@@ -65,9 +71,24 @@ export default function ApiKeysSection({
             className="mb-2"
           />
           <div className="flex gap-2">
-            <Button onClick={onCreateApiKey}>{t('apiKeys.form.createButton')}</Button>
-            <Button variant="outline" onClick={onCancelCreateApiKey}>
-              {t('apiKeys.form.cancelButton')}
+            <Button
+              onClick={onCreateApiKey}
+              aria-label={t('apiKeys.form.createButton')}
+              title={t('apiKeys.form.createButton')}
+              className="finger:h-11 finger:w-11 finger:px-0"
+            >
+              <Check aria-hidden="true" />
+              <span className="finger:hidden">{t('apiKeys.form.createButton')}</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onCancelCreateApiKey}
+              aria-label={t('apiKeys.form.cancelButton')}
+              title={t('apiKeys.form.cancelButton')}
+              className="finger:h-11 finger:w-11 finger:px-0"
+            >
+              <X aria-hidden="true" />
+              <span className="finger:hidden">{t('apiKeys.form.cancelButton')}</span>
             </Button>
           </div>
         </div>
@@ -94,8 +115,12 @@ export default function ApiKeysSection({
                   size="sm"
                   variant={key.is_active ? 'outline' : 'secondary'}
                   onClick={() => onToggleApiKey(key.id, key.is_active)}
+                  aria-label={key.is_active ? t('apiKeys.status.active') : t('apiKeys.status.inactive')}
+                  title={key.is_active ? t('apiKeys.status.active') : t('apiKeys.status.inactive')}
+                  className="finger:h-11 finger:w-11 finger:px-0"
                 >
-                  {key.is_active ? t('apiKeys.status.active') : t('apiKeys.status.inactive')}
+                  {key.is_active ? <ToggleRight aria-hidden="true" /> : <ToggleLeft aria-hidden="true" />}
+                  <span className="finger:hidden">{key.is_active ? t('apiKeys.status.active') : t('apiKeys.status.inactive')}</span>
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => onDeleteApiKey(key.id)}>
                   <Trash2 className="h-4 w-4" />

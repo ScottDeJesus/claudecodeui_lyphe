@@ -1,3 +1,4 @@
+import { Save, Send, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { useNtfySettings } from '@/modules/settings/hooks/useNtfySettings';
@@ -125,8 +126,12 @@ export default function NtfySettingsCard() {
                   variant="tonal"
                   disabled={isBusy}
                   onClick={() => void save()}
+                  aria-label={t('notifications.ntfy.save')}
+                  title={t('notifications.ntfy.save')}
+                  className="finger:h-11 finger:w-11 finger:px-0"
                 >
-                  {t('notifications.ntfy.save')}
+                  <Save aria-hidden="true" />
+                  <span className="finger:hidden">{t('notifications.ntfy.save')}</span>
                 </Button>
                 <Button
                   data-testid="ntfy-test"
@@ -135,8 +140,12 @@ export default function NtfySettingsCard() {
                   variant="outline"
                   disabled={isBusy || !isConfigured}
                   onClick={() => void sendTest()}
+                  aria-label={t('notifications.ntfy.test')}
+                  title={t('notifications.ntfy.test')}
+                  className="finger:h-11 finger:w-11 finger:px-0"
                 >
-                  {t('notifications.ntfy.test')}
+                  <Send aria-hidden="true" />
+                  <span className="finger:hidden">{t('notifications.ntfy.test')}</span>
                 </Button>
                 <Button
                   data-testid="ntfy-remove"
@@ -145,8 +154,12 @@ export default function NtfySettingsCard() {
                   variant="ghost"
                   disabled={isBusy || !isConfigured}
                   onClick={() => void remove()}
+                  aria-label={t('notifications.ntfy.remove')}
+                  title={t('notifications.ntfy.remove')}
+                  className="finger:h-11 finger:w-11 finger:px-0"
                 >
-                  {t('notifications.ntfy.remove')}
+                  <Trash2 aria-hidden="true" />
+                  <span className="finger:hidden">{t('notifications.ntfy.remove')}</span>
                 </Button>
               </div>
               {/* Always mounted, so the line appearing is never mistaken for the card moving. */}

@@ -422,26 +422,30 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
               Folders can include scripts, references, and assets.
             </div>
           </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <div className="flex w-full flex-col gap-2 finger:w-auto finger:flex-row sm:w-auto sm:flex-row">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full sm:w-auto"
+              className="finger:h-11 finger:w-11 finger:px-0"
+              aria-label="Choose Files"
+              title="Choose Files"
             >
               <FileUp className="h-4 w-4" />
-              Choose Files
+              <span className="finger:hidden">Choose Files</span>
             </Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => folderInputRef.current?.click()}
-              className="w-full sm:w-auto"
+              className="finger:h-11 finger:w-11 finger:px-0"
+              aria-label="Choose Folder"
+              title="Choose Folder"
             >
               <FolderUp className="h-4 w-4" />
-              Choose Folder
+              <span className="finger:hidden">Choose Folder</span>
             </Button>
           </div>
         </div>
@@ -507,6 +511,9 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
     </div>
   );
 
+  // The install press's words: how many skills wait in the queue. Shown on the button at a desk, and as its name under a finger.
+  const installLabel = `Install ${queuedFiles.length > 0 ? `${queuedFiles.length} Skill${queuedFiles.length === 1 ? '' : 's'}` : 'Skill'}`;
+
   return (
     <div className="min-w-0 space-y-4 overflow-x-hidden">
       <div className="flex min-w-0 items-start gap-3">
@@ -522,7 +529,7 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
       </div>
 
       <div className="space-y-2">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2 finger:flex-row sm:flex-row sm:items-center">
           <div className="relative min-w-0 flex-1 sm:max-w-md">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -547,21 +554,25 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
           <Button
             type="button"
             size="sm"
-            className="w-full sm:w-auto"
+            className="finger:h-11 finger:w-11 finger:px-0"
             onClick={() => handleAddDialogOpenChange(true)}
+            aria-label="Add Skill"
+            title="Add Skill"
           >
             <Plus className="h-4 w-4" />
-            Add Skill
+            <span className="finger:hidden">Add Skill</span>
           </Button>
           <Button
             onClick={() => void refreshSkills({ force: true })}
             variant="outline"
             size="sm"
-            className="w-full sm:w-auto"
+            className="finger:h-11 finger:w-11 finger:px-0"
             disabled={isLoading || isLoadingProjectScopes}
+            aria-label="Refresh"
+            title="Refresh"
           >
             <RefreshCw className={cn('h-4 w-4', (isLoading || isLoadingProjectScopes) && 'animate-spin')} />
-            Refresh
+            <span className="finger:hidden">Refresh</span>
           </Button>
         </div>
         {isLoadingProjectScopes && (
@@ -624,26 +635,31 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
                 </span>
               )}
             </div>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-col-reverse gap-2 finger:flex-row sm:flex-row sm:items-center">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="w-full sm:w-auto"
+                className="finger:h-11 finger:w-11 finger:px-0"
                 disabled={isSubmitting}
                 onClick={() => handleAddDialogOpenChange(false)}
+                aria-label="Cancel"
+                title="Cancel"
               >
-                Cancel
+                <X aria-hidden="true" />
+                <span className="finger:hidden">Cancel</span>
               </Button>
               <Button
                 type="button"
                 size="sm"
-                className="w-full sm:w-auto"
+                className="finger:h-11 finger:w-11 finger:px-0"
                 onClick={() => void handleUploadInstall()}
                 disabled={isSubmitting || queuedFiles.length === 0}
+                aria-label={installLabel}
+                title={installLabel}
               >
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                Install {queuedFiles.length > 0 ? `${queuedFiles.length} Skill${queuedFiles.length === 1 ? '' : 's'}` : 'Skill'}
+                <span className="finger:hidden">{installLabel}</span>
               </Button>
             </div>
           </div>

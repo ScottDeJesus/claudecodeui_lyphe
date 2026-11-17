@@ -148,14 +148,16 @@ export default function BrowserUseSettingsTab() {
                   size="sm"
                   onClick={() => void installBrowserBinaries()}
                   disabled={isInstalling || status?.installInProgress}
-                  className="flex-shrink-0"
+                  className="flex-shrink-0 finger:h-11 finger:w-11 finger:px-0"
+                  aria-label={isInstalling || status?.installInProgress ? 'Installing...' : 'Install Runtime'}
+                  title={isInstalling || status?.installInProgress ? 'Installing...' : 'Install Runtime'}
                 >
                   {isInstalling || status?.installInProgress ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Download className="h-4 w-4" />
                   )}
-                  {isInstalling || status?.installInProgress ? 'Installing...' : 'Install Runtime'}
+                  <span className="finger:hidden">{isInstalling || status?.installInProgress ? 'Installing...' : 'Install Runtime'}</span>
                 </Button>
               </div>
             )}

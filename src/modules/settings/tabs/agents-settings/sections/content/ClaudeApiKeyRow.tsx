@@ -1,4 +1,4 @@
-import { Key } from 'lucide-react';
+import { Key, Save, Trash2 } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -232,8 +232,18 @@ export default function ClaudeApiKeyRow({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="submit" size="sm" variant={picture?.set ? 'outline' : 'tonal'} busy={saving} aria-disabled={blocked || undefined}>
-              {submitWord}
+            <Button
+              type="submit"
+              size="sm"
+              variant={picture?.set ? 'outline' : 'tonal'}
+              busy={saving}
+              aria-disabled={blocked || undefined}
+              aria-label={submitWord}
+              title={submitWord}
+              className="finger:h-11 finger:w-11 finger:px-0"
+            >
+              <Save aria-hidden="true" />
+              <span className="finger:hidden">{submitWord}</span>
             </Button>
             {picture?.set && (
               <Button
@@ -244,12 +254,15 @@ export default function ClaudeApiKeyRow({
                 // 2.88:1 on the dark card; `data-tone` swaps in `--danger-ink` there (6.83:1), and
                 // the light rendering is unchanged.
                 data-tone="danger"
-                className="text-tone-ink"
+                className="text-tone-ink finger:h-11 finger:w-11 finger:px-0"
                 busy={saving}
                 aria-disabled={blocked || undefined}
                 onClick={() => onRemove(slot)}
+                aria-label={t('agents.claudeApi.remove', { defaultValue: 'Remove' })}
+                title={t('agents.claudeApi.remove', { defaultValue: 'Remove' })}
               >
-                {t('agents.claudeApi.remove', { defaultValue: 'Remove' })}
+                <Trash2 aria-hidden="true" />
+                <span className="finger:hidden">{t('agents.claudeApi.remove', { defaultValue: 'Remove' })}</span>
               </Button>
             )}
           </div>

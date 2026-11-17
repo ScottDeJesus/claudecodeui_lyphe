@@ -1,4 +1,4 @@
-import { XIcon } from 'lucide-react';
+import { Pencil, RefreshCw, XIcon } from 'lucide-react';
 import { Suspense, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -83,8 +83,15 @@ export default function AgentChainsContent() {
         >
           {/* `asChild` makes the button the dialog's trigger, which is what returns focus to it on close. */}
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              {t('agents.agentChains.button', { defaultValue: 'Edit Agent Chains' })}
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label={t('agents.agentChains.button', { defaultValue: 'Edit Agent Chains' })}
+              title={t('agents.agentChains.button', { defaultValue: 'Edit Agent Chains' })}
+              className="finger:h-11 finger:w-11 finger:px-0"
+            >
+              <Pencil aria-hidden="true" />
+              <span className="finger:hidden">{t('agents.agentChains.button', { defaultValue: 'Edit Agent Chains' })}</span>
             </Button>
           </DialogTrigger>
         </SettingRow>
@@ -108,8 +115,16 @@ export default function AgentChainsContent() {
                   <Banner
                     tone="warn"
                     action={(
-                      <Button variant="outline" size="sm" className="flex-none" onClick={() => window.location.reload()}>
-                        {t('agents.agentChains.reload', { defaultValue: 'Reload the page' })}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-none finger:h-11 finger:w-11 finger:px-0"
+                        onClick={() => window.location.reload()}
+                        aria-label={t('agents.agentChains.reload', { defaultValue: 'Reload the page' })}
+                        title={t('agents.agentChains.reload', { defaultValue: 'Reload the page' })}
+                      >
+                        <RefreshCw aria-hidden="true" />
+                        <span className="finger:hidden">{t('agents.agentChains.reload', { defaultValue: 'Reload the page' })}</span>
                       </Button>
                     )}
                   >

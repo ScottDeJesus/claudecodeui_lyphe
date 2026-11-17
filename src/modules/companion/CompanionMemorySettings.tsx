@@ -1,4 +1,4 @@
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -136,9 +136,12 @@ export function CompanionMemorySettingsView({ name, reading, pageHref, clearing,
               size="sm"
               data-companion-memory-clear=""
               onClick={() => setConfirming(true)}
-              className="text-muted-foreground hover:text-foreground [@media(pointer:coarse)]:min-h-11"
+              className="text-muted-foreground hover:text-foreground finger:h-11 finger:w-11 finger:px-0 [@media(pointer:coarse)]:min-h-11"
+              aria-label={t('voiceSettings.companion.memory.clear', { defaultValue: 'Clear her memory' })}
+              title={t('voiceSettings.companion.memory.clear', { defaultValue: 'Clear her memory' })}
             >
-              {t('voiceSettings.companion.memory.clear', { defaultValue: 'Clear her memory' })}
+              <Trash2 aria-hidden="true" />
+              <span className="finger:hidden">{t('voiceSettings.companion.memory.clear', { defaultValue: 'Clear her memory' })}</span>
             </Button>
           )}
         </div>

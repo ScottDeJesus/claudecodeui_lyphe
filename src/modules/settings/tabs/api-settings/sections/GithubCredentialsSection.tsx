@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Github, Plus, Trash2 } from 'lucide-react';
+import { Check, Eye, EyeOff, Github, Plus, ToggleLeft, ToggleRight, Trash2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button, Input } from '@/shared/ui';
@@ -49,9 +49,15 @@ export default function GithubCredentialsSection({
           <Github className="h-5 w-5" />
           <h3 className="text-lg font-semibold">{t('apiKeys.github.title')}</h3>
         </div>
-        <Button size="sm" onClick={() => onShowNewGithubFormChange(!showNewGithubForm)}>
-          <Plus className="mr-1 h-4 w-4" />
-          {t('apiKeys.github.addButton')}
+        <Button
+          size="sm"
+          onClick={() => onShowNewGithubFormChange(!showNewGithubForm)}
+          aria-label={t('apiKeys.github.addButton')}
+          title={t('apiKeys.github.addButton')}
+          className="finger:h-11 finger:w-11 finger:px-0"
+        >
+          <Plus className="mr-1 h-4 w-4 finger:mr-0" />
+          <span className="finger:hidden">{t('apiKeys.github.addButton')}</span>
         </Button>
       </div>
 
@@ -92,9 +98,24 @@ export default function GithubCredentialsSection({
           />
 
           <div className="flex gap-2">
-            <Button onClick={onCreateGithubCredential}>{t('apiKeys.github.form.addButton')}</Button>
-            <Button variant="outline" onClick={onCancelCreateGithubCredential}>
-              {t('apiKeys.github.form.cancelButton')}
+            <Button
+              onClick={onCreateGithubCredential}
+              aria-label={t('apiKeys.github.form.addButton')}
+              title={t('apiKeys.github.form.addButton')}
+              className="finger:h-11 finger:w-11 finger:px-0"
+            >
+              <Check aria-hidden="true" />
+              <span className="finger:hidden">{t('apiKeys.github.form.addButton')}</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onCancelCreateGithubCredential}
+              aria-label={t('apiKeys.github.form.cancelButton')}
+              title={t('apiKeys.github.form.cancelButton')}
+              className="finger:h-11 finger:w-11 finger:px-0"
+            >
+              <X aria-hidden="true" />
+              <span className="finger:hidden">{t('apiKeys.github.form.cancelButton')}</span>
             </Button>
           </div>
 
@@ -129,8 +150,12 @@ export default function GithubCredentialsSection({
                   size="sm"
                   variant={credential.is_active ? 'outline' : 'secondary'}
                   onClick={() => onToggleGithubCredential(credential.id, credential.is_active)}
+                  aria-label={credential.is_active ? t('apiKeys.status.active') : t('apiKeys.status.inactive')}
+                  title={credential.is_active ? t('apiKeys.status.active') : t('apiKeys.status.inactive')}
+                  className="finger:h-11 finger:w-11 finger:px-0"
                 >
-                  {credential.is_active ? t('apiKeys.status.active') : t('apiKeys.status.inactive')}
+                  {credential.is_active ? <ToggleRight aria-hidden="true" /> : <ToggleLeft aria-hidden="true" />}
+                  <span className="finger:hidden">{credential.is_active ? t('apiKeys.status.active') : t('apiKeys.status.inactive')}</span>
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => onDeleteGithubCredential(credential.id)}>
                   <Trash2 className="h-4 w-4" />

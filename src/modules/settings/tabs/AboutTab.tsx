@@ -78,11 +78,13 @@ export default function AboutTab() {
         href={GITHUB_REPO_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-2')}
+        aria-label="Star on GitHub"
+        title="Star on GitHub"
+        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-2 finger:h-11 finger:px-3')}
       >
         <GitHubIcon className="h-4 w-4" />
         <Star className="h-3.5 w-3.5" />
-        <span>Star on GitHub</span>
+        <span className="finger:hidden">Star on GitHub</span>
       </a>
 
       {/* Links */}

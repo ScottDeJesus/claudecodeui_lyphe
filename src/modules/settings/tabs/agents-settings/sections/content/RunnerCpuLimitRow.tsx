@@ -1,4 +1,4 @@
-import { CpuIcon } from 'lucide-react';
+import { CpuIcon, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { CPU_LIMIT_CHOICES, useCpuLimit, type CpuLimitChoice } from '@/modules/settings/hooks/useCpuLimit';
@@ -57,8 +57,16 @@ export default function RunnerCpuLimitRow() {
             })
           : t('status.loading', { ns: 'common', defaultValue: 'Loading...' })}
       >
-        <Button variant="outline" size="sm" onClick={() => void refresh()}>
-          {t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void refresh()}
+          aria-label={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+          title={t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
+          className="finger:h-11 finger:w-11 finger:px-0"
+        >
+          <RefreshCw aria-hidden="true" />
+          <span className="finger:hidden">{t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}</span>
         </Button>
       </SettingRow>
     );

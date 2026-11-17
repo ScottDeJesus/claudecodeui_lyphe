@@ -96,9 +96,12 @@ export default function AccountContent({ agent, authStatus, onLogin, onDesignLog
               onClick={onLogin}
               variant={authStatus.authenticated ? 'outline' : 'tonal'}
               size="sm"
+              aria-label={authStatus.authenticated ? t('agents.login.reLoginButton') : t('agents.login.button')}
+              title={authStatus.authenticated ? t('agents.login.reLoginButton') : t('agents.login.button')}
+              className="finger:h-11 finger:w-11 finger:px-0"
             >
-              <LogIn className="mr-2 h-4 w-4" />
-              {authStatus.authenticated ? t('agents.login.reLoginButton') : t('agents.login.button')}
+              <LogIn className="mr-2 h-4 w-4 finger:mr-0" />
+              <span className="finger:hidden">{authStatus.authenticated ? t('agents.login.reLoginButton') : t('agents.login.button')}</span>
             </Button>
           </SettingRow>
         )}
@@ -111,9 +114,16 @@ export default function AccountContent({ agent, authStatus, onLogin, onDesignLog
             working agent: nothing here is unconfigured, so nothing here is the next step. */}
         {agent === 'claude' && onDesignLogin && (
           <SettingRow label={t('agents.designLogin.title')} description={t('agents.designLogin.description')}>
-            <Button onClick={onDesignLogin} variant="outline" size="sm">
-              <Palette className="mr-2 h-4 w-4" />
-              {t('agents.designLogin.button')}
+            <Button
+              onClick={onDesignLogin}
+              variant="outline"
+              size="sm"
+              aria-label={t('agents.designLogin.button')}
+              title={t('agents.designLogin.button')}
+              className="finger:h-11 finger:w-11 finger:px-0"
+            >
+              <Palette className="mr-2 h-4 w-4 finger:mr-0" />
+              <span className="finger:hidden">{t('agents.designLogin.button')}</span>
             </Button>
           </SettingRow>
         )}
