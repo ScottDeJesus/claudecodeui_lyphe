@@ -9,12 +9,8 @@ export { CompanionProvider, useCompanion } from '@/modules/companion/context/Com
 export { CompanionPanel } from '@/modules/companion/CompanionPanel';
 export { CompanionDock } from '@/modules/companion/CompanionDock';
 export { CompanionSettingsSection } from '@/modules/companion/CompanionSettingsSection';
-// The action waiting for his word, as her panel draws it in her dock; its second home is the head of the station's right
-// rail, "What needs you" (`WhatNeedsYou`), with every rule of MAN-9186.
+// The action waiting for his word, as the companion's panel draws it in its dock, with every rule of MAN-9186.
 export { CompanionActionCard } from '@/modules/companion/CompanionActionCard';
-// The same action in one line, the card's words and deadline: the station module's phone arrangement stands it over its bottom
-// bar while the action waits, and its press opens the whole card in Needs you (it never carries his lines, MAN-9186).
-export { CompanionActionLine } from '@/modules/companion/CompanionActionLine';
 // Whether the action waiting for his word has lapsed (its deadline, one timer): the card and the line read it, and the station's
 // count of what needs him (through the station's `useLivePending`) so an action whose card is gone is not counted.
 export { useActionLapse } from '@/modules/companion/hooks/useActionLapse';

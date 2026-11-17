@@ -8,11 +8,8 @@ type StationStamp = { day: StationStampDay; clock: string; date: string };
 
 /**
  * THE STATION'S ONE STAMP WRITER: every time the page draws as a moment, on his clock and in the locale's. Its readers each word
- * the three parts with keys of their own, so a clock is spelled in one place and said in four:
- * - the strip (`SinceYouLastLooked`: each landing's time and his last look, `station.strip.when.*`);
- * - the memory lines (`MemoryLine`: when he said or typed it, `station.memory.when.*`);
- * - the chat stage (`ChatStage`: "last moved <when>", `station.chat.when.*`);
- * - a red check's "since" (`NeedItem`, `station.needs.when.*`).
+ * the three parts with keys of their own, so a clock is spelled in one place:
+ * - the chat stage (`ChatStage`: "last moved <when>", `station.chat.when.*`).
  *
  * `clock` is the locale's time of day ("2:04 PM", "14:04"); `date` is the page's one spelling of a day (`formatShortDate`:
  * "Oct 26", with its year once it is not this year's). The day is compared on the calendar and never on a count of hours, so a

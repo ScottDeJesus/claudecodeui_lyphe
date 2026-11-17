@@ -17,7 +17,7 @@ function isReading(body: unknown): body is CompanionMemoryReading {
  *
  * The card's own read and clear of her memory bank: `GET /api/companion/memory` when the section opens, `DELETE` when he confirms Clear,
  * and the `GET` again after it. EVENTS, NOT A WATCHDOG: nothing here polls it or re-reads on a timer. The `companion_memory` frame the
- * server sends after each write of her bank is followed by the station's corner (`useMemoryLines`), not by this card: its count is as
+ * server sends after each write of the bank is not followed by this card: its count is as
  * old as the last open or clear, which is the truth of a card he looks at and acts on.
  *
  * The read after a clear happens whether the clear went through or was refused: a clear that stopped part way (the docstore door

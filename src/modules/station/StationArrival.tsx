@@ -41,7 +41,7 @@ type StationArrivalProps = {
  * `stationScene.css` runs the motion from them; under reduced motion each is a fade. A place that makes room for the piece
  * reads the phase too (the dock's held row opens while its draft arrives and closes as it settles).
  *
- * Used by the station's dock: the companion's core (`StationHeadView`), Stop while a turn runs, and the draft held for your
+ * Used by the station's dock: the companion's core, Stop while a turn runs, and the draft held for your
  * Send (`StationDockView`).
  */
 export function StationArrival({ when, from = 'center', spring = 'lock', linger = 0, className, children }: StationArrivalProps) {

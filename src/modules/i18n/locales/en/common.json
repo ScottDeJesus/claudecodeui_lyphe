@@ -3899,7 +3899,6 @@
     },
     "action": {
       "waiting": "Waiting for your word",
-      "waitingShort": "Waiting",
       "verb": {
         "queue": "Queue <target/>",
         "hide": "Hide <target/>",
@@ -3994,10 +3993,7 @@
       "openCard": "Open {{kind}} {{title}} on the stage"
     },
     "head": {
-      "controls": "Controls",
-      "menu": "Controls and CloudCLI",
-      "showChat": "Show chat",
-      "showPortrait": "Show portrait"
+      "controls": "Controls"
     },
     "kaylee": {
       "home": "Home",
@@ -4024,28 +4020,7 @@
       "page": "Page"
     },
     "bar": {
-      "title": "Kaylee <accent>Station</accent>",
-      "back": "CloudCLI",
-      "backLabel": "Back to CloudCLI"
-    },
-    "compact": {
-      "switch": "Compact",
-      "switchLabel": "Section",
-      "section": {
-        "conversation": "Conversation",
-        "needs": "Needs you",
-        "where": "Where things stand",
-        "stage": "Stage"
-      },
-      "needsPressUnread": "Open Needs you",
-      "needsPress_zero": "Nothing needs you: open Needs you",
-      "needsPress_one": "1 needs you: open Needs you",
-      "needsPress_other": "{{count}} need you: open Needs you"
-    },
-    "phone": {
-      "bar": "Sections",
-      "needsPress": "Needs you · {{count}}",
-      "stagePress": "Stage: {{label}}"
+      "back": "CloudCLI"
     },
     "stage": {
       "name": "Panel",
@@ -4066,50 +4041,15 @@
       "block": "One block of a page in DocSpace",
       "open": "Open in DocSpace"
     },
-    "live": {
-      "title": "What’s running",
-      "more_one": "{{count}} more running",
-      "more_other": "{{count}} more running"
-    },
-    "where": {
-      "title": "Where things stand",
-      "open": "Where things stand"
-    },
-    "rail": {
-      "name": "Where things stand"
-    },
     "sessions": {
-      "heading": "Sessions",
       "state": {
         "working": "Working",
         "waiting": "Waiting on you",
         "idle": "Idle",
         "asleep": "Asleep"
       },
-      "asleep": "Asleep · {{count}}",
       "reading": "Reading your sessions…",
-      "retry": "Try again",
-      "none": {
-        "title": "No sessions yet",
-        "message": "A chat you start in CloudCLI stands here, with what it is doing."
-      },
-      "nothingRunning": {
-        "title": "Nothing is running",
-        "message_one": "One chat is asleep. A message wakes it.",
-        "message_other": "{{count}} chats are asleep. A message wakes any of them."
-      },
-      "her": {
-        "reading": "{{name}} is reading {{chat}}",
-        "drafting": "{{name}} is drafting for {{chat}}",
-        "walking": "{{name}} is walking {{chat}}"
-      }
-    },
-    "roadmap": {
-      "eyebrow": "Roadmap",
-      "reading": "Reading the roadmap…",
-      "none": "No roadmap yet. Make one on the Roadmap tab, and its open epics stand here.",
-      "noneOpen": "Nothing is open on this roadmap.",
-      "complete": "Complete · {{count}}"
+      "retry": "Try again"
     },
     "chat": {
       "moved": "last moved {{when}}",
@@ -4174,16 +4114,9 @@
       "walk": "The walkthrough ended"
     },
     "needs": {
-      "title": "What needs you",
-      "more_one": "{{count}} more",
-      "more_other": "{{count}} more",
-      "reading": "Reading what needs you…",
-      "empty": "Nothing needs you.",
       "retry": "Try again",
       "fault": {
-        "plans": "Couldn’t read the Accepts and design questions just now",
         "ask": "Couldn’t read the permissions just now",
-        "followups": "Couldn’t read the follow-ups just now",
         "check": "Couldn’t read the checks just now"
       },
       "kind": {
@@ -4201,25 +4134,6 @@
         "allow": "Allow…",
         "open": "Open"
       },
-      "status": {
-        "failing": "Failing",
-        "denied": "Refused"
-      },
-      "facts": {
-        "epic_one": "Epic · {{count}} feature",
-        "epic_other": "Epic · {{count}} features",
-        "feature": "Feature",
-        "questions": "{{count}} to answer",
-        "more": "{{count}} more waiting",
-        "open": "{{count}} open"
-      },
-      "where": "{{node}} · since {{time}}",
-      "when": {
-        "today": "{{clock}}",
-        "yesterday": "yesterday {{clock}}",
-        "day": "{{date}} {{clock}}"
-      },
-      "onStage": "On the stage",
       "openChat": "Open the chat",
       "ask": {
         "looking": "Looking for the ask…",
@@ -4253,75 +4167,9 @@
         "card": "{{label}} in Cerberus"
       }
     },
-    "strip": {
-      "name": "Since you last looked",
-      "timeline": "This week’s landings, oldest first",
-      "kind": {
-        "shipped": "Shipped",
-        "epic": "Epic complete",
-        "landed": "Landed",
-        "recovered": "Recovered"
-      },
-      "when": {
-        "today": "{{clock}}",
-        "yesterday": "yesterday {{clock}}",
-        "day": "{{day}}"
-      },
-      "by": "by {{chat}}",
-      "byHouse": "by the house",
-      "new": "New",
-      "newCount": "{{count}} new",
-      "seenLabel_one": "{{count}} new since you last looked: mark it seen",
-      "seenLabel_other": "{{count}} new since you last looked: mark them seen",
-      "rule": "You last looked",
-      "nothingNew": "Nothing new since you last looked",
-      "nothingNewShort": "Nothing new",
-      "week": "This week",
-      "quiet": "Nothing has landed this week",
-      "loading": "Reading what landed…",
-      "failed": "Couldn’t read what landed",
-      "failedShort": "Couldn’t read",
-      "retry": "Try again",
-      "retryLabel": "Try again: {{failure}}",
-      "expand": "Show the whole week",
-      "collapse": "Show only the newest"
-    },
     "dock": {
       "label": "{{name}}’s draft",
       "empty": "When {{name}} drafts a brief for a session, it waits here for your Send."
-    },
-    "memory": {
-      "title": "What I'm keeping",
-      "toggle_one": "What I'm keeping, {{count}} memory",
-      "toggle_other": "What I'm keeping, {{count}} memories",
-      "toggleUnknown": "What I'm keeping, how many can't be read",
-      "kind": {
-        "rule": "rule",
-        "gotcha": "gotcha",
-        "landmine": "landmine",
-        "manual": "name"
-      },
-      "when": {
-        "today": "today {{clock}}",
-        "yesterday": "yesterday {{clock}}"
-      },
-      "channel": {
-        "spoken": "said",
-        "typed": "typed"
-      },
-      "youSaid": "You said",
-      "youTyped": "You typed",
-      "quoted": "“{{quote}}”",
-      "noWords": "No words of yours are kept with this one.",
-      "reading": "Reading the memory…",
-      "unreadable": "The memory can't be read just now",
-      "retry": "Try again",
-      "empty": {
-        "title": "Nothing kept yet",
-        "message": "What is kept of what you say shows here."
-      },
-      "page": "Open the full page",
-      "pageLabel": "Open the full page: the memory in DocSpace, in a new tab"
     }
   }
 }

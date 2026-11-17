@@ -115,7 +115,7 @@ export function StationTalkView({ density, part = 'both', talk, name, bindingLab
 }
 
 /**
- * The talk control on the page, the `talk` slot's region (`stationRegions.ts`): it hands `StationTalkView` the page's one
+ * The talk control on the page, mounted by `StationShell`: it hands `StationTalkView` the page's one
  * press, the label of the key or mouse button bound to it, and the provider's `sendText`. It adds no state of its own: the
  * bound key and mouse button reach the same press through the provider's `useTalkBinding`. `part` passes through: the compact
  * arrangement draws this one region twice, its button in her head and its box in the Conversation section. The words he types in

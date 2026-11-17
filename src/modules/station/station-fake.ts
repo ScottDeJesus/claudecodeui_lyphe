@@ -4,18 +4,12 @@ import { ROADMAP_ALL_TOPIC } from '@/modules/live-bus';
 import { CardStageView } from '@/modules/station/CardStage';
 import { shelfFor, WALK_FOCUS, WALK_STAGE } from '@/modules/station/fake/cards';
 import { CONVERSATION_FAKE, CONVERSATION_STATES } from '@/modules/station/fake/conversation';
-import { CORNER_FAKE, CORNER_STATES } from '@/modules/station/fake/corner';
 import { DOCK_FAKE, DOCK_STATES } from '@/modules/station/fake/dock';
-import { HEAD_FAKE, HEAD_STATES } from '@/modules/station/fake/head';
-import { LIVE_FAKE } from '@/modules/station/fake/live';
-import { NEEDS_FAKE, NEEDS_STATES } from '@/modules/station/fake/needs';
 import { PORTRAIT_STATES } from '@/modules/station/fake/portrait';
-import { HOME_CHAT_STAGE, HOME_FOCUS, ROADMAP_PICTURES, SESSIONS_FAKE, SESSIONS_STATES } from '@/modules/station/fake/sessions';
+import { HOME_CHAT_STAGE, HOME_FOCUS, ROADMAP_PICTURES } from '@/modules/station/fake/sessions';
 import { WAITING_FEATURE } from '@/modules/station/fake/stage';
-import { STRIP_FAKE, STRIP_STATES } from '@/modules/station/fake/strip';
 import { TALK_FAKE, TALK_STATES } from '@/modules/station/fake/talk';
 import type { StationFocus } from '@/shared/station-types';
-import type { StationSlot } from '@/shared/types';
 
 /*
  * FAKE STATION PICTURES, for the prototype only: the station's own views drawn on fixture data, so every state of
@@ -44,12 +38,18 @@ import type { StationSlot } from '@/shared/types';
  * same file, drawings by name, and its one line in `REGION_STATES`: the probe draws each over the `home` picture with that
  * slot's drawing in its place, so a region's every state is photographed without a fifth picture.
  *
- * HER COLUMN IN THE PORTRAIT VIEW is two slots at once (her head without a face, her portrait where her conversation goes), so
- * its states are not a region's: `PORTRAIT_STATES` (`fake/portrait.ts`) holds a drawing per slot under one name, and
- * `lib/station-portrait.mjs` draws a name by putting both in their slots' places (`mountPicture`'s `states`).
+ * THE PORTRAIT stands where the conversation goes, so its states are not a region's own: `PORTRAIT_STATES`
+ * (`fake/portrait.ts`) holds a drawing under each name, which `lib/station-portrait.mjs` draws in the conversation's place.
+ *
+ * THE REGIONS WITH SAMPLES are the three the station still draws from a view of its own: the conversation, the talk control
+ * and the dock. The old station's other regions (its head, its two rails, its strip and its corner) were removed with their
+ * samples.
  */
 export { PORTRAIT_STATES };
 
+
+/** The regions a picture holds a drawing for. */
+type FakeSlot = 'conversation' | 'talk' | 'dock';
 
 /** The four named pictures. */
 type StationPicture = 'home' | 'waiting' | 'walkthrough' | 'empty';
@@ -61,7 +61,7 @@ type StationDrawing = { view: ComponentType<any>; props: Record<string, unknown>
 type StationBus = { topic: string; payload: unknown }[];
 
 /** One picture of the station: the focus on its stage, each filled slot's drawing (`{ view, props }`), and its live bus. */
-export type StationFixture = { focus: StationFocus | null; slots: Partial<Record<StationSlot, unknown>>; bus: StationBus };
+export type StationFixture = { focus: StationFocus | null; slots: Partial<Record<FakeSlot, unknown>>; bus: StationBus };
 
 /**
  * The stage's drawing in one picture: the focus's view with its props, whether the back-stack holds a focus, and her cards'
@@ -73,13 +73,7 @@ type StationStageDrawing = StationDrawing & { canGoBack: boolean; shelf: Station
  * THE REGIONS' SLICES, one line per region (`<slot>: <SLOT>_FAKE`, from `fake/<slot>.ts`), each added by its region's
  * plan; a slot with no line draws nothing in any picture, as the live layout does.
  */
-const REGION_FAKES: Partial<Record<StationSlot, Record<StationPicture, StationDrawing | null>>> = {
-  strip: STRIP_FAKE,
-  live: LIVE_FAKE,
-  corner: CORNER_FAKE,
-  needs: NEEDS_FAKE,
-  sessions: SESSIONS_FAKE,
-  head: HEAD_FAKE,
+const REGION_FAKES: Partial<Record<FakeSlot, Record<StationPicture, StationDrawing | null>>> = {
   conversation: CONVERSATION_FAKE,
   talk: TALK_FAKE,
   dock: DOCK_FAKE,
@@ -89,12 +83,7 @@ const REGION_FAKES: Partial<Record<StationSlot, Record<StationPicture, StationDr
  * THE REGIONS' OWN STATES, one line per region (`<slot>: <SLOT>_STATES`, from `fake/<slot>.ts`): each a drawing of its slot
  * by the state's name, which `.verify/kaylee-station-shots.mjs` draws over the `home` picture in that slot's place.
  */
-export const REGION_STATES: Partial<Record<StationSlot, Record<string, StationDrawing>>> = {
-  strip: STRIP_STATES,
-  corner: CORNER_STATES,
-  needs: NEEDS_STATES,
-  sessions: SESSIONS_STATES,
-  head: HEAD_STATES,
+export const REGION_STATES: Partial<Record<FakeSlot, Record<string, StationDrawing>>> = {
   conversation: CONVERSATION_STATES,
   talk: TALK_STATES,
   dock: DOCK_STATES,
@@ -132,7 +121,7 @@ export const FAKE_STAGE: Record<StationPicture, StationStageDrawing | null> = {
 /** A picture's slots: each region's drawing for it, from the table; a region that draws nothing there is left out. */
 function slotsOf(picture: StationPicture): StationFixture['slots'] {
   const slots: StationFixture['slots'] = {};
-  for (const [slot, fake] of Object.entries(REGION_FAKES) as [StationSlot, Record<StationPicture, StationDrawing | null>][]) {
+  for (const [slot, fake] of Object.entries(REGION_FAKES) as [FakeSlot, Record<StationPicture, StationDrawing | null>][]) {
     const drawing = fake[picture];
     if (drawing !== null) slots[slot] = drawing;
   }

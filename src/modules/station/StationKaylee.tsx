@@ -35,7 +35,7 @@ const PLACING_LOOK_MS = 1900;
  */
 export type StationKayleeForm = 'beside' | 'under' | 'mark';
 
-/** The most the controls' panel takes (`StationHead`'s own figure): two lines of the controls' line. */
+/** The most the controls' panel takes: two lines of the controls' line. */
 const CONTROLS_PANEL_PX = 380;
 
 const EYEBROW = 'font-mono text-[10px] font-medium uppercase leading-[14px] tracking-[0.18em] text-muted-foreground';

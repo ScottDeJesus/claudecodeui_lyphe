@@ -177,7 +177,7 @@ export function StationDockView({ tier, density, draft, name, targetWorking, onE
 }
 
 /**
- * The draft dock on the page, the `dock` slot's region (`stationRegions.ts`), handed the window's tier. It reads the draft and
+ * The draft dock on the page, mounted by `StationShell`, handed the window's tier. It reads the draft and
  * its verbs from the companion's provider, the target's live state from the station's sessions (the rows the left rail draws, never a poll
  * of its own) and the stage's press and the scroll memory from the station, and hands them to `StationDockView`. It reads
  * nothing on a clock: a new draft, a cleared one and the target starting or ending a turn each arrive as her picture's frames

@@ -184,7 +184,7 @@ export function StationStageView({ focus, view, canGoBack, onBack, onClear, shel
  * the companion's mark while it has just placed what stands there (`useStation().placed`).
  *
  * IT NEVER BRINGS ITSELF INTO VIEW: in the one-column arrangement the stage is a section, and a different thing put on it
- * pulls the switch to it (`useStationSection`, once, for every region's press); in the columns it is always on screen.
+ * pulled the switch to it (the old one-column layout, removed); in the scene it is always on screen.
  */
 export function StationStage() {
   const { t } = useTranslation();

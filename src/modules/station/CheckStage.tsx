@@ -28,7 +28,7 @@ type CheckFound = { kind: 'loading' } | { kind: 'unread' } | { kind: 'needs'; ne
  * edge covers the rail and the stage and stops short of her column (it begins at 708 px at most, and the sheet at 760 px at the
  * narrowest wide window, 1360 px). On a laptop the stage stands in her column under her face, so the sheet takes the right
  * rail's own 296 px. In compact and on a phone her head is the page's top and the sheet takes the screen, so it stands below her
- * head: `top` is the foot of her head's box, which the arrangement writes (`useStationHeadFoot`). The `0px` after it is the
+ * head: `top` is the foot of her head's box, which no arrangement writes since the old station's layouts were removed. The `0px` after it is the
  * sheet's own top, which a read of the property before its first write would otherwise turn into `auto`.
  */
 const CHECK_SHEET_PLACE: Readonly<Record<StationArrangement, { width?: string; top?: string }>> = {

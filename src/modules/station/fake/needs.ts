@@ -3,40 +3,24 @@ import type { ComponentProps } from 'react';
 import { AskStageView } from '@/modules/station/AskStage';
 import { CheckStageView } from '@/modules/station/CheckStage';
 import { DESK_EPIC } from '@/modules/station/fake/roadmap';
-import { WAITING_FEATURE } from '@/modules/station/fake/stage';
 import { FollowupsStageView } from '@/modules/station/FollowupsStage';
-import { WhatNeedsYouView } from '@/modules/station/WhatNeedsYou';
 import type { CerberusNeed } from '@/shared/cerberus-types';
 import type { CompanionPendingAction } from '@/shared/companion-types';
 import type { StationFocus, StationNeed } from '@/shared/station-types';
 import type { Followup } from '@/shared/types';
 
 /*
- * THE RIGHT RAIL'S FIXTURE DATA, for `station-fake.ts`'s pictures and the shots of the rail's three stages only. Nothing in the
- * app imports this file.
+ * THE FIXTURE DATA OF WHAT NEEDS HIM, for the shots of the three stages a need opens (an ask, a chat's follow-ups, a red
+ * check) and for the pending action in the companion's picture. Nothing in the app imports this file.
  *
- * Every item is a `StationNeed` as `GET /api/companion/station/needs` answers it (`server/modules/companion/station/
- * need-readers.ts`): its id in the reader's own form, a title of six words or fewer (else the plan's name with its dashes read
- * as spaces), an ask's `what` as `describeToolInput` prints a command. The pending action is a
- * `CompanionPendingAction` as her picture holds one. Ids and request ids no store holds (above 900000, as `fake/stage.ts`
- * keeps them), and made-up chat ids: nothing here names a real chat, ask or check. Times are relative to when it loads.
- *
- * - `waiting`: the "waiting on you" state — her action waiting for his word at the head ("Queue Kaylee’s desk", the epic's
- *   census its prompt), over two Accepts and one red check: the waiting feature's Accept (its card is on the stage) and the
- *   epic's, over three features. Her Queue answers the epic's Accept, so the count is 3 (`needsCountOf`). Nothing else in that
- *   picture waits on him: the left rail's roadmap (`fake/roadmap.ts`) stands the feature and the epic at "waiting on you:
- *   Accept" and no chat waits on a permission (`fake/sessions.ts`), her lines speak of the same three (`fake/conversation.ts`)
- *   and her picture holds the action (`PENDING`);
- * - `home`: one chat's follow-ups;
- * - `walkthrough`: one chat's permission, a deploy whose command wraps on a phone;
- * - `empty`: nothing, and no action: "Nothing needs you."
- *
- * `NEEDS_STATES` are the rail's states no picture shows, drawn over `home` in the slot's place: the first read still out
- * (`reading`), a read that failed with nothing read before (`failed`: the server's own sentence, Try again), and a read whose
- * dispatcher and Cerberus readers failed while the follow-ups answered (`faults`).
+ * Every need is a `StationNeed` as `GET /api/companion/station/needs` answers it (`server/modules/companion/station/
+ * need-readers.ts`): its id in the reader's own form, an ask's `what` as `describeToolInput` prints a command. The pending
+ * action is a `CompanionPendingAction` as the companion's picture holds one. Ids and request ids no store holds (above 900000,
+ * as `fake/stage.ts` keeps them), and made-up chat ids: nothing here names a real chat, ask or check. Times are relative to
+ * when it loads.
  *
  * `NEEDS_STAGE_FAKE` is one drawing per stage — the ask's on the permission, the follow-ups' on that chat's list, the check's on
- * the red check's Cerberus card — each with the picture whose rail holds its item, for the shots probe.
+ * the red check's Cerberus card — each with the picture it is drawn over, for the shots probe.
  */
 
 const NOW = Date.now();
@@ -45,21 +29,6 @@ const ago = (minutes: number): string => new Date(NOW - minutes * 60_000).toISOS
 
 /** A press a picture never makes: the shots photograph, they do not press. */
 const NO_PRESS = () => {};
-/** The action card's × on a picture: drawn, never pressed. */
-const NO_WITHDRAW = () => Promise.resolve();
-
-/** The waiting feature's Accept: the lock `fake/stage.ts` puts on its card, which the `waiting` picture's stage holds. */
-const WAITING_ASK = WAITING_FEATURE.asking;
-const FEATURE_ACCEPT: Extract<StationNeed, { kind: 'accept' }> = {
-  kind: 'accept',
-  id: `accept:${WAITING_ASK?.asked.id ?? 900101}-${WAITING_ASK?.asked.at ?? ago(6)}`,
-  card: WAITING_FEATURE.name,
-  epic: false,
-  title: 'What needs you: the right rail and the waiting-on-you state',
-  headline: 'kaylee-station--what-needs-you — 7 tasks',
-  features: 1,
-};
-
 /** The epic's census, as the dispatcher prints a lock over several features: every plan named, each phase line owned. */
 const EPIC_CENSUS = [
   'kaylee-desk--notes + kaylee-desk--pins + kaylee-desk--clock — 7 tasks',
@@ -79,37 +48,15 @@ const EPIC_CENSUS = [
   'Run it? · lock:station-fake-0000000002',
 ].join('\n');
 
-/** An epic's Accept: one lock over its three features, one item naming the epic (the Inbox's rule). The roadmap's epic is the same one. */
-const EPIC_ACCEPT: StationNeed = {
-  kind: 'accept',
-  id: `accept:900102-${ago(31)}`,
-  card: DESK_EPIC.name,
-  epic: true,
-  title: DESK_EPIC.title,
-  headline: `${DESK_EPIC.features.map((feature) => feature.name).join(' + ')} — 7 tasks`,
-  features: DESK_EPIC.features.length,
-};
-
 /**
  * The red check, failing 23 minutes. Its value names no clock time of its own: the one line that says when it went red is `since`,
  * and a time written into the words would disagree with it on any day but the one it was written.
  */
 const CHECK_SINCE = NOW - 23 * 60_000;
 const CHECK_VALUE = '401 from the shadow connector: the session token expired';
-const RED_CHECK: StationNeed = {
-  kind: 'check',
-  id: 'check:eis1/shadow-connector/session.valid',
-  node: 'eis1',
-  key: 'shadow-connector/session.valid',
-  label: 'Session is valid',
-  status: 'failing',
-  value: CHECK_VALUE,
-  since: CHECK_SINCE,
-};
-
 /**
- * Her action waiting for his word: he asked her to queue the epic, she read it back, and the card waits for his word. Exported for
- * her picture (`fake/conversation.ts`'s `waiting`), which holds the same action the right rail draws at its head.
+ * The companion's action waiting for his word: he asked for the epic to be queued, it was read back, and the card waits for his
+ * word. Exported for the companion's picture (`fake/conversation.ts`'s `waiting`), which holds it.
  */
 export const PENDING: CompanionPendingAction = {
   id: '900201',
@@ -124,18 +71,10 @@ export const PENDING: CompanionPendingAction = {
 
 /**
  * The `home` picture's chat with open follow-ups, and the `walkthrough` picture's chat waiting on a permission. Exported for the
- * left rail's slice (`fake/sessions.ts`), which lists these same chats, so the two rails of one picture name one house.
+ * house's chats (`fake/sessions.ts`), which list these same two, so every sample of one picture names one house.
  */
 export const FOLLOWUPS_CHAT = { sessionId: '00000000-0000-4000-8000-000000900301', chat: 'Lane drag on touch' };
 export const DEPLOY_CHAT = { sessionId: '00000000-0000-4000-8000-000000900401', chat: 'Deploy the station build' };
-
-const FOLLOWUPS: StationNeed = {
-  kind: 'followups',
-  id: `followups:${FOLLOWUPS_CHAT.sessionId}`,
-  ...FOLLOWUPS_CHAT,
-  count: 4,
-  newest: 'Check the drag on an iPad in landscape before it ships: the lane scrolled under the finger last time.',
-};
 
 /** A permission whose command is long enough to wrap at 390 px, with one more ask waiting behind it. */
 const PERMISSION: Extract<StationNeed, { kind: 'ask' }> = {
@@ -150,51 +89,6 @@ const PERMISSION: Extract<StationNeed, { kind: 'ask' }> = {
   rule: 'Bash(rsync:*)',
   options: [],
   more: 1,
-};
-
-/** What else a drawing of the rail may hold: the kinds the server could not read, and a read that failed whole. */
-type ReadTrouble = { faults?: StationNeed['kind'][]; failure?: string | null };
-
-/**
- * The rail's drawing in one picture: what needs him (null: not read yet), her pending action, the thing on the stage, and any
- * trouble the read had.
- */
-function drawing(needs: StationNeed[] | null, pending: CompanionPendingAction | null, focus: StationFocus | null, { faults = [], failure = null }: ReadTrouble = {}) {
-  return {
-    view: WhatNeedsYouView,
-    props: {
-      pending,
-      needs,
-      faults,
-      failure,
-      onReread: NO_PRESS,
-      focus,
-      onPress: NO_PRESS,
-      onWithdraw: NO_WITHDRAW,
-      name: 'Kaylee',
-    } satisfies Omit<ComponentProps<typeof WhatNeedsYouView>, 'tier' | 'density'>,
-  };
-}
-
-/**
- * The `needs` slot's drawing in each of the four pictures. `waiting`'s stage holds the feature's card, so its Accept reads as
- * on the stage; the other pictures' stages hold nothing of the rail's. `waiting`'s head is her action, and under it the feature's
- * Accept, the epic's and the red check: her Queue is the epic's Accept answered, so they count 3.
- */
-export const NEEDS_FAKE = {
-  home: drawing([FOLLOWUPS], null, null),
-  waiting: drawing([FEATURE_ACCEPT, EPIC_ACCEPT, RED_CHECK], PENDING, { kind: 'card', plan: FEATURE_ACCEPT.card, label: FEATURE_ACCEPT.title }),
-  walkthrough: drawing([PERMISSION], null, null),
-  empty: drawing([], null, null),
-};
-
-/** The rail's states no picture shows (`REGION_STATES`), each drawn over `home` in the `needs` slot's place. */
-export const NEEDS_STATES = {
-  reading: drawing(null, null, null),
-  // The server's own sentence for a read that failed (`needs.routes.ts`, 503).
-  failed: drawing(null, null, null, { failure: 'What needs you could not be read just now.' }),
-  // The dispatcher's reader (Accepts and rounds, one read) and Cerberus's failed; the follow-ups answered.
-  faults: drawing([FOLLOWUPS], null, null, { faults: ['accept', 'questions', 'check'] }),
 };
 
 /** One follow-up of the chat's list, filed `minutes` ago; `done` settled by the chat. */
@@ -232,7 +126,7 @@ const CHECK_NEED: CerberusNeed = {
   diagnosis: null,
 };
 
-/** Each stage's focus: what the rail's press on its item puts on the stage. */
+/** Each stage's focus: what a press on its need puts on the stage. */
 const ASK_FOCUS: Extract<StationFocus, { kind: 'ask' }> = {
   kind: 'ask', sessionId: PERMISSION.sessionId, requestId: PERMISSION.requestId, label: PERMISSION.chat,
 };
@@ -244,8 +138,7 @@ const CHECK_FOCUS: Extract<StationFocus, { kind: 'check' }> = {
 };
 
 /**
- * The three stages' own shots: each stage's focus, its view drawn on its fixture, and the picture whose rail holds its item (the
- * probe draws that picture's rail with the stage's focus, so the item reads as on the stage).
+ * The three stages' own shots: each stage's focus, its view drawn on its fixture, and the picture it is drawn over.
  */
 export const NEEDS_STAGE_FAKE = {
   ask: {

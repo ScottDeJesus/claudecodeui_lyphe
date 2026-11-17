@@ -4291,27 +4291,14 @@ export type StationTier = 'wide' | 'laptop' | 'narrow';
 export type StationArrangement = 'wide' | 'laptop' | 'compact' | 'phone';
 
 /**
- * The bar's "Compact" switch: whether his switch is on (the station pref `compact`, per device) and its press. `StationShell`
- * reads it and hands it through `StationShellView` to `StationBar`, or null where it would change nothing (below 1024 px,
- * where compact is the only arrangement), and the bar then draws none.
+ * Every place the station remembers a scroll position for: its regions and the `stage`. The key of the station's scroll
+ * memory, written when a region scrolls and put back when the page reloads or the layout moves a region. The names of the
+ * regions removed with the old station stay, so a stored record still reads.
  */
-export type StationCompactSwitch = { on: boolean; onChange: (on: boolean) => void };
+export type StationRegion = 'strip' | 'live' | 'sessions' | 'corner' | 'head' | 'conversation' | 'dock' | 'talk' | 'needs' | 'stage';
 
 /**
- * The named places of the station's layout that a region fills: `strip`, `live` (the chats running now: the scene's start rim),
- * `sessions`, `corner`, `head`, `conversation`, `dock`, `talk` and `needs`. A slot nothing fills draws nothing. Keys the layout's
- * slot map and the fixtures' slices.
- */
-export type StationSlot = 'strip' | 'live' | 'sessions' | 'corner' | 'head' | 'conversation' | 'dock' | 'talk' | 'needs';
-
-/**
- * Every place the station remembers a scroll position for: the slots and the `stage`. The key of the station's scroll
- * memory, written when a region scrolls and put back when the page reloads or the layout moves a region.
- */
-export type StationRegion = StationSlot | 'stage';
-
-/**
- * The station's own preferences, remembered per window by `useStationPref`: `stripCollapsed` (the strip is folded),
+ * The station's own preferences, as a stored record may still hold them (nothing reads them since the old regions were removed): `stripCollapsed` (the strip is folded),
  * `cornerOpen` (the corner is open), `compact` (his switch for the one-column arrangement), `asleepOpen` (the left rail's fold
  * of his asleep chats is open), `completeOpen` (its fold of the roadmap's complete epics is open), `compactSection` (the
  * section the one-column arrangement shows, a `StationCompactSection`), `compactSectionAside` (the section he was in when the
@@ -4324,8 +4311,7 @@ export type StationPrefKey =
 /**
  * How her column draws her, held per device by the station pref `herView` and chosen by the toggle in her head: `portrait` (the
  * default: her face, large and undisced, over the words of her latest answer alone) or `chat` (her face in its disc over her
- * whole conversation with him). Read by her head (`StationHeadView`, which draws the face only in `chat`) and her conversation
- * (`StationConversation`, which draws the portrait in `portrait`), and by the station's memory when it reads a stored record.
+ * whole conversation with him). Read only by the station's memory, when it reads a stored record.
  */
 export type StationHerView = 'portrait' | 'chat';
 
@@ -4351,14 +4337,6 @@ export type StationRegionProps = { tier: StationTier; density: StationDensity };
 export type StationDensity = 'full' | 'compact';
 
 /**
- * Her head drawn as the phone's top row, the bar and her head in one: what the phone's arrangement (`StationPhoneView`) hands the
- * head's region, and `StationHeadView` draws from. `sideways`: the phone on its side, her face at 32 px in a 40 px row (44 px
- * upright). `trail`: what stands after her words and before her menu, the arrangement's own (the count of what needs him and, on
- * its side, the strip's line). `onBackToCloudcli`: "CloudCLI" in her menu, the shell's way back in the same window.
- */
-export type StationHeadRow = { sideways: boolean; trail: ReactNode; onBackToCloudcli: () => void };
-
-/**
  * One word or line the station draws: its locale `key` and its `english`, the `defaultValue` it is drawn with when the locale holds
  * none. The station's tables of words (the rail's fault lines, its item's status words, the ask's wells, `STATION_NEED_KINDS`)
  * are made of these, so each is drawn as `t(words.key, words.english)`.
@@ -4371,12 +4349,3 @@ export type LocaleWords = { key: string; english: string };
  * `STATION_NEED_KINDS`, which gives each its glyph, its word, its tone and its one act.
  */
 export type StationNeedKind = Exclude<StationNeed['kind'], 'ask'> | StationAskKind;
-
-/**
- * Her mark on the station's left rail, while her activity names one of his chats (she is reading it, drafting for it or walking
- * it): that chat's `sessionId`, her `initial` (her name's first letter, as her disc draws it) and the `words` that say what she
- * is doing there ("Kaylee is reading Bugfixes"). Built by the rail's region (`WhereThingsStand`) from her activity, drawn by its
- * sessions section (`SessionRows`) on the chat's row, and on the asleep fold's head while that fold hides the row; the
- * fixtures (`fake/sessions.ts`) hold one for the `walkthrough` picture.
- */
-export type StationHerMark = { sessionId: string; initial: string; words: string };

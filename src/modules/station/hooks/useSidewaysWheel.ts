@@ -11,7 +11,7 @@ import type { RefObject, WheelEvent } from 'react';
  * ref to it, while its props go to the box around it, which a wheel over the scroller reaches by bubbling). A row that does not
  * overflow has nothing to turn, and the turn does nothing.
  *
- * Used by the station's two sideways rows: the strip's timeline (`LandedTimeline`) and the shelf of her cards (`StageShelfView`).
+ * Used by the station's sideways row: the shelf of the companion's cards (`StageShelfView`).
  */
 export function useSidewaysWheel(scroller: RefObject<HTMLElement | null>): (event: WheelEvent<HTMLElement>) => void {
   return useCallback((event) => {

@@ -10,10 +10,8 @@ import { useEffect, useState } from 'react';
  * no timer and never lapses here: the action is still his to fire or withdraw until the server says otherwise, and hiding
  * a live action is the worse mistake.
  *
- * `null` is no action at all: it sets no timer and never lapses. Used by this module's CompanionActionCard and
- * CompanionActionLine (the card in one line, on the station's phone), each of which draws nothing once it returns true: the two
- * lapse together; and, through the barrel, by the station's `useLivePending`, which the count of what needs him reads (`useNeedsCount`,
- * and the rail's head, `WhatNeedsYouView`). Those readers stay mounted across actions and so count a lapsed one out when its card goes;
+ * `null` is no action at all: it sets no timer and never lapses. Used by this module's CompanionActionCard, which draws nothing once it returns true;
+ * and, through the barrel, by the station's `useLivePending`, which the count of what needs him reads (`useNeedsCount`). Those readers stay mounted across actions and so count a lapsed one out when its card goes;
  * a past stamp reads live here for the render that brings it and the timer lapses it a tick later (only a keyed consumer is spared
  * that), so `useLivePending` also reads the stamp against the clock itself.
  */

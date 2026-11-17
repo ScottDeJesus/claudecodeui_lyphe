@@ -10,7 +10,7 @@ import { useOpenChatInCloudcli } from '@/modules/station/hooks/useOpenChatInClou
 import { StageOpen } from '@/modules/station/StageOpen';
 import { StageGone } from '@/modules/station/stageStates';
 import { stationStamp } from '@/modules/station/stationClock';
-import { SessionStateChip } from '@/modules/station/SessionRows';
+import { SessionStateChip } from '@/modules/station/SessionStateChip';
 import type { StationFocus, StationSession } from '@/shared/station-types';
 import { Banner, Button, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';

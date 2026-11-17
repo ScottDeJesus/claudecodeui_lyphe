@@ -2,14 +2,14 @@ import type { ComponentProps } from 'react';
 
 import { ALL_CARDS, SHELF_NOTES } from '@/modules/station/fake/cards';
 import { PENDING } from '@/modules/station/fake/needs';
-import { SESSIONS_FAKE } from '@/modules/station/fake/sessions';
+import { HOUSE_CHATS } from '@/modules/station/fake/sessions';
 import { StationConversationView } from '@/modules/station/StationConversation';
 import type { CompanionActivity, CompanionAttachment, CompanionLogEntry, CompanionPicture, CompanionSessionRef, CompanionSettings } from '@/shared/companion-types';
 import type { CompanionSentenceRef } from '@/shared/types';
 
 /*
  * HER CONVERSATION'S FIXTURES, and her picture in each of the station's four, for `station-fake.ts`'s pictures only. Nothing
- * in the app imports this file; `fake/head.ts` and `fake/talk.ts` draw her head and her talk control from the same pictures.
+ * in the app imports this file; `fake/talk.ts` draws the talk control from the same pictures.
  *
  * Every picture is a `CompanionPicture` as `GET /api/companion` answers it: her log as `CompanionLogEntry` rows (his lines with
  * how they came, her sentences joined by their turn and ordered by their index, the house's alerts and her harness's system
@@ -42,8 +42,8 @@ const ago = (minutes: number): string => new Date(NOW - minutes * 60_000).toISOS
 const NO_PRESS = () => {};
 
 /** The chat a picture's left rail draws by this name, as her activity names it. */
-function railChat(picture: keyof typeof SESSIONS_FAKE, name: string): CompanionSessionRef {
-  const found = SESSIONS_FAKE[picture].props.sessions?.find((session) => session.name === name);
+function railChat(picture: keyof typeof HOUSE_CHATS, name: string): CompanionSessionRef {
+  const found = HOUSE_CHATS[picture].find((session) => session.name === name);
   if (found === undefined) throw new Error(`fake/sessions.ts draws no chat "${name}" in its ${picture} picture`);
   return { sessionId: found.sessionId, name: found.name, project: found.project };
 }

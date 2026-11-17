@@ -44,8 +44,7 @@ function answersAnItem(needs: StationNeed[], pending: CompanionPendingAction): b
  *
  * `null` while `needs` is `null` (the first read of the items has not landed): a 0 would claim "nothing waits".
  *
- * Read by the three places that say the number: the rail's head (`WhatNeedsYouView`), compact's "Needs you" button and the phone's
- * bar, the last two through `useNeedsCount`; and by `.verify/kaylee-station-shots.mjs`, which hands compact's and the phone's
+ * Read through `useNeedsCount` by the place that says the number (`StationKaylee`); and by `.verify/kaylee-station-shots.mjs`, which hands compact's and the phone's
  * views the number their fixture's rail draws, so no picture holds a count of its own.
  */
 export function needsCountOf(needs: StationNeed[] | null, pending: CompanionPendingAction | null): number | null {

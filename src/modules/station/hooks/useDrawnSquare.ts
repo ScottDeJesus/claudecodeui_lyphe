@@ -8,8 +8,7 @@ import { resizeObserverIn } from '@/shared/utils';
  * face is sized by CSS (the room the portrait is given in the scene's center), which only the layout knows; the drawing takes the
  * px to fill it. `initialPx` stands until the first reading. A ResizeObserver, so it follows the box: an event, never a poll.
  *
- * Used by this module's StationHeadView (the dock's core, the compact head's disc, the phone row's face) and StationPortraitView
- * (the face, undisced, in the center).
+ * Used by this module's StationPortraitView (the face, undisced, in the center).
  */
 export function useDrawnSquare(initialPx: number): [(node: HTMLDivElement | null) => void, number] {
   const hostWindow = useHostWindow();

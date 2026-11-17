@@ -435,7 +435,7 @@ export const RAIL_BUTTON_UNLIT = 'text-muted-foreground hover:bg-secondary hover
  * Used with `RAIL_BUTTON_BASE` by the project-workspace module's RailButton (the view on screen) and by the companion
  * module's door (CompanionDock.tsx's CompanionDoorView, her panel open); and on its own by the companion module's
  * dock cell (CompanionDockView: her disc seated, her panel open). So a lit door, a lit seat and a lit view are one look.
- * The station module's left rail lights a row in it too (`RailRow`: the session, epic or feature on the stage, as
+ * The station module's left rail lit a row in it too (removed with the old station: the session, epic or feature on the stage, as
  * `aria-current`), its bar drawn inside the row's left edge, where a fold's clipping body cannot cut it: a lit thing is
  * one look on every rail.
  */
@@ -699,7 +699,7 @@ export const STATION_FOCUS_GLYPHS: Record<StationFocusKind, { icon: LucideIcon; 
  * together (MAN-578); `warn` whether it wears the warn tone — an Accept and a red check, what stands waiting on him, amber and
  * never red (MAN-577); and `act` the one act its item offers. "Queue…", "Answer…" and "Allow…" carry the ellipsis that says more
  * comes: the press brings the whole onto the stage, where the owner's own form fires it. "Open" opens at once, because opening is
- * harmless. Each word is its locale key with its English. Read by the station's `NeedItem` (the rail's item) and `AskStage`
+ * harmless. Each word is its locale key with its English. Read by the station's `AskStage`
  * (an ask's kind, said over what it would do).
  */
 export const STATION_NEED_KINDS: Readonly<Record<StationNeedKind, { icon: LucideIcon; word: LocaleWords; warn: boolean; act: LocaleWords }>> = {
@@ -784,22 +784,6 @@ export const ROADMAP_CIRCLE_ON_PHONE = { cx: 42, cy: 51, radius: 27 } as const;
 
 // ---------------------------
 
-//----------------- THE STATION PHONE'S SIDEWAYS CATCH ------------
-
-/**
- * A press of Kaylee Station's phone top row on its side, where the row is 40 px: drawn 40 px tall, its catch grown over and under
- * it by a transparent `::before`, so a finger still has 44 px (the touch law's own way to grow a press without moving its
- * neighbours, INV-10275). The `::before` stands on the press's padding box and reaches 4 px past it: worn by two borderless ghost
- * presses, her menu's trigger (the station's `HeadRow`) and the count of what needs him (`StationPhoneView`), whose catch is 48 px.
- */
-export const STATION_SIDEWAYS_CATCH = "relative h-10 before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']";
-
-/**
- * A press of the strip's count form (the phone's 40 px top row on its side) that keeps its own drawn size: its catch grown 8 px past
- * its padding box by a transparent `::before`, so its 32 px pill or 36 px outlined box (a 1.5 px border inside it) catches 44 px
- * and more. Worn by the strip's "<n> new" chip (`SinceYouLastLooked`) and its Try again (`StripLines`).
- */
-export const STATION_COUNT_FORM_CATCH = "relative before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']";
 
 // ---------------------------
 
