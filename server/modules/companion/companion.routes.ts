@@ -28,13 +28,12 @@ import { createCardsRoutes } from './cards.routes.js';
 import { createEarsRoutes } from './ears/ears.routes.js';
 import { createFaceRoutes } from './face/face.routes.js';
 import { createMemoryRoutes } from './memory/memory.routes.js';
-import { createStationLandedRoutes } from './station/landed.routes.js';
 import { createNeedsRoutes } from './station/needs.routes.js';
 import { createStationSessionsRoutes } from './station/sessions.routes.js';
 
 /**
  * Her door for the page: every route of the companion's table.
- * Mounted at `/api/companion` behind `authenticateToken` by the server entrypoint. `/memory` (Settings' "Her memory" card), `/face` (her face, `face/face.routes.ts`), `/ears` (the models her ears load, `ears/ears.routes.ts`), `/station/sessions` (the station's rail, `station/sessions.routes.ts`), `/station/needs` and `/station/asks` (what needs him and one chat's ask answered, `station/needs.routes.ts`) and `/station/landed` (the station's strip, `station/landed.routes.ts`) are routers of their own, mounted at the foot, and so is `cards.routes.ts` (`PUT /notes/:id/pin`, `PUT` and `DELETE /walk`: his pin on a card and his walk), which mounts at the root.
+ * Mounted at `/api/companion` behind `authenticateToken` by the server entrypoint. `/memory` (Settings' "Her memory" card), `/face` (her face, `face/face.routes.ts`), `/ears` (the models her ears load, `ears/ears.routes.ts`), `/station/sessions` (the station's rail, `station/sessions.routes.ts`), and `/station/needs` and `/station/asks` (what needs him and one chat's ask answered, `station/needs.routes.ts`) are routers of their own, mounted at the foot, and so is `cards.routes.ts` (`PUT /notes/:id/pin`, `PUT` and `DELETE /walk`: his pin on a card and his walk), which mounts at the root.
  *
  * ONLY TRANSPORT. A route here reads who is asking (`req.user`, which is her account) and which page (the
  * `x-companion-client` header), checks the SHAPE of what came (a body that is an object, a `text` of 1 to 8000
@@ -322,7 +321,6 @@ export function createCompanionRoutes(service: CompanionService): Router {
   router.use(createCardsRoutes(service)); // his pin on a card and his Back, Next and × on the walk
   router.use('/station/sessions', createStationSessionsRoutes()); // the station's rail: his chats as she reads them
   router.use('/station', createNeedsRoutes(service)); // the station's rail: what needs him, and one chat's ask answered
-  router.use('/station', createStationLandedRoutes(service)); // the station's strip: what landed since he last looked
 
   return router;
 }

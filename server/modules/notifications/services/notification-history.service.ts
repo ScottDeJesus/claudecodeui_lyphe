@@ -36,53 +36,9 @@ import { spendFreeWording } from './notification-spend-free.service.js';
  * that waits on another connection's lock (SQLite's busy wait is 5 s) would hold the push back that long. The listener seam
  * guards each listener, and the deferred write also catches its own fault so the line says which event it was and nothing else is lost.
  *
- * THE HISTORY HAS A SEAM OF ITS OWN (`onHistoryKept`): after a row is stored, inside the same deferred write, every listener
- * hears it, with the row as stored (its id included). So a reader that wants the rows AS THEY ARE KEPT (the station's strip of
- * what landed) rides this write and does not poll the table or hear the orchestrator a second time, where it would be free to
- * disagree with what the history holds (a repeat ask replaced, the wording with its figures taken out). Each listener runs in
- * its own guard, so a listener's fault costs only itself.
- *
  * Consumers: `server/index.ts` (starts it after `listen`, calls its unsubscribe on shutdown) and the companion module's
- * alert reads and station landed read and feed (`listNotificationHistory`, `listNotificationHistorySince`, `onHistoryKept`).
+ * alert reads (`listNotificationHistory`).
  */
-
-/** What hears a kept row: the account it belongs to and the row exactly as stored. */
-type HistoryKeptListener = (userId: number, row: NotificationHistoryRow) => void;
-
-const keptListeners = new Set<HistoryKeptListener>();
-
-/**
- * Hears every row the history keeps, after it is stored, with its id. Answers the unsubscribe, which is idempotent. A listener
- * is called synchronously inside the deferred write and should return quickly; its throw or rejected promise is logged and
- * costs the other listeners nothing. Consumed by the companion module's station feed.
- */
-export function onHistoryKept(listener: HistoryKeptListener): () => void {
-  keptListeners.add(listener);
-  return () => {
-    keptListeners.delete(listener);
-  };
-}
-
-/** The ONE guard around a kept-row listener: a fault is logged with which row it was and costs no one else anything. */
-function reportKeptListenerFault(row: NotificationHistoryRow, error: unknown): void {
-  console.error(`[Notifications] a history listener failed on ${row.code} (row ${row.id}, account ${row.user_id})`, error);
-}
-
-/**
- * Hands one stored row to every listener, each in its own guard (an `async` listener's rejection is as much its own fault as a throw)
- * and each with a row of its own: a listener that writes to the row it was handed changes only its own copy, never what the next hears.
- */
-function announceKept(row: NotificationHistoryRow): void {
-  // A copy of the set, so a listener that unsubscribes while it runs changes the NEXT announcement, not this one.
-  for (const listener of [...keptListeners]) {
-    try {
-      const outcome: unknown = listener(row.user_id, { ...row });
-      if (outcome instanceof Promise) outcome.catch((error: unknown) => reportKeptListenerFault(row, error));
-    } catch (error) {
-      reportKeptListenerFault(row, error);
-    }
-  }
-}
 
 /** The account an event belongs to as the whole number the history keys on; `null` for an id that is not one (the table's key is a number). */
 function accountIdOf(userId: string | number): number | null {
@@ -116,8 +72,7 @@ export function startNotificationHistory(): () => void {
       try {
         const { title, body } = spendFreeWording(event);
         const kept = { at, code: event.code, kind: event.kind, severity: event.severity, title, body, session_id: event.sessionId, plan: planOf(event) };
-        const id = notificationHistoryDb.record(accountId, kept, { replaceRepeat: event.kind === 'action_required' });
-        announceKept({ id, user_id: accountId, ...kept });
+        notificationHistoryDb.record(accountId, kept, { replaceRepeat: event.kind === 'action_required' });
       } catch (error) {
         console.error(`[Notifications] the history could not keep ${event.code} for account ${accountId} (session ${event.sessionId ?? 'none'})`, error);
       }
@@ -132,13 +87,4 @@ export function startNotificationHistory(): () => void {
  */
 export function listNotificationHistory(userId: number, limit: number): NotificationHistoryRow[] {
   return notificationHistoryDb.list(userId, limit);
-}
-
-/**
- * EVERY kept event of the account at or after `sinceIso` (an ISO-8601 UTC stamp), newest first, as stored. The history keeps every row
- * of the last `NOTIFICATION_HISTORY_WINDOW_MS`, so a `sinceIso` inside that window is answered whole, however busy the house was.
- * Consumed by the companion module's station landed read (`stationLanded`), which draws the week's landings from it.
- */
-export function listNotificationHistorySince(userId: number, sinceIso: string): NotificationHistoryRow[] {
-  return notificationHistoryDb.listSince(userId, sinceIso);
 }

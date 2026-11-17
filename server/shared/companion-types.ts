@@ -448,27 +448,3 @@ export type CompanionFrame =
 /** Her memory as Settings reads it: how many memories it holds (null when the bank cannot be read, `reason` saying why) and the DocSpace page that shows it. */
 export type CompanionMemoryReading = { count: number | null; pageId: string; reason: string | null };
 
-/**
- * One memory of her own bank as the station's memory view draws it: its `token` (the docstore row that holds it), `title`, `kind`,
- * the channel its first quote came by (`via`: `'spoken'` for a talk press's transcript, `'typed'` for a line he typed on her panel,
- * `null` when the memory quotes no one), when it was said or typed (`saidAt`, ISO, `null` when the row records none; the field keeps
- * its name for both channels), the `account` that said it (`null` when it records none) and a `quote` of its words (`null` when it
- * holds none). `via` is the channel the body's first quote line names (`He said (…)` or `He typed (…)`), the one fact the view needs to
- * say "said" or "typed" and never "said" of a typed line. Carried by `CompanionMemoryLines.lines`.
- */
-export type CompanionMemoryLine = {
-  token: string;
-  title: string;
-  kind: string;
-  via: 'spoken' | 'typed' | null;
-  saidAt: string | null;
-  account: string | null;
-  quote: string | null;
-};
-
-/**
- * Her memory read as lines: `count` how many memories the bank holds (`null` when it cannot be read, `reason` saying why, as in
- * `CompanionMemoryReading`), `pageId` the DocSpace page that shows it whole, and `lines` the memories the view draws, newest first.
- * Read again when `companion_memory` is heard.
- */
-export type CompanionMemoryLines = { count: number | null; pageId: string; reason: string | null; lines: CompanionMemoryLine[] };

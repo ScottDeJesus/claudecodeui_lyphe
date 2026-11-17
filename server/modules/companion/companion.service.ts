@@ -1,7 +1,7 @@
 import { companionDb } from '@/modules/database/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import type { CompanionDraft, CompanionPicture, CompanionSessionRef, CompanionSettings } from '@/shared/companion-types.js';
-import type { StationAskAnswer, StationLanded, StationNeed } from '@/shared/station-types.js';
+import type { StationAskAnswer, StationNeed } from '@/shared/station-types.js';
 import { AppError } from '@/shared/utils.js';
 
 import { prepareTypedAttachments } from './attachments/typed-attachments.js';
@@ -20,7 +20,6 @@ import { focusNewsEnvelope, readRunReply } from './feeds/focus-feed.js';
 import { withdrawStandingAction } from './hands/action-end.js';
 import type { CompanionHouse } from './house.js';
 import { answerStationAsk, stationNeeds, type StationAskOutcome } from './station/station-needs.js';
-import { stationLanded } from './station/station-landed.js';
 
 /**
  * Kaylee, per account. The service holds one `CompanionAccount` (her store, her live conversation, her activity)
@@ -52,8 +51,6 @@ import { stationLanded } from './station/station-landed.js';
  *     503: the HTTP drain comes after it, and a process woken then would have nothing left to end it. A turn in flight is let to
  *     finish first, at most `turnBoundMs` (`session/companion-restart.ts`), and the sentences it speaks meanwhile keep streaming;
  *   - `resendUnanswered` is the takeover: it lifts the hold of a session born beside a predecessor and says again what was never answered;
- *   - `landed` is the station strip's read: the account's landings of the last seven days. Like `stationNeeds` it hands the
- *     house to a station reader, so the route stays transport and the house stays private here;
  *   - `alert`, `runFailed`, `runCompleted` and `chatDeleted` are the verbs the house's feeds call (each is explained at its verb);
  *     `alert` and the focus push refuse once `stopAll` has run, for the reason a message does;
  *   - `stationNeeds` and `answerStationAsk` back the station's rail (`station/needs.routes.ts`): everything that needs him, read whole
@@ -160,12 +157,6 @@ function createCompanionService() {
 
     /** One chat's waiting ask answered as the page's own decision: `POST /api/companion/station/asks` (`station/station-needs.ts`), settled through the runtime. */
     answerStationAsk: (userId: number, answer: StationAskAnswer): Promise<StationAskOutcome> => answerStationAsk(userId, answer, attached().runtime),
-
-    /**
-     * What landed for the account in the last seven days, newest first (`station/station-landed.ts`): `GET /api/companion/station/landed`.
-     * Makes no account of hers and wakes nothing: it reads the history, and the house only to name the chat of a dispatcher landing.
-     */
-    landed: (userId: number): Promise<StationLanded[]> => stationLanded(userId, attached().house),
 
     /** The page `client` holds the floor from now on: she acts on it, and "open this chat" is sent to it alone. */
     takeFloor(userId: number, client: string): void {

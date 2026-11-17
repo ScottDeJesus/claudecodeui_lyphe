@@ -68,20 +68,9 @@ export type StationNeed =
 /** The answer a press on a waiting ask sends: the `answer` text for the ask `requestId` of chat `sessionId`. */
 export type StationAskAnswer = { sessionId: string; requestId: string; answer: string };
 
-/** What a landed entry of the station's roadmap is: a feature `shipped`, an `epic` finished, a build `landed`, or a chain `recovered`. */
-export type StationLandedKind = 'shipped' | 'epic' | 'landed' | 'recovered';
-
-/**
- * One line of what has landed: the log's row `id`, when it landed (`at`, ISO), its `kind`, its `title`, the `plan` it belongs to and
- * the `sessionId` and `chat` name it came from (each `null` when it has none). Carried by `station_landed`.
- */
-export type StationLanded = { id: number; at: string; kind: StationLandedKind; title: string; plan: string | null; sessionId: string | null; chat: string | null };
-
 /**
  * Every frame the station's hint carries to a page, each sent to every open socket of the account. `station_sessions_changed` says a
  * chat changed, and the page reads its sessions again; `states` is `true` when a chat's state moved (starting, waiting, ending) and
- * `false` when only its activity did, which the page may fold more slowly. `station_landed` carries one new `entry` of what landed.
+ * `false` when only its activity did, which the page may fold more slowly.
  */
-export type StationFrame =
-  | { kind: 'station_sessions_changed'; states: boolean }
-  | { kind: 'station_landed'; entry: StationLanded };
+export type StationFrame = { kind: 'station_sessions_changed'; states: boolean };

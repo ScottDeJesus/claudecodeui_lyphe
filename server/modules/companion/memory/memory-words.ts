@@ -131,7 +131,7 @@ const QUOTE_LINE = /^He (said|typed) \((.*?), (\S+?)\): “(.*)”$/;
  * Every quote of a body, in order: the one parse of the `He said (…): “…”` and `He typed (…): “…”` lines that `firstQuote` and `quotesAlike`
  * read. A line that is not a quote (the context, the reason) is passed over. `via` is the channel the verb names (`said` is `spoken`,
  * `typed` is `typed`); `text` is as the body holds it. Consumed by `memory-verbs.ts` (recall reads the first quote's `via` and `at` for
- * `said <when>` or `typed <when>`) and by `bank-lines.ts`.
+ * `said <when>` or `typed <when>`).
  */
 export function quotesOf(body: string): Array<{ account: string; at: string; via: HisLine['via']; text: string }> {
   const quotes: Array<{ account: string; at: string; via: HisLine['via']; text: string }> = [];
