@@ -80,7 +80,7 @@ function readOpened(fields: Record<string, unknown>): PressInput['opened'] {
   const { opened } = fields;
   if (opened === undefined) return 'button';
   if (opened === 'name') return 'name';
-  throw inputInvalid('opened must be "name" for a press her name opened; leave it out for a press of the talk button.', 'opened');
+  throw inputInvalid('opened must be "name" for a press the name opened; leave it out for a press of the talk button.', 'opened');
 }
 
 const pressUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: PRESS_AUDIO_MAX_BYTES } }).single('audio');

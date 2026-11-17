@@ -218,7 +218,7 @@ async function prepareClearMemory(input: PrepareInput): Promise<Preparation> {
   const target: CompanionActionTarget = { kind: 'memory', spoken: 'your memory', count };
   const things = `${count} ${count === 1 ? 'thing' : 'things'}`;
   return ready('clear_memory', target, {
-    prompt: `She forgets the ${things} she keeps. The docstore's history keeps them.`,
+    prompt: `Kaylee forgets the ${things} kept. The docstore's history keeps them.`,
     readBack: `${sayOf('clear_memory', target.spoken)}: you forget the ${things} you keep; the docstore's history keeps them, and the conversation is not touched.`,
   });
 }

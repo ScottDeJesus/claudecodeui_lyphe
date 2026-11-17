@@ -72,7 +72,7 @@ export function askLine(ask: ListedAsk, detailed = false): string {
     // on, she is told what she can do with it.
     const { server, message } = elicitationOf(ask.input);
     const asked = `${server} asks for his input${message === '' ? '' : `: "${cutAt(oneLine(message), 100)}"`}`;
-    return detailed ? `${asked} — a form for him to fill in the chat; from here she can only decline it (deny)` : asked;
+    return detailed ? `${asked} — a form for him to fill in the chat; from here it can only be declined (deny)` : asked;
   }
   const toolName = ask.toolName ?? 'a tool';
   if (!detailed) return `wants permission: ${describeToolCall(toolName, ask.input)}`;

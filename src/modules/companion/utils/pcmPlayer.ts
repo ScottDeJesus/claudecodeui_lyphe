@@ -176,7 +176,7 @@ export function createPcmPlayer(): PcmPlayer {
       typeof window === 'undefined'
         ? undefined
         : window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Constructor) throw new Error('This browser has no Web Audio, so she cannot be heard here.');
+    if (!Constructor) throw new Error('This browser has no Web Audio, so Kaylee cannot be heard here.');
     let context: AudioContext;
     try {
       context = new Constructor({ sampleRate: PCM_SAMPLE_RATE });

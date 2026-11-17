@@ -49,7 +49,7 @@ export const DONE_VERB: Readonly<Record<CompanionActionKind, string>> = {
   resume_run: 'resumed the run',
   open: 'opened',
   close_followup: 'closed the follow-up on',
-  clear_memory: 'cleared her memory',
+  clear_memory: 'cleared the memory',
 };
 
 /** The refusal of an open while no page holds the floor: the open is sent to that page alone. Consumed by `direct-tools.ts` (before the open's row is written) and `action-doors.ts` (`openOnFloor`). */

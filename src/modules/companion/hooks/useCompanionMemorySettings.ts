@@ -53,7 +53,7 @@ export function useCompanionMemorySettings(name: string) {
       const response = await api.companion.memory.read();
       if (!response.ok) throw new Error((await refusalSentence(response)) ?? `Request failed (${response.status})`);
       const body: unknown = await response.json();
-      if (!isReading(body)) throw new Error('The answer was not a reading of her memory.');
+      if (!isReading(body)) throw new Error('The answer was not a reading of the memory.');
       next = body;
     } catch (error) {
       console.warn('[Companion] Could not read her memory:', error);

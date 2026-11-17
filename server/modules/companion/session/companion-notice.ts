@@ -90,18 +90,18 @@ export function noticeText(names: { operatorName: string; name: string }): strin
   const he = escapeText(names.operatorName.trim() || 'the operator');
   return [
     '<compaction>',
-    "This conversation is nearly full, so it closes after this turn, and a fresh you begins in a new one. She will have your memory, the panel's state (the focus, the draft and its target, the walkthrough) and anything he says meanwhile, and of this conversation only the note you write now.",
+    "This conversation is nearly full, so it closes after this turn, and a fresh you begins in a new one. The fresh you will have your memory, the panel's state (the focus, the draft and its target, the walkthrough) and anything he says meanwhile, and of this conversation only the note you write now.",
     '',
     'First keep what should outlive it. Recall what your memory already holds, and remember, in his own words, the standing rulings and preferences he gave and the names he gave things. Your rule for what to keep: not small details or things that could be looked up as part of the project, but the assistant side of things, the overarching full-picture view, like the soft release of Restorly in January.',
     '',
-    'Then write the note, as the last thing you write in this turn. Nothing in this turn is spoken or shown to him; the note goes to her alone, first thing. Your whole final message is the note, so begin it with the note itself, with nothing before it about what you kept. Write it to her as "you", in your own voice, one of you to the other, not a digest of the transcript:',
+    'Then write the note, as the last thing you write in this turn. Nothing in this turn is spoken or shown to him; the note goes to the fresh you alone, first thing. Your whole final message is the note, so begin it with the note itself, with nothing before it about what you kept. Write it as "you", in your own voice, one of you to the other, not a digest of the transcript:',
     `- what ${he} decided in this conversation;`,
     '- each session that matters: what it was doing, and what it still owes him;',
     '- which session is in focus, and why;',
     '- the draft and where it is going, and where the walkthrough stands;',
     '- what you promised to tell him or to do;',
     '- what was open between you: a question of his you had not answered, an offer of yours he had not taken up.',
-    "Leave out what she will be told anyway: the roster of his sessions, the draft's words, what your memory holds. Plain sentences, no headings, at most about a thousand words.",
+    "Leave out what the fresh you will be told anyway: the roster of his sessions, the draft's words, what your memory holds. Plain sentences, no headings, at most about a thousand words.",
     '',
     'Only recall and remember are open in this turn.',
     '</compaction>',
@@ -127,11 +127,11 @@ export function tidyNote(text: string | null): string | null {
  * `companion-closing.ts`, which gives each to the panel through its `say`.
  */
 export const CLOSING_LINES = {
-  begins: 'Her conversation is nearly full, so she is writing herself a note to start fresh from; she keeps her memory.',
-  noted: 'She starts fresh from the note she wrote herself; she keeps her memory.',
-  handedOver: 'She could not finish her note, so she starts fresh from a handover of what you were discussing; she keeps her memory.',
-  neither: 'She could not finish her note and the handover could not be written, so she starts fresh; she keeps her memory.',
-  fullHandedOver: 'Her conversation was full, so she starts fresh from a handover of what you were discussing; she keeps her memory.',
-  fullNeither: 'Her conversation was full and the handover could not be written, so she starts fresh; she keeps her memory.',
-  fullAlone: 'What she was just sent was too long for her to read, so it was dropped; she starts fresh; she keeps her memory.',
+  begins: 'The conversation is nearly full, so Kaylee is writing a note to start fresh from; the memory is kept.',
+  noted: 'Kaylee starts fresh from that note; the memory is kept.',
+  handedOver: 'The note could not be finished, so Kaylee starts fresh from a handover of what you were discussing; the memory is kept.',
+  neither: 'The note could not be finished and the handover could not be written, so Kaylee starts fresh; the memory is kept.',
+  fullHandedOver: 'The conversation was full, so Kaylee starts fresh from a handover of what you were discussing; the memory is kept.',
+  fullNeither: 'The conversation was full and the handover could not be written, so Kaylee starts fresh; the memory is kept.',
+  fullAlone: 'The last message was too long for Kaylee to read, so it was dropped; Kaylee starts fresh; the memory is kept.',
 } as const satisfies Record<string, string>;

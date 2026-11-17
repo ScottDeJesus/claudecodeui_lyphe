@@ -117,7 +117,7 @@ async function recalled(deps: CompanionToolDeps, about: string): Promise<{ answe
  */
 export async function recall(deps: CompanionToolDeps, input: { about: string; panel?: boolean }): Promise<ToolTextResult> {
   const { answer, carded } = await recalled(deps, input.about.trim());
-  return input.panel === true && carded ? toPanel(deps, 'From her memory', answer, LIST_ABOUT_NOTHING) : answer;
+  return input.panel === true && carded ? toPanel(deps, "From Kaylee's memory", answer, LIST_ABOUT_NOTHING) : answer;
 }
 
 /** `remember`'s refusal of a door's sentence, for a call that read the bank (nothing was written). */
@@ -286,7 +286,7 @@ async function clearInOrder(cause: ClearCause): Promise<ClearAnswer> {
   const listed = await bankDoor.list();
   if (!listed.ok) return { ok: false, sentence: `Your memory can't be reached just now: ${listed.sentence.replace(/[.!?]+$/, '')}.` };
 
-  const reason = cause.kind === 'settings' ? `${cause.account} cleared her memory in Settings, ${cause.at}.` : quoteLine(cause.account, cause.line);
+  const reason = cause.kind === 'settings' ? `${cause.account} cleared Kaylee's memory in Settings, ${cause.at}.` : quoteLine(cause.account, cause.line);
   let forgotten = 0;
   for (const memory of listed.value) {
     const retired = await bankDoor.retire(memory.token, reason);

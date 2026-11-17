@@ -689,7 +689,7 @@
       "noBoard": "No board",
       "autonomy": "Autonomy",
       "deepseekFlash": "DeepSeek Flash",
-      "deepseekFlashTooltip": "Puts this board's Metis, and every runner she starts, on DeepSeek Flash.",
+      "deepseekFlashTooltip": "Puts this board's Metis, and every runner Metis starts, on DeepSeek Flash.",
       "newBoard": "New board",
       "rename": "Rename",
       "archive": "Archive",

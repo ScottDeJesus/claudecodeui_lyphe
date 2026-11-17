@@ -95,7 +95,7 @@ export function questionsOf(input: unknown): Question[] {
 function answerQuestion(ask: PendingAsk, words: string, chatName: string): AskAnswer {
   const questions = questionsOf(ask.input);
   if (questions.length !== 1 || !isRecord(ask.input)) {
-    const parts = questions.length === 0 ? 'no question she can read' : `${questions.length} questions`;
+    const parts = questions.length === 0 ? 'no question that can be read' : `${questions.length} questions`;
     return refused(`${chatName}'s ask has ${parts}, and one answer cannot cover it. Tell him to answer it in the chat; do not guess.`);
   }
   const [{ question, options }] = questions;

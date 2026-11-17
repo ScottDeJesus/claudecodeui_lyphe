@@ -149,7 +149,7 @@ async function download(entry: EarsFile, location: string): Promise<EarsFileAnsw
     armIdleTimer();
     const response = await fetch(`${HUGGING_FACE}/${entry.repo}/resolve/${entry.revision}/${entry.path}`, { redirect: 'follow', signal: stall.signal });
     if (!response.ok || response.body === null) {
-      return refuse(entry, `Hugging Face answered ${response.status} when ${label} was fetched, so her ears' file is not here yet.`);
+      return refuse(entry, `Hugging Face answered ${response.status} when ${label} was fetched, so the ears' file is not here yet.`);
     }
     const hash = createHash('sha256');
     let received = 0;
@@ -171,7 +171,7 @@ async function download(entry: EarsFile, location: string): Promise<EarsFileAnsw
     return { ok: true, location };
   } catch (error) {
     await discardPart(part);
-    return refuse(entry, `${label} could not be fetched from Hugging Face (${describeFailure(error)}), so her ears' file is not here yet.`);
+    return refuse(entry, `${label} could not be fetched from Hugging Face (${describeFailure(error)}), so the ears' file is not here yet.`);
   } finally {
     clearTimeout(idleTimer);
   }
@@ -223,7 +223,7 @@ export async function keepEarsFile(entry: EarsFile): Promise<EarsFileAnswer> {
       if (answer.ok) verifiedThisProcess.add(location);
       return answer;
     } catch (error) {
-      return refuse(entry, `${entry.repo}/${entry.path} could not be kept on disk (${describeFailure(error)}), so her ears' file is not here yet.`);
+      return refuse(entry, `${entry.repo}/${entry.path} could not be kept on disk (${describeFailure(error)}), so the ears' file is not here yet.`);
     }
   })().finally(() => fetchesInFlight.delete(location));
   fetchesInFlight.set(location, work);
@@ -237,6 +237,6 @@ export async function keepEarsFile(entry: EarsFile): Promise<EarsFileAnswer> {
  */
 export async function earsFile(repo: string, filePath: string): Promise<EarsFileAnswer> {
   const entry = manifestEntry(repo, filePath);
-  if (entry === null) return { ok: false, status: 404, sentence: 'Her ears do not load that file.' };
+  if (entry === null) return { ok: false, status: 404, sentence: 'The ears do not load that file.' };
   return keepEarsFile(entry);
 }

@@ -63,7 +63,7 @@ const ABSENT_REFUSAL = 'That is not a line of his. Give his whole line exactly a
 const JUDGMENT: Record<Exclude<KeptWhy, 'asked'>, string> = {
   ruling: 'a standing ruling or preference of his',
   name: 'a name he gives something',
-  stale: 'something he told her is stale',
+  stale: 'something he said is stale',
   brief: 'how he likes a brief written',
 };
 
@@ -116,8 +116,8 @@ export function quoteLine(account: string, line: HisLine): string {
 export function memoryBody(input: { account: string; lines: HisLine[]; why: KeptWhy; context: string | null }): string {
   const quotes = input.lines.map((line) => quoteLine(input.account, line));
   const context = input.context === null ? '' : folded(input.context);
-  const reason = input.why === 'asked' ? 'Kept because he asked.' : `Kept on her own judgment: ${JUDGMENT[input.why]}.`;
-  return [...quotes, ...(context === '' ? [] : [`Context, in her words: ${context}`]), reason].join('\n');
+  const reason = input.why === 'asked' ? 'Kept because he asked.' : `Kept on Kaylee's own judgment: ${JUDGMENT[input.why]}.`;
+  return [...quotes, ...(context === '' ? [] : [`Context, in Kaylee's words: ${context}`]), reason].join('\n');
 }
 
 /**

@@ -75,11 +75,11 @@ const FAILED_RUN_MARK_MS = 30_000;
 
 /** The 409 of an edit when no draft is held, with what to do about it. */
 const noDraft = (): AppError =>
-  new AppError('There is no draft to edit; ask her to draft one first.', { code: 'COMPANION_NO_DRAFT', statusCode: 409 });
+  new AppError('There is no draft to edit; ask Kaylee to draft one first.', { code: 'COMPANION_NO_DRAFT', statusCode: 409 });
 
 /** The 503 of a message that arrives once the server has begun to stop: her process would be launched with nothing left to end it. */
 const stopping = (): AppError =>
-  new AppError('The server is shutting down, so she cannot take a message just now; send it again once it is back.', { code: 'COMPANION_STOPPING', statusCode: 503 });
+  new AppError('The server is shutting down, so Kaylee cannot take a message just now; send it again once it is back.', { code: 'COMPANION_STOPPING', statusCode: 503 });
 
 function createCompanionService() {
   const accounts = new Map<number, CompanionAccount>();
@@ -219,7 +219,7 @@ function createCompanionService() {
           await session.setModel(settings.model);
         } catch (error) {
           console.error(`[Companion] account ${userId}: her running process would not switch to ${settings.model}`, error);
-          store.appendLog({ role: 'system', text: `She could not switch to ${settings.model} while awake; she will use it the next time she wakes.` });
+          store.appendLog({ role: 'system', text: `Kaylee could not switch to ${settings.model} while awake; it is used from the next wake.` });
         }
       }
       return settings;

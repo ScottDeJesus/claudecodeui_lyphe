@@ -111,7 +111,7 @@ export function createEarsEngine(input: {
     // A worker that never started (its script or one of its imports did not load) is a failure the page must hear of in words.
     started.onerror = (event) => {
       if (worker !== started) return;
-      const sentence = `Her ears could not start (${event.message || 'the worker failed to load'}).`;
+      const sentence = `The ears could not start (${event.message || 'the worker failed to load'}).`;
       discardWorker(sentence);
       onMessage({ kind: 'failed', sentence });
     };
@@ -152,7 +152,7 @@ export function createEarsEngine(input: {
 
     async attach(stream) {
       const frames = framesForCapture;
-      if (frames === null) throw new Error('Her ears are not armed: there is no frames channel to capture into.');
+      if (frames === null) throw new Error('The ears are not armed: there is no frames channel to capture into.');
       takeCaptureApart();
       const attachedAt = undone;
       try {
@@ -189,7 +189,7 @@ export function createEarsEngine(input: {
       framesForCapture = null;
       // An arm still loading is abandoned: the worker finishes it and then runs the `disarm` below, which undoes it. Its caller is told
       // so, and `arming` is freed, so the next `arm()` posts an arm of its own instead of sharing one that is about to be undone.
-      failArm('Her ears were disarmed before they were ready.');
+      failArm('The ears were disarmed before they were ready.');
       send({ kind: 'disarm' });
     },
 
@@ -203,7 +203,7 @@ export function createEarsEngine(input: {
       takeCaptureApart();
       framesForCapture?.close();
       framesForCapture = null;
-      failArm('Her ears were ended before they were ready.');
+      failArm('The ears were ended before they were ready.');
       worker?.terminate();
       worker = null;
       unanswered = 0;

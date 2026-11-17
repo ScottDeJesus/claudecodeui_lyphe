@@ -66,7 +66,7 @@ function enqueue(job: () => Promise<void> | void, always = false): void {
     } catch (error) {
       console.error('[ears] worker job failed', error);
       broken = true;
-      post({ kind: 'failed', sentence: `Her ears stopped: ${error instanceof Error ? error.message : String(error)}.` });
+      post({ kind: 'failed', sentence: `The ears stopped: ${error instanceof Error ? error.message : String(error)}.` });
     }
   });
 }

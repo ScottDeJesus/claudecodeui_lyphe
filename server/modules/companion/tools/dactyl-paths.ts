@@ -264,7 +264,7 @@ function judgeFile(given: string, roots: string[], attached: AttachedLookup): Ju
   }
   if (!statSync(real).isFile()) return { ok: false, sentence: notRegularSentence(shown) };
   if (!roots.some((root) => isUnder(real, root))) {
-    return { ok: false, sentence: `${given.trim()} is outside what a dactyl may read: a visible project, ~/.claude, or her own scratch folder. Pick a file inside one of them.` };
+    return { ok: false, sentence: `${given.trim()} is outside what a dactyl may read: a visible project, ~/.claude, or the companion's own scratch folder. Pick a file inside one of them.` };
   }
   return { ok: true, file: real };
 }

@@ -128,7 +128,7 @@ function longLog(): CompanionLogEntry[] {
     rows.push(she(at - 5, `t-long-${turn}`, 2, 'Want me to read the question out?'));
     if (turn === 2) rows.push(house(at - 120, 'alert', 'Feature finished · Kanban lanes · claudecodeui_lyphe\nLane drag landed. Follow-ups it filed for him: keep the drop zone the full lane height.'));
     if (turn === 5) rows.push(house(at - 90, 'alert', 'Permission · Migration chat · shadow-connector\nWaiting on him: run `npm run migrate` in Bash.'));
-    if (turn === 6) rows.push(house(at - 60, 'system', 'Her conversation could not be resumed; she starts fresh.'));
+    if (turn === 6) rows.push(house(at - 60, 'system', 'The conversation could not be resumed; Kaylee starts fresh.'));
   }
   rows.push(he(60, 'and the migration chat?'));
   rows.push(she(55, 't-long-end', 0, 'Three of five tables are copied and checked.', [{ tag: 'short pause', at: 44 }]));
