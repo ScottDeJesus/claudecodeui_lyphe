@@ -57,7 +57,7 @@ export default function ApiKeysSection({
       </div>
 
       {showNewKeyForm && (
-        <div className="mb-4 rounded-lg border bg-card p-4">
+        <div className="mb-4 border-y border-border p-4">
           <Input
             placeholder={t('apiKeys.form.placeholder')}
             value={newKeyName}
@@ -78,7 +78,7 @@ export default function ApiKeysSection({
           <p className="text-sm italic text-muted-foreground">{t('apiKeys.empty')}</p>
         ) : (
           apiKeys.map((key) => (
-            <div key={key.id} className="flex items-center justify-between rounded-lg border p-3">
+            <div key={key.id} className="flex items-center justify-between border-b border-border py-3 last:border-b-0">
               <div className="flex-1">
                 <div className="font-medium">{key.key_name}</div>
                 <code className="text-xs text-muted-foreground">{key.api_key}</code>

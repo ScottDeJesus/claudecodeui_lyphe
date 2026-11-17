@@ -61,13 +61,12 @@ export default function SettingsSidebar({ activeTab, onChange }: SettingsSidebar
                 onClick={() => onChange(item.id)}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  // Only `transform` transitions. Colour moves on a theme flip and nowhere
-                  // else (the vv-anim rule), and translating beats animating a width or a
-                  // margin — a transformed row is composited and never reflows the rail.
-                  'flex items-center gap-3 whitespace-nowrap rounded-lg px-3 py-2.5 text-left text-sm transition-transform duration-move ease-enter',
+                  // No wash and no corners: the row you are on is the strong ink with the accent's mark at its start, the
+                  // others are the muted ink until pointed at. Nothing moves.
+                  'flex items-center gap-3 whitespace-nowrap border-l-2 px-3 py-2.5 text-left text-sm',
                   isActive
-                    ? 'bg-primary/10 font-medium text-foreground'
-                    : 'text-muted-foreground hover:translate-x-[3px] hover:bg-secondary hover:text-foreground active:bg-secondary',
+                    ? 'border-primary font-medium text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
                 )}
               >
                 <Icon className="h-4 w-4 flex-shrink-0" />

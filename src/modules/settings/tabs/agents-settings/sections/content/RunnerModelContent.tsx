@@ -64,7 +64,7 @@ export default function RunnerModelContent() {
   const healUnknown = healEnabled === null;
 
   return (
-    <div className="divide-y divide-border rounded-xl border border-border bg-card">
+    <div className="divide-y divide-border border-y border-border">
       <SettingRow
         icon={<LLMProviderLogo provider="deepseek" className="h-4 w-4" />}
         label={label}

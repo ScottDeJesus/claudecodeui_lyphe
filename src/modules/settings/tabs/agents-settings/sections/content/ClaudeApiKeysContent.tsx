@@ -107,7 +107,7 @@ export default function ClaudeApiKeysContent() {
   // One row per slot, in slot order, whatever order the picture carries them in. After a failed read
   // there is no picture: both rows are drawn as unknown, with no field to overwrite anything.
   return (
-    <div className="divide-y divide-border rounded-xl border border-border bg-card">
+    <div className="divide-y divide-border border-y border-border">
       <SettingRow
         icon={<KeyRound className="h-4 w-4" />}
         label={(

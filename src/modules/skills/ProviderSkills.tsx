@@ -72,12 +72,12 @@ const SCOPE_LABELS: Record<SkillsScope, string> = {
 };
 
 const SCOPE_BADGE_CLASSES: Record<SkillsScope, string> = {
-  user: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  user: 'bg-[var(--pos-soft)] text-[var(--pos-ink)]',
   plugin: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300',
-  repo: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  project: 'border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300',
+  repo: 'bg-[var(--warn-soft)] text-[var(--warn-ink)]',
+  project: 'bg-[var(--warn-soft)] text-[var(--warn-ink)]',
   admin: 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300',
-  system: 'border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-300',
+  system: 'bg-secondary text-muted-foreground',
 };
 
 const SCOPE_ORDER: SkillsScope[] = ['user', 'plugin', 'repo', 'project', 'admin', 'system'];
@@ -613,8 +613,8 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
                 <div className={cn(
                   'max-h-24 overflow-y-auto whitespace-pre-wrap rounded-lg border px-3 py-2 text-sm',
                   submitError || loadError
-                    ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-200'
-                    : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+                    ? 'bg-[var(--danger-soft)] text-[var(--danger-ink)]'
+                    : 'bg-[var(--pos-soft)] text-[var(--pos-ink)]',
                 )}>
                   {submitError || loadError || 'Skills saved successfully.'}
                 </div>
@@ -651,13 +651,13 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
       </Dialog>
 
       {!isAddDialogOpen && (submitError || loadError) && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-200">
+        <div className="bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
           {submitError || loadError}
         </div>
       )}
 
       {justInstalled && saveStatus === 'success' && !isAddDialogOpen && (
-        <div className="inline-flex items-center gap-2 rounded border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+        <div className="inline-flex items-center gap-2 bg-[var(--pos-soft)] px-3 py-1 text-xs font-medium text-[var(--pos-ink)]">
           <CheckCircle2 className="h-4 w-4" />
           Skills saved successfully.
         </div>
@@ -707,7 +707,7 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
               {group.skills.map((skill) => (
                 <div
                   key={`${skill.command}:${skill.sourcePath}:${skill.projectPath || 'global'}`}
-                  className="min-w-0 rounded-lg border border-border bg-card/50 p-4"
+                  className="min-w-0 border-y border-border/50 p-4"
                 >
                   <div className="min-w-0 space-y-1">
                     <div className="break-all font-mono text-sm font-semibold text-foreground">{skill.command}</div>

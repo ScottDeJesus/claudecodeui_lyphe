@@ -18,9 +18,9 @@ export default function PremiumFeatureCard({
   ctaText = 'Available with CloudCLI Pro',
 }: PremiumFeatureCardProps) {
   return (
-    <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-5">
+    <div className="border-b border-border px-4 py-4 last:border-b-0">
       <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center text-muted-foreground">
           {icon}
         </div>
         <div className="min-w-0 flex-1">

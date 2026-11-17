@@ -63,7 +63,7 @@ export default function AccountContent({ agent, authStatus, onLogin, onDesignLog
         </div>
       </div>
 
-      <div className="divide-y divide-border/50 rounded-xl border border-border bg-card">
+      <div className="divide-y divide-border/50 border-y border-border">
         {/* A status is not a control, so it rides the label line with `null` for the controls: in
             the controls slot the row's 10rem floor treats a badge like a button and drops it
             under the text on a 320px phone. */}
@@ -119,7 +119,7 @@ export default function AccountContent({ agent, authStatus, onLogin, onDesignLog
         )}
 
         {authStatus.error && (
-          <div className="px-4 py-4 text-sm text-red-600 dark:text-red-400">
+          <div className="px-4 py-4 text-sm text-[var(--danger-ink)]">
             {t('agents.error', { error: authStatus.error })}
           </div>
         )}

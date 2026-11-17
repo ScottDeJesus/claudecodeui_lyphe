@@ -58,7 +58,7 @@ export default function GithubCredentialsSection({
       <p className="mb-4 text-sm text-muted-foreground">{t('apiKeys.github.descriptionAlt')}</p>
 
       {showNewGithubForm && (
-        <div className="mb-4 space-y-3 rounded-lg border bg-card p-4">
+        <div className="mb-4 space-y-3 border-y border-border p-4">
           <Input
             placeholder={t('apiKeys.github.form.namePlaceholder')}
             value={newGithubName}
@@ -73,14 +73,16 @@ export default function GithubCredentialsSection({
               onChange={(event) => onNewGithubTokenChange(event.target.value)}
               className="pr-10"
             />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={onToggleNewTokenVisibility}
               aria-label={showNewTokenPlainText ? 'Hide token' : 'Show token'}
-              className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+              className="absolute right-0.5 top-1/2 size-8 -translate-y-1/2"
             >
-              {showNewTokenPlainText ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+              {showNewTokenPlainText ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+            </Button>
           </div>
 
           <Input
@@ -112,7 +114,7 @@ export default function GithubCredentialsSection({
           <p className="text-sm italic text-muted-foreground">{t('apiKeys.github.empty')}</p>
         ) : (
           githubCredentials.map((credential) => (
-            <div key={credential.id} className="flex items-center justify-between rounded-lg border p-3">
+            <div key={credential.id} className="flex items-center justify-between border-b border-border py-3 last:border-b-0">
               <div className="flex-1">
                 <div className="font-medium">{credential.credential_name}</div>
                 {credential.description && (

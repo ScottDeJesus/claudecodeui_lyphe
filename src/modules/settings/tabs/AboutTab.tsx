@@ -2,8 +2,8 @@ import { Cloud, ExternalLink, Star, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { CLOUDCLI_WORDMARK_FONT_FAMILY } from '@/shared/constants';
-import { IS_PLATFORM } from '@/shared/utils';
-import { AppLogo } from '@/shared/ui';
+import { IS_PLATFORM, cn } from '@/shared/utils';
+import { AppLogo, buttonVariants } from '@/shared/ui';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import PremiumFeatureCard from '@/modules/settings/PremiumFeatureCard';
 
@@ -60,7 +60,7 @@ export default function AboutTab() {
                 href={releasesUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 rounded bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-600 transition-colors hover:bg-green-500/20 dark:text-green-400"
+                className="flex items-center gap-1 bg-[var(--pos-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--pos-ink)]"
               >
                 {t('apiKeys.version.updateAvailable', { version: latestVersion })}
                 <ExternalLink className="h-2.5 w-2.5" />
@@ -78,7 +78,7 @@ export default function AboutTab() {
         href={GITHUB_REPO_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-2')}
       >
         <GitHubIcon className="h-4 w-4" />
         <Star className="h-3.5 w-3.5" />
@@ -127,7 +127,7 @@ export default function AboutTab() {
 
       {/* Hosted CTA (OSS mode only) */}
       {!IS_PLATFORM && (
-        <div className="rounded-xl border border-primary/10 bg-primary/5 p-4">
+        <div className="border-y border-border p-4">
           <h4 className="text-sm font-medium text-foreground">Try CloudCLI Hosted</h4>
           <p className="mt-1 text-xs text-muted-foreground">
             Team collaboration, shared MCP configs, settings sync across environments, and managed infrastructure.
@@ -146,7 +146,7 @@ export default function AboutTab() {
 
       {/* Premium feature placeholders (OSS mode only) */}
       {!IS_PLATFORM && (
-        <div className="space-y-4 border-t border-border/50 pt-6">
+        <div className="space-y-2 border-t border-border pt-6">
           <h3 className="text-sm font-medium text-foreground">CloudCLI Pro Features</h3>
           <PremiumFeatureCard
             icon={<Cloud className="h-5 w-5" />}

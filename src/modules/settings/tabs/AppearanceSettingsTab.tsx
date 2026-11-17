@@ -281,14 +281,15 @@ export default function AppearanceSettingsTab({
             label={t('appearanceSettings.projectSorting.label')}
             description={t('appearanceSettings.projectSorting.description')}
           >
-            <select
+            <Select
+              ariaLabel={t('appearanceSettings.projectSorting.label')}
               value={projectSortOrder}
-              onChange={(event) => onProjectSortOrderChange(event.target.value as ProjectSortOrder)}
-              className="w-36 touch-manipulation rounded-lg border border-input bg-card p-2.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
-            >
-              <option value="name">{t('appearanceSettings.projectSorting.alphabetical')}</option>
-              <option value="date">{t('appearanceSettings.projectSorting.recentActivity')}</option>
-            </select>
+              onChange={(next) => onProjectSortOrderChange(next as ProjectSortOrder)}
+              options={[
+                { value: 'name', label: t('appearanceSettings.projectSorting.alphabetical') },
+                { value: 'date', label: t('appearanceSettings.projectSorting.recentActivity') },
+              ]}
+            />
           </SettingRow>
         </SettingsCard>
       </SettingsSection>

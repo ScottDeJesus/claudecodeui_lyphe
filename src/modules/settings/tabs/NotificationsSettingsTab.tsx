@@ -56,7 +56,7 @@ export default function NotificationsSettingsTab({
       </div>
 
       {isDesktop ? (
-        <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+        <div className="space-y-4 border-y border-border p-4">
           <h4 className="font-medium text-foreground">
             {t('notifications.desktop.title', { defaultValue: 'Notify this desktop app' })}
           </h4>
@@ -89,19 +89,19 @@ export default function NotificationsSettingsTab({
                     : t('notifications.desktop.enable', { defaultValue: 'Enable desktop notifications' })}
                 </Button>
                 {desktopNotifications?.enabled && (
-                  <span className="text-sm text-green-600 dark:text-green-400">
+                  <span className="text-sm text-[var(--pos-ink)]">
                     {t('notifications.desktop.enabled', { defaultValue: 'Desktop notifications are enabled' })}
                   </span>
                 )}
               </div>
               {desktopNotifications?.lastError && (
-                <p className="text-sm text-red-600 dark:text-red-400">{desktopNotifications.lastError}</p>
+                <p className="text-sm text-[var(--danger-ink)]">{desktopNotifications.lastError}</p>
               )}
             </div>
           )}
         </div>
       ) : (
-        <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+        <div className="space-y-4 border-y border-border p-4">
           <h4 className="font-medium text-foreground">{t('notifications.webPush.title')}</h4>
           {!pushSupported ? (
             <p className="text-sm text-muted-foreground">{t('notifications.webPush.unsupported')}</p>
@@ -136,7 +136,7 @@ export default function NotificationsSettingsTab({
                     : t('notifications.webPush.enable')}
               </Button>
               {isPushSubscribed && (
-                <span className="text-sm text-green-600 dark:text-green-400">
+                <span className="text-sm text-[var(--pos-ink)]">
                   {t('notifications.webPush.enabled')}
                 </span>
               )}
@@ -147,7 +147,7 @@ export default function NotificationsSettingsTab({
 
       <NtfySettingsCard />
 
-      <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+      <div className="space-y-4 border-y border-border p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -195,7 +195,7 @@ export default function NotificationsSettingsTab({
         </Button>
       </div>
 
-      <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+      <div className="space-y-4 border-y border-border p-4">
         <h4 className="font-medium text-foreground">{t('notifications.events.title')}</h4>
         <div className="space-y-3">
           <label className="flex items-center gap-2 text-sm text-foreground">
