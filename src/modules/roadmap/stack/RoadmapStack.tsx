@@ -6,7 +6,8 @@ import { useStepPhrase } from '@/modules/roadmap/hooks/useStepPhrase';
 import { createStackPainter } from '@/modules/roadmap/utils/stackPainter';
 import { ROADMAP_FEATURE_WORD_KEYS, ROADMAP_MILESTONE_WORD_KEYS } from '@/shared/constants';
 import type { Roadmap } from '@/shared/roadmap-types';
-import type { RoadmapStackHandle, RoadmapStackTarget, RoadmapStackTier, RoadmapStackWall } from '@/shared/types';
+import type { RoadmapStackHandle, RoadmapStackRest, RoadmapStackTarget, RoadmapStackTier, RoadmapStackWall } from '@/shared/types';
+import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import { cn } from '@/shared/utils';
 
 type RoadmapStackProps = {
@@ -22,7 +23,21 @@ type RoadmapStackProps = {
   /** The open card itself, drawn by the owner: the stack only places it. */
   card: ReactNode;
   handleRef?: Ref<RoadmapStackHandle>;
+  /**
+   * Where the stack rests as one small circle, in its own box's pixels, on a page that keeps it small until it is pressed. Absent, it always stands
+   * (the Roadmap tab's face).
+   */
+  rest?: RoadmapStackRest;
+  /** With a `rest`: whether it stands, over the whole of its box, or rests as its circle. */
+  standing?: boolean;
+  /** With a `rest`: the small circle was pressed. */
+  onStand?: () => void;
+  /** With a `rest`: the small circle's accessible name. */
+  restLabel?: string;
 };
+
+/** How far past the small circle's radius its press reaches, in px: half an arc's band and a little air. */
+const REST_REACH = 9;
 
 /** What the words under the stack say: the ring in front and the wall that faces the pointer there, or the ring pointed at. */
 type Reading = { tier: number; facing: string | null; shown: number; top: number };
@@ -98,14 +113,25 @@ function TierReading({ roadmap, tier }: { roadmap: Roadmap; tier: RoadmapStackTi
  *
  * It is one focusable thing: a slider whose value is the wall in front, said as its words.
  *
- * Used by `RoadmapStackFace`, as the Roadmap tab's Stack face.
+ * SMALL UNTIL PRESSED, where its owner gives it a `rest`. Then its box lies over the owner's page and takes no press of its own: the canvas draws one
+ * small circle at the rest (the painter's small form), a round button over it is the one thing pressed, and what is under the box stays in reach.
+ * Standing (`standing`), the box covers what is under it with the page's own ground, the canvas takes the presses and the keys as above, and the words
+ * come in once it is up. The canvas is one for both, so standing up is a move of the same drawing and never a second one.
+ *
+ * Used by `stack/StackOf`, for the Roadmap tab's Stack face and the sessions home's circle.
  */
-export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, handleRef }: RoadmapStackProps) {
+export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, handleRef, rest, standing = false, onStand, restLabel }: RoadmapStackProps) {
   const { t } = useTranslation();
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const readingRef = useRef<HTMLDivElement>(null);
+  const coverRef = useRef<HTMLDivElement>(null);
+  const restButtonRef = useRef<HTMLButtonElement>(null);
+  // Whether the stack is up and takes presses: always, with no rest; with one, while its owner says it stands.
+  const up = rest === undefined || standing;
   const painterRef = useRef<ReturnType<typeof createStackPainter> | null>(null);
+  const isPageHeld = useIsPageHeld();
   // Read by the frame loop, which outlives any one render: the card it places and the press it reports are the latest.
   const openRef = useRef(open);
   const onOpenRef = useRef(onOpen);
@@ -153,6 +179,11 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
       holder.style.cssText = css;
     };
     const loop = (now: number) => {
+      // A page held under another is not seen: nothing is drawn for it until it is back.
+      if (isPageHeld()) {
+        frame = requestAnimationFrame(loop);
+        return;
+      }
       const shown = painter.frame(now);
       const facing = shown.facing?.feature.name ?? null;
       setReading((held) => (
@@ -160,6 +191,13 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
           ? held
           : { tier: shown.tier, facing, shown: shown.shown, top: shown.readingTop }
       ));
+      // Standing up, its words wait until it has stood, and the ground comes in under it as it leaves its circle.
+      const words = readingRef.current;
+      const wordsShow = String(Math.round(Math.min(1, Math.max(0, (shown.grown - 0.55) / 0.45)) * 100) / 100);
+      if (words && words.style.opacity !== wordsShow) words.style.opacity = wordsShow;
+      const cover = coverRef.current;
+      const coverShows = String(Math.round(Math.min(1, shown.grown / 0.4) * 100) / 100);
+      if (cover && cover.style.opacity !== coverShows) cover.style.opacity = coverShows;
       // The open card follows its wall: over it where there is room, at the foot of a narrow box.
       const holder = cardRef.current;
       const target = openRef.current;
@@ -186,7 +224,26 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
       calm.removeEventListener('change', stillness);
       painterRef.current = null;
     };
-  }, []);
+  }, [isPageHeld]);
+
+  // Where it rests, and whether it stands: the painter's, told after it is made and before the first picture. Keyed on the rest's figures, not the object.
+  const restCx = rest?.cx;
+  const restCy = rest?.cy;
+  const restRadius = rest?.radius;
+  useEffect(() => {
+    painterRef.current?.setRest(restCx === undefined || restCy === undefined || restRadius === undefined ? null : { cx: restCx, cy: restCy, radius: restRadius });
+  }, [restCx, restCy, restRadius]);
+  // Stood up, the keyboard is the canvas's; laid down again by a key, it goes back to the circle's button. A stack with no rest takes no focus by itself.
+  const resting = rest !== undefined;
+  const wasUpRef = useRef(up);
+  useEffect(() => {
+    painterRef.current?.setStanding(up);
+    if (resting && up !== wasUpRef.current) {
+      if (up) canvasRef.current?.focus({ preventScroll: true });
+      else if (boxRef.current?.contains(document.activeElement) || document.activeElement === document.body) restButtonRef.current?.focus({ preventScroll: true });
+    }
+    wasUpRef.current = up;
+  }, [up, resting]);
 
   // Each new picture is handed to the painter, which keeps the ring in front and every wall's eased figures across it.
   useEffect(() => {
@@ -203,17 +260,29 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
   const pointed = reading.shown >= 0 ? tiers[reading.shown] ?? null : null;
 
   return (
-    <div ref={boxRef} data-roadmap-stack={tier?.milestone.name ?? ''} className="relative h-full min-h-0 w-full overflow-hidden">
+    <div
+      ref={boxRef}
+      data-roadmap-stack={tier?.milestone.name ?? ''}
+      data-roadmap-stack-form={up ? 'standing' : 'small'}
+      className={cn('relative h-full min-h-0 w-full overflow-hidden', !up && 'pointer-events-none')}
+    >
+      {/* The page's own ground, under a stack that stands over its owner's page: it comes in as the stack leaves its circle. */}
+      {resting && <div ref={coverRef} aria-hidden="true" className="absolute inset-0 bg-background" style={{ opacity: 0 }} />}
       <canvas
         ref={canvasRef}
-        tabIndex={0}
-        role="slider"
-        aria-orientation="horizontal"
-        aria-label={t('roadmap.stack.label')}
-        aria-valuemin={1}
-        aria-valuemax={Math.max(1, tier?.walls.length ?? 1)}
-        aria-valuenow={facing && tier ? tier.walls.indexOf(facing) + 1 : 1}
-        aria-valuetext={facing && tier ? t('roadmap.stack.value', { feature: facing.feature.title, epic: facing.epic.title, n: tier.n, milestone: tier.milestone.title }) : undefined}
+        // Small, it is a drawing under its owner's button: nothing to focus, nothing to read out.
+        {...(up
+          ? {
+              tabIndex: 0,
+              role: 'slider',
+              'aria-orientation': 'horizontal' as const,
+              'aria-label': t('roadmap.stack.label'),
+              'aria-valuemin': 1,
+              'aria-valuemax': Math.max(1, tier?.walls.length ?? 1),
+              'aria-valuenow': facing && tier ? tier.walls.indexOf(facing) + 1 : 1,
+              'aria-valuetext': facing && tier ? t('roadmap.stack.value', { feature: facing.feature.title, epic: facing.epic.title, n: tier.n, milestone: tier.milestone.title }) : undefined,
+            }
+          : { tabIndex: -1, 'aria-hidden': true })}
         data-roadmap-stack-facing={reading.facing ?? ''}
         className={cn(
           'absolute inset-0 block h-full w-full touch-none select-none font-mono outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring',
@@ -252,6 +321,7 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
       {/* What faces the pointer, in words; or the ring he is pointing at. Hidden from assistive tech: the slider's value says it. */}
       {tier && (
         <div
+          ref={readingRef}
           aria-hidden="true"
           data-roadmap-stack-reading
           // Three lines, where it is, what it is and how it stands; put away while a card is open, which says all three.
@@ -262,10 +332,28 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
         </div>
       )}
 
-      {open !== null && (
+      {up && open !== null && (
         <div ref={cardRef} data-roadmap-stack-card={open.kind} className="scrollbar-thin absolute z-10 overflow-y-auto overscroll-contain">
           {card}
         </div>
+      )}
+
+      {/* The small circle's one press: a round button over the drawing, which lights its rim while a pointer or the keyboard is on it. */}
+      {rest !== undefined && !up && (
+        <button
+          ref={restButtonRef}
+          type="button"
+          data-roadmap-stack-rest
+          aria-label={restLabel}
+          title={restLabel}
+          onClick={onStand}
+          onPointerEnter={() => painterRef.current?.setPeek(true)}
+          onPointerLeave={() => painterRef.current?.setPeek(false)}
+          onFocus={() => painterRef.current?.setPeek(true)}
+          onBlur={() => painterRef.current?.setPeek(false)}
+          className="pointer-events-auto absolute cursor-pointer rounded-full outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          style={{ left: rest.cx - rest.radius - REST_REACH, top: rest.cy - rest.radius - REST_REACH, width: 2 * (rest.radius + REST_REACH), height: 2 * (rest.radius + REST_REACH) }}
+        />
       )}
     </div>
   );

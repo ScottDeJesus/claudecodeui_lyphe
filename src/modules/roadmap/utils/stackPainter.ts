@@ -1,4 +1,4 @@
-import type { RoadmapStackFrame, RoadmapStackTarget, RoadmapStackTier, RoadmapStackWall } from '@/shared/types';
+import type { RoadmapStackFrame, RoadmapStackRest, RoadmapStackTarget, RoadmapStackTier, RoadmapStackWall } from '@/shared/types';
 
 // THE ROADMAP'S STACK, PAINTED. One canvas, and everything that happens on it: where each ring stands, how
 // its walls are drawn, how the ring in front turns under a hand, and what a press lands on. It holds no React
@@ -14,6 +14,13 @@ import type { RoadmapStackFrame, RoadmapStackTarget, RoadmapStackTier, RoadmapSt
 // one wears two bars, a parked one is ruled across inside a whole edge, a running task's storey crawls. Colour
 // only says the three things that ask for the operator: the accent for a word he owes, the positive colour for
 // what shipped while he was away, the danger colour for what is blocked or stalled.
+//
+// SMALL, AND STANDING. Where its owner gives it a place to rest (`setRest`), the stack is one small circle there
+// until it is stood up (`setStanding`): seen from straight above, holding only the features of the ring in front
+// that are in flight, shipped or parked, each an arc of the circle, sharing it evenly. Standing up is one move
+// in an order (`view`): it grows and tips back while the arcs slide to their own places on the rim; as it tips the
+// arcs give way to the walls that were under them; last, everything the circle did not hold comes in — the
+// features not yet begun, the rings under and over, the floor. Laid down, the same in reverse.
 
 const TAU = Math.PI * 2;
 
@@ -23,6 +30,13 @@ const RISE = 0.8;
 
 /** How far in from the rim the epics' threads lie on the floor of the ring in front, as a share of its radius. */
 const EPIC_RHO = 0.69;
+
+/** How wide an arc of the small circle is drawn across the rim, in pixels: half inside it, half outside. */
+const ARC_BAND = 10;
+
+/** How long the stack takes to stand up from its circle, and to lie back down, in seconds. */
+const STAND_S = 0.85;
+const FOLD_S = 0.65;
 
 type Rgb = readonly [number, number, number];
 type Colors = { ink: Rgb; body: Rgb; muted: Rgb; accent: Rgb; ground: Rgb; danger: Rgb; done: Rgb };
@@ -54,6 +68,7 @@ type Drag = { angle: number; x: number; y: number; moved: number; hit: Hit; at: 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 const lerp = (from: number, to: number, share: number) => from + (to - from) * share;
 const smooth = (share: number) => share * share * (3 - 2 * share);
+const inOut = (share: number) => (share < 0.5 ? 4 * share * share * share : 1 - Math.pow(-2 * share + 2, 3) / 2);
 /** An angle folded into (-π, π], so the nearer way round is always the one taken. */
 const fold = (angle: number) => {
   let folded = (angle + Math.PI) % TAU;
@@ -82,6 +97,27 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
   let height = 0;
   let ratio = 1;
   let stance: Stance = { cx: 0, cy: 0, radius: 100, wall: 20, band: 9, step: 13 };
+  // The stance it has standing in the whole canvas; `stance` is on the way between its rest and this while it stands up.
+  let full = stance;
+  // Where it rests as one small circle (null: it always stands), whether it is asked to stand, and how far up it is, 0 to 1.
+  let rest: RoadmapStackRest | null = null;
+  let standing = true;
+  let grown = 1;
+  // The parts of standing up, each 0 to 1 (`view`): grown and tipped, arcs in their places, arcs showing, walls showing, the rest showing.
+  let tipped = 1;
+  let slid = 1;
+  let arcs = 0;
+  let wallsIn = 1;
+  let othersIn = 1;
+  // The lean now: 1 and 0 seen from straight above, `TILT` and `RISE` standing.
+  let tilt = TILT;
+  let rise = RISE;
+  // The small circle lit, under a pointer or the keyboard's focus.
+  let peek = false;
+  // The feature that keeps the foot of the small circle, by name: the others share the circle round from it.
+  let anchorName: string | null = null;
+  // Where each wall of the ring in front is drawn while the stack is not fully up: on the way between its share of the small circle and its own place.
+  const spots = new Map<string, { at: number; width: number }>();
   let colors = FALLBACK;
   let font = 'ui-monospace, monospace';
   // The ring in front, and the same figure eased, so a change of ring is a move and not a cut.
@@ -129,7 +165,8 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
   const pointOn = (tier: RoadmapStackTier, place: Place, angle: number, up = 0, inward = 1): Point => {
     const reach = stance.radius * place.rho * inward;
     const turned = angle + turnOf(tier).rot;
-    return [stance.cx + reach * Math.sin(turned), stance.cy + reach * TILT * Math.cos(turned) - (place.lift + up) * RISE];
+    // Seen from straight above a wall's height does not show: it is a line on the rim.
+    return [stance.cx + reach * Math.sin(turned), stance.cy + reach * tilt * Math.cos(turned) - (place.lift + up) * rise];
   };
   /** 1 at the front of a ring, where the pointer is; -1 at the back. */
   const depthOf = (tier: RoadmapStackTier, angle: number) => Math.cos(angle + turnOf(tier).rot);
@@ -160,6 +197,58 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     return path;
   };
 
+  /** Where standing up has got to: every part of it from `grown`, the lean, and the stance on the way from the rest to the full one. */
+  const view = () => {
+    if (rest === null) {
+      tipped = 1; slid = 1; arcs = 0; wallsIn = 1; othersIn = 1; tilt = TILT; rise = RISE;
+      stance = full;
+      return;
+    }
+    tipped = inOut(grown);
+    slid = inOut(clamp(grown / 0.62, 0, 1));
+    arcs = 1 - smooth(clamp((grown - 0.3) / 0.45, 0, 1));
+    wallsIn = smooth(clamp(grown / 0.4, 0, 1));
+    othersIn = smooth(clamp((grown - 0.5) / 0.5, 0, 1));
+    const lean = lerp(Math.PI / 2, Math.asin(TILT), tipped);
+    tilt = Math.sin(lean);
+    rise = Math.cos(lean);
+    stance = { cx: lerp(rest.cx, full.cx, tipped), cy: lerp(rest.cy, full.cy, tipped), radius: lerp(rest.radius, full.radius, tipped), wall: full.wall, band: full.band, step: full.step };
+  };
+
+  /** What the small circle holds of a ring: its features in flight, the ones shipped, and what is parked, set aside but in sight. */
+  const onCircle = (wall: RoadmapStackWall) => wall.feature.word === 'in flight' || wall.feature.word === 'shipped' || wall.feature.step === 'parked';
+
+  /**
+   * Where the walls of the ring in front are drawn while the stack is not fully up. Small, the ones the circle holds share it
+   * evenly, in their own order, the one nearest the front keeping the foot; standing, each is where it belongs on the rim.
+   */
+  const spread = () => {
+    spots.clear();
+    const tier = tiers[front];
+    if (!tier || grown >= 1) return;
+    const rot = turnOf(tier).rot;
+    const held = tier.walls.filter(onCircle);
+    const count = held.length;
+    if (count === 0) return;
+    let anchor = held.find((wall) => wall.feature.name === anchorName);
+    if (!anchor) {
+      anchor = held.reduce((best, wall) => (Math.abs(fold(wall.at + rot)) < Math.abs(fold(best.at + rot)) ? wall : best), held[0]);
+      anchorName = anchor.feature.name;
+    }
+    const anchorAt = held.indexOf(anchor);
+    const anchorTurn = fold(anchor.at + rot);
+    const share = TAU / count;
+    for (const [index, wall] of held.entries()) {
+      let steps = index - anchorAt;
+      if (steps > count / 2) steps -= count;
+      if (steps <= -count / 2) steps += count;
+      let round = wall.at - anchor.at;
+      if (steps > 0 && round < 0) round += TAU;
+      if (steps < 0 && round > 0) round -= TAU;
+      spots.set(wall.feature.name, { at: wall.at + (steps * share - (anchorTurn + round)) * (1 - slid), width: lerp(share, wall.width, slid) });
+    }
+  };
+
   /** The stack in the canvas it has: the ring in front as wide as fits, room over it for a full wall and under it for the closed rings and the words. */
   const fit = () => {
     const reach = Math.min(width / 2 - (width < 700 ? 14 : 40), 380);
@@ -171,7 +260,8 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     const radius = clamp(Math.min(reach, room / (2 * TILT + 0.27 * RISE)), 70, 380);
     const wall = clamp(radius * 0.2, 18, 72);
     const spare = Math.max(0, (room - 2 * radius * TILT - wall * 1.16 * RISE) / 2);
-    stance = { cx: width / 2, cy: 14 + wall * 1.16 * RISE + radius * TILT + spare, radius, wall, band, step };
+    full = { cx: width / 2, cy: 14 + wall * 1.16 * RISE + radius * TILT + spare, radius, wall, band, step };
+    view();
   };
 
   const nearestWall = (tier: RoadmapStackTier): RoadmapStackWall | null => {
@@ -197,7 +287,7 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     front = next;
     settle(tiers[front]);
   };
-  const angleAt = (x: number, y: number) => Math.atan2((x - stance.cx) / stance.radius, (y - stance.cy) / (stance.radius * TILT));
+  const angleAt = (x: number, y: number) => Math.atan2((x - stance.cx) / stance.radius, (y - stance.cy) / (stance.radius * tilt));
 
   /** What a point lands on: a wall of the ring in front, a closed ring under it or a hoop over it, an epic's thread, or the ring itself. */
   const hitAt = (x: number, y: number): Hit | null => {
@@ -212,17 +302,17 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     // A ring under the one in front: the bands below its front edge, a step each.
     const across = (x - stance.cx) / stance.radius;
     if (Math.abs(across) < 1) {
-      const below = y - (stance.cy + stance.radius * TILT * Math.sqrt(1 - across * across));
-      const steps = Math.ceil((below - 1) / (stance.step * RISE));
+      const below = y - (stance.cy + stance.radius * tilt * Math.sqrt(1 - across * across));
+      const steps = Math.ceil((below - 1) / (stance.step * rise));
       if (below > 1 && steps >= 1 && front - steps >= 0) return { on: 'tier', tier: front - steps };
     }
     // A ring over it: the small ones above the middle, the topmost first; anywhere inside one is that one.
     for (let index = tiers.length - 1; index > front; index -= 1) {
       const place = placeOf(index);
-      const reach = Math.hypot((x - stance.cx) / stance.radius, (y - (stance.cy - place.lift * RISE)) / (stance.radius * TILT));
+      const reach = Math.hypot((x - stance.cx) / stance.radius, (y - (stance.cy - place.lift * rise)) / (stance.radius * tilt));
       if (reach <= place.rho + 0.04) return { on: 'tier', tier: index };
     }
-    const rho = Math.hypot(across, (y - stance.cy) / (stance.radius * TILT));
+    const rho = Math.hypot(across, (y - stance.cy) / (stance.radius * tilt));
     const angle = fold(angleAt(x, y) - turnOf(tier).rot);
     if (rho > 0.84 && rho < 1.14) {
       const wall = tier.walls.find((item) => Math.abs(fold(angle - item.at)) <= item.width / 2);
@@ -235,11 +325,15 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     return rho < 1.2 ? { on: 'ring' } : null;
   };
 
-  /** Parked is its own look: a block ruled across with slanting lines inside a whole edge. Nothing about it moves. */
-  const rule = (tier: RoadmapStackTier, place: Place, from: number, to: number, high: number, alpha: number, clip: Path2D) => {
+  /**
+   * Parked is its own look: a block ruled across with slanting lines inside a whole edge. Nothing about it moves. `up` and
+   * `inward` are the block's two edges: a wall runs from the floor up at the rim, an arc of the small circle across the rim.
+   */
+  const rule = (tier: RoadmapStackTier, place: Place, from: number, to: number, up: readonly [number, number], inward: readonly [number, number], alpha: number, clip: Path2D) => {
+    if (alpha < 0.02) return;
     const reach = stance.radius * place.rho;
     const gap = 6.5 / reach;
-    const slant = high / reach;
+    const slant = (inward[0] === inward[1] ? up[1] - up[0] : (inward[1] - inward[0]) * reach) / reach;
     ctx.save();
     ctx.clip(clip);
     ctx.strokeStyle = paint(colors.ink, 0.6 * alpha);
@@ -247,8 +341,8 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     ctx.setLineDash([]);
     ctx.beginPath();
     for (let angle = from - slant; angle < to; angle += gap) {
-      const low = pointOn(tier, place, angle, 0);
-      const top = pointOn(tier, place, angle + slant, high);
+      const low = pointOn(tier, place, angle, up[0], inward[0]);
+      const top = pointOn(tier, place, angle + slant, up[1], inward[1]);
       ctx.moveTo(low[0], low[1]);
       ctx.lineTo(top[0], top[1]);
     }
@@ -261,19 +355,25 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     const motion = motions.get(feature.name);
     if (!motion) return;
     const open = place.open;
-    const depth = depthOf(tier, wall.at);
+    // Not fully up, a wall the small circle holds is on its way from its arc, and comes in as the circle tips; every other wall comes in last.
+    const spot = spots.get(feature.name);
+    const shows = grown >= 1 ? 1 : spot ? wallsIn : othersIn;
+    if (shows < 0.02) return;
+    const at = spot?.at ?? wall.at;
+    const span = spot?.width ?? wall.width;
+    const depth = depthOf(tier, at);
     const isFront = depth >= 0;
-    const isFacing = wall === facing && open > 0.9;
-    const from = wall.at - wall.width / 2 + 0.011 / place.rho;
-    const to = wall.at + wall.width / 2 - 0.011 / place.rho;
+    const isFacing = wall === facing && open > 0.9 && grown >= 1;
+    const from = at - span / 2 + 0.011 / place.rho;
+    const to = at + span / 2 - 0.011 / place.rho;
     const tasks = feature.tasks.length;
     const bareIdea = feature.word === 'idea' && wall.tone === null;
     const high = lerp(bareIdea ? Math.min(place.flat, 3) : place.flat, stance.wall * motion.frame, open);
     // Nearer walls are lit, further ones stand back; a closed ring is quieter than the one in front.
-    const lit = lerp(place.away < 0 ? 0.3 : 0.4, 1, (depth + 1) / 2) * lerp(place.away < 0 ? 0.62 : 0.7, 1, open) * (isFacing ? 1 : 0.88);
+    const lit = lerp(place.away < 0 ? 0.3 : 0.4, 1, (depth + 1) / 2) * lerp(place.away < 0 ? 0.62 : 0.7, 1, open) * (isFacing ? 1 : 0.88) * shows;
     const line = wall.tone === 'danger' ? colors.danger : wall.tone === 'warn' ? colors.accent : colors.body;
 
-    if (open > 0.5) wallPaths.set(wall, wallPath(tier, place, from, to, 0, Math.max(high, 7)));
+    if (open > 0.5 && grown >= 1) wallPaths.set(wall, wallPath(tier, place, from, to, 0, Math.max(high, 7)));
     ctx.lineJoin = 'round';
     ctx.setLineDash([]);
     // An idea is a mark on the floor and nothing more.
@@ -311,7 +411,7 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     }
     // Its frame: how tall it will stand. A design is dashed; a build held or waiting is dotted; what is parked is ruled across, in a whole edge.
     const parked = feature.step === 'parked';
-    if (parked && high > 5) rule(tier, place, from, to, high, lit, frame);
+    if (parked && high > 5) rule(tier, place, from, to, [0, high], [1, 1], lit, frame);
     ctx.strokeStyle = paint(parked ? colors.ink : line, (wall.tone !== null || parked ? 0.95 : 0.5) * lit);
     ctx.lineWidth = isFacing || parked ? 1.5 : 1;
     const waits = feature.step === 'queued' || feature.step === 'waiting' || feature.step === 'starting';
@@ -331,7 +431,7 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     if (feature.step === 'paused' && open > 0.6) {
       ctx.strokeStyle = paint(colors.body, 0.9 * lit);
       ctx.lineWidth = 1.5;
-      for (const up of [4, 8]) ctx.stroke(edgePath(tier, place, from + wall.width * 0.3, to - wall.width * 0.3, high * motion.fill + up));
+      for (const up of [4, 8]) ctx.stroke(edgePath(tier, place, from + span * 0.3, to - span * 0.3, high * motion.fill + up));
     }
     if (feature.step === 'stalled') {
       ctx.strokeStyle = paint(colors.danger, lit);
@@ -340,14 +440,14 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     }
     // It shipped while he was away: it stands over the rest with its cap lit, and shows so even on a closed ring.
     if (wall.unseen) {
-      ctx.strokeStyle = paint(colors.done, 1);
+      ctx.strokeStyle = paint(colors.done, shows);
       ctx.lineWidth = 3;
       ctx.stroke(edgePath(tier, place, from, to, high));
     }
     // It waits on his word: a bead held over it. On the far side of a closed ring there is no wall for it to stand on.
     if (feature.waiting_on_you !== null && (isFront || place.away > -0.5)) {
-      const bead = pointOn(tier, place, wall.at, high + lerp(6, 9, open));
-      ctx.fillStyle = paint(colors.accent, Math.max(lit, 0.85));
+      const bead = pointOn(tier, place, at, high + lerp(6, 9, open));
+      ctx.fillStyle = paint(colors.accent, Math.max(lit, 0.85) * shows);
       ctx.beginPath();
       ctx.arc(bead[0], bead[1], 2.6, 0, TAU);
       ctx.fill();
@@ -358,9 +458,99 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     }
   };
 
+  /**
+   * A feature on the small circle: an arc of it. Shipped, it is whole, and capped in the positive colour until he has looked.
+   * In flight, it is filled as far as it is built, round the way a dial fills; the part still to build crawls while it is being
+   * built, is dotted while it waits its turn, wears two bars when paused, and is in the danger colour when stalled or blocked.
+   * Parked, it is ruled across inside a whole edge, and still.
+   */
+  const drawArc = (tier: RoadmapStackTier, place: Place, wall: RoadmapStackWall, spot: { at: number; width: number }, seconds: number) => {
+    const { feature } = wall;
+    const motion = motions.get(feature.name);
+    if (!motion) return;
+    // The air between two arcs: 2.5px a side, less where a circle holds so many that its arcs would be mostly air.
+    const gap = Math.min(2.5, spot.width * stance.radius * 0.12) / stance.radius;
+    const from = spot.at - spot.width / 2 + gap;
+    const to = spot.at + spot.width / 2 - gap;
+    if (to <= from) return;
+    const inner = 1 - ARC_BAND / 2 / stance.radius;
+    const outer = 1 + ARC_BAND / 2 / stance.radius;
+    const bad = wall.tone === 'danger';
+    const done = feature.word === 'shipped';
+    const band = (start: number, end: number) => {
+      const path = new Path2D();
+      const steps = Math.max(2, Math.ceil((end - start) / 0.05));
+      for (let i = 0; i <= steps; i += 1) {
+        const point = pointOn(tier, place, lerp(start, end, i / steps), 0, outer);
+        if (i === 0) path.moveTo(point[0], point[1]);
+        else path.lineTo(point[0], point[1]);
+      }
+      for (let i = steps; i >= 0; i -= 1) {
+        const point = pointOn(tier, place, lerp(start, end, i / steps), 0, inner);
+        path.lineTo(point[0], point[1]);
+      }
+      path.closePath();
+      return path;
+    };
+    const whole = band(from, to);
+    const fill = done ? 1 : motion.fill;
+    // It fills from the far end: clockwise, as he looks down on it.
+    const built = to - (to - from) * fill;
+    ctx.lineJoin = 'round';
+    ctx.setLineDash([]);
+    if (feature.step === 'parked') {
+      rule(tier, place, from, to, [0, 0], [inner, outer], arcs, whole);
+      ctx.strokeStyle = paint(colors.ink, 0.95 * arcs);
+      ctx.lineWidth = 1.5;
+      ctx.stroke(whole);
+      return;
+    }
+    const moving = feature.step === 'building' || feature.step === 'starting';
+    if (fill > 0.004) {
+      ctx.fillStyle = paint(bad ? colors.danger : colors.ink, (done ? (wall.unseen ? 1 : 0.5) : moving ? 0.95 : 0.6) * arcs);
+      ctx.fill(band(built, to));
+    }
+    const waits = feature.step === 'queued' || feature.step === 'waiting' || feature.step === 'starting';
+    ctx.strokeStyle = paint(bad ? colors.danger : colors.body, (bad ? 0.95 : 0.5) * arcs);
+    ctx.lineWidth = 1;
+    ctx.setLineDash(waits ? [1, 3] : []);
+    ctx.stroke(whole);
+    ctx.setLineDash([]);
+    if (feature.step === 'building' && fill < 0.995) {
+      ctx.strokeStyle = paint(colors.ink, 0.95 * arcs);
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.lineDashOffset = still ? 0 : seconds * 14;
+      ctx.stroke(edgePath(tier, place, from + gap, built, 0));
+      ctx.setLineDash([]);
+    }
+    if (feature.step === 'paused') {
+      ctx.strokeStyle = paint(colors.body, 0.9 * arcs);
+      ctx.lineWidth = 1.5;
+      const middle = (from + built) / 2;
+      for (const bar of [middle - 1.6 / stance.radius, middle + 1.6 / stance.radius]) {
+        const low = pointOn(tier, place, bar, 0, inner + 2 / stance.radius);
+        const top = pointOn(tier, place, bar, 0, outer - 2 / stance.radius);
+        ctx.beginPath();
+        ctx.moveTo(low[0], low[1]);
+        ctx.lineTo(top[0], top[1]);
+        ctx.stroke();
+      }
+    }
+    if (wall.unseen) {
+      ctx.strokeStyle = paint(colors.done, arcs);
+      ctx.lineWidth = 3;
+      ctx.stroke(edgePath(tier, place, from, to, 0, outer + 3 / stance.radius));
+    }
+    if (motion.flash > 0.01) {
+      ctx.fillStyle = paint(colors.done, 0.7 * motion.flash * arcs);
+      ctx.fill(whole);
+    }
+  };
+
   /** The floor of the ring in front: a thread for each epic, lit as far as it has shipped, a knot for each feature, and its name. */
   const drawFloor = (tier: RoadmapStackTier, place: Place) => {
-    const open = place.open;
+    const open = place.open * othersIn;
     const facingEpic = facing && tier.walls.includes(facing) ? facing.epic.name : null;
     const small = stance.radius < 190;
     ctx.textAlign = 'center';
@@ -422,9 +612,9 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
   const drawMast = (above: { index: number; place: Place }[]) => {
     if (above.length === 0) return;
     const top = above[above.length - 1].place.lift;
-    const alpha = clamp((above[0].place.away - 0.5) * 2, 0, 1);
+    const alpha = clamp((above[0].place.away - 0.5) * 2, 0, 1) * othersIn;
     const foot = stance.cy;
-    const head = stance.cy - (top + stance.radius * 0.13) * RISE;
+    const head = stance.cy - (top + stance.radius * 0.13) * rise;
     const fade = ctx.createLinearGradient(0, foot, 0, head);
     fade.addColorStop(0, paint(colors.body, 0.3 * alpha));
     fade.addColorStop(0.75, paint(colors.body, 0.22 * alpha));
@@ -438,9 +628,9 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     ctx.stroke();
     ctx.setLineDash([]);
     for (const item of above) {
-      ctx.fillStyle = paint(item.index === shown() ? colors.ink : colors.body, 0.7 * clamp((item.place.away - 0.5) * 2, 0, 1));
+      ctx.fillStyle = paint(item.index === shown() ? colors.ink : colors.body, 0.7 * othersIn * clamp((item.place.away - 0.5) * 2, 0, 1));
       ctx.beginPath();
-      ctx.arc(stance.cx, stance.cy - item.place.lift * RISE, 1.5, 0, TAU);
+      ctx.arc(stance.cx, stance.cy - item.place.lift * rise, 1.5, 0, TAU);
       ctx.fill();
     }
   };
@@ -450,9 +640,10 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     ctx.clearRect(0, 0, width, height);
     wallPaths.clear();
     const order = tiers.map((tier, index) => ({ tier, index, place: placeOf(index) })).sort((a, b) => a.place.lift - b.place.lift);
+    const drawnAt = (wall: RoadmapStackWall) => spots.get(wall.feature.name)?.at ?? wall.at;
     const half = (tier: RoadmapStackTier, isFront: boolean) => tier.walls
-      .filter((wall) => (depthOf(tier, wall.at) >= 0) === isFront)
-      .sort((a, b) => depthOf(tier, a.at) - depthOf(tier, b.at));
+      .filter((wall) => (depthOf(tier, drawnAt(wall)) >= 0) === isFront)
+      .sort((a, b) => depthOf(tier, drawnAt(a)) - depthOf(tier, drawnAt(b)));
     // From the ground up. A ring that is reached, or the one in front, has a floor: it hides what lies under it, so of
     // the rings below only their front edges show. The rings to come are open hoops; the floor shows through them.
     let mast = false;
@@ -467,13 +658,14 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
         ctx.fillStyle = paint(colors.ground, solid);
         ctx.fill(rim);
       }
-      ctx.strokeStyle = paint(colors.body, place.away > 0 ? lerp(0.16, 0.34, clamp(place.away, 0, 1)) : 0.16);
+      // Small, the circle itself is the one line drawn besides the arcs.
+      ctx.strokeStyle = paint(colors.body, (place.away > 0 ? lerp(0.16, 0.34, clamp(place.away, 0, 1)) : 0.16) * (index === front ? lerp(2, 1, tipped) : othersIn));
       ctx.lineWidth = 1;
       ctx.setLineDash(place.away > 0.5 ? [2, 4] : []);
       ctx.stroke(rim);
       ctx.setLineDash([]);
       for (const wall of half(tier, false)) drawWall(tier, place, wall, seconds);
-      if (place.open > 0.03) drawFloor(tier, place);
+      if (place.open * othersIn > 0.03) drawFloor(tier, place);
       // The ring he is pointing at; one a finger chose waits, lit, for its second press.
       if (index === shown() && place.open < 0.5) {
         ctx.strokeStyle = paint(colors.ink, index === chosen && !still ? 0.72 + 0.28 * Math.sin(seconds * 5) : 0.9);
@@ -481,10 +673,24 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
         ctx.stroke(edgePath(tier, place, 0, TAU, place.away < 0 ? place.flat : 0));
       }
       for (const wall of half(tier, true)) drawWall(tier, place, wall, seconds);
+      if (index === front && arcs > 0.02) {
+        for (const wall of tier.walls) {
+          const spot = spots.get(wall.feature.name);
+          if (spot) drawArc(tier, place, wall, spot, seconds);
+        }
+      }
+    }
+    // Small, and pointed at or focused: its rim lights.
+    if (rest !== null && !standing && peek) {
+      ctx.strokeStyle = paint(colors.ink, 0.9);
+      ctx.lineWidth = 1.25;
+      ctx.beginPath();
+      ctx.arc(stance.cx, stance.cy, Math.max(1, stance.radius - ARC_BAND / 2 - 5), 0, TAU);
+      ctx.stroke();
     }
     // The pointer, under the whole stack: what stands over it on the ring in front is what faces him.
     const foot = footOf();
-    ctx.fillStyle = paint(colors.ink, 0.9);
+    ctx.fillStyle = paint(colors.ink, 0.9 * tipped);
     ctx.beginPath();
     ctx.moveTo(stance.cx, foot + 9);
     ctx.lineTo(stance.cx - 5, foot + 18);
@@ -499,7 +705,7 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     }
   };
   /** The foot of the stack: under the front edge of the ring in front and every closed ring beneath it. */
-  const footOf = () => stance.cy + stance.radius * TILT + Math.max(0, frontEased) * stance.step * RISE;
+  const footOf = () => stance.cy + stance.radius * tilt + Math.max(0, frontEased) * stance.step * rise + (1 - tipped) * (ARC_BAND / 2 + 4);
 
   /** The next wall that asks for him: round the ring in front first, then on the nearest ring that has one. */
   const nextAsking = (direction: 1 | -1) => {
@@ -567,9 +773,47 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
       font = style.fontFamily || font;
     },
 
-    /** Whether the operator asked for less motion: the crawl stands still and a turn lands at once. */
+    /** Whether the operator asked for less motion: the crawl stands still, a turn lands at once, and the stack stands up and lies down in one step. */
     setStill(next: boolean) {
       still = next;
+    },
+
+    /**
+     * Where the stack rests as one small circle, in the canvas's own pixels, or null for a stack that always stands. A stack
+     * first given a rest starts there, small.
+     */
+    setRest(next: RoadmapStackRest | null) {
+      if (next === null) {
+        rest = null;
+        standing = true;
+        grown = 1;
+      } else {
+        if (rest === null) {
+          standing = false;
+          grown = 0;
+        }
+        rest = next;
+      }
+      view();
+    },
+
+    /** Stands the stack up from its circle, or lays it back down. Laid down, it points at nothing and holds no turn. */
+    setStanding(next: boolean) {
+      if (rest === null || standing === next) return;
+      standing = next;
+      // The button that lit the rim leaves with the circle, and says nothing as it goes.
+      peek = false;
+      if (!next) {
+        anchorName = null;
+        hover = -1;
+        chosen = -1;
+        drag = null;
+      }
+    },
+
+    /** The small circle is under a pointer or holds the keyboard's focus: its rim lights. */
+    setPeek(next: boolean) {
+      peek = next;
     },
 
     /**
@@ -632,6 +876,13 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
       lastAt = now;
       frontEased += (front - frontEased) * Math.min(1, elapsed * (still ? 40 : 5.5));
       if (Math.abs(front - frontEased) < 0.002) frontEased = front;
+      if (rest !== null) {
+        const to = standing ? 1 : 0;
+        if (grown !== to) {
+          grown = still ? to : clamp(grown + (standing ? elapsed / STAND_S : -elapsed / FOLD_S), 0, 1);
+          view();
+        }
+      }
       for (const [index, tier] of tiers.entries()) {
         if (drag && index === front && drag.hit.on !== 'tier') continue;
         const turn = turnOf(tier);
@@ -666,13 +917,15 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
       }
       sparks = sparks.filter((spark) => spark.age < 1);
       facing = tiers[front] ? nearestWall(tiers[front]) : null;
+      spread();
       if (width > 0 && height > 0) draw(now / 1000);
-      return { tier: front, facing, shown: shown() === front ? -1 : shown(), readingTop: Math.round(footOf() + 26) };
+      return { tier: front, facing, shown: shown() === front ? -1 : shown(), readingTop: Math.round(footOf() + lerp(12, 26, tipped)), grown };
     },
 
     /** A pointer went down. True when it landed on the stack, so the canvas holds the pointer until it lifts. */
     pointerDown(x: number, y: number, touch: boolean): boolean {
-      const hit = hitAt(x, y);
+      // Small or on its way, it is not turned or pressed here: its owner's own button stands it up.
+      const hit = grown >= 1 ? hitAt(x, y) : null;
       if (!hit || !tiers[front]) return false;
       drag = { angle: angleAt(x, y), x, y, moved: 0, hit, at: performance.now(), speed: 0, touch };
       const turn = turnOf(tiers[front]);
@@ -684,7 +937,7 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     /** A pointer moved: held, it turns the ring in front; a mouse that is not held points at a ring. Returns whether it is over one. */
     pointerMove(x: number, y: number, mouse: boolean): boolean {
       if (!drag) {
-        const hit = mouse ? hitAt(x, y) : null;
+        const hit = mouse && grown >= 1 ? hitAt(x, y) : null;
         hover = hit?.on === 'tier' ? hit.tier : -1;
         return hover >= 0;
       }
@@ -747,7 +1000,7 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
     wheel(forward: boolean) {
       const tier = tiers[front];
       const now = performance.now();
-      if (!tier || tier.walls.length === 0 || now - wheelAt < 90) return;
+      if (!tier || tier.walls.length === 0 || now - wheelAt < 90 || grown < 1) return;
       wheelAt = now;
       chosen = -1;
       const at = facing ? tier.walls.indexOf(facing) : 0;
@@ -760,7 +1013,7 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
      */
     key(key: string, shift: boolean): RoadmapStackTarget | boolean {
       const tier = tiers[front];
-      if (!tier) return false;
+      if (!tier || grown < 1) return false;
       chosen = -1;
       const count = tier.walls.length;
       const at = facing ? tier.walls.indexOf(facing) : 0;

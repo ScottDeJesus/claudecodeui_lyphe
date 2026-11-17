@@ -4209,9 +4209,17 @@ export type RoadmapStackHandle = { face: (name: string) => void };
 /**
  * What the stack's painter reports after each frame, so the canvas can say it in words: the ring in front (`tier`, an index
  * into the tiers), the wall that faces the pointer there, and the ring the operator is pointing at or has chosen with a
- * first tap (`shown`, -1 for none). `readingTop` is where the words go, in the canvas's own pixels, under the stack.
+ * first tap (`shown`, -1 for none). `readingTop` is where the words go, in the canvas's own pixels, under the stack. `grown` is how far up it stands, 0
+ * resting as its small circle to 1 standing; a stack with no rest is always 1.
  */
-export type RoadmapStackFrame = { tier: number; facing: RoadmapStackWall | null; shown: number; readingTop: number };
+export type RoadmapStackFrame = { tier: number; facing: RoadmapStackWall | null; shown: number; readingTop: number; grown: number };
+
+/**
+ * Where the roadmap's stack rests as one small circle, in the pixels of the box it is drawn in: its middle and its radius. Given by the page that keeps the
+ * stack small until it is pressed (project-workspace's sessions home, through the roadmap module's `RoadmapCircle`), handed down `stack/StackOf` and
+ * `stack/RoadmapStack` to the painter (`utils/stackPainter`).
+ */
+export type RoadmapStackRest = { cx: number; cy: number; radius: number };
 
 // ---------------------------
 //----------------- CLAUDE API KEYS: the door's picture of who pays for a plan run ------------

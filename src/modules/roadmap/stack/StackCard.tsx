@@ -13,6 +13,7 @@ import { ItemDialog } from '@/modules/roadmap/modals/ItemDialog';
 import { PromoteDialog } from '@/modules/roadmap/modals/PromoteDialog';
 import { EpicPanel } from '@/modules/roadmap/panel/EpicPanel';
 import { dotStateOf } from '@/modules/roadmap/utils/treeLayout';
+import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
 import type { RoadmapAct } from '@/shared/roadmap-types';
@@ -37,6 +38,7 @@ type StackCardProps = {
 function CardFrame({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
   const { t } = useTranslation();
   const hostWindow = useHostWindow();
+  const isPageHeld = useIsPageHeld();
   const frameRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLButtonElement>(null);
   // Focus goes back to the stack when the card leaves, and into the card as it opens, so the keyboard that opened it can close it.
@@ -50,7 +52,8 @@ function CardFrame({ label, onClose, children }: { label: string; onClose: () =>
   useEffect(() => {
     const hostDocument = hostWindow.document;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+      // A page held under another (the workspace under the station, the home under a chat) keeps its card and hears no key.
+      if (event.key !== 'Escape' || isPageHeld()) return;
       event.preventDefault();
       if (modalInFrontHoldsEscape(frameRef.current, hostDocument)) return;
       event.stopPropagation();
@@ -58,7 +61,7 @@ function CardFrame({ label, onClose, children }: { label: string; onClose: () =>
     };
     hostWindow.addEventListener('keydown', onKeyDown, true);
     return () => hostWindow.removeEventListener('keydown', onKeyDown, true);
-  }, [hostWindow, onClose]);
+  }, [hostWindow, onClose, isPageHeld]);
 
   return (
     <div ref={frameRef} {...OWNS_ESCAPE} role="group" aria-label={label} className="flex min-w-0 flex-col gap-2">

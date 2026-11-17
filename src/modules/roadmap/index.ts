@@ -42,3 +42,6 @@ export type { RoadmapCardFacts } from '@/modules/roadmap/hooks/useRoadmapCard';
 // feature, a feature's empty goal) open the roadmap's own dialogs under it. Its consumer is src/modules/station
 // (`CardStage`, around the stage's roadmap facts).
 export { RoadmapDialogHost } from '@/modules/roadmap/RoadmapDialogHost';
+// The roadmap as one small circle that stands up as the whole stack when pressed, for a page that is not the roadmap's: project-workspace's sessions
+// home (`WorkspaceHome`) draws it at its head.
+export { RoadmapCircle } from '@/modules/roadmap/RoadmapCircle';

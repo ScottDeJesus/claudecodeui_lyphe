@@ -6,21 +6,34 @@ import { CompanionFace, useCompanion } from '@/modules/companion';
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useRailBadges } from '@/modules/project-workspace/hooks/useRailBadges';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
+import { RoadmapCircle } from '@/modules/roadmap';
 import { SessionsBoard } from '@/modules/sidebar';
 import { openStation } from '@/shared/cloudcliDoors';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
-import type { AppTab, Project, RecentConversationListItem } from '@/shared/types';
+import type { AppTab, Project, RecentConversationListItem, RoadmapStackRest } from '@/shared/types';
 import { ActionMenu, Button } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
 
 /**
  * The views the home's menu leads to, in its order: the screens he visits seldom. Chat is not one (the home is his chats), and the tools he does not use as
- * screens (Shell, Files, Git, Browser, Tasks, Notes) stay on the rail alone. A view the person has hidden from the navigation is left out here too.
+ * screens (Shell, Files, Git, Browser, Tasks, Notes) stay on the rail alone. The Roadmap view leads them for what the home's circle does not carry: the
+ * tree, the choice of roadmap, and In flight's board. A view the person has hidden from the navigation is left out here too.
  */
 const MENU_VIEWS: readonly AppTab[] = ['runner', 'cerberus', 'inbox', 'api', 'kanban', 'universe', 'schedules'];
 
 /** The side of the square Kaylee's docked core is drawn in, in px: a chat's own core's size. */
 const CORE_SIZE = 60;
+
+/**
+ * Where the roadmap's circle rests at the head, in the home's own pixels, at a desk and on a phone: its middle on the line Kaylee's core stands on at the
+ * foot, so the two are one above the other. The head is as tall as the circle needs, and the cog stands level with it across the page.
+ */
+const CIRCLE_AT_DESK: RoadmapStackRest = { cx: 66, cy: 78, radius: 33 };
+const CIRCLE_ON_PHONE: RoadmapStackRest = { cx: 42, cy: 51, radius: 27 };
+
+/** The cog's side, in px, and how far the head reaches below the circle's middle: its radius, half an arc's band and a little air. */
+const COG_SIZE = 44;
+const HEAD_BELOW_CIRCLE = 13;
 
 type WorkspaceHomeProps = {
   /** Whether the home has been the page on screen at least once: its board reads the chats' feed from then on. */
@@ -37,7 +50,8 @@ type WorkspaceHomeProps = {
  * - THE COG, at the head on the end side, opens Settings over the home (the workspace's own dialog, which stands in a portal over every page).
  * - THE MENU, at the foot on the end side, lists the screens he visits seldom, each with what its rail badge says while it has one; choosing one shows that
  *   view in the workspace.
- * - THE HEAD'S START SIDE is kept for the roadmap's circle, which is not drawn yet.
+ * - THE ROADMAP'S CIRCLE, at the head on the start side, over Kaylee's core: small until pressed, then the whole stack over the home (`RoadmapCircle`,
+ *   which lies over the home's box and takes no press but the circle's while it is small).
  *
  * The root is the workspace frame's own box (`pwa-status-clear fixed inset-0`, its bottom riding `--keyboard-height`), so in the home-screen app it clears
  * the status bar and lifts over the keyboard as the frame does.
@@ -47,7 +61,8 @@ type WorkspaceHomeProps = {
 export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
   const { t } = useTranslation();
   const { setActiveTab, sidebarSharedProps } = useProjectSidebarState();
-  const { projects, onNewSession, onSessionDelete, onShowSettings } = sidebarSharedProps;
+  const { projects, onNewSession, onSessionDelete, onShowSettings, isMobile } = sidebarSharedProps;
+  const circle = isMobile ? CIRCLE_ON_PHONE : CIRCLE_AT_DESK;
   const { views } = useWorkspaceViews();
   const badges = useRailBadges();
   const doors = useStationDoors();
@@ -83,7 +98,7 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
       className="pwa-status-clear fixed inset-0 flex flex-col bg-background text-foreground"
       style={{ bottom: 'var(--keyboard-height, 0px)' }}
     >
-      <header className="flex h-[76px] flex-none items-center justify-end px-3 md:pl-9 md:pr-11">
+      <header className="flex flex-none items-start justify-end px-3 md:pr-11" style={{ height: circle.cy + circle.radius + HEAD_BELOW_CIRCLE, paddingTop: circle.cy - COG_SIZE / 2 }}>
         <Button data-home-settings variant="outline" size="icon" className="size-11" aria-label={t('rail.settings')} title={t('rail.settings')} onClick={onShowSettings}>
           <Settings aria-hidden="true" />
         </Button>
@@ -120,6 +135,8 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
           />
         )}
       </footer>
+
+      <RoadmapCircle rest={circle} />
     </div>
   );
 }
