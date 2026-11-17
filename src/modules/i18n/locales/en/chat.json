@@ -145,6 +145,14 @@
     "stopSpeaking": "Stop",
     "loading": "Loading…"
   },
+  "rail": {
+    "label": "Turns",
+    "turn": "Turn {{n}}"
+  },
+  "work": {
+    "label": "Work",
+    "failed": "{{count}} failed"
+  },
   "core": {
     "settings": "Chat settings · {{model}}"
   },

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import type { CSSProperties, Dispatch, ReactElement, RefObject, SetStateAction } from 'react';
 
+import { WorkFold } from '@/modules/chat/transcript/WorkFold';
 import type { ChatMessage,
   Project,
   ProjectChoice,
@@ -411,7 +412,7 @@ function ChatMessagesPane({
                 const groupPrevMessage = prevMessage;
                 prevMessage = item.messages[item.messages.length - 1] || prevMessage;
 
-                return { isUser: false, node: (
+                return { isUser: false, work: item.messages, first: item.messages[0] as ChatMessage | undefined, node: (
                   <LazyMessageRow
                     key={`tool-group-${getMessageKey(item.messages[0])}`}
                     lazyRows={lazyRows}
@@ -439,13 +440,18 @@ function ChatMessagesPane({
               const messagePrevMessage = prevMessage;
               prevMessage = item;
 
-              return { isUser: item.type === 'user', node: (
+              // A row of the session's work, and the calls it holds: a tool call or its notice, as "Show work" names them, and a
+              // thought (work with no call to count). A call that waits on the reader is not work to fold away: it stays in sight.
+              const work = isHiddenWork(item, readToolPermissionState) ? (item.isToolUse ? [item] : []) : item.isThinking ? [] : null;
+
+              return { isUser: item.type === 'user', work, first: item as ChatMessage | undefined, node: (
                 <LazyMessageRow
                   key={getMessageKey(item)}
                   lazyRows={lazyRows}
                   timestamp={item.timestamp}
                   initiallyNearViewport={initiallyNearViewport}
                   pinned={Boolean(item.isToolUse && readToolPermissionState?.(item.toolName, item.toolInput) === 'waiting')}
+                  yours={item.type === 'user'}
                 >
                   <MessageComponent
                     message={item}
@@ -474,9 +480,27 @@ function ChatMessagesPane({
             // theirs sits in its bubble. The rows stay separate LazyMessageRows inside it, so lazy
             // mounting and timestamp anchors work exactly as before. It is not a card: a reply is
             // its model's mark and its words, on the page's own ground (`reading.css`).
+            //
+            // Inside a turn, each RUN OF WORK (the tool calls and thoughts between two things the session said) is gathered into
+            // one `WorkFold`: the rows themselves while the turn runs, and one line that opens to them once it has ended. Only the
+            // last turn can be running, and only while the session is.
             const turns: ReactElement[] = [];
             let turn: ReactElement[] = [];
-            const closeTurn = () => {
+            let run: { nodes: ReactElement[]; calls: ChatMessage[]; first: ChatMessage | undefined } | null = null;
+            const closeRun = (finished: boolean) => {
+              if (run === null) return;
+              // A run that opens its turn wears the turn's mark: the row that would have worn it is inside the run.
+              const model = run.first?.model ?? '';
+              const opens = turn.length === 0 ? { model, name: (model && resolveModelLabel?.(model)) || model } : null;
+              turn.push(
+                <WorkFold key={`work-${run.nodes[0].key}`} calls={run.calls} createDiff={createDiff} finished={finished} opens={opens}>
+                  {run.nodes}
+                </WorkFold>
+              );
+              run = null;
+            };
+            const closeTurn = (finished: boolean) => {
+              closeRun(finished);
               if (turn.length === 0) return;
               turns.push(
                 <div key={`turn-${turn[0].key}`} data-chat-turn="" className="space-y-3 py-1 sm:space-y-4">
@@ -487,17 +511,24 @@ function ChatMessagesPane({
             };
             for (const row of rows) {
               if (row.isUser) {
-                closeTurn();
+                closeTurn(true);
                 turns.push(row.node);
+              } else if (row.work !== null) {
+                run ??= { nodes: [], calls: [], first: row.first };
+                run.nodes.push(row.node);
+                run.calls.push(...row.work);
               } else {
+                // Something said: the work before it is a run that has ended, whatever the turn does next.
+                closeRun(true);
                 turn.push(row.node);
               }
             }
             // The indicator joins the open Claude turn, or opens one after the operator's bubble.
             if (showTypingIndicator) {
+              closeRun(true);
               turn.push(<TypingIndicator key="typing-indicator" />);
             }
-            closeTurn();
+            closeTurn(!isProcessing);
             return turns;
           })()}
         </>

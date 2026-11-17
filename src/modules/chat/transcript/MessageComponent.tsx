@@ -8,6 +8,7 @@ import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LL
 import { formatUsageLimitText, stripProposedPlanEnvelope } from '@/modules/chat/utils/chatFormatting';
 import { ToolRenderer, ToolErrorDisplay, SubagentPanel, shouldHideToolResult } from '@/modules/chat/tools';
 import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermissionState';
+import { replyMaterialOf } from '@/modules/chat/transcript/replyMark';
 import ThinkingRow from '@/modules/chat/transcript/ThinkingRow';
 import ChatMessageImages from '@/modules/chat/transcript/ChatMessageImages';
 import { shapeKey } from '@/modules/chat/transcript/shapes/collapseState';
@@ -63,17 +64,6 @@ type MessageComponentProps = {
 };
 
 const COPY_HIDDEN_TOOL_NAMES = new Set(['Bash', 'Edit', 'Write', 'ApplyPatch']);
-
-/**
- * The material a reply's mark wears, by the family its model's name carries: Opus the tube, Haiku the wire, every other model
- * Mercury (`reading.css` gives each its colour). The same reading the chat's core makes of the model it runs on.
- */
-function replyMaterialOf(model: string): 'mercury' | 'tube' | 'wire' {
-  const name = model.toLowerCase();
-  if (name.includes('opus')) return 'tube';
-  if (name.includes('haiku')) return 'wire';
-  return 'mercury';
-}
 
 /**
  * Rendered by chat's ChatMessagesPane and ToolGroupContainer to draw one
@@ -283,7 +273,8 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
                mark's title, never spelled out beside it. Error and tool turns keep a plain disc and their word: they are STATES,
                not speakers. An error turn is amber rather than red — nothing here is destructive, something went wrong — and it
                says so in the word beside the dot, so the state survives a screen with no colour at all. */
-            <div className="mb-2.5 flex items-center gap-2.5">
+            // `data-reply-head`: a turn that opens with work wears its mark on that work's line instead (`WorkFold`), and this one stands down.
+            <div data-reply-head="" className="mb-2.5 flex items-center gap-2.5">
               {message.type === 'error' || message.type === 'tool' ? (
                 <span
                   aria-hidden="true"

@@ -40,6 +40,8 @@ type LazyMessageRowProps = {
    * survive a placeholder swap.
    */
   pinned?: boolean;
+  /** The row is one of the reader's own lines: the wrapper says so (`data-chat-your-line`), mounted or not, for the rail of turns to find. */
+  yours?: boolean;
   children: ReactNode;
 };
 
@@ -48,6 +50,7 @@ export default function LazyMessageRow({
   timestamp,
   initiallyNearViewport,
   pinned = false,
+  yours = false,
   children,
 }: LazyMessageRowProps) {
   const [isNearViewport, setIsNearViewport] = useState(initiallyNearViewport);
@@ -85,6 +88,7 @@ export default function LazyMessageRow({
     <div
       ref={elementRef}
       data-message-timestamp={timestamp || undefined}
+      data-chat-your-line={yours ? '' : undefined}
       style={isMounted ? undefined : { height: measuredHeight ?? ESTIMATED_ROW_HEIGHT_PX }}
     >
       {isMounted ? children : null}

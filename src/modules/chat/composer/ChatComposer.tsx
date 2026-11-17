@@ -43,6 +43,7 @@ import type { SendMenuChoice } from '@/modules/chat/composer/SendMenuPopover';
 import { ScheduleMessagePopover } from '@/modules/chat/composer/ScheduleMessagePopover';
 import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageList';
 import { ChatCore } from '@/modules/chat/composer/ChatCore';
+import { TurnRail } from '@/modules/chat/transcript/TurnRail';
 import ComposerDeepSeekSwitch from '@/modules/chat/composer/ComposerDeepSeekSwitch';
 import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
@@ -58,6 +59,9 @@ type MentionableFile = {
 const NO_PENDING_STEERS: PendingSteer[] = [];
 
 type ChatComposerProps = {
+  /** The transcript's scroller and how many messages it holds, for the rail of turns over the core (`TurnRail`); absent, no rail is drawn. */
+  turnsScrollerRef?: RefObject<HTMLDivElement | null>;
+  messageCount?: number;
   /** The chat this composer writes into, or null before it has one: the key its input box is registered under as a page anchor. */
   sessionId: string | null;
   pendingPermissionRequests: PendingPermissionRequest[];
@@ -151,7 +155,6 @@ type ChatComposerProps = {
   onTextareaPaste: (event: ClipboardEvent<HTMLTextAreaElement>) => void;
   onTextareaScrollSync: (target: HTMLTextAreaElement) => void;
   onTextareaInput: (event: FormEvent<HTMLTextAreaElement>) => void;
-  isInputFocused?: boolean;
   onInputFocusChange?: (focused: boolean) => void;
   placeholder: string;
   isTextareaExpanded: boolean;
@@ -171,6 +174,8 @@ const LONG_PRESS_MS = 500;
  * model/permission popovers that drive the next turn.
  */
 export default function ChatComposer({
+  turnsScrollerRef,
+  messageCount = 0,
   sessionId,
   pendingPermissionRequests,
   handlePermissionDecision,
@@ -240,7 +245,6 @@ export default function ChatComposer({
   onTextareaPaste,
   onTextareaScrollSync,
   onTextareaInput,
-  isInputFocused = false,
   onInputFocusChange,
   placeholder,
   isTextareaExpanded,
@@ -395,7 +399,6 @@ export default function ChatComposer({
 
   // Hide the thinking/status bar while any permission request is pending
   const hasPendingPermissions = pendingPermissionRequests.length > 0;
-  const hasActivityIndicator = Boolean(activity && !hasPendingPermissions);
 
   const hasQueuedDraft = Boolean(queuedDraft);
   const submitAriaLabel = canQueueDraft
@@ -424,7 +427,7 @@ export default function ChatComposer({
           second time and floated both tabs inside the input's corners (Athena, 2026-09-10). */}
       {!hasPendingPermissions && (
         <div className="pointer-events-none absolute bottom-full left-1/2 z-10 w-full max-w-[54.25rem] -translate-x-1/2 translate-y-px bg-transparent">
-          <ActivityIndicator activity={activity} onAbort={onAbortSession} isInputFocused={isInputFocused} />
+          <ActivityIndicator activity={activity} onAbort={onAbortSession} />
         </div>
       )}
 
@@ -546,6 +549,7 @@ export default function ChatComposer({
           controls={settingsId}
           onToggle={() => setSettingsOpen((open) => !open)}
         />
+        {turnsScrollerRef && <TurnRail scrollerRef={turnsScrollerRef} messageCount={messageCount} />}
       <div ref={anchorRef} className="relative min-w-0 flex-1">
         {/* The mic's one line, a refusal's sentence or the note that Gemini stood in for the home server: above the form, never
             inside it. The form clips whatever overflows it, and a sentence that names two transcribers is several lines, whose
@@ -601,7 +605,6 @@ export default function ChatComposer({
           status={isLoading ? 'streaming' : 'ready'}
           className={[
             isTextareaExpanded ? 'chat-input-expanded' : '',
-            hasActivityIndicator ? 'rounded-t-none' : '',
           ].filter(Boolean).join(' ')}
           {...getRootProps()}
         >

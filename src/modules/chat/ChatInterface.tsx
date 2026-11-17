@@ -318,7 +318,6 @@ function ChatInterface({
     handlePermissionDecision,
     handleGrantToolPermission,
     handleInputFocusChange,
-    isInputFocused,
     commandModalPayload,
     closeCommandModal,
     showCostModal,
@@ -663,6 +662,8 @@ function ChatInterface({
 
           <ChatComposer
             sessionId={openSessionId}
+            turnsScrollerRef={scrollContainerRef}
+            messageCount={chatMessages.length}
             exportSurface={exportSurface}
           pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} cliSessionId={cliSessionId} resolveModelLabel={resolveModelLabel} />}
           pendingPermissionRequests={pendingPermissionRequests}
@@ -735,7 +736,6 @@ function ChatInterface({
           onTextareaPaste={handlePaste}
           onTextareaScrollSync={syncInputOverlayScroll}
           onTextareaInput={handleTextareaInput}
-          isInputFocused={isInputFocused}
           onInputFocusChange={handleInputFocusChange}
           placeholder={t('input.placeholder', { provider: selectedProviderLabel })}
           isTextareaExpanded={isTextareaExpanded}

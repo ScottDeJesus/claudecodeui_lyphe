@@ -1,14 +1,14 @@
+import { Square } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import { Shimmer, SignalLoop } from '@/shared/ui';
+import { Button, Shimmer, SignalLoop } from '@/shared/ui';
 import type { SessionActivity } from '@/shared/types';
 
 type ActivityIndicatorProps = {
   activity: SessionActivity | null;
   onAbort?: () => void;
-  isInputFocused?: boolean;
 };
 
 const ACTION_KEYS = [
@@ -33,7 +33,7 @@ const EXIT_ANIMATION_MS = 220;
  * Rendered by chat's ChatComposer above the input so the user can see and
  * interrupt the in-flight turn without leaving the composer.
  */
-export default function ActivityIndicator({ activity, onAbort, isInputFocused = false }: ActivityIndicatorProps) {
+export default function ActivityIndicator({ activity, onAbort }: ActivityIndicatorProps) {
   const { t } = useTranslation('chat');
   // Both timers below pace what the reader sees (the leave animation, the seconds clock), so they run
   // on the window the reader is in: a hidden opener throttles its timers hard.
@@ -80,21 +80,20 @@ export default function ActivityIndicator({ activity, onAbort, isInputFocused = 
   const elapsedLabel = minutes < 1
     ? t('claudeStatus.elapsed.seconds', { count: seconds, defaultValue: '{{count}}s' })
     : t('claudeStatus.elapsed.minutesSeconds', { minutes, seconds, defaultValue: '{{minutes}}m {{seconds}}s' });
-  const tabSurfaceClassName = [
-    'chat-activity-tab inline-flex h-8 items-center rounded-b-none rounded-t-lg border border-b-0 bg-card px-3 text-xs transition-all duration-200',
-    isInputFocused
-      ? 'border-primary/30 shadow-[0_-1px_2px_color-mix(in_srgb,var(--ink)_8%,transparent),1px_0_2px_color-mix(in_srgb,var(--ink)_6%,transparent),-1px_0_2px_color-mix(in_srgb,var(--ink)_6%,transparent)]'
-      : 'border-border/50 shadow-[0_-1px_1px_color-mix(in_srgb,var(--ink)_4%,transparent),1px_0_1px_color-mix(in_srgb,var(--ink)_3%,transparent),-1px_0_1px_color-mix(in_srgb,var(--ink)_3%,transparent)]',
-  ].join(' ');
 
+  // THE WORKING LINE: what the chat is doing and for how long, over the line the reader types in, and the one press that stops it. A line
+  // on the page's ground, not a tab: the loop, the word, the time. Stop is a button that looks like one (the kit's), its mark alone; Escape
+  // stops a turn too and is named in the button's title, never drawn as a key cap.
+  const stopLabel = t('claudeStatus.stop', { defaultValue: 'Stop' });
   return (
     <div
-      className={`pointer-events-none bg-transparent ${
+      data-chat-activity=""
+      className={`pointer-events-none bg-transparent pb-1.5 ${
         isExiting ? 'chat-activity-exit' : 'chat-activity-enter'
       }`}
     >
-      <div className="flex items-end justify-between gap-2">
-        <div className={`${tabSurfaceClassName} gap-2`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="inline-flex h-8 items-center gap-2 bg-background pr-2 text-xs">
           {/* The agent's loop: dashes that turn while the turn is worked on, the same sign Kaylee's face makes when she thinks. */}
           <SignalLoop state="thinking" size={13} />
           <Shimmer className="font-mono text-[11px] uppercase tracking-[0.14em]">{`${label}…`}</Shimmer>
@@ -102,20 +101,16 @@ export default function ActivityIndicator({ activity, onAbort, isInputFocused = 
         </div>
 
         {renderedActivity.canInterrupt && onAbort && (
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="icon"
             onClick={onAbort}
-            className={`${tabSurfaceClassName} pointer-events-auto gap-1.5 text-muted-foreground hover:bg-card hover:text-destructive`}
-            aria-label={t('claudeStatus.stop', { defaultValue: 'Stop' })}
+            className="pointer-events-auto size-8 bg-background finger:size-11"
+            aria-label={stopLabel}
+            title={`${stopLabel} (Esc)`}
           >
-            <svg className="h-2.5 w-2.5 fill-current" viewBox="0 0 24 24" aria-hidden>
-              <rect x="5" y="5" width="14" height="14" rx="2" />
-            </svg>
-            <span>{t('claudeStatus.stop', { defaultValue: 'Stop' })}</span>
-            <kbd className="hidden rounded border border-border/60 px-1 text-[10px] text-muted-foreground/70 sm:inline-block">
-              esc
-            </kbd>
-          </button>
+            <Square aria-hidden="true" className="fill-current" />
+          </Button>
         )}
       </div>
     </div>

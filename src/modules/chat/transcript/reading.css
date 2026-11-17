@@ -65,3 +65,12 @@
 .chat-talk [data-shape-header]:not([data-tone]) [data-shape-icon] { color: var(--ink-muted); }
 .chat-talk [data-shape='table'] :is(thead, thead tr, th) { background: none; }
 .chat-talk [data-shape='facts'] dt { color: var(--ink-muted); font-weight: 500; }
+
+/* ---------- a run of work ----------
+ * The rows of a run stand close together, each on its hairline, whatever room the turn keeps between the things it says:
+ * a list, not a stack of cards. The line of a finished run stands on a hairline of its own. */
+.chat-work > :not([data-chat-work-line]) + :not([data-chat-work-line]),
+.chat-work [data-chat-work-rows] > * + * { margin-top: 0; }
+.chat-work [data-chat-work-line] { border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+/* A turn that opens with work wears its mark on that work's line, so the first row's own head stands down. */
+.chat-work [data-reply-head] { display: none; }

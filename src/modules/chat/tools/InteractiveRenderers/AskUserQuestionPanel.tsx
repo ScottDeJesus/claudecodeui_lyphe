@@ -324,17 +324,32 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/40 px-3 py-2 sm:px-4">
-          <Button type="button" variant="ghost" size="sm" onClick={handleSkip} className="h-8 px-2 text-muted-foreground">
+        <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2 sm:px-4">
+          {/* Every act here is a button that looks like one. Escape skips too, and is named in the button's title: a way out is never drawn as a key cap. */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSkip}
+            className="h-8 px-3 finger:h-11"
+            title={`${isSingle ? t('question.skip', { defaultValue: 'Skip' }) : t('question.skipAll', { defaultValue: 'Skip all' })} (Esc)`}
+          >
             {isSingle ? t('question.skip', { defaultValue: 'Skip' }) : t('question.skipAll', { defaultValue: 'Skip all' })}
-            <span className={keyHintClass}>Esc</span>
           </Button>
 
           <div className="ml-auto flex items-center gap-1.5">
             {!isSingle && !isFirst && (
-              <Button type="button" variant="ghost" size="sm" onClick={() => setCurrentStep(s => s - 1)} className="h-8 px-2.5">
+              // Back is a mark that says itself: the arrow alone, its word the title and the name for a reader.
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentStep(s => s - 1)}
+                className="size-8 finger:size-11"
+                aria-label={t('question.back', { defaultValue: 'Back' })}
+                title={t('question.back', { defaultValue: 'Back' })}
+              >
                 <ChevronLeft aria-hidden />
-                {t('question.back', { defaultValue: 'Back' })}
               </Button>
             )}
 
@@ -344,13 +359,13 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
                 size="sm"
                 onClick={handleSubmit}
                 disabled={!hasCurrentSelection && !Object.keys(buildAnswers()).length}
-                className="h-8 px-3.5"
+                className="h-8 px-3.5 finger:h-11"
               >
                 {t('question.submit', { defaultValue: 'Submit' })}
                 <span className={keyHintClass}>Enter</span>
               </Button>
             ) : (
-              <Button type="button" size="sm" onClick={() => setCurrentStep(s => s + 1)} className="h-8 px-3.5">
+              <Button type="button" size="sm" onClick={() => setCurrentStep(s => s + 1)} className="h-8 px-3.5 finger:h-11">
                 {t('question.next', { defaultValue: 'Next' })}
                 <span className={keyHintClass}>Enter</span>
               </Button>
