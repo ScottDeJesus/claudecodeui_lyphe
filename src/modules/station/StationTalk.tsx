@@ -6,10 +6,11 @@ import { useStationTalkFiles, useStationTalkText } from '@/modules/station/conte
 import type { StationDensity, StationRegionProps, TalkPress } from '@/shared/types';
 
 /**
- * Which halves of the talk control a drawing holds: `both` (the scene's dock), the talk button alone (`button`: the compact
- * arrangement's head) or the typing box alone (`composer`: the compact arrangement's Conversation section, and the phone's).
+ * Which halves of the talk control a drawing holds: the two as ONE box (`box`: the scene, the talk press inside the box to type in),
+ * the two side by side (`both`), the talk button alone (`button`: the compact arrangement's head) or the typing box alone
+ * (`composer`: the compact arrangement's Conversation section, and the phone's).
  */
-type TalkPart = 'both' | 'button' | 'composer';
+type TalkPart = 'both' | 'button' | 'composer' | 'box';
 
 type StationTalkViewProps = {
   /** `compact`: the talk button 44 px tall, its words kept. The box is the same at both. */
@@ -52,12 +53,15 @@ type StationTalkViewProps = {
  * 768 px (`touchField`), so a finger lands on it too. While the companion's picture is read (`ready` false) the line under the
  * button stands empty: the settings, and so the key you bound, are not known yet.
  *
+ * ONE BOX (`box`, the scene's): `CompanionComposer` given the page's `talk`, so the field, the plus that attaches, the talk press
+ * and send stand in one bordered box, as in a chat; what failed with the last press is said right above it.
+ *
  * ONE HALF (`part`): the button alone fills the box its caller gives it, with no padding of its own (the compact head places
  * it); the box alone is `CompanionComposer` as in the row, padding itself. Each is still the page's one press and one box.
  *
  * YOUR TYPED WORDS AND YOUR FILES are the station's (`text` and `onText`, `attachedFiles` and `onAttachedFiles`, which `StationTalk`
  * binds to the provider's), not the box's: pressing the bar's Compact switch mounts another arrangement's tree and its own box, and
- * the words and the chips stand in it. The box draws a paperclip first in its tools, so the files go with your words as in a chat.
+ * the words and the chips stand in it. The box draws its plus (attach) first in its tools, so the files go with your words as in a chat.
  *
  * `data-station-talk` reads the press's state and `data-station-talk-part` the halves drawn. A pure view: `StationTalk` below
  * binds it, and the fixtures draw it on `fake/talk.ts`'s pictures.
@@ -81,6 +85,7 @@ export function StationTalkView({ density, part = 'both', talk, name, bindingLab
       ready={ready}
       visible
       onSend={onSend}
+      talk={part === 'box' ? talk : undefined}
       touchField
       atScreenFoot={false}
       text={text}

@@ -4003,6 +4003,15 @@
       "showChat": "Show chat",
       "showPortrait": "Show portrait"
     },
+    "kaylee": {
+      "home": "Home",
+      "earsOn": "{{name}} is listening for the name",
+      "earsOff": "Listen for the name",
+      "running_one": "{{count}} running",
+      "running_other": "{{count}} running",
+      "waiting_one": "{{count}} waiting on you",
+      "waiting_other": "{{count}} waiting on you"
+    },
     "talk": {
       "orPress": "or press",
       "bindHint": "Bind a key in Settings"

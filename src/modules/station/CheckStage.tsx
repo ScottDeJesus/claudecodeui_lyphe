@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CheckSheet, NeedCard, useCerberusNeedOf } from '@/modules/cerberus';
-import { useStation, useStationPref } from '@/modules/station/context/StationContext';
+import { useStation } from '@/modules/station/context/StationContext';
 import { stationArrangementOf } from '@/modules/station/stationArrangement';
 import { StageGone } from '@/modules/station/stageStates';
 import type { CerberusNeed } from '@/shared/cerberus-types';
@@ -139,9 +139,8 @@ export function CheckStageView({ focus, found, onOpenSheet, onRetry }: CheckStag
  */
 export function CheckStage({ focus }: { focus: CheckFocus }) {
   const { tier, phone } = useStation();
-  // His Compact switch, which decides the arrangement above 1024 px; the shell reads the same pref.
-  const [compactOn] = useStationPref('compact', false);
-  const place = CHECK_SHEET_PLACE[stationArrangementOf(tier, phone, compactOn)];
+  // The arrangement as the shell picks it: the window's alone, since the scene has no Compact switch.
+  const place = CHECK_SHEET_PLACE[stationArrangementOf(tier, phone, false)];
   const { need, unreachable, retry } = useCerberusNeedOf(focus.node, focus.key);
   // The check the sheet is open on, null while it is shut. State, because the sheet is drawn from it and it opens on a press of the card or of "Open the check".
   const [sheet, setSheet] = useState<CerberusSheetTarget | null>(null);

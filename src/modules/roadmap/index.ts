@@ -43,5 +43,8 @@ export type { RoadmapCardFacts } from '@/modules/roadmap/hooks/useRoadmapCard';
 // (`CardStage`, around the stage's roadmap facts).
 export { RoadmapDialogHost } from '@/modules/roadmap/RoadmapDialogHost';
 // The roadmap as one small circle that stands up as the whole stack when pressed, for a page that is not the roadmap's: project-workspace's sessions
-// home (`WorkspaceHome`) draws it at its head.
+// home (`WorkspaceHome`) draws it at its head, and the station's scene (`StationShell`) over the companion's column while a thing is on the panel.
 export { RoadmapCircle } from '@/modules/roadmap/RoadmapCircle';
+// The same roadmap already standing as the whole stack, for a page with the room for it: the station's scene (`StationShell`) draws it over the companion
+// while nothing is on the panel, and the circle above in its place while something is.
+export { RoadmapStanding } from '@/modules/roadmap/RoadmapStanding';

@@ -10,7 +10,7 @@ import type {
   RefObject,
   TouchEvent,
 } from 'react';
-import { PaperclipIcon, PencilRulerIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
+import { PlusIcon, PencilRulerIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
 
 import { PAGE_ANCHOR } from '@/shared/constants';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
@@ -562,7 +562,7 @@ export default function ChatComposer({
               from 4px to 2px and the row stays one line. At 352 and up it is the 4px it always
               was. Measured, not guessed. */}
           <PromptInputTools className="min-w-0 gap-0.5 min-[352px]:gap-1">
-            {/* The paperclip at every width. The desktop half of this used to spell "Attach a
+            {/* The plus (attach) at every width. The desktop half of this used to spell "Attach a
                 file" in full, which was the widest thing in a row of icons and said no more
                 than the clip does. */}
             <PromptInputButton
@@ -570,7 +570,7 @@ export default function ChatComposer({
               onClick={openAttachmentPicker}
               aria-label={t('input.attachFiles')}
             >
-              <PaperclipIcon />
+              <PlusIcon />
             </PromptInputButton>
 
             {voiceShown && (
@@ -589,7 +589,7 @@ export default function ChatComposer({
 
             {/* Crossed tools, not a speech bubble: this opens the SKILLS/commands menu, and a
                 bubble said "message". No colour override — it wears the same accent the
-                paperclip does, so the composer's two icon buttons read as one family rather
+                attach button does, so the composer's two icon buttons read as one family rather
                 than as two different greens. */}
             <PromptInputButton
               tooltip={{ content: t('input.showAllCommands') }}
