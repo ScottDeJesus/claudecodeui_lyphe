@@ -98,8 +98,8 @@ async function readCapped(response: Response, cap: number): Promise<Blob | null>
  * voice and no look of its own. Handed to the chat through `CoreDrawingProvider`, because the chat module cannot import the companion's.
  * One function for the app's life, so the provider's value never changes.
  */
-const drawChatCore = ({ material, state, size }: CoreDrawingInput) => (
-  <CompanionAvatar presence={{ state, session: null, files: null, walk: null }} voice={null} sentences={null} look={null} material={material} size={size} />
+const drawChatCore = ({ material, state, drive, size }: CoreDrawingInput) => (
+  <CompanionAvatar presence={{ state, session: null, files: null, walk: null }} voice={null} sentences={null} look={null} material={material} drive={drive} size={size} />
 );
 
 /**

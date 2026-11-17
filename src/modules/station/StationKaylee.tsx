@@ -3,6 +3,7 @@ import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AccountWeekRing } from '@/modules/accounts';
 import { CompanionControls, CompanionFace, CompanionStatus, CompanionStopButton, useCompanion, useCompanionPresence } from '@/modules/companion';
 import { SessionsHalo } from '@/modules/sidebar';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
@@ -19,6 +20,9 @@ import { cn } from '@/shared/utils';
 
 /** The square the companion's core is drawn in, in px: in the halo's middle, and alone as the mark at the head of one column. */
 const CORE_PX: Record<StationKayleeForm, number> = { beside: 64, under: 64, mark: 48 };
+
+/** How far outside the core's edge the account's week is drawn, in px. */
+const WEEK_GAP = 4;
 
 /**
  * Where the companion stands on the scene. `beside`: at rest, at the foot of the room the roadmap stands in, the halo at the start with the
@@ -52,6 +56,11 @@ type StationKayleeViewProps = {
   face: (px: number) => ReactNode;
   /** The core, pressed: the way back to the sessions home. */
   onHome: () => void;
+  /**
+   * The account's week as a ring round the core, at the radius it is given in px (`AccountWeekRing` on the page): its band opens the
+   * account switcher. Absent on a fixture, which draws the core alone.
+   */
+  week?: (radius: number) => ReactNode;
   /** The companion's picture, or null while it loads or its read has failed: the lines then draw nothing. */
   picture: CompanionPicture | null;
   /** The sentence this page's player is sounding, marked in the answer; null when none is. */
@@ -112,7 +121,7 @@ function clockOf(stamp: string): string {
  * `data-station-kaylee` reads the form. A pure view: `StationKaylee` below binds it.
  */
 export function StationKayleeView({
-  form, halo, name, presence, face, onHome, picture, speaking, controls, stop, ears, onSayAgain, failedSentence, running, waiting, transcript,
+  form, halo, name, presence, face, onHome, week, picture, speaking, controls, stop, ears, onSayAgain, failedSentence, running, waiting, transcript,
 }: StationKayleeViewProps) {
   const { t } = useTranslation();
   const nameId = useId();
@@ -131,17 +140,20 @@ export function StationKayleeView({
     waiting !== null && waiting > 0 ? t('station.kaylee.waiting', { count: waiting }) : null,
   ].filter(Boolean).join(' · ');
   const core = (
-    <button
-      type="button"
-      data-station-kaylee-core=""
-      aria-label={t('station.kaylee.home')}
-      title={t('station.kaylee.home')}
-      onClick={onHome}
-      className="relative grid shrink-0 place-items-center rounded-full outline-none transition-transform hover:scale-[1.04] focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
-      style={{ width: CORE_PX[form], height: CORE_PX[form] }}
-    >
-      {face(CORE_PX[form])}
-    </button>
+    // The core's own box: the account's week is centred on it, under the core's press, so only the band outside the core reaches it.
+    <span className="relative grid shrink-0 place-items-center" style={{ width: CORE_PX[form], height: CORE_PX[form] }}>
+      {week?.(CORE_PX[form] / 2 + WEEK_GAP)}
+      <button
+        type="button"
+        data-station-kaylee-core=""
+        aria-label={t('station.kaylee.home')}
+        title={t('station.kaylee.home')}
+        onClick={onHome}
+        className="relative grid size-full place-items-center rounded-full outline-none transition-transform hover:scale-[1.04] focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+      >
+        {face(CORE_PX[form])}
+      </button>
+    </span>
   );
 
   return (
@@ -302,6 +314,7 @@ export function StationKaylee({ form, haloWidth, onHome }: { form: StationKaylee
       presence={presence}
       face={(px) => <CompanionFace size={px} />}
       onHome={onHome}
+      week={(radius) => <AccountWeekRing radius={radius} />}
       picture={picture}
       speaking={voice.speaking}
       controls={(

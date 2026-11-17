@@ -489,6 +489,13 @@ function ChatMessagesPane({
             let run: { nodes: ReactElement[]; calls: ChatMessage[]; first: ChatMessage | undefined } | null = null;
             const closeRun = (finished: boolean) => {
               if (run === null) return;
+              // A run that holds no call (a thought alone, or every call put away by "Show work") has nothing to count on a line:
+              // its rows stand in the turn as they are.
+              if (run.calls.length === 0) {
+                turn.push(...run.nodes);
+                run = null;
+                return;
+              }
               // A run that opens its turn wears the turn's mark: the row that would have worn it is inside the run.
               const model = run.first?.model ?? '';
               const opens = turn.length === 0 ? { model, name: (model && resolveModelLabel?.(model)) || model } : null;

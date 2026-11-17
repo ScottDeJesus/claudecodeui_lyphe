@@ -389,6 +389,7 @@ export default function ChatComposer({
   // Whether the chat's settings stand open over the line: the core's press opens and closes them. Closed each time the composer mounts,
   // so the line is quiet until they are asked for.
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const settingsId = useId();
   // A question of the chat's that waits on the reader (the session protection's own set): with a pending permission, what draws the core in.
   const awaitingInput = useAwaitingInputSessionIdSet().has(sessionId ?? '');
@@ -475,10 +476,11 @@ export default function ChatComposer({
         />
       )}
 
-      {/* THE CHAT'S SETTINGS, kept behind its core: what sets the chat up rather than writes to it. The same controls the line's
-          own row held, each unchanged; they stand here while the core's press has them open. A query container
-          (`[container-type:inline-size]`): the model pill's tool-set count shows only where this row is wide enough to hold it
-          (ComposerModelMenu). */}
+      {/* THE REST OF THE CHAT'S SETTINGS, kept behind its core: what sets the chat up rather than writes to it. The model and the
+          effort are the rings round the core (`ChatCore`), so the menu here is the tool sets and, below `sm`, the edit mode. The other
+          controls are the ones the line's own row held, each unchanged; they stand here while the core's press has them open. A
+          query container (`[container-type:inline-size]`): the pill's tool-set count shows only where this row is wide enough to
+          hold it (ComposerModelMenu). */}
       {settingsOpen && (
         <div
           id={settingsId}
@@ -495,6 +497,7 @@ export default function ChatComposer({
             onSelectModel={onSelectModel}
             modelsLoading={modelsLoading}
             toolsets={toolsets}
+            modelSetElsewhere
             // One pill or two, never both: below `sm` the model menu carries the edit mode as a third section.
             permissionMode={isNarrowComposer ? permissionMode : undefined}
             permissionModes={isNarrowComposer ? availablePermissionModes : undefined}
@@ -542,12 +545,18 @@ export default function ChatComposer({
       <div className="chat-line mx-auto max-w-[54.25rem]">
         <ChatCore
           model={model}
-          modelLabel={availableModelLabelsById?.[model] ?? availableModelOptions.find((option) => option.value === model)?.label ?? model}
+          modelOptions={availableModelOptions}
+          modelLabelsById={availableModelLabelsById}
+          onSelectModel={onSelectModel}
+          effort={effort}
+          effortOptions={availableEffortOptions}
+          onSelectEffort={onSelectEffort}
           state={hasPendingPermissions || awaitingInput ? 'waiting' : isLoading ? 'working' : 'idle'}
           context={contextShare}
           open={settingsOpen}
           controls={settingsId}
           onToggle={() => setSettingsOpen((open) => !open)}
+          onClose={closeSettings}
         />
         {turnsScrollerRef && <TurnRail scrollerRef={turnsScrollerRef} messageCount={messageCount} />}
       <div ref={anchorRef} className="relative min-w-0 flex-1">

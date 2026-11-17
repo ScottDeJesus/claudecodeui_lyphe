@@ -4,13 +4,6 @@ import { Switch } from '@/shared/ui';
 import type { ClaudeAccountSwitch, ClaudeAccounts } from '@/shared/types';
 import { formatShortDate } from '@/shared/utils';
 
-/**
- * The line that closes the section. A switch raises one question — "will this lose my work?" — and
- * this answers it: work already running finishes on its account, and an open chat moves at its next message.
- */
-const SWITCHING_IN_WORDS =
-  'Switching sets where new chats and plan runs start. Running work stays on its account; an open chat moves at its next message.';
-
 /** The automatic switch's whole sentence: its accessible name, which the short visible label stands for. */
 const AUTO_SWITCH_WORDS = 'Switch automatically when the account in use fills';
 
@@ -24,21 +17,21 @@ const DOOR_UNREACHABLE_LINE = 'The server could not read the accounts — which 
 const NO_ACT = () => undefined;
 
 /**
- * The last switch in two parts: who and when ("Switched to sdjesus89 · Oct 30, 11:41 pm", the day only when it was not
- * today), and its reason, whole. `why` is `null` when the door gave none.
+ * The last switch in one line: when, and its reason whole ("Switched Oct 30, 11:41 pm · weekly is at its ceiling …", the day only
+ * when it was not today). It names no account: it is said on the row it switched to.
  */
-function lastSwitchInWords(lastSwitch: ClaudeAccountSwitch, nowMs: number): { lead: string; why: string | null } {
+function lastSwitchInWords(lastSwitch: ClaudeAccountSwitch, nowMs: number): string {
   const why = typeof lastSwitch.why === 'string' && lastSwitch.why.trim() ? lastSwitch.why.trim() : null;
   // `at` is wire input like every reading's stamp: a row relayed without a readable time has no
   // clock to state, and `new Date(NaN).toISOString()` throws in render — taking the whole app down
   // over one line. The switch is still a fact; say it without the time.
   const at = new Date(lastSwitch.at * 1000);
-  if (Number.isNaN(at.getTime())) return { lead: `Switched to ${lastSwitch.to_slug}`, why };
+  if (Number.isNaN(at.getTime())) return why === null ? 'Switched' : `Switched · ${why}`;
   const clock = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase();
   const day = formatShortDate(at.toISOString());
   const sameDay = at.toDateString() === new Date(nowMs).toDateString();
   const when = sameDay || day === null ? clock : `${day}, ${clock}`;
-  return { lead: `Switched to ${lastSwitch.to_slug} · ${when}`, why };
+  return why === null ? `Switched ${when}` : `Switched ${when} · ${why}`;
 }
 
 type ClaudeAccountRowsProps = {
@@ -55,8 +48,8 @@ type ClaudeAccountRowsProps = {
 
 /**
  * The account section of the account panel: one row per account in slug order, the identities the
- * box is signed in to but the store does not hold, the automatic switch, the last switch and why,
- * and the one sentence that says what a switch does to work already running.
+ * box is signed in to but the store does not hold, and the automatic switch, with nothing under it.
+ * The last switch and its reason are the hover of "In use" on the account it switched to.
  *
  * Used by the accounts module's AccountPanelBody, after the meters and the balances; the fakes beside
  * it (`claude-accounts-fake.ts`) draw every state without a server, so a state is reviewable before
@@ -95,10 +88,7 @@ function AccountRowsBody({
 
   if (!picture.reachable) {
     return (
-      <div className="flex flex-col gap-1.5">
-        <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">Accounts</div>
-        <p className="px-2 text-xs leading-relaxed text-muted-foreground">{DOOR_UNREACHABLE_LINE}</p>
-      </div>
+      <p className="text-xs leading-relaxed text-muted-foreground">{DOOR_UNREACHABLE_LINE}</p>
     );
   }
 
@@ -106,64 +96,46 @@ function AccountRowsBody({
   const candidates = [...picture.candidates].sort((left, right) => left.slug.localeCompare(right.slug));
   const auto = picture.auto;
   const held = picture.held;
-  // The one place the last switch's reason is stated, whole and dated: no row repeats it, because a reason's
-  // figures are that day's and a row would present them as current.
+  // The last switch's reason, whole and dated, in one place: the hover of "In use" on the account it switched to. A reason's
+  // figures are that day's, so it is never written out on a row as if it were current.
   const lastSwitch = picture.last_switch === null ? null : lastSwitchInWords(picture.last_switch, nowMs);
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">{`Accounts · ${accounts.length + candidates.length}`}</div>
-
-      <div className="flex flex-col gap-0.5">
-        {accounts.map((account, index) => (
-          <AccountRowView
-            key={account.digest}
-            account={account}
-            hue={index}
-            nowMs={nowMs}
-            busy={busy}
-            held={held}
-            onUse={onUse}
-            onSetup={onSetup}
-            onRemove={onRemove}
-          />
-        ))}
-        {candidates.map((candidate, index) => (
-          <CandidateRow
-            key={candidate.digest}
-            slug={candidate.slug}
-            email={candidate.email ?? null}
-            hue={accounts.length + index}
-            busy={busy}
-            onSetup={onSetup}
-          />
-        ))}
-        {accounts.length === 0 && candidates.length === 0 && (
-          <p className="px-2 text-xs leading-relaxed text-muted-foreground">No accounts are set up yet.</p>
-        )}
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2" role="heading" aria-level={3}>
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Accounts</span>
+        <span aria-hidden="true" className="h-px flex-1 bg-border" />
       </div>
 
+      {accounts.length === 0 && candidates.length === 0 ? (
+        <p className="py-1 text-xs leading-relaxed text-muted-foreground">No accounts are set up yet.</p>
+      ) : (
+        <ul className="flex flex-col">
+          {accounts.map((account) => (
+            <AccountRowView
+              key={account.digest}
+              account={account}
+              nowMs={nowMs}
+              busy={busy}
+              held={held}
+              switched={lastSwitch !== null && picture.last_switch?.to === account.digest ? lastSwitch : null}
+              onUse={onUse}
+              onSetup={onSetup}
+              onRemove={onRemove}
+            />
+          ))}
+          {candidates.map((candidate) => (
+            <CandidateRow key={candidate.digest} slug={candidate.slug} email={candidate.email ?? null} nowMs={nowMs} busy={busy} onSetup={onSetup} />
+          ))}
+        </ul>
+      )}
+
       {accounts.length > 0 && (
-        <div className="mt-0.5 flex items-center justify-between gap-3 px-2">
-          {/* Short to the eye; the switch's accessible name keeps the whole sentence. */}
-          <span className="text-xs leading-relaxed text-muted-foreground">Auto-switch when full</span>
+        <div className="flex items-center justify-between gap-3 pt-1">
+          {/* Short to the eye; the switch's accessible name keeps the whole sentence. Nothing is written under it. */}
+          <span className="text-[13px] text-foreground">Auto-switch when full</span>
           <Switch checked={auto} onChange={onSetAuto} label={AUTO_SWITCH_WORDS} disabled={busy} />
         </div>
-      )}
-
-      {!auto && accounts.length > 0 && (
-        <p className="px-2 text-xs leading-relaxed text-ink-faint">Off: the account in use stays chosen even when full.</p>
-      )}
-
-      {lastSwitch !== null && (
-        <p className="px-2 text-xs leading-relaxed text-ink-faint">
-          <span className="block text-muted-foreground">{lastSwitch.lead}</span>
-          {lastSwitch.why}
-        </p>
-      )}
-
-      {accounts.length > 0 && (
-        <p className="px-2 pt-0.5 text-xs leading-relaxed text-ink-faint">{SWITCHING_IN_WORDS}</p>
       )}
     </div>
   );

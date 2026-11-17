@@ -154,7 +154,11 @@
     "failed": "{{count}} failed"
   },
   "core": {
-    "settings": "Chat settings · {{model}}"
+    "settings": "Chat settings · {{model}}",
+    "settingsWithEffort": "Chat settings · {{model}}, {{effort}} effort",
+    "rings": "How this chat is set",
+    "model": "Model",
+    "effort": "Effort"
   },
   "input": {
     "placeholder": "Ask for a change, or describe what you want next",
@@ -236,6 +240,7 @@
       }
     },
     "toolsets": {
+      "pill": "Tool sets",
       "heading": "Tool sets for this conversation",
       "onNode": "This chat runs on {{node}}. Tool sets are this box's own.",
       "unreadable": "The tool-set file could not be read: {{error}}",

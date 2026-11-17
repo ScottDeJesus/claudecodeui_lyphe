@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { ReactNode } from 'react';
 
-import { AccountsProvider } from '@/modules/accounts';
+import { AccountSwitcher, AccountsProvider } from '@/modules/accounts';
 import { AppSwitcherProvider } from '@/modules/app-switcher';
 import { ChatHostProvider } from '@/modules/chat-host';
 import { useProjectChatState } from '@/modules/project-workspace/context/ProjectsStateContext';
@@ -41,6 +41,8 @@ function ProjectWorkspaceShell({
               {/* The sessions home, the workspace's own second page: his chats by folder, drawn over the frame while the router stands at `/home`. */}
               <WorkspaceHomeLayer />
             </CompanionHost>
+            {/* The account switcher, one for the workspace: an account ring on any page, or the rail's account button, opens it. */}
+            <AccountSwitcher />
           </AccountsProvider>
         </AppSwitcherProvider>
       </ChatHostProvider>

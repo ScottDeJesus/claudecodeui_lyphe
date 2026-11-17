@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCurrentApplication, useSwitcherActions } from '@/modules/app-switcher';
+import { AccountWeekRing } from '@/modules/accounts';
 import { CompanionFace, useCompanion } from '@/modules/companion';
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useRailBadges } from '@/modules/project-workspace/hooks/useRailBadges';
@@ -55,6 +56,7 @@ type WorkspaceHomeProps = {
  * - A CHAT, pressed, is brought forward in the workspace (`openChatInWorkspace`, the door Kaylee's own order to open a chat goes through). New chat is the
  *   workspace's new-chat screen; a chat closed or deleted here is let go of by the workspace as if its own list had removed it.
  * - KAYLEE'S CORE, docked at the foot on the start side, live as it is everywhere (`CompanionFace`): a press opens the station.
+ *   Round it, the account's week as a hairline (`AccountWeekRing`): a press on that band opens the account switcher.
  * - THE COG, at the head on the end side, opens Settings over the home (the workspace's own dialog, which stands in a portal over every page).
  * - THE MENU, at the foot on the end side, lists the screens he visits seldom, each with what its rail badge says while it has one; choosing one shows that
  *   view in the workspace.
@@ -147,21 +149,25 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
       </main>
 
       <footer className="flex h-[84px] flex-none items-center justify-between px-3 pb-[var(--safe-area-inset-bottom)] md:pl-9 md:pr-11">
-        <button
-          type="button"
-          data-home-core
-          aria-label={t('home.station', { name: companionName })}
-          title={t('home.station', { name: companionName })}
-          onClick={() => {
-            // The roadmap goes with the reader: the station's stack arrives from this page's circle.
-            doors.markRoadmapTravel('station');
-            openStation(doors.navigate);
-          }}
-          className="grid flex-none place-items-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
-          style={{ width: CORE_SIZE, height: CORE_SIZE }}
-        >
-          <CompanionFace size={CORE_SIZE} />
-        </button>
+        {/* The core's own box: the account's week is a ring centred on it, under the core's press, so only the band outside the core
+            reaches it and opens the account switcher. */}
+        <span className="relative grid flex-none place-items-center" style={{ width: CORE_SIZE, height: CORE_SIZE }}>
+          <AccountWeekRing radius={CORE_SIZE / 2 + 4} />
+          <button
+            type="button"
+            data-home-core
+            aria-label={t('home.station', { name: companionName })}
+            title={t('home.station', { name: companionName })}
+            onClick={() => {
+              // The roadmap goes with the reader: the station's stack arrives from this page's circle.
+              doors.markRoadmapTravel('station');
+              openStation(doors.navigate);
+            }}
+            className="relative grid size-full place-items-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+          >
+            <CompanionFace size={CORE_SIZE} />
+          </button>
+        </span>
         {menuItems.length > 0 && (
           <ActionMenu
             label={t('home.places')}

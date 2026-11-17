@@ -31,6 +31,8 @@ type CompanionAvatarProps = {
   look: CompanionFaceLook | null;
   /** The material she is drawn in (her `companionMaterial` preference); Mercury where none is given. */
   material?: CompanionMaterial;
+  /** How hard the core is driven, 0 to 1: a chat's own core gives its effort, and its surface stirs with it. Kaylee's gives none. */
+  drive?: number;
   /** Her name as he set it; the default stands in while a page has not read it. */
   name?: string;
   /** The square she fills, in CSS pixels: it picks the tier (disc under 120 px, core under 260 px, the whole dial above). The canvases follow the square's own box frame by frame. */
@@ -94,7 +96,7 @@ function frameFromLevel(level: number, previous: AstrolabeVoiceFrame | null): As
  * Her accessible name is her name and the state in words ("Kaylee, reading Bugfixes"), which a button around her may replace with a label
  * of its own; the canvases are for the eye alone.
  */
-export function CompanionAvatar({ presence, voice, sentences, look, material = 'mercury', name, size }: CompanionAvatarProps) {
+export function CompanionAvatar({ presence, voice, sentences, look, material = 'mercury', drive = 0, name, size }: CompanionAvatarProps) {
   const { t } = useTranslation();
   const her = name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
   const tier: AstrolabeTier = size < 120 ? 'disc' : size < 260 ? 'core' : 'dial';
@@ -115,9 +117,9 @@ export function CompanionAvatar({ presence, voice, sentences, look, material = '
   })();
 
   // The latest of what the loop reads, kept off React's render path: a frame reads these, and each commit replaces them.
-  const latest = useRef({ presence, voice, sentences, look, material, label });
+  const latest = useRef({ presence, voice, sentences, look, material, drive, label });
   useLayoutEffect(() => {
-    latest.current = { presence, voice, sentences, look, material, label };
+    latest.current = { presence, voice, sentences, look, material, drive, label };
   });
 
   useEffect(() => {
@@ -202,6 +204,7 @@ export function CompanionAvatar({ presence, voice, sentences, look, material = '
           asleep: p.state === 'asleep',
           word,
           material: current.material,
+          drive: current.drive,
         });
       } catch (error) {
         // One bad frame must not take the page down: report it once and keep drawing.

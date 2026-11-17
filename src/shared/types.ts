@@ -1182,12 +1182,13 @@ export type CompanionFaceLook = { dx: number; dy: number };
 //----------------- HER FACE: THE ASTROLABE INSTRUMENT ------------
 
 /**
- * The material her face is drawn in, and the mood it carries (the Astrolabe design system's three personas): `mercury`, polished chrome
+ * The material a core is drawn in, and the mood it carries (the Astrolabe design system's personas): `mercury`, polished chrome
  * beside the warm amber accent (the default); `tube`, amber vacuum-tube glass, for slow and reflective sessions; `wire`, a cyan
- * wireframe, for fast debugging. Stored per user as the `companionMaterial` preference (the companion module's `useCompanionMaterial`),
- * and read by its face and its Settings card.
+ * wireframe, for fast debugging; `plasma`, a violet charge held in dark glass. Stored per user as the `companionMaterial` preference
+ * (the companion module's `useCompanionMaterial`) and read by its face and its Settings card; a chat's own core wears the one its model
+ * maps to (the chat module's `replyMaterialOf`).
  */
-export type CompanionMaterial = 'mercury' | 'tube' | 'wire';
+export type CompanionMaterial = 'mercury' | 'tube' | 'wire' | 'plasma';
 
 /**
  * One frame of what a voice is doing, as the companion module's ear (`astrolabeEar.ts`) hears it from an AnalyserNode: loudness (`rms`)
@@ -1221,6 +1222,8 @@ export type AstrolabeFrameInput = {
   asleep: boolean;
   word: string | null;
   material: CompanionMaterial;
+  /** How hard it is driven, 0 to 1 (a chat's effort): it stirs the surface and widens the glow. Absent is 0, at rest. */
+  drive?: number;
 };
 
 /**

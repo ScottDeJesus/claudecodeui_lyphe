@@ -17,7 +17,8 @@ type CompanionMaterialSettingsProps = {
 
 /**
  * Her face card on Settings: the Astrolabe instrument she is drawn as, live, and the material it is made of — Mercury (chrome, the
- * default), Tube (amber glass, for slow and reflective sessions) or Wire (a cyan wireframe, for fast debugging). Used by this module's
+ * default), Tube (amber glass, for slow and reflective sessions), Wire (a cyan wireframe, for fast debugging) or Plasma (a violet charge
+ * held in dark glass). Used by this module's
  * CompanionSettingsSection, in CompanionSettingsView's `face` slot. The choice is the `companionMaterial` preference, so it follows him to
  * every device, and her button and the station change with it at once.
  */
@@ -29,6 +30,7 @@ export function CompanionMaterialSettings({ name }: CompanionMaterialSettingsPro
     { value: 'mercury', label: t('voiceSettings.companion.material.mercury', { defaultValue: 'Mercury' }), detail: t('voiceSettings.companion.material.mercuryDetail', { defaultValue: 'Polished chrome. The default.' }) },
     { value: 'tube', label: t('voiceSettings.companion.material.tube', { defaultValue: 'Tube' }), detail: t('voiceSettings.companion.material.tubeDetail', { defaultValue: 'Amber vacuum-tube glass, for slow, reflective sessions.' }) },
     { value: 'wire', label: t('voiceSettings.companion.material.wire', { defaultValue: 'Wire' }), detail: t('voiceSettings.companion.material.wireDetail', { defaultValue: 'A cyan wireframe, for fast debugging.' }) },
+    { value: 'plasma', label: t('voiceSettings.companion.material.plasma', { defaultValue: 'Plasma' }), detail: t('voiceSettings.companion.material.plasmaDetail', { defaultValue: 'A violet charge held in dark glass.' }) },
   ];
   const chosen = options.find((option) => option.value === material) ?? options[0];
 

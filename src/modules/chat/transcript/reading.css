@@ -11,8 +11,8 @@
  * `data-reply-mark`, `data-code-fence`); none changes the DOM. */
 
 /* ---------- whose reply it is ----------
- * The loop at a reply's head wears its model's material: Opus the tube's amber, Haiku the wire's cyan, and every other
- * model the chrome of Mercury. The name is the mark's title and its label for a reader; it is not written out. */
+ * The loop at a reply's head wears its model's material: Opus the tube's amber, Haiku the wire's cyan, Sonnet the plasma's
+ * violet, and every other model the chrome of Mercury. The name is the mark's title and its label for a reader; it is not written out. */
 [data-reply-mark] {
   flex: none;
   width: 14px;
@@ -22,6 +22,7 @@
 }
 [data-reply-mark='tube'] { border-color: var(--tube); }
 [data-reply-mark='wire'] { border-color: var(--wire); }
+[data-reply-mark='plasma'] { border-color: var(--plasma); }
 
 /* ---------- a shape, without its box ---------- */
 .chat-talk [data-shape]:not([data-shape='section'], [data-shape='widget'], [data-shape='docspace'], [data-shape='embed'], [data-shape='diagram'], [data-shape-fullscreen]) {

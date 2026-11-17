@@ -4,7 +4,7 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
 import type { CompanionMaterial } from '@/shared/types';
 
 /** Every material her face can be drawn in, in the order her Settings card offers them. */
-const MATERIALS: readonly CompanionMaterial[] = ['mercury', 'tube', 'wire'];
+const MATERIALS: readonly CompanionMaterial[] = ['mercury', 'tube', 'wire', 'plasma'];
 
 /**
  * The one reader of the `companionMaterial` preference: this module's CompanionFace draws her in it and her Settings card

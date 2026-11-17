@@ -143,7 +143,8 @@ precision mediump float;
 #endif
 varying vec2 vUv;
 uniform float uTime, uR, uBound, uSpikeH, uSpikeB, uSpikeN, uBreath, uThink, uHalo, uEnergy, uPx, uStepK, uFlow, uDay;
-uniform vec3 uL0, uL1, uL2, uLA, uLK, uW, uCA, uCB, uHaloC;
+uniform vec3 uL0, uL1, uL2, uLA, uLK, uCA, uCB, uHaloC;
+uniform vec4 uW;
 uniform vec4 uS0, uS1, uS2, uS3, uSA;
 uniform mat3 uSpin;
 uniform int uSteps;
@@ -304,6 +305,22 @@ vec3 shWire(vec3 sn, float ndv, float dsp, float cr) {
   float fr = pow(1.0 - ndv, 2.5);
   return vec3(0.003, 0.01, 0.014) + uCA * g * (0.35 + 0.5 * ndv) + uCB * ct * 0.9 + uCA * fr * 0.6 + uCB * cr * 1.2;
 }
+/* Plasma: dark glass with a charge held in it. Filaments wander out from the middle to the wall, brighter where they touch it. */
+float plFil(float phi, float rho, float base, float sp, float k) {
+  float a = base + 0.55 * sin(uTime * sp + k) + 0.24 * sin(rho * 7.0 - uTime * (1.1 + sp) + k * 2.0);
+  float d = abs(mod(phi - a + PI, 2.0 * PI) - PI) * max(rho, 0.08);
+  return exp(-d * 26.0) * smoothstep(0.02, 0.3, rho);
+}
+vec3 shPlasma(vec3 sn, vec3 r, float ndv, float cr) {
+  float rho = length(sn.xy);
+  float phi = atan(sn.y, sn.x);
+  float f = plFil(phi, rho, 0.4, 0.31, 0.0) + plFil(phi, rho, 2.5, 0.23, 1.7) + plFil(phi, rho, 4.4, 0.37, 3.1) + 0.7 * plFil(phi, rho, 5.6, 0.19, 4.6);
+  f *= 0.55 + 1.3 * uEnergy + 0.45 * rho;
+  float seed = exp(-rho * rho * 9.0);
+  float fr = pow(1.0 - ndv, 3.0);
+  vec3 c = vec3(0.012, 0.008, 0.022) + uCA * (0.05 + 0.5 * seed) + uCA * f * 0.9 + vec3(1.0, 0.92, 1.0) * (f * f * 0.45 + seed * seed * 0.5);
+  return c * (1.0 - 0.6 * fr) + env(r) * (0.05 + 0.85 * pow(1.0 - ndv, 5.0)) * vec3(0.86, 0.82, 1.0) + uCB * fr * 0.5 + uCB * cr * 1.2;
+}
 void main() {
   vec2 p2 = vUv;
   float rr2 = dot(p2, p2);
@@ -342,6 +359,7 @@ void main() {
       if (uW.x > 0.002) c += uW.x * shChrome(r, ndv, cr);
       if (uW.y > 0.002) c += uW.y * shTube(n, r, ndv, pos, cr);
       if (uW.z > 0.002) c += uW.z * shWire(sn, ndv, dsp, cr);
+      if (uW.w > 0.002) c += uW.w * shPlasma(sn, r, ndv, cr);
       col = 1.0 - exp(-c * 1.25);
       alpha = 1.0;
     } else {
@@ -482,7 +500,7 @@ function ringPoint(basis: { U: Vec3; V: Vec3 }, radius: number, theta: number): 
   return [radius * (c * basis.U[0] + s * basis.V[0]), radius * (c * basis.U[1] + s * basis.V[1]), radius * (c * basis.U[2] + s * basis.V[2])];
 }
 const RETICLE_CORNERS: ReadonlyArray<readonly [number, number]> = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
-const MATERIALS: readonly CompanionMaterial[] = ['mercury', 'tube', 'wire'];
+const MATERIALS: readonly CompanionMaterial[] = ['mercury', 'tube', 'wire', 'plasma'];
 
 function makeCanvas(host: HTMLElement): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
@@ -515,7 +533,7 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
   let fastMs = 0;
 
   // The instrument's envelopes and eases (`v`), the pointer and its lock (`dial`), the rings, the lobes and what rides out on an onset.
-  const v = { t: 0, think: 0, speak: 0, listen: 0, rms: 0, low: 0, mid: 0, high: 0, energy: 0, spikeEnv: 0, f0: 0, voicing: 0, presence: 1 };
+  const v = { t: 0, think: 0, speak: 0, listen: 0, rms: 0, low: 0, mid: 0, high: 0, energy: 0, spikeEnv: 0, f0: 0, voicing: 0, presence: 1, drive: 0 };
   const dial = {
     az: 1.15, azVel: 0, lockErr: 1, locked: false, acquired: false, lockAmt: 0, lockPulse: 0, sweep: 0, thinkStart: 0, wasThinking: false, target: null as number | null,
     inPsi: 0, inPsiT: 0, inOmega: 0.4, inIota: 70 * DEG, midPsi: 2, midPsiT: 2, midOmega: 2.3, midIota: 54 * DEG, pitchDev: 0, walk: 0,
@@ -690,7 +708,8 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     ctx.beginPath();
     for (let i = 0; i <= 120; i++) {
       const a = (i / 120) * TAU;
-      const rr = R * k * (1 + 0.018 * Math.sin(3 * a + clock) + 0.012 * Math.sin(5 * a - clock * 1.3) + 0.08 * v.low * v.speak * Math.pow(Math.max(0, Math.cos(a - dial.az)), 4));
+      // How hard it is driven stirs the outline: a wider swell and a faster ripple on top of its breath.
+      const rr = R * k * (1 + (0.018 + 0.022 * v.drive) * Math.sin(3 * a + clock * (1 + 1.6 * v.drive)) + (0.012 + 0.02 * v.drive) * Math.sin(5 * a - clock * (1.3 + 2.4 * v.drive)) + 0.014 * v.drive * Math.sin(9 * a + clock * 4.1) + 0.08 * v.low * v.speak * Math.pow(Math.max(0, Math.cos(a - dial.az)), 4));
       const x = cx + rr * Math.cos(a);
       const y = cy - rr * Math.sin(a);
       if (i) ctx.lineTo(x, y);
@@ -700,11 +719,12 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     const [c1, c2, c3, c4, c5] = palette.chrome;
     const tint = material === 'mercury' ? null : palette.accent;
     const mix = (c: Rgb, amount: number): Rgb => (tint ? [lerp(c[0], tint[0], amount), lerp(c[1], tint[1], amount), lerp(c[2], tint[2], amount)] : c);
-    gradient.addColorStop(0, rgba(mix(c1, 0.1), 1));
-    gradient.addColorStop(0.16, rgba(mix(c2, 0.25), 1));
-    gradient.addColorStop(0.5, rgba(mix(c3, 0.35), 1));
-    gradient.addColorStop(0.8, rgba(mix(c4, 0.3), 1));
-    gradient.addColorStop(0.94, rgba(mix(c5, 0.2), 1));
+    // Tinted far enough that a core this small still tells its material by its colour: a chat's core is read at a glance.
+    gradient.addColorStop(0, rgba(mix(c1, 0.14), 1));
+    gradient.addColorStop(0.16, rgba(mix(c2, 0.34), 1));
+    gradient.addColorStop(0.5, rgba(mix(c3, 0.5), 1));
+    gradient.addColorStop(0.8, rgba(mix(c4, 0.42), 1));
+    gradient.addColorStop(0.94, rgba(mix(c5, 0.28), 1));
     gradient.addColorStop(1, rgba(palette.accent, 0.6));
     ctx.fillStyle = gradient;
     ctx.fill();
@@ -739,6 +759,7 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     v.speak = ease(v.speak, state === 'speaking' ? 1 : 0, dt, 0.16);
     v.listen = ease(v.listen, state === 'listening' ? 1 : 0, dt, 0.25);
     v.presence = ease(v.presence, input.asleep ? 0.55 : 1, dt, 0.4);
+    v.drive = ease(v.drive, clamp(input.drive ?? 0, 0, 1), dt, 0.3);
     const heard = (state === 'speaking' || state === 'listening') && input.voice ? input.voice : null;
     v.rms = follow(v.rms, heard ? heard.rms : 0, dt, 0.012, 0.075);
     v.low = follow(v.low, heard ? heard.low : 0, dt, 0.02, 0.12);
@@ -855,7 +876,7 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     }
     spin += dt * (0.05 + 0.35 * v.energy * v.speak + 0.3 * v.think) * rate;
     const ti = MATERIALS.indexOf(material);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < MATERIALS.length; i++) {
       const goal = i === ti ? 1 : 0;
       const next = ease(materialWeights[i], goal, dt, 0.18);
       materialWeights[i] = Math.abs(next - goal) < 0.002 ? goal : next;
@@ -924,7 +945,8 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     const sp = v.speak;
     const th = v.think;
     const ls = v.listen;
-    const E = v.rms;
+    // The voice's loudness, or how hard it is driven when that is more: the filament, the charge and the glow all feed on it.
+    const E = Math.max(v.rms, 0.5 * v.drive);
     const LA = lobes.a;
     const se = clamp((v.spikeEnv - 0.02) / 0.3, 0, 1);
     const spikeH = 0.62 * se * se * (3 - 2 * se) * sp;
@@ -947,7 +969,7 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     const toUnit = (c: Rgb) => [c[0] / 255, c[1] / 255, c[2] / 255];
     core.draw({
       uTime: clock, uR, uBound: bound, uSpikeH: spikeH, uSpikeB: 0.24, uSpikeN: 260, uBreath: 0.02 * (1 - 0.5 * sp) + 0.008, uThink: th,
-      uFlow: 0.004 + 0.024 * v.energy * sp + 0.01 * th, uLK: lobes.k,
+      uFlow: 0.004 + 0.024 * v.energy * sp + 0.01 * th + 0.012 * v.drive, uLK: lobes.k,
       uHalo: (0.22 + 0.8 * E * sp + 0.3 * th + 0.1 * ls) * (palette.light ? 0.7 : 1), uEnergy: E, uPx: 2 / (glCanvas.width || 1),
       uStepK: clamp(0.88 / Math.sqrt(1 + slope * slope), 0.4, 0.85),
       uL0: lobes.d[0], uL1: lobes.d[1], uL2: lobes.d[2], uLA: LA, uW: materialWeights,

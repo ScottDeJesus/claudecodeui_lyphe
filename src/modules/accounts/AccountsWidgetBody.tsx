@@ -4,9 +4,9 @@ import { AccountPanelBody } from '@/modules/accounts/AccountPanelBody';
 import { useAccountsContext } from '@/modules/accounts/context/AccountsContext';
 
 /**
- * The account panel as the desktop chat gutter draws it: the same body the rail button's popover shows — the
- * usage meters first, the DeepSeek and Jev balances, then one row per account with its weekly figure,
- * the one in use marked, and a tap on another row to switch.
+ * The account panel as the desktop chat gutter draws it: the same body the account switcher shows — a dial for each
+ * usage window first, then one row per account with its week as a ring, the one in use marked and a press on another
+ * row's act to switch, then the DeepSeek and Jev balances.
  *
  * Used by `src/modules/chat-gutters` (`ChatGutterLayout`), through the accounts barrel, as the Accounts widget's body. It
  * takes no props: the panel is the account's, the same in every chat, and every figure it draws is read from

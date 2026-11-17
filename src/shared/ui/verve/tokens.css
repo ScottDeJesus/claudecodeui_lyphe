@@ -96,11 +96,13 @@
   --signal-b:#3b88a3;
   --signal-loop:#252b31;
   --signal-halo:#6c879e;
-  /* the other two materials, which the companion's face swaps in */
+  /* the other three materials, which a core swaps in: the companion's by its setting, a chat's by its model */
   --tube:#a33a00;--tube-tint:rgba(163, 58, 0, 0.12);--tube-ground:#f1ede7;
   --tube-signal-a:#c2540e;--tube-signal-b:#b4813f;--tube-signal-loop:#3a2a1f;--tube-signal-halo:#c46a2a;
   --wire:#00657a;--wire-tint:rgba(0, 101, 122, 0.12);--wire-ground:#e9eff2;
   --wire-signal-a:#0a8aab;--wire-signal-b:#4a9fb3;--wire-signal-loop:#123642;--wire-signal-halo:#2a98b8;
+  --plasma:#5b3fc4;--plasma-tint:rgba(91, 63, 196, 0.12);--plasma-ground:#eeedf3;
+  --plasma-signal-a:#6d4fd6;--plasma-signal-b:#8a78c4;--plasma-signal-loop:#2a2540;--plasma-signal-halo:#7a62c8;
 }
 
 /* ---------- colours: NIGHT ---------- */
@@ -150,6 +152,8 @@
   --tube-signal-a:#ff9e3e;--tube-signal-b:#ffd6a0;--tube-signal-loop:#ffe4c4;--tube-signal-halo:#ff8c32;
   --wire:#5fe3ff;--wire-tint:rgba(95, 227, 255, 0.14);--wire-ground:#030608;
   --wire-signal-a:#46e2ff;--wire-signal-b:#d6faff;--wire-signal-loop:#c8f8ff;--wire-signal-halo:#3cd2ff;
+  --plasma:#b9a2ff;--plasma-tint:rgba(185, 162, 255, 0.14);--plasma-ground:#09080d;
+  --plasma-signal-a:#a98bff;--plasma-signal-b:#e3d9ff;--plasma-signal-loop:#ece8ff;--plasma-signal-halo:#8f6bff;
 }
 
 /* the chrome ramp: the Mercury material's five stops, the same under any light */

@@ -24,29 +24,28 @@ type JevBalanceReadoutProps = {
 };
 
 /**
- * What is left of the Jev (TypeSafe) credit.
- * Used by the accounts module's AccountPanelBody, under the DeepSeek balance and its rate line.
+ * What is left of the Jev (TypeSafe) credit, on one line: its name, then the figure.
+ * Used by the accounts module's AccountPanelBody, under the DeepSeek balance and its rate.
  *
  * Unlike that figure this one is NOT the vendor's: TypeSafe publishes no balance route, so it is
  * the credit the operator seeded (`~/.claude/state/jev_account.json`) minus what this host metered
- * on its own calls. The `≈` and the note say so, because a key used anywhere else spends money
- * this screen cannot see.
+ * on its own calls. The `≈` says so on the line; what was spent of what credit, and that a key used anywhere else spends
+ * money this screen cannot see, is the line's hover and its words for a reader that asks.
  */
 export function JevBalanceReadout({ balance }: JevBalanceReadoutProps) {
   const figure = balance && balance.leftUsd !== null ? `≈ ${usd(balance.leftUsd)}` : null;
+  const note = noteInWords(balance);
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline gap-2">
-        <span className="flex items-center gap-1.5 self-center text-[13px] font-medium text-foreground">
-          <JevLogo className="h-4 w-4" />
-          Jev balance
-        </span>
-        <span className={cn('ml-auto text-[12.5px] tabular-nums', figure ? 'text-muted-foreground' : 'text-ink-faint')}>
-          {figure ?? NO_FIGURE}
-        </span>
-      </div>
-      <span className="text-xs leading-relaxed text-ink-faint">{noteInWords(balance)}</span>
+    <div data-balance="jev" title={note} className="flex min-h-7 items-center gap-2">
+      <span className="flex items-center gap-1.5 text-[13px] text-foreground">
+        <JevLogo className="h-4 w-4" />
+        Jev
+      </span>
+      <span className={cn('ml-auto text-[13px] tabular-nums', figure ? 'text-foreground' : 'text-ink-faint')}>
+        {figure ?? NO_FIGURE}
+      </span>
+      <span className="sr-only">{note}</span>
     </div>
   );
 }

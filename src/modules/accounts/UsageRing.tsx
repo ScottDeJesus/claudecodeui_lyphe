@@ -21,7 +21,7 @@ type UsageRingProps = {
   /** The reading is the last one the provider gave, not a current one: the ring dims as the panel's bars do. */
   degraded?: boolean;
   /**
-   * The account rows' form. A row has room under its ring and a phone has no hover, so the window's name and its
+   * The account rows' form, where the ring opens the row as its mark. A row has room under its ring and a phone has no hover, so the window's name and its
    * countdown are written under the ring ("wk · 3d") and the middle holds the figure ("92", "—" for no reading) — the
    * one visible mark that tells a week at 0% from a week nobody measured. The rail has no room for a caption, so
    * its middle holds the countdown and its window is told by its place and its hover words.
@@ -83,14 +83,11 @@ export function UsageRing({ usageWindow, now, degraded = false, captioned = fals
   );
 
   return (
-    // The rail's words open beside the rail, over the page, on one line each. A row ring sits at the panel's right edge,
-    // where a phone has no room to its right, so its words open to its left, over its own row — and wrap inside 11rem
-    // (`max-w-44`): the popover is docked at the window's left edge, and on a 320px phone a bubble on one line (about
-    // 290px) ran off the screen. `w-max` keeps the bubble its words' own width under that cap: the Tooltip sets its left
-    // edge at the ring before shifting it left, and an auto width would shrink to the little room right of the ring, a
-    // column of one word per line.
+    // The words open to the ring's right, over the page beside the rail or over the row the ring opens. A row's words wrap inside 11rem
+    // (`max-w-44`), so on a narrow phone the bubble stays inside the switcher's own width instead of running off the screen; `w-max`
+    // keeps it its words' own width under that cap.
     <Tooltip
-      position={captioned ? 'left' : 'right'}
+      position="right"
       className={captioned ? 'w-max max-w-44 whitespace-normal' : undefined}
       content={words.map((line, index) => (
         <span key={line} className={index === 0 ? 'block font-semibold' : 'block'}>
@@ -99,7 +96,7 @@ export function UsageRing({ usageWindow, now, degraded = false, captioned = fals
       ))}
     >
       {captioned ? (
-        // A fixed width, so a ring stands in the same column on every row whatever its caption says ("wk · 3d", "wk").
+        // A fixed width, so the rings stand in one column down the rows whatever each caption says ("wk · 3d", "wk").
         <div data-usage-ring={RING_HANDLE} className="flex w-12 flex-col items-center">
           {ring}
           <span data-ring-caption className="whitespace-nowrap text-[10px] tabular-nums leading-none text-muted-foreground">

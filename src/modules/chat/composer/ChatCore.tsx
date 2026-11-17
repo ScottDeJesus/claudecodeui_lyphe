@@ -1,23 +1,46 @@
 import '@/modules/chat/composer/chatLine.css';
 
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AccountWeekRing } from '@/modules/accounts';
+import { CoreRings } from '@/modules/chat/composer/CoreRings';
+import type { CoreRing } from '@/modules/chat/composer/CoreRings';
+import { replyMaterialOf } from '@/modules/chat/transcript/replyMark';
+import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
 import { useCoreDrawing } from '@/shared/context/CoreDrawingContext';
 import type { CoreDrawingInput } from '@/shared/context/CoreDrawingContext';
-import type { CompanionMaterial } from '@/shared/types';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { resolveModelLabel, resolveModelOption } from '@/shared/modelLabels';
+import type { ProviderModelOption } from '@/shared/types';
 import { SignalLoop } from '@/shared/ui';
+import { OWNS_ESCAPE, overlayInFrontHoldsEscape } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
 /** The side of the square the chat's core is drawn in, in px: the size of the companion's own core docked on the sessions home. */
 const CORE_PX = 56;
 
-/** The ring that reads the context, in the core's own box: its radius and how thick it is drawn. */
-const RING_RADIUS = 31;
+/** In its disc the core is drawn larger, where it is the thing being set: this share of the disc's side. */
+const CORE_SHARE_OF_DISC = 0.36;
+
+/** The ring that reads the context: how far outside the core's edge it runs, and how thick it is drawn, in px. */
+const CONTEXT_GAP = 3;
 const RING_WIDTH = 1.5;
-const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+
+/** The account's week, the ring outside the context's: how far outside the core's edge it runs, in px. */
+const ACCOUNT_GAP = 7;
 
 /** From this share of the context window the ring takes the warn ink: the window is nearly full. */
 const CONTEXT_WARN = 0.8;
+
+/** The disc the rings open in: its side at most, its side at least, and the air it keeps from the chat column's edges, in px. */
+const DISC_PX = 280;
+const DISC_MIN_PX = 200;
+const DISC_EDGE = 12;
+
+/** What counts as the settings' own surface for a press: the row the core opens, a menu or dialog opened from it, the account switcher. */
+const OWN_SURFACE = '[data-chat-settings], [role="menu"], [role="dialog"], [data-owns-escape]';
 
 /** What the chat is doing, as its core draws it. */
 export type ChatCoreState = 'idle' | 'working' | 'waiting';
@@ -25,22 +48,21 @@ export type ChatCoreState = 'idle' | 'working' | 'waiting';
 /** The core's own forms for the three: at rest, the loop turning while a turn runs, and drawn in (listening) while it waits on the reader. */
 const FORM: Record<ChatCoreState, CoreDrawingInput['state']> = { idle: 'idle', working: 'thinking', waiting: 'listening' };
 
-/**
- * The material a model is drawn in, by the family its name carries: Opus is Tube, Haiku is Wire, and every other model is Mercury. A fourth
- * material for Sonnet is the design system's (Plasma) and is not in this app's instrument yet, so Sonnet reads as Mercury until it is.
- */
-function materialOf(model: string): CompanionMaterial {
-  const name = model.toLowerCase();
-  if (name.includes('opus')) return 'tube';
-  if (name.includes('haiku')) return 'wire';
-  return 'mercury';
-}
+type EffortOption = NonNullable<ProviderModelOption['effort']>['values'][number];
 
 type ChatCoreProps = {
-  /** The model the chat runs on, by id or label: the core is made of it. */
+  /** The model the chat runs on, by the catalog's alias or by the id a stored chat carries: the core is made of it. */
   model: string;
-  /** The model's name as the reader knows it ("Opus 5.5"), for the core's spoken name; the id stands in while the catalog loads. */
-  modelLabel: string;
+  /** Every model the chat can be set to: the stops of the model ring. */
+  modelOptions: ProviderModelOption[];
+  /** The picker's name for each concrete model id the catalog lists, for a stored chat's id. */
+  modelLabelsById?: Record<string, string>;
+  onSelectModel: (model: string) => void;
+  /** How hard the chat thinks, by the catalog's own word, or the app's word for the model's own default. */
+  effort: string;
+  /** The efforts the model accepts: the stops of the effort ring after "Default". Empty draws no effort ring. */
+  effortOptions: EffortOption[];
+  onSelectEffort: (effort: string) => void;
   /** What the chat is doing. */
   state: ChatCoreState;
   /** How full the context window is, 0 to 1, or null while it is not known: the hairline round the core. */
@@ -51,73 +73,212 @@ type ChatCoreProps = {
   controls: string;
   /** The core, pressed: the chat's settings open or close. */
   onToggle: () => void;
+  /** Escape, or a press anywhere else: the settings close. */
+  onClose: () => void;
   className?: string;
 };
 
 /**
  * THE CHAT'S OWN CORE, beside the line the reader types in: the same instrument the companion is drawn with, one for each chat. The drawing
  * is the page's to give (`useCoreDrawing`): the instrument is the companion module's, which the chat cannot import without a cycle.
- * It says three things without a word. WHAT IT IS MADE OF is the model the chat runs on (`materialOf`). ITS FORM is what the chat is doing: at
- * rest, the loop turning while a turn runs, drawn in while it waits on the reader. THE HAIRLINE ROUND IT is how full the context window is, in the
- * warn ink once it is nearly full.
  *
- * IT IS A PRESS: the chat's settings (the model and effort, how edits happen, the tool sets, the count of tokens, the commands, export) open in a
- * row over the line and close again. They are the composer's own controls, unchanged; the core is where they are kept.
+ * IT SAYS FIVE THINGS WITHOUT A WORD. WHAT IT IS MADE OF is the model the chat runs on (`replyMaterialOf`). HOW RESTLESS ITS SURFACE IS is the
+ * effort it is driven at. ITS FORM is what the chat is doing: at rest, the loop turning while a turn runs, drawn in while it waits on the
+ * reader. THE HAIRLINE ROUND IT is how full the context window is, in the warn ink once it is nearly full. THE HAIRLINE OUTSIDE THAT is the
+ * account's week (`AccountWeekRing`), and a press on its band opens the account switcher.
  *
- * WHERE IT STANDS is the stylesheet's (`chatLine.css`): in the margin beside the line where the chat's column has one, so the line and the talk
- * above it keep one left edge, and at the line's start where it has none. Either way it stays level with the line's middle as the line grows.
+ * PRESS THE CORE AND IT IS SET BY TURNING. The core rises out of its dock into a disc over the talk, with two flat rings round it
+ * (`CoreRings`): the effort inside, lit as far as it is set, and the model outside, lit whole in the model's own colour. Turn one and
+ * the core changes as it turns, before the stop is chosen. The rest of the chat's settings (tool sets, the count of tokens, the commands, export) open with it, in a row over the
+ * line; they are the composer's own controls, unchanged. Escape, a press anywhere else or a second press on the core puts it all away.
  *
- * `data-chat-core` reads the state. Used by `ChatComposer`.
+ * WHERE IT STANDS is the stylesheet's (`chatLine.css`): docked in the margin beside the line where the chat's column has one, so the line
+ * and the talk above it keep one left edge, and at the line's start where it has none. Either way it stays level with the line's middle
+ * as the line grows. Open, its disc stands over the talk at the column's start, clear of the line, so the line stays in use.
+ *
+ * `data-chat-core` reads the state and `data-chat-core-material` the material. Each ring is `data-chat-ring` ("model", "effort") with
+ * its stops as `data-ring-stop`, so a script can set one by pressing the core and then a stop. Used by `ChatComposer`.
  */
-export function ChatCore({ model, modelLabel, state, context, open, controls, onToggle, className }: ChatCoreProps) {
+export function ChatCore({
+  model, modelOptions, modelLabelsById, onSelectModel, effort, effortOptions, onSelectEffort, state, context, open, controls, onToggle, onClose, className,
+}: ChatCoreProps) {
   const { t } = useTranslation('chat');
   const draw = useCoreDrawing();
-  const label = t('core.settings', { defaultValue: 'Chat settings · {{model}}', model: modelLabel });
+  const hostWindow = useHostWindow();
+  const dockRef = useRef<HTMLDivElement>(null);
+  const ringsRef = useRef<HTMLDivElement>(null);
+  const pressRef = useRef<HTMLButtonElement>(null);
+  // Where the open disc stands from the dock, and its side: measured from the chat's own column each time it opens or its room changes.
+  // Null while shut, when the core sits in its dock.
+  const [lift, setLift] = useState<{ dx: number; dy: number; size: number } | null>(null);
+  // A stop a ring is being turned past, before it is chosen: the core wears it at once. Null while no ring is held.
+  const [preview, setPreview] = useState<{ ring: string; value: string } | null>(null);
+
+  // The model ring's stops are the catalog's. A stored chat carries the id the SDK ran (`claude-opus-5-5`), not the catalog's alias, so
+  // it stands on the stop of its family (`modelAt`), which then wears the name of the model the chat is really on. A model the catalog
+  // has no family for (a custom one that was removed) is a stop of its own after the rest, so the ring never shows a model the chat is
+  // not on.
+  const { modelStops, modelAt } = useMemo(() => {
+    const own = resolveModelLabel(modelOptions, model, modelLabelsById) || model;
+    const at = resolveModelOption(modelOptions, model);
+    const stops = modelOptions.map((option) => ({ value: option.value, label: option === at ? own : option.label || option.value }));
+    return at === null ? { modelStops: [...stops, { value: model, label: own }], modelAt: model } : { modelStops: stops, modelAt: at.value };
+  }, [model, modelOptions, modelLabelsById]);
+  // The effort ring's: the model's own default first, as the app's menu has it, then each level the model accepts.
+  const effortStops = useMemo(() => (effortOptions.length === 0 ? [] : [
+    { value: DEFAULT_EFFORT_VALUE, label: t('composer.effortDefault', { defaultValue: 'Default' }) },
+    ...effortOptions.map((option) => ({ value: option.value, label: option.value })),
+  ]), [effortOptions, t]);
+
+  const rings = useMemo<CoreRing[]>(() => [
+    ...(effortStops.length > 0 ? [{ id: 'effort', label: t('core.effort', { defaultValue: 'Effort' }), stops: effortStops, value: effort, onSelect: onSelectEffort, scale: true }] : []),
+    { id: 'model', label: t('core.model', { defaultValue: 'Model' }), stops: modelStops, value: modelAt, onSelect: onSelectModel, scale: false },
+  ], [effort, effortStops, modelAt, modelStops, onSelectEffort, onSelectModel, t]);
+
+  const onPreview = useCallback((ring: string, value: string | null) => {
+    setPreview(value === null ? null : { ring, value });
+  }, []);
+
+  // What the core wears: the stop a held ring is passing, else what the chat is set to. A model is read by its value and its name
+  // together, since either may carry the family ("opus", "Opus 5.5").
+  const shownModel = preview?.ring === 'model' ? preview.value : modelAt;
+  const shownEffort = preview?.ring === 'effort' ? preview.value : effort;
+  const modelLabel = modelStops.find((stop) => stop.value === shownModel)?.label ?? shownModel;
+  const material = replyMaterialOf(`${shownModel} ${modelLabel}`);
+  // How hard it is driven, 0 to 1: where the effort stands among the model's levels. The model's own default is driven at the middle.
+  const effortAt = effortOptions.findIndex((option) => option.value === shownEffort);
+  const drive = effortOptions.length === 0 ? 0 : effortAt < 0 ? 0.5 : effortOptions.length === 1 ? 1 : effortAt / (effortOptions.length - 1);
+
+  // The open disc's place: at the column's start (its middle on a narrow one), its foot clear of everything the composer holds, never
+  // over the column's top.
+  useLayoutEffect(() => {
+    const dock = dockRef.current;
+    if (!open || dock === null) {
+      setLift(null);
+      return undefined;
+    }
+    const column = dock.closest('.chat-column') ?? hostWindow.document.documentElement;
+    const shell = dock.closest('.chat-composer-shell') ?? dock;
+    const settle = () => {
+      const docked = dock.getBoundingClientRect();
+      const room = column.getBoundingClientRect();
+      const size = Math.round(Math.max(DISC_MIN_PX, Math.min(DISC_PX, room.width - 2 * DISC_EDGE)));
+      // At the column's start where the column is wide; in its middle where the disc takes most of it (a phone).
+      const middleX = room.width < 2 * size ? room.left + room.width / 2 : room.left + DISC_EDGE + size / 2;
+      const middleY = Math.max(room.top + DISC_EDGE + size / 2, shell.getBoundingClientRect().top - DISC_EDGE - size / 2);
+      const next = { dx: Math.round(middleX - (docked.left + docked.width / 2)), dy: Math.round(middleY - (docked.top + docked.height / 2)), size };
+      setLift((current) => (current !== null && current.dx === next.dx && current.dy === next.dy && current.size === next.size ? current : next));
+    };
+    settle();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(settle);
+    observer?.observe(column);
+    observer?.observe(shell);
+    return () => observer?.disconnect();
+  }, [open, hostWindow]);
+
+  // Open, the settings let go on Escape or on a press anywhere else. Escape is taken on the window's capture phase and marked handled,
+  // so the chat's running turn is not stopped by it (`useEscapeToAbortSession` reads the mark), and a panel opened in front of the rings
+  // (a menu from the row, the account switcher) keeps the key until it has shut.
+  useEffect(() => {
+    if (!open) return undefined;
+    const doc = hostWindow.document;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (target === null || dockRef.current?.contains(target) || target.closest(OWN_SURFACE)) return;
+      onClose();
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || overlayInFrontHoldsEscape(ringsRef.current, doc)) return;
+      event.preventDefault();
+      onClose();
+      pressRef.current?.focus({ preventScroll: true });
+    };
+    doc.addEventListener('pointerdown', closeOnOutsidePointer);
+    hostWindow.addEventListener('keydown', closeOnEscape, { capture: true });
+    return () => {
+      doc.removeEventListener('pointerdown', closeOnOutsidePointer);
+      hostWindow.removeEventListener('keydown', closeOnEscape, { capture: true });
+    };
+  }, [open, hostWindow, onClose]);
+
+  const effortLabel = effortStops.find((stop) => stop.value === effort)?.label ?? null;
+  const label = effortLabel === null || effort === DEFAULT_EFFORT_VALUE
+    ? t('core.settings', { defaultValue: 'Chat settings · {{model}}', model: modelLabel })
+    : t('core.settingsWithEffort', { defaultValue: 'Chat settings · {{model}}, {{effort}} effort', model: modelLabel, effort: effortLabel });
   const filled = context === null ? 0 : Math.min(1, Math.max(0, context));
+  const up = open && lift !== null;
+  // The core's square: its dock's, and larger in the disc. Its two hairlines keep their distance from its edge at either size.
+  const corePx = up ? Math.round(lift.size * CORE_SHARE_OF_DISC) : CORE_PX;
+  const contextRadius = corePx / 2 + CONTEXT_GAP;
+  const contextLength = 2 * Math.PI * contextRadius;
+  const contextBox = contextRadius + CONTEXT_GAP;
 
   return (
-    <button
-      type="button"
-      data-chat-core={state}
-      aria-label={label}
-      title={label}
-      aria-expanded={open}
-      aria-controls={controls}
-      onClick={onToggle}
-      className={cn(
-        // Its position is the stylesheet's (`chatLine.css`): in the line's row, or in the strip beside it.
-        'chat-line__core grid flex-none place-items-center rounded-full outline-none transition-transform hover:scale-[1.04] focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background',
-        className,
-      )}
+    // The dock: the core's place beside the line. Its position is the stylesheet's (`chatLine.css`): in the line's row, or in the strip.
+    <div
+      ref={dockRef}
+      data-chat-core-dock={up ? 'open' : 'docked'}
+      data-chat-core-material={material}
+      className={cn('chat-line__core chat-inst flex-none', className)}
       style={{ width: CORE_PX, height: CORE_PX }}
     >
-      {/* The core's own accessible name is the companion's; here the button speaks for it. */}
-      <span aria-hidden="true" className="pointer-events-none grid size-full place-items-center">
-        {draw !== null
-          ? draw({ material: materialOf(model), state: FORM[state], size: CORE_PX })
-          // No page gave the instrument (a surface that mounts the chat alone): the app's small loop stands in.
-          : <SignalLoop state={state === 'working' ? 'thinking' : 'idle'} size={28} />}
-      </span>
-      {context !== null && (
-        <svg
-          aria-hidden="true"
-          data-chat-core-context={Math.round(filled * 100)}
-          data-tone={filled >= CONTEXT_WARN ? 'warn' : undefined}
-          viewBox="-34 -34 68 68"
-          className="pointer-events-none absolute -inset-1.5 -rotate-90"
-        >
-          <circle r={RING_RADIUS} fill="none" strokeWidth={RING_WIDTH} style={{ stroke: 'var(--border)' }} />
-          <circle
-            r={RING_RADIUS}
-            fill="none"
-            strokeWidth={RING_WIDTH}
-            strokeLinecap="butt"
-            strokeDasharray={`${filled * RING_LENGTH} ${RING_LENGTH}`}
-            style={{ stroke: filled >= CONTEXT_WARN ? 'var(--warn-ink)' : 'var(--ink-muted)' }}
-            className="transition-[stroke-dasharray] duration-500 motion-reduce:transition-none"
-          />
-        </svg>
-      )}
-    </button>
+      {/* What rises: a point at the dock's middle that everything is centred on, carried to the disc's middle while the settings are open. */}
+      <div
+        className="chat-inst__lift"
+        style={(up ? { transform: `translate(${lift.dx}px, ${lift.dy}px)`, '--chat-inst-disc': `${lift.size}px` } : undefined) as CSSProperties | undefined}
+      >
+        <span aria-hidden="true" className="chat-inst__ground" />
+        {up && (
+          <div ref={ringsRef} {...OWNS_ESCAPE} role="group" aria-label={t('core.rings', { defaultValue: 'How this chat is set' })} className="chat-inst__rings">
+            <CoreRings rings={rings} size={lift.size} onPreview={onPreview} />
+          </div>
+        )}
+        <div className="chat-inst__heart">
+          {/* The account's week, outside the context's hairline. A chat standing in a window of its own has no switcher to open beside
+              it, so there the ring only reads. */}
+          <AccountWeekRing radius={corePx / 2 + ACCOUNT_GAP} pressable={hostWindow === window} />
+          <button
+            ref={pressRef}
+            type="button"
+            data-chat-core={state}
+            aria-label={label}
+            title={label}
+            aria-expanded={open}
+            aria-controls={controls}
+            onClick={onToggle}
+            className="chat-inst__press grid place-items-center rounded-full outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+            style={{ width: corePx, height: corePx }}
+          >
+            {/* The core's own accessible name is the companion's; here the button speaks for it. */}
+            <span aria-hidden="true" className="pointer-events-none grid size-full place-items-center">
+              {draw !== null
+                ? draw({ material, state: FORM[state], drive, size: corePx })
+                // No page gave the instrument (a surface that mounts the chat alone): the app's small loop stands in.
+                : <SignalLoop state={state === 'working' ? 'thinking' : 'idle'} size={28} />}
+            </span>
+            {context !== null && (
+              <svg
+                aria-hidden="true"
+                data-chat-core-context={Math.round(filled * 100)}
+                data-tone={filled >= CONTEXT_WARN ? 'warn' : undefined}
+                viewBox={`${-contextBox} ${-contextBox} ${2 * contextBox} ${2 * contextBox}`}
+                className="pointer-events-none absolute -inset-1.5 -rotate-90"
+              >
+                <circle r={contextRadius} fill="none" strokeWidth={RING_WIDTH} style={{ stroke: 'var(--border)' }} />
+                <circle
+                  r={contextRadius}
+                  fill="none"
+                  strokeWidth={RING_WIDTH}
+                  strokeLinecap="butt"
+                  strokeDasharray={`${filled * contextLength} ${contextLength}`}
+                  style={{ stroke: filled >= CONTEXT_WARN ? 'var(--warn-ink)' : 'var(--ink-muted)' }}
+                  className="transition-[stroke-dasharray] duration-500 motion-reduce:transition-none"
+                />
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

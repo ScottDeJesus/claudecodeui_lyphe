@@ -157,34 +157,35 @@ type DeepseekBalanceReadoutProps = {
 };
 
 /**
- * The money left on this host's DeepSeek account.
+ * The money left on this host's DeepSeek account, on one line: its name, then the figure.
  * Used by the accounts module's AccountPanelBody, which draws it in the panel from the ONE reading
  * `useDeepseekBalance` holds in AccountsProvider.
  *
  * Deliberately NOT a Meter. Every other reading on this surface is a share of a limit, and the
- * Meter's whole business is the bar that share is drawn on — but a balance has no limit to be a
- * share OF, and a bar over money would have to invent the ceiling it is measured against. So this
- * composes the same type register the Meter's stacked form uses — label left, figure right, a
- * faint line under it — and draws no bar at all.
+ * Meter's whole business is the arc that share is drawn on — but a balance has no limit to be a
+ * share OF, and a dial over money would have to invent the ceiling it is measured against.
+ *
+ * WHAT NEEDS EXPLAINING IS BEHIND THE LINE, NOT UNDER IT: why a figure is unknown, or when a healthy one was read, is the line's hover
+ * and its words for a reader that asks. The one thing said out loud is the vendor refusing the account, as a warn word beside the figure.
  */
 export function DeepseekBalanceReadout({ balance }: DeepseekBalanceReadoutProps) {
   const { figure, note } = readOut(balance);
   // An em-dash is an unknown, and every unknown is drawn in the faint ink — including a blank
   // amount, which is a reading of nothing rather than a quiet zero.
   const known = figure !== null;
+  const refused = balance !== null && balance.reachable && balance.available === false;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline gap-2">
-        <span className="flex items-center gap-1.5 self-center text-[13px] font-medium text-foreground">
-          <LLMProviderLogo provider="deepseek" className="h-4 w-4" />
-          DeepSeek balance
-        </span>
-        <span className={cn('ml-auto text-[12.5px] tabular-nums', known ? 'text-muted-foreground' : 'text-ink-faint')}>
-          {figure ?? NO_FIGURE}
-        </span>
-      </div>
-      {note && <span className="text-xs leading-relaxed text-ink-faint">{note}</span>}
+    <div data-balance="deepseek" title={note ?? undefined} className="flex min-h-7 items-center gap-2">
+      <span className="flex items-center gap-1.5 text-[13px] text-foreground">
+        <LLMProviderLogo provider="deepseek" className="h-4 w-4" />
+        DeepSeek
+      </span>
+      {refused && <span data-tone="warn" className="font-mono text-[10px] uppercase leading-none tracking-[0.12em] text-tone-ink">Unavailable</span>}
+      <span className={cn('ml-auto text-[13px] tabular-nums', known ? 'text-foreground' : 'text-ink-faint')}>
+        {figure ?? NO_FIGURE}
+      </span>
+      {note && <span className="sr-only">{note}</span>}
     </div>
   );
 }
