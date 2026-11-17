@@ -1,7 +1,7 @@
 import React, { Suspense, useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ChatInterface, type ChatExportSurface, type TokenUsageSurface } from '@/modules/chat';
+import { ChatInterface } from '@/modules/chat';
 import { ChatGutterLayout } from '@/modules/chat-gutters';
 import { ChatHostSlot, useChatHost } from '@/modules/chat-host';
 import { FilesView } from '@/modules/file-manager';
@@ -27,6 +27,10 @@ import { useFileOpenResolver } from '@/modules/project-workspace/hooks/useFileOp
 import { useHiddenNavFallback } from '@/modules/project-workspace/hooks/useHiddenNavFallback';
 import { useRunnerLanding } from '@/modules/project-workspace/hooks/useRunnerLanding';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
+import { CompanionAvatar } from '@/modules/companion';
+import { CoreDrawingProvider } from '@/shared/context/CoreDrawingContext';
+import type { CoreDrawingInput } from '@/shared/context/CoreDrawingContext';
+import ChatHead from '@/modules/project-workspace/ChatHead';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
 import WorkspaceErrorBoundary from '@/modules/project-workspace/WorkspaceErrorBoundary';
@@ -88,6 +92,16 @@ async function readCapped(response: Response, cap: number): Promise<Blob | null>
   return new Blob(chunks, { type: response.headers.get('content-type') ?? '' });
 }
 
+
+/**
+ * A chat's core, drawn: the companion's own instrument (`CompanionAvatar`), made of the material and in the form the chat asks for, with no
+ * voice and no look of its own. Handed to the chat through `CoreDrawingProvider`, because the chat module cannot import the companion's.
+ * One function for the app's life, so the provider's value never changes.
+ */
+const drawChatCore = ({ material, state, size }: CoreDrawingInput) => (
+  <CompanionAvatar presence={{ state, session: null, files: null, walk: null }} voice={null} sentences={null} look={null} material={material} size={size} />
+);
+
 /**
  * Rendered by ProjectMainRegion to show the active view's pane, with a project selected or not. Nothing in the
  * rail is project-scoped, so the house views (Roadmap, Kanban, Inbox, Browser and the rest) draw on their own;
@@ -148,14 +162,6 @@ function WorkspaceMain({
   // The counter behind that nonce. A ref, not state: nothing renders from it, and bumping it must
   // not be a second render on top of the request it is part of.
   const openRequestNonce = useRef(0);
-
-  // The chat's token count, lifted so the mobile header can carry it (the composer hides its
-  // copy below `md`). Chat-tab only: the number is that chat's, and the header stays a strip of
-  // navigation on every other tab.
-  const [tokenUsageSurface, setTokenUsageSurface] = useState<TokenUsageSurface | null>(null);
-  // The export button travels the same way and for the same reason: on a phone it used to float
-  // over the transcript it was exporting.
-  const [chatExportSurface, setChatExportSurface] = useState<ChatExportSurface | null>(null);
 
   // The request always carries an ABSOLUTE path, because Files picks the root that holds it. A relative
   // one — a chat card that named a file by its project path — is the open project's, and joins its folder.
@@ -321,16 +327,21 @@ function WorkspaceMain({
 
   return (
     <div className="flex h-full flex-col">
-      <WorkspaceHeader
-        selectedProject={selectedProject}
-        selectedSession={selectedSession}
-        viewLabel={viewLabel}
-        isMobile={isMobile}
-        onMenuClick={onMenuClick}
-        newSessionLabel={t('mainContent.newSession')}
-        tokenUsage={activeTab === 'chat' ? tokenUsageSurface : null}
-        chatExport={activeTab === 'chat' ? chatExportSurface : null}
-      />
+      {/* The Chat view has a head of its own, at every width: the way back to the sessions home, and the chat's name. Every other view
+          keeps the phone's strip (the drawer's button and the view's name). The chat's count of tokens and its export are the
+          composer's at every width now, behind the chat's core, so neither is handed to a header. */}
+      {activeTab === 'chat' && !floating ? (
+        <ChatHead selectedProject={selectedProject} selectedSession={selectedSession} newSessionLabel={t('mainContent.newSession')} />
+      ) : (
+        <WorkspaceHeader
+          selectedProject={selectedProject}
+          selectedSession={selectedSession}
+          viewLabel={viewLabel}
+          isMobile={isMobile}
+          onMenuClick={onMenuClick}
+          newSessionLabel={t('mainContent.newSession')}
+        />
+      )}
 
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">
         <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
@@ -340,6 +351,7 @@ function WorkspaceMain({
                   their own column untouched. The boundary is handed down rather than imported
                   there: each widget body gets its own, and a crashing widget cannot blank the
                   chat tab. */}
+              <CoreDrawingProvider value={drawChatCore}>
               <ChatGutterLayout enabled={!isMobile && !floating} sessionId={selectedSession?.id ?? null}
                 boundary={WorkspaceErrorBoundary}>
                 <ChatHostSlot sessionId={selectedSession?.id ?? null} showing={activeTab === 'chat'}>
@@ -362,12 +374,11 @@ function WorkspaceMain({
                     sendByCtrlEnter={sendByCtrlEnter}
                     externalMessageUpdate={externalMessageUpdate}
                     newSessionTrigger={newSessionTrigger}
-                    onTokenUsageSurface={setTokenUsageSurface}
-                    onChatExportSurface={setChatExportSurface}
                     onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
                   />
                 </ChatHostSlot>
               </ChatGutterLayout>
+              </CoreDrawingProvider>
             </WorkspaceErrorBoundary>
           ) : chooseProjectBody}
         </div>

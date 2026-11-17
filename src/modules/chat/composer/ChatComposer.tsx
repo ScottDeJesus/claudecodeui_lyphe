@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type {
   ChangeEvent,
   ClipboardEvent,
@@ -14,6 +14,7 @@ import { PlusIcon, PencilRulerIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } fr
 
 import { PAGE_ANCHOR } from '@/shared/constants';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { useAwaitingInputSessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { usePageAnchor } from '@/shared/context/PageAnchorsContext';
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import {
@@ -21,7 +22,6 @@ import {
   PromptInput,
   PromptInputBody,
   PromptInputTextarea,
-  PromptInputFooter,
   PromptInputTools,
   PromptInputButton,
   PromptInputSubmit,
@@ -42,6 +42,7 @@ import { SendMenuPopover } from '@/modules/chat/composer/SendMenuPopover';
 import type { SendMenuChoice } from '@/modules/chat/composer/SendMenuPopover';
 import { ScheduleMessagePopover } from '@/modules/chat/composer/ScheduleMessagePopover';
 import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageList';
+import { ChatCore } from '@/modules/chat/composer/ChatCore';
 import ComposerDeepSeekSwitch from '@/modules/chat/composer/ComposerDeepSeekSwitch';
 import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
@@ -381,6 +382,17 @@ export default function ChatComposer({
   // A timer left running past unmount would call setState on a dead component.
   useEffect(() => cancelLongPress, [cancelLongPress]);
 
+  // Whether the chat's settings stand open over the line: the core's press opens and closes them. Closed each time the composer mounts,
+  // so the line is quiet until they are asked for.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsId = useId();
+  // A question of the chat's that waits on the reader (the session protection's own set): with a pending permission, what draws the core in.
+  const awaitingInput = useAwaitingInputSessionIdSet().has(sessionId ?? '');
+  // How full the context window is, for the core's hairline: what is used of the whole, or null while either is not known.
+  const contextUsed = Number(tokenBudget?.used);
+  const contextTotal = Number(tokenBudget?.total);
+  const contextShare = Number.isFinite(contextUsed) && Number.isFinite(contextTotal) && contextTotal > 0 ? contextUsed / contextTotal : null;
+
   // Hide the thinking/status bar while any permission request is pending
   const hasPendingPermissions = pendingPermissionRequests.length > 0;
   const hasActivityIndicator = Boolean(activity && !hasPendingPermissions);
@@ -460,9 +472,81 @@ export default function ChatComposer({
         />
       )}
 
-      {/* The anchor is the input box's own column, not the shell: the shell also holds the pinned agents' strip and the
-          activity tab, which would carry a guide's centre away from the box she is looking at. */}
-      <div ref={anchorRef} className="relative mx-auto max-w-[54.25rem]">
+      {/* THE CHAT'S SETTINGS, kept behind its core: what sets the chat up rather than writes to it. The same controls the line's
+          own row held, each unchanged; they stand here while the core's press has them open. A query container
+          (`[container-type:inline-size]`): the model pill's tool-set count shows only where this row is wide enough to hold it
+          (ComposerModelMenu). */}
+      {settingsOpen && (
+        <div
+          id={settingsId}
+          data-chat-settings=""
+          className="mx-auto mb-2 flex max-w-[54.25rem] flex-wrap items-center gap-1.5 [container-type:inline-size]"
+        >
+          <ComposerModelMenu
+            effort={effort}
+            effortOptions={availableEffortOptions}
+            onSelectEffort={onSelectEffort}
+            model={model}
+            modelOptions={availableModelOptions}
+            modelLabelsById={availableModelLabelsById}
+            onSelectModel={onSelectModel}
+            modelsLoading={modelsLoading}
+            toolsets={toolsets}
+            // One pill or two, never both: below `sm` the model menu carries the edit mode as a third section.
+            permissionMode={isNarrowComposer ? permissionMode : undefined}
+            permissionModes={isNarrowComposer ? availablePermissionModes : undefined}
+            onSelectPermissionMode={isNarrowComposer ? onSelectPermissionMode : undefined}
+          />
+
+          {!isNarrowComposer && (
+            <ComposerPermissionMenu
+              permissionMode={permissionMode}
+              permissionModes={availablePermissionModes}
+              onSelectPermissionMode={onSelectPermissionMode}
+            />
+          )}
+
+          {/* A pressed chip, not an icon: the state has to be readable at a glance, and "on" for a mode is a word plus a fill. */}
+          <Chip
+            size="sm"
+            className="h-8"
+            selected={plainMode}
+            onClick={onTogglePlainMode}
+            title={t('input.plainModeTooltip')}
+          >
+            {t('input.plainMode')}
+          </Chip>
+
+          {/* Beside Plain because it is the same kind of thing, a mode the reader flips. It carries its own server read. */}
+          <ComposerDeepSeekSwitch yieldsToVoice={false} />
+
+          {/* Crossed tools, not a speech bubble: this opens the SKILLS/commands menu. */}
+          <PromptInputButton
+            tooltip={{ content: t('input.showAllCommands') }}
+            onClick={onToggleCommandMenu}
+          >
+            <PencilRulerIcon />
+          </PromptInputButton>
+
+          <TokenUsageSummary usage={tokenBudget} onClick={onShowTokenUsage} />
+
+          {exportSurface && <ChatExportMenu {...exportSurface} />}
+        </div>
+      )}
+
+      {/* The line: the chat's core, then the box. The anchor is the box's own column, not the shell: the shell also holds the
+          pinned agents' strip and the activity tab, which would carry a guide's centre away from the box she is looking at. */}
+      <div className="chat-line mx-auto max-w-[54.25rem]">
+        <ChatCore
+          model={model}
+          modelLabel={availableModelLabelsById?.[model] ?? availableModelOptions.find((option) => option.value === model)?.label ?? model}
+          state={hasPendingPermissions || awaitingInput ? 'waiting' : isLoading ? 'working' : 'idle'}
+          context={contextShare}
+          open={settingsOpen}
+          controls={settingsId}
+          onToggle={() => setSettingsOpen((open) => !open)}
+        />
+      <div ref={anchorRef} className="relative min-w-0 flex-1">
         {/* The mic's one line, a refusal's sentence or the note that Gemini stood in for the home server: above the form, never
             inside it. The form clips whatever overflows it, and a sentence that names two transcribers is several lines, whose
             first ones were cut off when this stood over the mic. Left-aligned, where the mic is, and wrapped inside the box's width. */}
@@ -527,154 +611,63 @@ export default function ChatComposer({
 
           <input {...getInputProps()} />
 
-          <PromptInputBody>
-            <div ref={inputHighlightRef} aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
-              <div className="chat-input-placeholder block w-full whitespace-pre-wrap break-words px-4 py-2 text-sm leading-6 text-transparent">
-                {renderInputWithMentions(input)}
+          {/* ONE ROW: the field, what goes with a message (a file, the voice), and the one button that sends or stops. Everything
+              that sets the chat up rather than writes to it stands behind the chat's core (`settings`, below). */}
+          <div className="flex items-end gap-1 py-1 pl-1 pr-2">
+            <PromptInputBody className="min-w-0 flex-1">
+              <div ref={inputHighlightRef} aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
+                <div className="chat-input-placeholder block w-full whitespace-pre-wrap break-words px-4 py-2 text-sm leading-6 text-transparent">
+                  {renderInputWithMentions(input)}
+                </div>
               </div>
-            </div>
-
-            <PromptInputTextarea
-              ref={textareaRef}
-              dir="auto"
-              value={input}
-              onChange={onInputChange}
-              onClick={onTextareaClick}
-              onKeyDown={onTextareaKeyDown}
-              onPaste={onTextareaPaste}
-              onScroll={(event) => onTextareaScrollSync(event.target as HTMLTextAreaElement)}
-              onFocus={() => onInputFocusChange?.(true)}
-              onBlur={() => onInputFocusChange?.(false)}
-              onInput={onTextareaInput}
-              placeholder={placeholder}
-            />
-        </PromptInputBody>
-
-        {/* A query container (`[container-type:inline-size]`): the model pill's tool-set count shows only
-            where this row is wide enough to hold it (ComposerModelMenu), in whatever window or panel the
-            composer stands. The row takes its width from the form, never from its content, so the
-            containment changes nothing it draws. */}
-        <PromptInputFooter className="flex-wrap gap-y-1 [container-type:inline-size]">
-          {/* At 320px with the voice button in the row, the widest of the operator's model labels
-              (Haiku 4.5, an 80px pill) leaves these two clusters 2px short of the track — and the
-              last thing on this row that can give ground is the space between the controls
-              themselves, so below the width the DeepSeek chip is offered from the gaps tighten
-              from 4px to 2px and the row stays one line. At 352 and up it is the 4px it always
-              was. Measured, not guessed. */}
-          <PromptInputTools className="min-w-0 gap-0.5 min-[352px]:gap-1">
-            {/* The plus (attach) at every width. The desktop half of this used to spell "Attach a
-                file" in full, which was the widest thing in a row of icons and said no more
-                than the clip does. */}
-            <PromptInputButton
-              tooltip={{ content: t('input.attachFiles') }}
-              onClick={openAttachmentPicker}
-              aria-label={t('input.attachFiles')}
-            >
-              <PlusIcon />
-            </PromptInputButton>
-
-            {voiceShown && (
-              <VoiceInputButton state={voiceState} onToggle={voiceToggle} />
-            )}
-
-            {/* Below `md` the count rides the workspace header instead (WorkspaceHeader) — on a
-                phone this footer row is the tightest strip on the screen and the header has the
-                room. `md` is the 768px line `useDeviceSettings` calls mobile, so the two never
-                show at once. */}
-            <TokenUsageSummary
-              usage={tokenBudget}
-              onClick={onShowTokenUsage}
-              className="hidden md:inline-flex"
-            />
-
-            {/* Crossed tools, not a speech bubble: this opens the SKILLS/commands menu, and a
-                bubble said "message". No colour override — it wears the same accent the
-                attach button does, so the composer's two icon buttons read as one family rather
-                than as two different greens. */}
-            <PromptInputButton
-              tooltip={{ content: t('input.showAllCommands') }}
-              onClick={onToggleCommandMenu}
-            >
-              <PencilRulerIcon />
-            </PromptInputButton>
-
-            {/* A pressed chip, not an icon: the state has to be readable at a glance from the
-                strip, and "on" for a mode is a word plus a fill, the same grammar the model
-                and permission pills use on the right. */}
-            <Chip
-              size="sm"
-              className="h-8"
-              selected={plainMode}
-              onClick={onTogglePlainMode}
-              title={t('input.plainModeTooltip')}
-            >
-              {t('input.plainMode')}
-            </Chip>
-
-            {/* Beside Plain because it is the same kind of thing — a mode the reader flips and then
-                looks at again later to remember which side it is on — and because the two are read
-                together. It carries its own server read; see ComposerDeepSeekSwitch, and is told
-                what the row holds rather than assuming it. */}
-            <ComposerDeepSeekSwitch yieldsToVoice={voiceShown} />
-
-            {/* The width rule lives on this wrapper, not on the button, because the button is not
-                what the row lays out: a tooltipped PromptInputButton puts a div of its own around
-                it, and a `display:none` button inside a live div still counts as a flex item — it
-                took a `gap-1` of 4px of the row at every width below `sm`, invisible and
-                unclickable, which is what tipped a 320px row onto a second line once the box had
-                text in it. `contents` at `sm` hands the tooltip's own div back to the flex row,
-                exactly where the button used to sit. */}
-            {hasInput && (
-              <span className="hidden sm:contents">
-                <PromptInputButton
-                  tooltip={{ content: t('input.clearInput', { defaultValue: 'Clear input' }) }}
-                  onClick={onClearInput}
-                >
-                  <XIcon />
-                </PromptInputButton>
-              </span>
-            )}
-
-          </PromptInputTools>
-
-          {/* `min-w-0` and no `shrink-0`: measured at 390px this row wanted 371px inside a 358px
-              track and the send button was clipped off the right edge. Shrinking is only
-              possible if the row may shrink, and only useful if its children may too —
-              the two menu buttons already truncate their labels. */}
-          <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
-            {/* One pill or two, never both: below `sm` the model menu carries the edit mode as
-                a third section, so rendering the permission chip as well would put the same
-                choice on screen twice. */}
-            <ComposerModelMenu
-              effort={effort}
-              effortOptions={availableEffortOptions}
-              onSelectEffort={onSelectEffort}
-              model={model}
-              modelOptions={availableModelOptions}
-              modelLabelsById={availableModelLabelsById}
-              onSelectModel={onSelectModel}
-              modelsLoading={modelsLoading}
-              toolsets={toolsets}
-              permissionMode={isNarrowComposer ? permissionMode : undefined}
-              permissionModes={isNarrowComposer ? availablePermissionModes : undefined}
-              onSelectPermissionMode={isNarrowComposer ? onSelectPermissionMode : undefined}
-            />
-
-            {!isNarrowComposer && (
-              <ComposerPermissionMenu
-                permissionMode={permissionMode}
-                permissionModes={availablePermissionModes}
-                onSelectPermissionMode={onSelectPermissionMode}
+  
+              <PromptInputTextarea
+                ref={textareaRef}
+                dir="auto"
+                rows={1}
+                value={input}
+                onChange={onInputChange}
+                onClick={onTextareaClick}
+                onKeyDown={onTextareaKeyDown}
+                onPaste={onTextareaPaste}
+                onScroll={(event) => onTextareaScrollSync(event.target as HTMLTextAreaElement)}
+                onFocus={() => onInputFocusChange?.(true)}
+                onBlur={() => onInputFocusChange?.(false)}
+                onInput={onTextareaInput}
+                placeholder={placeholder}
+                // A placeholder longer than the line is cut with an ellipsis, never wrapped under itself: the line is one line until it is typed in.
+                className="[&::placeholder]:overflow-hidden [&::placeholder]:text-ellipsis [&::placeholder]:whitespace-nowrap"
               />
-            )}
+          </PromptInputBody>
 
-            {/* From `md` up only: below it the workspace header carries the same menu, and two of
-                them would offer one conversation twice. */}
-            {exportSurface && (
-              <div className="hidden md:block">
-                <ChatExportMenu {...exportSurface} />
-              </div>
-            )}
+            <PromptInputTools className="mb-1 min-w-0 gap-0.5">
+              {/* The plus (attach). The kit's 32px button keeps its size to the eye and takes a 44px catch under a finger. */}
+              <PromptInputButton
+                tooltip={{ content: t('input.attachFiles') }}
+                onClick={openAttachmentPicker}
+                aria-label={t('input.attachFiles')}
+                className="relative before:absolute before:inset-0 before:content-[''] finger:before:-inset-1.5"
+              >
+                <PlusIcon />
+              </PromptInputButton>
+
+              {voiceShown && (
+                <VoiceInputButton state={voiceState} onToggle={voiceToggle} />
+              )}
+
+              {/* `contents` at `sm` hands the tooltip's own div back to the flex row; below it the button is not offered, and a
+                  hidden button inside a live div would still take a gap of the row. */}
+              {hasInput && (
+                <span className="hidden sm:contents">
+                  <PromptInputButton
+                    tooltip={{ content: t('input.clearInput', { defaultValue: 'Clear input' }) }}
+                    onClick={onClearInput}
+                  >
+                    <XIcon />
+                  </PromptInputButton>
+                </span>
+              )}
+            </PromptInputTools>
 
             <PromptInputSubmit
               ref={sendButtonRef}
@@ -724,9 +717,8 @@ export default function ChatComposer({
               // the button that answers it says so — in the tooltip and to a screen reader both.
               aria-label={sendLabelWithHint}
               title={sendLabelWithHint}
-              // Same 32px as every other control in this row on a phone, which is the
-              // width where they sit shoulder to shoulder; desktop keeps the bigger target.
-              className="h-8 w-8 sm:h-10 sm:w-10"
+              // The kit's 32px send keeps its size to the eye and takes a 44px catch under a finger.
+              className="relative mb-1 before:absolute before:inset-0 before:content-[''] finger:before:-inset-1.5"
             >
               {isTranscribing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -751,9 +743,8 @@ export default function ChatComposer({
               onSelect={(choice) => onSendMenuChoice?.(choice)}
             />
           </div>
-
-        </PromptInputFooter>
       </PromptInput>
+      </div>
       </div>
       </div>
     </div>

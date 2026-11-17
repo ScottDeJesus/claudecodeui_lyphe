@@ -542,7 +542,9 @@ function ChatInterface({
 
   return (
     <PermissionContext.Provider value={permissionContextValue}>
-      <div className="flex h-full min-h-0 flex-col">
+      {/* `chat-column`: the query container the talk and the line both measure against (`composer/chatLine.css`), so the strip the
+          chat's core stands in is given, or not, to both at once. */}
+      <div className="chat-column flex h-full min-h-0 flex-col">
         {/* The one place the CLI-version fact carries an ACTION. It stands above the transcript
             because it describes the turn being read, and it leaves on its own when that run ends
             — the stale set empties and this goes with it, dismissed or not. */}

@@ -12,6 +12,7 @@
     "copyAsText": "Copy as text"
   },
   "messageTypes": {
+    "writtenBy": "Written by {{model}}",
     "user": "U",
     "error": "Error",
     "tool": "Tool",
@@ -143,6 +144,9 @@
     "speak": "Read aloud",
     "stopSpeaking": "Stop",
     "loading": "Loading…"
+  },
+  "core": {
+    "settings": "Chat settings · {{model}}"
   },
   "input": {
     "placeholder": "Ask for a change, or describe what you want next",

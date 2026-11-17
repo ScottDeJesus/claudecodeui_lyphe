@@ -1,3 +1,5 @@
+import '@/modules/chat/transcript/reading.css';
+
 import { useTranslation } from 'react-i18next';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import type { CSSProperties, Dispatch, ReactElement, RefObject, SetStateAction } from 'react';
@@ -16,7 +18,6 @@ import { isHiddenWork } from '@/modules/chat/utils/workVisibility';
 import { useChatFontSize } from '@/shared/hooks/useChatFontSize';
 import { useLazyRowObserver } from '@/modules/chat/hooks/useLazyRowObserver';
 import { useModelLabelResolver } from '@/modules/chat/hooks/useModelLabelResolver';
-import { Card } from '@/shared/ui';
 import LazyMessageRow from '@/modules/chat/transcript/LazyMessageRow';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
 import ProviderSelectionEmptyState from '@/modules/chat/transcript/ProviderSelectionEmptyState';
@@ -311,7 +312,9 @@ function ChatMessagesPane({
           THIS box, not of the scroller: the follow watches this box's size, and a change in the
           scroller's own padding would move the foot without resizing anything it could see. */}
       <div
-        className={`mx-auto w-full max-w-[54.25rem] space-y-3 px-4 sm:space-y-4 ${
+        // `chat-talk`: in a column with room, the talk gives up a strip at its start for the chat's core and starts where the line
+        // starts (`composer/chatLine.css`).
+        className={`chat-talk mx-auto w-full max-w-[54.25rem] space-y-3 px-4 sm:space-y-4 ${
           hasActivityIndicator ? 'pb-12 sm:pb-14' : 'pb-3 sm:pb-4'
         } ${
           isOpeningSession ? 'pointer-events-none opacity-0' : 'opacity-100 transition-opacity duration-150'
@@ -467,22 +470,18 @@ function ChatMessagesPane({
             });
 
             // Everything between two of the operator's turns — replies, tool calls, commands,
-            // notices — is one turn of Claude's, so it sits in one card, as theirs sits in
-            // its bubble. The rows stay separate LazyMessageRows inside it, so lazy mounting
-            // and timestamp anchors work exactly as before. Its tail points left, at the
-            // speaker's mark, as the operator's bubble points right.
+            // notices — is one turn of Claude's, so it stands as one group (`data-chat-turn`), as
+            // theirs sits in its bubble. The rows stay separate LazyMessageRows inside it, so lazy
+            // mounting and timestamp anchors work exactly as before. It is not a card: a reply is
+            // its model's mark and its words, on the page's own ground (`reading.css`).
             const turns: ReactElement[] = [];
             let turn: ReactElement[] = [];
             const closeTurn = () => {
               if (turn.length === 0) return;
               turns.push(
-                <Card
-                  key={`turn-${turn[0].key}`}
-                  data-side="start"
-                  className="vv-bubble space-y-3 py-3 sm:space-y-4 sm:px-4"
-                >
+                <div key={`turn-${turn[0].key}`} data-chat-turn="" className="space-y-3 py-1 sm:space-y-4">
                   {turn}
-                </Card>
+                </div>
               );
               turn = [];
             };

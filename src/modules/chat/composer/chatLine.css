@@ -1,0 +1,21 @@
+/* THE LINE THE READER TYPES IN, THE CHAT'S CORE BESIDE IT, AND THE TALK OVER THEM (`ChatComposer`, `ChatCore`, `ChatMessagesPane`).
+ *
+ * ONE LEFT EDGE. The talk starts where the line starts. In a column with room for it, a strip at the column's start is the
+ * core's: the core stands in it, level with the line's middle however tall the line grows, and the talk above gives up the
+ * same strip, so a reply's first word and the line's first letter are on one edge. In a column with no room (a phone, a chat
+ * squeezed between its gutters, the floating panel) there is no strip: the core is the first thing in the line's own row.
+ *
+ * The measure is the chat's own column (`chat-column`, a query container on `ChatInterface`'s root), never the window: the
+ * chat stands in panels of every width. */
+.chat-column { container: chat / inline-size; }
+.chat-line { position: relative; display: flex; align-items: center; gap: 12px; }
+.chat-line__core { position: relative; }
+
+/* The strip: the core's 56 px and 12 px of air, inside the 1rem the column already keeps at its start. */
+@container chat (min-width: 44rem) {
+  .chat-column .chat-composer-shell { padding-left: calc(1rem + 68px); }
+  .chat-column .chat-line__core { position: absolute; right: 100%; top: 50%; margin-right: 12px; transform: translateY(-50%); }
+  .chat-column .chat-line__core:hover { transform: translateY(-50%) scale(1.04); }
+  /* The talk's own words are as wide as the line (54.25rem), past the strip and the column's 1rem at each side. */
+  .chat-column .chat-talk { max-width: calc(54.25rem + 68px + 2rem); padding-left: calc(1rem + 68px); }
+}
