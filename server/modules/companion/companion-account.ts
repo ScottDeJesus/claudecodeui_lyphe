@@ -117,6 +117,7 @@ export function createCompanionAccount(userId: number, runtime: ProviderRuntimeG
     house,
     activity: { current: () => activity, set: setActivity },
     inLastTurn: () => session?.inLastTurn ?? false,
+    turnId: () => session?.turnId ?? null,
   });
 
   session = createCompanionSession({

@@ -45,6 +45,8 @@ import { createStationSessionsRoutes } from './station/sessions.routes.js';
  * AN ANSWER IS THE THING ITSELF, not wrapped: `GET /` answers the picture, `PUT /settings` the settings and
  * `PUT /draft` the draft, so a page folds them straight into what it holds. A write that has nothing to
  * say answers 204 — `DELETE /draft` and `DELETE /action` (his × on the card of the action waiting for his word) among them.
+ * `GET /work/:id` answers what one tool call of a turn was given and what it answered (`CompanionWorkBody`), read when the call is
+ * opened in the log, or 404 `COMPANION_WORK_NOT_FOUND` for a call no longer kept.
  *
  * THE TYPED DOOR, `POST /messages`, takes `text` (1-8000 characters, or 0-8000 when the line carries files) and `attachments`: up to ten `{ path, name }`
  * records of files the page already uploaded to the chat's own route (`POST /api/assets/files`); nothing else of a record is read. The service reads each file off
@@ -284,6 +286,17 @@ export function createCompanionRoutes(service: CompanionService): Router {
       readClientId(request);
       service.cancelAction(readAuthenticatedUserId(request));
       response.status(204).end();
+    }),
+  );
+
+  // One call of a tool, opened in the log: what it was given and what it answered. The id is read as a card's is (a whole number of 1 or more).
+  router.get(
+    '/work/:id',
+    asyncHandler(async (request: Request, response: Response) => {
+      readClientId(request);
+      const body = service.workBody(readAuthenticatedUserId(request), readNoteIdParam(readPathParam(request.params.id, 'id')));
+      if (body === null) throw new AppError('That call is no longer kept.', { code: 'COMPANION_WORK_NOT_FOUND', statusCode: 404 });
+      response.json(body);
     }),
   );
 

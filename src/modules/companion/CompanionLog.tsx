@@ -6,8 +6,9 @@ import { useTranslation } from 'react-i18next';
 import { CompanionAttachments } from '@/modules/companion/CompanionAttachments';
 import { CompanionCardChip } from '@/modules/companion/CompanionCardChip';
 import { CompanionReply, SpeakingDots } from '@/modules/companion/CompanionReply';
+import { CompanionWork } from '@/modules/companion/CompanionWork';
 import { useFollowNewest } from '@/modules/companion/hooks/useFollowNewest';
-import type { CompanionLogEntry, CompanionNote } from '@/shared/companion-types';
+import type { CompanionLogEntry, CompanionNote, CompanionWorkEntry } from '@/shared/companion-types';
 import type { CompanionSentenceRef } from '@/shared/types';
 import { Button, EmptyState, ScrollArea } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -15,6 +16,8 @@ import { cn } from '@/shared/utils';
 type CompanionLogProps = {
   /** The picture's log, oldest first. */
   entries: CompanionLogEntry[];
+  /** The picture's work: the tool calls of the log's turns, oldest first, each standing after the line it began after. Absent, none is drawn. */
+  work?: CompanionWorkEntry[];
   /** Her name, for her lines' caption and the empty state. */
   name: string;
   /** The turn she is answering right now, or null: its paragraph ends in the breathing dots. */
@@ -38,28 +41,54 @@ type CompanionLogProps = {
 
 /**
  * What the log draws, one block per row: his line; her turn, every sentence of one turn joined into one paragraph; an
- * alert; a system line. Her sentences of one turn stay one block only while nothing comes between them.
+ * alert; a system line; a run of a turn's work (the tool calls made between two things said). Her sentences of one turn stay
+ * one block only while nothing comes between them: work done mid-answer parts the paragraph where it was done, as in a chat,
+ * and the part after it is marked `continues` (the same turn going on, so it wears no second caption).
  */
 type LogBlock =
   | { kind: 'operator' | 'alert' | 'system'; key: string; entry: CompanionLogEntry }
-  | { kind: 'kaylee'; key: string; turnId: string | null; at: string; sentences: CompanionLogEntry[] };
+  | { kind: 'kaylee'; key: string; turnId: string | null; at: string; sentences: CompanionLogEntry[]; continues: boolean }
+  | { kind: 'work'; key: string; at: string; calls: CompanionWorkEntry[] };
+
+/** No work: one array, so a log drawn without any does not see a new `[]` every render. */
+const NO_WORK: CompanionWorkEntry[] = [];
 
 /** The house's caption ink and type (MAN-742): who spoke and when, above what they said. */
 const CAPTION = 'flex items-center gap-1 text-xs uppercase tracking-[0.14em] text-ink-faint';
 
-/** The log's rows, in order: consecutive sentences of one turn fold into one block, ordered by their place in it. */
-function blocksOf(entries: CompanionLogEntry[]): LogBlock[] {
+/**
+ * The log's rows, in order: consecutive sentences of one turn fold into one block, ordered by their place in it, and the tool
+ * calls stand among the lines as runs, each call after the line it began after (`afterLogId`). A call whose line the log no longer
+ * holds has no place and is not drawn; with no line at all, every call is.
+ */
+function blocksOf(entries: CompanionLogEntry[], work: CompanionWorkEntry[]): LogBlock[] {
   const blocks: LogBlock[] = [];
-  for (const entry of entries) {
+  const calls = [...work].sort((a, b) => a.id - b.id);
+  let next = 0;
+  // The calls made after the line just placed and before the one that follows it, as one run.
+  const placeWorkBefore = (followingId: number) => {
+    const run: CompanionWorkEntry[] = [];
+    while (next < calls.length && calls[next].afterLogId < followingId) run.push(calls[next++]);
+    if (run.length > 0) blocks.push({ kind: 'work', key: `w${run[0].id}`, at: run[0].at, calls: run });
+  };
+  // Calls from before the oldest line have lost their place.
+  if (entries.length > 0) while (next < calls.length && calls[next].afterLogId < entries[0].id) next += 1;
+
+  entries.forEach((entry, index) => {
     const last = blocks[blocks.length - 1];
     if (entry.role !== 'kaylee') {
       blocks.push({ kind: entry.role, key: `e${entry.id}`, entry });
     } else if (last?.kind === 'kaylee' && last.turnId !== null && last.turnId === entry.turnId) {
       last.sentences.push(entry);
     } else {
-      blocks.push({ kind: 'kaylee', key: `e${entry.id}`, turnId: entry.turnId, at: entry.at, sentences: [entry] });
+      // The same turn going on after a run of its work: the paragraph's second part.
+      const before = last?.kind === 'work' ? blocks[blocks.length - 2] : undefined;
+      const continues = before?.kind === 'kaylee' && before.turnId !== null && before.turnId === entry.turnId;
+      blocks.push({ kind: 'kaylee', key: `e${entry.id}`, turnId: entry.turnId, at: entry.at, sentences: [entry], continues });
     }
-  }
+    placeWorkBefore(entries[index + 1]?.id ?? Number.POSITIVE_INFINITY);
+  });
+  if (entries.length === 0) placeWorkBefore(Number.POSITIVE_INFINITY);
   for (const block of blocks) {
     if (block.kind === 'kaylee') block.sentences.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
   }
@@ -72,7 +101,7 @@ function blocksOf(entries: CompanionLogEntry[]): LogBlock[] {
  * conversation, and stands on the stage's shelf alone.
  */
 function cardPlaces(blocks: LogBlock[], notes: CompanionNote[]): Map<number, CompanionNote[]> {
-  const starts = blocks.map((block) => Date.parse(block.kind === 'kaylee' ? block.at : block.entry.at));
+  const starts = blocks.map((block) => Date.parse(block.kind === 'kaylee' || block.kind === 'work' ? block.at : block.entry.at));
   const places = new Map<number, CompanionNote[]>();
   for (const note of [...notes].sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || a.id - b.id)) {
     const at = Date.parse(note.at);
@@ -106,6 +135,10 @@ function clockOf(iso: string): string {
  * speaking — her own failures among them, which she never says herself — small, in the warn tone, with the ▲ mark.
  * Colour is never the whole signal: every kind has its glyph or its caption too.
  *
+ * THE WORK OF A TURN, given `work`: the tool calls she made stand among the lines where she made them, each run of them as one
+ * closed line that opens to its calls (`CompanionWork`), the way a chat draws a session's work. A run made mid-answer parts her
+ * paragraph there; the part after it wears no second caption.
+ *
  * HER CARDS, given `cards` (the station's): each stands as a chip (CompanionCardChip) 8px under the block before it, after
  * the last block at or before the moment she put it up, so a card she put up mid-answer follows that answer's paragraph. A
  * card taken down leaves the log with it. Without `cards` (her panel) no card is drawn here.
@@ -114,11 +147,11 @@ function clockOf(iso: string): string {
  * line until he scrolls up; then "Newest" stands at its foot and brings him back (`useFollowNewest`); `scrollRef` hands the
  * same scroller to a caller that holds its place. Before her first hello it is an empty state that says what she is for.
  */
-export function CompanionLog({ entries, name, turnId, visible, speaking = null, cards, scrollRef }: CompanionLogProps) {
+export function CompanionLog({ entries, work = NO_WORK, name, turnId, visible, speaking = null, cards, scrollRef }: CompanionLogProps) {
   const { t } = useTranslation();
   const last = entries[entries.length - 1];
-  // A new row, a sentence growing, a card put up or taken down, or a turn starting or ending all change what stands at the end.
-  const contentKey = `${entries.length}:${last?.id ?? 0}:${last?.text.length ?? 0}:${turnId ?? ''}:${cards?.notes.length ?? 0}`;
+  // A new row, a sentence growing, a tool call made, a card put up or taken down, or a turn starting or ending all change what stands at the end.
+  const contentKey = `${entries.length}:${last?.id ?? 0}:${last?.text.length ?? 0}:${turnId ?? ''}:${cards?.notes.length ?? 0}:${work.length}`;
   const { scrollerRef, following, jumpToNewest } = useFollowNewest(contentKey, visible);
   // One callback for both refs, so the scroller is bound once: the log's own first, then the caller's.
   const bindScroller = useCallback((node: HTMLDivElement | null) => {
@@ -126,7 +159,7 @@ export function CompanionLog({ entries, name, turnId, visible, speaking = null, 
     scrollRef?.(node);
   }, [scrollerRef, scrollRef]);
 
-  if (entries.length === 0 && turnId === null) {
+  if (entries.length === 0 && work.length === 0 && turnId === null) {
     return (
       <div data-companion-log="empty" className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-background p-4">
         <EmptyState icon={AudioLines} title={t('companion.log.emptyTitle')} message={t('companion.log.emptyMessage', { name })} />
@@ -134,23 +167,27 @@ export function CompanionLog({ entries, name, turnId, visible, speaking = null, 
     );
   }
 
-  const blocks = blocksOf(entries);
+  const blocks = blocksOf(entries, work);
   const lastBlock = blocks[blocks.length - 1];
-  // Her answer has begun but no sentence of it has landed yet: a caption and the dots stand in for its paragraph.
+  // Her answer has begun but no sentence of it stands at the end yet (none has landed, or work is being done after the last one):
+  // the dots stand in for the paragraph to come, under her caption unless the turn already wears it.
   const waitingOnFirstSentence = turnId !== null && !(lastBlock?.kind === 'kaylee' && lastBlock.turnId === turnId);
+  const turnHasSpoken = blocks.some((block) => block.kind === 'kaylee' && block.turnId === turnId);
   const speakingWords = t('companion.log.speaking', { name });
   const places = cards === undefined ? null : cardPlaces(blocks, cards.notes);
   const onOpenCard = cards?.onOpen;
 
   const row = (block: LogBlock): ReactNode => {
+    if (block.kind === 'work') return <CompanionWork key={block.key} calls={block.calls} turnId={turnId} name={name} />;
     if (block.kind === 'kaylee') {
       return (
         <div key={block.key} data-companion-entry="kaylee" className="flex flex-col gap-1">
-          <div className={CAPTION}>{name} · {clockOf(block.at)}</div>
+          {!block.continues && <div className={CAPTION}>{name} · {clockOf(block.at)}</div>}
           <CompanionReply
             sentences={block.sentences}
             turnId={block.turnId}
-            answering={block.turnId !== null && block.turnId === turnId}
+            // The dots end the turn's last paragraph alone: an earlier part of it, with work after it, is said.
+            answering={block.turnId !== null && block.turnId === turnId && block === lastBlock}
             speaking={speaking}
             name={name}
           />
@@ -249,7 +286,7 @@ export function CompanionLog({ entries, name, turnId, visible, speaking = null, 
           })}
           {waitingOnFirstSentence && (
             <div data-companion-entry="kaylee-waiting" className="flex flex-col gap-1">
-              <div className={CAPTION}>{name}</div>
+              {!turnHasSpoken && <div className={CAPTION}>{name}</div>}
               <div className="text-sm leading-relaxed"><SpeakingDots label={speakingWords} /></div>
             </div>
           )}

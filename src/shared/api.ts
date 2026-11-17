@@ -890,6 +890,8 @@ export const api = {
     // Sends the draft as it stands. Answers `{ outcome: 'started' | 'folded' }`; a refused send is a 409 carrying the reason.
     sendDraft: (mode: 'turn' | 'steer') => post('/api/companion/draft/send', { mode }, companionOptions()),
     dismissNote: (id: number) => del(`/api/companion/notes/${id}`, undefined, companionOptions()),
+    // What one tool call of a turn was given and what it answered (`CompanionWorkBody`), read when the call is opened in the log; 404 for one no longer kept.
+    work: (id: number) => get(`/api/companion/work/${id}`, companionOptions()),
     // His keep on a card: `pin` sets it pinned or not (a pinned card survives her Clear and she cannot take it down). Answers 204, or a 404
     // `COMPANION_NOTE_NOT_FOUND` for a card that is no longer on his panel; the `companion_note_pinned` frame carries it to every page.
     notes: {

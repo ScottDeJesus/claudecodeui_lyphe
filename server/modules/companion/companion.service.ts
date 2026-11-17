@@ -1,6 +1,6 @@
 import { companionDb } from '@/modules/database/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
-import type { CompanionDraft, CompanionPicture, CompanionSessionRef, CompanionSettings } from '@/shared/companion-types.js';
+import type { CompanionDraft, CompanionPicture, CompanionSessionRef, CompanionSettings, CompanionWorkBody } from '@/shared/companion-types.js';
 import type { StationAskAnswer, StationNeed } from '@/shared/station-types.js';
 import { AppError } from '@/shared/utils.js';
 
@@ -256,6 +256,9 @@ function createCompanionService() {
       account.store.setFloor(client);
       return account.sendDraft({ mode, text });
     },
+
+    /** What one tool call of a turn was given and what it answered, for the log's opened row; `null` for a call the account no longer holds. */
+    workBody: (userId: number, id: number): CompanionWorkBody | null => accountOf(userId).store.readWorkBody(id),
 
     /** Dismisses a note card. A note already gone (the other page dismissed it first) is not an error. His ×, pinned or not: it is his act. */
     dismissNote(userId: number, id: number): void {

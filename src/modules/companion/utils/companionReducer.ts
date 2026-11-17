@@ -1,4 +1,4 @@
-import type { CompanionFace, CompanionFrame, CompanionLogEntry, CompanionNote, CompanionNoteKind, CompanionOpenTarget, CompanionPicture } from '@/shared/companion-types';
+import type { CompanionFace, CompanionFrame, CompanionLogEntry, CompanionNote, CompanionNoteKind, CompanionOpenTarget, CompanionPicture, CompanionWorkEntry } from '@/shared/companion-types';
 
 /**
  * How a page folds what Kaylee tells it into the picture it holds: `reduceCompanion(picture, frame)` is the whole of it.
@@ -20,7 +20,8 @@ import type { CompanionFace, CompanionFrame, CompanionLogEntry, CompanionNote, C
  *
  * `companion_pending` replaces the one action waiting for his word (`null` when it was taken, withdrawn, replaced or
  * lapsed on the server), and a frame cut short of the fields the action card draws from is left alone like any other.
- * `companion_cleared` empties what Clear empties on the server — the log, the unpinned notes, the draft, the pending action, the
+ * `companion_work` puts one tool call of a turn among the picture's `work`, by its id: sent as the call begins and again as it ends.
+ * `companion_cleared` empties what Clear empties on the server — the log, the work of its turns, the unpinned notes, the draft, the pending action, the
  * walk, the focus, her activity and the turn — so the panel is bare at once; the provider also reads the picture again,
  * which is the server's own word on the rest. It keeps her `face` (Clear wipes her memory, not her look) and the cards he
  * pinned (his keep). `companion_note_pinned` replaces one card's `pinned` by its id. `companion_face`
@@ -32,6 +33,9 @@ import type { CompanionFace, CompanionFrame, CompanionLogEntry, CompanionNote, C
 
 /** How many log entries a page keeps: the newest, as `GET /api/companion` carries. The server stores more; the panel draws no more than this. */
 const LOG_KEPT = 200;
+
+/** The most tool calls a page holds: more than the turns of `LOG_KEPT` lines are likely to have made. The oldest leave first. */
+const WORK_KEPT = 400;
 
 //----------------- THE SHAPES A PAGE DRAWS FROM ------------
 // Not the whole contract: the fields the panel, the door and the palette read, so a payload that lacks one is refused
@@ -46,6 +50,10 @@ const orNull = (isShape: (value: unknown) => boolean) => (value: unknown): boole
 const isSessionRef = (value: unknown): boolean => isRecord(value) && isText(value.sessionId) && isText(value.name) && isText(value.project);
 const isEntry = (value: unknown): value is CompanionLogEntry =>
   isRecord(value) && isNumber(value.id) && isText(value.at) && isText(value.role) && isText(value.text) && Array.isArray(value.sounds);
+/** A tool call as the log draws it: the fields its line reads. */
+const isWork = (value: unknown): value is CompanionWorkEntry =>
+  isRecord(value) && isNumber(value.id) && isNumber(value.afterLogId) && isText(value.tool) && isText(value.at)
+  && orNull(isText)(value.turnId) && orNull(isText)(value.about) && orNull(isText)(value.endedAt) && typeof value.failed === 'boolean';
 /** Keyed by the contract's union, so a kind added to `CompanionNoteKind` without a word here is a compile error rather than a card the guard refuses. */
 const NOTE_KINDS: Record<CompanionNoteKind, true> = { note: true, list: true, diff: true, plan: true, page: true };
 const NOTE_KIND_WORDS: ReadonlySet<string> = new Set(Object.keys(NOTE_KINDS));
@@ -118,6 +126,7 @@ export function isCompanionPicture(value: unknown): value is CompanionPicture {
     && orNull(isWalk)(value.walk)
     && Array.isArray(value.notes) && value.notes.every(isNote)
     && Array.isArray(value.log) && value.log.every(isEntry)
+    && Array.isArray(value.work) && value.work.every(isWork)
     && isFace(value.face);
 }
 
@@ -160,6 +169,14 @@ function appendEntry(log: CompanionLogEntry[], entry: CompanionLogEntry): Compan
   return next.length > LOG_KEPT ? next.slice(next.length - LOG_KEPT) : next;
 }
 
+/** A tool call joins the work in id order; a call already held (its end, after its beginning) replaces the one held. Only the newest `WORK_KEPT` stay. */
+function putWork(work: CompanionWorkEntry[], entry: CompanionWorkEntry): CompanionWorkEntry[] {
+  const at = work.findIndex((held) => held.id === entry.id);
+  if (at !== -1) return work.map((held, index) => (index === at ? entry : held));
+  const next = [...work, entry].sort((a, b) => a.id - b.id);
+  return next.length > WORK_KEPT ? next.slice(next.length - WORK_KEPT) : next;
+}
+
 /** A note card joins the notes in id order; the same note twice is one card. */
 function addNote(notes: CompanionNote[], note: CompanionNote): CompanionNote[] {
   return insertById(notes, note);
@@ -178,6 +195,9 @@ export function reduceCompanion(picture: CompanionPicture, frame: CompanionFrame
       const log = appendEntry(picture.log, frame.entry);
       return log === picture.log ? picture : { ...picture, log };
     }
+    // A tool call of a turn, as it begins and again as it ends: the log draws it among the lines, after the line it began after.
+    case 'companion_work':
+      return isWork(frame.entry) ? { ...picture, work: putWork(picture.work, frame.entry) } : picture;
     case 'companion_turn':
       if (!isText(frame.turnId)) return picture;
       if (frame.state === 'started') return { ...picture, turnId: frame.turnId };
@@ -222,6 +242,7 @@ export function reduceCompanion(picture: CompanionPicture, frame: CompanionFrame
       return {
         ...picture,
         log: [],
+        work: [],
         notes: picture.notes.filter((note) => note.pinned),
         draft: null,
         pending: null,

@@ -122,8 +122,8 @@ export type { FollowupKind, FollowupRow } from '@/modules/database/repositories/
 // Used by the session-panel module; `sessions.db.ts` moves a merged chat's versions itself.
 export { sessionPanelDb } from '@/modules/database/repositories/session-panel.db.js';
 export type { SessionPanelHeadRow, SessionPanelKind, SessionPanelRow } from '@/modules/database/repositories/session-panel.db.js';
-// The companion's own tables: Kaylee's per-account state, exchange (the newest 400 rows), note cards and record of the
-// actions she prepared for his word, as rows — snake_case columns, JSON columns as text. Used by the companion module's
+// The companion's own tables: Kaylee's per-account state, exchange (the newest 400 rows), note cards, record of the
+// actions she prepared for his word and the tool calls of the companion's turns, as rows — snake_case columns, JSON columns as text. Used by the companion module's
 // store, which maps them to the wire contract.
 export { companionDb } from '@/modules/database/repositories/companion.db.js';
 export type {
@@ -142,6 +142,10 @@ export type {
   CompanionActionOutcome,
   CompanionActionRow,
 } from '@/modules/database/repositories/companion-actions.db.js';
+export type {
+  CompanionWorkBodyRow,
+  CompanionWorkHeadRow,
+} from '@/modules/database/repositories/companion-work.db.js';
 // Every brief Kaylee has relayed into a chat, keyed on the chat so it survives her Clear. Used by the companion
 // module to record a send and by Providers to mark the matching user messages "Through Kaylee" in history.
 export { relayedSendsDb } from '@/modules/database/repositories/relayed-sends.db.js';

@@ -3,7 +3,7 @@
  * exchange, her note cards, the briefs she has relayed into chats, and her record of the actions
  * she prepared for his word.
  *
- * WHY `companion_state`, `companion_log`, `companion_notes` AND `companion_actions` HANG ON `users`.
+ * WHY `companion_state`, `companion_log`, `companion_notes`, `companion_actions` AND `companion_work` HANG ON `users`.
  * Everything of hers is keyed by the CloudCLI account: the account's own conversation, its own
  * panel, its own cards, its own record of actions. `ON DELETE CASCADE` takes all of them away with
  * the account without any path that removes a user knowing these tables exist.
@@ -34,6 +34,14 @@
  * (`addCompanionActionArmedFromColumn`), and the three columns of a card's shape, `companion_notes.kind`, `ref_json` and `pinned`
  * (`addCompanionNoteShapeColumns`): what the card is, what it is about and whether he pinned it, defaulting to a note about nothing,
  * unpinned, which is every card held before them.
+ *
+ * WHAT `companion_work` KEEPS. One row for each call of a tool the companion made in a turn, so the log can show a turn's work the way
+ * a chat shows a session's: the turn (`turn_id`), the call's place in the log's order (`after_log_id`, the newest `companion_log`
+ * id when it began), the tool and a few words of what it concerned (`tool`, `about`), what it was given (`input_json`) and what it
+ * answered (`result`, cut to a bound, `result_cut` saying so), when it began and ended and whether it failed. It hangs on `users`
+ * as the log does, and it is the conversation's: Clear deletes it with the log. A call of the companion's memory keeps NEITHER
+ * what it was given NOR what it answered (`input_json` and `result` stay NULL, `kept` 0): CloudCLI stores none of that memory.
+ * The repository keeps the newest rows per account and prunes on every insert (`companion-work.db.ts`).
  *
  * WHY `relayed_sends` HANGS ON `sessions`. A relayed send is a fact about a CHAT'S history — "this
  * message came to the chat through Kaylee" — so it follows the chat, keyed on the app session id
@@ -89,4 +97,14 @@ CREATE TABLE IF NOT EXISTS companion_actions (
   outcome TEXT CHECK (outcome IN ('took','already','refused','cancelled','replaced','expired')),
   answer TEXT);
 CREATE INDEX IF NOT EXISTS idx_companion_actions_user ON companion_actions(user_id, prepared_at);
+CREATE TABLE IF NOT EXISTS companion_work (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  turn_id TEXT,                 -- the turn the call was made in
+  after_log_id INTEGER NOT NULL, -- the newest companion_log id when the call began: its place in the log's order
+  tool TEXT NOT NULL, about TEXT,
+  kept INTEGER NOT NULL DEFAULT 1, -- 0: a call of the companion's memory, whose input and result are never stored
+  input_json TEXT, result TEXT, result_cut INTEGER NOT NULL DEFAULT 0,
+  started_at TEXT NOT NULL, ended_at TEXT, failed INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS idx_companion_work_user ON companion_work(user_id, id);
 `;

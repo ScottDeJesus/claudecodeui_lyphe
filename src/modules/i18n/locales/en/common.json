@@ -3845,6 +3845,19 @@
       "emptyTitle": "Nothing said yet",
       "emptyMessage": "Type to {{name}} below. {{name}} keeps track of every chat you're running, drafts what to tell one, and sends only on your word."
     },
+    "work": {
+      "label": "Work",
+      "failed": "{{count}} failed",
+      "failedOne": "Failed",
+      "stopped": "Stopped",
+      "running": "Running",
+      "reading": "Opening…",
+      "gone": "No longer kept.",
+      "unread": "Couldn't open this.",
+      "notKept": "{{name}}'s memory is not stored here.",
+      "noAnswer": "No answer.",
+      "cut": "The rest of the answer was not kept."
+    },
     "attachments": {
       "strip": "You attached"
     },

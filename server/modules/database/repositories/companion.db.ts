@@ -1,5 +1,6 @@
 import { getConnection } from '@/modules/database/connection.js';
 import { companionActionsDb } from '@/modules/database/repositories/companion-actions.db.js';
+import { companionWorkDb } from '@/modules/database/repositories/companion-work.db.js';
 import type { CompanionNoteKind, CompanionNoteRef } from '@/shared/companion-types.js';
 import { isStoreStamp } from '@/shared/utils.js';
 
@@ -419,6 +420,8 @@ export const companionDb = {
       const clearedAt = new Date().toISOString();
       db.prepare(`UPDATE companion_actions SET ended_at = ?, outcome = 'cancelled' WHERE user_id = ? AND outcome IS NULL AND said_log_id IS NULL`).run(clearedAt, userId);
       const logRemoved = db.prepare('DELETE FROM companion_log WHERE user_id = ?').run(userId).changes;
+      // The work of the turns those lines held goes with them: it is the conversation's.
+      db.prepare('DELETE FROM companion_work WHERE user_id = ?').run(userId);
       const notesRemoved = db.prepare('DELETE FROM companion_notes WHERE user_id = ? AND pinned = 0').run(userId).changes;
       const stateReset =
         db
@@ -435,4 +438,6 @@ export const companionDb = {
 
   // Her record of actions (`openAction`, `endAction`, `listActions`): the same object, so the companion reads one repository.
   ...companionActionsDb,
+  // The tool calls of the companion's turns (`beginWork`, `endWork`, `listWork`, `readWorkBody`), the same way.
+  ...companionWorkDb,
 };

@@ -42,7 +42,9 @@ import { sessionTools } from './session-tools.js';
  *   - `openOnFloor`: "the app brings that chat, card, page or check up" happens on the page that holds the floor alone;
  *   - `refuse`: a refusal is `isError` text that says what to do next, never a throw;
  *   - `inLastTurn`: true while her last turn before her conversation closes runs. `buildCompanionTools` reads it at each
- *     call and answers every tool but `recall` and `remember` with a refusal then (below), so the tool files never see it.
+ *     call and answers every tool but `recall` and `remember` with a refusal then (below), so the tool files never see it;
+ *   - `recordWork`: every call is written to the store as it begins and as it ends, so the log can show a turn's work
+ *     (`work-record.ts`). `buildCompanionTools` runs each handler inside it, so the tool files never see it either.
  *
  * Consumers: `companion-account.ts` (builds the deps and the definitions for one account's session) and every
  * tool file of this folder (they take `CompanionToolDeps`).
@@ -96,6 +98,8 @@ export type CompanionToolDeps = {
   inLastTurn(): boolean;
   /** Sends the held draft as it stands (`companion-send.ts`): the one door `send_to_session` and `create_session` go through. */
   sendDraft: DraftSender;
+  /** Runs one call of `tool` with its record round it (`work-record.ts`): answers and throws what `run` does. Called by `buildCompanionTools` alone. */
+  recordWork<T>(tool: string, args: unknown, run: () => Promise<T>): Promise<T>;
 };
 
 /** The two tools her last turn leaves open: her own memory, read and written. Everything else answers `LAST_TURN_REFUSAL` there. */
@@ -124,6 +128,9 @@ const LAST_TURN_REFUSAL = 'Not in this last turn: only recall and remember are o
  * refusal is in the handler and never in the list because the CLI records a conversation's tools once (name, description, schema)
  * and keeps them on every resume, and `sessionShapeOf` fingerprints exactly those: a tool dropped or reworded for her last turn
  * would be a new shape, and both accounts would start fresh. Consumed by `companion-account.ts`, once per account.
+ *
+ * THE RECORD OF A TURN'S WORK. Outside her last turn every call runs inside `deps.recordWork`, which writes it to the store as it
+ * begins and as it ends. Her last turn is recorded nowhere: nothing of it is shown to him.
  */
 export function buildCompanionTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<any>> {
   return [
@@ -143,7 +150,7 @@ export function buildCompanionTools(deps: CompanionToolDeps): Array<SdkMcpToolDe
   ].map((definition): SdkMcpToolDefinition<any> => ({
     ...definition,
     handler: (args, extra) => {
-      if (!deps.inLastTurn()) return definition.handler(args, extra);
+      if (!deps.inLastTurn()) return deps.recordWork(definition.name, args, () => definition.handler(args, extra));
       if (!OPEN_IN_LAST_TURN.has(definition.name)) return Promise.resolve(deps.refuse(LAST_TURN_REFUSAL));
       // Nothing of her last turn is shown to him: a recall's `panel` (a card on his panel, and she is told only that it is there) is read as
       // false, so the card is never put up and she reads her memory herself, which is what the turn is for.

@@ -60,6 +60,7 @@ export function StationConversationView({ picture, readFailure, onReread, name, 
       {picture !== null ? (
         <CompanionLog
           entries={picture.log}
+          work={picture.work}
           name={name}
           turnId={picture.turnId}
           visible
