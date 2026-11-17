@@ -95,16 +95,24 @@ const MARKDOWN_SIGNAL =
 const FOLLOWUPS_SIGNAL =
   `Beside this chat sits its Next steps widget, which keeps this chat's open next steps and known gaps in front of the user so none is lost, and you are the one who fills it, with the followups command, in the same turn as the reply that opens or settles an item. Do it before you write the final text of the reply, as one Bash call, even when the turn has nothing else to run. When the reply leaves something open for later (a question or choice you put to the user, an offer waiting on a yes from the user, a step you put off), file it with followups add --next "<one plain line>"; when you know of a gap you are leaving (something not tested or that you could not check from here, a case not handled, a limit or risk you chose not to fix), file it with followups add --gap "<one plain line>". Word each line as you would say it to the user, with no codes or ids, in at most 200 characters (the command refuses a longer line and files nothing from that call), and put every --next and --gap of the turn in one call. A reply that asks the user a question or says that something went unchecked always has an item to file. Never file what the same reply finishes, and never file uncommitted work: the Git tab already shows it. When an item is settled (answered, done, or no longer true) close it with followups done <id>; followups lists what is open with ids, so run it before closing anything you did not file this turn.`;
 
+// The chat's panel (server/modules/session-panel/): the one place beside the talk that the chat has to itself, filled with the
+// `panel` command (bin/panel.mjs) over the chat-commands door. Said after the Next steps instruction, which must lead (measured,
+// above), and only to a launch that carries the chat credential, for the reason that instruction is. Kept to what a model would
+// not guess: that the panel exists, what it is for, the verbs, and that a change to what is showing is an update and not a
+// second thing. Not yet measured on a live chat.
+const PANEL_SIGNAL =
+  'This chat also has a panel beside the talk, which stays in view while the talk scrolls, and you fill it with the panel command: use it for a thing the user will keep looking at or work on with you over several turns (a diagram, a picture, a page, a small live page of your own), and keep a thing said once in the reply. panel show --title "<title>" with one of --diagram <file, or - for stdin> (mermaid source), --picture <path or address of an image>, --page <address, by the embed rules above> or --widget <file, or - for stdin> (an HTML body, as a widget fence takes it) puts the thing there; when the user asks for a change to what is showing, run panel update with the same flags, which changes it in place as a new version instead of starting a second thing; panel clear empties it, and panel alone says what is showing.';
+
 export const SURFACE_PROMPT_APPEND = `${WIDGET_SIGNAL} ${EMBED_SIGNAL} ${MARKDOWN_SIGNAL}`;
 
 /**
- * The surface prompt with the Next steps instruction in front of it. Called by `claude-runtime.provider.js`
+ * The surface prompt with the Next steps instruction in front of it and the panel's after that. Called by `claude-runtime.provider.js`
  * after the toolsets hook has answered, and ONLY for a launch that carries the chat credential
- * (`CLOUDCLI_TOOLSET_TOKEN` in the launch's env): the instruction tells the chat to run `followups`, and the
+ * (`CLOUDCLI_TOOLSET_TOKEN` in the launch's env): the instructions tell the chat to run `followups` and `panel`, and a
  * command has nothing to run with in a chat that has no credential — one whose project runs on a Cerberus node
  * (the hook gives those none: a stdio command there could not reach this box's loopback), one with no app session
  * id, or one whose hook did not answer. Such a chat keeps `SURFACE_PROMPT_APPEND` as it was.
  */
 export function leadWithFollowupsSignal(append: string): string {
-  return `${FOLLOWUPS_SIGNAL} ${append}`;
+  return `${FOLLOWUPS_SIGNAL} ${PANEL_SIGNAL} ${append}`;
 }

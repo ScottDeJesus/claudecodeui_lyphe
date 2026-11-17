@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChatInterface } from '@/modules/chat';
 import { ChatGutterLayout } from '@/modules/chat-gutters';
+import { SessionPanelLayout, SessionPanelProvider } from '@/modules/session-panel';
 import { ChatHostSlot, useChatHost } from '@/modules/chat-host';
 import { FilesView } from '@/modules/file-manager';
 import { StandaloneShell } from '@/modules/standalone-shell';
@@ -326,6 +327,9 @@ function WorkspaceMain({
   const viewLabel = activeTab === 'chat' ? null : (views.find((view) => view.id === activeTab)?.label ?? null);
 
   return (
+    // The chat's panel is read once here, for the switch in the chat's head and the panel beside the talk. Only for a chat on
+    // screen in this pane: a floating chat, another view and a chat not yet begun have none.
+    <SessionPanelProvider sessionId={activeTab === 'chat' && !floating ? (selectedSession?.id ?? null) : null}>
     <div className="flex h-full flex-col">
       {/* The Chat view has a head of its own, at every width: the way back to the sessions home, and the chat's name. Every other view
           keeps the phone's strip (the drawer's button and the view's name). The chat's count of tokens and its export are the
@@ -352,6 +356,8 @@ function WorkspaceMain({
                   there: each widget body gets its own, and a crashing widget cannot blank the
                   chat tab. */}
               <CoreDrawingProvider value={drawChatCore}>
+              {/* The chat's panel stands beside all of this, gutters included: the chat keeps its place whatever the panel does. */}
+              <SessionPanelLayout>
               <ChatGutterLayout enabled={!isMobile && !floating} sessionId={selectedSession?.id ?? null}
                 boundary={WorkspaceErrorBoundary}>
                 <ChatHostSlot sessionId={selectedSession?.id ?? null} showing={activeTab === 'chat'}>
@@ -378,6 +384,7 @@ function WorkspaceMain({
                   />
                 </ChatHostSlot>
               </ChatGutterLayout>
+              </SessionPanelLayout>
               </CoreDrawingProvider>
             </WorkspaceErrorBoundary>
           ) : chooseProjectBody}
@@ -526,6 +533,7 @@ function WorkspaceMain({
         </WorkspaceErrorBoundary>
       </div>
     </div>
+    </SessionPanelProvider>
   );
 }
 

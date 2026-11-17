@@ -1,0 +1,19 @@
+/* The chat and its panel, side by side (`SessionPanelLayout`). The chat is always the second child and is never unmounted: the
+ * panel comes and goes beside it. At a desk a thing shown takes the room and the talk a column of its own beside it; follow-ups
+ * alone are a narrow column. On a narrow screen one of the two is in front. */
+.session-panel-layout { display: flex; height: 100%; min-width: 0; min-height: 0; }
+.session-panel-chat { flex: 1; min-width: 0; min-height: 0; height: 100%; }
+.session-panel { display: none; }
+
+@media (min-width: 880px) {
+  .session-panel-layout[data-panel='wide'] { gap: 24px; width: min(1400px, 100%); margin-inline: auto; }
+  .session-panel-layout[data-panel='wide'] > .session-panel { display: flex; flex: 1; }
+  .session-panel-layout[data-panel='wide'] > .session-panel-chat { flex: none; width: min(46%, 560px); }
+  .session-panel-layout[data-panel='side'] > .session-panel { display: flex; flex: none; width: 300px; }
+}
+
+/* Narrow: the panel is a place you switch to from the chat's head. */
+@media (max-width: 879.98px) {
+  .session-panel-layout[data-view='panel'] > .session-panel { display: flex; flex: 1; }
+  .session-panel-layout[data-view='panel'] > .session-panel-chat { display: none; }
+}

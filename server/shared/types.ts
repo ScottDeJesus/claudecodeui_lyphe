@@ -223,6 +223,7 @@ export type GatewayEventKind =
   | 'kanban_event'
   | 'notes_changed'
   | 'followups_changed'
+  | 'session_panel_changed'
   | 'scheduled_messages_changed'
   | 'cerberus_changed'
   | 'cerberus_run_output'
@@ -362,6 +363,9 @@ export type NotesChangedEvent = { kind: 'notes_changed'; at: number };
 
 /** Sent to every open socket after a followup is filed, closed or reopened. It names the chat by its APP session id under `appSessionId` — deliberately NOT `sessionId`: the workspace flags a chat for attention (the unread mark) when any frame carries a `sessionId` that is not the one on screen (`useProjectsState`), and a chat's items moving is no news in the transcript. A widget re-reads when the id is its own chat's and ignores the frame otherwise. It carries no `seq`, so it can never become a transcript row. */
 export type FollowupsChangedEvent = { kind: 'followups_changed'; appSessionId: string; at: number };
+
+/** Sent to every open socket after a chat's panel changed: a thing shown, a new version of it, or the panel cleared. It names the chat by its APP session id under `appSessionId` (never `sessionId`, which would raise the chat's unread mark), and nothing else: a panel of that chat reads its versions again. */
+export type SessionPanelChangedEvent = { kind: 'session_panel_changed'; appSessionId: string; at: number };
 
 /** Sent to every open socket after a chat's scheduled messages changed: one was scheduled, cancelled or dismissed, claimed by the dispatcher as its turn starts, or failed to send. It names the chat by its APP session id under `sessionId` and nothing else — no message and no text — so a composer showing that chat re-reads the list through the authenticated per-user GET and every other composer ignores the frame. Because it carries `sessionId`, the workspace's unread mark (`useProjectsState`) and the transcript handler (`useChatRealtimeHandlers`) each name this kind and leave it alone; it carries no `seq`, so it can never become a transcript row. */
 export type ScheduledMessagesChangedEvent = { kind: 'scheduled_messages_changed'; sessionId: string; at: number };
@@ -2527,6 +2531,18 @@ export type Note = { id: string; title: string; description: string; createdAt: 
 export type NoteInput = { title: string; description: string };
 /** The order a save carries: `writer` names one open tab, `seq` counts that tab's sends from 1, so a save with a lower `seq` than one already applied from the same writer is an older text arriving late. Orders of two writers are never compared. */
 export type SaveOrder = { writer: string; seq: number };
+
+//----------------- SESSION PANEL ------------
+// The session panel's wire shapes, produced by `server/modules/session-panel/` and mirrored field-for-field in
+// `src/shared/types.ts` § SESSION PANEL. A change to either shape belongs in both files at once.
+/** The four kinds of thing a chat can put on its panel: a `diagram` (mermaid source), a `picture` (an http(s) address, or an image file on this box), a `page` (an http(s) address drawn in a frame) and a `widget` (an HTML body run in the sandboxed widget frame, a page the chat wrote itself). */
+export type SessionPanelKind = 'diagram' | 'picture' | 'page' | 'widget';
+/** One version of what a chat's panel shows, without its body: its never-reused `id` (what the transcript's mark points at), the `version` number a reader sees (from 1 for each chat, starting again after a clear), its `kind`, its `title` and when it was shown. The list a panel reads is these, oldest first; the newest is what the panel shows. */
+export type SessionPanelVersionHead = { id: number; version: number; kind: SessionPanelKind; title: string; createdAt: string };
+/** One version whole: its head and its `body` (mermaid source, an address, a path of a picture on this box, or an HTML body, by `kind`). `pictureIsFile` is true for a picture kept as a file on this box, which a reader's browser gets from the panel's own door and never by its path. */
+export type SessionPanelVersion = SessionPanelVersionHead & { body: string; pictureIsFile: boolean };
+/** What `panel show` and `panel update` carry before the service judges them: `kind` and `title` may be left out of an update, which keeps the ones showing. */
+export type SessionPanelInput = { kind: SessionPanelKind | null; title: string | null; body: string };
 
 //----------------- FOLLOWUPS ------------
 // The followups lane's wire shapes, produced by `server/modules/followups/` and mirrored field-for-field in

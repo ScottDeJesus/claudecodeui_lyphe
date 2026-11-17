@@ -16,6 +16,8 @@ import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermis
 import { getIntrinsicMessageKey } from '@/modules/chat/utils/messageKeys';
 import { collectRunTerminalReplies, groupConsecutiveTools, isToolGroupItem } from '@/modules/chat/utils/toolGrouping';
 import { isHiddenWork } from '@/modules/chat/utils/workVisibility';
+import { parseToolPayload } from '@/modules/chat/utils/messageTransforms';
+import { SessionPanelMark, panelShownIdOf } from '@/modules/session-panel';
 import { useChatFontSize } from '@/shared/hooks/useChatFontSize';
 import { useLazyRowObserver } from '@/modules/chat/hooks/useLazyRowObserver';
 import { useModelLabelResolver } from '@/modules/chat/hooks/useModelLabelResolver';
@@ -198,6 +200,24 @@ function ChatMessagesPane({
     () => groupConsecutiveTools(shownMessages, Boolean(showThinking)),
     [shownMessages, showThinking],
   );
+  // Where the session put a thing on its panel: the versions each turn showed, by the reader's message that opens the turn (null
+  // for a turn with none before it in what is loaded). Read from the FULL message order, as the anchors below are: "Show work" off
+  // drops the call's own row, and the mark is not work, it is where the thing on the panel came from.
+  const panelMarks = useMemo(() => {
+    const marks = new Map<ChatMessage | null, number[]>();
+    let opener: ChatMessage | null = null;
+    for (const message of chatMessages) {
+      if (message.type === 'user') {
+        opener = message;
+      } else if (message.isToolUse && message.toolName === 'Bash') {
+        const command = (parseToolPayload(message.toolInput) as { command?: unknown } | null)?.command;
+        const printed = message.toolResult?.content;
+        const id = typeof command === 'string' && typeof printed === 'string' ? panelShownIdOf(command, printed) : null;
+        if (id !== null) marks.set(opener, [...(marks.get(opener) ?? []), id]);
+      }
+    }
+    return marks;
+  }, [chatMessages]);
   // Each row's turn anchor, which its file previews are scoped by (`shapes/previewScope.ts`): the last
   // tool call before it in its turn, else the turn's prompt. Read from the FULL message order, never
   // from the rows on screen — "Show work", the loaded window and a tool row leaving its waiting state
@@ -506,8 +526,12 @@ function ChatMessagesPane({
               );
               run = null;
             };
+            // The reader's message that opened the turn being gathered, which the panel's marks are kept by.
+            let opener: ChatMessage | null = null;
             const closeTurn = (finished: boolean) => {
               closeRun(finished);
+              // The turn ends with a mark for each version it put on the panel; pressed, it goes to that version.
+              for (const id of panelMarks.get(opener) ?? []) turn.push(<SessionPanelMark key={`panel-mark-${id}`} versionId={id} />);
               if (turn.length === 0) return;
               turns.push(
                 <div key={`turn-${turn[0].key}`} data-chat-turn="" className="space-y-3 py-1 sm:space-y-4">
@@ -519,6 +543,7 @@ function ChatMessagesPane({
             for (const row of rows) {
               if (row.isUser) {
                 closeTurn(true);
+                opener = row.first ?? null;
                 turns.push(row.node);
               } else if (row.work !== null) {
                 run ??= { nodes: [], calls: [], first: row.first };

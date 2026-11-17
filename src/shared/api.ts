@@ -1086,6 +1086,16 @@ export const api = {
     setState: (id: number, state: 'open' | 'done') => patch(`/api/followups/${id}`, { state }),
   },
 
+  // The session panel's lane: what one chat has put on its panel, keyed on the chat's app session id. `list` answers the chat's
+  // versions without their bodies, oldest first (the newest is what the panel shows); `version` answers one whole; `picture`
+  // answers the bytes of a version's picture file, which need the auth header and so are fetched as a blob, never named in a
+  // bare `src`. The person only reads here: a panel is changed by its chat's own `panel` command.
+  sessionPanel: {
+    list: (appSessionId: string) => get(`/api/session-panel?session=${encodeURIComponent(appSessionId)}`),
+    version: (id: number) => get(`/api/session-panel/versions/${id}`),
+    picture: (id: number) => get(`/api/session-panel/versions/${id}/picture`, { timeoutMs: NO_REQUEST_TIMEOUT }),
+  },
+
   // The tool-set lane (MAN-8490): which of the box's named MCP sets one chat has on.
   // Both verbs answer `{ success: true, data }` and a refusal is the app's `{ success: false, error }`
   // envelope, so a caller reads them through `readApiJson`. `read` answers the chat's `SessionToolsetsView`;

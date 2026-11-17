@@ -1860,6 +1860,28 @@
     "fullscreen": "Fullscreen",
     "exitFullscreen": "Leave fullscreen"
   },
+  "sessionPanel": {
+    "name": "Panel",
+    "named": "Panel · {{title}}",
+    "version": "{{kind}} · V{{n}} / {{of}}",
+    "v": "V{{n}}",
+    "versions": "{{title}}, its versions",
+    "latest": "Latest",
+    "kind": {
+      "diagram": "Diagram",
+      "picture": "Picture",
+      "page": "Page",
+      "widget": "Its own page"
+    },
+    "mark": "On the panel · V{{n}} · {{title}}",
+    "switchWithOpen_one": "Panel, {{count}} follow-up open",
+    "switchWithOpen": "Panel, {{count}} follow-ups open",
+    "openPage": "Open the page",
+    "enlarge": "Enlarge {{title}}",
+    "reading": "Reading the panel",
+    "pictureGone": "This picture is no longer where the session showed it from.",
+    "versionGone": "This version is no longer on the panel."
+  },
   "followups": {
     "group": {
       "next": "Next steps",

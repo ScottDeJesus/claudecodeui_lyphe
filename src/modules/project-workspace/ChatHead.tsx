@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { SessionPanelSwitch } from '@/modules/session-panel';
 import { openHome } from '@/shared/cloudcliDoors';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { Project, ProjectSession } from '@/shared/types';
@@ -18,8 +19,9 @@ type ChatHeadProps = {
 
 /**
  * THE HEAD OF A CHAT: the way back and what this is. A back arrow at the start goes to the sessions home, where every chat is; beside it,
- * the word Chat with the project's name, and the chat's own title under them. Nothing else: what the chat is doing is its core's to say,
- * at the foot beside the line (`ChatCore`), and everything that sets the chat up is behind that core.
+ * the word Chat with the project's name, and the chat's own title under them. On a narrow screen a chat with a panel has the switch to
+ * it at the end (`SessionPanelSwitch`). Nothing else: what the chat is doing is its core's to say, at the foot beside the line
+ * (`ChatCore`), and everything that sets the chat up is behind that core.
  *
  * It stands in place of the sidebar, the rail and the phone's header strip while the Chat view is on screen, at every width: the sessions
  * home is the list of chats now, and the other views are reached from its menu. `pwa-header-safe` keeps it clear of a phone's status bar.
@@ -52,6 +54,8 @@ export default function ChatHead({ selectedProject, selectedSession, newSessionL
         </p>
         <h1 className="truncate text-lg font-normal leading-tight text-foreground sm:text-xl" title={title}>{title}</h1>
       </div>
+      {/* On a narrow screen the chat's panel is a place switched to from here; at a desk it is beside the talk and this draws nothing. */}
+      <SessionPanelSwitch />
     </header>
   );
 }

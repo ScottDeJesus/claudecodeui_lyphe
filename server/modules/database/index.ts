@@ -118,6 +118,10 @@ export { memoryCandidatesDb } from '@/modules/database/repositories/memory-candi
 // Used by the followups module; `sessions.db.ts` moves a merged chat's items itself.
 export { followupsDb } from '@/modules/database/repositories/followups.db.js';
 export type { FollowupKind, FollowupRow } from '@/modules/database/repositories/followups.db.js';
+// The session panel's own table: what one chat has put on its panel, a row for each version, keyed on the chat's app session id.
+// Used by the session-panel module; `sessions.db.ts` moves a merged chat's versions itself.
+export { sessionPanelDb } from '@/modules/database/repositories/session-panel.db.js';
+export type { SessionPanelHeadRow, SessionPanelKind, SessionPanelRow } from '@/modules/database/repositories/session-panel.db.js';
 // The companion's own tables: Kaylee's per-account state, exchange (the newest 400 rows), note cards and record of the
 // actions she prepared for his word, as rows — snake_case columns, JSON columns as text. Used by the companion module's
 // store, which maps them to the wire contract.
