@@ -9,12 +9,14 @@ import { useSimpleChatFolders } from '@/modules/sidebar/hooks/useSimpleChatFolde
 import { useSimpleChatList } from '@/modules/sidebar/hooks/useSimpleChatList';
 import { useSimpleChatProject } from '@/modules/sidebar/hooks/useSimpleChatProject';
 import { useSimpleChatRemove } from '@/modules/sidebar/hooks/useSimpleChatRemove';
+import { subagentDots } from '@/modules/sidebar/utils/simpleChatMarks';
 import SidebarSimpleDeleteDialog from '@/modules/sidebar/SidebarSimpleDeleteDialog';
 import SidebarSimpleFolderPicker from '@/modules/sidebar/SidebarSimpleFolderPicker';
 import SidebarSimpleStopDialog from '@/modules/sidebar/SidebarSimpleStopDialog';
 import { api } from '@/shared/api';
 import { useSessionHostLiveSet } from '@/shared/context/SessionHostLivenessContext';
 import { useAwaitingInputSessionIdSet, useBusySessionIdSet, useSubagentRunningSessionIdSet } from '@/shared/context/SessionProtectionContext';
+import { useSubagentModelsBySession } from '@/shared/context/subagentModelsContext';
 import { projectNameHints } from '@/shared/projectNameHints';
 import type { Project, RecentConversationListItem } from '@/shared/types';
 import { Button, ConfirmDialog, EmptyState, Spinner } from '@/shared/ui';
@@ -55,6 +57,7 @@ export function SessionsBoard({ projects, enabled, onOpenChat, onNewChat, onSess
   const busySessionIds = useBusySessionIdSet();
   const awaitingInputSessionIds = useAwaitingInputSessionIdSet();
   const subagentRunningSessionIds = useSubagentRunningSessionIdSet();
+  const subagentModels = useSubagentModelsBySession();
   const liveHostSessionIds = useSessionHostLiveSet();
 
   // No chat is open on the board, so the feed is asked to keep none in view.
@@ -114,6 +117,7 @@ export function SessionsBoard({ projects, enabled, onOpenChat, onNewChat, onSess
       isRunning={busySessionIds.has(chat.sessionId)}
       isAwaitingInput={awaitingInputSessionIds.has(chat.sessionId)}
       isSubagentRunning={subagentRunningSessionIds.has(chat.sessionId)}
+      subagents={subagentDots(subagentRunningSessionIds.has(chat.sessionId), subagentModels.get(chat.sessionId))}
       // Only a Claude chat can have a session host, so only one can be asleep, and none is until the server's first census has arrived.
       isAsleep={liveHostSessionIds !== null && chat.provider === 'claude' && !liveHostSessionIds.has(chat.sessionId)}
       isRemoveFailed={failedSessionId === chat.sessionId}

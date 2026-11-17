@@ -28,7 +28,7 @@ import type { AnyRecord, NormalizedMessage, SubagentActivity } from '@/shared/ty
  * strip above the chat box when the desktop chat gutters are not showing and in the gutter's
  * Subagents widget while they are: a "running" row older than this is not believed.
  *
- * Read by the sidebar's purple dot too (`hasRunningSubagent`, and the candidate window in
+ * Read by the sidebar's subagent mark too (`runningSubagentModels`, and the candidate window in
  * `session-subagent-runs.service.ts`), so the three answers to "is an agent still out there" are
  * one window rather than three.
  */
@@ -204,15 +204,20 @@ function isRunningContainer(message: NormalizedMessage): boolean {
 }
 
 /**
- * Whether this conversation has a subagent running RIGHT NOW — the question the sidebar's purple
- * dot asks, and the answer the chat's pinned strip draws its own purple disc from.
+ * The model of every subagent this conversation has running RIGHT NOW, one entry for each, in the order the strip pins them:
+ * the model the agent's own transcript names (`subagent.model`), or `''` for one whose model is not recorded yet. Empty when it
+ * has none running: the question the sidebar's subagent mark asks, and the answer the chat's pinned strip draws its own from.
  *
  * Asked through `collectSessionAgents` deliberately, rather than by re-walking the messages: the
  * containers it offers and the four-hour launch window it applies to an unfinished one ARE the
- * strip's selection, so the dot can never light on an agent the strip would not pin.
+ * strip's selection, so a mark can never light on an agent the strip would not pin.
+ *
+ * Consumed by `session-subagent-runs.service.ts`, for the running-sessions route's `subagentSessionIds` and `subagentModels`.
  */
-export function hasRunningSubagent(messages: NormalizedMessage[], now: number = Date.now()): boolean {
-  return collectSessionAgents(messages, now).some(isRunningContainer);
+export function runningSubagentModels(messages: NormalizedMessage[], now: number = Date.now()): string[] {
+  return collectSessionAgents(messages, now)
+    .filter(isRunningContainer)
+    .map((message) => (typeof message.subagent?.model === 'string' ? message.subagent.model : ''));
 }
 
 /**

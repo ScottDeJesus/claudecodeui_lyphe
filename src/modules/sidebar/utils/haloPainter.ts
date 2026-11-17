@@ -1,17 +1,17 @@
-import type { SessionsHaloSlot } from '@/shared/types';
+import type { SessionsHaloSlot, SubagentDot } from '@/shared/types';
 
 // THE HALO'S PAINTER: every chat of the simple list as one slot on a hoop that stands round the companion's core, seen from a little
 // above. A slot says its chat's state by how it stands, in three tracks up the band's face, the same marks a tile on the sessions board
 // draws: the top edge lit for a reply not read yet; the square in the middle dark for a chat asleep, lit and still for one awake, a
 // ring of dashes turning in it while its turn runs, and filled in the accent, breathing, while it waits on the reader; a bead on the
-// lower edge for a subagent still at work. The chats of one folder stand together, a firmer wall and a little air between folders.
+// lower edge for each subagent still at work, in its model's colour. The chats of one folder stand together, a firmer wall and a little air between folders.
 // The hoop turns: the slot at the front, over the pointer, is the one that is read out and the one a press opens.
 //
 // Drawn on a canvas because every slot leans with the hoop as it turns; the component over it (`board/SessionsHalo`) owns the element,
 // its events and the words.
 
 type Rgb = readonly [number, number, number];
-type Colors = { ink: Rgb; tone: Rgb; muted: Rgb; accent: Rgb; bead: Rgb };
+type Colors = { ink: Rgb; tone: Rgb; muted: Rgb; accent: Rgb; tube: Rgb; wire: Rgb; plasma: Rgb };
 
 const TAU = Math.PI * 2;
 /** How far the hoop leans toward the reader: its depth on screen over its width. */
@@ -22,8 +22,11 @@ const FOLDER_GAP = 0.09;
 const SQUARE: readonly [number, number] = [0.24, 0.78];
 const UNREAD_FROM = 0.84;
 const BEAD_AT = 0.11;
+/** The most beads one slot shows, and how much of the slot's width they may spread across. */
+const MOST_BEADS = 3;
+const BEADS_SPREAD = 0.5;
 
-const FALLBACK: Colors = { ink: [255, 255, 255], tone: [238, 241, 244], muted: [149, 157, 166], accent: [242, 166, 90], bead: [158, 211, 230] };
+const FALLBACK: Colors = { ink: [255, 255, 255], tone: [238, 241, 244], muted: [149, 157, 166], accent: [242, 166, 90], tube: [255, 176, 102], wire: [95, 227, 255], plasma: [185, 162, 255] };
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 const lerp = (from: number, to: number, by: number) => from + (to - from) * by;
@@ -108,6 +111,11 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
   // The chat the core is dealing with now, and which way the words go; and how far from the middle the core's own edge is, in px.
   let link: HaloLink | null = null;
   let hole = 0;
+
+  /** What a subagent's bead is filled with: its model's material, the bright ink for Mercury, the quiet ink for a model not known. */
+  const beadColor = (bead: SubagentDot): Rgb => (
+    bead === 'tube' ? colors.tube : bead === 'wire' ? colors.wire : bead === 'plasma' ? colors.plasma : bead === 'mercury' ? colors.ink : colors.muted
+  );
 
   /** A point on the band: `angle` round from the front, `up` the band's face from foot (0) to top (1), `out` its distance from the axis in radii. */
   const point = (angle: number, up: number, out = 1): [number, number] => [
@@ -248,12 +256,19 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
       ctx.fillStyle = rgba(colors.ink, Math.min(1, shade + 0.25));
       ctx.fill(piece(low, high, UNREAD_FROM, 1));
     }
-    if (slot.helpers) {
-      const [x, y] = point(mid + (still ? 0 : Math.sin(now / 450 + index) * (high - low) * 0.12), BEAD_AT);
-      ctx.beginPath();
-      ctx.arc(x, y, clamp(band * 0.08, 1.6, 3), 0, TAU);
-      ctx.fillStyle = rgba(colors.bead, Math.min(1, shade + 0.3));
-      ctx.fill();
+    if (slot.helpers.length > 0) {
+      // One bead for each subagent, side by side along the foot of the slot and swaying together, each in its model's colour.
+      const beads = slot.helpers.slice(0, MOST_BEADS);
+      const sway = still ? 0 : Math.sin(now / 450 + index) * (high - low) * 0.12;
+      const step = beads.length > 1 ? ((high - low) * BEADS_SPREAD) / (beads.length - 1) : 0;
+      const size = clamp(band * 0.08, 1.6, 3);
+      beads.forEach((bead, at) => {
+        const [x, y] = point(mid + sway + (at - (beads.length - 1) / 2) * step, BEAD_AT);
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, TAU);
+        ctx.fillStyle = rgba(beadColor(bead), Math.min(1, shade + 0.3));
+        ctx.fill();
+      });
     }
     if (hover === index) {
       ctx.strokeStyle = rgba(colors.ink, 0.9);
@@ -350,7 +365,9 @@ export function createHaloPainter(canvas: HTMLCanvasElement) {
         tone: token('--ink', FALLBACK.tone),
         muted: token('--ink-muted', FALLBACK.muted),
         accent: token('--accent', FALLBACK.accent),
-        bead: token('--signal-b', FALLBACK.bead),
+        tube: token('--tube', FALLBACK.tube),
+        wire: token('--wire', FALLBACK.wire),
+        plasma: token('--plasma', FALLBACK.plasma),
       };
       font = style.getPropertyValue('--font-mono').trim() || font;
     },

@@ -4167,8 +4167,8 @@ export type RoadmapTreeSelection = { kind: 'roadmap' } | { kind: 'milestone' | '
  * One chat as a slot on the halo, the simple chat list drawn as a hoop round the companion's core: the chat's `id` and `title`, the
  * folder it stands in (`folder` its id and `folderName` its name, both null for a chat in none), where it stands (`asleep` with no
  * live session host, `idle` awake and still, `working` while its turn runs, `waiting` while it waits on the reader), whether a reply
- * is `unread`, and whether one of its `helpers` (a subagent) is still at work. Laid out by the sidebar module's `SessionsHalo` and
- * drawn by its `haloPainter`.
+ * is `unread`, and its `helpers`: one entry for each subagent still at work, the material of its model (`SubagentDot`). Laid out
+ * by the sidebar module's `SessionsHalo` and drawn by its `haloPainter`.
  */
 export type SessionsHaloSlot = {
   id: string;
@@ -4177,8 +4177,15 @@ export type SessionsHaloSlot = {
   folderName: string | null;
   state: 'asleep' | 'idle' | 'working' | 'waiting';
   unread: boolean;
-  helpers: boolean;
+  helpers: readonly SubagentDot[];
 };
+
+/**
+ * One subagent still at work, as the dot a chat draws for it: the material its model wears (`modelMaterialOf`: Opus the tube,
+ * Haiku the wire, Sonnet the plasma, any other model Mercury), or null for an agent whose model is not known. Made by the sidebar
+ * module's `subagentDots`; drawn by its `SessionTile` and its `haloPainter`.
+ */
+export type SubagentDot = CompanionMaterial | null;
 
 // ---------------------------
 //----------------- ROADMAP STACK: what the roadmap's stack, its painter and its face share ------------

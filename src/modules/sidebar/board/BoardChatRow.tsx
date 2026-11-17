@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next';
 
 import { SessionTile } from '@/modules/sidebar/board/SessionTile';
 import { chatMarks } from '@/modules/sidebar/utils/simpleChatMarks';
-import type { RecentConversationListItem, SimpleListDragProps } from '@/shared/types';
+import type { RecentConversationListItem, SimpleListDragProps, SubagentDot } from '@/shared/types';
 import { ActionMenu } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -15,6 +15,8 @@ type BoardChatRowProps = {
   isAwaitingInput: boolean;
   /** A subagent from this chat is still running, often after the chat's own turn has ended. */
   isSubagentRunning: boolean;
+  /** Those subagents, one entry for each, as the dots the tile draws for them (`subagentDots`). */
+  subagents: readonly SubagentDot[];
   /** The chat has no live session host. It stays fully usable: the next message starts a host. */
   isAsleep: boolean;
   isRemoveFailed: boolean;
@@ -56,7 +58,7 @@ type BoardChatRowProps = {
  * Used by `BoardFolder`, once per chat of a column.
  */
 export function BoardChatRow({
-  row, isRunning, isAwaitingInput, isSubagentRunning, isAsleep, isRemoveFailed, projectNameHint,
+  row, isRunning, isAwaitingInput, isSubagentRunning, subagents, isAsleep, isRemoveFailed, projectNameHint,
   onSelect, onClose, onTogglePin, onDelete, onRename, onMoveToFolder, dragProps, isDragging = false, dropEdge = null, t,
 }: BoardChatRowProps) {
   // Whether the title is open for typing: the menu's Rename opens it, Enter or a blur saves, Escape leaves it as it was.
@@ -119,7 +121,7 @@ export function BoardChatRow({
 
       {isEditing ? (
         <div className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 py-1 pr-1.5">
-          <SessionTile marks={marks} isAsleep={isAsleep} />
+          <SessionTile marks={marks} subagents={subagents} isAsleep={isAsleep} />
           <input
             type="text"
             value={draft}
@@ -147,7 +149,7 @@ export function BoardChatRow({
             onSelect();
           }}
         >
-          <SessionTile marks={marks} isAsleep={isAsleep} />
+          <SessionTile marks={marks} subagents={subagents} isAsleep={isAsleep} />
           <span className="flex min-w-0 flex-1 flex-col">
             <span
               className={cn(

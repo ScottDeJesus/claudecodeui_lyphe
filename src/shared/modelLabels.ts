@@ -1,4 +1,4 @@
-import type { ProviderModelOption } from '@/shared/types';
+import type { CompanionMaterial, ProviderModelOption } from '@/shared/types';
 
 /**
  * Catalog values that name a POLICY rather than a model — "use the recommended
@@ -188,4 +188,19 @@ export function resolveModelOption(options: ProviderModelOption[], modelId: stri
   if (exact) return exact;
   if (deepseekLabelOf(modelId)) return null;
   return familyOption(options, modelId);
+}
+
+/**
+ * The material a model wears, by the family its name carries: Opus the tube (amber), Haiku the wire (cyan), Sonnet the plasma
+ * (violet), and every other model Mercury (chrome). The app's one colour coding for models: a reply's mark, the chat's core and
+ * its model ring, and the dots a sessions-board tile draws for its subagents all ask here, so a model is one colour everywhere.
+ *
+ * Used by the chat module's `replyMaterialOf` and the sidebar module's `subagentDots`.
+ */
+export function modelMaterialOf(model: string): CompanionMaterial {
+  const name = model.toLowerCase();
+  if (name.includes('opus')) return 'tube';
+  if (name.includes('haiku')) return 'wire';
+  if (name.includes('sonnet')) return 'plasma';
+  return 'mercury';
 }

@@ -4,10 +4,11 @@ import { useTranslation } from 'react-i18next';
 
 import { useSimpleChatList } from '@/modules/sidebar/hooks/useSimpleChatList';
 import { createHaloPainter, haloHeightFor, haloMiddle } from '@/modules/sidebar/utils/haloPainter';
-import { chatMarks } from '@/modules/sidebar/utils/simpleChatMarks';
+import { chatMarks, subagentDots } from '@/modules/sidebar/utils/simpleChatMarks';
 import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import { useSessionHostLiveSet } from '@/shared/context/SessionHostLivenessContext';
 import { useAwaitingInputSessionIdSet, useBusySessionIdSet, useSubagentRunningSessionIdSet } from '@/shared/context/SessionProtectionContext';
+import { useSubagentModelsBySession } from '@/shared/context/subagentModelsContext';
 import type { RecentConversationListItem, SessionsHaloSlot } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
@@ -61,6 +62,7 @@ export function SessionsHalo({ enabled, width, names, reading, link, coreRadius,
   const busySessionIds = useBusySessionIdSet();
   const awaitingInputSessionIds = useAwaitingInputSessionIdSet();
   const subagentRunningSessionIds = useSubagentRunningSessionIdSet();
+  const subagentModels = useSubagentModelsBySession();
   const liveHostSessionIds = useSessionHostLiveSet();
   const isPageHeld = useIsPageHeld();
   // No chat is open at the halo, so the feed is asked to keep none in view.
@@ -84,13 +86,13 @@ export function SessionsHalo({ enabled, width, names, reading, link, coreRadius,
         folderName,
         state: marks.awaitingInput ? 'waiting' : marks.running ? 'working' : asleep ? 'asleep' : 'idle',
         unread: marks.unread,
-        helpers: marks.subagents,
+        helpers: subagentDots(marks.subagents, subagentModels.get(chat.sessionId)),
       };
     };
     const inFolders = items.flatMap((item) => (item.kind === 'folder' ? item.folder.chats.map((chat) => slotOf(chat, item.folder.folderId, item.folder.name)) : []));
     const loose = items.flatMap((item) => (item.kind === 'chat' ? [slotOf(item.chat, null, null)] : []));
     return [...inFolders, ...loose];
-  }, [items, busySessionIds, awaitingInputSessionIds, subagentRunningSessionIds, liveHostSessionIds, t]);
+  }, [items, busySessionIds, awaitingInputSessionIds, subagentRunningSessionIds, subagentModels, liveHostSessionIds, t]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const painterRef = useRef<ReturnType<typeof createHaloPainter> | null>(null);
@@ -176,7 +178,7 @@ export function SessionsHalo({ enabled, width, names, reading, link, coreRadius,
   const stateWords = read === null ? '' : [
     read.state === 'waiting' ? t('simpleList.awaitingInput') : read.state === 'working' ? t('simpleList.running') : read.state === 'idle' ? t('board.idle') : t('board.asleep'),
     read.unread ? t('simpleList.unread') : null,
-    read.helpers ? t('simpleList.subagentsRunning') : null,
+    read.helpers.length > 0 ? t('simpleList.subagentsRunning') : null,
   ].filter(Boolean).join(' · ');
   const front = slots[shown.front] ?? null;
 

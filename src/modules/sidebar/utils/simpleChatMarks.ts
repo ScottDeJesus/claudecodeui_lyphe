@@ -1,4 +1,5 @@
-import type { SimpleChatMark } from '@/shared/types';
+import { modelMaterialOf } from '@/shared/modelLabels';
+import type { SimpleChatMark, SubagentDot } from '@/shared/types';
 
 /**
  * The marks rule in its one home: which of the four marks one chat draws, and which single mark a
@@ -35,6 +36,22 @@ export function chatMarks(facts: {
     // Beside whichever mark above applies, never instead of one: a subagent often outlives the turn.
     subagents: facts.isSubagentRunning,
   };
+}
+
+const NO_DOTS: readonly SubagentDot[] = [];
+const ONE_UNKNOWN_DOT: readonly SubagentDot[] = [null];
+
+/**
+ * The dots a chat draws for the subagents it has running, one for each, in the colour coding of the models (`modelMaterialOf`);
+ * an agent that has not named its model is a dot of no model. None unless the chat draws its `subagents` mark, and one of no
+ * model when it does but no models came with it (a server older than the field), so the dots never contradict the mark.
+ *
+ * Read by `SessionsBoard` (a tile's dots) and `SessionsHalo` (a slot's beads).
+ */
+export function subagentDots(hasSubagents: boolean, models: readonly string[] | undefined): readonly SubagentDot[] {
+  if (!hasSubagents) return NO_DOTS;
+  if (!models || models.length === 0) return ONE_UNKNOWN_DOT;
+  return models.map((model) => (model ? modelMaterialOf(model) : null));
 }
 
 /** The most pressing mark any of a folder's chats draws, which is what its one dot wears. Null when none draws any. */
