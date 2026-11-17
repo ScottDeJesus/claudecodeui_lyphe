@@ -96,7 +96,7 @@ export function CheckLabelEditor({ value, onSave, onCancel, busy }: CheckLabelEd
         <Button type="submit" size="sm" disabled={busy || unchanged}>
           {t('cerberus.sheet.save')}
         </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onCancel}>
+        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onCancel}>
           {t('cerberus.sheet.cancel')}
         </Button>
       </span>

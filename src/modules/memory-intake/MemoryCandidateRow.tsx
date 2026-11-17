@@ -208,7 +208,7 @@ export function MemoryCandidateRow({ candidate, refusal, busy, onReview }: Memor
           </Button>
           <Button
             size="sm"
-            variant="ghost"
+            variant="outline"
             disabled={busy}
             title={t('memory.actions.discardTitle')}
             onClick={() => onReview(candidate.id, false)}

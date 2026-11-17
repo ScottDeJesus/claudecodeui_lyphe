@@ -94,7 +94,7 @@ export function SelectedCheck({
   // "Name this check" is a quiet text action, never a filled chip: a second filled pill beside the
   // status (in the accent green) would compete with a refused red or a failing amber for the eye.
   const nameAction = check.label === null ? (
-    <Button ref={nameTriggerRef} variant="ghost" size="sm" className="h-8 px-2" onClick={onName}>
+    <Button ref={nameTriggerRef} variant="outline" size="sm" className="h-8 px-2" onClick={onName}>
       <Pencil aria-hidden />
       {t('cerberus.sheet.nameThis')}
     </Button>
@@ -142,7 +142,7 @@ export function SelectedCheck({
         )}
         {check.mute === null ? (
           onMute && (
-            <Button variant="ghost" size="sm" onClick={onMute}>
+            <Button variant="outline" size="sm" onClick={onMute}>
               {t('cerberus.sheet.mute')}
             </Button>
           )
@@ -155,7 +155,7 @@ export function SelectedCheck({
                 {t('cerberus.sheet.muteNote', { time: hm(check.mute.until), reason: check.mute.reason })}
               </span>
             </Badge>
-            <Button variant="ghost" size="sm" onClick={onUnmute}>
+            <Button variant="outline" size="sm" onClick={onUnmute}>
               {t('cerberus.sheet.unmute')}
             </Button>
           </>

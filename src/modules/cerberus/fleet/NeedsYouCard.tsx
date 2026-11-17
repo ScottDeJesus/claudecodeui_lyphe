@@ -122,7 +122,7 @@ export function NeedCard({ need, leaving, onOpen, onMute, wholeValue = false }: 
         )}
         {onMute && (
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             disabled={leaving}
             className="finger:h-11"
@@ -232,7 +232,7 @@ export function NeedsYouCard({ needs, muted, counts, now, onOpen, onMute }: Need
                     {t('cerberus.needs.mutedMeta', { time: hm(mute.until), left: timeLeft(t, mute.until, now), reason: mute.reason })}
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => onUnmute(mute.id)}>
+                <Button variant="outline" size="sm" onClick={() => onUnmute(mute.id)}>
                   {t('cerberus.needs.unmute')}
                 </Button>
               </li>

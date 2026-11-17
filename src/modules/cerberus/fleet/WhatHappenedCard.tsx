@@ -66,7 +66,7 @@ export function WhatHappenedCard({ activity, now }: WhatHappenedCardProps) {
         <span
           key={newestKey}
           aria-hidden
-          className={cn('ml-2.5 size-[7px] rounded-full', newest === undefined ? 'bg-input' : 'bg-primary motion-safe:animate-[vv-ring_1.2s_ease-out_1]')}
+          className={cn('ml-2.5 size-[7px] rounded-full', newest === undefined ? 'bg-input' : 'bg-[var(--pos-dot)] motion-safe:animate-[vv-ring_1.2s_ease-out_1]')}
         />
       </h2>
       {events.length > 0 ? (

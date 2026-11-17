@@ -198,7 +198,7 @@ export function FleetRings({ items, nodes, now, onOpenCell }: FleetRingsProps) {
                   style={{ animationDelay: `${-(index % BEAT_PHASES) * BEAT_STEP_S}s` }}
                   className={cn(
                     'absolute -top-[3.5px] left-full -ml-[3px] size-1.5 rounded-full opacity-0 motion-safe:animate-cerberus-travel',
-                    spoke === 'amber' ? 'bg-tone-dot' : 'bg-primary',
+                    spoke === 'amber' ? 'bg-tone-dot' : 'bg-[var(--pos-dot)]',
                   )}
                 />
               )}

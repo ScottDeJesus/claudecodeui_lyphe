@@ -58,7 +58,7 @@ function FeedFoot({ earlier, onEarlier }: { earlier: CerberusFeedFoot; onEarlier
   const reading = earlier === 'reading';
   return (
     <div className="border-t border-muted pt-2">
-      <Button variant="ghost" size="sm" className="max-md:h-11" disabled={reading} aria-busy={reading || undefined} onClick={onEarlier}>
+      <Button variant="outline" size="sm" className="max-md:h-11" disabled={reading} aria-busy={reading || undefined} onClick={onEarlier}>
         {reading ? t('cerberus.history.readingEarlier') : t('cerberus.history.showEarlier')}
       </Button>
     </div>
