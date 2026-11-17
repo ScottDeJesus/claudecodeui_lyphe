@@ -1,5 +1,5 @@
 import { House, Settings } from 'lucide-react';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AccountRailButton, UsageRings } from '@/modules/accounts';
@@ -88,21 +88,6 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
     return () => cancelAnimationFrame(frame);
   }, [activeTab, litPresent]);
 
-  // Whether the Chat button stands whole in the scroll region. State because the switcher's disc, seated in this rail,
-  // draws no dot while the Chat badge says a reply waits — and in a window too short for the rail the region scrolls
-  // and the reveal of a lit view far down can take Chat out of it, leaving the reply unsigned. Watched only while a
-  // reply waits, by an observer rooted at the region, so nothing polls and no scroll listener runs.
-  const [chatInView, setChatInView] = useState(true);
-  const chatBadged = badges.chat !== undefined;
-  useEffect(() => {
-    const region = scrollRef.current;
-    const chatButton = region?.querySelector('[data-view-id="chat"]');
-    if (!chatBadged || !region || !chatButton) return undefined;
-    const watch = new IntersectionObserver(([entry]) => setChatInView(entry.intersectionRatio >= 0.9), { root: region, threshold: [0.9] });
-    watch.observe(chatButton);
-    return () => watch.disconnect();
-  }, [chatBadged]);
-
   // A press on a phone chooses a pane the drawer is covering, so the drawer gets out of the way. Docked, it closes nothing.
   const press = (id: AppTab) => {
     setActiveTab(id);
@@ -140,9 +125,13 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
       aria-label={t('rail.label')}
       className="relative z-50 flex h-full w-12 flex-none flex-col items-center bg-background pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] pt-2"
     >
-      <div className="grid size-11 flex-none place-items-center md:size-10">
-        <AppSwitcherDock unreadBadgeHidden={chatBadged && !chatInView} pressOverride={pressOverride} />
-      </div>
+      {/* The rail's top cell stands only while it has something to offer: the way back to a collapsed chat list. The applications'
+          disc that used to sit here is gone from this app; its acts are the sessions home's menu's. */}
+      {pressOverride !== null && (
+        <div className="grid size-11 flex-none place-items-center md:size-10">
+          <AppSwitcherDock pressOverride={pressOverride} />
+        </div>
+      )}
       <div
         ref={scrollRef}
         className="scrollbar-hide mt-1 flex min-h-0 w-full flex-1 scroll-py-1.5 flex-col items-center overflow-y-auto overflow-x-hidden overscroll-contain"

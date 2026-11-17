@@ -46,12 +46,13 @@ export function AppSwitcherDock({
   unreadBadgeHidden?: boolean;
   pressOverride?: DockPress | null;
 }) {
-  const { registerDock, setDockBadgeHidden, setDockPress, fabPosition, dockRect } = useAppSwitcher();
+  const { registerDock, setDockBadgeHidden, setDockPress } = useAppSwitcher();
   const dockRef = useRef<HTMLDivElement>(null);
   const ownButtonRef = useRef<HTMLButtonElement>(null);
 
-  // The kit's own test for "drawn in the dock", less the drag in hand: docked, on a dock that measured.
-  const seated = fabPosition.docked && dockRect !== null;
+  // NO DISC IS EVER SEATED HERE NOW: the switcher's floating button is gone from this app, so the dock always answers an override with
+  // its own rail button, and holds no more than its box while there is none. (The seat's bookkeeping below is kept as it was.)
+  const seated = false;
   // Read by the focus hand-off below at the moment an override arrives, so that hand-off is keyed on the arrival alone
   // and a disc dragged out or back later never re-runs it.
   const seatedRef = useRef(seated);

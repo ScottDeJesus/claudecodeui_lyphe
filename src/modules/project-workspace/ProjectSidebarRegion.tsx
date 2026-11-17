@@ -5,6 +5,7 @@ import type {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useCurrentApplication } from '@/modules/app-switcher';
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import WorkspaceRail from '@/modules/project-workspace/WorkspaceRail';
 import { Sidebar } from '@/modules/sidebar';
@@ -16,9 +17,11 @@ function ProjectSidebarRegion({
 }: Pick<ProjectWorkspaceShellProps, 'isMobile'>) {
   const { t } = useTranslation('common');
   const { sidebarOpen, setSidebarOpen, sidebarSharedProps, activeTab } = useProjectSidebarState();
+  const currentApplication = useCurrentApplication();
   // The Chat view stands alone: its head carries the way back to the sessions home, which is the list of chats now. The sidebar stays
   // MOUNTED under it (it hosts the Settings dialog, which the home's cog opens, and keeps its own lists warm) and takes no room.
-  const aside = activeTab === 'chat';
+  // With an application up over the main region the rail comes back: it is the way out, to the sessions home and its menu.
+  const aside = activeTab === 'chat' && currentApplication === null;
 
   // The views rail, rendered INTO the sidebar through its `rail` slot: the rail is this module's and the list is the
   // sidebar's, so the sidebar tells the rail whether the list is collapsed and never imports it. Stable on `isMobile`,

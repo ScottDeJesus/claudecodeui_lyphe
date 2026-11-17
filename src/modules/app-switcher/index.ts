@@ -1,6 +1,7 @@
 // The switcher's four doors, and every one is a mount. The project-workspace shell wraps its tree in
-// the provider, renders the layer over the main region and the FAB beside the command palette, and
-// the workspace rail mounts the dock in its top cell, in the sidebar's rail.
+// the provider, renders the layer over the main region and the drawer beside the command palette, and
+// the workspace rail mounts the dock in its top cell, in the sidebar's rail. The switcher has no
+// floating button: its acts are the sessions home's menu's and the command palette's.
 //
 // EXACTLY FOUR THINGS ELSE LEAVE, and each is one of the two shapes a decision can take across a
 // module boundary. `useCurrentApplication` is an ANSWER — the application in front, or null — and
@@ -17,7 +18,9 @@
 // must be decided in one place starts being read in two.
 export { AppSwitcherProvider } from '@/modules/app-switcher/context/AppSwitcherContext';
 export { AppSwitcherDock } from '@/modules/app-switcher/AppSwitcherDock';
-export { AppSwitcherFab } from '@/modules/app-switcher/AppSwitcherFab';
+// The drawer, mounted on its own: there is no floating button on this app any more, so the shell mounts the list of applications
+// directly (it must open with no application up), and the sessions home's menu opens it (`useSwitcherActions`' Applications act).
+export { AppDrawer as AppSwitcherDrawer } from '@/modules/app-switcher/AppDrawer';
 export { AppSwitcherLayer } from '@/modules/app-switcher/AppSwitcherLayer';
 export { useCurrentApplication } from '@/modules/app-switcher/hooks/useCurrentApplication';
 export { useSwitcherActions } from '@/modules/app-switcher/hooks/useSwitcherActions';

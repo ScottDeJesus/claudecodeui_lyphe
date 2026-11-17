@@ -1,9 +1,9 @@
 import { useCallback, useLayoutEffect } from 'react';
 import type { ReactNode } from 'react';
 
-import { AppSwitcherFab, AppSwitcherLayer, useCurrentApplication } from '@/modules/app-switcher';
+import { AppSwitcherDrawer, AppSwitcherLayer, useCurrentApplication } from '@/modules/app-switcher';
 import { ChatHostFloating, useChatHost } from '@/modules/chat-host';
-import { CompanionFab, CompanionPanel } from '@/modules/companion';
+import { CompanionPanel } from '@/modules/companion';
 import FloatingChatHeader from '@/modules/project-workspace/FloatingChatHeader';
 import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffects';
 import { useHomeShowing, useStationDoors, useStationShowing } from '@/shared/context/StationLayerContext';
@@ -43,15 +43,12 @@ function HeldWorkspace({ children }: { children: ReactNode }) {
 /**
  * Rendered by ProjectWorkspaceShell inside its providers (the chat's host, the application switcher and Kaylee's picture): the fixed container that lays out the sidebar, main region and global overlays, where the pieces that read those providers are wired together.
  *
- * The floating chat is mounted here, inside the container, just before the FAB: above the application layer and
- * below the FAB, which stays the reader's way out. The FAB's drawn rect goes to the chat's host through
- * `reportAnchor`, so the panel stands beside it and follows it, and whether an application covers the main region
- * goes to `reportCovered`. The chat's door (`useChatDoor`) is built once here and pressed from three places: the
- * hotkey, wherever the reader's keys land (this tab or the chat's picture-in-picture window), the FAB, and the
- * command palette's Applications group.
- *
- * Kaylee's button is mounted after the applications button, on the same floating layer, so it rides over every application
- * and her panel, one rung under the applications button.
+ * NOTHING FLOATS OVER THE PAGE. The applications' floating button and Kaylee's are gone from this app: the applications' acts are
+ * the sessions home's menu's and the command palette's, the list of applications (`AppSwitcherDrawer`) is mounted here so it can
+ * open with no application up, and Kaylee is at the station (her panel is still the rail's door's and the palette's). The floating
+ * chat is mounted here too, above the application layer; with no button to stand beside it rests in its own corner. The chat's
+ * door (`useChatDoor`) is built once here and pressed from two places: the hotkey, wherever the reader's keys land (this tab or
+ * the chat's picture-in-picture window), and the command palette's Applications group.
  *
  * THE FRAME IS HELD WHILE THE STATION OR THE SESSIONS HOME IS THE PAGE ON SCREEN (`HeldWorkspace`): it stays mounted with everything it keeps, and nothing of it, her button and
  * her panel included, is seen, focused or pressed. The chat under it is out of sight, which `CoverReporter` tells the chat's host, and the hotkey of the chat's
@@ -64,7 +61,7 @@ export default function WorkspaceFrame({
   navigate,
 }: ProjectWorkspaceShellProps) {
   const door = useChatDoor();
-  const { reportAnchor, pipWindow } = useChatHost();
+  const { pipWindow } = useChatHost();
   const doors = useStationDoors();
   const toggleChatWhileOnScreen = useCallback(() => {
     if (!doors.showing() && !doors.homeShowing()) door.toggle();
@@ -98,8 +95,7 @@ export default function WorkspaceFrame({
         <ProjectCommandPalette chatDoor={door} />
         <ChatHostFloating header={<FloatingChatHeader />} />
         <CompanionPanel />
-        <AppSwitcherFab chatDoor={door} onAnchorChange={reportAnchor} />
-        <CompanionFab />
+        <AppSwitcherDrawer />
       </div>
     </HeldWorkspace>
   );

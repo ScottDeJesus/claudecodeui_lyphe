@@ -1,7 +1,8 @@
 import { Menu as MenuIcon, Settings } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useCurrentApplication, useSwitcherActions } from '@/modules/app-switcher';
 import { CompanionFace, useCompanion } from '@/modules/companion';
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useRailBadges } from '@/modules/project-workspace/hooks/useRailBadges';
@@ -11,7 +12,7 @@ import { SessionsBoard } from '@/modules/sidebar';
 import { openStation } from '@/shared/cloudcliDoors';
 import { ROADMAP_CIRCLE_AT_DESK, ROADMAP_CIRCLE_ON_PHONE } from '@/shared/constants';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
-import type { AppTab, Project, RecentConversationListItem, RoadmapStackRest } from '@/shared/types';
+import type { AppTab, ChatDoor, Project, RecentConversationListItem, RoadmapStackRest } from '@/shared/types';
 import { ActionMenu, Button } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
 
@@ -31,6 +32,12 @@ const CORE_SIZE = 60;
  */
 const CIRCLE_AT_DESK: RoadmapStackRest = ROADMAP_CIRCLE_AT_DESK;
 const CIRCLE_ON_PHONE: RoadmapStackRest = ROADMAP_CIRCLE_ON_PHONE;
+
+/**
+ * A chat door that opens nothing, for the switcher's list of acts: the list wants a door for its Chat act, and the home leaves that act out
+ * (the chat it would float belongs to a page the home covers). The workspace's own door (`useChatDoor`) is built once, by its frame.
+ */
+const NO_CHAT_DOOR: ChatDoor = { floating: false, unread: false, toggle: () => {}, collapse: () => {} };
 
 /** The cog's side, in px, and how far the head reaches below the circle's middle: its radius, half an arc's band and a little air. */
 const COG_SIZE = 44;
@@ -98,6 +105,30 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
     }];
   }), [views, badges, setActiveTab, doors]);
 
+  // The applications' acts, under the screens: the list of applications always, and what can be done to the one in front (reload it,
+  // close it, open it in a tab) while one is up. The switcher's own list (`useSwitcherActions`), less the acts that cannot run and less
+  // Chat, which floats the chat of a page this one covers. This menu is where the applications' floating button went.
+  const switcherActs = useSwitcherActions(NO_CHAT_DOOR);
+  const applicationActs = useMemo<ActionMenuItem[]>(() => switcherActs
+    .filter((act) => act.key !== 'chat' && !act.disabled)
+    .map((act, index) => ({
+      key: `application-${act.key}`,
+      label: act.label,
+      showDividerBefore: index === 0,
+      onSelect: act.run,
+    })), [switcherActs]);
+  const menuItems = useMemo(() => [...places, ...applicationActs], [places, applicationActs]);
+
+  // An application put up from here (a row of the list, pressed) stands over the workspace, which this page covers: the workspace
+  // comes forward so it is seen. Only a change of the application in front while the home is on screen; one already up stays under.
+  const applicationId = useCurrentApplication()?.app.id ?? null;
+  const shownApplicationRef = useRef(applicationId);
+  useEffect(() => {
+    const before = shownApplicationRef.current;
+    shownApplicationRef.current = applicationId;
+    if (applicationId !== null && applicationId !== before && doors.homeShowing()) doors.navigate(doors.workspacePath());
+  }, [applicationId, doors]);
+
   return (
     <div
       data-workspace-home=""
@@ -131,11 +162,11 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
         >
           <CompanionFace size={CORE_SIZE} />
         </button>
-        {places.length > 0 && (
+        {menuItems.length > 0 && (
           <ActionMenu
             label={t('home.places')}
             ariaLabel={t('home.places')}
-            items={places}
+            items={menuItems}
             icon={MenuIcon}
             iconOnly
             align="right"

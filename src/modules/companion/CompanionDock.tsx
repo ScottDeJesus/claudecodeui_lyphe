@@ -165,14 +165,14 @@ export function CompanionDockView({ seated, away, open, name, onPress, onRect }:
  * from the door; CompanionDockView draws it.
  */
 export function CompanionDock() {
-  const { picture, open, setOpen, fabPosition, dockRect, fabAway, registerDock } = useCompanion();
-  // Seated: her rest is docked AND the cell is believed (on screen, rail docked). A disc docked on a phone rests in its corner, so the drawer's cell draws her door.
-  const seated = fabPosition.docked && dockRect !== null;
+  const { picture, open, setOpen, registerDock } = useCompanion();
 
   return (
     <CompanionDockView
-      seated={seated}
-      away={fabAway}
+      // NO DISC IS EVER SEATED HERE NOW: the companion's floating button is gone from this app (the companion is at the station), so
+      // the cell always draws the door, the rail's way to the panel.
+      seated={false}
+      away={false}
       open={open}
       name={picture?.settings.name ?? null}
       onPress={() => setOpen(!open)}
