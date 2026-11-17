@@ -4,8 +4,6 @@ import { ArrowDownIcon } from 'lucide-react';
 
 import { useTasksSettings } from '@/modules/task-master';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-import { useHostWindow } from '@/shared/context/HostWindowContext';
-import { useIsPageHeld } from '@/shared/context/HeldPageContext';
 import PermissionContext from '@/modules/chat/context/PermissionContext';
 import type { TokenUsageSurface } from '@/modules/chat/composer/TokenUsageSummary';
 import type { ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
@@ -28,6 +26,7 @@ import { useChatRealtimeHandlers } from '@/modules/chat/hooks/useChatRealtimeHan
 import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
 import { useIsLookingAtSession, useSessionPresence } from '@/modules/chat/hooks/useSessionPresence';
 import { useSessionStore } from '@/modules/chat/hooks/useSessionStore';
+import { useEscapeToAbortSession } from '@/modules/chat/hooks/useEscapeToAbortSession';
 import { useCliSessionId } from '@/modules/chat/hooks/useCliSessionId';
 import { useModelLabelResolver } from '@/modules/chat/hooks/useModelLabelResolver';
 import { useSessionToolsets } from '@/modules/chat/hooks/useSessionToolsets';
@@ -111,8 +110,6 @@ function ChatInterface({
 }: ChatInterfaceProps) {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const { subscribe, isConnected } = useWebSocket();
-  const hostWindow = useHostWindow();
-  const isPageHeld = useIsPageHeld();
   // The transcript assembles what an export needs; two surfaces draw the button from it. On a phone
   // that is the workspace header (published upward, as before); on a desktop it is the composer,
   // beside the model and the edit mode, which is why it is also kept here.
@@ -408,33 +405,12 @@ function ChatInterface({
     onSteerOutcome: handleSteerOutcome,
   });
 
-  useEffect(() => {
-    if (!canAbortSession) {
-      return;
-    }
-
-    const handleGlobalEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.repeat || event.defaultPrevented) {
-        return;
-      }
-      // The station on screen covers this chat (it stays mounted under it): an Escape typed there is the station's, and must not end a turn nobody is looking at.
-      if (isPageHeld()) {
-        return;
-      }
-
-      event.preventDefault();
-      handleAbortSession();
-    };
-
-    // The host document, not the opener's: a key pressed in the floating window never reaches the
-    // opener's document. Still a document CAPTURE listener, so a panel that owns Escape (marked from
-    // a window capture listener, which runs first) keeps the key through `defaultPrevented`.
-    const hostDocument = hostWindow.document;
-    hostDocument.addEventListener('keydown', handleGlobalEscape, { capture: true });
-    return () => {
-      hostDocument.removeEventListener('keydown', handleGlobalEscape, { capture: true });
-    };
-  }, [canAbortSession, handleAbortSession, hostWindow, isPageHeld]);
+  // Escape stops the running turn, except where it belongs to a field or an open layer.
+  useEscapeToAbortSession({
+    canAbortSession,
+    onAbortSession: handleAbortSession,
+    composerRef: textareaRef,
+  });
 
   useEffect(() => {
     return () => {

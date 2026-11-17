@@ -100,7 +100,7 @@ function keyShortcutsOf(shortcut: string): string {
  * wrapping, and Enter and Space are the focused item's own click. Escape, a press
  * outside the arc and the FAB, and focus moving into an application's frame each put it away (the effect
  * below says why each is bound where it is), and Escape gives focus back to the FAB. While open the shell
- * carries `OWNS_ESCAPE`, so a dialog under it stands down and ChatInterface's Escape, which stops a running
+ * carries `OWNS_ESCAPE`, so a dialog under it stands down and `useEscapeToAbortSession`, which stops a running
  * turn, finds the key already taken (`defaultPrevented`).
  *
  * STACKING. `z-[60]`, the FAB's own level in the shell's stacking context (see the note above `.vv-fab` in
@@ -125,7 +125,7 @@ export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
   // The three ways the reader puts an open radial away without choosing an item, bound only while it is open.
   // The radial belongs to the opener's own window, like the FAB it fans out from, so this is the global `window`.
   //  - Escape, on a WINDOW CAPTURE listener, which runs before every document listener: `preventDefault()` is
-  //    the mark ChatInterface's Escape reads (`defaultPrevented`), so a running turn is left alone, and the
+  //    the mark `useEscapeToAbortSession` reads (`defaultPrevented`), so a running turn is left alone, and the
   //    shell carries `OWNS_ESCAPE` while open so a dialog under it stands down too. Focus goes back to the FAB.
   //  - A pointerdown outside the shell and the FAB. The FAB is outside the shell but its press is its own
   //    toggle: closing here as well would put the radial away on the pointerdown and let the click reopen it.

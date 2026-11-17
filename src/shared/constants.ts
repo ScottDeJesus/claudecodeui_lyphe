@@ -796,3 +796,15 @@ export const STATION_COUNT_FORM_CATCH = "relative before:absolute before:inset-x
  * upload route holds the same ten, and the companion's composer caps a refused send's put-back at it.
  */
 export const MAX_ATTACHMENT_COUNT = 10;
+
+// ---------------------------
+
+//----------------- KEYBOARD ESCAPE LAYERS ------------
+
+/**
+ * Matches an open layer that dismisses itself on Escape: a menu, a modal dialog, or any panel that states it owns
+ * Escape while it is open (`OWNS_ESCAPE`, the `data-owns-escape` marker of `shared/ui/overlayEscape`). The chat's
+ * page-wide Escape that stops a running turn (`useEscapeToAbortSession`) checks for it with `querySelector` on the
+ * document the chat is drawn in, and steps aside while one is open, so dismissing the layer is all that Escape does.
+ */
+export const ESCAPE_LAYER_SELECTOR = '[data-owns-escape], [aria-modal="true"], [role="menu"]';
