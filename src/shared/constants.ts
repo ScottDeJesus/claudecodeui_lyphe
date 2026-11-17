@@ -503,13 +503,13 @@ export const ROADMAP_EPIC_WORD_KEYS: Record<RoadmapEpicWord, string> = {
 
 /**
  * How each feature dot is painted, by its state: a Verve token for the fill and one for the stroke, put on
- * through `style`. Green shipped, amber in flight, the garnish designing (orange in light, gold in dark),
+ * through `style`. Green shipped (the theme's positive tone, never the accent: the accent is what waits on a word), amber in flight, the garnish designing (orange in light, gold in dark),
  * teal proposed, red blocked, and an idea hollow (the surface inside a faint ring). Used by the roadmap
  * module's tree, `tree/TreeEpicNode`, for each feature's dot under its epic's title, and by its panel,
  * `panel/PanelRows`'s `PanelDot`, for each row's dot and the feature's State fact.
  */
 export const ROADMAP_DOT_PAINT: Record<RoadmapDotState, { fill: string; stroke: string }> = {
-  shipped: { fill: 'var(--accent)', stroke: 'var(--accent)' },
+  shipped: { fill: 'var(--pos-dot)', stroke: 'var(--pos-dot)' },
   inFlight: { fill: 'var(--warn-dot)', stroke: 'var(--warn-dot)' },
   designing: { fill: 'var(--garnish)', stroke: 'var(--garnish)' },
   proposed: { fill: 'var(--info-dot)', stroke: 'var(--info-dot)' },

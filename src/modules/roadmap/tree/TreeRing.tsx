@@ -75,7 +75,7 @@ export function TreeRing({ cx, cy, r, strokeWidth, shipped, total, moment }: Tre
         className={cn('fill-card', total === 0 ? 'stroke-ink-faint' : 'stroke-input', ABOUT_ITS_CENTRE, moment && BLOOM)}
       />
       {share > 0 && (
-        <g strokeWidth={strokeWidth} strokeLinecap="round" className={cn('fill-none stroke-primary', ABOUT_ITS_CENTRE, moment && BLOOM)}>
+        <g strokeWidth={strokeWidth} strokeLinecap="round" className={cn('fill-none stroke-[var(--pos-dot)]', ABOUT_ITS_CENTRE, moment && BLOOM)}>
           {before >= 1 && <circle {...circle} />}
           {before > 0 && before < 1 && <circle {...circle} pathLength={1} strokeDasharray={`${before} ${1 - before}`} strokeDashoffset={0.25} />}
           {drawn > 0 && (

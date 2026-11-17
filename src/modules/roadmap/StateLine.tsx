@@ -43,11 +43,11 @@ export function StateLine({ word, step, phrase }: StateLineProps) {
 
   // The line is a grid of five equal columns, so each station sits at the centre of its own
   // fifth: 10%, 30% … 90% across. The track runs from the first centre to the last — dashed, the way
-  // still to go — and the accent laid over it reaches the word's station, a fifth of the width a step.
+  // still to go — and the positive tone laid over it (what is done is green) reaches the word's station, a fifth of the width a step.
   return (
     <div role="img" aria-label={label} data-state-line={word} className="relative grid w-full grid-cols-5">
       <span aria-hidden="true" className="absolute inset-x-[10%] top-[11px] border-t-2 border-dashed border-input" />
-      <span aria-hidden="true" className="absolute left-[10%] top-[11px] h-0.5 bg-primary" style={{ width: `${at * 20}%` }} />
+      <span aria-hidden="true" className="absolute left-[10%] top-[11px] h-0.5 bg-[var(--pos-dot)]" style={{ width: `${at * 20}%` }} />
       {STATIONS.map((station, index) => {
         const standing = standingOf(index);
         return (
@@ -80,7 +80,7 @@ export function StateLine({ word, step, phrase }: StateLineProps) {
 function LargeStation({ standing, owed }: { standing: Standing; owed: boolean }) {
   if (standing === 'passed') {
     return (
-      <span aria-hidden="true" className="relative grid size-6 place-items-center rounded-full bg-primary text-primary-foreground">
+      <span aria-hidden="true" className="relative grid size-6 place-items-center rounded-full bg-[var(--pos-dot)] text-background">
         <Check className="size-3.5" strokeWidth={3} />
       </span>
     );
@@ -89,7 +89,7 @@ function LargeStation({ standing, owed }: { standing: Standing; owed: boolean })
     return (
       <span
         aria-hidden="true"
-        className={cn('relative grid size-6 place-items-center rounded-full border-[1.5px] bg-card', owed ? 'border-warn-ink text-warn-ink' : 'border-primary text-primary')}
+        className={cn('relative grid size-6 place-items-center rounded-full border-[1.5px] bg-card', owed ? 'border-warn-ink text-warn-ink' : 'border-foreground text-foreground')}
       >
         <span className="size-2 rounded-full bg-current" />
       </span>

@@ -28,14 +28,14 @@ export function TreeMilestoneEdges({ spot }: { spot: TreeMilestoneSpot }) {
       <path
         d={`M ${spot.x} ${spine.top} H ${spine.x} V ${spine.bottom}`}
         strokeWidth={1.4}
-        className={cn('fill-none', milestone.word === 'reached' ? 'stroke-primary' : 'stroke-input')}
+        className={cn('fill-none', milestone.word === 'reached' ? 'stroke-[var(--pos-dot)]' : 'stroke-input')}
       />
       {epics.map((row) => (
         <path
           key={row.epic.name}
           d={`M ${spine.x} ${row.y} H ${row.tickTo}`}
           strokeWidth={1.4}
-          className={cn('fill-none', row.epic.word === 'complete' ? 'stroke-primary' : 'stroke-input')}
+          className={cn('fill-none', row.epic.word === 'complete' ? 'stroke-[var(--pos-dot)]' : 'stroke-input')}
         />
       ))}
     </>

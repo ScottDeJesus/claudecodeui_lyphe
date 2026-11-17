@@ -52,7 +52,7 @@ export function TreeGoalConnectors({ layout, goalX }: TreeGoalConnectorsProps) {
             strokeWidth={1.4}
             pathLength={drawing ? 1 : undefined}
             strokeDasharray={drawing ? 1 : undefined}
-            className={cn('fill-none', spot.milestone.word === 'reached' ? 'stroke-primary' : 'stroke-input', drawing && 'motion-safe:animate-roadmap-draw')}
+            className={cn('fill-none', spot.milestone.word === 'reached' ? 'stroke-[var(--pos-dot)]' : 'stroke-input', drawing && 'motion-safe:animate-roadmap-draw')}
           />
         );
       })}
