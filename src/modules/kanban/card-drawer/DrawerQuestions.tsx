@@ -124,7 +124,7 @@ function QuestionRow({
           <Badge tone="positive" className="vv-badge--compact">
             {decision.length > 0 ? decision : t('kanban.questions.answeredBlank')}
           </Badge>
-          <Button variant="ghost" size="sm" className="ml-auto h-7 px-2" onClick={() => setChanging(true)}>
+          <Button variant="outline" size="sm" className="ml-auto h-7 px-2" onClick={() => setChanging(true)}>
             {t('kanban.questions.change')}
           </Button>
         </div>
@@ -173,7 +173,7 @@ function QuestionRow({
           <div className="flex items-center gap-2">
             {question.answered && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 className="h-7 px-2"
                 onClick={() => {
