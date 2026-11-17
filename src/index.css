@@ -687,7 +687,12 @@
     /* Only disable hover states for interactive elements, not containers.
        Never on a Verve-painted element (`vv-*`): `inherit` copies the PARENT's paint, not the
        element's own resting paint, so a tapped accent button or the DockableFab turned into a pale
-       disc in the page's colours until the next tap elsewhere. */
+       disc in the page's colours until the next tap elsewhere.
+       THE TRANSFORM IS NOT INHERITED, for the same reason: `transform: inherit` threw away the element's own resting
+       transform, so a press that is placed by one (`-translate-x-1/2`, the chat core's `translate(-50%, -50%)`) jumped
+       half its size the moment it was hovered. Under a mouse on a touch-first device that put it out from under the
+       pointer, it lost the hover, came back, and flickered (the cores and the account ring round them). Only a hover's
+       grow is undone, through Tailwind's own scale variables, so the resting place stands. */
     button:not([class*="vv-"]):hover,
     [role="button"]:not([class*="vv-"]):hover,
     .cursor-pointer:not([class*="vv-"]):hover,
@@ -699,7 +704,8 @@
       background-color: inherit !important;
       color: inherit !important;
       opacity: inherit !important;
-      transform: inherit !important;
+      --tw-scale-x: 1 !important;
+      --tw-scale-y: 1 !important;
     }
     
     /* Force buttons to be immediately clickable */

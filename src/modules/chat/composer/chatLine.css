@@ -60,6 +60,10 @@
 @keyframes chat-inst-heart { from { transform: scale(0.64); } }
 .chat-inst__press { position: absolute; top: 0; left: 0; transform: translate(-50%, -50%); transition: transform var(--dur-quick) var(--ease-enter); }
 .chat-inst__press:hover { transform: translate(-50%, -50%) scale(1.04); }
+/* No grow under a finger: a tap leaves `:hover` standing until the next tap elsewhere, and the core would stay grown. */
+@media (hover: none) and (pointer: coarse) {
+  .chat-inst__press:hover { transform: translate(-50%, -50%); }
+}
 @media (prefers-reduced-motion: reduce) {
   .chat-inst__lift, .chat-inst__ground { transition-duration: var(--duration-fade); transition-timing-function: ease; }
   .chat-inst__rings, .chat-inst[data-chat-core-dock='open'] .chat-inst__heart { animation: none; }
