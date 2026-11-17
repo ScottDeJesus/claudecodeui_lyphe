@@ -9,6 +9,9 @@ export { SessionPanelProvider } from '@/modules/session-panel/SessionPanelProvid
 export { SessionPanelLayout } from '@/modules/session-panel/SessionPanelLayout';
 // SessionPanelSwitch: used by project-workspace's `ChatHead`, as the narrow screen's way between the talk and the panel.
 export { SessionPanelSwitch } from '@/modules/session-panel/SessionPanelSwitch';
+// The panel's form for the open chat (`none`, `side` or `wide`), so the chat's head can take the width of the block the chat and
+// its panel stand in. Its consumer is project-workspace's `ChatHead`.
+export { useSessionPanel } from '@/modules/session-panel/context/sessionPanelContext';
 // SessionPanelMark and panelShownIdOf: used by the chat module's transcript (`ChatMessagesPane`), which marks the turn where the
 // chat put a version on its panel.
 export { SessionPanelMark } from '@/modules/session-panel/SessionPanelMark';

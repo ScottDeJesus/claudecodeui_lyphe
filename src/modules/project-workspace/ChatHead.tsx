@@ -1,12 +1,12 @@
 import { ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { SessionPanelSwitch } from '@/modules/session-panel';
+import { SessionPanelSwitch, useSessionPanel } from '@/modules/session-panel';
 import { openHome } from '@/shared/cloudcliDoors';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { Project, ProjectSession } from '@/shared/types';
 import { Button } from '@/shared/ui';
-import { getSessionTitle } from '@/shared/utils';
+import { cn, getSessionTitle } from '@/shared/utils';
 
 type ChatHeadProps = {
   /** The project the open chat belongs to; null before one is chosen. */
@@ -16,6 +16,16 @@ type ChatHeadProps = {
   /** What a chat not yet begun is called. */
   newSessionLabel: string;
 };
+
+/**
+ * The head's width at a desk: the width of the block under it, so its way back stands over the block's left edge and not at the
+ * window's. The talk alone is 868 px; with follow-ups beside it 1240; with a thing on the panel 1400 (`sessionPanel.css`).
+ */
+const HEAD_WIDTH = {
+  none: 'min-[880px]:max-w-[868px]',
+  side: 'min-[880px]:max-w-[1240px]',
+  wide: 'min-[880px]:max-w-[1400px]',
+} as const;
 
 /**
  * THE HEAD OF A CHAT: the way back and what this is. A back arrow at the start goes to the sessions home, where every chat is; beside it,
@@ -36,11 +46,14 @@ type ChatHeadProps = {
 export default function ChatHead({ selectedProject, selectedSession, newSessionLabel }: ChatHeadProps) {
   const { t } = useTranslation();
   const doors = useStationDoors();
+  const form = useSessionPanel()?.form ?? 'none';
   const title = selectedSession ? getSessionTitle(selectedSession) : newSessionLabel;
   const back = t('home.title', { defaultValue: 'Home' });
 
   return (
-    <header data-chat-head="" className="pwa-header-safe flex flex-shrink-0 items-center gap-3 px-4 py-3 finger:gap-2 finger:px-3 finger:!pb-0.5 finger:!pt-0.5">
+    <header data-chat-head="" className="pwa-header-safe flex-shrink-0 py-3 finger:!pb-0.5 finger:!pt-0.5">
+      {/* The row is as wide as the block under it, and centred as it is: the head is that block's first line. */}
+      <div className={cn('mx-auto flex w-full items-center gap-3 px-4 finger:gap-2 finger:px-3', HEAD_WIDTH[form])}>
       <Button
         data-chat-head-back=""
         variant="outline"
@@ -61,6 +74,7 @@ export default function ChatHead({ selectedProject, selectedSession, newSessionL
       </div>
       {/* On a narrow screen the chat's panel is a place switched to from here; at a desk it is beside the talk and this draws nothing. */}
       <SessionPanelSwitch />
+      </div>
     </header>
   );
 }
