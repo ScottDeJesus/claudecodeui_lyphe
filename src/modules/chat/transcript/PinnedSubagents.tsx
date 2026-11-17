@@ -86,7 +86,7 @@ function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId, res
     <>
       {rows.length > 0 ? (
     // `mb-8` leaves room for the activity tab, which floats above the input in that gap.
-    <div className="mx-auto mb-8 w-full max-w-[54.25rem]" data-testid="pinned-subagents-strip">
+    <div className="mx-auto mb-8 w-full max-w-[var(--chat-measure,54.25rem)]" data-testid="pinned-subagents-strip">
       {/* Capped and scrollable: a fan-out of six agents is ordinary here, and at ~44px a row
         * an uncapped strip took a third of a phone's reading area for the whole run. */}
       <div className="scrollbar-thin flex max-h-44 flex-col gap-1 overflow-y-auto rounded-xl border border-[var(--info-dot)] bg-popover/95 p-1.5 shadow-sm backdrop-blur-sm">

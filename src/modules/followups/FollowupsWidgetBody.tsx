@@ -17,8 +17,8 @@ const GROUPS = [
  * The Next steps widget's body: the open chat's own open items in two groups, "Next steps" and "Known gaps", and a
  * closed "Done (N)" fold at the bottom that lists the settled ones, each with an untick.
  *
- * Used by `src/modules/session-panel` (`SessionPanel`), through the followups barrel, as the follow-ups on the chat's
- * panel, and by `src/modules/station` (`FollowupsStage`), the same way, as a chat's follow-ups on the station's stage. It
+ * Used by `src/modules/session-panel` (`SessionPanel` and `SessionFollowups`), through the followups barrel, as the
+ * follow-ups on the chat's panel and in the chat's side column at a desk, and by `src/modules/station` (`FollowupsStage`), the same way, as a chat's follow-ups on the station's stage. It
  * reads the list its host already made (`FollowupsContext`) — on the panel the same reading that gives its switch its
  * count — and draws nothing of its own state but the fold. The chrome, the header, the count and the scrolling belong
  * to the frame around it. Under a finger (a touch screen, or a window under 768 px) the Done fold's head is a 44 px catch,

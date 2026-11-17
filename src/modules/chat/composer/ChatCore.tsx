@@ -2,6 +2,7 @@ import '@/modules/chat/composer/chatLine.css';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { AccountWeekRing } from '@/modules/accounts';
@@ -9,6 +10,7 @@ import { CoreRings } from '@/modules/chat/composer/CoreRings';
 import type { CoreRing } from '@/modules/chat/composer/CoreRings';
 import { replyMaterialOf } from '@/modules/chat/transcript/replyMark';
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
+import { useChatCorePlace } from '@/shared/context/ChatCorePlaceContext';
 import { useCoreDrawing } from '@/shared/context/CoreDrawingContext';
 import type { CoreDrawingInput } from '@/shared/context/CoreDrawingContext';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
@@ -23,6 +25,12 @@ const CORE_PX = 56;
 
 /** In its disc the core is drawn larger, where it is the thing being set: this share of the disc's side. */
 const CORE_SHARE_OF_DISC = 0.36;
+
+/**
+ * The side of the core's square where the page keeps a place for it apart from the line (`useChatCorePlace`), in px: the size it has in
+ * its disc, so the rings open round it where it stands and it neither moves nor grows.
+ */
+const CORE_APART_PX = 96;
 
 /** The ring that reads the context: how far outside the core's edge it runs, and how thick it is drawn, in px. */
 const CONTEXT_GAP = 3;
@@ -96,6 +104,10 @@ type ChatCoreProps = {
  * and the talk above it keep one left edge, and at the line's start where it has none. Either way it stays level with the line's middle
  * as the line grows. Open, its disc stands over the talk at the column's start, clear of the line, so the line stays in use.
  *
+ * AT A DESK THE PAGE KEEPS A PLACE FOR IT BESIDE THE TALK (`useChatCorePlace`, project-workspace's `ChatDesk`): the core is drawn into
+ * that box, larger, and its disc opens round it where it stands. It is still this one component under the composer, so what it reads
+ * and what its presses do are the same in either place.
+ *
  * `data-chat-core` reads the state and `data-chat-core-material` the material. Each ring is `data-chat-ring` ("model", "effort") with
  * its stops as `data-ring-stop`, so a script can set one by pressing the core and then a stop. Used by `ChatComposer`.
  */
@@ -105,6 +117,8 @@ export function ChatCore({
   const { t } = useTranslation('chat');
   const draw = useCoreDrawing();
   const hostWindow = useHostWindow();
+  // The box the page keeps for the core apart from the line, or null: the core then stands in the line's own row.
+  const place = useChatCorePlace();
   const dockRef = useRef<HTMLDivElement>(null);
   const ringsRef = useRef<HTMLDivElement>(null);
   const pressRef = useRef<HTMLButtonElement>(null);
@@ -157,6 +171,17 @@ export function ChatCore({
       setLift(null);
       return undefined;
     }
+    if (place !== null) {
+      // Apart from the line the core has its own place, with the room for its disc round it: it opens where it stands.
+      const settleInPlace = () => {
+        const size = Math.round(Math.max(DISC_MIN_PX, Math.min(DISC_PX, place.getBoundingClientRect().width - 2 * DISC_EDGE)));
+        setLift((current) => (current !== null && current.dx === 0 && current.dy === 0 && current.size === size ? current : { dx: 0, dy: 0, size }));
+      };
+      settleInPlace();
+      const placeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(settleInPlace);
+      placeObserver?.observe(place);
+      return () => placeObserver?.disconnect();
+    }
     const column = dock.closest('.chat-column') ?? hostWindow.document.documentElement;
     const shell = dock.closest('.chat-composer-shell') ?? dock;
     const settle = () => {
@@ -174,7 +199,7 @@ export function ChatCore({
     observer?.observe(column);
     observer?.observe(shell);
     return () => observer?.disconnect();
-  }, [open, hostWindow]);
+  }, [open, hostWindow, place]);
 
   // Open, the settings let go on Escape or on a press anywhere else. Escape is taken on the window's capture phase and marked handled,
   // so the chat's running turn is not stopped by it (`useEscapeToAbortSession` reads the mark), and a panel opened in front of the rings
@@ -207,20 +232,24 @@ export function ChatCore({
     : t('core.settingsWithEffort', { defaultValue: 'Chat settings · {{model}}, {{effort}} effort', model: modelLabel, effort: effortLabel });
   const filled = context === null ? 0 : Math.min(1, Math.max(0, context));
   const up = open && lift !== null;
-  // The core's square: its dock's, and larger in the disc. Its two hairlines keep their distance from its edge at either size.
-  const corePx = up ? Math.round(lift.size * CORE_SHARE_OF_DISC) : CORE_PX;
+  // The core's square: its dock's, and larger in the disc; in a place of its own, the larger one always. Its two hairlines keep their
+  // distance from its edge at any size.
+  const restPx = place !== null ? CORE_APART_PX : CORE_PX;
+  const corePx = place !== null ? CORE_APART_PX : up ? Math.round(lift.size * CORE_SHARE_OF_DISC) : CORE_PX;
   const contextRadius = corePx / 2 + CONTEXT_GAP;
   const contextLength = 2 * Math.PI * contextRadius;
   const contextBox = contextRadius + CONTEXT_GAP;
 
-  return (
+  const dock = (
     // The dock: the core's place beside the line. Its position is the stylesheet's (`chatLine.css`): in the line's row, or in the strip.
+    // In a place of its own it is that place's to position, and only the instrument's own rules apply.
     <div
       ref={dockRef}
       data-chat-core-dock={up ? 'open' : 'docked'}
+      data-chat-core-apart={place !== null ? '' : undefined}
       data-chat-core-material={material}
-      className={cn('chat-line__core chat-inst flex-none', className)}
-      style={{ width: CORE_PX, height: CORE_PX }}
+      className={cn(place !== null ? 'chat-inst relative' : 'chat-line__core chat-inst flex-none', className)}
+      style={{ width: restPx, height: restPx }}
     >
       {/* What rises: a point at the dock's middle that everything is centred on, carried to the disc's middle while the settings are open. */}
       <div
@@ -281,4 +310,5 @@ export function ChatCore({
       </div>
     </div>
   );
+  return place !== null ? createPortal(dock, place) : dock;
 }

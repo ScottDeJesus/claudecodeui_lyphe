@@ -26,7 +26,7 @@ export default function QueuedMessageCard({
   // A line of the reader's own, waiting: its words on the page's ground behind a hairline, with no wash. The two things that can be done to it
   // are buttons that look like buttons (the kit's), each its mark alone.
   return (
-    <div data-chat-waiting="queued" className="settings-content-enter mx-auto mb-2 max-w-[54.25rem] rounded-lg border border-border px-3 py-2">
+    <div data-chat-waiting="queued" className="settings-content-enter mx-auto mb-2 max-w-[var(--chat-measure,54.25rem)] rounded-lg border border-border px-3 py-2">
       <div className="flex items-start gap-2.5">
         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/60" aria-hidden />
 

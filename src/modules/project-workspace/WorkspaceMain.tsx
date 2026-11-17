@@ -23,6 +23,7 @@ import type { AppTab, FileOpenRequest, FilesRoot, GitRepository, Project, Projec
 import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import { absolutePathIn } from '@/shared/utils';
+import { useChatDeskSide } from '@/modules/project-workspace/hooks/useChatDeskSide';
 import { useFileOpenResolver } from '@/modules/project-workspace/hooks/useFileOpenResolver';
 import { useHiddenNavFallback } from '@/modules/project-workspace/hooks/useHiddenNavFallback';
 import { useRunnerLanding } from '@/modules/project-workspace/hooks/useRunnerLanding';
@@ -30,6 +31,7 @@ import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspac
 import { CompanionAvatar } from '@/modules/companion';
 import { CoreDrawingProvider } from '@/shared/context/CoreDrawingContext';
 import type { CoreDrawingInput } from '@/shared/context/CoreDrawingContext';
+import { ChatDesk } from '@/modules/project-workspace/ChatDesk';
 import ChatHead from '@/modules/project-workspace/ChatHead';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
@@ -146,6 +148,11 @@ function WorkspaceMain({
   // While the chat floats it is live outside this tab: it counts as the active chat whichever tab is open,
   // and the session's panel stands down with it.
   const floating = useChatHost().placement !== 'home';
+
+  // At a desk the chat has a column beside it for its core, the roadmap's circle and its follow-ups (`ChatDesk`); this is its width,
+  // 0 for none. A chat that floats took its core with it, and with no project there is no chat to have one.
+  const deskSide = useChatDeskSide();
+  const chatSide = floating || selectedProject === null ? 0 : deskSide;
 
   // The one path-opening capability three caller families share — the chat's Edit/Write cards and
   // bare links, the git panel's changed-file rows, and the tree beside the file manager. It lives
@@ -326,16 +333,14 @@ function WorkspaceMain({
   const viewLabel = activeTab === 'chat' ? null : (views.find((view) => view.id === activeTab)?.label ?? null);
 
   return (
-    // The chat's panel is read once here, for the switch in the chat's head and the panel beside the talk. Only for a chat on
-    // screen in this pane: a floating chat, another view and a chat not yet begun have none.
-    <SessionPanelProvider sessionId={activeTab === 'chat' && !floating ? (selectedSession?.id ?? null) : null}>
+    // The chat's panel is read once here, for the switch in the chat's head, the panel in the talk's place and the follow-ups in
+    // the chat's side column. Only for a chat on screen in this pane: a floating chat, another view and a chat not yet begun have none.
+    <SessionPanelProvider sessionId={activeTab === 'chat' && !floating ? (selectedSession?.id ?? null) : null} followupsApart={chatSide > 0}>
     <div className="flex h-full flex-col">
-      {/* The Chat view has a head of its own, at every width: the way back to the sessions home, and the chat's name. Every other view
-          keeps the phone's strip (the drawer's button and the view's name). The chat's count of tokens and its export are the
-          composer's at every width now, behind the chat's core, so neither is handed to a header. */}
-      {activeTab === 'chat' && !floating ? (
-        <ChatHead selectedProject={selectedProject} selectedSession={selectedSession} newSessionLabel={t('mainContent.newSession')} />
-      ) : (
+      {/* The Chat view has a head of its own, at every width: the way back to the sessions home, and the chat's name. It is the first
+          line of the chat's own pane (`ChatDesk` below), so at a desk it stands over the chat and not over the column beside it. Every
+          other view keeps the phone's strip (the drawer's button and the view's name), as does the Chat view while its chat floats. */}
+      {(activeTab !== 'chat' || floating) && (
         <WorkspaceHeader
           selectedProject={selectedProject}
           selectedSession={selectedSession}
@@ -348,14 +353,18 @@ function WorkspaceMain({
 
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">
         <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
+          <ChatDesk
+            side={chatSide}
+            head={floating ? null : <ChatHead selectedProject={selectedProject} selectedSession={selectedSession} newSessionLabel={t('mainContent.newSession')} />}
+          >
           {selectedProject ? (
             <WorkspaceErrorBoundary showDetails>
               <CoreDrawingProvider value={drawChatCore}>
-              {/* The chat's panel stands beside the chat: the chat keeps its place whatever the panel does. */}
+              {/* The chat's panel stands in the chat's place when switched to: the chat keeps its place in the tree whatever the panel does. */}
               <SessionPanelLayout>
-              {/* THE CHAT'S OWN COLUMN: the transcript's cap (868px, its `max-w-[54.25rem]`) and nothing wider, centred,
-                  so the scroll pane and the scrollbar on its right edge end where the transcript ends. */}
-              <div data-testid="chat-column" className="mx-auto h-full min-h-0 w-full min-w-0 max-w-[868px]">
+              {/* THE CHAT'S OWN COLUMN: the transcript's cap (868px) and nothing wider, centred, so the scroll pane and the scrollbar
+                  on its right edge end where the transcript ends. At a desk the chat's surface is the cap (`--chat-column`, `ChatDesk`). */}
+              <div data-testid="chat-column" className="mx-auto h-full min-h-0 w-full min-w-0 max-w-[var(--chat-column,868px)]">
                 <ChatHostSlot sessionId={selectedSession?.id ?? null} showing={activeTab === 'chat'}>
                   <ChatInterface
                     isActive={activeTab === 'chat' || floating}
@@ -384,6 +393,7 @@ function WorkspaceMain({
               </CoreDrawingProvider>
             </WorkspaceErrorBoundary>
           ) : chooseProjectBody}
+          </ChatDesk>
         </div>
 
         {shouldShowTasksTab && (selectedProject

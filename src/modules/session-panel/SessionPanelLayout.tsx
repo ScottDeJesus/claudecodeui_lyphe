@@ -5,18 +5,16 @@ import { useSessionPanel } from '@/modules/session-panel/context/sessionPanelCon
 import { SessionPanel } from '@/modules/session-panel/SessionPanel';
 
 /**
- * THE CHAT AND ITS PANEL, SIDE BY SIDE. The chat is `children`, mounted in the same place at every width and in every form of the
+ * THE CHAT AND ITS PANEL, ONE IN FRONT. The chat is `children`, mounted in the same place at every width and in every form of the
  * panel, so nothing of it (a half-typed line, where the talk is scrolled to) is lost when a panel comes or goes.
  *
- * - No panel (the chat has neither a thing shown nor a follow-up): the chat has the whole pane, as before.
- * - A thing shown, at a desk: the panel has the room and the talk a column beside it (`sessionPanel.css` has the measures).
- * - Follow-ups alone, at a desk: a narrow column of them beside the chat.
- * - On a narrow screen: one of the two is in front, chosen by the switch in the chat's head (`SessionPanelSwitch`). The chat is
- *   hidden while the panel is in front, never unmounted.
+ * - No panel (the chat has nothing shown, and no follow-up the panel is to draw): the chat has the whole pane.
+ * - A panel: the talk is in front until the reader switches, by the switch in the chat's head (`SessionPanelSwitch`) or a mark
+ *   in the talk (`SessionPanelMark`); the panel then stands in the chat's place. The chat is hidden meanwhile, never unmounted.
  *
  * With no provider over it (the chat floating) it is the chat alone.
  *
- * Used by project-workspace's `WorkspaceMain`, round the chat's pane, gutters and all.
+ * Used by project-workspace's `WorkspaceMain`, round the chat's pane.
  */
 export function SessionPanelLayout({ children }: { children: ReactNode }) {
   const panel = useSessionPanel();

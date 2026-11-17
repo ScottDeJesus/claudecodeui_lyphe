@@ -427,7 +427,7 @@ export default function ChatComposer({
           content box, so 100% is already the input's width — the calc took the padding off a
           second time and floated both tabs inside the input's corners (Athena, 2026-09-10). */}
       {!hasPendingPermissions && (
-        <div className="pointer-events-none absolute bottom-full left-1/2 z-10 w-full max-w-[54.25rem] -translate-x-1/2 translate-y-px bg-transparent">
+        <div className="pointer-events-none absolute bottom-full left-1/2 z-10 w-full max-w-[var(--chat-measure,54.25rem)] -translate-x-1/2 translate-y-px bg-transparent">
           <ActivityIndicator activity={activity} onAbort={onAbortSession} />
         </div>
       )}
@@ -444,7 +444,7 @@ export default function ChatComposer({
       />
 
       {isEditingSentMessage && (
-        <div className="mx-auto mb-2 flex max-w-[54.25rem] items-center gap-2 rounded-xl border border-warn-ink/30 bg-warn-ink/10 px-3 py-2 text-xs text-foreground">
+        <div className="mx-auto mb-2 flex max-w-[var(--chat-measure,54.25rem)] items-center gap-2 rounded-xl border border-warn-ink/30 bg-warn-ink/10 px-3 py-2 text-xs text-foreground">
           <PencilIcon className="h-3.5 w-3.5 shrink-0 text-warn-ink" />
           <span className="min-w-0 flex-1">
             {t('composer.editing.title')}
@@ -485,7 +485,7 @@ export default function ChatComposer({
         <div
           id={settingsId}
           data-chat-settings=""
-          className="mx-auto mb-2 flex max-w-[54.25rem] flex-wrap items-center gap-1.5 [container-type:inline-size]"
+          className="mx-auto mb-2 flex max-w-[var(--chat-measure,54.25rem)] flex-wrap items-center gap-1.5 [container-type:inline-size]"
         >
           <ComposerModelMenu
             effort={effort}
@@ -542,7 +542,7 @@ export default function ChatComposer({
 
       {/* The line: the chat's core, then the box. The anchor is the box's own column, not the shell: the shell also holds the
           pinned agents' strip and the activity tab, which would carry a guide's centre away from the box she is looking at. */}
-      <div className="chat-line mx-auto max-w-[54.25rem]">
+      <div className="chat-line mx-auto max-w-[var(--chat-measure,54.25rem)]">
         <ChatCore
           model={model}
           modelOptions={availableModelOptions}

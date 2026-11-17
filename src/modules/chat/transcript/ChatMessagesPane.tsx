@@ -335,7 +335,7 @@ function ChatMessagesPane({
       <div
         // `chat-talk`: in a column with room, the talk gives up a strip at its start for the chat's core and starts where the line
         // starts (`composer/chatLine.css`).
-        className={`chat-talk mx-auto w-full max-w-[54.25rem] space-y-3 px-4 sm:space-y-4 ${
+        className={`chat-talk mx-auto w-full max-w-[var(--chat-measure,54.25rem)] space-y-3 px-4 sm:space-y-4 ${
           hasActivityIndicator ? 'pb-12 sm:pb-14' : 'pb-3 sm:pb-4'
         } ${
           isOpeningSession ? 'pointer-events-none opacity-0' : 'opacity-100 transition-opacity duration-150'

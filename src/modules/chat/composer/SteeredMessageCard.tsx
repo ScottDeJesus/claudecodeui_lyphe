@@ -19,7 +19,7 @@ export default function SteeredMessageCard({ steer, providerLabel }: SteeredMess
 
   return (
     // The same form as a queued line, with no wash: its dot is the accent, breathing, because this one is already on its way in.
-    <div data-chat-waiting="steered" className="settings-content-enter mx-auto mb-2 max-w-[54.25rem] rounded-lg border border-border px-3 py-2">
+    <div data-chat-waiting="steered" className="settings-content-enter mx-auto mb-2 max-w-[var(--chat-measure,54.25rem)] rounded-lg border border-border px-3 py-2">
       <div className="flex items-start gap-2.5">
         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary" aria-hidden />
 

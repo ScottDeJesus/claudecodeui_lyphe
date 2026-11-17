@@ -5,10 +5,10 @@ import { useSessionPanel } from '@/modules/session-panel/context/sessionPanelCon
 import { Button } from '@/shared/ui';
 
 /**
- * THE WAY TO THE PANEL ON A NARROW SCREEN: a switch in the chat's head between the talk and the panel, with how many of the chat's
- * follow-ups are open beside it. At a desk the panel is beside the talk and this is not drawn; with no panel it is not drawn at
- * any width. Under a finger it is its mark and the count alone, drawn 28 px tall to fit the
- * chat's one-line head, with a transparent `::before` that keeps its catch at 44 px.
+ * THE WAY TO THE PANEL: a switch in the chat's head between the talk and the panel, with how many of the chat's follow-ups are
+ * open beside it. Where the follow-ups are drawn apart from the panel (the chat's side column at a desk) it is the way to what
+ * the chat put there alone, and counts nothing. With no panel it is not drawn. Under a finger it is its mark and the count
+ * alone, drawn 28 px tall to fit the chat's one-line head, with a transparent `::before` that keeps its catch at 44 px.
  *
  * Used by project-workspace's `ChatHead`, at the end of the head.
  */
@@ -18,14 +18,14 @@ export function SessionPanelSwitch() {
   if (panel === null || panel.form === 'none') return null;
 
   const front = panel.view === 'panel';
-  const open = panel.followups.openCount;
+  const open = panel.followupsApart ? 0 : panel.followups.openCount;
   const name = open > 0 ? t('sessionPanel.switchWithOpen', { count: open }) : t('sessionPanel.name');
   return (
     <Button
       data-session-panel-switch=""
       variant={front ? 'default' : 'outline'}
       size="sm"
-      className="relative h-9 flex-none gap-1.5 px-2.5 finger:h-7 finger:min-w-7 finger:px-1.5 finger:before:absolute finger:before:-inset-2 finger:before:content-[''] min-[880px]:hidden"
+      className="relative h-9 flex-none gap-1.5 px-2.5 finger:h-7 finger:min-w-7 finger:px-1.5 finger:before:absolute finger:before:-inset-2 finger:before:content-['']"
       aria-pressed={front}
       aria-label={name}
       title={name}

@@ -6,7 +6,10 @@
  * squeezed between its gutters, the floating panel) there is no strip: the core is the first thing in the line's own row.
  *
  * The measure is the chat's own column (`chat-column`, a query container on `ChatInterface`'s root), never the window: the
- * chat stands in panels of every width. */
+ * chat stands in panels of every width.
+ *
+ * HOW WIDE THE WORDS RUN is `--chat-measure`: 54.25rem (868 px) unless the page that mounts the chat sets it wider (a desk's
+ * `ChatDesk`). The talk, the line and everything that stands over the line take the one measure. */
 .chat-column { container: chat / inline-size; }
 .chat-line { position: relative; display: flex; align-items: center; gap: 12px; }
 /* In the line's own row the core keeps the air its outer hairline needs from the column's edge. */
@@ -16,13 +19,20 @@
 
 /* The strip: the core's 56 px and 12 px of air, inside the 1rem the column already keeps at its start. */
 @container chat (min-width: 44rem) {
-  .chat-column .chat-composer-shell { padding-left: calc(1rem + 68px); }
-  .chat-column .chat-line__core { position: absolute; right: 100%; top: 50%; margin: 0 12px 0 0; transform: translateY(-50%); }
+  .chat-column:not([data-chat-core-apart]) .chat-composer-shell { padding-left: calc(1rem + 68px); }
+  .chat-column:not([data-chat-core-apart]) .chat-line__core { position: absolute; right: 100%; top: 50%; margin: 0 12px 0 0; transform: translateY(-50%); }
   /* The rail of turns: over the core and its two hairlines, on its middle, growing up from it. */
-  .chat-column .chat-line__rail { position: absolute; right: 100%; bottom: calc(50% + 48px); display: flex; width: 56px; margin-right: 12px; }
-  /* The talk's own words are as wide as the line (54.25rem), past the strip and the column's 1rem at each side. */
-  .chat-column .chat-talk { max-width: calc(54.25rem + 68px + 2rem); padding-left: calc(1rem + 68px); }
+  .chat-column:not([data-chat-core-apart]) .chat-line__rail { position: absolute; right: 100%; bottom: calc(50% + 48px); display: flex; width: 56px; margin-right: 12px; }
+  /* The talk's own words are as wide as the line (the chat's measure), past the strip and the column's 1rem at each side. */
+  .chat-column:not([data-chat-core-apart]) .chat-talk { max-width: calc(var(--chat-measure, 54.25rem) + 68px + 2rem); padding-left: calc(1rem + 68px); }
 }
+
+/* THE CORE APART FROM THE LINE (`data-chat-core-apart`, set by `ChatInterface` where the page keeps the core a place of its own: a
+ * desk's side column). No strip for the core, at any width. The rail of turns keeps a narrow one, 28 px, at the line's start: it
+ * stands on the line's foot and grows up from it, and the talk gives up the same 28 px so the two still share one left edge. */
+.chat-column[data-chat-core-apart] .chat-composer-shell { padding-left: calc(1rem + 28px); }
+.chat-column[data-chat-core-apart] .chat-line__rail { position: absolute; right: 100%; bottom: 0; display: flex; width: 28px; }
+.chat-column[data-chat-core-apart] .chat-talk { max-width: calc(var(--chat-measure, 54.25rem) + 28px + 2rem); padding-left: calc(1rem + 28px); }
 
 /* ---------- the core in its dock, and risen into its disc ----------
  * The dock keeps the core's place beside the line. Everything the core is made of hangs on one point at the dock's middle
@@ -58,6 +68,8 @@
 .chat-inst__heart { width: 0; height: 0; }
 .chat-inst[data-chat-core-dock='open'] .chat-inst__heart { animation: chat-inst-heart var(--duration-lock) var(--ease-lock) both; }
 @keyframes chat-inst-heart { from { transform: scale(0.64); } }
+/* In a place of its own the core is already the size it has in its disc: nothing to grow into. */
+.chat-inst[data-chat-core-apart][data-chat-core-dock='open'] .chat-inst__heart { animation: none; }
 .chat-inst__press { position: absolute; top: 0; left: 0; transform: translate(-50%, -50%); transition: transform var(--dur-quick) var(--ease-enter); }
 .chat-inst__press:hover { transform: translate(-50%, -50%) scale(1.04); }
 /* No grow under a finger: a tap leaves `:hover` standing until the next tap elsewhere, and the core would stay grown. */

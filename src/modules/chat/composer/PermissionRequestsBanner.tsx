@@ -52,7 +52,7 @@ export default function PermissionRequestsBanner({
   }
 
   return (
-    <div className="mx-auto mb-3 max-w-[54.25rem] space-y-2">
+    <div className="mx-auto mb-3 max-w-[var(--chat-measure,54.25rem)] space-y-2">
       {filteredRequests.map((request) => {
         if (request.toolName === MCP_ELICITATION_TOOL_NAME) {
           return <McpElicitationPanel key={request.requestId} request={request} onDecision={handlePermissionDecision} />;
