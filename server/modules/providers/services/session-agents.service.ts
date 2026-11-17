@@ -10,8 +10,7 @@ import type { AnyRecord, NormalizedMessage, SubagentActivity } from '@/shared/ty
  *
  * The chat's pinned rows (`src/modules/chat/transcript/PinnedSubagents.tsx`) keep an agent in view
  * while it runs and after it finishes, until the reader dismisses it. They are drawn in the strip
- * above the chat box when the desktop chat gutters are not showing and in the gutter's Subagents
- * widget while they are. They used to take their agents from the transcript rows the page had
+ * above the chat box. They used to take their agents from the transcript rows the page had
  * loaded, and a page loads history from the tail, twenty rows at a time — so an agent launched
  * early in a long turn left the rows as soon as the main thread had done twenty rows of work
  * since, which is the exact moment it needs pinning (measured 2026-09-10: a planner still running,
@@ -25,8 +24,7 @@ import type { AnyRecord, NormalizedMessage, SubagentActivity } from '@/shared/ty
 
 /**
  * Mirrors `RUNNING_BELIEVED_FOR_MS` in the chat's pinned rows (`PinnedSubagents.tsx`), drawn in the
- * strip above the chat box when the desktop chat gutters are not showing and in the gutter's
- * Subagents widget while they are: a "running" row older than this is not believed.
+ * strip above the chat box: a "running" row older than this is not believed.
  *
  * Read by the sidebar's subagent mark too (`runningSubagentModels`, and the candidate window in
  * `session-subagent-runs.service.ts`), so the three answers to "is an agent still out there" are
@@ -35,8 +33,7 @@ import type { AnyRecord, NormalizedMessage, SubagentActivity } from '@/shared/ty
 export const RUNNING_BELIEVED_FOR_MS = 4 * 60 * 60 * 1000;
 /**
  * Mirrors `FINISHED_SHOWN_FOR_MS` in the chat's pinned rows (`PinnedSubagents.tsx`), drawn in the
- * strip above the chat box when the desktop chat gutters are not showing and in the gutter's
- * Subagents widget while they are: how long a finished agent stays offered.
+ * strip above the chat box: how long a finished agent stays offered.
  */
 const FINISHED_SHOWN_FOR_MS = 2 * 60 * 60 * 1000;
 /** A bound on the payload, newest first; a fan-out larger than this has scrolled out of any strip. */

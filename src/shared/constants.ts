@@ -306,12 +306,11 @@ export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';
 
 /**
  * The space between two lane cards, whether they stand side by side on the wall of the Roadmap tab's
- * In flight face or one under another in the Runs widget. Both homes read this one value,
- * so the widget's list keeps the face's card spacing.
+ * In flight face.
  *
- * Used by `LANE_WALL_GRID` below and by the runner-tab module's `RunnerWidgetBody` (its list of cards).
+ * Used by `LANE_WALL_GRID` below.
  */
-export const LANE_CARD_GAP = 'gap-4';
+const LANE_CARD_GAP = 'gap-4';
 
 /**
  * The wall of the Roadmap tab's In flight face: an auto-fill grid of lane cards, each column at least 22rem wide (or the
@@ -531,8 +530,8 @@ export const RUNNER_LANDING_PARAM = 'runner';
 /**
  * The query parameter a landing names a roadmap in (`?roadmap=<name>`): the Roadmap tab's Roadmap face
  * on that roadmap. Taken, held and stripped under the very rule `RUNNER_LANDING_PARAM` follows. Used by
- * the project-workspace module's `useRunnerLanding`, which reads it, and the roadmap module's chat-gutter
- * widget (`RoadmapWidgetBody`), which writes it from a surface that has no Roadmap tab above it.
+ * the project-workspace module's `useRunnerLanding`, which reads it. Nothing in the app writes it since the chat's
+ * widget column was removed; a link that carries it still lands.
  */
 export const ROADMAP_LANDING_PARAM = 'roadmap';
 

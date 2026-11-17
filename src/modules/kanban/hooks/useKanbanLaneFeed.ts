@@ -58,8 +58,6 @@ export type KanbanLaneFeed = {
  * The strip stands in the board header and is handed ONE thing — the board's id — because that
  * header calls no hook and the panel hands it no counts. So the reading made below cannot travel
  * down a prop chain to it: the feed PUBLISHES, and the strip LISTENS through `useBoardVitals`.
- * `chat/subagents/subagentSource.ts` and `chat/embeds/embedSource.ts` are the same shape, for the
- * same problem — one component telling another something neither of them owns.
  *
  * ONE SLOT, because one board is open at a time, TAGGED with the id it belongs to. A board switch
  * that leaves the old reading standing for a moment is then refused by IDENTITY and not by timing:

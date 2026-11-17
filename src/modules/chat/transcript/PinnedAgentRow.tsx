@@ -8,9 +8,7 @@ import { describeSubagentUsage, formatSubagentFinishTime, type SubagentMarkProvi
 /**
  * One `Agent`-tool subagent as a row.
  *
- * Read by the chat module's pinned strip (`PinnedSubagents.tsx`), which draws it above the chat box
- * when the desktop gutters are not showing, and by `subagents/SubagentWidgetBody.tsx`, the gutter's
- * Subagents widget, which draws the same rows while they are.
+ * Read by the chat module's pinned strip (`PinnedSubagents.tsx`), which draws it above the chat box.
  *
  * Extracted verbatim from the strip that used to draw it inline (`PinnedSubagents.tsx`), when that
  * strip grew a SECOND kind of pin beside it. The move is pure: same markup, same classes, same

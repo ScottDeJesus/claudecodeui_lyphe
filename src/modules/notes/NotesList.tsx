@@ -18,8 +18,7 @@ const NOTES_WALL_GRID = 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem)
 
 /**
  * THE NOTES, ONE CARD PER NOTE, THE BLANK CARD FIRST. Used by `src/modules/notes/NotesPanel` (the
- * Notes tab's pane) and by `src/modules/notes/NotesWidgetBody` (the chat gutter's widget) — it is
- * ONE list in two homes, so a card, a delete and the wall's grid read the same at either width.
+ * Notes tab's pane).
  *
  * THE THREE UNREAD STATES ARE NOT THE EMPTY ONE, and the order below says so: `notes === null` is
  * "no read has answered", which is a spinner until one fails and then an unreachable box with the

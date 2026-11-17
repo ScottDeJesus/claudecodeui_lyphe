@@ -40,12 +40,6 @@ import { usePlainModePreference } from '@/shared/hooks/usePlainModePreference';
 import { Banner, Button } from '@/shared/ui';
 import ChatMessagesPane from '@/modules/chat/transcript/ChatMessagesPane';
 import PinnedSubagents from '@/modules/chat/transcript/PinnedSubagents';
-import {
-  publishSubagentSource,
-  useSubagentStripClaimed,
-} from '@/modules/chat/subagents/subagentSource';
-import { collectEmbedTargets } from '@/modules/chat/embeds/collectEmbedTargets';
-import { publishEmbedSource } from '@/modules/chat/embeds/embedSource';
 import ChatComposer from '@/modules/chat/composer/ChatComposer';
 import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
 
@@ -228,38 +222,13 @@ function ChatInterface({
   });
 
   // The id the launcher stamps on every launch this chat makes — a chain's later stages included,
-  // which print no receipt into any transcript. The strip and the widget anchor the lane's launches
+  // which print no receipt into any transcript. The strip anchors the lane's launches
   // by it (`readStampedLaunchIds`), so a new stage shows the moment the lane carries it.
   const cliSessionId = useCliSessionId(selectedSession?.id ?? null);
 
   // What a pinned agent or soul runs on, in the words the transcript's headers use. Held here, beside
-  // the catalog, and published with the rows so the gutter widget names a model exactly as the strip does.
+  // the catalog, and handed to the strip.
   const resolveModelLabel = useModelLabelResolver(provider, providerModelCatalog);
-
-  // The gutters cannot see this chat's own store — `useSessionStore` is a ref private to this
-  // component — so the rows they draw are published here, tagged with the id they are handed.
-  useEffect(() => {
-    const sessionId = selectedSession?.id;
-    if (typeof sessionId !== 'string') { publishSubagentSource(null); return; }
-    publishSubagentSource({ sessionId, cliSessionId, agentMessages, soulLaunchIds, resolveModelLabel });
-    return () => publishSubagentSource(null);
-  }, [selectedSession?.id, cliSessionId, agentMessages, soulLaunchIds, resolveModelLabel]);
-
-  // The addresses this chat has declared in embed fences, for the Embed widget in the gutter. Read
-  // off the MESSAGES rather than off the rendered transcript, because the transcript unmounts rows
-  // that scroll away and the widget's list must not move with the reader's scrollbar —
-  // `collectEmbedTargets` says the rest. Memoised on the message array's identity: the scan skips
-  // any message without the fence in it, so a chat that never uses one pays a substring test per
-  // message per store update and nothing more.
-  const embedTargets = useMemo(() => collectEmbedTargets(chatMessages), [chatMessages]);
-  useEffect(() => {
-    const sessionId = selectedSession?.id;
-    if (typeof sessionId !== 'string') { publishEmbedSource(null); return; }
-    publishEmbedSource({ sessionId, targets: embedTargets });
-    return () => publishEmbedSource(null);
-  }, [selectedSession?.id, embedTargets]);
-  // While a gutter shows the Subagents widget it draws these same rows: the strip stands down.
-  const stripClaimed = useSubagentStripClaimed();
 
   // Brand-new conversation: the composer allocated a stable session id via
   // the session gateway before the first send. Record it locally and put it
@@ -665,7 +634,7 @@ function ChatInterface({
             turnsScrollerRef={scrollContainerRef}
             messageCount={chatMessages.length}
             exportSurface={exportSurface}
-          pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} cliSessionId={cliSessionId} resolveModelLabel={resolveModelLabel} />}
+          pinnedAgents={<PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} cliSessionId={cliSessionId} resolveModelLabel={resolveModelLabel} />}
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
           handleGrantToolPermission={handleGrantToolPermission}

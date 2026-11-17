@@ -347,23 +347,8 @@
     "expand": "Espandi"
   },
   "gutters": {
-    "runner": {
-      "title": "Esecuzioni"
-    },
-    "roadmap": {
-      "title": "Roadmap"
-    },
-    "memory": {
-      "title": "Memoria",
-      "pending": "In attesa di revisione",
-      "recent": "Archiviati di recente",
-      "recentEmpty": "Niente archiviato finora",
-      "pendingEmpty": "Niente in attesa"
-    },
     "subagents": {
       "title": "Subagenti",
-      "empty": "Nessun subagente in questa chat",
-      "clearCompleted": "Rimuovi completati",
       "back": "Torna ai subagenti",
       "loading": "Caricamento della trascrizione…",
       "notFound": "Nessuna trascrizione sul disco per ora",
@@ -373,32 +358,12 @@
       "openRow": "Leggi la trascrizione di {{name}}"
     },
     "embed": {
-      "title": "Incorporato",
-      "empty": "Niente di incorporato in questa chat",
-      "placeholder": "Indirizzo da incorporare…",
-      "address": "Indirizzo da incorporare",
-      "pick": "Quale incorporato mostrare",
-      "choose": "Scegli una pagina…",
-      "custom": "Digita un indirizzo…",
-      "open": "Apri la pagina in una nuova scheda",
-      "rejected": "Non è un indirizzo http:// o https://",
       "plainHttpBlocked": "Questa pagina è servita in http semplice, e un browser non mostra una pagina http dentro questa app finché è aperta in https. Usa il link Apri per vederla in una scheda a parte."
     },
-    "notes": {
-      "title": "Note"
-    },
-    "accounts": {
-      "title": "Account"
-    },
-    "open": "Apri {{name}}",
-    "collapse": "Comprimi",
-    "dragHint": "Trascina su un lato",
     "pin": {
       "label": "Questa sessione",
       "title": "Creato dalla chat che hai aperto"
-    },
-    "fullscreen": "Schermo intero",
-    "exitFullscreen": "Esci da schermo intero"
+    }
   },
   "applications": {
     "fabLabelMenu": "Apri il menu",

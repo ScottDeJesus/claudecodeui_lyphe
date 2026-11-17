@@ -1261,9 +1261,6 @@
       "remove": "{{title}} deleted",
       "promote": "{{title}} sent to design"
     },
-    "widget": {
-      "open": "Open the roadmap"
-    },
     "tree": {
       "label": "The roadmap as a tree: its goal, milestones, epics and features",
       "goal": "Goal",
@@ -1804,23 +1801,8 @@
     "refused": "Not started"
   },
   "gutters": {
-    "runner": {
-      "title": "Runs"
-    },
-    "roadmap": {
-      "title": "Roadmap"
-    },
-    "memory": {
-      "title": "Memory",
-      "pending": "Waiting for review",
-      "recent": "Recently filed",
-      "recentEmpty": "Nothing filed yet",
-      "pendingEmpty": "Nothing waiting"
-    },
     "subagents": {
       "title": "Subagents",
-      "empty": "No subagents in this chat",
-      "clearCompleted": "Clear completed",
       "back": "Back to subagents",
       "loading": "Loading transcript…",
       "notFound": "No transcript on disk yet",
@@ -1830,35 +1812,12 @@
       "openRow": "Read {{name}}'s transcript"
     },
     "embed": {
-      "title": "Embed",
-      "empty": "Nothing embedded in this chat yet",
-      "placeholder": "Address to embed…",
-      "address": "Address to embed",
-      "pick": "Which embed to show",
-      "choose": "Choose a page…",
-      "custom": "Type an address…",
-      "open": "Open the page in a new tab",
-      "rejected": "That is not an http:// or https:// address",
       "plainHttpBlocked": "This page is plain http, and a browser will not draw a plain-http page inside this app while it is open over https. Use the Open link to see it in its own tab."
     },
-    "notes": {
-      "title": "Notes"
-    },
-    "accounts": {
-      "title": "Accounts"
-    },
-    "followups": {
-      "title": "Next steps"
-    },
-    "open": "Open {{name}}",
-    "collapse": "Collapse",
-    "dragHint": "Drag to either side",
     "pin": {
       "label": "This session",
       "title": "Created by the chat you have open"
-    },
-    "fullscreen": "Fullscreen",
-    "exitFullscreen": "Leave fullscreen"
+    }
   },
   "sessionPanel": {
     "name": "Panel",

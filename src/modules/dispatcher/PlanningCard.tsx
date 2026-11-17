@@ -137,7 +137,7 @@ function PlanningLineRow({ line }: { line: PlanningLine }) {
  * Handles: `data-planning-card` on the root (valued with the number of lines), `data-planning-empty` on the quiet line,
  * `data-planning-dial` on the strip (valued `held` or `runs`) with its press's `data-planning-dial-press`.
  *
- * Used by the runner-tab module, through this module's barrel: `RunnerPanel` (In flight) and `RunnerWidgetBody` (the Runs widget).
+ * Used by the runner-tab module, through this module's barrel: `RunnerPanel` (In flight).
  */
 export function PlanningCard() {
   const { t } = useTranslation();

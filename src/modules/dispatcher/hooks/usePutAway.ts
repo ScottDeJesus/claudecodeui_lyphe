@@ -41,7 +41,7 @@ type PutAway = {
  * `carriedNames` is the lane's UNFILTERED list of names (`useDispatcherPlans`), which every entry write prunes
  * the stored list against.
  *
- * Used by `PlanCard`'s callers (`RunnerPanel`, `RunnerWidgetBody`), `DispatchArcDeck`, `PlanControls` (a hidden
+ * Used by `PlanCard`'s caller (`RunnerPanel`), `DispatchArcDeck`, `PlanControls` (a hidden
  * card's Show) and `HiddenPlans`.
  */
 export function usePutAway(carriedNames: string[]): PutAway {

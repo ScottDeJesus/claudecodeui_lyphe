@@ -13,8 +13,7 @@ import { dispatchSoulsStateDir } from '@/shared/utils.js';
  * transcript; the only thing it leaves there is the receipt its launcher printed, `SOUL LAUNCHED
  * launch=<id> …`, captured as the result of the Bash call that started it. The chat's pinned rows
  * (`src/modules/chat/transcript/PinnedSubagents.tsx`) draw that launch beside the `Agent`-tool
- * agents. They are drawn in the strip above the chat box when the desktop chat gutters are not
- * showing and in the gutter's Subagents widget while they are, and they can draw only the ids they
+ * agents. They are drawn in the strip above the chat box, and they can draw only the ids they
  * know — so this list rides on every latest-page response
  * for the same reason the agent list does (`collectSessionAgents` in
  * `session-agents.service.ts`): a page loads history from the TAIL, and a launch started early in a

@@ -3876,58 +3876,9 @@ export type UniverseActivityRow = {
 export type UniverseDigest = { edits: number; execs: number; at: number };
 
 // ---------------------------
-//----------------- CHAT GUTTERS ------------
-// The desktop chat's side gutters: optional widgets beside the transcript, each draggable between
-// the four slots. The placement is a setting the client owns (it never reaches the server), so
-// these types describe a stored shape rather than a wire one.
-
-/** Which side of the transcript a widget sits on. Each side is ONE stack: a widget is dropped into
- *  a place in it, and the rest close up or make room — there is no fixed number of berths. */
-export type GutterSide = 'left' | 'right';
-
-/** The widgets a chat gutter can hold: the dispatcher's plan cards, in the operator's own order, the
- *  roadmap the Roadmap tab shows at a column's width, the memory-intake rows the session proposed, the
- *  subagents it has pinned, the embed — a live page the chat named, or the reader typed in — the
- *  account's notes, the open chat's own next steps and known gaps (`followups`), and the Claude accounts panel
- *  — the usage windows, both balances, every account's figures and the switch (`accounts`). These are the ids
- *  the DOM carries as `data-widget`, and the keys `useGutterPlacements` stores its records under. */
-export type GutterWidgetId = 'runner' | 'roadmap' | 'memory' | 'subagents' | 'embed' | 'notes' | 'followups' | 'accounts';
-
-/** One widget's place in its side's stack and whether it is expanded. `order` is the sort key within
- *  the side, dense from 0 after every move; a collapsed widget is still placed — it draws as a tab
- *  where it stands, which is what makes `open` a separate fact from the place rather than a value of
- *  it. */
-export type GutterWidgetPlacement = { side: GutterSide; order: number; open: boolean };
-
-/** Every widget's placement for ONE chat. A record rather than a pair of fields because a widget is
- *  addressed by its own id everywhere else in this feature, and a widget added later costs one member
- *  here rather than a second parallel field. `UserPreferences.chatGutters` holds a fallback of this
- *  shape plus one per session — see `useGutterPlacements`, which owns the stored shape. */
-export type ChatGutterPlacements = Record<GutterWidgetId, GutterWidgetPlacement>;
-
-// ---------------------------
 //----------------- SUBAGENT TRANSCRIPTS ------------
 /** What one subagent transcript read answers, mirrored byte-for-byte from the server's `server/shared/types.ts`. `found` is `false` when the session, provider, file or launch cannot be resolved — then `activity` is empty, `total` is 0, `inFlight` is `false` and `finishedAt` is `null`, and "not found" is a 200 carrying this shape, never an HTTP error. `activity` is the LAST 1000 entries (the server's `SUBAGENT_TRANSCRIPT_LIMIT`), each truncated, and `total` is the untruncated count. */
 export type SubagentTranscriptResult = { found: boolean; activity: SubagentActivity[]; total: number; inFlight: boolean; finishedAt: string | null };
-
-// ---------------------------
-//----------------- CHAT SUBAGENT WIDGET ------------
-/** What the chat publishes for its Subagents widget: the session the rows belong to, the chat's own CLI session id (`null` until the provider has reported one), against which the widget anchors the lane's launches by their `launched_by` stamp, the agent container rows of the history the chat has loaded, the launcher-soul ids that same history anchored, and the chat's resolver from a model id to the name a person calls it (`null` for an id its catalog does not carry), so the widget's rows name a model exactly as the chat's own do. Scoped by `sessionId`, which the widget checks before drawing anything — rows tagged with another chat are refused, not shown. */
-export type ChatSubagentSource = { sessionId: string; cliSessionId: string | null; agentMessages: ChatMessage[]; soulLaunchIds: string[]; resolveModelLabel: (modelId: string) => string | null };
-
-// ---------------------------
-//----------------- CHAT EMBED WIDGET ------------
-/**
- * What the chat publishes for its Embed widget: the session the addresses belong to, and every
- * embed fence that session's loaded history declares, oldest first.
- *
- * Scoped by `sessionId` exactly as `ChatSubagentSource` is, and checked the same way — a list tagged
- * with another chat is refused rather than shown, which is what stops the widget carrying one
- * conversation's dashboards into the next. The targets are `EmbedUrlRef`s, the SAME shape
- * `classifyWidgetBody` produces for the inline card, because the widget and the card must never
- * disagree about what an address, a title or a height is.
- */
-export type ChatEmbedSource = { sessionId: string; targets: EmbedUrlRef[] };
 
 /** What the widget's transcript view is open on: an `Agent`-tool row addressed by the tool call that spawned it (`id` is that call's `tool_id`), a launcher soul addressed by its launch id, or a board's Metis addressed by the session id the board minted. Its third consumer is the kanban module's `KanbanMetisPanel.tsx`, which opens a fleet row into the same view rather than a copy of it. */
 export type SubagentTranscriptTarget = { kind: 'agent' | 'soul' | 'metis'; id: string };

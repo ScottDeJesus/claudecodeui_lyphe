@@ -345,23 +345,8 @@
     "expand": "展開"
   },
   "gutters": {
-    "runner": {
-      "title": "実行"
-    },
-    "roadmap": {
-      "title": "ロードマップ"
-    },
-    "memory": {
-      "title": "メモリ",
-      "pending": "レビュー待ち",
-      "recent": "最近の記録",
-      "recentEmpty": "まだ何も記録されていません",
-      "pendingEmpty": "待機中のものはありません"
-    },
     "subagents": {
       "title": "サブエージェント",
-      "empty": "このチャットにサブエージェントはいません",
-      "clearCompleted": "完了分をクリア",
       "back": "サブエージェントに戻る",
       "loading": "トランスクリプトを読み込み中…",
       "notFound": "ディスク上にまだトランスクリプトがありません",
@@ -371,32 +356,12 @@
       "openRow": "{{name}} のトランスクリプトを読む"
     },
     "embed": {
-      "title": "埋め込み",
-      "empty": "このチャットにはまだ埋め込みがありません",
-      "placeholder": "埋め込むアドレス…",
-      "address": "埋め込むアドレス",
-      "pick": "表示する埋め込み",
-      "choose": "ページを選択…",
-      "custom": "アドレスを入力…",
-      "open": "ページを新しいタブで開く",
-      "rejected": "http:// または https:// のアドレスではありません",
       "plainHttpBlocked": "このページは暗号化されていない http で提供されており、このアプリが https で開かれている間、ブラウザは http のページをアプリ内に表示しません。「開く」リンクから専用のタブで表示できます。"
     },
-    "notes": {
-      "title": "メモ"
-    },
-    "accounts": {
-      "title": "アカウント"
-    },
-    "open": "{{name}} を開く",
-    "collapse": "折りたたむ",
-    "dragHint": "どちらかの側へドラッグ",
     "pin": {
       "label": "このセッション",
       "title": "開いているチャットで作成されました"
-    },
-    "fullscreen": "全画面",
-    "exitFullscreen": "全画面を終了"
+    }
   },
   "applications": {
     "fabLabelMenu": "メニューを開く",

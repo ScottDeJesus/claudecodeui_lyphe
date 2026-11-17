@@ -227,8 +227,7 @@ export function ShapeFrame({ kind, title, collapseKey, actions, children, classN
         // switcher's layer z-40) and UNDER the rail (z-50) and the FAB (z-60), so the FAB stays live over a
         // fullscreen card (see surfaces.css). A dialog opened from here — the command palette, a confirm —
         // is in front whatever this number is: it portals to `<body>`, outside the shell's stacking context
-        // this card is drawn in. The gutter widgets' fullscreen stands higher, over the rail and the FAB
-        // (`GutterWidgetFrame`).
+        // this card is drawn in.
         // `pwa-notch-safe` because fullscreen is the screen, whatever its layer. In the
         // home-screen app the header row — and the fullscreen switch out of it — would otherwise
         // sit in the status-bar band at the top and the notch band at the side (see src/index.css).

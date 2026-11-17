@@ -190,7 +190,7 @@
      `max()` against `--pwa-notch-safe-pad`, the padding the sheet already wants: a layer declares
      it inline — `class="… pwa-notch-safe [--pwa-notch-safe-pad:1.5rem]"`. Absent, it is 0px and
      the padding is the inset alone, which is what every box that carries no padding of its own
-     wants: the three full-bleed layers (`Lightbox`, `ShapeFrame`, `GutterWidgetFrame`) and the
+     wants: the two full-bleed layers (`Lightbox`, `ShapeFrame`) and the
      two dialog panels (Settings, ProviderLoginModal). */
   body.pwa-mode .pwa-notch-safe {
     padding-top: max(var(--safe-area-inset-top), var(--pwa-notch-safe-pad, 0px));

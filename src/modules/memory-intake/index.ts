@@ -12,6 +12,3 @@ export { useMemoryReview } from '@/modules/memory-intake/hooks/useMemoryReview';
 // Lazy: the panel is the section's whole tree and loads on the section's first open, so importing this
 // barrel for anything else never pulls the panel into the first page load.
 export const MemoryIntakePanel = lazy(() => import('@/modules/memory-intake/MemoryIntakePanel').then((m) => ({ default: m.MemoryIntakePanel })));
-// The lane as the desktop chat gutter draws it: this chat's queue, then what was recently filed.
-// Its consumer is src/modules/chat-gutters, which mounts it beside the transcript.
-export { MemoryWidgetBody } from '@/modules/memory-intake/MemoryWidgetBody';

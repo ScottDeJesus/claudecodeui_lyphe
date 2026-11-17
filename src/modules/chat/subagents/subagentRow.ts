@@ -1,9 +1,8 @@
 import type { PinnedSubagentRow } from '@/modules/chat/hooks/usePinnedSubagentRows';
 
 /**
- * How a pinned row is addressed when it is opened, read the same way by both surfaces that open
- * one: the gutter's Subagents widget (`SubagentWidgetBody.tsx`) and the strip above the chat box
- * (`transcript/PinnedSubagents.tsx`).
+ * How a pinned row is addressed when it is opened, read by the surface that opens
+ * one: the strip above the chat box (`transcript/PinnedSubagents.tsx`).
  */
 
 /** The id a row is addressed by: an agent's spawning tool call, or a soul's launch id. */

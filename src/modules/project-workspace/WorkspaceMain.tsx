@@ -2,7 +2,6 @@ import React, { Suspense, useCallback, useEffect, useRef, useState, type Dispatc
 import { useTranslation } from 'react-i18next';
 
 import { ChatInterface } from '@/modules/chat';
-import { ChatGutterLayout } from '@/modules/chat-gutters';
 import { SessionPanelLayout, SessionPanelProvider } from '@/modules/session-panel';
 import { ChatHostSlot, useChatHost } from '@/modules/chat-host';
 import { FilesView } from '@/modules/file-manager';
@@ -145,7 +144,7 @@ function WorkspaceMain({
   useTaskMasterProjectSync(selectedProject);
 
   // While the chat floats it is live outside this tab: it counts as the active chat whichever tab is open,
-  // and the gutters stand down — the floating chat draws its own pinned subagent strip.
+  // and the session's panel stands down with it.
   const floating = useChatHost().placement !== 'home';
 
   // The one path-opening capability three caller families share — the chat's Edit/Write cards and
@@ -351,15 +350,12 @@ function WorkspaceMain({
         <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
           {selectedProject ? (
             <WorkspaceErrorBoundary showDetails>
-              {/* The gutters wrap the chat from OUTSIDE, so the transcript and the composer keep
-                  their own column untouched. The boundary is handed down rather than imported
-                  there: each widget body gets its own, and a crashing widget cannot blank the
-                  chat tab. */}
               <CoreDrawingProvider value={drawChatCore}>
-              {/* The chat's panel stands beside all of this, gutters included: the chat keeps its place whatever the panel does. */}
+              {/* The chat's panel stands beside the chat: the chat keeps its place whatever the panel does. */}
               <SessionPanelLayout>
-              <ChatGutterLayout enabled={!isMobile && !floating} sessionId={selectedSession?.id ?? null}
-                boundary={WorkspaceErrorBoundary}>
+              {/* THE CHAT'S OWN COLUMN: the transcript's cap (868px, its `max-w-[54.25rem]`) and nothing wider, centred,
+                  so the scroll pane and the scrollbar on its right edge end where the transcript ends. */}
+              <div data-testid="chat-column" className="mx-auto h-full min-h-0 w-full min-w-0 max-w-[868px]">
                 <ChatHostSlot sessionId={selectedSession?.id ?? null} showing={activeTab === 'chat'}>
                   <ChatInterface
                     isActive={activeTab === 'chat' || floating}
@@ -383,7 +379,7 @@ function WorkspaceMain({
                     onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
                   />
                 </ChatHostSlot>
-              </ChatGutterLayout>
+              </div>
               </SessionPanelLayout>
               </CoreDrawingProvider>
             </WorkspaceErrorBoundary>

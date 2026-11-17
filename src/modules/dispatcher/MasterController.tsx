@@ -45,8 +45,7 @@ import { cn } from '@/shared/utils';
  * ONE COMPONENT, TWO MOUNTS, ONE FRAME: a press in either place is the same press, and both draw from the same
  * `useDispatcherPlans` picture, so a choice made in one is the other's next render.
  *
- * Used by `RunnerPanel` (runner-tab), as the second row of In flight's header, and by `RunnerWidgetBody` (runner-tab),
- * at the top of the chat gutter's Runs widget — the controls live with the decks they order (MAN-642).
+ * Used by `RunnerPanel` (runner-tab), as the second row of In flight's header — the controls live with the decks they order (MAN-642).
  */
 export function MasterController({ className }: { className?: string }) {
   const { t } = useTranslation();

@@ -347,23 +347,8 @@
     "expand": "Développer"
   },
   "gutters": {
-    "runner": {
-      "title": "Exécutions"
-    },
-    "roadmap": {
-      "title": "Feuille de route"
-    },
-    "memory": {
-      "title": "Mémoire",
-      "pending": "En attente de révision",
-      "recent": "Récemment classés",
-      "recentEmpty": "Rien de classé pour l'instant",
-      "pendingEmpty": "Rien en attente"
-    },
     "subagents": {
       "title": "Sous-agents",
-      "empty": "Aucun sous-agent dans cette conversation",
-      "clearCompleted": "Effacer les terminés",
       "back": "Retour aux sous-agents",
       "loading": "Chargement de la transcription…",
       "notFound": "Pas encore de transcription sur le disque",
@@ -373,32 +358,12 @@
       "openRow": "Lire la transcription de {{name}}"
     },
     "embed": {
-      "title": "Intégration",
-      "empty": "Rien d'intégré dans cette conversation",
-      "placeholder": "Adresse à intégrer…",
-      "address": "Adresse à intégrer",
-      "pick": "Quelle intégration afficher",
-      "choose": "Choisir une page…",
-      "custom": "Saisir une adresse…",
-      "open": "Ouvrir la page dans un nouvel onglet",
-      "rejected": "Ce n'est pas une adresse http:// ou https://",
       "plainHttpBlocked": "Cette page est servie en http simple, et un navigateur n'affiche pas une page http dans cette appli tant qu'elle est ouverte en https. Utilisez le lien Ouvrir pour la voir dans son propre onglet."
     },
-    "notes": {
-      "title": "Notes"
-    },
-    "accounts": {
-      "title": "Comptes"
-    },
-    "open": "Ouvrir {{name}}",
-    "collapse": "Réduire",
-    "dragHint": "Glisser vers un côté",
     "pin": {
       "label": "Cette session",
       "title": "Créé par la conversation que vous avez ouverte"
-    },
-    "fullscreen": "Plein écran",
-    "exitFullscreen": "Quitter le plein écran"
+    }
   },
   "applications": {
     "fabLabelMenu": "Ouvrir le menu",

@@ -35,7 +35,7 @@ async function readBody(response: Response): Promise<unknown> {
 }
 
 /**
- * The two review verbs and their lifecycle. Used by MemoryIntakePanel and MemoryWidgetBody, and
+ * The two review verbs and their lifecycle. Used by MemoryIntakePanel, and
  * through this module's barrel by the heal module's rule cards (`useRuleReview`), which carry the
  * same two presses.
  *

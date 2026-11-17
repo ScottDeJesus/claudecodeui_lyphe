@@ -51,9 +51,6 @@ export type UserPreferences = {
   dispatcher: unknown;
   /** Composer toggle: every sent message rides under the `/plain` command. See `usePlainModePreference`. */
   plainMode: boolean;
-  /** Where each chat-gutter widget sits and whether it is open, per chat, plus the fallback a chat
-   *  with no arrangement of its own opens with. See `modules/chat-gutters/hooks/useGutterPlacements.ts`. */
-  chatGutters: unknown;
   /** The name of the roadmap on screen in the Roadmap tab and its widget, or null before one is chosen. Written WHOLE — the last device to choose wins — and a name the picture no longer holds reads as the first roadmap. See `modules/roadmap/hooks/useRoadmap.ts`. */
   roadmapSelected: string | null;
   /** The completion each roadmap last celebrated for this user, one entry list written by entry patch (`writeUserPreferenceEntries`): `{ seen: { name: string, at: string }[] }` — `name` the roadmap's, `at` the dispatcher's UTC string of the newest `shipped_at`, `completed_at` or `reached_at` played. Phone and desktop share it, so a completion plays once between them — provided a writer never sends an `at` older than the one it read: the merge replaces the named entry and does not compare (see `ENTRY_LISTED_KEYS` in `user-preferences.db.ts`). See `modules/roadmap/hooks/useCelebrations.ts`. */
@@ -109,7 +106,6 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string | null> = {
   chatFontSize: null,
   dispatcher: null,
   plainMode: null,
-  chatGutters: null,
   roadmapSelected: null,
   roadmapSeen: null,
   filesPins: null,
@@ -221,38 +217,11 @@ const isRetryableStatus = (status: number | null): boolean => (
 );
 
 /**
- * Folds a queued save into the one already waiting. Every key but `chatGutters` and the entry-patched
- * ones (`ENTRY_PATCHED_KEYS`, folded per entry) replaces: the newest value of a setting is the
- * setting. A gutter message names ONE chat (or, for a chat not sent yet,
- * only the fallback), so replacing it would drop the chat the earlier message carried — two arranges
- * inside the debounce window is enough — and the queue must keep the promise the wire value makes:
- * a message never asserts a chat it did not touch.
- *
- * Three shapes can arrive here, and the third is why this is not simply a union. A message with a
- * record `sessions` names that chat; a message that is only `{ fallback }` names no chat; and an
- * older build's flat record (`{ runner, memory, subagents }` — no `fallback`, no `sessions`) IS the
- * fallback it means, which is how the server reads it too. Folding that one like the others would
- * throw its arrangement away, so it becomes the fallback over whatever chats are pending.
+ * Folds a queued save into the one already waiting. Every key but the entry-patched ones
+ * (`ENTRY_PATCHED_KEYS`, folded per entry) replaces: the newest value of a setting is the setting.
  */
 function foldServerWrite(key: UserPreferenceKey, pending: unknown, incoming: unknown): unknown {
-  if (ENTRY_PATCHED_KEYS.has(key)) {
-    return foldEntryPatches(pending, incoming);
-  }
-  if (key !== 'chatGutters' || !isRecord(pending) || !isRecord(incoming)) {
-    return incoming;
-  }
-
-  const sessionsOf = (value: Record<string, unknown>) => (isRecord(value.sessions) ? value.sessions : {});
-  const orderOf = (value: Record<string, unknown>) => (Array.isArray(value.order) ? value.order : []);
-  const legacy = (value: Record<string, unknown>) => !('fallback' in value) && !('sessions' in value);
-
-  const fallback = legacy(incoming) ? incoming : incoming.fallback ?? (legacy(pending) ? pending : pending.fallback);
-  const sessions = { ...sessionsOf(pending), ...sessionsOf(incoming) };
-  const order = [
-    ...orderOf(pending).filter((id) => !orderOf(incoming).includes(id)),
-    ...orderOf(incoming),
-  ];
-  return { fallback, sessions, order };
+  return ENTRY_PATCHED_KEYS.has(key) ? foldEntryPatches(pending, incoming) : incoming;
 }
 
 /**
@@ -263,10 +232,8 @@ function foldServerWrite(key: UserPreferenceKey, pending: unknown, incoming: unk
  * landed: the screen and the server would disagree until the next change. `chatDrafts.ts` retries
  * the current value for the same reason.
  *
- * For `chatGutters` that means the current arrangement of the chats THIS message named, and no
- * others — the retry must keep the wire's promise that a message never asserts a chat it did not
- * touch. A chat the store has since forgotten is dropped from it. An entry patch keeps the same
- * promise per entry (`refreshEntryPatch`).
+ * An entry patch is rebuilt per entry (`refreshEntryPatch`): the entries this message named, as the
+ * store holds them now, and no others, so a message never asserts an entry it did not touch.
  */
 function refreshForRetry(key: UserPreferenceKey, sent: unknown): unknown {
   const current = preferences[key];
@@ -274,29 +241,7 @@ function refreshForRetry(key: UserPreferenceKey, sent: unknown): unknown {
     // The entries this patch named, as the store holds them now, and no others.
     return refreshEntryPatch(current, sent);
   }
-  if (key !== 'chatGutters') {
-    return current === undefined ? sent : current;
-  }
-  if (!isRecord(current) || !isRecord(sent)) {
-    return sent;
-  }
-
-  const named = isRecord(sent.sessions) ? Object.keys(sent.sessions) : [];
-  if (named.length === 0) {
-    // A chat that had no id yet: the message only ever carried the fallback, and the store's copy of
-    // it is the value the operator just set.
-    return { fallback: current.fallback ?? (isRecord(sent) ? sent.fallback : undefined) };
-  }
-
-  const held = isRecord(current.sessions) ? current.sessions : {};
-  const sessions: Record<string, unknown> = {};
-  for (const sessionId of named) {
-    if (sessionId in held) sessions[sessionId] = held[sessionId];
-  }
-  // No `fallback`: this message names chats, and the copy of the fallback beside them is exactly as
-  // stale as the sections the narrowing exists to keep off the wire. The fallback travels only in the
-  // message that carries nothing else, above.
-  return { sessions, order: Object.keys(sessions) };
+  return current === undefined ? sent : current;
 }
 
 /**
@@ -437,9 +382,9 @@ export function writeUserPreference(key: UserPreferenceKey, value: unknown, wire
   const wire = wireValue === undefined ? wireOf(key, preferences[key], value) : wireValue;
   preferences = { ...preferences, [key]: value };
   writeMirror();
-  // `wireValue` is for a preference the server merges rather than replaces (`chatGutters`, whose
-  // value holds a section per chat): the browser keeps the whole document, and sends only the part
-  // it changed, so a section another device wrote — and this one last read hours ago — is neither
+  // `wireValue` is for a write the server merges rather than replaces (an entry patch, from
+  // `writeUserPreferenceEntries`): the browser keeps the whole document, and sends only the part
+  // it changed, so an entry another device wrote — and this one last read hours ago — is neither
   // asserted nor reverted. Absent, the value itself goes up, which is right for every other key
   // but the whole-document entry keys (`wireOf`), whose difference goes up.
   if (wire !== NOTHING_TO_SEND) queueServerWrite({ [key]: wire });
@@ -503,10 +448,10 @@ export function flushUserPreferences(): void {
  * server again after the page was away, because another device may have written the preference since the sign-in read
  * (`StationLandedProvider`: the last look another device wrote). The CALLER decides that the server's value is the one to keep;
  * a write of the same key still waiting to be sent is newer than anything the server holds, so it is left alone. Only for a key
- * written whole: an entry-patched key or `chatGutters` merges on the server, and a copy adopted whole would erase this device's entries.
+ * written whole: an entry-patched key merges on the server, and a copy adopted whole would erase this device's entries.
  */
 export function adoptUserPreference(key: UserPreferenceKey, value: unknown): void {
-  if (ENTRY_PATCHED_KEYS.has(key) || key === 'chatGutters') {
+  if (ENTRY_PATCHED_KEYS.has(key)) {
     throw new Error(`adoptUserPreference: ${key} merges on the server and cannot be adopted whole`);
   }
   if (key in pendingServerWrites || JSON.stringify(preferences[key]) === JSON.stringify(value)) return;

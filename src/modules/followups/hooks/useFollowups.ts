@@ -8,7 +8,7 @@ import type { Followup } from '@/shared/types';
 
 /**
  * Whether one element of the answer is an item this module can draw. The array is read OUTSIDE every widget's
- * boundary (`openCount` feeds the badge in `ChatGutterLayout`), so an element that is `null`, or lacks a
+ * boundary (`openCount` feeds the count on the session panel's switch), so an element that is `null`, or lacks a
  * field the count and the groups read, must be dropped here and never reach a render that would take the whole
  * chat to the workspace's error panel. The server never sends one; a proxy or a stale cache could.
  */
@@ -29,10 +29,10 @@ type Reading = { sessionId: string; items: Followup[] };
 /**
  * The open chat's next steps and known gaps: one read, kept current, and the tick that settles an item.
  *
- * Called ONCE, by `ChatGutterLayout`, which needs the count outside every widget's boundary for the badge and
- * hands the same value to the widget's body through `FollowupsContext` — so the badge and the rows are one reading
- * and can never disagree. `sessionId` is the chat's APP session id (the gutter's own), or `null` while no chat is
- * open or the gutters are not drawn, when nothing is read and nothing is subscribed.
+ * Called ONCE per host, by the session panel's provider (`SessionPanelProvider`), which needs the count outside the
+ * body's boundary and hands the same value to the body through `FollowupsContext` — so the count and the rows are one
+ * reading and can never disagree — and by the station's `FollowupsStage`. `sessionId` is the chat's APP session id, or
+ * `null` while no chat is open, when nothing is read and nothing is subscribed.
  *
  * A FRAME IS A HINT, NOT A PICTURE. `followups_changed` names the chat it moved, and the answer to one for THIS chat
  * (or to `websocket_reconnected`) is always "read the list again"; a frame for another chat is ignored. The

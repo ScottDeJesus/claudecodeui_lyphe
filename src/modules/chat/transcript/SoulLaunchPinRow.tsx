@@ -15,9 +15,7 @@ import { formatSubagentFinishTime } from '@/modules/chat/utils/subagentSummary';
 /**
  * One launcher soul as a row, drawn beside the `Agent`-tool agents.
  *
- * Read by the chat module's pinned strip (`PinnedSubagents.tsx`), which draws it above the chat box
- * when the desktop gutters are not showing, and by `subagents/SubagentWidgetBody.tsx`, the gutter's
- * Subagents widget, which draws the same rows while they are.
+ * Read by the chat module's pinned strip (`PinnedSubagents.tsx`), which draws it above the chat box.
  *
  * It is a SECOND KIND OF ROW IN THE SAME STRIP, and it is drawn to be indistinguishable in shape
  * from the agent rows next to it — same centred mark, same two lines, the same place for the status

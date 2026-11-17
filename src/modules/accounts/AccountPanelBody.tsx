@@ -18,8 +18,8 @@ const UNREACHABLE_LINE = 'The server could not read accounts or usage — both a
  * week as a ring and its one act, the automatic switch, the two balances and the rate on a line each, and the door's sign-in. Drawn as the panel's own children,
  * with no chrome of its own — a fragment, so whoever stands it up supplies the box and the column its sections sit in.
  *
- * Used by the accounts module's AccountPopover (the account switcher every account ring opens) and by AccountsWidgetBody, in the
- * Accounts gutter widget. It takes no props: both read the one state `AccountsProvider` holds, so the two homes cannot disagree about
+ * Used by the accounts module's AccountPopover (the account switcher every account ring opens). It takes no props: it reads
+ * the one state `AccountsProvider` holds, so two drawings of it cannot disagree about
  * the account in use or a figure on it.
  *
  * Codex is deliberately absent — these are the Claude accounts the door holds, and Codex stays in Settings → Agents (D6).

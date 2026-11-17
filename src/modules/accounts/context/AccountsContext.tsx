@@ -212,8 +212,8 @@ export function AccountsProvider({ children }: { children: ReactNode }) {
 
 /**
  * The account panel's state and acts, from the provider above. Used by the accounts module's AccountRailButton and
- * AccountWeekRing (what opens the switcher), AccountPopover (the switcher), AccountPanelBody (the body both homes draw) and
- * AccountsWidgetBody (the gutter's refresh). A loud error when nothing provides it: a panel drawn outside the workspace would otherwise draw an
+ * AccountWeekRing (what opens the switcher), AccountPopover (the switcher) and AccountPanelBody (its body).
+ * A loud error when nothing provides it: a panel drawn outside the workspace would otherwise draw an
  * empty picture and read as "you have no accounts".
  */
 export function useAccountsContext(): AccountsValue {

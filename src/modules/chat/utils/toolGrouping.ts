@@ -187,7 +187,7 @@ export function groupConsecutiveTools(
  * result with nothing to attach to, or a synthetic placeholder the server
  * writes when a turn produced nothing ("No response requested.").
  */
-export function isProseReply(message: ChatMessage): boolean {
+function isProseReply(message: ChatMessage): boolean {
   return message.type === 'assistant'
     && !message.isToolUse
     && !message.isThinking
