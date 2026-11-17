@@ -16,9 +16,9 @@ type CompanionFaceProps = {
 };
 
 /**
- * Her face bound to this page's provider, the one binding her button and the station draw. Consumed by this module's
- * `CompanionFab` (inside the disc, at the disc's size less its rim, with the look the disc is drawing) and by the station
- * module (her head and portrait, looking at no anchor).
+ * Her face bound to this page's provider. Consumed, through the barrel, by the project-workspace module's `WorkspaceHome` (the core
+ * docked on the sessions home) and by the station module (the core in its halo), both looking at no anchor. The floating button
+ * that also drew it is gone.
  *
  * It reads what the face needs from the provider and from `useCompanionPresence`, the same presence the status line and the button's
  * label read (MAN-9089): her state, the page player's `analyser`, `level` and `progress` (stable functions, so a frame sixty times a

@@ -7,7 +7,6 @@
 // Everything else in this module is private.
 export { CompanionProvider, useCompanion } from '@/modules/companion/context/CompanionContext';
 export { CompanionPanel } from '@/modules/companion/CompanionPanel';
-export { CompanionFab } from '@/modules/companion/CompanionFab';
 export { CompanionDock } from '@/modules/companion/CompanionDock';
 export { CompanionSettingsSection } from '@/modules/companion/CompanionSettingsSection';
 // The action waiting for his word, as her panel draws it in her dock; its second home is the head of the station's right
@@ -26,7 +25,7 @@ export { CompanionDraftCard } from '@/modules/companion/CompanionDraftCard';
 // The pieces the station composes, each defined with its consumers named:
 // the one state of hers (MAN-9089): this module's panel, button and face read it, and the station's head reads it for its status line.
 export { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
-// her face bound to the provider: this module's button (CompanionFab, inside the disc), and the station's head.
+// her face bound to the provider: the sessions home's docked core and the station's.
 export { CompanionFace } from '@/modules/companion/CompanionFace';
 // her state in words with its dot: this module's panel header (CompanionHeader), and the station's head.
 export { CompanionStatus } from '@/modules/companion/CompanionStatus';

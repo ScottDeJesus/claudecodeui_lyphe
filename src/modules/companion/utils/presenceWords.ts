@@ -11,7 +11,7 @@ export const baseName = (path: string): string => path.split(/[\\/]/).filter(Boo
 /**
  * Her name, then what she is doing, in words ("Kaylee, reading Bugfixes"): the accessible name of her face and the label of
  * her button, which are one sentence so a reader of either hears the other. Used by this module's CompanionAvatar (the
- * face's `aria-label`) and CompanionFab (the button's label and tooltip).
+ * face's `aria-label`).
  *
  * One word for each of the fourteen presence states, her process included: the button never says "ready" for a Kaylee who
  * is stopped, asleep, waking or still loading. The subject is the chat or the files the presence carries; a presence that
