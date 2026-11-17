@@ -7,6 +7,7 @@ import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, Read
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
 import type { CompanionLogEntry, CompanionMouthPiece, CompanionSessionRef } from '@/shared/companion-types';
+import type { RoadmapEpic, RoadmapFeature, RoadmapMilestone } from '@/shared/roadmap-types';
 import type { StationAskKind, StationNeed } from '@/shared/station-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
@@ -4155,6 +4156,62 @@ export type RoadmapDotState = 'shipped' | 'inFlight' | 'designing' | 'proposed' 
  * the picture no longer holds reads as nothing selected.
  */
 export type RoadmapTreeSelection = { kind: 'roadmap' } | { kind: 'milestone' | 'epic' | 'feature'; name: string };
+
+// ---------------------------
+//----------------- ROADMAP STACK: what the roadmap's stack, its painter and its face share ------------
+
+/**
+ * One feature as a wall on its milestone's ring, laid out once by the roadmap module's `layoutStack` and read by the
+ * stack's painter (`utils/stackPainter`), its canvas (`stack/RoadmapStack`) and its face (`RoadmapStackFace`). `at` and
+ * `width` are its place and its room round the ring, in radians. `frame` is how tall it stands, as a share of a full wall:
+ * how far along its path the feature is. `fill` is how much of that frame is built, the share of its tasks done. `tone` is
+ * what it says in colour beside its form: `danger` when it is blocked (by its own, its epic's or its milestone's reason)
+ * or stalled, `warn` when it waits on the operator. `unseen` is a feature that shipped since the operator last looked.
+ * `attention` orders what asks for him: 3 a word he owes, 2 shipped unseen, 1 stalled, 0 nothing.
+ */
+export type RoadmapStackWall = {
+  feature: RoadmapFeature;
+  epic: RoadmapEpic;
+  at: number;
+  width: number;
+  frame: number;
+  fill: number;
+  tone: 'danger' | 'warn' | null;
+  unseen: boolean;
+  attention: 0 | 1 | 2 | 3;
+};
+
+/** One epic as its thread on the floor of its milestone's ring: the arc it runs (`from` to `to`, radians) over its own walls. */
+export type RoadmapStackEpic = { epic: RoadmapEpic; from: number; to: number; walls: RoadmapStackWall[] };
+
+/**
+ * One milestone as a ring of the stack: its 1-based place on the roadmap, its epics' threads, and every wall in ring order.
+ * `span` is how much of the ring its walls take, in radians: a reached milestone fills its ring, and one that is not keeps
+ * its walls to a readable width and leaves the rest of the rim bare.
+ */
+export type RoadmapStackTier = {
+  milestone: RoadmapMilestone;
+  n: number;
+  epics: RoadmapStackEpic[];
+  walls: RoadmapStackWall[];
+  span: number;
+};
+
+/** What a press on the stack asks its face to open: a feature's card or an epic's, by the item's name. */
+export type RoadmapStackTarget = { kind: 'feature' | 'epic'; name: string };
+
+/**
+ * What the stack's owner can ask of it: bring a feature's wall to the front, on whichever ring it stands. Handed out
+ * by `stack/RoadmapStack` and held by `RoadmapStackFace`, for a feature's row pressed in an epic's card.
+ */
+export type RoadmapStackHandle = { face: (name: string) => void };
+
+/**
+ * What the stack's painter reports after each frame, so the canvas can say it in words: the ring in front (`tier`, an index
+ * into the tiers), the wall that faces the pointer there, and the ring the operator is pointing at or has chosen with a
+ * first tap (`shown`, -1 for none). `readingTop` is where the words go, in the canvas's own pixels, under the stack.
+ */
+export type RoadmapStackFrame = { tier: number; facing: RoadmapStackWall | null; shown: number; readingTop: number };
 
 // ---------------------------
 //----------------- CLAUDE API KEYS: the door's picture of who pays for a plan run ------------

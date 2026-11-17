@@ -948,7 +948,13 @@
     "faces": {
       "label": "Roadmap view",
       "path": "Roadmap",
+      "stack": "Stack",
       "inFlight": "In flight"
+    },
+    "stack": {
+      "label": "Roadmap stack",
+      "value": "{{feature}}, {{epic}}, milestone {{n}}: {{milestone}}",
+      "back": "Back"
     },
     "loading": "Reading the roadmap…",
     "kind": {

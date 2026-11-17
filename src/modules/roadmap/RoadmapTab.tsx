@@ -3,12 +3,13 @@ import { useTranslation } from 'react-i18next';
 
 import { useDispatcherPlans } from '@/modules/dispatcher';
 import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
+import { RoadmapStackFace } from '@/modules/roadmap/RoadmapStackFace';
 import { RoadmapTreeFace } from '@/modules/roadmap/RoadmapTreeFace';
 import { RunnerPanel } from '@/modules/runner-tab';
 import { Spinner, Tabs } from '@/shared/ui';
 
-/** The tab's two faces: the roadmap as a tree from its goal, and the live cards of what is in flight. */
-type Face = 'path' | 'inFlight';
+/** The tab's three faces: the roadmap as a tree from its goal, the roadmap as a stack of its milestones, and the live cards of what is in flight. */
+type Face = 'path' | 'stack' | 'inFlight';
 
 type RoadmapTabProps = {
   /** The plan a `?runner=` landing named, held by `useRunnerLanding` until its card has been brought into view; `null` on every ordinary visit. */
@@ -24,8 +25,9 @@ type RoadmapTabProps = {
 };
 
 /**
- * The Roadmap tab: a segmented switch over its two faces. Roadmap is the tree from the goal
- * (`RoadmapTreeFace`, in viewport fit); In flight is the live cards (`RunnerPanel`, mounted whole beneath the switch with only a
+ * The Roadmap tab: a segmented switch over its three faces. Roadmap is the tree from the goal
+ * (`RoadmapTreeFace`, in viewport fit); Stack is the same roadmap as rings, one per milestone, the current one standing
+ * open (`RoadmapStackFace`); In flight is the live cards (`RunnerPanel`, mounted whole beneath the switch with only a
  * reveal handed down). A visit opens on In flight (`startFace`); the Roadmap widget at full screen opens on Roadmap,
  * the face its column body was already showing. In flight carries a pill and the amber — the cards
  * drawn, and the sentence for the prompts waiting on the operator — so the switch says where the
@@ -59,7 +61,7 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
   const [requestedPlan, setRequestedPlan] = useState<string | null>(null);
 
   // A landing turns the face while this renders, not in an effect after it: set during render, React
-  // discards the pass and renders again before anything is committed, so `RoadmapTreeFace` never mounts under
+  // discards the pass and renders again before anything is committed, so neither roadmap face ever mounts under
   // a landing and `RunnerPanel` is the first thing drawn with the plan in hand. It holds the face on In
   // flight until the request is retired: by the pane once the bus has spoken, or by the operator's own
   // press on Roadmap (`showFace`), so nothing he does is undone and nothing waits on a quiet lane.
@@ -84,7 +86,7 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
     onRevealed();
   }, [onRevealed]);
 
-  // The operator's own press on the switch. Turning to Roadmap answers any request still pending — a
+  // The operator's own press on the switch. Turning to Roadmap or to Stack answers any request still pending — a
   // landing the workspace holds, or a card press waiting on `RunnerPanel`'s lazy chunk — so both are
   // retired here: the render-time turn above then has nothing to re-apply, and no reveal can fire later
   // on a plain visit to In flight or after a trip to another tab.
@@ -95,7 +97,7 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
     }
     setRequestedPlan(null);
     if (revealPlan !== null) onRevealed();
-    setFace('path');
+    setFace(id === 'stack' ? 'stack' : 'path');
   };
 
   // The `?roadmap=` landing's selection, answered once there is something to answer it with (the face
@@ -126,6 +128,7 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
           ariaLabel={t('roadmap.faces.label')}
           tabs={[
             { id: 'path', label: t('roadmap.faces.path') },
+            { id: 'stack', label: t('roadmap.faces.stack') },
             {
               id: 'inFlight',
               label: t('roadmap.faces.inFlight'),
@@ -142,6 +145,8 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
       <div className="min-h-0 flex-1">
         {face === 'path' ? (
           <RoadmapTreeFace fit="viewport" openCard={openCard} />
+        ) : face === 'stack' ? (
+          <RoadmapStackFace openCard={openCard} />
         ) : (
           // The live cards load the first time the face is drawn; the switch above stays put while they do.
           <Suspense fallback={<div className="grid h-full place-items-center"><Spinner /></div>}>
