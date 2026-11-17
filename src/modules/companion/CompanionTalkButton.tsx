@@ -2,6 +2,7 @@ import { Mic } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useFinePointer } from '@/modules/companion/hooks/useFinePointer';
 import type { TalkPressState } from '@/shared/types';
 import { Button, keepFieldFocus, PromptInputButton, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -54,7 +55,8 @@ const KEYCAP = 'rounded-md border border-b-2 border-border bg-muted px-1.5 font-
  * spinner turning round the mic. Its words (`label`) wrap to a second line rather than cut, inside a width the caller gives.
  * 56 px tall; `compact`, 44 px (the station's compact head), its words set tighter so their two lines still stand inside it.
  * ITS LINE: "or press F8" with the bound control as Settings' keycap, or "Bind a key in Settings", empty at its height while
- * his settings are not read; drawn only where a keyboard or a mouse can press it (`any-pointer: fine`): a phone has neither.
+ * his settings are not read; drawn only where a keyboard or a mouse can press it (`useFinePointer`: a mouse or a pen attached or
+ * heard): a phone has neither.
  * While an error stands, the error stands in its place on every device, amber with the ▲ (an error replaces the helper rather
  * than stacking under it, as Settings' own talk row does), and is the button's description, so a reader hears it with its
  * name; the binding's words follow the button in reading order, and a phone, which hides them, is never told them.
@@ -68,6 +70,8 @@ function LargeTalkButton({ state, error, onToggle, label, bindingLabel, compact 
   // The error's line, which describes the button while an error stands.
   const errorId = useId();
   const listening = state === 'listening';
+  // Whether a key or a mouse can press the button here: the binding's line is drawn only where one can (a phone has neither).
+  const finePointer = useFinePointer();
 
   return (
     // A query container of its own width (the caller's box gives it), so its line stands beside the button where it fits.
@@ -111,7 +115,10 @@ function LargeTalkButton({ state, error, onToggle, label, bindingLabel, compact 
         {error === null ? (
           <p
             data-companion-talk-binding={bindingLabel === undefined ? 'unread' : bindingLabel === null ? 'unbound' : 'bound'}
-            className="hidden min-h-5 flex-wrap items-center gap-x-1.5 px-1 text-xs text-muted-foreground [@container(min-width:20rem)]:max-w-36 [@container(min-width:20rem)]:shrink-0 [@media(any-pointer:fine)]:flex"
+            className={cn(
+              'hidden min-h-5 flex-wrap items-center gap-x-1.5 px-1 text-xs text-muted-foreground [@container(min-width:20rem)]:max-w-36 [@container(min-width:20rem)]:shrink-0',
+              finePointer && 'flex',
+            )}
           >
             {bindingLabel === undefined ? null : bindingLabel === null ? (
               t('station.talk.bindHint', { defaultValue: 'Bind a key in Settings' })

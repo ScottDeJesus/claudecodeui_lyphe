@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useBoardVerbs } from '@/modules/dispatcher/hooks/useBoardVerbs';
 import { useDispatcherVerbs, type DispatcherVerbScope } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
 import { Button } from '@/shared/ui';
 import type { PlanningPausedVia, PlanningPress } from '@/shared/types';
@@ -64,6 +65,49 @@ export function PlanningPausePress({ name, press, scope }: { name: string; press
     <Button type="button" variant="secondary" size="sm" className="h-8 finger:h-11" disabled={pending} title={t('dispatcher.planningPause.pressTitle')}
       onClick={() => void sendPress()} data-dispatcher-pause-planning data-pause-scope={scope}>
       {t('dispatcher.planningPause.press')}
+    </Button>
+  );
+}
+
+/**
+ * THE HOUSE-WIDE PRESS OF PAUSE ALL'S PLANNING EXCEPTION, in the Planning card's head: `Resume planning` lets the planner outings run
+ * while Pause all is on, and `Pause planning` holds them again (`dispatcher epics run-planning` / `hold-planning`, sent through
+ * `useBoardVerbs().setDial`; the route spells `--by app:card`). Tasks and the queue stay held either way, an outing already out is
+ * never touched, and Resume all drops the exception.
+ *
+ * IT IS NOT `PlanningPausePress`, though it wears the same two words: that press brakes and lifts ONE feature's or epic's planning
+ * (`pause-planning` / `resume-planning`), which Pause all never touches, while this one is Pause all's and the whole house's. The strip's
+ * own sentence (`PlanningCard`) says which brake a press is.
+ *
+ * `press` IS A READING, NEVER CHOSEN HERE (`dialPress` in `planningPress.ts`), and the press is held as `PlanningPausePress` holds
+ * its own: disabled while a press is out, and then from a press the lane took until the strip shows it (the strip redraws from the
+ * next `dispatcher_state` frame, and until then a still-enabled button would take a second press the dispatcher refuses as already
+ * done). A press the lane refused is not held. Sized as every press on a lane card is: the action bar's 32px desk / 44px finger height.
+ *
+ * Handle: `data-planning-dial-press`, valued with the word it sends (`run-planning` or `hold-planning`).
+ *
+ * Used by `PlanningCard`, in the strip under its title — the one place this press is drawn.
+ */
+export function PlanningDialPress({ press }: { press: PlanningPress }) {
+  const { t } = useTranslation();
+  const { setDial, busy } = useBoardVerbs();
+  // The press the lane last took from this button, held until the strip shows the answer: `busy` clears the moment the dispatcher
+  // answers, but the strip flips on the next frame. Essential state, the same hold `PlanningPausePress` keeps.
+  const [taken, setTaken] = useState<PlanningPress | null>(null);
+  // The strip flipping IS the frame arriving: let go, so a later flip back (Resume all from the terminal) finds the button free.
+  if (taken !== null && taken !== press) setTaken(null);
+  const pending = busy || taken !== null;
+  const word = press === 'resume' ? 'run-planning' : 'hold-planning';
+
+  const sendPress = async () => {
+    if (await setDial(word)) setTaken(press);
+  };
+
+  return (
+    <Button type="button" variant={press === 'resume' ? 'default' : 'secondary'} size="sm" className="h-8 finger:h-11" disabled={pending}
+      title={t(press === 'resume' ? 'dispatcher.planningDial.resumeTitle' : 'dispatcher.planningDial.pauseTitle')}
+      onClick={() => void sendPress()} data-planning-dial-press={word}>
+      {t(press === 'resume' ? 'dispatcher.planningPause.resume' : 'dispatcher.planningPause.press')}
     </Button>
   );
 }

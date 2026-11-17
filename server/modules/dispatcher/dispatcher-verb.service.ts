@@ -12,7 +12,9 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * the press's `--by` and nothing else), `arm-accept` / `disarm-accept` (the operator's "Accept when
  * cut" on a designed plan — the card's press carries `--by app:card` and the design stamp it read — and its
  * Cancel), `queue` (an epic moved in the queue In flight runs top down — `--before` another epic,
- * `--last`, or `--at` a place), `epics` (the epic dial's word: `1` to `5`, `pause` or `resume`),
+ * `--last`, or `--at` a place), `epics` (the epic dial's word: `pause` or `resume` — Pause all and Resume all — or
+ * `run-planning` / `hold-planning`, which let planning through Pause all and hold it again and carry the card's
+ * `--by app:card`),
  * `start` (the board's one Start: every plan held for its first Start let go at once), `hide` (plans, or an
  * epic's open plans, paused and held out of the queue until shown — a walk in flight stops once its task
  * in flight finishes) and `unhide` (Show: each hidden plan comes back held, or paused if it had walked,
@@ -38,7 +40,9 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * keeps it). `park`, `unpark` and `drop` are the plan card's own and no arc header
  * draws them; `queue` is the arc's alone, and takes its move after the arc's name.
  * `epics` and `start` are the BOARD's: they name no plan and no arc, so they are relayed
- * with an empty name and the argv is exactly `["epics", word]` or `["start"]`.
+ * with an empty name and the argv is exactly `["epics", word]` for Pause all's `pause` and `resume`,
+ * `["epics", word, "--by", "app:card"]` for the planning pair `run-planning` and `hold-planning` (the route
+ * spells the door itself), or `["start"]`.
  *
  * This server never touches a plan. It does not hold the dispatcher's lock, does not signal its
  * daemon and never writes the store (`hooks/dispatcher/store.py`, which no server writer may reach —

@@ -1,6 +1,6 @@
 import type { DispatcherPlanner } from '@/shared/types.js';
 
-import { each, field, flagSince, isCount, isFlag, isRecord, isText, isTextOrNull, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { cpuWaitSince, each, field, flagSince, isCount, isFlag, isRecord, isText, isTextOrNull, need, oneOf, textSince } from './dispatcher-state.transport.js';
 
 /**
  * One planner outing of the dispatcher's document, read field by field into the type the badges draw.
@@ -73,6 +73,10 @@ export function plannerOf(raw: unknown): DispatcherPlanner {
     // and `false` (a build older than the keys held nothing here).
     pace_hold: textSince(field(planner, 'pace_hold'), `planner.pace_hold for ${target}`) ?? '',
     overridden: flagSince(field(planner, 'overridden'), `planner.overridden for ${target}`),
+    // THE AGENT THIS OUTING IS OUT ON, IF IT WAITS FOR CPU (`cpu_report.mark_outings`): `{launch, since, words}` or `null`, the dispatcher's own
+    // reading of the gate's marker. The Planning line draws its Override for an outing whose subject has no card and no deck on screen; a drawn
+    // card or deck carries it itself. ABSENT reads `null` (a build older than the key held nothing back).
+    cpu_wait: cpuWaitSince(field(planner, 'cpu_wait'), `planner.cpu_wait for ${target}`),
     // WHETHER A STANDING PLANNING PAUSE HOLDS THIS OUTING, whatever its state (`report_planners.mark_paused`): the
     // ended entry the pause itself left reads `true` too, which is what lets a loose Planning line — no epic on the lane to
     // read its own `planning_paused` from — draw Resume planning once the pause has ended its outing. ABSENT reads

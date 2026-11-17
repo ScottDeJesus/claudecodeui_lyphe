@@ -24,7 +24,7 @@ import type { KanbanPmClient } from './kanban-pm-client.js';
  * declared vocabulary and the read vocabulary are one list rather than two that had to be kept in
  * step by hand.
  */
-export const SEARCH_KINDS = ['feature', 'decision', 'issue', 'lesson'] as const;
+export const SEARCH_KINDS = ['ticket', 'decision', 'issue', 'lesson'] as const;
 
 export const SEARCH_LIMIT_DEFAULT = 20;
 export const SEARCH_LIMIT_MAX = 100;
@@ -172,7 +172,7 @@ export async function searchHistory(
   const cards = await openAllCards(client, client.boardId);
 
   for (const card of cards) {
-    if (kinds.has('feature')) {
+    if (kinds.has('ticket')) {
       const fields: Array<[string, number]> = [
         [card.title, 3],
         [card.description, 2],
@@ -182,7 +182,7 @@ export async function searchHistory(
       for (const [text, score] of fields) {
         const snippet = snippetAround(text ?? '', query);
         if (snippet === null) continue;
-        hits.push({ kind: 'feature', cardId: card.id, title: card.title, snippet, score });
+        hits.push({ kind: 'ticket', cardId: card.id, title: card.title, snippet, score });
         break;
       }
     }
@@ -210,11 +210,11 @@ export async function searchHistory(
     { events: Array<{ kind: string; cardId: string | null; payload: unknown }> }
   >(`/events?boardId=${client.boardId}&limit=${EVENT_READ_LIMIT}`);
 
-  if (kinds.has('feature')) {
+  if (kinds.has('ticket')) {
     for (const event of events.events) {
       const snippet = snippetAround(`${event.kind} ${JSON.stringify(event.payload)}`, query);
       if (snippet !== null) {
-        hits.push({ kind: 'feature', cardId: event.cardId, title: event.kind, snippet, score: 1 });
+        hits.push({ kind: 'ticket', cardId: event.cardId, title: event.kind, snippet, score: 1 });
       }
     }
   }

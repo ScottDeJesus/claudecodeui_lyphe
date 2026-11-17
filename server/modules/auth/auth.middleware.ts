@@ -230,10 +230,23 @@ const authenticateWebSocket = (token) => {
   }
 };
 
+// The account a token names, for a caller that only wants to know WHOSE it is: a log line, never a gate. The signature is
+// checked and expiry is not (a lapsed session still says whose page it was); a refusal logs nothing, because a verify error's
+// message can quote a fragment of the token it choked on.
+const readTokenUsername = (token) => {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET, { ignoreExpiration: true });
+    return typeof decoded?.username === 'string' ? decoded.username : null;
+  } catch {
+    return null;
+  }
+};
+
 export {
   validateApiKey,
   authenticateToken,
   generateToken,
   authenticateWebSocket,
+  readTokenUsername,
   JWT_SECRET
 };

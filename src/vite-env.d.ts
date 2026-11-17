@@ -21,4 +21,10 @@ interface Window {
     /** Opens the always-on-top window. Must be called inside a user gesture, which the call spends. */
     requestWindow(options?: { width?: number; height?: number }): Promise<Window>;
   };
+  /**
+   * The boot reporter, defined by the first inline script of index.html before any module runs. It posts what the page saw of
+   * its own boot, plus the `facts` passed here, to `/api/boot-report`, which writes one journal line. Optional because a page
+   * served without that script (a probe's blank document) has none; callers ask first and never wait on it.
+   */
+  cloudcliBootReport?: (kind: string, facts: Record<string, unknown>) => void;
 }

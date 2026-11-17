@@ -178,7 +178,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
       };
 
       // The host window's capture phase, which runs before the chat's own document capture listener
-      // (ChatInterface's Escape-stops-the-turn) in that same window — the order the comment above
+      // (`useEscapeToAbortSession`) in that same window — the order the comment above
       // depends on holds in a picture-in-picture window exactly as it does at home.
       hostWindow.addEventListener('keydown', handleKeyDown, true);
 

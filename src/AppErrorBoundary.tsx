@@ -13,12 +13,24 @@ import type { ReactNode } from 'react';
  * so it depends on no context, no theme, no i18n and no design token — just markup and a
  * reload. The boot watchdog in index.html still stands behind it, for the crashes React never
  * gets to see.
+ *
+ * It also tells the server, through the reporter index.html defines: this card is a page the
+ * person cannot use, and until it said so nothing outside that one browser knew it had been drawn.
  */
 export default function AppErrorBoundary({ children }: { children: ReactNode }) {
   return (
     <ErrorBoundary
       onError={(error, info) => {
         console.error('[App] Uncaught render error:', error, info.componentStack);
+        try {
+          window.cloudcliBootReport?.('render-error', {
+            message: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+            stack: error instanceof Error ? error.stack?.split('\n').slice(0, 4).join(' | ') : undefined,
+            componentStack: info.componentStack?.trim().split('\n').slice(0, 4).join(' | '),
+          });
+        } catch {
+          // A report that cannot be built must not throw inside the boundary that is already catching a throw.
+        }
       }}
       fallbackRender={({ error }) => (
         <div

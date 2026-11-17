@@ -57,13 +57,13 @@ const PROTOCOL_VERSION = '2024-11-05';
 /**
  * The argument shapes more than one tool declares, in one home each.
  *
- * The transport validates against these very declarations, so a second copy of "the feature card
+ * The transport validates against these very declarations, so a second copy of "the ticket card
  * id" would be a second door: one tool's would drift from another's, and the drift would only show
  * up as a tool call that stopped accepting an id its neighbour still took.
  */
 export const CARD_ID_ARGUMENT = {
   type: 'string',
-  description: "The feature card id (e.g. 'c-3').",
+  description: "The ticket card id (e.g. 'c-3').",
 };
 
 export const TAGS_ARGUMENT = {

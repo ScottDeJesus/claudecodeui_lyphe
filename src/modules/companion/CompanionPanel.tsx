@@ -9,12 +9,14 @@ import { CompanionDraftNoneLine } from '@/modules/companion/CompanionDraftFoldLi
 import { CompanionHeader } from '@/modules/companion/CompanionHeader';
 import { CompanionLog } from '@/modules/companion/CompanionLog';
 import { CompanionNotes } from '@/modules/companion/CompanionNotes';
+import { CompanionPanelBoundary } from '@/modules/companion/CompanionPanelBoundary';
 import { CompanionPanelGrips } from '@/modules/companion/CompanionPanelGrips';
 import { CompanionWalkStrip } from '@/modules/companion/CompanionWalkStrip';
 import { useCompanion } from '@/modules/companion/context/CompanionContext';
 import { useCompanionPanelPlace } from '@/modules/companion/hooks/useCompanionPanelPlace';
 import { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
 import { useDraftFold } from '@/modules/companion/hooks/useDraftFold';
+import { mayFocusFieldOnOpen } from '@/modules/companion/hooks/useFinePointer';
 import { useNotesFold } from '@/modules/companion/hooks/useNotesFold';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
 import { openStation } from '@/shared/cloudcliDoors';
@@ -85,14 +87,16 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  * meant for send. The sheet carries its own close, and whatever the FAB opens in the shell — an application at 40, the
  * floating chat at 45 — would open under the sheet anyway; dialogs, menus and toasts are portalled and stay above it.
  *
- * FROM LG, UNDER A FINE POINTER, HE MOVES AND RESIZES IT (`useCompanionPanelPlace`): a press on the header's empty space
- * carries it, and the kit's grips on its four edges and four corners (`CompanionPanelGrips`) size it, held inside the
- * shell, 8px in, and never smaller than her header, the composer, the log's floor and every card in the dock at its own
- * floor stand in (measured from the panel), nor narrower than 320px. Where he leaves it is kept in this browser and drawn
- * inline; with nothing kept nothing is, and the column above is what stands. While it floats, the two rows that scroll at
- * its right edge — the log and the dock, the notes' scroller inside it — keep a 6px gutter there (a transparent border
- * over their own ground), the width of the right edge's grip, so the strip stands beside their scrollbars and never on
- * one. Under a finger at lg it stays that column; below lg it is the sheet, with no grips and no gutter.
+ * FROM LG, WITH A MOUSE OR A PEN ON THE PAGE, HE MOVES AND RESIZES IT (`useCompanionPanelPlace`; the mouse is known by its
+ * events, `useFinePointer`, since a touchscreen computer Windows reports as used as a tablet names its pointer coarse and its
+ * mouse is never asked): a press on the header's empty space carries it, and the kit's grips on its four edges and four
+ * corners (`CompanionPanelGrips`) size it, held inside the shell, 8px in, and never smaller than her header, the composer,
+ * the log's floor and every card in the dock at its own floor stand in (measured from the panel), nor narrower than 320px.
+ * Where he leaves it is kept in this browser and drawn inline; with nothing kept nothing is, and the column above is what
+ * stands. While it floats, the two rows that scroll at its right edge — the log and the dock, the notes' scroller inside it —
+ * keep a gutter there (a transparent border over their own ground), the width of the right edge's grip (6px; 12px where the
+ * browser names touch its primary pointer), so the strip stands beside their scrollbars and never on one. With nothing but
+ * fingers on the page at lg it stays that column; below lg it is the sheet, with no grips and no gutter.
  *
  * TOP TO BOTTOM: the header (who, what she is doing, the focus, the controls, this device's voice switch given `voice`, and
  * this device's ears given `ears`; its status line draws `presence` alone, in which the page's own state wins over her process and her activity: Cut
@@ -130,8 +134,9 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  *
  * KEYS. Escape pressed inside the panel closes it, and is claimed on the way (`preventDefault` in the window's capture
  * phase): the chat stops its running turn on any Escape nobody claimed, and a key pressed in her composer is not his
- * chat's. Opened on a desktop it puts the cursor in her composer; on a touch screen it does not, so opening her to read
- * the draft does not raise the keyboard. Closed from inside, it hands focus back to her door when it is on screen: the
+ * chat's. Opened where a mouse or a pen drives the page, by a press that was not a finger's, it puts the cursor in her
+ * composer (`mayFocusFieldOnOpen`); opened by a finger, or on a page that has heard neither, it does not, so opening her to
+ * read the draft does not raise the keyboard. Closed from inside, it hands focus back to her door when it is on screen: the
  * rail's door, or her disc, wherever it stands on screen.
  */
 export function CompanionPanelView({
@@ -172,7 +177,7 @@ export function CompanionPanelView({
   }, [open, close]);
 
   useEffect(() => {
-    if (!open || !window.matchMedia('(pointer: fine)').matches) return;
+    if (!open || !mayFocusFieldOnOpen()) return;
     panelRef.current?.querySelector<HTMLTextAreaElement>('[data-companion-composer-field]')?.focus({ preventScroll: true });
   }, [open]);
 
@@ -186,9 +191,11 @@ export function CompanionPanelView({
         open ? 'flex' : 'hidden',
         'absolute inset-0 z-[61] flex-col overflow-hidden [container-type:size] max-lg:rounded-none max-lg:border-0 max-lg:shadow-none',
         'lg:inset-y-3 lg:left-auto lg:right-3 lg:z-[45] lg:w-[400px] lg:border-input lg:shadow-lift',
-        // The right edge's grip is the kit's 6px strip (`--vv-grip-edge` under a fine pointer, which floating always is).
-        place.floating && '[&>[data-companion-log]]:border-r-[6px] [&>[data-companion-log]]:border-r-transparent',
-        place.floating && '[&>[data-companion-dock]]:border-r-[6px] [&>[data-companion-dock]]:border-r-transparent',
+        // The right edge's grip is the kit's strip, `--vv-grip-edge`: 6px, and 12px where the browser names touch its primary
+        // pointer (a touchscreen computer used as a tablet floats the panel too, its mouse in use), so the log and the dock keep
+        // that much clear of it.
+        place.floating && '[&>[data-companion-log]]:border-r-[6px] [@media(pointer:coarse)]:[&>[data-companion-log]]:border-r-[12px] [&>[data-companion-log]]:border-r-transparent',
+        place.floating && '[&>[data-companion-dock]]:border-r-[6px] [@media(pointer:coarse)]:[&>[data-companion-dock]]:border-r-[12px] [&>[data-companion-dock]]:border-r-transparent',
       )}
       style={place.style}
     >
@@ -310,11 +317,22 @@ export function CompanionPanelView({
 }
 
 /**
- * Her panel on the page: what WorkspaceFrame renders after the floating chat. It reads the page's picture, the open
- * state and the verbs from the companion's provider, and what she is doing from `useCompanionPresence`, and hands them to
- * CompanionPanelView, which draws every state.
+ * Her panel on the page: what WorkspaceFrame renders after the floating chat, in a boundary of her own
+ * (`CompanionPanelBoundary`): a fault while she draws gives way her panel alone, never the page.
  */
 export function CompanionPanel() {
+  return (
+    <CompanionPanelBoundary>
+      <CompanionPanelOnPage />
+    </CompanionPanelBoundary>
+  );
+}
+
+/**
+ * Her panel's own reads: the page's picture, the open state and the verbs from the companion's provider, and what she is doing
+ * from `useCompanionPresence`, handed to CompanionPanelView, which draws every state.
+ */
+function CompanionPanelOnPage() {
   // `voice` is the switch and the sentence sounding, for the header's switch and the log's mark; the status line reads `presence` instead.
   const {
     picture, readFailure, reread, open, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, interrupt, clear,

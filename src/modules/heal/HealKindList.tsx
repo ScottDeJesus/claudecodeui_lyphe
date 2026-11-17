@@ -1,12 +1,14 @@
-import { ChevronRightIcon, ExternalLinkIcon, InboxIcon } from 'lucide-react';
+import { ChevronRightIcon, InboxIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { usePaletteOps } from '@/modules/command-palette';
-import { agoWord, byUrgency, classTone, classWord, transcriptRef, trendMark } from '@/modules/heal/healState';
+import { HealItemRow } from '@/modules/heal/HealItemRow';
+import { agoWord, byUrgency, classTone, classWord } from '@/modules/heal/healState';
 import type { HealItem, HealKindRow } from '@/modules/heal/healTypes';
+import { useOpenFrictionLine } from '@/modules/heal/hooks/useOpenFrictionLine';
 import { api, readApiJson } from '@/shared/api';
-import { Badge, Button, Chip, Collapsible, CollapsibleContent, CollapsibleTrigger, EmptyState, Spinner } from '@/shared/ui';
+import { trendMark } from '@/shared/trend';
+import { Badge, Chip, Collapsible, CollapsibleContent, CollapsibleTrigger, EmptyState, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /**
@@ -27,13 +29,7 @@ import { cn } from '@/shared/utils';
  */
 export function HealKindList({ kinds }: { kinds: HealKindRow[] }) {
   const { t } = useTranslation();
-  // The workspace's own file opener: the healed item's transcript is a path in the SAME project this
-  // workspace has open, so the press brings the Files tab forward at the row's line rather than
-  // teaching this module a second way to open a file.
-  const { openFileReference } = usePaletteOps();
-  const onOpenItem = (item: HealItem) => {
-    if (item.transcript) openFileReference(item.transcript, item.transcript_line ?? undefined);
-  };
+  const onOpenItem = useOpenFrictionLine();
 
   if (kinds.length === 0) {
     return (
@@ -190,35 +186,12 @@ function KindRow({ row, onOpenItem }: { row: HealKindRow; onOpenItem: (item: Hea
           ) : (
             <ul className="flex flex-col divide-y divide-border border-t border-border">
               {rows.items.map((item) => (
-                <ItemRow key={item.id} item={item} onOpen={onOpenItem} />
+                <HealItemRow key={item.id} item={item} onOpen={onOpenItem} />
               ))}
             </ul>
           )}
         </CollapsibleContent>
       </Collapsible>
-    </li>
-  );
-}
-
-function ItemRow({ item, onOpen }: { item: HealItem; onOpen: (item: HealItem) => void }) {
-  const { t } = useTranslation();
-  return (
-    <li className={cn('flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-xs', item.ignored && 'text-muted-foreground')} data-heal-item={item.id}>
-      <span className="w-16 flex-none font-mono text-muted-foreground">{agoWord(item.ts)}</span>
-      <Badge as="span" tone="neutral">{item.tool ? `${item.source} · ${item.tool}` : item.source}</Badge>
-      {item.soul && <Badge as="span" tone="info">{t('heal.kinds.soul', { defaultValue: 'soul' })}</Badge>}
-      {item.klass !== null && <Chip size="sm" tone={classTone(item.klass)}>{classWord(item.klass)}</Chip>}
-      {item.ignored && <Badge as="span" tone="neutral">{t('heal.kinds.ignoredOne', { defaultValue: 'ignored' })}</Badge>}
-      {/* The row's own words reach the DOM as a text node: a rail's detail quotes the command it refused. */}
-      <span className="line-clamp-2 w-full min-w-0 break-words leading-snug">{item.detail ?? '—'}</span>
-      {item.transcript !== null ? (
-        <Button variant="ghost" size="sm" className="h-7 px-2 font-mono text-xs" onClick={() => onOpen(item)} title={item.transcript}>
-          <ExternalLinkIcon aria-hidden="true" />
-          {transcriptRef(item.transcript, item.transcript_line)}
-        </Button>
-      ) : (
-        <span className="text-muted-foreground">{t('heal.kinds.noTranscript', { defaultValue: 'no transcript' })}</span>
-      )}
     </li>
   );
 }

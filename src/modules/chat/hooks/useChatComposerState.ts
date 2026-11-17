@@ -1080,25 +1080,36 @@ export function useChatComposerState({
           attachments: uploadedAttachments,
         },
       });
-      setEditingAnchorId(null);
+      // Only this send's edit: an edit begun in another chat during the upload stays.
+      setEditingAnchorId((current) => (current === editingAnchorId ? null : current));
 
       // Recorded under the (possibly just-allocated) session id, so the first
       // message of a new chat lands in the history of the session the user is
       // navigated to. Queued drafts were recorded when they were queued; the
       // consecutive-duplicate check keeps this second call a no-op.
       recordSentMessage(currentInput, targetSessionId);
+      clearAttachmentsFor(submitScope);
+      // The upload and the session allocation above can outlast a switch to another chat, whose text,
+      // draft and edit must survive this send. A brand-new chat is still open under its allocated
+      // session id: its scope moves from `project:<id>` to that id.
+      const isSendingChatOpen = draftScopeRef.current === submitScope || draftScopeRef.current === targetSessionId;
+      if (!isSendingChatOpen) {
+        // The chat left keeps text the user went back and edited during the upload.
+        if (submitScope && readDraftText(submitScope) === currentInput) {
+          writeDraftText(submitScope, '');
+        }
+        return;
+      }
+      if (submitScope) {
+        writeDraftText(submitScope, '');
+      }
       setInput('');
       inputValueRef.current = '';
       resetCommandMenuState();
-      clearAttachmentsFor(submitScope);
       setIsTextareaExpanded(false);
 
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
-      }
-
-      if (draftScopeRef.current) {
-        writeDraftText(draftScopeRef.current, '');
       }
     },
     [

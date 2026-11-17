@@ -185,7 +185,7 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
   }, [currentStep, questions, toggleOption, toggleOther, handleSubmit]);
 
   // Escape skips — from a window-level CAPTURE listener, the shape the accounts panel uses
-  // (docs/MANUAL.md (accounts)). ChatInterface aborts the running turn from a document-level capture
+  // (docs/MANUAL.md (accounts)). `useEscapeToAbortSession` aborts the running turn from a document-level capture
   // listener gated on `defaultPrevented`, and window capture runs first: marking the event here
   // is what keeps "Skip all — Esc" from killing the run instead. Only a key pressed INSIDE the
   // panel is the panel's: elsewhere Escape keeps its app-wide meaning. And inside the "Other"

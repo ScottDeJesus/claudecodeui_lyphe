@@ -1,8 +1,7 @@
 import { execFile } from 'node:child_process';
-import os from 'node:os';
-import path from 'node:path';
 
 import type { ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types.js';
+import { pacerBin } from '@/shared/utils.js';
 
 import { isFiniteNumber, isRecord, resetEpoch } from './usage-windows.js';
 
@@ -47,12 +46,6 @@ const NOTE_TIMEOUT_MS = 10_000;
 /** The read call's ceiling. `status` is a local SQLite read and a table lookup, not a network poll:
  *  five seconds is a pacer fault, and the poll answers without a picture rather than without a reading. */
 const STATUS_TIMEOUT_MS = 5_000;
-
-/** The binary: the probe seam, else the house's wrapper (`scripts/pacer`, in `scripts/launch-table`'s
- *  shape). Read on every call rather than at module load, so a probe redirects the door it gets. */
-function pacerBin(): string {
-  return process.env.PACER_BIN || path.join(os.homedir(), '.claude', 'scripts', 'pacer');
-}
 
 /** One window as the door takes it: a fraction 0..1 and its reset in epoch SECONDS. */
 type DoorWindow = { used: number; resets_at: number };

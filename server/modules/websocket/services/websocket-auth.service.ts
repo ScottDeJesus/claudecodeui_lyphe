@@ -1,5 +1,6 @@
 import type { VerifyClientCallbackSync } from 'ws';
 
+import { requestSourceOf } from '@/shared/request-source.js';
 import type { AuthenticatedWebSocketRequest } from '@/shared/types.js';
 
 type WebSocketAuthDependencies = {
@@ -54,6 +55,8 @@ export function verifyWebSocketClient(
   }
 
   request.user = user;
-  console.log('[OK] WebSocket authenticated for user:', user.username);
+  // Which device, so a socket in this journal can be joined to the boot report (or the absence of one) of the page that opened it.
+  const { from, host } = requestSourceOf(request.headers, request.socket.remoteAddress);
+  console.log('[OK] WebSocket authenticated for user:', user.username, `from=${from} host=${host}`);
   return true;
 }

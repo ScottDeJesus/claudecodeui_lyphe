@@ -10,6 +10,7 @@ import type { LLMProvider, NormalizedMessage } from '@/shared/types.js';
 import { createNormalizedMessage } from '@/shared/utils.js';
 import { oneLine } from '@/shared/tool-call-hint.js';
 
+import { noDraftSentence } from './companion-draft-end.js';
 import type { CompanionStore } from './companion-store.js';
 import { sendOptionsFor, type ChatSendOptions } from './tools/send-options.js';
 
@@ -17,10 +18,12 @@ import { sendOptionsFor, type ChatSendOptions } from './tools/send-options.js';
  * THE DRAFT IS THE ONLY THING SENT, and this is the one place it goes out: the panel's Send (`POST /draft/send`), her
  * `send_to_session` and her `create_session` all end here, so a brief reaches a chat the same way whoever pressed.
  *
- * WHAT IS CHECKED FIRST. A draft must be held. A caller that says what it is sending (a tool, which was told the words
- * by her) must say the draft's own words, trimmed, and must name the chat or the project the draft is for: a mismatch
- * is refused, and the refusal names the draft (its target and its first words), so nothing reaches a chat that was not
- * on his screen first.
+ * WHAT IS CHECKED FIRST. A draft must be held, and a send that finds none says WHY by how the draft last ended
+ * (`noDraftSentence`): he took it down (his answer, which she leaves alone), it already went (and to which chat, for a send of
+ * those words), or nothing on record (never written, she cleared it, or the words were never drafted). A caller that says
+ * what it is sending (a tool, which was told the words by her) must say the draft's own words, trimmed, and must name the
+ * chat or the project the draft is for: a mismatch is refused, and the refusal names the draft (its target and its first
+ * words), so nothing reaches a chat that was not on his screen first.
  *
  * WHAT A SEND IS. It runs as if he had typed it in that chat's composer: the chat's own model, effort and permission
  * mode, his tool rules read now, the chat's name as the notification's summary (`sendOptionsFor`).
@@ -165,10 +168,10 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
   /**
    * After a send: the draft is spent, the chat is the focus and the page that holds the floor opens it. The draft clears
    * only if it is still the one that went — he or she may have rewritten it while the send was out, and that rewrite is
-   * the next brief, not this one.
+   * the next brief, not this one. It clears as SENT to `chat`, with the words that went, so a second send of those words is refused as already gone.
    */
   function afterSend(chat: CompanionSessionRef, sent: CompanionDraft): void {
-    if (store.readState().draft?.updatedAt === sent.updatedAt) store.setDraft(null);
+    if (store.readState().draft?.updatedAt === sent.updatedAt) store.endDraft({ kind: 'sent', session: chat, words: sent.text.trim() });
     deps.setFocus(chat);
     deps.openOnFloor({ kind: 'chat', sessionId: chat.sessionId }, chat.name);
   }
@@ -248,7 +251,7 @@ export function createDraftSender(deps: SenderDeps): DraftSender {
 
   async function sendHeldDraft(request: DraftSendRequest): Promise<DraftSendOutcome> {
     const draft = store.readState().draft;
-    if (draft === null) return refused('There is no draft to send. Write the brief with update_draft first, so he sees it on his screen, then send it.');
+    if (draft === null) return refused(noDraftSentence(store.readDraftEnd(), request));
     const words = draft.text.trim();
     if (words === '') return refused('The draft has no words in it. Write the brief with update_draft, then send it.');
 

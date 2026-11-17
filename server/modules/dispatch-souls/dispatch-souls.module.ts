@@ -1,11 +1,14 @@
+import path from 'node:path';
+
 import type { Router } from 'express';
 
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import { createPolledLane } from '@/shared/polled-lane.service.js';
 import type { RelayAnswer, ResumeRunOrder } from '@/shared/relayed-press-types.js';
 import type { SoulLaunchSnapshot, SoulLaunchStateEvent } from '@/shared/types.js';
-import { dispatchSoulsStateDir } from '@/shared/utils.js';
+import { dispatchSoulsStateDir, pacerHomeDir } from '@/shared/utils.js';
 
+import { releaseCpuWait } from './cpu-wait.transport.js';
 import { createDispatchSoulsRouter } from './dispatch-souls.routes.js';
 import { resumeChainOnHisWord } from './run-resume.service.js';
 import { readSoulTranscript } from './soul-transcript.service.js';
@@ -66,6 +69,9 @@ export type DispatchSoulsModule = {
  */
 export function createDispatchSoulsModule(): DispatchSoulsModule {
   const stateDir = dispatchSoulsStateDir();
+  // Where a launch the runner is holding back for CPU keeps its marker: the pacer's own folder, beside the launch root's
+  // parent (`pacerHomeDir` follows `PLAN_RUNNER_PACER_HOME`, as the pacer does), so a scratch state root has its own.
+  const cpuWaitDir = path.join(pacerHomeDir(path.dirname(stateDir)), 'cpu-wait');
 
   const broadcast = (frame: SoulLaunchStateEvent): void => {
     const message = JSON.stringify(frame);
@@ -105,6 +111,7 @@ export function createDispatchSoulsModule(): DispatchSoulsModule {
         LAUNCH_KEEP_S,
         (dir, message) => logErrorOnce(`[DispatchSouls] could not read launch directory ${dir}: ${message}`),
         servedModelByLaunchId,
+        cpuWaitDir,
       ),
     frame: (launches) => ({ kind: 'soul_launch_state', launches, at: Date.now() }),
     broadcast,
@@ -116,6 +123,7 @@ export function createDispatchSoulsModule(): DispatchSoulsModule {
     router: createDispatchSoulsRouter({
       current: () => lane.current(),
       transcript: (launchId) => readSoulTranscript(stateDir, launchId),
+      cpuRelease: (launchId) => releaseCpuWait(launchId),
     }),
     start: () => lane.start(),
     stop: () => lane.stop(),

@@ -571,34 +571,6 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts
 
-## INV-6336 — probe — a fresh chain owns nothing until its first stage has a spec; the dot is dark for seconds
-
-a fresh chain owns nothing until its first stage has a spec; the dot is dark for seconds
-
-```probe
-python3 /home/lyphe/.claude/state/pipeline-reviews/purple-dot-souls/athena-probes/chain-start-lag.py
-expect: `chains 200 | seconds with a chain running and no stage launch to name an owner: median 4.8 p90 17.1 max 62.2` (figures drift a little; median several seconds, max a minute)
-```
-
-measured 2026-10-02 by chain chain-purple-dot-souls-20261002-043723-dbad, finding L1, LOW
-probe-key: a74ae0c43e064715765e05748c71d907c75ecf68
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
-
-## INV-6337 — probe — the reader's id fence is tighter than the launcher's: a chain id over 120 characters is never counted
-
-the reader's id fence is tighter than the launcher's: a chain id over 120 characters is never counted
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/purple-dot-souls/athena-probes/long-chain-id.mjs
-expect: `id length 127: launcher walker_alive=True | dot reader counts it=false` — and `id length 32: … counts it=true`
-```
-
-measured 2026-10-02 by chain chain-purple-dot-souls-20261002-043723-dbad, finding L2, LOW
-probe-key: 9686bb9886de60f111e500376e0adfb69f7376ff
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
-
 ## INV-6340 — probe — A page that has been open a while never sees another device's draft, and its first keystroke replaces that draft whole
 
 A page that has been open a while never sees another device's draft, and its first keystroke replaces that draft whole
@@ -610,34 +582,6 @@ expect: `[FAIL] LONG-LIVED phone page, 8 s after the desktop saved: shows the de
 
 measured 2026-10-02 by chain chain-ask-drafts-20261002-042748-c2a8, finding L1, LOW
 probe-key: d0db172d5740b6438abd2c8c598432ab72545a8f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/AskDraftPrune.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useAskDraft.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-ask-drafts.mjs
-
-## INV-6341 — probe — The prune deletes a draft on the first frame without its ask, but an open ask can leave the lane and come back under the same identity; two comments say it cannot
-
-The prune deletes a draft on the first frame without its ask, but an open ask can leave the lane and come back under the same identity; two comments say it cannot
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/ask-drafts/athena-probes/gap.sh && node /home/lyphe/.claude/state/pipeline-reviews/ask-drafts/athena-probes/s9.mjs
-expect: `asking while the outing is live: null`, then `SAME identity as before the gap: true`; then `entries while the ask was off the lane: 0; after the SAME ask (910001-2026-10-01T12:00:00Z) returned: entries=0, notes field=null`
-```
-
-measured 2026-10-02 by chain chain-ask-drafts-20261002-042748-c2a8, finding L2, LOW
-probe-key: 72ec8cd169ddae4ac49fef2a4430c3e93cf8b51f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/AskDraftPrune.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useAskDraft.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-ask-drafts.mjs
-
-## INV-6342 — probe — The builder's probe writes whole lists to the shared account, which wipes any concurrent writer's entries (INV-4406 says never whole)
-
-The builder's probe writes whole lists to the shared account, which wipes any concurrent writer's entries (INV-4406 says never whole)
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/ask-drafts/athena-probes/s11.mjs
-expect: `bystander entry present before: true`, then `bystander entry present after the probe's whole-list write: false`
-```
-
-measured 2026-10-02 by chain chain-ask-drafts-20261002-042748-c2a8, finding L3, LOW
-probe-key: 0b072066a79008946c0e4064ce981cff325817f1
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/AskDraftPrune.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useAskDraft.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-ask-drafts.mjs
 
@@ -8201,20 +8145,21 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/cl
 
 ## INV-8633 — The lanes to shadow-connector read the secret from its env file at call time and copy it nowhere; an allowlist is the only door
 
-Rules for the two lanes to shadow-connector — `server/modules/affected-areas/` (manual: MAN-8559) and `server/modules/carrier-bulletins/` (manual: MAN-8909) — the forwarder they share, `server/shared/shadow-connector-lane.ts` (manual: MAN-8863), and the allowlist router beside it, `server/shared/shadow-connector-lane-router.ts` (manual: MAN-8908):
+Rules for the lanes to shadow-connector — `server/modules/affected-areas/` (manual: MAN-8559), `server/modules/carrier-bulletins/` (manual: MAN-8909) and `server/modules/upload-runs/` (manual: MAN-9897) — the forwarder they share, `server/shared/shadow-connector-lane.ts` (manual: MAN-8863) with its event-stream sibling and its wire (`shadow-connector-lane-stream.ts`, `shadow-connector-lane-wire.ts`; manual: MAN-9896), and the allowlist router beside it, `server/shared/shadow-connector-lane-router.ts` (manual: MAN-8908):
 
 1. `EIS_INTERNAL_SECRET` is read in `server/shared/shadow-connector-lane.ts` and nowhere else, and is never written to `process.env`, this server's `.env`, a log line or an error message. why: a copy drifts on rotation, and the agent sessions this server spawns inherit its environment. A lane imports the forwarder; it does not parse the env file itself.
 2. `describeFailure` uses only an error's NAME and its cause's CODE, never its message. why: a transport error can quote the request, and the request carries the secret.
-3. Only a lane's own module (`affected-areas.module.ts`, `carrier-bulletins.module.ts`) reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` for its lane, and passes the values to `createShadowConnectorLane` with its own distinct `label`. why: a scratch engine or an empty env file is proven by setting the variable before `createAffectedAreasModule()` / `createCarrierBulletinsModule()`; a shared label would make two lanes' journal lines indistinguishable.
+3. Only a lane's own module (`affected-areas.module.ts`, `carrier-bulletins.module.ts`, `upload-runs.module.ts`) reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` for its lane, and passes the values to `createShadowConnectorLane` with its own distinct `label`. why: a scratch engine or an empty env file is proven by setting the variable before `createAffectedAreasModule()` / `createCarrierBulletinsModule()` / `createUploadRunsModule()`; a shared label would make two lanes' journal lines indistinguishable.
 4. A new engine route reaches the browser only as a row of its lane's `ALLOWLIST` with its id rules, query rules and body kind, answered by `createLaneRouter`. why: an unlisted path is the lane's own 404 and a bad id a 422 before any byte leaves; the lane never forwards a caller-invented path or query key. The bulletins lane's table is GET rows only, because its surface is read-only (INV-9382 in shadow-connector).
-5. The lane never reshapes an upstream body: status and JSON pass through whole; only lane faults carry `{ error }`. An upstream response header travels only when the lane names it (`passHeaders`); the Tours lane names none, the bulletins lane `x-left-out` and `cache-control`. An image is relayed only if its bytes begin with the lane's format signature as well as carrying its Content-Type.
+5. The lane never reshapes an upstream body: status and JSON pass through whole; only lane faults carry `{ error }`. An upstream response header travels only when the lane names it (`passHeaders`); the Tours lane names none, the bulletins lane `x-left-out` and `cache-control`, the upload-runs lane none. An image is relayed only if its bytes begin with the lane's format signature as well as carrying its Content-Type.
 6. `fetch` keeps `redirect: 'manual'`. why: the secret header must not follow a `Location`.
 7. A lane's routes do not copy the router's loop, its tails or its fault-to-status map: a lane that needs different behaviour changes `LaneRouterDefinition`. why: two copies of the checks drift, and a check that is weaker in one lane is an id the engine sees.
 8. The Gemini budget a lane carries is the REQUEST's, from the router's `relayBudgetOf` (MAN-8863, "The budget carried"), and never `process.env`. why: the server's own environment is no one's budget, and the agent sessions it spawns inherit it; a lane that read it would spend under the server's name.
+9. An event stream is the lane's `stream`, not a longer `forward`, and it holds rules 1 to 8 as `forward` does (the secret from the forwarder's own read, `redirect: 'manual'`, the request's budget, a table row for every path, a declared query only). It adds two: its connect is bounded and its read is not, and the browser hanging up closes the upstream. why: an open feed outlasts any timeout, so a bound on the read would cut a live view; and a stream no one is reading holds a subscriber at the engine. The browser's `?token=` is no row's query key and never leaves this server (MAN-9896). A retiring server ends its open streams as its HTTP drain starts (`endOpenEventStreams`, called by the shutdown path in `server/index.ts`): a stream nobody ends holds the drain for its whole bound and is journalled as a cut request.
 
 Trap: a unit that exports `EIS_INTERNAL_SECRET` in its own environment overrides `.env` for the engine (`main.py` calls `load_dotenv()` with its default `override=False`, so the process environment wins) but not for the lanes, which read only the file: the two then disagree and every forward is the engine's 403. Read from the code 2026-10-17; not reproduced.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/upload-runs/upload-runs.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/upload-runs/upload-runs.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-wire.ts
 
 ## INV-8644 — probe — LOW — The gallery tag is 3.55:1 over a white photo, and neither the sheet nor the report says so
 
@@ -10240,78 +10185,6 @@ measured 2026-10-21 by chain chain-usage-limits--account-switch--whole-20261021-
 probe-key: cea89c710a67633226d57a865016753d0f04adef
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-passes.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch.sh, /home/lyphe/.claude/hooks/enforce_claude_api_secret.py, /home/lyphe/.claude/hooks/plan_runner/claude_account/route.py
-
-## INV-9404 — probe — MEDIUM — the lane drops every response header, so the engine's `X-Left-Out` never reaches the browser, and the requirement was deleted instead of met
-
-MEDIUM — the lane drops every response header, so the engine's `X-Left-Out` never reaches the browser, and the requirement was deleted instead of met
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-lo.XXXXXX) || exit 1
-cat > "$D/p.mts" <<'EOF'
-import http from 'node:http'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import express from 'express';
-const eng = http.createServer((_q, r) => { r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store, max-age=0', 'x-left-out': '[{"carrier":"State Farm","reason":"unplannable"}]' }); r.end('[{"carrier":"Hanover Insurance"}]'); });
-await new Promise<void>((res) => eng.listen(0, '127.0.0.1', res));
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'athena-lo-env-')); const env = path.join(tmp, 'env'); fs.writeFileSync(env, 'EIS_INTERNAL_SECRET=scratch-secret\n');
-process.env.SHADOW_CONNECTOR_URL = `http://127.0.0.1:${(eng.address() as any).port}`; process.env.SHADOW_CONNECTOR_ENV_FILE = env;
-const { createCarrierBulletinsModule } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts');
-const app = express(); app.use('/api/carrier-bulletins', createCarrierBulletinsModule().router);
-const lane = http.createServer(app); await new Promise<void>((res) => lane.listen(0, '127.0.0.1', res));
-const rs = await fetch(`http://127.0.0.1:${(lane.address() as any).port}/api/carrier-bulletins/overview`);
-console.log('lane answers', rs.status, '| x-left-out=' + rs.headers.get('x-left-out'), '| cache-control=' + rs.headers.get('cache-control'), '| body=' + (await rs.text()));
-process.exit(0);
-EOF
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/p.mts"
-expect: lane answers 200 | x-left-out=null | cache-control=null | body=[{"carrier":"Hanover Insurance"}]
-```
-
-measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding M1, MEDIUM
-probe-key: 48e4e43024f75119b9a380d59beed15149ae8d4f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
-
-## INV-9405 — probe — LOW — "a 2xx that is not a PNG is the lane's unreadable" is held by the Content-Type header alone
-
-LOW — "a 2xx that is not a PNG is the lane's unreadable" is held by the Content-Type header alone
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-png.XXXXXX) || exit 1
-cat > "$D/p.mts" <<'EOF'
-import http from 'node:http'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import express from 'express';
-const eng = http.createServer((_q, r) => { r.writeHead(200, { 'content-type': 'image/png' }); r.end('<html>an error page, not a PNG</html>'); });
-await new Promise<void>((res) => eng.listen(0, '127.0.0.1', res));
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'athena-png-env-')); const env = path.join(tmp, 'env'); fs.writeFileSync(env, 'EIS_INTERNAL_SECRET=scratch-secret\n');
-process.env.SHADOW_CONNECTOR_URL = `http://127.0.0.1:${(eng.address() as any).port}`; process.env.SHADOW_CONNECTOR_ENV_FILE = env;
-const { createCarrierBulletinsModule } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts');
-const app = express(); app.use('/api/carrier-bulletins', createCarrierBulletinsModule().router);
-const lane = http.createServer(app); await new Promise<void>((res) => lane.listen(0, '127.0.0.1', res));
-const sha = 'a'.repeat(64);
-const rs = await fetch(`http://127.0.0.1:${(lane.address() as any).port}/api/carrier-bulletins/files/${sha}/pages/1/image`);
-const b = Buffer.from(await rs.arrayBuffer());
-console.log('lane answers', rs.status, '| content-type=' + rs.headers.get('content-type'), '| cache-control=' + rs.headers.get('cache-control'), '| PNG signature=' + (b.subarray(0, 8).toString('hex') === '89504e470d0a1a0a'), '| first bytes=' + JSON.stringify(b.subarray(0, 12).toString('latin1')));
-process.exit(0);
-EOF
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/p.mts"
-expect: lane answers 200 | content-type=image/png | cache-control=private, max-age=31536000, immutable | PNG signature=false | first bytes="<html>an err"   (cured: 502 and no cache-control)
-```
-
-measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding L1, LOW
-probe-key: 34b30e90d6daa6cf7193349afd1df8abc6a3d5b0
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
-
-## INV-9406 — probe — LOW — rows lost: the move out of MAN-8559 dropped three facts that no row carries now
-
-LOW — rows lost: the move out of MAN-8559 dropped three facts that no row carries now
-
-```probe
-for t in MAN-8863 INV-8633 MAN-8908 MAN-8909 MAN-8559; do echo "$t begins-with-quote=$(docstore get $t --text | grep -c -i 'begins with') next(error)=$(docstore get $t --text | grep -c 'next(error)')"; done; docstore history MAN-8559 --limit 1 --diff --text | grep -c 'really begins with'
-expect: every row prints begins-with-quote=0 next(error)=0, and the last line prints 1 (the clause sits in the before-image of MAN-8559's 17:03 write)
-```
-
-measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding L2, LOW
-probe-key: f0bf3cac0de8086c7847e20ea4216170a1db7b88
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
 
 ## INV-9443 — probe — MEDIUM — the card's Delete is never drawn for a plan whose design is waiting, so "the card's Delete relays this verb, so it withdraws too, with no app change" is false
 
@@ -12502,59 +12375,6 @@ cd / && case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
 
 measured 2026-10-26 by chain chain-kaylee--companion--drafting-20261026-184416-a293, finding L2, LOW
 probe-key: 653cd399b3a47bee24208872690aa52595801a7d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/draft-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-draft-tools.mjs
-
-## INV-9793 — probe — LOW — `update_draft` moves the focus before the write that can fail
-
-LOW — `update_draft` moves the focus before the write that can fail
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-#!/usr/bin/env bash
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-: > "$1/auth.db"
-cat > "$1/p.mts" <<'MTS'
-import { z } from 'zod';
-const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
-const { initializeDatabase, getConnection } = await import(`${R}/database/index.ts`);
-const { createCompanionStore } = await import(`${R}/companion/companion-store.ts`);
-const { createToolDeps } = await import(`${R}/companion/tools/tool-deps.ts`);
-const { THINKING_ACTIVITY } = await import(`${R}/companion/session/companion-turns.ts`);
-const { draftTools } = await import(`${R}/companion/tools/draft-tools.ts`);
-const { stateEnvelope } = await import(`${R}/companion/session/companion-envelopes.ts`);
-await initializeDatabase();
-const db = getConnection();
-db.prepare("INSERT INTO users(id,username,password_hash) VALUES (987,'p','x')").run();
-db.prepare("INSERT INTO projects(project_id,project_path,custom_project_name) VALUES ('pa','/opt/ap-a','Alpha project')").run();
-db.prepare("INSERT INTO sessions(session_id,provider,project_path,custom_name,isArchived,created_at,updated_at) VALUES ('aaaaaaaa-1300-4000-8000-000000000001','claude','/opt/ap-a','alpha chat',0,'2026-10-26T10:00:00Z','2026-10-26T10:00:00Z')").run();
-const real = createCompanionStore(987);
-const make = (over: object = {}) => {
-  const store: any = { ...real, ...over };
-  let current: any = THINKING_ACTIVITY;
-  const deps = createToolDeps({ userId: 987, store, runtime: {} as any, activity: { current: () => current, set: (n: any) => { current = n; } } });
-  const tools: any = Object.fromEntries(draftTools(deps).map((t) => [t.name, t]));
-  return async (tool: string, args: object) => {
-    const parsed = z.object(tools[tool].inputSchema).safeParse(args);
-    if (!parsed.success) return { schema: parsed.error.issues.map((i) => i.message).join('; ') } as any;
-    const r = await tools[tool].handler(parsed.data, {});
-    return { text: r.content[0].text as string, isError: r.isError === true } as any;
-  };
-};
-const call = make();
-const failing = make({ setDraft() { throw new Error('SQLITE_BUSY: database is locked'); } });
-const r = await failing('update_draft', { session: 'alpha chat', text: 'brief' });
-console.log('P5 answer:', r.text.slice(0, 50), '| focus afterwards:', real.readState().focus?.name ?? 'none', '| draft afterwards:', real.readState().draft ? 'held' : 'none');
-MTS
-DATABASE_PATH="$1/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$1/p.mts" 2>&1 | grep -E '^P5'
-EOF
-bash "$D/p.sh" "$D"
-cd / && case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
-```
-
-measured 2026-10-26 by chain chain-kaylee--companion--drafting-20261026-184416-a293, finding L3, LOW
-probe-key: eb8dc380dcc21571bdf1fe3924ac84b5e2186273
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/draft-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-draft-tools.mjs
 
@@ -23706,131 +23526,6 @@ probe-key: 08290df78a3ed665bcf1ab278e1050298363f70d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosisVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-auto-diagnosis-switch-shot.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-auto-panel-shot.mjs
 
-## INV-10826 — probe — MEDIUM — at its least height the dock is a 17px strip: an action card waiting for his word (and the draft, walkthrough and notes) is out of sight
-
-MEDIUM — at its least height the dock is a 17px strip: an action card waiting for his word (and the draft, walkthrough and notes) is out of sight
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  await page.evaluate(() => { localStorage.setItem('companion-panel', JSON.stringify({ left: 300, top: 8, width: 320, height: 100 })); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('actionAnswer'); });
-  await page.waitForTimeout(600);
-  const r = await page.evaluate(() => {
-    const p = document.querySelector('[data-companion-panel]'); const d = p.querySelector('[data-companion-dock]').getBoundingClientRect(); const a = p.querySelector('[data-companion-action]').getBoundingClientRect();
-    const seen = Math.max(0, Math.min(a.bottom, d.bottom) - Math.max(a.top, d.top));
-    const buttons = [...p.querySelectorAll('[data-companion-action] button')];
-    return { panelHeight: Math.round(p.getBoundingClientRect().height), dockHeight: Math.round(d.height), actionHeight: Math.round(a.height), actionPxInSight: Math.round(seen), buttonsInSight: buttons.filter((b) => { const x = b.getBoundingClientRect(); return x.top >= d.top && x.bottom <= d.bottom; }).length, buttons: buttons.length };
-  });
-  await page.evaluate(() => localStorage.removeItem('companion-panel'));
-  console.log('at its least height with an action waiting:', JSON.stringify(r));
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: `actionPxInSight` of the whole card and `buttonsInSight` equal to `buttons` (cured, a dock that shows the card at the least height); today {"panelHeight":259,"dockHeight":17,"actionHeight":399,"actionPxInSight":4,"buttonsInSight":0,"buttons":2}
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-move-resize-notes-fold-20261104-102647-b803, finding M1, MEDIUM
-probe-key: 31d056f9b2ca05c2a37c3ee840e70261dcba0632
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ResizeGrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
-
-## INV-10827 — probe — MEDIUM — the right edge's 6px grip sits over 7 of the 10px of the log's and the notes' scrollbars: a press on the thumb's edge resizes the panel instead of scrolling
-
-MEDIUM — the right edge's 6px grip sits over 7 of the 10px of the log's and the notes' scrollbars: a press on the thumb's edge resizes the panel instead of scrolling
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false, launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } });
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  await page.evaluate(() => { localStorage.removeItem('companion-panel'); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
-  await page.waitForTimeout(600);
-  const info = await page.evaluate(() => {
-    const p = document.querySelector('[data-companion-panel]'); const right = p.getBoundingClientRect().right;
-    const log = p.querySelector('[role="log"]').parentElement; const r = log.getBoundingClientRect(); const y = Math.round((r.top + r.bottom) / 2);
-    const who = (inset) => { const e = document.elementFromPoint(right - inset, y); const g = e && e.closest('[data-companion-grip]'); return g ? `grip:${g.getAttribute('data-companion-grip')}` : 'scroller'; };
-    return { scrollbarPx: log.offsetWidth - log.clientWidth, answers: Object.fromEntries([2, 5, 7, 10, 14].map((i) => [`${i}px in`, who(i)])), right, y, width: Math.round(p.getBoundingClientRect().width), scrollTop: log.scrollTop };
-  });
-  await page.mouse.move(info.right - 3, info.y); await page.mouse.down(); await page.mouse.move(info.right - 123, info.y, { steps: 8 }); await page.mouse.up(); await page.waitForTimeout(300);
-  const after = await page.evaluate(() => ({ width: Math.round(document.querySelector('[data-companion-panel]').getBoundingClientRect().width) }));
-  await page.evaluate(() => localStorage.removeItem('companion-panel'));
-  console.log('scrollbar', info.scrollbarPx + 'px; who answers a press', JSON.stringify(info.answers), '| a press 3px in dragged 120px left: panel width', info.width, '->', after.width);
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: every `px in` up to the scrollbar's own width answers `scroller` and the width stays 400 (cured); today `scrollbar 10px; who answers a press {"2px in":"grip:right","5px in":"grip:right","7px in":"grip:right","10px in":"scroller","14px in":"scroller"} | … panel width 400 -> 320`
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-move-resize-notes-fold-20261104-102647-b803, finding M2, MEDIUM
-probe-key: d50692ab6a45af8dac15937ab42c6a2960759a8b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ResizeGrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
-
-## INV-10828 — probe — LOW — the keyboard grip changes corner and drops the focus in the middle of a keyboard resize; no key moves the panel
-
-LOW — the keyboard grip changes corner and drops the focus in the middle of a keyboard resize; no key moves the panel
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  await page.evaluate(() => { localStorage.setItem('companion-panel', JSON.stringify({ left: 500, top: 50, width: 400, height: 600 })); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
-  await page.waitForTimeout(600);
-  await page.locator('[data-companion-panel] button.vv-resize-grip').focus();
-  const out = [];
-  for (let i = 1; i <= 4; i++) {
-    await page.keyboard.press('ArrowRight'); await page.waitForTimeout(120);
-    out.push(await page.evaluate((n) => { const a = document.activeElement; const r = document.querySelector('[data-companion-panel]').getBoundingClientRect(); return `#${n} width ${Math.round(r.width)} centre ${Math.round(r.left + r.width / 2)} focus ${a === document.body ? 'BODY' : a.getAttribute('aria-label')}`; }, i));
-  }
-  await page.evaluate(() => localStorage.removeItem('companion-panel'));
-  console.log(out.join(' | '));
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: every step's focus reads `Resize Kaylee's panel` (cured); today `#3 width 448 centre 724 focus BODY` and #4 stays at 448
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-move-resize-notes-fold-20261104-102647-b803, finding L1, LOW
-probe-key: 0b44738ba9d665d994f741be2dff7bdb28551747
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionPanelStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ResizeGrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
-
 ## INV-10830 — probe — `--mode off` presses the switch even when it already reads OFF, turning it ON (live write, no guard)
 
 `--mode off` presses the switch even when it already reads OFF, turning it ON (live write, no guard)
@@ -23998,189 +23693,6 @@ probe-key: 1ae234167ecbffe5ffc9769a83f0e86654f66cbd
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-results.db.ts
 
-## INV-10845 — probe — on a short floating panel the draft's fold leaves the panel's floor stale: folding GROWS the panel, reopening leaves Send out of sight
-
-on a short floating panel the draft's fold leaves the panel's floor stale: folding GROWS the panel, reopening leaves Send out of sight
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
-const FOLD = '[data-companion-panel] [data-companion-draft] [data-card-fold]';
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  await page.evaluate(() => { for (const k of ['companion-notes-fold', 'companion-draft-fold']) localStorage.removeItem(k); localStorage.setItem('companion-panel', JSON.stringify({ left: 700, top: 20, width: 400, height: 520 })); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
-  await page.waitForTimeout(600);
-  const read = () => page.evaluate(() => { const p = document.querySelector('[data-companion-panel]'); const d = p.querySelector('[data-companion-dock]'); const s = p.querySelector('[data-companion-draft] [data-companion-send]')?.getBoundingClientRect(); const db = d.getBoundingClientRect(); return `panel ${Math.round(p.getBoundingClientRect().height)}px, dock scrolls ${d.scrollHeight - d.clientHeight}px, Send in sight: ${s ? s.top >= db.top && s.bottom <= db.bottom + 1 : 'folded'}`; });
-  const open = await read();
-  await page.locator(FOLD).click(); await page.waitForTimeout(600); const folded = await read();
-  await page.locator(FOLD).click(); await page.waitForTimeout(600); const reopened = await read();
-  await page.evaluate(() => localStorage.removeItem('companion-panel'));
-  console.log(`draft open   : ${open}\ndraft folded : ${folded}\ndraft reopened: ${reopened}`);
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -4
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: cured when the folded panel is no taller than the open one and the reopened one reads `dock scrolls 0px, Send in sight: true`; today `draft open   : panel 637px, dock scrolls 0px, Send in sight: true`, `draft folded : panel 701px, …` and `draft reopened: panel 520px, dock scrolls 112px, Send in sight: false`
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-draft-fold-20261104-143026-0f02, finding M1, MEDIUM
-probe-key: 0e23bf7c8e17a8db43267f50d8bdaf11a2c8048d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFoldMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDraftFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/usePanelFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
-
-## INV-10846 — probe — a keyboard fold of the draft drops the focus to the page's body; the notes' chevron keeps it
-
-a keyboard fold of the draft drops the focus to the page's body; the notes' chevron keeps it
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
-const DRAFT = '[data-companion-panel] [data-companion-draft] [data-card-fold]';
-const NOTES = '[data-companion-panel] [data-companion-notes-count] [data-card-fold]';
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  await page.evaluate(() => { for (const k of ['companion-panel', 'companion-notes-fold', 'companion-draft-fold']) localStorage.removeItem(k); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
-  await page.waitForTimeout(600);
-  const focus = () => page.evaluate(() => { const a = document.activeElement; return a === document.body ? 'BODY' : `${a.tagName} "${a.getAttribute('aria-label')}"`; });
-  for (const [name, sel] of [['notes', NOTES], ['draft', DRAFT]]) {
-    await page.locator(sel).focus(); await page.keyboard.press('Enter'); await page.waitForTimeout(450);
-    const folded = await focus();
-    await page.keyboard.press('Enter'); await page.waitForTimeout(450);
-    console.log(`${name} chevron, Enter to fold -> focus on ${folded}; Enter again -> focus on ${await focus()}`);
-  }
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: cured when the draft line reads like the notes line (`BUTTON "Expand draft"` then `BUTTON "Collapse draft"`, as the notes' `BUTTON "Expand notes"` then `BUTTON "Collapse notes"`); today `draft chevron, Enter to fold -> focus on BODY; Enter again -> focus on BODY` (the second Enter presses nothing) while the notes line keeps its chevron focused
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-draft-fold-20261104-143026-0f02, finding M2, MEDIUM
-probe-key: 5ace777a8d32e440616b2b4ac982f29feb1cf1e8
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFoldMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDraftFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/usePanelFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
-
-## INV-10848 — probe — a save the server refused is invisible while the draft is folded, and the folded line presents the unsaved words as the draft
-
-a save the server refused is invisible while the draft is folded, and the folded line presents the unsaved words as the draft
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit, SHELL } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  // The panel's own view on the dense fixture, with a draft verb the server refuses (the kit's verbs never refuse a save).
-  await page.evaluate(async (shell) => {
-    for (const k of ['companion-panel', 'companion-notes-fold', 'companion-draft-fold']) localStorage.removeItem(k);
-    window.__companionKit.unmountAll();
-    const { h, importModule, readSpecifier, mount } = window.__mountReact;
-    const { CompanionPanelView } = await importModule('/src/modules/companion/CompanionPanel.tsx');
-    const { presenceOf } = await importModule('/src/modules/companion/hooks/useCompanionPresence.ts');
-    const { FAKE_PANEL } = await importModule('/src/modules/companion/companion-fake.ts');
-    const { ToastProvider } = await importModule(await readSpecifier('/src/modules/companion/CompanionControls.tsx', /from "([^"]*\/ToastContext[^"]*)"/));
-    const fake = FAKE_PANEL.dense; const noop = async () => {};
-    const verbs = { onClose: () => {}, onSendText: noop, onModelChange: noop, onLiveChange: noop, onInterrupt: noop, onClear: noop, onEditDraft: async () => { throw new Error('the server is down'); }, onSendDraft: noop, onClearDraft: noop, onDismissNote: noop, onWithdraw: noop };
-    const { root, host } = await mount('companion-panel', null, 'display:contents');
-    document.querySelector(shell).appendChild(host);
-    root.render(h(ToastProvider, null, h(CompanionPanelView, { ...fake, ...verbs, presence: presenceOf(fake.picture, 'idle', false, false) })));
-    await window.__mountReact.settle();
-  }, SHELL);
-  await page.waitForTimeout(500);
-  await page.locator('[data-companion-panel] [data-companion-draft] textarea').click();
-  await page.keyboard.press('Control+End'); await page.keyboard.type(' UNSAVED');
-  await page.keyboard.press('Shift+Tab'); await page.waitForTimeout(300);   // the chevron; the blur's save is refused
-  await page.keyboard.press('Enter'); await page.waitForTimeout(500);       // fold
-  console.log(await page.evaluate(() => {
-    const card = document.querySelector('[data-companion-draft]'); const alert = card.querySelector('[role="alert"]');
-    return `fold: ${card.getAttribute('data-companion-draft-fold')} | line ends: "${card.querySelector('[data-companion-draft-line]')?.textContent.replace(/\s+/g, ' ').slice(-24)}" | refusal: ${alert ? `"${alert.textContent.trim()}" ${alert.closest('[inert]') ? 'INSIDE the folded body (inert, unheard)' : 'in sight'}` : 'none'} | mark: ${card.querySelector('[data-companion-draft-mark]')?.textContent ?? 'none'}`;
-  }));
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: cured when a refused save is not hidden by the fold (the line or a mark says it, or the refusal is in sight); today `fold: folded | line ends: "…UNSAVED" | refusal: "▲Your edit wasn't saved: the server is down" INSIDE the folded body (inert, unheard) | mark: none`
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-draft-fold-20261104-143026-0f02, finding L2, LOW
-probe-key: 6ad45992e8837cc4bb6e039ef3fb227c46f00957
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFoldMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDraftFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/usePanelFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
-
-## INV-10849 — probe — `useDraftFold`'s `ownWords` never expires, so words he once saved can come back from her unmarked
-
-`useDraftFold`'s `ownWords` never expires, so words he once saved can come back from her unmarked
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-import { installCompanionKit } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs';
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const { browser, page } = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' }, hotUpdates: false });
-try {
-  await installCompanionKit(page);
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(400);
-  await page.evaluate(() => { for (const k of ['companion-panel', 'companion-notes-fold', 'companion-draft-fold']) localStorage.removeItem(k); window.__companionKit.unmountAll(); return window.__companionKit.mountPanel('dense'); });
-  await page.waitForTimeout(600);
-  const setText = (t) => page.evaluate((t) => window.__companionKit.updatePanel((p) => ({ draft: { ...p.draft, text: t, updatedAt: new Date().toISOString() } })), t);
-  const line = () => page.evaluate(() => `${document.querySelector('[data-companion-draft-brief]')?.textContent} | mark: ${document.querySelector('[data-companion-draft-mark]')?.textContent ?? 'none'}`);
-  // He writes his brief and it is saved (a Tab blurs the field), and the save comes back.
-  await page.locator('[data-companion-panel] [data-companion-draft] textarea').click();
-  await page.keyboard.press('Control+A'); await page.keyboard.type('HIS BRIEF X'); await page.keyboard.press('Tab'); await page.waitForTimeout(200);
-  await setText('HIS BRIEF X'); await page.waitForTimeout(200);
-  // She rewrites it to Y; he reads Y and folds the draft.
-  await setText('HER BRIEF Y'); await page.waitForTimeout(200);
-  await page.locator('[data-companion-panel] [data-companion-draft] [data-card-fold]').click(); await page.waitForTimeout(400);
-  console.log('folded on her words      :', await line());
-  await setText('HIS BRIEF X'); await page.waitForTimeout(250);   // while folded she puts back the very words he saved
-  console.log('she restores his words   :', await line());
-} finally { await browser.close(); }
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-timeout 120 node "$1/p.mjs" 2>&1 | tail -3
-EOF
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: cured when the last line ends `mark: Edited`; today `she restores his words   : · HIS BRIEF X | mark: none` (the words on the line changed from Y to X and nothing says so)
-```
-
-measured 2026-11-04 by chain chain-kaylee-panel-draft-fold-20261104-143026-0f02, finding L3, LOW
-probe-key: 42c8befed6e355102000a88f948dbdc2af10fc2d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFoldMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useDraftFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useNotesFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/usePanelFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
-
 ## INV-10853 — probe — LOW — no standing proof fails if a toggle loses its name; the one check on it was retired with the cure
 
 LOW — no standing proof fails if a toggle loses its name; the one check on it was retired with the cure
@@ -24200,26 +23712,6 @@ echo "[probe exit $?]"
 
 measured 2026-11-04 by chain chain-kaylee-fold-toggle-names-20261104-155809-0f36, finding L1, LOW
 probe-key: da04be768e9647e9169f90fe47fbdce3ad0bacec
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/CardFold.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
-
-## INV-10854 — probe — LOW — INV-10846's `expect:` line quotes the names this build replaced; the builder saw it and left it
-
-LOW — INV-10846's `expect:` line quotes the names this build replaced; the builder saw it and left it
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-docstore get INV-10846 --text 2>/dev/null | grep -c 'BUTTON "Expand"' || true
-EOF
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-# expect: `1` while the expect line quotes the bare names; `0` once it quotes "Expand draft" / "Collapse draft" or the row is retired
-```
-
-measured 2026-11-04 by chain chain-kaylee-fold-toggle-names-20261104-155809-0f36, finding L2, LOW
-probe-key: d78bff865772e7fe8d248838ea2730398691fa37
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftFoldLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/CardFold.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-draft-fold-legs.mjs
 
@@ -24826,13 +24318,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-do
 ## INV-11297 — The Planning card — what an editor of its files must not break
 
 Reference: MAN-9671 (the card, its words and its two standing proofs).
-1. **The planning press has one home: a line of the Planning card.** `PlanCard`, `DispatchArcDeck`, `PlanControls` and `ArcControls` say `Planning paused` (`PlanningPausedLine`) and draw no Pause planning or Resume planning. why: the operator asked for one place to look and to press.
+1. **The planning press has one home: a line of the Planning card.** `PlanCard`, `DispatchArcDeck`, `PlanControls` and `ArcControls` say `Planning paused` (`PlanningPausedLine`) and draw no Pause planning or Resume planning. why: the operator asked for one place to look and to press. THE HOUSE-WIDE PRESS has one home too: the strip under the card's title (`PlanningDialPress`, drawn from `dialPress`), which lets planning through Pause all and holds it again for the whole house; it is never drawn on a line and a line's press is never drawn in it, because the two brake different things (Pause all's planning, and one subject's planning).
 2. **A line keeps its place.** Lines stand in the order their subjects were made (`created_at`, then name), loose epics last; never in the outings' order. why: Resume planning sends an outing back as a NEW row and would move the line just pressed.
 3. **The whole lane is asked.** `planningLines` takes the frame's own `plans` and `arcs`, never the drawn lists. why: a hidden feature's designer is still out.
 4. **A feature held only by its epic's pause has no line.** The epic's line says `Planning paused` and holds the one Resume; the dispatcher refuses the feature's own lift, naming the epic's.
 5. **A hold has one press.** A line draws its outing's pace hold and Override only while `PlanningLine.drawn` is false (the subject has no card or deck on this screen); a drawn card or deck draws its own.
 6. **An epic is owed Pause planning only for an outing of its own** (`arc.planner`). Features being planned with nothing of the epic's own out leave no line and no epic-wide press; each feature's line is the brake.
-7. **A press is a reading of the document, never chosen on the client.** `featurePress`, `epicPress`, `loosePress` and `planningPausedVia` read `planning_paused` by truthiness (an absent key is no pause) and draw a press only where the dispatcher would take it. why: a press drawn where it would refuse.
+7. **A press is a reading of the document, never chosen on the client.** `featurePress`, `epicPress`, `loosePress` and `planningPausedVia` read `planning_paused` by truthiness (an absent key is no pause) and draw a press only where the dispatcher would take it. `dialPress` reads `route.epics` the same way: `null` or `paused` false draws none (the dispatcher refuses both dial words with Pause all off), `planning_through` is read by truthiness (an absent key is planning held), and Resume planning is drawn only while a QUEUED outing waits on the pause (`!line.paused`; a line's own pause has its own Resume). why: a press drawn where it would refuse.
 8. **A put-away subject keeps its press.** `featurePress` and `epicPress` carry no `hidden` clause: a hide holds the walk and not the planning, the dispatcher refuses neither verb on a hidden plan, and the Planning card lists its outing. A parked feature is read off `plan.state`, never `status`, because a hide outranks `parked` in the status word. why: a hidden feature that is paused would read `Planning paused` with no Resume until it was shown; a status-read `parked` would give a put-away parked feature a Pause planning with nothing being planned.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningLines.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningPause.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts
@@ -25744,3 +25236,407 @@ measured 2026-11-08 by chain chain-home-transcription-box-cleanup-20261108-14163
 probe-key: 79d0641404afd4623242eb4e8dc9227fc70901ef
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/speech-transcriber.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/transcript-cleanup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary-hints.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/vocabulary.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/VocabularySection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/home-server-clean.mjs
+
+## INV-11595 — probe — LOW — the `sent` sentence is given for any send that finds no draft, including a send of words that never went
+
+LOW — the `sent` sentence is given for any send that finds no draft, including a send of words that never went
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { execFileSync } from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe';
+const D = process.argv[2];
+execFileSync('sqlite3', ['-readonly', path.join(os.homedir(), '.cloudcli', 'auth.db'), `.backup '${path.join(D, 'auth.db')}'`]);
+process.env.DATABASE_PATH = path.join(D, 'auth.db');
+process.env.CERBERUS_DB_PATH = path.join(D, 'cerberus.db');
+process.env.CLOUDCLI_SESSIONS_DIR = path.join(D, 'sessions');
+const { PROBE_PROJECT, ensureProbeProject } = await import(`${R}/.verify/lib/probe-project.mjs`);
+const { probeHouse } = await import(`${R}/.verify/lib/probe-house.mjs`);
+ensureProbeProject();
+const { sessionsDb } = await import(`${R}/server/modules/database/index.ts`);
+const { sessionsService } = await import(`${R}/server/modules/providers/index.ts`);
+const { companionService } = await import(`${R}/server/modules/companion/companion.service.ts`);
+const { createCompanionStore } = await import(`${R}/server/modules/companion/companion-store.ts`);
+const { buildCompanionTools } = await import(`${R}/server/modules/companion/tools/companion-tools.ts`);
+const { createToolDeps } = await import(`${R}/server/modules/companion/tools/tool-deps.ts`);
+const { IDLE_ACTIVITY } = await import(`${R}/server/modules/companion/session/companion-turns.ts`);
+const runtime = { hasRuntime: () => true, async run() { return undefined; }, abort: async () => false, steer: async () => 'not_running', activity: () => ({ live: false, busy: false, why: null }), resolveToolApproval: () => {}, getPendingApprovalsForSession: () => [] };
+companionService.attachRuntime(runtime, probeHouse);
+const store = createCompanionStore(1);
+let activity = IDLE_ACTIVITY;
+const deps = createToolDeps({ userId: 1, store, runtime, house: probeHouse, activity: { current: () => activity, set: (next) => { activity = next; } } });
+const tools = Object.fromEntries(buildCompanionTools(deps).map((tool) => [tool.name, tool]));
+const call = async (name, args) => { const r = await tools[name].handler(args, {}); return `${r.isError ? '[refused] ' : ''}${r.content.map((b) => b.text).join(' ')}`; };
+const made = sessionsService.createAppSession('claude', PROBE_PROJECT, 'Bugfixes', true);
+sessionsDb.updateSessionCustomName(made.sessionId, 'Bugfixes');
+await companionService.clear(1);
+await call('update_draft', { session: made.sessionId, text: 'First brief: fix the export retry.' });
+console.log('first brief sent        :', await call('send_to_session', { session: made.sessionId, text: 'First brief: fix the export retry.', mode: 'turn' }));
+console.log('NEW words, no new draft :', await call('send_to_session', { session: made.sessionId, text: 'Second brief: rename the Download button.', mode: 'turn' }));
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /tmp && timeout 150 cloudcli-tsx "$1/p.mjs" "$1" 2>&1 | grep -E '^(first brief|NEW words)'
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `first brief sent        : Started a new turn in Bugfixes.` then `NEW words, no new draft : [refused] That draft already went to Bugfixes, so nothing was sent twice.` while the sentence ignores the request; cured when the second line is today's sentence (it names update_draft) or the sentence tells her to write other words with update_draft first
+```
+
+measured 2026-11-09 by chain chain-kaylee-draft-takedown-20261109-135254-6458, finding L1, LOW
+probe-key: 449ddc59999ff999086330fc4ca4a1224ea55fcf
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-draft-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-draft-takedown.mjs
+
+## INV-11596 — probe — LOW — the showing cannot tell the effort constant from a literal `max` on the settings side
+
+LOW — the showing cannot tell the effort constant from a literal `max` on the settings side
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "the showing reads settings-lines.ts's source: $(grep -c 'settings-lines' .verify/kaylee-draft-takedown.mjs)"
+echo "settings-lines.ts interpolates the constant: $(grep -c 'Her effort: ${COMPANION_EFFORT}' server/modules/companion/eyes/settings-lines.ts)"
+echo "[probe exit $?]"
+# expect: `…source: 0` and `…constant: 1` while the showing cannot see a literal on the settings side; cured when the first count is 1 or more
+```
+
+measured 2026-11-09 by chain chain-kaylee-draft-takedown-20261109-135254-6458, finding L2, LOW
+probe-key: 9d3dc17a905153f08a13fcf4edb9a3c069cd36a3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-draft-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-draft-takedown.mjs
+
+## INV-11597 — probe — LOW — the docs the split and the edit touched are left short in four places
+
+LOW — the docs the split and the edit touched are left short in four places
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "providers manual still points at a section the split moved out of MAN-9072 ('MAN-9072 §Options'): $(grep -c 'MAN-9072 §Options' server/modules/providers/MANUAL.md)"
+printf 'rows serving an edit of the takedown showing, with how often their body (not their governs line) names it:'
+for t in $(docstore govern "$PWD/.verify/kaylee-draft-takedown.mjs" --touch write --text | cut -d' ' -f1); do printf ' %s=%s' "$t" "$(docstore get "$t" --text | grep -v '^governs:' | grep -c 'kaylee-draft-takedown')"; done; echo
+echo "MAN-9147's readDraftEnd row names a handover as a way the record is lost: $(docstore get MAN-9147 --text | grep 'readDraftEnd()' | grep -c -i handover)"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `…(\'MAN-9072 §Options\'): 1`, `…names it: MAN-9072=0` and `…is lost: 0` while the docs are short; cured when the first is 0, the serving row's count is 1 or more, and the last is 1
+```
+
+measured 2026-11-09 by chain chain-kaylee-draft-takedown-20261109-135254-6458, finding L3, LOW
+probe-key: d45ea59bd1b27f41595213f3af6957b44618ad97
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-draft-end.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-draft-takedown.mjs
+
+## INV-11598 — src/modules/companion — a pointer media query cannot say a mouse drives the page: useFinePointer reads it off the pointer events
+
+On a Windows touchscreen computer that Windows reports as used as a tablet, Chromium answers `pointer: coarse` and `hover: none`, and no query says a mouse is attached, while the mouse works.
+- `IsDeviceUsedAsATablet()` gives `{POINTER_TYPE_COARSE, HOVER_TYPE_NONE}`; the mouse is never asked (`ui/base/pointer/pointer_device_win.cc`).
+- The primary pointer is fine whenever any fine pointer is available (`GetPrimaryPointerType`, `ui/base/pointer/pointer_device.cc`), so a coarse primary makes `(any-pointer: fine)` false too: `(pointer: fine)`, `(any-pointer: fine)` and a change from one to the other all answer no.
+- The mouse still sends pointer events of type `mouse`. `useFinePointer` (`hooks/useFinePointer.ts`) is true when `(any-pointer: fine)` is, or from the page's first `pointerdown` or `pointermove` of type `mouse` or `pen`, and stays true for the life of the page.
+- Measured, his recording of 2026-11-09 13:28: 44px controls and the `hover: none` words drawn, no grab cursor on her header, no grips, a drag on the header selecting the page's text.
+
+| when | do |
+|---|---|
+| a gate asks whether a mouse or a pen drives the page: the panel floats and moves (`useCompanionPanelPlace`), the talk button's "or press F8" line (`CompanionTalkButton`), her composer taking the focus as she opens (`mayFocusFieldOnOpen`) | `useFinePointer` (`mayFocusFieldOnOpen` for the focus); never `(pointer: fine)`, `(any-pointer: fine)` or `(hover: hover)` |
+| a gate asks whether a phone's or tablet's OS runs the page: the PDF preview (`canShowPdf` and `onPhoneOrTabletOs`, `useFilePreview.ts`, MAN-5899) | the OS; never a pointer query |
+| sizes and words for a finger: 44px catches, `finger:`, the `hover: none` words | the browser's own classification, as the touch law has it (INV-10275); his whole UI draws at touch size, by design |
+
+Proof: `node .verify/kaylee-panel-move-mouse-on-touch.mjs` launches Chromium with those answers (`--blink-settings`) and a real mouse (MAN-9062).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFinePointer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-mouse-on-touch.mjs
+
+## INV-11599 — probe — HIGH — the cure floats her under touch sizing, and there a draft aimed at a running chat takes the whole app down once the panel is shorter than its content
+
+HIGH — the cure floats her under touch sizing, and there a draft aimed at a running chat takes the whole app down once the panel is shorter than its content
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+// Athena: the REAL app tree (no kit), his coarse state, a real mouse click on her door. The server's answers are stubbed so her picture carries a draft aimed at a chat that is working
+// (the house's `dense` fixture picture) — nothing is written anywhere.
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { reloadApp } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs';
+const APP = 'http://127.0.0.1:5183';
+const COARSE_ONLY = '--blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=1,availableHoverTypes=1';
+const [state = 'his', height = '620'] = process.argv.slice(2);
+// 1. the fixture picture, read out of the dev client
+const probe = await openConsole({ appUrl: APP, hotUpdates: false });
+const picture = await probe.page.evaluate(async () => { const m = await import('/src/modules/companion/companion-fake.ts'); return JSON.parse(JSON.stringify(m.FAKE_PANEL.dense.picture)); });
+await probe.browser.close();
+const sessionId = picture.draft.target.session.sessionId;
+// 2. the real app, stubbed answers
+const { browser, page, errors } = await openConsole({ appUrl: APP, hotUpdates: false, viewport: { width: 1440, height: Number(height) },
+  launchOptions: state === 'his' ? { args: [COARSE_ONLY] } : {}, contextOptions: { deviceScaleFactor: state === 'his' ? 1.5 : 1 } });
+await page.route(/\/api\/companion$/, (route) => (route.request().method() === 'GET' ? route.fulfill({ json: picture }) : route.continue()));
+await page.route(/\/api\/providers\/sessions\/running/, (route) => route.fulfill({ json: { data: { sessions: [{ sessionId, startedAt: Date.now(), statusText: 'working', canInterrupt: true, provider: 'claude', projectPath: '/tmp/x', projectDisplayName: 'x', sessionTitle: 'busy chat', lastActivity: new Date().toISOString() }], subagentSessionIds: [], awaitingInputSessionIds: [] } } }));
+await page.evaluate(() => localStorage.removeItem('companion-panel'));
+await reloadApp(page); await page.waitForTimeout(1500);
+const pt = await page.evaluate(() => { const d = [...document.querySelectorAll('[data-companion-door], [data-companion-fab] > .vv-fab')].find((e) => e.checkVisibility({ visibilityProperty: true })); if (!d) return null; const r = d.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+if (!pt) { console.log('no door visible'); await browser.close(); process.exit(0); }
+if (process.argv[4] === 'mouse-first') { await page.mouse.move(pt.x + 300, pt.y - 200); await page.waitForTimeout(500); }
+await page.evaluate(() => { const d = [...document.querySelectorAll('[data-companion-door], [data-companion-fab] > .vv-fab')].find((e) => e.checkVisibility({ visibilityProperty: true })); d.click(); }); // a synthetic click: no pointer event reaches the page
+await page.waitForTimeout(1500);
+const before = { loops: errors.filter((e) => /Maximum update depth/.test(e)).length, panel: await page.evaluate(() => { const p = document.querySelector('[data-companion-panel]'); if (!p) return null; const r = p.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }), grips: await page.evaluate(() => document.querySelectorAll('[data-companion-grip]').length) };
+console.log(`${state.padEnd(5)} opened with no mouse heard yet -> panel ${JSON.stringify(before.panel)}, grips ${before.grips}, update-depth errors ${before.loops}`);
+await page.mouse.move(pt.x + 300, pt.y - 200); await page.waitForTimeout(2000); // the first mouse move of the page
+const text = (await page.evaluate(() => document.body.innerText)).replace(/\n+/g, ' | ').slice(0, 90);
+const loops = errors.filter((e) => /Maximum update depth/.test(e)).length;
+const panel = await page.evaluate(() => { const p = document.querySelector('[data-companion-panel]'); if (!p) return null; const r = p.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; });
+const gripsAfter = await page.evaluate(() => document.querySelectorAll('[data-companion-grip]').length);
+console.log(`${state.padEnd(5)} real app tree, window 1440x${height}, after its first mouse move -> grips ${gripsAfter}, panel ${JSON.stringify(panel)} | "Maximum update depth" errors: ${loops} | page now reads: ${text}`);
+await browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+for st in his plain; do timeout 150 node "$1/p.mjs" $st 620 column-first 2>&1 | grep -E '^(his|plain)' | cut -c1-300; done
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: his: `opened with no mouse heard yet -> panel [1028,12,400,596], grips 0, update-depth errors 0`, then `after its first mouse move -> grips 0, panel null | "Maximum update depth" errors: 2 | page now reads: CloudCLI hit an error | The screen it was drawing could not finish…` while the defect stands; plain: the panel stays drawn, errors 0, the page reads the app's own text. Cured when his second line reads like plain's. Dev client :5183 (the probe reads the fixture from /src); about 90 s; nothing is written (server answers stubbed).
+```
+
+measured 2026-11-09 by chain chain-kaylee-panel-drag-root-cause-20261109-135843-6350, finding H1, HIGH
+probe-key: 1928741d1f006c45175d18e9694f9fffbf47261e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFinePointer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ViewBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-mouse-on-touch.mjs
+
+## INV-11600 — probe — MEDIUM — task item 2 ("every page and window where the same cause bites") is not done: two `(pointer: fine)` readers are left, and in his state one shows on her own panel the moment she floats
+
+MEDIUM — task item 2 ("every page and window where the same cause bites") is not done: two `(pointer: fine)` readers are left, and in his state one shows on her own panel the moment she floats
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+// Athena: where the focus lands when a person opens her panel with a real mouse click — his state vs a plain desktop.
+import { reloadApp } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const COARSE_ONLY = '--blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=1,availableHoverTypes=1';
+for (const state of ['his', 'plain']) {
+  const { browser, page } = await openConsole({ appUrl: 'http://127.0.0.1:5184', hotUpdates: false, viewport: { width: 1707, height: 960 },
+    launchOptions: state === 'his' ? { args: [COARSE_ONLY] } : {}, contextOptions: { deviceScaleFactor: 1.5 } });
+  await page.evaluate(() => localStorage.removeItem('companion-panel'));
+  await reloadApp(page); await page.waitForTimeout(600);
+  const pt = await page.evaluate(() => { const d = [...document.querySelectorAll('[data-companion-door], [data-companion-fab] > .vv-fab')].find((e) => e.checkVisibility({ visibilityProperty: true })); const r = d.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.move(pt.x, pt.y); await page.mouse.down(); await page.mouse.up(); await page.waitForTimeout(900);
+  const r = await page.evaluate(() => ({ pointerFine: matchMedia('(pointer: fine)').matches, panelFloats: document.querySelectorAll('[data-companion-panel] [data-companion-grip]').length === 8, focus: document.activeElement === document.body ? 'BODY' : `${document.activeElement.tagName}${document.activeElement.hasAttribute('data-companion-composer-field') ? ' (her typing box)' : ''}` }));
+  console.log(`${state.padEnd(6)} real click on her door -> ${JSON.stringify(r)}`);
+  await browser.close();
+}
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+grep -n "matchMedia('(pointer: fine)')" src/modules/companion/CompanionPanel.tsx src/modules/chat/transcript/shapes/useFilePreview.ts | cut -c1-140 || echo none
+timeout 140 node "$1/p.mjs" 2>&1 | grep -E '^(his|plain)' | cut -c1-200
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: the two reader lines (CompanionPanel.tsx:177 and useFilePreview.ts:41), then `his … {"pointerFine":false,"panelFloats":true,"focus":"BUTTON"}` and `plain … {"pointerFine":true,"panelFloats":true,"focus":"TEXTAREA (her typing box)"}` while the defect stands; cured when his focus reads TEXTAREA (her typing box). Live prod client :5184; about 60 s; nothing is written.
+```
+
+measured 2026-11-09 by chain chain-kaylee-panel-drag-root-cause-20261109-135843-6350, finding M1, MEDIUM
+probe-key: 47bef3e7b37a42131964b212db3dfc12eba90168
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFinePointer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ViewBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-mouse-on-touch.mjs
+
+## INV-11601 — probe — LOW — the rows the builder rewrote are out of reach of editors of the files they describe, and the new standing proof is governed by no row
+
+LOW — the rows the builder rewrote are out of reach of editors of the files they describe, and the new standing proof is governed by no row
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+R=/home/lyphe/.claude/claudecodeui_lyphe
+for f in src/modules/companion/hooks/useCompanionPanelPlace.ts src/modules/companion/CompanionHeader.tsx src/modules/companion/CompanionPanel.tsx src/modules/companion/CompanionPanelGrips.tsx src/modules/companion/CompanionTalkButton.tsx src/modules/companion/hooks/useFinePointer.ts .verify/kaylee-panel-move-mouse-on-touch.mjs; do
+  printf '%-62s ' "$f"; ~/.claude/scripts/docstore govern "$R/$f" --touch write --limit 3 --text | cut -d' ' -f1 | tr '\n' ' '; echo
+done
+for t in INV-10826 INV-10827 INV-10828 INV-10845 INV-10846 INV-10848 INV-10849; do ~/.claude/scripts/docstore get "$t" >/dev/null 2>&1 && printf '%s filed | ' "$t" || printf '%s retired | ' "$t"; done; echo
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: INV rows only for the place hook, header, panel, grips and talk button (`useFinePointer.ts` prints `MAN-9062`), `(no` for the standing proof, and seven `filed` while it stands; cured when `MAN-9062` is among the three for the place hook, the panel, the header and the grips, the proof is governed, and the seven cured rows read `retired`
+```
+
+measured 2026-11-09 by chain chain-kaylee-panel-drag-root-cause-20261109-135843-6350, finding L1, LOW
+probe-key: 39a4ab04cec2706cf24fa46739bc6239e942745e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFinePointer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ViewBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-mouse-on-touch.mjs
+
+## INV-11602 — probe — LOW — `MAN-9062` states the fine-pointer grip sizes as fact, and the coarse floating state this diff creates draws others
+
+LOW — `MAN-9062` states the fine-pointer grip sizes as fact, and the coarse floating state this diff creates draws others
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+// Athena: the sizes of the eight grips in HIS state vs a plain desktop, and what each covers of the header and the composer.
+import { reloadApp } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/app-load.mjs';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const COARSE_ONLY = '--blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=1,availableHoverTypes=1';
+const state = process.argv[2] ?? 'his';
+const { browser, page } = await openConsole({ appUrl: 'http://127.0.0.1:5184', hotUpdates: false, viewport: { width: 1707, height: 960 },
+  launchOptions: state === 'his' ? { args: [COARSE_ONLY] } : {}, contextOptions: { deviceScaleFactor: 1.5 } });
+await page.evaluate(() => localStorage.removeItem('companion-panel'));
+await reloadApp(page); await page.waitForTimeout(600);
+const pt = await page.evaluate(() => { const d = [...document.querySelectorAll('[data-companion-door], [data-companion-fab] > .vv-fab')].find((e) => e.checkVisibility({ visibilityProperty: true })); const r = d.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+await page.mouse.move(pt.x, pt.y); await page.mouse.down(); await page.mouse.up(); await page.waitForTimeout(900);
+const out = await page.evaluate(() => {
+  const p = document.querySelector('[data-companion-panel]'); const pr = p.getBoundingClientRect();
+  return [...p.querySelectorAll('[data-companion-grip]')].map((g) => { const r = g.getBoundingClientRect(); return `${g.getAttribute('data-edge') ?? g.getAttribute('data-corner')}${g.hasAttribute('data-pointer-only') ? '' : '(kbd)'}: ${Math.round(r.width)}x${Math.round(r.height)} at ${Math.round(r.left - pr.left)},${Math.round(r.top - pr.top)}`; });
+});
+console.log(`== ${state}`); for (const l of out) console.log('  ', l);
+await browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "MAN-9062 says '6px strips between the corners': $(~/.claude/scripts/docstore get MAN-9062 --text | grep -c '6px strips between the corners')"
+for s in his plain; do timeout 100 node "$1/p.mjs" $s 2>&1 | cut -c1-90; done
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `…: 1`, then for `his` edge strips `374x12` / `12x910`, corners `12x12` and the keyboard glyph `24x24`, and for `plain` `374x6` / `6x910`, `12x12`, `16x16` (the label column reads `null(kbd)` for every grip: only the sizes matter); cured when the row names the touch-state numbers or says 6px under a fine pointer and 12px under a coarse one. Live prod client :5184; about 40 s.
+```
+
+measured 2026-11-09 by chain chain-kaylee-panel-drag-root-cause-20261109-135843-6350, finding L2, LOW
+probe-key: bc4b3dd014ba540017a12e5cb20812a395391928
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/useFilePreview.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanelGrips.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPanelPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFinePointer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ViewBoundary.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-panel-move-mouse-on-touch.mjs
+
+## INV-11805 — probe — (MEDIUM) The rule this build adds is in 22 manual rows, and none of them reaches an editor of the two files that own it
+
+(MEDIUM) The rule this build adds is in 22 manual rows, and none of them reaches an editor of the two files that own it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# For each code file this build changed: which three rows does the edit hook serve on a first write-touch, and do any of them say planning can be let through Pause all?
+S=~/.claude/scripts/docstore
+R=/home/lyphe/.claude
+for f in hooks/dispatcher/epic_dial.py hooks/dispatcher/planner_holds.py hooks/dispatcher/planner_rule.py hooks/dispatcher/pace_demand.py claudecodeui_lyphe/server/modules/dispatcher/dispatcher-epics.reader.ts claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts; do
+  served=$($S govern "$R/$f" --touch write --limit 3 --text | cut -d' ' -f1)
+  says=""
+  for t in $served; do $S get "$t" --text | grep -q -E 'planning_through|run-planning|holds_planners|planning exception' && says="$says $t"; done
+  printf '%-72s served: %s | say the exception:%s\n' "$f" "$(echo $served)" "${says:- none}"
+done
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today every one of the six lines ends `say the exception: none`; cured when `epic_dial.py` and `planner_holds.py` each list a row (the new invariant) that names `planning_through` or `holds_planners` among their three
+```
+
+measured 2026-11-12 by chain chain-resume-planning-under-pause-all-20261112-192137-efc1, finding M1, MEDIUM
+probe-key: 84f30dbd60464c6fd1a4c80734f87c4e59d83ae5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanningPause.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/planningPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/planning-dial-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/planning-dial-press/press.mjs
+
+## INV-11822 — The Uploads view is read-only and says only what it read: five rules an edit to src/modules/upload-runs keeps
+
+`src/modules/upload-runs` is the Cerberus tab's Uploads view. It watches; the Restorly Uploads page is where a person acts. An edit to the module keeps all five.
+
+- **Read-only.** No Start, no answer box and no Stop, on the view or in a run's sheet. A press changes what is read or shown and writes nothing. why: Cerberus watches; the page is where a person acts.
+- **A test run is never clean or hiccup.** A dry run (`dry_run`) is listed only while Test runs is on, wears the neutral "Test run" mark with grey reason chips, and is in none of the head's or the pills' figures. Live, it is worded as a test too: the head ("A test run is running"), the Live now pill and the Live now card (`LiveStatus.test`, MAN-9891). why: a dry run is not an upload.
+- **Not read is never none.** A heal answer still out shows a dash; one that could not be read says "not read" (`frictionFailed`); neither draws "no friction". A wire `null` is "not known", never clean (MAN-9882). why: a monitor that cannot see must never look quiet.
+- **The vendor's words are text and data.** The agent's words, a tool's summary, a step's reason, a customer, a login, a flow and a reason's detail reach the page as React text nodes: never markup, never an i18n key. The view's own sentences are `cerberus.uploads.*` (MAN-7870).
+- **Colour never stands alone.** A tone reaches paint as `data-tone` plus a `tone-*` name, and a state that speaks in colour also carries its icon or word (MAN-739, MAN-578).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/
+
+## INV-11831 — The Uploads events pane sets overflow-anchor: none because useFollowNewest moves the scroll itself — the browser's anchoring and the hook's move add up
+
+The events pane of a run's sheet (`RunEvents.tsx`, `data-uploads-events-pane`) carries `overflow-anchor: none`, and `useFollowNewest` (`hooks/useFollowNewest.ts`) moves the pane's `scrollTop` itself when a line arrives at the foot while the reader has scrolled up. They are one rule in two places.
+- The browser's own scroll anchoring moves the offset too. With both on, the shift of the reader's line went from 97 px to 372 px (measured 2026-11-13, Chromium).
+- Safari has no scroll anchoring, so the hook's move is what holds there; the property is what keeps Chromium from adding its own.
+- Keep both. why: without the property Chromium adds its move to the hook's; without the hook the reader slides on every engine, since the property turns the browser's own move off.
+- Shown by `.verify/uploads-fill-states.mjs` stage `follow` (MAN-9914). The pane's behaviour: MAN-9913.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/upload-runs/RunEvents.tsx
+
+## INV-11832 — the boot-report door stays above the body parsers and the API-key check in server/index.ts
+
+`app.use('/api/boot-report', createBootReportModule())` sits right after `cors` and ahead of `express.json({ limit: '50mb' })`, `express.urlencoded` and `app.use('/api', validateApiKey)`. The page that posts is the one that did not draw, so it holds no session and no API key.
+
+| mount moved below | what happens |
+|---|---|
+| `validateApiKey` | with `API_KEY` set every report is a 401 (the page sends no `x-api-key`); the page keeps it in its outbox and the journal never hears of a failed page. `.env` sets no `API_KEY` today, so nothing shows until one is set |
+| `express.json({ limit: '50mb' })` | the 50 MB parser reads the body first and the door's own 16 kB parser stands down (body-parser skips a parsed body): a caller with no token makes the API parse 50 MB |
+
+- the door bounds itself because it is public: 16 kB parser, 30 reports a minute per source and 60 in all, one line per report of at most 14,000 characters (MAN-9909).
+- a middleware meant for every `/api` path goes below the door, not above it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/boot-report/
+
+## INV-11833 — vite.config.js never imports a file builders save: server/shared/gemini-budget-relay.ts is read at run time by vite-plugins/budgetRelay.js
+
+A file `vite.config.js` imports is a config dependency: Vite restarts the whole dev server, every open page with it, on each save of one. `server/shared/gemini-budget-relay.ts`, which builders edit, was one.
+
+- symptom: a save of the relay prints `… changed, restarting server…` in `journalctl -u cloudcli-client-dev`; every open page reloads onto a cold module graph, and the HTTPS front's dial to :5183 is refused while Vite comes back (2026-11-13: two restarts inside one second at 08:19:40, the front refused at 08:19:44).
+- fix: `vite.config.js` imports only `vite-plugins/budgetRelay.js`, which loads the relay at RUN time with a computed specifier that esbuild does not follow. The dev server swaps a saved relay in (`budget relay reloaded, no restart`); `vite preview` reads it once, at start. Another server file the proxy needs is read the same way, never imported.
+- the relay stays loadable by Node's own type stripping: erasable TypeScript only (no `enum`, no `namespace`) and `node:` built-ins only, because no build step stands between a save and the running rule. A file that will not load leaves the proxy naming no budget, so the connector refuses a call that reaches Gemini; a save that does not parse keeps the previous rule.
+- measured 2026-11-13: Vite's `loadConfigFromFile` listed the relay as a config dependency before and does not after; a whitespace-only save of the relay left 0 `restarting server` lines and one `budget relay reloaded, no restart`, and the proxy's three header cases (box with a header, box with none, the HTTPS front with a forged header) answered the same before the save, after it and after its restore. Mechanism and rows: MAN-9523.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/gemini-budget-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/budgetRelay.js
+
+## INV-11858 — Chat app regression cases — `cases/<area>/<name>.mjs|.ts` on `cases/lib/`: the checks-token doors, the header, the verdict line, `writes: none` or scratch the case made, no test framework
+
+The chat app's regression cases are plain scripts on the running app: no framework, no test-runner config, no `*.test.*` name, no `tests/` directory. The suite's one config is `cases/cases.toml` (suite `lyphecli`); `~/.claude/scripts/cases` registers, runs and records the cases. The runner's contract: MAN-7652. The kit: MAN-9924.
+
+## Where a case lives
+- `cases/<area>/<name>.<ext>`. `<name>` is the promise said as a name: the intent's name in the dispatcher's store, registered first (`cases add <name> --suite lyphecli --sentence -`). `<area>` is a key of `[areas]`.
+- `<ext>` is `.mjs` (`node`) or `.ts` (`cloudcli-tsx`). A `.ts` case judges server code with no route: it imports the module by path inside the body (`await import("../../server/modules/…")`).
+- A case reaches the running app, the browser and the kit through `../lib/` only: never `playwright`, a raw `fetch` of the app, or a kit file by path. why: each door keeps its credential and its CANNOT RUN rules in one file.
+
+## The lib — each file's head comment is its Usage
+| file | exports | does |
+|---|---|---|
+| `cases/lib/case.mjs` | `runCase` `held` `broken` `cannotRun` `CannotRun` `KIT` | the kit's door: the bytes of `kit/node/door.mjs`, never edited here |
+| `cases/lib/app.mjs` | `api(path, call)`, `apiWithNoToken(path, call)`, `withPage(t, { viewport })` | the running app through the checks token (below) |
+| `cases/lib/scratch.mjs` | `scratchDir(t, label)` | the kit's scratch folder, loaded through `KIT` at the call |
+| `cases/lib/suite_helper.mjs` | `helperOf`, `repoOf`, `writeScript`, `runScript`, `startScript`, `runnerEnv`, `handEnv`, `describe`, `OWN_HELPER`, `KIT_DOOR` | another suite's `cases/lib/case.mjs` judged from outside it, by scratch scripts run as child processes (area `suites`) |
+
+## Where a case looks
+| to read | door | origin and rule |
+|---|---|---|
+| the API | `api(path)` | the server on `SERVER_PORT` from the repo's `.env`, every request carrying `Authorization: Bearer <the checks token>` |
+| the refusal itself | `apiWithNoToken(path, { judge401: false })` | the same origin, no credential: for the case whose promise IS the 401 |
+| the screen | `withPage(t, { viewport })` | Chromium from the repo's own `playwright` on `VITE_PORT`, signed in with the checks token, closed by a cleanup deferred on `t` |
+- The checks token is minted in the case's process as `scripts/universe-token.mjs` mints one: the app's own secret, read and never made, ten minutes of life, nothing written to disk.
+- A 401 is CANNOT RUN unless the call says `judge401: false` (MAN-7477). The sign-in screen, the "Can't reach the server" screen and the onboarding screen each end `withPage` CANNOT RUN. No case fills the sign-in form.
+- No origin is a number written in a case or the lib: both ports come from `.env`.
+
+## Header — `//` comments in the case's first 30 lines
+| line | holds |
+|---|---|
+| `// protects:` | comma-separated paths, relative to the repo or absolute, a directory ending `/`, or a glob; the line may repeat |
+| `// writes:` | `none`, stated exactly once |
+- With them, a comment saying the promise.
+
+## Verdict — the last line on stdout, and the exit code
+| line | exit | meaning |
+|---|---|---|
+| `HELD: <saw>` | 0 | the promise holds |
+| `BROKEN: <saw>` | 1 | it does not; `<saw>` is what was seen instead |
+| `CANNOT RUN: <why>` | 2 | the case could not judge; never read as held or broken |
+- The body returns `held(saw)`, `broken(saw)` or `cannotRun(why)`, or throws `CannotRun`. Diagnostics go to stderr.
+
+## `writes: none`
+- Every case says `writes: none`. A case that must write writes only on scratch it made, gone when it ends: `scratchDir(t, label)`; a file there named by the variable the module reads (`GEMINI_PLAN_CAP_FILE`, `DATABASE_PATH` set before the module loads), never the live file or database.
+- No case calls a model, or a route that calls one.
+
+## Run
+| when | do |
+|---|---|
+| one case, recorded | `~/.claude/scripts/cases run <name> --suite lyphecli` |
+| an area, the suite | `cases run --suite lyphecli --area <area>` · `cases run --suite lyphecli --all` |
+| one case, no record | `node cases/<area>/<name>.mjs` or `cloudcli-tsx cases/<area>/<name>.ts` from `/home/lyphe/.claude/claudecodeui_lyphe`, with `cases` on PATH or `CASES_KIT` set |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/cases/

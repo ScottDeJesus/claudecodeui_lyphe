@@ -18,7 +18,8 @@ type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 /**
  * Where each edge strip stands: flush with its side, inside the panel's border, running between the corners (12px in
- * from each end, the panel's radius), so a corner is never an edge's. The kit gives the strip its thickness, 6px.
+ * from each end, the panel's radius), so a corner is never an edge's. The kit gives the strip its thickness: 6px, and 12px
+ * where the browser names touch its primary pointer (the glyph button below is 16px, and 24px under that query).
  */
 const EDGE_PLACE: Record<Edge, string> = {
   top: 'inset-x-3 top-0',
@@ -50,8 +51,8 @@ const CORNERS: Corner[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right
 
 /**
  * Her floating panel's frame of grips: the kit's `ResizeGrip` on all four edges and all four corners, each resizing the
- * sides it names. Composed by this module's CompanionPanel, last in the panel, only while the panel floats (from lg, under
- * a fine pointer): the sheet a phone draws has none.
+ * sides it names. Composed by this module's CompanionPanel, last in the panel, only while the panel floats (from lg, where a
+ * mouse or a pen drives the page): the sheet a phone draws has none.
  *
  * At rest the frame draws one thing — the glyph of the keyboard's grip in the bottom corner that faces into the page, the
  * house's sign that a floating panel resizes (the floating chat wears the same one) — and the panel otherwise looks as it

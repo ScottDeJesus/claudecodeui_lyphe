@@ -7,6 +7,7 @@ import type { PreviewKind } from '@/modules/chat/transcript/shapes/detect';
 import { PreviewScopeContext } from '@/modules/chat/transcript/shapes/previewScope';
 import { readTranscriptPicture, useOutsideImage } from '@/modules/chat/transcript/transcriptPictures';
 import { useShapeCollapse, useShapeInteractive } from '@/modules/chat/transcript/shapes/useShapeCollapse';
+import { isApplePlatform } from '@/shared/utils';
 
 export type FilePreviewState = {
   /** The loaded preview, or `null` — not a previewable file, not loaded yet, unreadable, or in an export. */
@@ -28,17 +29,26 @@ const ACCEPTS: Record<PreviewKind, (type: string) => boolean> = {
 };
 
 /**
+ * A browser on a phone's or a tablet's own OS: Android's (a Chromium says `mobile`; the others name Android in their user
+ * agent) and every browser on iOS and iPadOS (an Apple platform with a touch screen: a Mac has none). A pointer query cannot
+ * tell these from the rest: a touchscreen computer used as a tablet answers a coarse pointer, and its browser draws a PDF well.
+ */
+function onPhoneOrTabletOs(): boolean {
+  const hinted = (navigator as Navigator & { userAgentData?: { mobile: boolean } }).userAgentData?.mobile === true;
+  return hinted || /Android/.test(navigator.userAgent) || (isApplePlatform() && navigator.maxTouchPoints > 1);
+}
+
+/**
  * Can this browser show a PDF inside a frame, pages and all? A phone's browser mostly cannot: Android
  * Chrome offers a download instead, every time the row mounts, and iOS Safari reports a viewer yet
- * draws only a still first page. `navigator.pdfViewerEnabled` is the browser's own answer, and a fine
- * pointer is what tells a desktop from a phone that answers yes; anywhere else the chip opens the file
- * as any other chip does.
+ * draws only a still first page. `navigator.pdfViewerEnabled` is the browser's own answer, and a
+ * phone's or tablet's OS (`onPhoneOrTabletOs`) is what tells a desktop from a phone that answers yes;
+ * anywhere else the chip opens the file as any other chip does.
  */
 const canShowPdf = (): boolean =>
   typeof navigator !== 'undefined'
   && navigator.pdfViewerEnabled === true
-  && typeof matchMedia === 'function'
-  && matchMedia('(pointer: fine)').matches;
+  && !onPhoneOrTabletOs();
 
 /**
  * The source a preview is given for its bytes.

@@ -3,9 +3,10 @@ import type { TFunction } from 'i18next';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { useCpuRelease } from '@/shared/hooks/useCpuRelease';
 import { useElapsed } from '@/shared/hooks/useElapsed';
 import { spendText } from '@/shared/spend';
-import { LLMProviderLogo } from '@/shared/ui';
+import { Button, LLMProviderLogo } from '@/shared/ui';
 import type { SoulLaunchSnapshot } from '@/shared/types';
 import { cn } from '@/shared/utils';
 import { soulName } from '@/modules/chat/subagents/subagentRow';
@@ -30,6 +31,12 @@ import { formatSubagentFinishTime } from '@/modules/chat/utils/subagentSummary';
  * server's lane and joined here by launch id (`src/modules/dispatch-souls/`). Elapsed is the
  * running row's; the cost, the tokens and how long it took are the receipt's, and they are absent
  * — not zero — until that lands.
+ *
+ * A LAUNCH THE RUNNER HOLDS BACK WHILE THE BOX'S CPU IS FULL says so (`launch.cpu_wait`, set by the lane only while its launcher is alive
+ * and its soul has not started): its chip reads `Waiting for CPU` and its own clock instead of `running`, and a line under the others carries
+ * the gate's words with an Override that starts THIS agent now and leaves the check on (`useCpuRelease`). It is the same line and the same press
+ * the plan cards draw for the dispatcher's own agents (`CpuWaitOverride`, which this module cannot import: the dispatcher module already imports
+ * the chat module, and the two barrels may not import each other), muted as a wait is everywhere on the board: a hold is not an error.
  */
 
 type SoulLaunchPinRowProps = {
@@ -73,6 +80,10 @@ export const SoulLaunchPinRow = memo(({ launch, modelLabel, onDismiss, onOpen, o
   // `null` for a finished launch: the hook then holds NO interval at all, so a strip of a dozen
   // ended souls costs nothing per second rather than a dozen timers.
   const elapsed = useElapsed(running ? launch.started_at : null);
+  // Waiting for CPU is a running launch whose soul has not started: its own clock counts the wait, not the soul's time.
+  const waiting = running ? launch.cpu_wait : null;
+  const waited = useElapsed(waiting === null ? null : waiting.since);
+  const cpuRelease = useCpuRelease(launch.launch_id);
   const finishTime = formatSubagentFinishTime(
     launch.ended_at === null ? null : new Date(launch.ended_at * 1000).toISOString(),
   );
@@ -102,6 +113,7 @@ export const SoulLaunchPinRow = memo(({ launch, modelLabel, onDismiss, onOpen, o
       {...openProps}
       data-testid="pinned-soul-row"
       data-status={launch.state}
+      data-cpu-waiting={String(waiting !== null)}
       data-launch-id={launch.launch_id}
       data-provider={launch.provider}
       // The mark sits beside BOTH lines, centred on the row's height; the lines stack to its right.
@@ -128,7 +140,15 @@ export const SoulLaunchPinRow = memo(({ launch, modelLabel, onDismiss, onOpen, o
               <span className="min-w-0 flex-1 truncate">{launch.role}</span>
             </span>
           )}
-          {running ? (
+          {waiting !== null ? (
+            // Waiting for CPU: the same chip in muted ink with a still dot — a hold is not an error and not work, and the dot that
+            // pulses says a soul is working. Its clock is the wait's own.
+            <span data-testid="pinned-soul-waiting" className="ml-auto flex flex-shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+              {t('cpuWait.waiting')}
+              {waited && <span className="tabular-nums text-muted-foreground/70">· {waited}</span>}
+            </span>
+          ) : running ? (
             // "running" AND the clock, never the clock alone: a bare "3m 12s" beside a finished
             // agent's timestamp reads as the same kind of fact, and this one has to say which it is.
             // On a phone the whole chip leaves the header — the word and the clock with it — and the
@@ -201,6 +221,30 @@ export const SoulLaunchPinRow = memo(({ launch, modelLabel, onDismiss, onOpen, o
                 )}
               </span>
             )}
+          </div>
+        )}
+        {/* The gate's own words for why this agent has not started, and the press that starts THIS one now. The row is itself
+          * a button that opens the transcript, so the press stops its click here and the keyboard's Enter never reaches the row
+          * (it acts only on a key pressed on the row itself). */}
+        {waiting !== null && (
+          <div data-testid="pinned-soul-cpu-wait" className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+            <span data-plan-cpu-wait="" className="min-w-0 break-words">{t('cpuWait.line', { clause: waiting.words })}</span>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-7 finger:h-11"
+              disabled={cpuRelease.busy}
+              title={t('cpuWait.overrideTitle')}
+              data-cpu-wait-override
+              data-launch-id={launch.launch_id}
+              onClick={(event) => {
+                event.stopPropagation();
+                void cpuRelease.release();
+              }}
+            >
+              {t('dispatcher.override.press')}
+            </Button>
           </div>
         )}
         {/* A refused or silent endpoint is why this soul did no work, and it is the one thing a

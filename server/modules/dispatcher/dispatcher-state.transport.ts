@@ -1,6 +1,6 @@
 import { readDispatcherJson } from '@/shared/dispatcher-command.js';
 import { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, need, oneOf } from '@/shared/document-fields.js';
-import type { DispatcherModelWord, DispatcherPlanningPause, DispatcherStall } from '@/shared/types.js';
+import type { DispatcherCpuWait, DispatcherModelWord, DispatcherPlanningPause, DispatcherStall } from '@/shared/types.js';
 
 // The dispatcher lane's readers import the field vocabulary from here, so its import surface is
 // the one it always had; the readers themselves live in `@/shared/document-fields.ts`.
@@ -111,6 +111,24 @@ export function planningPausedSince(value: unknown, where: string): DispatcherPl
   return {
     at: need(field(pause, 'at'), isText, `${where}.at`),
     by: need(field(pause, 'by'), isText, `${where}.by`),
+  };
+}
+
+/**
+ * The agent a card says is waiting for CPU (`DispatcherCpuWait`) a build OLDER than the field did not write, read as `null` — and
+ * refused by name when the key IS there and is neither `null` nor an object of a launch id, a start moment and words.
+ *
+ * `planningPausedSince`'s doctrine, for a fact about an agent: `null` is the honest reading of an absent key, because a wait says
+ * something IS happening (the runner is holding an agent back, `hooks/dispatcher/cpu_report.py`) and a build that never wrote the key
+ * held nothing back — so a card drawn from it draws no wait. The `words` are the gate's own sentence, text and nothing this reader parses.
+ */
+export function cpuWaitSince(value: unknown, where: string): DispatcherCpuWait | null {
+  if (value === undefined || value === null) return null;
+  const wait = need(value, isRecord, where);
+  return {
+    launch: need(field(wait, 'launch'), isText, `${where}.launch`),
+    since: need(field(wait, 'since'), isCount, `${where}.since`),
+    words: need(field(wait, 'words'), isText, `${where}.words`),
   };
 }
 

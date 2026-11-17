@@ -18,6 +18,7 @@ import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlan
 import { usePutAway } from '@/modules/dispatcher/hooks/usePutAway';
 import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
 import { phaseWord } from '@/modules/dispatcher/phaseWord';
+import { CpuWaitOverride } from '@/modules/dispatcher/CpuWaitOverride';
 import { PaceOverride } from '@/modules/dispatcher/PaceOverride';
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanCard } from '@/modules/dispatcher/PlanCard';
@@ -253,9 +254,14 @@ export function DispatchArcDeck({
               {/* The pacer's hold on the epic's OWN queued outings — its design before any plan of it exists, its
                   whole-arc cut, a tell, its judgment — with its Override, or the Override standing with its Turn
                   off. It is the epic's alone: no plan card repeats it, so each hold has one press. */}
-              {(arc.pace_hold || arc.overridden) && (
+              {(arc.pace_hold || arc.overridden || arc.cpu_wait) && (
                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <PaceOverride name={arc.name} hold={arc.pace_hold} overridden={arc.overridden} scope="arc" />
+                  {(arc.pace_hold || arc.overridden) && (
+                    <PaceOverride name={arc.name} hold={arc.pace_hold} overridden={arc.overridden} scope="arc" />
+                  )}
+                  {/* The epic's own planner outing the runner holds back while the box's CPU is full, with the Override that
+                      starts that one agent now (`CpuWaitOverride`): the epic's alone, as its pace hold is. */}
+                  {arc.cpu_wait && <CpuWaitOverride wait={arc.cpu_wait} />}
                 </div>
               )}
             </>

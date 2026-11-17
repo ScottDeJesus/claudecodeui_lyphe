@@ -249,8 +249,11 @@ At rest there is exactly one child: `ps -o pid= --ppid $(systemctl show -p MainP
 cloudcli-server-dev)` prints one line. Two is the handover window: near-instant with nothing in
 flight on the retiring child, stretching up to its own drain bound (`HTTP_DRAIN_BOUND_MS`,
 [`server/http-drain.ts`](../../server/http-drain.ts)) while an HTTP request it already accepted is
-still finishing, and up to ~70 s while a turn of Kaylee's is finishing (the exit waits for her; the
-rest of its shutdown does not).
+still finishing (an event stream held open for a view, the upload runs' feed or a live run's stream,
+is not one: the shutdown ends it as the drain starts, `endOpenEventStreams` in
+[`server/shared/shadow-connector-lane-stream.ts`](../../server/shared/shadow-connector-lane-stream.ts)),
+and up to ~70 s while a turn of Kaylee's is finishing (the exit waits for her; the rest of its
+shutdown does not).
 
 ## SO_REUSEPORT
 

@@ -105,13 +105,14 @@ function aimOf(session: string, project: string): { ok: true; aim: DraftAim } | 
 }
 
 /**
- * An empty `update_draft`: clears the draft and its target, the verb the panel's own button has (`DELETE /draft`). A clear
+ * An empty `update_draft`: clears the draft and its target, as the panel's own button does (`DELETE /draft`), except that the
+ * store keeps that it was SHE who cleared it: a send of it afterwards is refused plainly, not with his answer. A clear
  * names no chat, so her focus stays where it was and no activity is set; with no draft held there is nothing to write,
  * and the answer is plain text, not a refusal.
  */
 function clearDraft(deps: CompanionToolDeps): ToolTextResult {
   if (deps.store.readState().draft === null) return textResult('There was no draft to clear.');
-  deps.store.setDraft(null);
+  deps.store.endDraft({ kind: 'cleared_by_her' });
   return textResult('Draft cleared.');
 }
 

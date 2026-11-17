@@ -20,13 +20,17 @@ import net from 'node:net';
  *  - a client on this box with none → `null`, and nothing is carried. The connector then answers a request
  *    that reaches Gemini with its own refusal, which the sender can always fix.
  *
- * Node built-ins only, so both importers can load it: the Vite config (esbuild bundles it when Vite loads
- * the config, and `vite preview` reads the same one) and the server (run by tsx, where `@/` is `server/`).
+ * Node built-ins only, and erasable TypeScript only (no enum, no namespace), so both importers can load it: the Vite
+ * proxy (`vite-plugins/budgetRelay.js` imports it at RUN time and Node strips the types itself; the dev server swaps
+ * a saved version in without a restart, and `vite preview` reads it once, at start) and the server (run by tsx, where
+ * `@/` is `server/`). The config must never import it statically: a file the config imports is a config dependency,
+ * and Vite restarts the whole dev server, every open page with it, on every save of one.
  */
 
 /**
- * The header a budget travels in. Consumers: `vite.config.js` (the `/api` proxy sets it) and the lane
- * forwarder in this directory (it sends it).
+ * The header a budget travels in. Consumers: `vite-plugins/budgetRelay.js` (the `/api` proxy sets it) and the lane wire in
+ * this directory (`shadow-connector-lane-wire.ts`, which puts it on every call to shadow-connector, a forwarded
+ * one or a stream).
  */
 export const BUDGET_HEADER = 'X-Gemini-Budget-Plan';
 
@@ -133,8 +137,8 @@ function firstBudgetHeader(rawHeaders: readonly string[]): string | undefined {
 
 /**
  * `relayBudget` over an inbound Node request (an `http.IncomingMessage` or an express `Request`): its socket's
- * addresses, its front stamp and its first budget header. Consumers: `vite.config.js` (the `/api` proxy of :5183 and
- * :5184) and `shadow-connector-lane-router.ts` (both lanes, so a caller that reaches the API's tailnet listener from
+ * addresses, its front stamp and its first budget header. Consumers: `vite-plugins/budgetRelay.js` (the `/api` proxy of
+ * :5183 and :5184, which `vite.config.js` builds) and `shadow-connector-lane-router.ts` (every lane, so a caller that reaches the API's tailnet listener from
  * off the box is judged by the same rule).
  */
 export function relayBudgetOf(request: {

@@ -993,7 +993,7 @@ A user message that came to a chat through Kaylee wears a small "Through Kaylee"
 
 ## The record and the live row
 - `companion-send.ts` records every send: `relayedSendsDb.record(sessionId, 'turn' | 'steer', words, messageUuid?)` (table: MAN-9082). The text is stored trimmed. A TURN stamps a uuid on its message (`runDetachedChatTurn`'s `messageUuid`, a server-only option: `dispatchRun` clears any a page sends; `claude-runtime.provider.js` `buildPromptMessages` uses it when it is a uuid) which the CLI keeps as the transcript row's own uuid, and records it in `relayed_sends.message_uuid`. A steer records none, and neither does a turn into a chat of another provider: only the Claude runtime reads `options.messageUuid`, so `companion-send.ts` stamps one only when the chat's provider is `claude`, and any other provider's row is marked by the text rule below.
-- Live echo: a user `text` row with id `local_kaylee_<uuid>`, `spokenVia: 'kaylee'`, written by the send (MAN-9072). A steer's echo is the only live row: the CLI does echo each message it reads (`--replay-user-messages`), but the runtime shows that echo for a composer steer alone and drops hers (MAN-9068).
+- Live echo: a user `text` row with id `local_kaylee_<uuid>`, `spokenVia: 'kaylee'`, written by the send (MAN-9764). A steer's echo is the only live row: the CLI does echo each message it reads (`--replay-user-messages`), but the runtime shows that echo for a composer steer alone and drops hers (MAN-9068).
 - Persisted row: the history read marks it again. A steer's persisted row is the `queued_command` attachment drawn as a user row (`claude-queued-prompt.ts`, MAN-9068); without it there is nothing to mark.
 
 ## `markRelayedSends(sessionId, messages)` (`providers/services/session-relayed-sends.ts`)
@@ -1045,7 +1045,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/service
 ## Read — `sessionsDb.latestPermissionMode(provider?)`
 - The most recent NON-NULL `permission_mode`, ordered by `julianday(COALESCE(updated_at, created_at)) DESC, rowid DESC`. why `julianday`: `updated_at` is written in two spellings (SQLite's `CURRENT_TIMESTAMP` and the watcher's ISO), which do not sort as text.
 - `provider` narrows it to that provider's chats: a mode is a provider's own word. `null` when no chat has one.
-- Caller: `tools/send-options.ts` (`sendOptionsFor`) for a NEW chat. For an existing chat the send reads that row's own `permission_mode` and leaves the option out when it holds none (MAN-9072 §Options).
+- Caller: `tools/send-options.ts` (`sendOptionsFor`) for a NEW chat. For an existing chat the send reads that row's own `permission_mode` and leaves the option out when it holds none (MAN-9765).
 
 ## Proof
 `.verify/companion-permission-mode.mjs`: a scratch chat in `PROBE_PROJECT`, on Haiku through the composer's own chip; `sqlite3 -readonly` shows `permission_mode` NULL before the first send and the composer's mode after one typed send (Enter); the chat is deleted at the end. `.verify/companion-storage.ts` runs `latestPermissionMode` before and after a session is given one.
@@ -1080,7 +1080,7 @@ The house's model names and the account's default model. Code: `list/claude/clau
 | file unreadable or not JSON | `null` | `[Claude] the account default model could not be read from its settings` with the path |
 | `model` names no table family (`default`, another name) | `null` | `[Claude] the account default model names a family the house has no name for…` |
 - `null` → the caller sends no model and `opus[1m]` runs.
-- Consumer: `companion-send.ts` `sendToNewChat`, for a new chat whose `model` she left out (MAN-9072).
+- Consumer: `companion-send.ts` `sendToNewChat`, for a new chat whose `model` she left out (MAN-9072 §`model`, MAN-9764).
 - `claudeConfigDir()` (`server/shared/utils.ts`): `CLAUDE_CONFIG_DIR` trimmed when set, else `~/.claude`. Callers: this reader, `claude-auth.provider.ts`, `claude-login-renewal.ts` and the accounts module's `usage.service.ts`.
 
 ## Proof

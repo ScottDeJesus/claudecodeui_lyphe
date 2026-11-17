@@ -10,6 +10,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 
+import { useFinePointer } from '@/modules/companion/hooks/useFinePointer';
 import { clampPanelRect, keyboardCorner, movePanelRect, resizePanelRect } from '@/modules/companion/utils/companionPanelGeometry';
 import { readPanelRect, writePanelRect } from '@/modules/companion/utils/companionPanelStorage';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
@@ -22,18 +23,26 @@ type Size = { width: number; height: number };
 type ResizeDelta = { dx: number; dy: number };
 type ResizeHandlers = { onResize: (delta: ResizeDelta) => void; onResizeEnd: (delta: ResizeDelta) => void };
 
-/** Where her panel floats, and so moves and resizes: Tailwind's `lg` (the panel's own `lg:` stance), under a fine pointer. */
-const FLOATING_QUERY = '(min-width: 1024px) and (pointer: fine)';
+/** Tailwind's `lg`: the width from which the panel has its own `lg:` stance, and so room to float. */
+const LG_QUERY = '(min-width: 1024px)';
 
 /** The browser's one answer, made once: `matchMedia` hands back a live object every read and subscriber shares. */
-const floatingQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(FLOATING_QUERY) : null;
+const lgQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(LG_QUERY) : null;
 
-function subscribeFloating(listener: () => void): () => void {
-  floatingQuery?.addEventListener('change', listener);
-  return () => floatingQuery?.removeEventListener('change', listener);
+function subscribeLg(listener: () => void): () => void {
+  lgQuery?.addEventListener('change', listener);
+  return () => lgQuery?.removeEventListener('change', listener);
 }
 
-const readFloating = () => floatingQuery?.matches ?? false;
+const readLg = () => lgQuery?.matches ?? false;
+
+/**
+ * The most a measured floor may differ from the one held and still be the held one. A row's height follows the panel's own (a
+ * `cqh` cap, a percentage) and a card writes its floor from fractional boxes, so a panel held at its floor reads that floor a
+ * pixel off the box it has just drawn: answered by a render, the next read is a pixel off the other way, and so on until React
+ * gives up on the page. A pixel of rounding is never a row that came or went.
+ */
+const FLOOR_NOISE_PX = 1;
 
 /** The room of the shell the panel is placed in (its containing block, `offsetParent`); null while the panel is not drawn. */
 function measureRoom(panel: HTMLElement): Size | null {
@@ -112,10 +121,15 @@ function draw(panel: HTMLElement, rect: CompanionPanelRect): void {
 }
 
 /**
- * Where her panel stands while it FLOATS — from lg, under a fine pointer — and the drags that move and resize it. Used by
- * this module's CompanionPanel: the panel's inline box, the header's press, and one pair of handlers per grip of
- * `CompanionPanelGrips`. Below lg, or under a finger, `floating` is false, nothing is drawn inline and the panel is the
- * sheet (or the column) its classes make it.
+ * Where her panel stands while it FLOATS — from lg, where a mouse or a pen drives the page (`useFinePointer`) — and the drags
+ * that move and resize it. Used by this module's CompanionPanel: the panel's inline box, the header's press, and one pair of
+ * handlers per grip of `CompanionPanelGrips`. Below lg, or with nothing but fingers on the page, `floating` is false, nothing
+ * is drawn inline and the panel is the sheet (or the column) its classes make it.
+ *
+ * WHETHER A MOUSE DRIVES THE PAGE IS READ OFF ITS EVENTS, NOT ONLY OFF THE BROWSER'S CLASSIFICATION. A touchscreen computer
+ * that Windows reports as used as a tablet answers neither `(pointer: fine)` nor `(any-pointer: fine)`: Chromium gives it a
+ * coarse pointer and no hover and never asks about the mouse in his hand (`useFinePointer` says why), so a panel floated on
+ * either query stands where it is drawn while he drags it, and the drag selects the page's text instead.
  *
  * WITH NOTHING STORED, NOTHING IS DRAWN INLINE: her default stance is the panel's own classes (the right edge, 12px in, the
  * full height less 12px top and bottom, 400px wide), so a browser in which he never moved her sees exactly what it saw
@@ -147,7 +161,11 @@ export function useCompanionPanelPlace(panelRef: RefObject<HTMLElement>, open: b
   resizeBy: (handle: CompanionPanelHandle) => ResizeHandlers;
   keyboardCorner: 'bottom-left' | 'bottom-right';
 } {
-  const floating = useSyncExternalStore(subscribeFloating, readFloating, () => false);
+  // Whether the window is wide enough for her `lg:` stance, the room to float in: the browser's media query, read as it changes.
+  const wide = useSyncExternalStore(subscribeLg, readLg, () => false);
+  // Whether a mouse or a pen drives the page: only then is she a window to move; a page of fingers keeps the column.
+  const finePointer = useFinePointer();
+  const floating = wide && finePointer;
   const hostWindow = useHostWindow();
   // What he last moved or resized her panel to in this browser, read once; null for her default stance. Written at the
   // release of each drag and never by a clamp, so a box held in by a smaller window comes back when the window grows.
@@ -168,7 +186,8 @@ export function useCompanionPanelPlace(panelRef: RefObject<HTMLElement>, open: b
     if (!panel || gesture.current) return;
     const measured = measureRoom(panel);
     if (measured) setRoom((was) => (was?.width === measured.width && was.height === measured.height ? was : measured));
-    setFloor(contentFloor(panel));
+    const measuredFloor = contentFloor(panel);
+    setFloor((held) => (Math.abs(measuredFloor - held) <= FLOOR_NOISE_PX ? held : measuredFloor));
   }, [panelRef]);
 
   // After every render: a row that came or went with this render (a failure's banner, the dock) moves the floor.
