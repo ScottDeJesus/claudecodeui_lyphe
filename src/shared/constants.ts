@@ -775,6 +775,14 @@ export const STATION_PATH = '/station';
  */
 export const SESSIONS_HOME_PATH = '/home';
 
+/**
+ * Where the roadmap's small circle rests on the sessions home, in the page's own pixels: its middle and its radius, at a desk and on a phone.
+ * Read by project-workspace's `WorkspaceHome` (which draws the circle there) and the station's `StationShell` (which draws the circle at the
+ * same place on a phone, and has the stack arrive from it at a desk), so the roadmap does not move between the two pages.
+ */
+export const ROADMAP_CIRCLE_AT_DESK = { cx: 66, cy: 78, radius: 33 } as const;
+export const ROADMAP_CIRCLE_ON_PHONE = { cx: 42, cy: 51, radius: 27 } as const;
+
 // ---------------------------
 
 //----------------- THE STATION PHONE'S SIDEWAYS CATCH ------------

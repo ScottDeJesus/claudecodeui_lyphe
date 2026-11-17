@@ -223,6 +223,7 @@
     "noFolder": "No folder"
   },
   "board": {
+    "halo": "Chats",
     "idle": "Idle",
     "asleep": "Asleep",
     "empty": "No chats yet."

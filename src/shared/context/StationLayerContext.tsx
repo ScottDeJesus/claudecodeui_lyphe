@@ -46,7 +46,17 @@ type StationDoors = {
    * on the workspace.
    */
   openOnStage: (target: CompanionOpenTarget, label: string) => boolean;
+  /**
+   * The roadmap's travel between the sessions home and the station, which both show it: the page that is left says where the reader is going
+   * (`markRoadmapTravel`), and the page that comes forward asks once whether it was come to that way (`takeRoadmapTravel`, true at most once per
+   * mark, and only for a few seconds after it), so its roadmap can be drawn arriving from where the other page showed it.
+   */
+  markRoadmapTravel: (to: 'station' | 'home') => void;
+  takeRoadmapTravel: (to: 'station' | 'home') => boolean;
 };
+
+/** How long a marked travel stays good, in ms: the station's chunk may still be loading on the first visit. */
+const TRAVEL_GOOD_MS = 4000;
 
 const StationShowingContext = createStableContext(import.meta.hot, 'StationShowingContext', false);
 const HomeShowingContext = createStableContext(import.meta.hot, 'HomeShowingContext', false);
@@ -143,6 +153,18 @@ export function StationLayerProvider({ showing, homeShowing, workspacePath, chil
   }, []);
   const openChatInWorkspace = useCallback((sessionId: string) => workspaceChatOpenRef.current?.(sessionId), []);
 
+  // The travel last marked, and when; null once taken.
+  const travelRef = useRef<{ to: 'station' | 'home'; at: number } | null>(null);
+  const markRoadmapTravel = useCallback((to: 'station' | 'home') => {
+    travelRef.current = { to, at: Date.now() };
+  }, []);
+  const takeRoadmapTravel = useCallback((to: 'station' | 'home'): boolean => {
+    const marked = travelRef.current;
+    if (marked === null || marked.to !== to) return false;
+    travelRef.current = null;
+    return Date.now() - marked.at < TRAVEL_GOOD_MS;
+  }, []);
+
   const openOnStage = useCallback((target: CompanionOpenTarget, label: string): boolean => {
     if (!showingRef.current) return false;
     if (stageOpenRef.current === null) waitingOpenRef.current = { target, label };
@@ -161,8 +183,10 @@ export function StationLayerProvider({ showing, homeShowing, workspacePath, chil
       registerWorkspaceChatOpen,
       openChatInWorkspace,
       openOnStage,
+      markRoadmapTravel,
+      takeRoadmapTravel,
     }),
-    [navigate, onShowingChange, registerStageOpen, registerWorkspaceChatOpen, openChatInWorkspace, openOnStage],
+    [navigate, onShowingChange, registerStageOpen, registerWorkspaceChatOpen, openChatInWorkspace, openOnStage, markRoadmapTravel, takeRoadmapTravel],
   );
 
   // The held open outlives nothing: the station leaving the screen without ever registering drops it.

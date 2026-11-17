@@ -16,6 +16,11 @@ import { cn } from '@/shared/utils';
 type RoadmapCircleProps = {
   /** Where the circle rests, in the pixels of the box this is laid over: its middle and its radius. The page keeps that place clear for it. */
   rest: RoadmapStackRest;
+  /**
+   * How many times the reader has come back to this page from one where the stack stood: each time the count goes up, the circle is shown
+   * standing for an instant and lies down into its place, so the one drawing is seen to come back. Absent, or zero: it is simply there.
+   */
+  returns?: number;
 };
 
 /**
@@ -34,7 +39,7 @@ type RoadmapCircleProps = {
  *
  * Exported through the roadmap barrel for project-workspace's sessions home (`WorkspaceHome`), at its head's start side.
  */
-export function RoadmapCircle({ rest }: RoadmapCircleProps) {
+export function RoadmapCircle({ rest, returns }: RoadmapCircleProps) {
   const { t } = useTranslation();
   const { picture, selected } = useRoadmap();
   const hostWindow = useHostWindow();
@@ -81,6 +86,7 @@ export function RoadmapCircle({ rest }: RoadmapCircleProps) {
             rest={rest}
             standing={standing}
             onStand={() => setStanding(true)}
+            returns={returns}
             restLabel={t('roadmap.stack.open', { title: selected.title })}
           />
         )}

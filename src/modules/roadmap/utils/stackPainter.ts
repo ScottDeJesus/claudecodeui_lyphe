@@ -103,6 +103,8 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
   let rest: RoadmapStackRest | null = null;
   let standing = true;
   let grown = 1;
+  // True while the rest is one lent for an arrival (`arriveFrom`): given back the moment the stack is up.
+  let lent = false;
   // The parts of standing up, each 0 to 1 (`view`): grown and tipped, arcs in their places, arcs showing, walls showing, the rest showing.
   let tipped = 1;
   let slid = 1;
@@ -811,6 +813,31 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
       }
     },
 
+    /**
+     * A stack that always stands arrives from a circle elsewhere on its canvas: it starts as that circle and stands up from it, once, and
+     * keeps no rest afterwards. For a page the reader reaches from another that showed the roadmap as that circle, so the one drawing
+     * is seen to travel. Nothing for a stack that has a rest of its own, and nothing under reduced motion.
+     */
+    arriveFrom(from: RoadmapStackRest) {
+      if (still || (rest !== null && !lent)) return;
+      rest = from;
+      lent = true;
+      standing = true;
+      grown = 0;
+      view();
+    },
+
+    /**
+     * A stack resting as its circle is shown standing for an instant and lies down from there: the other half of the travel, for the page
+     * that shows the circle when the reader comes back to it from one where the stack stood. Nothing for a stack that is standing, or that
+     * has no rest, and nothing under reduced motion.
+     */
+    lieDownFromStanding() {
+      if (still || rest === null || lent || standing) return;
+      grown = 1;
+      view();
+    },
+
     /** The small circle is under a pointer or holds the keyboard's focus: its rim lights. */
     setPeek(next: boolean) {
       peek = next;
@@ -880,6 +907,10 @@ export function createStackPainter(canvas: HTMLCanvasElement) {
         const to = standing ? 1 : 0;
         if (grown !== to) {
           grown = still ? to : clamp(grown + (standing ? elapsed / STAND_S : -elapsed / FOLD_S), 0, 1);
+          if (lent && grown === 1) {
+            rest = null;
+            lent = false;
+          }
           view();
         }
       }

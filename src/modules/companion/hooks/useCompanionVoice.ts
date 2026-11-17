@@ -39,6 +39,8 @@ type CompanionVoiceHook = {
   cutOff: () => Promise<void> | null;
   /** The press that ends his recording: the pull is asked again from what she says next. */
   release: () => void;
+  /** Says the newest answer again from its first sentence (`createSpeechPull().again`), unlocking the page's audio first: the press is a gesture. Nothing while the switch is off. */
+  again: () => void;
   /** Stops what sounds and asks for nothing more of the turn, with the floor kept (Stop, Clear). It leaves the timed mouth shapes the page has heard: `forgetMouth` is Clear's. */
   silence: () => void;
   /** The player's `level()` — its RMS over the last 43 ms, 0..1, and 0 when nothing sounds — for her face's mouth. One function for the page's life. */
@@ -143,6 +145,11 @@ export function useCompanionVoice({ picture, clientId }: { picture: CompanionPic
   }, [engine]);
 
   const silence = useCallback(() => engine.silence(), [engine]);
+  const again = useCallback(() => {
+    if (!onRef.current) return;
+    player.unlock().catch((failure: unknown) => console.warn('[Companion] Her voice could not be unlocked on this page:', failure));
+    engine.again();
+  }, [engine, player]);
   const release = useCallback(() => engine.release(), [engine]);
 
   const voice = useMemo<CompanionVoice>(() => ({ on, setOn, speaking, cut }), [on, setOn, speaking, cut]);
@@ -151,7 +158,7 @@ export function useCompanionVoice({ picture, clientId }: { picture: CompanionPic
   // The store's three functions close over its own map and never read `this`, so they too are handed out as they stand and keep one identity.
   const { of: mouth, hear: hearMouth, forget: forgetMouth } = mouthPieces;
   return useMemo(
-    () => ({ voice, unlock, cutOff, release, silence, level, progress, analyser, mouth, hearMouth, forgetMouth }),
-    [voice, unlock, cutOff, release, silence, level, progress, analyser, mouth, hearMouth, forgetMouth],
+    () => ({ voice, unlock, cutOff, release, silence, again, level, progress, analyser, mouth, hearMouth, forgetMouth }),
+    [voice, unlock, cutOff, release, silence, again, level, progress, analyser, mouth, hearMouth, forgetMouth],
   );
 }

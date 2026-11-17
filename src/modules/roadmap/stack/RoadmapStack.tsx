@@ -34,6 +34,14 @@ type RoadmapStackProps = {
   onStand?: () => void;
   /** With a `rest`: the small circle's accessible name. */
   restLabel?: string;
+  /**
+   * The stack's travel between two pages that both show it. `arriveFrom` with `arrivals`: each time `arrivals` goes up, a stack that always
+   * stands arrives from that circle (the painter's `arriveFrom`). `returns`: each time it goes up, a stack resting as its circle lies down
+   * from standing (`lieDownFromStanding`). Zero, or absent, is no travel.
+   */
+  arriveFrom?: RoadmapStackRest;
+  arrivals?: number;
+  returns?: number;
 };
 
 /** How far past the small circle's radius its press reaches, in px: half an arc's band and a little air. */
@@ -120,7 +128,7 @@ function TierReading({ roadmap, tier }: { roadmap: Roadmap; tier: RoadmapStackTi
  *
  * Used by `stack/StackOf`, for the Roadmap tab's Stack face and the sessions home's circle.
  */
-export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, handleRef, rest, standing = false, onStand, restLabel }: RoadmapStackProps) {
+export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, handleRef, rest, standing = false, onStand, restLabel, arriveFrom, arrivals = 0, returns = 0 }: RoadmapStackProps) {
   const { t } = useTranslation();
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -244,6 +252,17 @@ export function RoadmapStack({ roadmap, tiers, arrival, open, onOpen, card, hand
     }
     wasUpRef.current = up;
   }, [up, resting]);
+
+  // The travel between two pages: asked of the painter each time its count goes up, and on the first picture when the stack is mounted mid-travel.
+  const fromCx = arriveFrom?.cx;
+  const fromCy = arriveFrom?.cy;
+  const fromRadius = arriveFrom?.radius;
+  useEffect(() => {
+    if (arrivals > 0 && fromCx !== undefined && fromCy !== undefined && fromRadius !== undefined) painterRef.current?.arriveFrom({ cx: fromCx, cy: fromCy, radius: fromRadius });
+  }, [arrivals, fromCx, fromCy, fromRadius]);
+  useEffect(() => {
+    if (returns > 0) painterRef.current?.lieDownFromStanding();
+  }, [returns]);
 
   // Each new picture is handed to the painter, which keeps the ring in front and every wall's eased figures across it.
   useEffect(() => {

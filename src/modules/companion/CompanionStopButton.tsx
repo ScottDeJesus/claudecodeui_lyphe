@@ -34,9 +34,18 @@ export function CompanionStopButton({ name, onInterrupt }: CompanionStopButtonPr
   };
 
   return (
-    <Button variant="outline" size="sm" busy={stopping} onClick={stop} className="shrink-0 finger:h-11" aria-label={t('companion.stopHint', { name })}>
+    <Button
+      variant="outline"
+      size="sm"
+      busy={stopping}
+      onClick={stop}
+      className="shrink-0 finger:h-11 finger:w-11 finger:px-0"
+      aria-label={t('companion.stopHint', { name })}
+      title={t('companion.stop')}
+    >
       <Square aria-hidden="true" className="fill-current" />
-      {t('companion.stop')}
+      {/* Under a finger the mark alone: a button there is its icon. */}
+      <span className="finger:hidden">{t('companion.stop')}</span>
     </Button>
   );
 }

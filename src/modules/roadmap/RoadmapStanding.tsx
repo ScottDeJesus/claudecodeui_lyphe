@@ -2,6 +2,16 @@ import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
 import { RoadmapDialogHost } from '@/modules/roadmap/RoadmapDialogHost';
 import { StackOf } from '@/modules/roadmap/stack/StackOf';
 import { useRevealCard } from '@/shared/hooks/useRevealCard';
+import type { RoadmapStackRest } from '@/shared/types';
+
+type RoadmapStandingProps = {
+  /**
+   * Where the stack arrives from, in the pixels of its own box, when the reader comes from a page that showed it as a small circle there; with
+   * `arrivals`, the count of such comings. Each time the count goes up the stack starts as that circle and stands up from it. Absent: it is simply there.
+   */
+  arriveFrom?: RoadmapStackRest;
+  arrivals?: number;
+};
 
 /**
  * THE ROADMAP STANDING ON A PAGE THAT IS NOT THE ROADMAP'S: the roadmap on screen (`useRoadmap`'s selected one) as its whole stack (`StackOf`), already
@@ -14,7 +24,7 @@ import { useRevealCard } from '@/shared/hooks/useRevealCard';
  *
  * Exported through the roadmap barrel for the station's scene (`StationShell`), in the room over the companion while nothing is on the panel.
  */
-export function RoadmapStanding() {
+export function RoadmapStanding({ arriveFrom, arrivals }: RoadmapStandingProps) {
   const { picture, selected } = useRoadmap();
   const reveal = useRevealCard();
 
@@ -23,7 +33,7 @@ export function RoadmapStanding() {
     <div data-roadmap-standing="" className="relative h-full min-h-0 w-full">
       <RoadmapDialogHost onOpenCard={reveal}>
         {/* Keyed by the roadmap: another roadmap is another stack, arriving on its own current milestone. */}
-        {() => <StackOf key={selected.name} roadmap={selected} />}
+        {() => <StackOf key={selected.name} roadmap={selected} arriveFrom={arriveFrom} arrivals={arrivals} />}
       </RoadmapDialogHost>
     </div>
   );

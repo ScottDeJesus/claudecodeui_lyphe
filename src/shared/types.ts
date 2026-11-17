@@ -4158,6 +4158,26 @@ export type RoadmapDotState = 'shipped' | 'inFlight' | 'designing' | 'proposed' 
 export type RoadmapTreeSelection = { kind: 'roadmap' } | { kind: 'milestone' | 'epic' | 'feature'; name: string };
 
 // ---------------------------
+//----------------- SESSIONS HALO: what the halo and its painter share ------------
+
+/**
+ * One chat as a slot on the halo, the simple chat list drawn as a hoop round the companion's core: the chat's `id` and `title`, the
+ * folder it stands in (`folder` its id and `folderName` its name, both null for a chat in none), where it stands (`asleep` with no
+ * live session host, `idle` awake and still, `working` while its turn runs, `waiting` while it waits on the reader), whether a reply
+ * is `unread`, and whether one of its `helpers` (a subagent) is still at work. Laid out by the sidebar module's `SessionsHalo` and
+ * drawn by its `haloPainter`.
+ */
+export type SessionsHaloSlot = {
+  id: string;
+  title: string;
+  folder: string | null;
+  folderName: string | null;
+  state: 'asleep' | 'idle' | 'working' | 'waiting';
+  unread: boolean;
+  helpers: boolean;
+};
+
+// ---------------------------
 //----------------- ROADMAP STACK: what the roadmap's stack, its painter and its face share ------------
 
 /**

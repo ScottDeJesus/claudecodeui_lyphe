@@ -15,11 +15,11 @@ type DraftCardProps = ComponentProps<typeof CompanionDraftCard>;
 
 type StationDockViewProps = {
   /**
-   * The window's tier. In the scene the held draft takes at most 45% of the window's height; at the `narrow` tier (compact's
-   * Conversation section) it holds itself to the frame that ends above the on-screen keyboard (`NARROW_FRAME_HOLD`).
+   * The window's tier. Held over the box, the draft takes at most 36% of the window's height; at the `narrow` tier (a tablet, a
+   * phone) it holds itself to the frame that ends above the on-screen keyboard instead (`NARROW_FRAME_HOLD`).
    */
   tier: StationTier;
-  /** `full` (the scene, wide and laptop): the held form, drawn only while a draft stands. `compact`: the section's form. */
+  /** `full` (the scene, at every width): the held form, drawn only while a draft stands. `compact`: a section's form, with its quiet line when empty. */
   density: StationDensity;
   /** The draft as the companion's picture holds it, or null while it holds none. */
   draft: CompanionDraft | null;
@@ -120,7 +120,7 @@ function keepFieldFocusInDockWhileDisabled(event: PointerEvent<HTMLElement>) {
 export function StationDockView({ tier, density, draft, name, targetWorking, onEdit, onSend, onClear, onTargetPress, scrollRef }: StationDockViewProps) {
   const { t } = useTranslation();
   const label = t('station.dock.label', { name, defaultValue: '{{name}}’s draft' });
-  const held = density === 'full' && tier !== 'narrow';
+  const held = density === 'full';
   // A flex column with no automatic minimum (which would count the field's whole basis), so the card gives way with the dock:
   // inside the card only the field shrinks, down to nothing under its head line.
   const card = draft === null ? null : (
@@ -151,7 +151,7 @@ export function StationDockView({ tier, density, draft, name, targetWorking, onE
             data-station-dock={draft === null ? 'empty' : draft.target.kind}
             onMouseDown={keepFieldFocusInDock}
             onPointerDown={keepFieldFocusInDockWhileDisabled}
-            className={cn('mx-auto flex w-full min-w-0 max-w-2xl flex-col [&_[data-companion-draft]]:shadow-[var(--shadow-overlay)]', HELD_CAP)}
+            className={cn('mx-auto flex w-full min-w-0 max-w-2xl flex-col [&_[data-companion-draft]]:shadow-[var(--shadow-overlay)]', tier === 'narrow' ? NARROW_FRAME_HOLD : HELD_CAP)}
           >
             {card}
           </section>

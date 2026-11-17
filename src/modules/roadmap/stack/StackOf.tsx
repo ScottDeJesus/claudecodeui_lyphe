@@ -27,6 +27,10 @@ type StackOfProps = {
   onStand?: () => void;
   /** With a `rest`: the small circle's accessible name. */
   restLabel?: string;
+  /** The stack's travel between two pages that both show it (`RoadmapStack`'s own three): where a standing stack arrives from and how many times, and how many times a resting one has come back. */
+  arriveFrom?: RoadmapStackRest;
+  arrivals?: number;
+  returns?: number;
 };
 
 /**
@@ -40,7 +44,7 @@ type StackOfProps = {
  *
  * Used by `RoadmapStackFace` (the Roadmap tab's Stack face, always standing) and `RoadmapCircle` (the sessions home's circle, small until pressed).
  */
-export function StackOf({ roadmap, rest, standing, onStand, restLabel }: StackOfProps) {
+export function StackOf({ roadmap, rest, standing, onStand, restLabel, arriveFrom, arrivals, returns }: StackOfProps) {
   const stackRef = useRef<RoadmapStackHandle>(null);
   // The card that is open on the stack, by the feature's or the epic's name; one at a time.
   const [open, setOpen] = useState<RoadmapStackTarget | null>(NO_CARD);
@@ -107,6 +111,9 @@ export function StackOf({ roadmap, rest, standing, onStand, restLabel }: StackOf
       standing={standing}
       onStand={onStand}
       restLabel={restLabel}
+      arriveFrom={arriveFrom}
+      arrivals={arrivals}
+      returns={returns}
       card={open !== null && <StackCard target={open} tiers={tiers} onClose={close} onOpenFeature={openFeature} />}
     />
   );

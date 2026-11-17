@@ -15,25 +15,56 @@
 [data-arrival='settling'] { animation: ast-settle var(--duration-settle) var(--ease-settle) both; pointer-events: none; }
 
 /* ---------- the scene's grid: the roadmap over the companion, or the companion beside the panel ----------
- * Two cells that never leave the tree (the companion's and the stage's), placed by what the stage holds. At rest one column:
- * the roadmap takes the room, the shelf of the companion's cards (when it has any) and the companion stand under it. With a
- * thing on the panel two columns: the companion's own (`--kaylee-col`, the shell's figure for the arrangement) and the panel. */
+ * Two cells that never leave the tree (the companion's and the stage's), placed by what the stage holds and by the room there is.
+ * At rest one column: the roadmap takes the room, the shelf of the companion's cards (when it has any) and the companion stand
+ * under it. With a thing on the panel, two columns where there is room for them (wide and laptop): the companion's own
+ * (`--kaylee-col`, the shell's figure for the arrangement) and the panel. In one column (compact and the phone) the companion is
+ * a row at the head and the panel has the rest. */
 [data-station-scene-grid] {
   grid-template: 'road' minmax(0, 1fr) 'stage' auto 'kaylee' auto / minmax(0, 1fr);
 }
 [data-station-scene='staged'] > [data-station-scene-grid] {
   grid-template: 'kaylee stage' minmax(0, 1fr) / var(--kaylee-col) minmax(0, 1fr);
 }
+[data-station-arrangement='compact'] [data-station-scene='staged'] > [data-station-scene-grid],
+[data-station-arrangement='phone'] [data-station-scene='staged'] > [data-station-scene-grid] {
+  grid-template: 'kaylee' auto 'stage' minmax(0, 1fr) / minmax(0, 1fr);
+}
+/* A phone at rest has no roadmap standing: the companion has the room, under the head the roadmap's circle rests in. */
+[data-station-arrangement='phone'] [data-station-scene='rest'] > [data-station-scene-grid] {
+  grid-template: 'kaylee' minmax(0, 1fr) 'stage' auto / minmax(0, 1fr);
+}
 [data-station-road] { grid-area: road; }
 [data-station-kaylee-cell] { grid-area: kaylee; }
 [data-station-stage-cell] { grid-area: stage; }
-/* The companion's column leaves the roadmap's circle its place over the core. */
-[data-station-scene='staged'] [data-station-kaylee-cell] { padding-top: 116px; }
+[data-station-arrangement='phone'] [data-station-scene='rest'] [data-station-kaylee-cell] { padding-top: 28px; }
+/* On its side the circle is beside the companion, not over it. */
+@media (max-height: 520px) {
+  [data-station-arrangement='phone'] [data-station-scene='rest'] [data-station-kaylee-cell] { padding-top: 0; padding-left: 72px; }
+}
+/* The companion's column leaves the roadmap's circle its place over the halo. */
+[data-station-arrangement='wide'] [data-station-scene='staged'] [data-station-kaylee-cell],
+[data-station-arrangement='laptop'] [data-station-scene='staged'] [data-station-kaylee-cell] { padding-top: 108px; }
+/* A window too short for the stack and the companion both (a tablet on its side, a small window): the roadmap gives way. */
+@media (max-height: 620px) {
+  [data-station-scene='rest'] [data-station-road] { display: none; }
+  [data-station-scene='rest'] > [data-station-scene-grid] { grid-template: 'stage' auto 'kaylee' minmax(0, 1fr) / minmax(0, 1fr); }
+  /* `safe`: what does not fit starts at the top and scrolls, never cut off above it. */
+  [data-station-scene='rest'] [data-station-kaylee-cell] { justify-content: safe center; overflow-y: auto; }
+}
+
+/* A phone on its side with a thing on the panel: too short for the companion over the panel, so the two stand side by side. */
+@media (max-height: 520px) {
+  [data-station-arrangement='compact'] [data-station-scene='staged'] > [data-station-scene-grid],
+  [data-station-arrangement='phone'] [data-station-scene='staged'] > [data-station-scene-grid] {
+    grid-template: 'kaylee stage' minmax(0, 1fr) / 280px minmax(0, 1fr);
+  }
+  [data-station-scene='staged'] [data-station-kaylee-cell] { overflow-y: auto; }
+}
 
 /* ---------- the panel: the one thing on the stage ----------
  * At rest the stage's cell keeps only its shelf (the companion's cards), on the box's measure, and only while the shelf has
- * cards. With a thing on it, it is the panel: a surface of its own beside the companion, arriving on the spring, as does
- * each new thing on it. */
+ * cards. With a thing on it, it is the panel: a surface of its own, arriving on the spring, as does each new thing on it. */
 [data-station-scene='rest'] [data-station-stage-cell] { width: 100%; max-width: 720px; margin-inline: auto; }
 [data-station-scene='rest'] [data-station-stage-cell]:has(> [data-station-stage='empty']) [data-station-stage-empty-message] { display: none; }
 [data-station-scene='rest'] [data-station-stage-cell]:has(> [data-station-stage='empty']):not(:has([data-station-shelf])) { display: none; }
@@ -44,6 +75,12 @@
   border-radius: var(--radius-card);
   background: var(--surface);
   animation: ast-arrive var(--duration-lock) var(--ease-lock) both;
+}
+[data-station-arrangement='compact'] [data-station-scene='staged'] [data-station-stage-cell],
+[data-station-arrangement='phone'] [data-station-scene='staged'] [data-station-stage-cell] { margin: 0 8px 8px; }
+@media (max-height: 520px) {
+  [data-station-arrangement='compact'] [data-station-scene='staged'] [data-station-stage-cell],
+  [data-station-arrangement='phone'] [data-station-scene='staged'] [data-station-stage-cell] { margin: 8px 8px 8px 0; }
 }
 [data-station-scene] [data-station-stage-body] { animation: ast-fade-in var(--duration-fade) ease both; }
 

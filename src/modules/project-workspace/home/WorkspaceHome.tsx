@@ -1,5 +1,5 @@
 import { Menu as MenuIcon, Settings } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionFace, useCompanion } from '@/modules/companion';
@@ -9,6 +9,7 @@ import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspac
 import { RoadmapCircle } from '@/modules/roadmap';
 import { SessionsBoard } from '@/modules/sidebar';
 import { openStation } from '@/shared/cloudcliDoors';
+import { ROADMAP_CIRCLE_AT_DESK, ROADMAP_CIRCLE_ON_PHONE } from '@/shared/constants';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { AppTab, Project, RecentConversationListItem, RoadmapStackRest } from '@/shared/types';
 import { ActionMenu, Button } from '@/shared/ui';
@@ -28,8 +29,8 @@ const CORE_SIZE = 60;
  * Where the roadmap's circle rests at the head, in the home's own pixels, at a desk and on a phone: its middle on the line Kaylee's core stands on at the
  * foot, so the two are one above the other. The head is as tall as the circle needs, and the cog stands level with it across the page.
  */
-const CIRCLE_AT_DESK: RoadmapStackRest = { cx: 66, cy: 78, radius: 33 };
-const CIRCLE_ON_PHONE: RoadmapStackRest = { cx: 42, cy: 51, radius: 27 };
+const CIRCLE_AT_DESK: RoadmapStackRest = ROADMAP_CIRCLE_AT_DESK;
+const CIRCLE_ON_PHONE: RoadmapStackRest = ROADMAP_CIRCLE_ON_PHONE;
 
 /** The cog's side, in px, and how far the head reaches below the circle's middle: its radius, half an arc's band and a little air. */
 const COG_SIZE = 44;
@@ -66,6 +67,11 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
   const { views } = useWorkspaceViews();
   const badges = useRailBadges();
   const doors = useStationDoors();
+  // How many times the reader has come back from the station with its roadmap standing: the circle lies down from standing each time (`RoadmapCircle`).
+  const [returns, setReturns] = useState(0);
+  useEffect(() => doors.onShowingChange(() => {
+    if (doors.homeShowing() && doors.takeRoadmapTravel('home')) setReturns((count) => count + 1);
+  }), [doors]);
   const { picture } = useCompanion();
   const companionName = picture?.settings.name ?? t('companion.defaultName');
 
@@ -115,7 +121,11 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
           data-home-core
           aria-label={t('home.station', { name: companionName })}
           title={t('home.station', { name: companionName })}
-          onClick={() => openStation(doors.navigate)}
+          onClick={() => {
+            // The roadmap goes with the reader: the station's stack arrives from this page's circle.
+            doors.markRoadmapTravel('station');
+            openStation(doors.navigate);
+          }}
           className="grid flex-none place-items-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
           style={{ width: CORE_SIZE, height: CORE_SIZE }}
         >
@@ -136,7 +146,7 @@ export function WorkspaceHome({ visited }: WorkspaceHomeProps) {
         )}
       </footer>
 
-      <RoadmapCircle rest={circle} />
+      <RoadmapCircle rest={circle} returns={returns} />
     </div>
   );
 }

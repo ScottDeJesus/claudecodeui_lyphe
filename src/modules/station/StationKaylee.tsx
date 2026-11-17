@@ -1,24 +1,32 @@
-import { Ear, EarOff, MessageSquare, SlidersHorizontal } from 'lucide-react';
+import { Ear, EarOff, MessageSquare, SlidersHorizontal, Volume2 } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanionControls, CompanionFace, CompanionStatus, CompanionStopButton, useCompanion, useCompanionPresence } from '@/modules/companion';
+import { SessionsHalo } from '@/modules/sidebar';
 import { useStationSessions } from '@/modules/station/context/StationSessionsContext';
 import { useNeedsCount } from '@/modules/station/context/StationNeedsContext';
 import { StationArrival } from '@/modules/station/StationArrival';
 import { StationConversationView } from '@/modules/station/StationConversation';
 import { StationPortraitWords } from '@/modules/station/StationPortrait';
 import { useStation } from '@/modules/station/context/StationContext';
-import { openHome } from '@/shared/cloudcliDoors';
 import type { CompanionLogEntry, CompanionPicture } from '@/shared/companion-types';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { CompanionEars, CompanionPresence, CompanionSentenceRef } from '@/shared/types';
 import { Button, buttonVariants, Menu, Sheet } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
-/** The square the companion's core is drawn in on the scene, in px: twice a chat's own core. */
-const CORE_PX = 120;
+/** The square the companion's core is drawn in, in px: in the halo's middle, and alone as the mark at the head of one column. */
+const CORE_PX: Record<StationKayleeForm, number> = { beside: 64, under: 64, mark: 48 };
+
+/**
+ * Where the companion stands on the scene. `beside`: at rest, at the foot of the room the roadmap stands in, the halo at the start with the
+ * lines beside it. `under`: the halo over the lines, in the companion's own column while a thing is on the panel (and, on a phone held
+ * upright, in the middle of the screen while nothing is). `mark`: one column with a thing on the panel, the core alone at the head with the
+ * lines beside it, so the panel has the screen.
+ */
+export type StationKayleeForm = 'beside' | 'under' | 'mark';
 
 /** The most the controls' panel takes (`StationHead`'s own figure): two lines of the controls' line. */
 const CONTROLS_PANEL_PX = 380;
@@ -29,11 +37,13 @@ const EYEBROW = 'font-mono text-[10px] font-medium uppercase leading-[14px] trac
 const NAME_PRESS = 'size-8 shrink-0 finger:size-11';
 
 type StationKayleeViewProps = {
+  /** Where the companion stands on the scene (`StationKayleeForm`). */
+  form: StationKayleeForm;
   /**
-   * Where the column stands on the scene. `beside`: at rest, at the foot of the room the roadmap stands in, the core at the start
-   * with the lines beside it. `under`: with a thing on the panel, the companion's own column at the start, the lines under the core.
+   * The halo, drawn round the core it is handed (`SessionsHalo` on the page): the chats as a hoop, the core in its middle. Not asked for in
+   * `mark`, where the core stands alone.
    */
-  form: 'beside' | 'under';
+  halo: (core: ReactNode) => ReactNode;
   /** The companion's name as you set it, the default while its picture loads. */
   name: string;
   /** What the companion is doing on this page (`useCompanionPresence`): the status line reads it, as the core does. */
@@ -52,6 +62,8 @@ type StationKayleeViewProps = {
   stop: ReactNode;
   /** This page's ears: the press by the name switches them, and is lit while they listen. */
   ears: CompanionEars;
+  /** Says the latest answer again; null while there is none to say, a turn runs, or this device's voice is off (the press is then drawn disabled). */
+  onSayAgain: (() => void) | null;
   /** While the companion's process has failed, its sentence; null while it runs. */
   failedSentence: string | null;
   /** How many chats are working now, and how many things wait on you; null until each has been read. */
@@ -76,72 +88,86 @@ function clockOf(stamp: string): string {
 }
 
 /**
- * THE COMPANION ON THE STATION'S SCENE: the core, the name with its few presses, and two lines. It is what the station is for and
- * the one thing that is always there; everything else on the scene is the panel, the roadmap and the box to type in.
+ * THE COMPANION ON THE STATION'S SCENE: the core in its halo, the name with its few presses, and two lines. It is what the station is for
+ * and the one thing that is always there; everything else on the scene is the panel, the roadmap and the box to type in.
  *
- * - THE CORE is the companion's own drawing at 120 px, live as everywhere. It is a press: the way back to the sessions home.
- * - BY THE NAME, three presses, each a mark: the conversation, which opens the whole log in a sheet from the start side (it is not
- *   on the scene: the last line each way is what is usually wanted); the ears, lit while they listen for the name; and the
- *   controls (the model, Live, the voice, Clear), the kit `Menu` whose panel holds `CompanionControls`' line, without the ears' switch. Stop stands beside
- *   them while a turn runs, never behind a press. After them, how many chats are running and how many things wait on you, in
- *   words, once each has been read: a count, not a list.
- * - THE STATE, in words (`CompanionStatus`), and a failed process's sentence under it in the warn ink.
+ * - THE CORE is the companion's own drawing, live as everywhere. It is a press: the way back to the sessions home. Round it stands THE
+ *   HALO (`halo`), every chat a slot on a hoop; the slot at the front is read out under it, and pressed, opens its chat.
+ * - BY THE NAME, four presses, each a mark: the conversation, which opens the whole log in a sheet (it is not on the scene: the last
+ *   line each way is what is usually wanted); the speaker, which says the latest answer again, for a reader who was out of the room;
+ *   the ears, lit while they listen for the name; and the controls (the model, Live, the voice, Clear), the kit `Menu` whose panel
+ *   holds `CompanionControls`' line, without the ears' switch. Stop stands beside them while a turn runs, never behind a press. After
+ *   them, how many chats are running and how many things wait on you, in words, once each has been read: a count, not a list.
+ * - THE STATE, in words (`CompanionStatus`: Listening and Transcribing while you talk), and a failed process's sentence under it in
+ *   the warn ink.
  * - TWO LINES. Yours, the last, as it was taken, with how it was given and when: enough to see a spoken line was heard right.
  *   Then the companion's latest answer as it is said (`StationPortraitWords`: the sentence being spoken on its band, the dots
  *   while one is on its way).
  *
- * TWO FORMS, one tree. `beside`: the core at the start and everything else beside it, on a measure the box to type in shares,
- * so the two read as one column in the middle of the screen. `under`: the core over the name, the lines under them, in the
- * middle of the companion's own column while the panel has the rest of the screen; a long answer scrolls inside its pane.
+ * THREE FORMS, one tree (`StationKayleeForm`). `beside`: the halo at the start and everything else beside it, on a measure the box to
+ * type in shares, so the two read as one column in the middle of the screen. `under`: the halo over the name and the lines, centred. A
+ * long answer scrolls inside its pane. `mark`: the core alone, small, with the presses beside it, the state and the last line heard on
+ * one line under them, and the answer held to two lines: the least of the companion that still says what it is doing.
  *
  * `data-station-kaylee` reads the form. A pure view: `StationKaylee` below binds it.
  */
 export function StationKayleeView({
-  form, name, presence, face, onHome, picture, speaking, controls, stop, ears, failedSentence, running, waiting, transcript,
+  form, halo, name, presence, face, onHome, picture, speaking, controls, stop, ears, onSayAgain, failedSentence, running, waiting, transcript,
 }: StationKayleeViewProps) {
   const { t } = useTranslation();
   const nameId = useId();
   // Whether the whole conversation's sheet is open. The press by the name opens it; the sheet's own ways out close it.
   const [transcriptOpen, setTranscriptOpen] = useState(false);
-  const beside = form === 'beside';
+  const under = form === 'under';
+  const mark = form === 'mark';
   const yours = picture === null ? null : lastOfYours(picture.log);
+  const yoursWords = yours === null ? '' : yours.text === '' ? t('companion.log.nothingHeard') : `“${yours.text}”`;
   const controlsLabel = t('station.head.controls', { defaultValue: 'Controls' });
   const transcriptLabel = t('companion.log.label', { name });
   const earsLabel = t(ears.on ? 'station.kaylee.earsOn' : 'station.kaylee.earsOff', { name });
+  const againLabel = t('station.kaylee.again');
   const counts = [
     running !== null && running > 0 ? t('station.kaylee.running', { count: running }) : null,
     waiting !== null && waiting > 0 ? t('station.kaylee.waiting', { count: waiting }) : null,
   ].filter(Boolean).join(' · ');
+  const core = (
+    <button
+      type="button"
+      data-station-kaylee-core=""
+      aria-label={t('station.kaylee.home')}
+      title={t('station.kaylee.home')}
+      onClick={onHome}
+      className="relative grid shrink-0 place-items-center rounded-full outline-none transition-transform hover:scale-[1.04] focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+      style={{ width: CORE_PX[form], height: CORE_PX[form] }}
+    >
+      {face(CORE_PX[form])}
+    </button>
+  );
 
   return (
     <section
       data-station-kaylee={form}
       aria-labelledby={nameId}
-      className={cn('flex min-w-0', beside ? 'mx-auto w-full max-w-[720px] items-center gap-5 px-3 py-3' : 'min-h-0 flex-1 flex-col items-center justify-center gap-3 px-4 pb-4')}
+      className={cn(
+        'flex min-w-0',
+        form === 'beside' && 'mx-auto w-full max-w-[720px] items-center gap-4 px-3 py-2',
+        under && 'min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 pb-3',
+        mark && 'mx-auto w-full max-w-[720px] items-start gap-3 px-3 py-2',
+      )}
     >
-      <button
-        type="button"
-        data-station-kaylee-core=""
-        aria-label={t('station.kaylee.home')}
-        title={t('station.kaylee.home')}
-        onClick={onHome}
-        className="relative grid shrink-0 place-items-center rounded-full outline-none transition-transform hover:scale-[1.03] focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
-        style={{ width: CORE_PX, height: CORE_PX }}
-      >
-        {face(CORE_PX)}
-      </button>
+      {mark ? core : halo(core)}
 
-      <div className={cn('flex min-w-0 flex-col gap-2', beside ? 'flex-1 items-start' : 'min-h-0 w-full items-center text-center')}>
-        {yours !== null && (
-          <div data-station-kaylee-yours="" className={cn('flex min-w-0 max-w-full flex-col', beside ? 'items-start' : 'items-center')}>
-            <p className="max-w-full truncate text-sm text-foreground">{yours.text === '' ? t('companion.log.nothingHeard') : `“${yours.text}”`}</p>
+      <div className={cn('flex min-w-0 flex-col gap-1.5', under ? 'min-h-0 w-full items-center text-center' : 'flex-1 items-start')}>
+        {yours !== null && !mark && (
+          <div data-station-kaylee-yours="" className={cn('flex min-w-0 max-w-full flex-col', under ? 'items-center' : 'items-start')}>
+            <p className="max-w-full truncate text-sm text-foreground">{yoursWords}</p>
             <p className={EYEBROW}>
               {[t('companion.log.you'), yours.via === null ? null : t(yours.via === 'spoken' ? 'companion.log.spoken' : 'companion.log.typed'), clockOf(yours.at)].filter(Boolean).join(' · ')}
             </p>
           </div>
         )}
 
-        <div className={cn('flex min-w-0 max-w-full flex-wrap items-center gap-x-3 gap-y-1.5', !beside && 'justify-center')}>
+        <div className={cn('flex min-w-0 max-w-full flex-wrap items-center gap-x-3 gap-y-1.5', under && 'justify-center')}>
           <h2 id={nameId} data-station-kaylee-name="" className={cn(EYEBROW, 'text-foreground')}>{name}</h2>
           <div className="flex items-center gap-1.5">
             <Button
@@ -154,6 +180,18 @@ export function StationKayleeView({
               onClick={() => setTranscriptOpen(true)}
             >
               <MessageSquare aria-hidden="true" />
+            </Button>
+            <Button
+              data-station-kaylee-again=""
+              variant="outline"
+              size="icon"
+              className={NAME_PRESS}
+              aria-label={againLabel}
+              title={againLabel}
+              disabled={onSayAgain === null}
+              onClick={() => onSayAgain?.()}
+            >
+              <Volume2 aria-hidden="true" />
             </Button>
             <Button
               data-station-kaylee-ears={ears.state}
@@ -180,11 +218,13 @@ export function StationKayleeView({
             />
             <StationArrival when={stop !== null} from="dock" className="shrink-0">{stop}</StationArrival>
           </div>
-          {counts !== '' && <span data-station-kaylee-counts="" className="font-mono text-[11px] leading-4 text-muted-foreground">{counts}</span>}
+          {counts !== '' && !mark && <span data-station-kaylee-counts="" className="font-mono text-[11px] leading-4 text-muted-foreground">{counts}</span>}
         </div>
 
-        <div className={cn('flex min-w-0 max-w-full flex-col', beside ? 'items-start' : 'items-center')}>
-          <CompanionStatus presence={presence} emphasis="station" />
+        <div className={cn('flex min-w-0 max-w-full', mark ? 'items-baseline gap-2' : 'flex-col', under ? 'items-center' : !mark && 'items-start')}>
+          <CompanionStatus presence={presence} emphasis={mark ? 'panel' : 'station'} />
+          {/* The mark is one line where the other forms have two: the state, then what was last heard, in the room that is left. */}
+          {mark && yours !== null && <p data-station-kaylee-yours="" className="min-w-0 truncate text-sm text-muted-foreground">{yoursWords}</p>}
           {failedSentence !== null && (
             <p data-station-kaylee-failed="" data-tone="warn" title={failedSentence} className="flex min-w-0 items-start gap-1.5 text-xs leading-snug text-tone-ink">
               <span aria-hidden="true">▲</span>
@@ -198,9 +238,9 @@ export function StationKayleeView({
             picture={picture}
             name={name}
             speaking={speaking}
-            align={beside ? 'start' : 'center'}
+            align={under ? 'center' : 'start'}
             quietEmpty
-            className={beside ? 'max-h-[7.5rem] w-full' : 'w-full'}
+            className={cn('w-full', form === 'beside' && 'max-h-[7.5rem]', mark && 'max-h-[3rem]')}
           />
         )}
       </div>
@@ -213,16 +253,20 @@ export function StationKayleeView({
 }
 
 /**
- * The companion on the scene, on the page: it hands `StationKayleeView` the core bound to this page's provider, the presence, the
- * picture and the voice, the controls bound to the provider's verbs, Stop while a turn runs, the ears, the two counts (the chats
- * the station holds as working, and what needs you by the station's one rule, `useNeedsCount`), the whole conversation for its
- * sheet, and the way home. It adds no state of the companion's.
+ * The companion on the scene, on the page: it hands `StationKayleeView` the core bound to this page's provider, the halo round it
+ * (`SessionsHalo`, the simple chat list as a hoop: a chat pressed at its front opens in the workspace), the presence, the picture and
+ * the voice, the controls bound to the provider's verbs, Stop while a turn runs, the ears, the speaker's press, the two counts (the
+ * chats the station holds as working, and what needs you by the station's one rule, `useNeedsCount`), the whole conversation for its
+ * sheet, and the way home (`onHome`, the shell's, which takes the roadmap along). It adds no state of the companion's.
  *
- * Drawn by `StationShell`, in the scene (wide and laptop), in the form the stage's focus gives it.
+ * THE CORE'S DEALINGS WITH A CHAT are the picture's own (`picture.activity`): while the companion reads a chat the halo draws a bead
+ * coming in from that chat's slot, and while it drafts for one, a bead going out to it.
+ *
+ * Drawn by `StationShell`, in the scene, in the form and at the halo's width the arrangement gives it.
  */
-export function StationKaylee({ form }: { form: 'beside' | 'under' }) {
+export function StationKaylee({ form, haloWidth, onHome }: { form: StationKayleeForm; haloWidth: number; onHome: () => void }) {
   const { t } = useTranslation();
-  const { picture, readFailure, reread, voice, ears, saveSettings, interrupt, clear } = useCompanion();
+  const { picture, readFailure, reread, voice, sayAgain, ears, saveSettings, interrupt, clear } = useCompanion();
   const presence = useCompanionPresence();
   const { sessions } = useStationSessions();
   const waiting = useNeedsCount();
@@ -230,14 +274,34 @@ export function StationKaylee({ form }: { form: 'beside' | 'under' }) {
   const doors = useStationDoors();
   const name = picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
   const turnRunning = picture?.turnId != null;
+  const answered = picture !== null && picture.log.some((entry) => entry.role === 'kaylee' && entry.turnId !== null && entry.index !== null);
+  const activity = picture?.activity ?? null;
+  const dealt = activity === null || activity.session === null ? null
+    : activity.phase === 'reading_session' ? { id: activity.session.sessionId, way: 'in' as const }
+      : activity.phase === 'drafting' ? { id: activity.session.sessionId, way: 'out' as const }
+        : null;
 
   return (
     <StationKayleeView
       form={form}
+      halo={(core) => (
+        <SessionsHalo
+          enabled
+          width={haloWidth}
+          // A halo standing small, over the lines, writes no folder's name round itself.
+          names={form === 'beside'}
+          reading
+          link={dealt}
+          coreRadius={CORE_PX[form] / 2}
+          onOpenChat={(sessionId) => doors.openChatInWorkspace(sessionId)}
+        >
+          {core}
+        </SessionsHalo>
+      )}
       name={name}
       presence={presence}
       face={(px) => <CompanionFace size={px} />}
-      onHome={() => openHome(doors.navigate)}
+      onHome={onHome}
       picture={picture}
       speaking={voice.speaking}
       controls={(
@@ -257,6 +321,7 @@ export function StationKaylee({ form }: { form: 'beside' | 'under' }) {
       )}
       stop={turnRunning ? <CompanionStopButton name={name} onInterrupt={interrupt} /> : null}
       ears={ears}
+      onSayAgain={answered && !turnRunning && voice.on && voice.speaking === null ? sayAgain : null}
       failedSentence={picture?.process.state === 'failed' ? (picture.process.error ?? t('companion.panel.failedUnknown', { name })) : null}
       running={sessions === null ? null : sessions.filter((row) => row.state === 'working').length}
       waiting={waiting}

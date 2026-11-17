@@ -1,4 +1,4 @@
-import { ArrowUpRight, FolderGit2, Pin, PinOff, X } from 'lucide-react';
+import { ArrowUpRight, FolderGit2, Pin, PinOff, Trash2 } from 'lucide-react';
 import { Fragment, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -168,16 +168,35 @@ export function NoteStageView({ focus, note, readFailed = null, pageHref, onPin,
 
   const glyph = COMPANION_NOTE_KIND_GLYPHS[note.kind];
   const KindIcon = glyph.icon;
+  const pinLabel = note.pinned ? t('station.cards.unpin', { defaultValue: 'Unpin' }) : t('station.cards.pin', { defaultValue: 'Pin' });
+  const dismissLabel = t('station.cards.dismiss', { defaultValue: 'Dismiss' });
   return (
     <article data-station-note={note.id} data-station-note-kind={note.kind} data-station-note-pinned={note.pinned} className="min-w-0">
       <StageHeadActions>
-        <Button variant="outline" size="sm" data-station-note-pin={note.pinned ? 'unpin' : 'pin'} className="finger:h-11" onClick={() => onPin(!note.pinned)}>
+        {/* Under a finger each is its mark alone, and says its word to a reader. Dismiss is the bin, not a second × beside the panel's own. */}
+        <Button
+          variant="outline"
+          size="sm"
+          data-station-note-pin={note.pinned ? 'unpin' : 'pin'}
+          className="finger:h-11 finger:w-11 finger:px-0"
+          aria-label={pinLabel}
+          title={pinLabel}
+          onClick={() => onPin(!note.pinned)}
+        >
           {note.pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
-          {note.pinned ? t('station.cards.unpin', { defaultValue: 'Unpin' }) : t('station.cards.pin', { defaultValue: 'Pin' })}
+          <span className="finger:hidden">{pinLabel}</span>
         </Button>
-        <Button variant="outline" size="sm" data-station-note-dismiss="" className="finger:h-11" onClick={onDismiss}>
-          <X aria-hidden="true" />
-          {t('station.cards.dismiss', { defaultValue: 'Dismiss' })}
+        <Button
+          variant="outline"
+          size="sm"
+          data-station-note-dismiss=""
+          className="finger:h-11 finger:w-11 finger:px-0"
+          aria-label={dismissLabel}
+          title={dismissLabel}
+          onClick={onDismiss}
+        >
+          <Trash2 aria-hidden="true" />
+          <span className="finger:hidden">{dismissLabel}</span>
         </Button>
       </StageHeadActions>
       <Card className="flex min-w-0 flex-col overflow-hidden">

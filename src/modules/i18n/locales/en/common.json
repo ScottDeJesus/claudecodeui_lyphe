@@ -4005,6 +4005,7 @@
     },
     "kaylee": {
       "home": "Home",
+      "again": "Say it again",
       "earsOn": "{{name}} is listening for the name",
       "earsOff": "Listen for the name",
       "running_one": "{{count}} running",

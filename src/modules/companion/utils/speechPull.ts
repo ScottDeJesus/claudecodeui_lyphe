@@ -287,6 +287,23 @@ export function createSpeechPull(player: PcmPlayer, setSpeaking: (sentence: Comp
     silence,
 
     /**
+     * Says the newest answer again, from its first sentence: for a reader who was out of the room when it was said. Only while the page
+     * holds the floor with its voice on, nothing is sounding or on its way, no turn is running and his mic is shut; else it does nothing.
+     * The speech door answers a sentence asked for again from its cache, or speaks it anew (`companion-speech-cache.ts`); one it no longer
+     * knows ends the pull for that turn, as any other does. True when the answer was asked for.
+     */
+    again(): boolean {
+      if (held || pull === null || seen === null || seen.turnId !== null) return false;
+      if (player.playing() !== null || pull.pending !== null) return false;
+      const turnId = newestSentenceTurn(seen.log);
+      if (turnId === null) return false;
+      queued.length = 0;
+      follow(turnId, 0);
+      pump();
+      return true;
+    },
+
+    /**
      * The press that opens his mic. It holds the pull (nothing is asked for until `release`, so a turn she is still thinking
      * through does not speak into his clip). When a sentence is sounding or on its way it also stops it all and POSTs the cut:
      * `heard` is the last sentence of that turn whose playback ended, `interrupted` the one playing. Answers the POST's settling

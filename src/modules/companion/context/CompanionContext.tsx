@@ -96,6 +96,11 @@ type CompanionContextValue = {
    */
   voice: CompanionVoice;
   /**
+   * Says the newest answer again on this page, from its first sentence: the station's speaker press, for a reader who was out of the
+   * room. Nothing while the voice's switch is off, while a turn runs, or while something is already sounding.
+   */
+  sayAgain: () => void;
+  /**
    * This page's ears: `on` / `setOn` the per-device switch (`companion-ears` in localStorage, off by default), `state` what they are doing
    * (the switch row draws it), and `reason` the sentence when they cannot listen. Her name opens the same ONE press as `talk` (the page that
    * holds the floor listens, and only when the switch is on, the page has been touched and it has a microphone); read by `CompanionControls`
@@ -488,12 +493,12 @@ export function CompanionProvider({ onOpen, children }: { onOpen: (target: Compa
     () => ({
       picture, readFailure: picture === null ? readFailure : null, reread, open, clientId, setOpen, takeFloor, sendText, saveSettings, editDraft, sendDraft,
       clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear, talk,
-      voice: speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
+      voice: speech.voice, sayAgain: speech.again, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
       progress: speech.progress, analyser: speech.analyser, mouth: speech.mouth,
     }),
     [
       picture, readFailure, reread, open, clientId, setOpen, takeFloor, sendText, saveSettings, editDraft, sendDraft, clearDraft, cancelAction, dismissNote, pinNote, moveWalk, endWalk, interrupt, clear,
-      talk, speech.voice, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress, speech.analyser, speech.mouth,
+      talk, speech.voice, speech.again, ears, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level, speech.progress, speech.analyser, speech.mouth,
     ],
   );
 
