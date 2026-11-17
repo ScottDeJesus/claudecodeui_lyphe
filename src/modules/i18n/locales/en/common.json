@@ -1362,6 +1362,18 @@
     },
     "rounds_one": "{{count}} round",
     "rounds": "{{count}} rounds",
+    "round": "Round {{n}}",
+    "run": {
+      "build": "build",
+      "fix": "fix",
+      "review": "review",
+      "running": "running"
+    },
+    "columns": {
+      "in": "in",
+      "cache": "cache",
+      "out": "out"
+    },
     "pill": {
       "paid": "${{usd}}",
       "paidTitle": "${{usd}} billed by {{vendor}}",
