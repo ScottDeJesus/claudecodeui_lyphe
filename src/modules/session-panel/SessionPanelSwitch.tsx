@@ -7,7 +7,8 @@ import { Button } from '@/shared/ui';
 /**
  * THE WAY TO THE PANEL ON A NARROW SCREEN: a switch in the chat's head between the talk and the panel, with how many of the chat's
  * follow-ups are open beside it. At a desk the panel is beside the talk and this is not drawn; with no panel it is not drawn at
- * any width. Under a finger it is its mark and the count alone.
+ * any width. Under a finger it is its mark and the count alone, drawn 28 px tall to fit the
+ * chat's one-line head, with a transparent `::before` that keeps its catch at 44 px.
  *
  * Used by project-workspace's `ChatHead`, at the end of the head.
  */
@@ -24,7 +25,7 @@ export function SessionPanelSwitch() {
       data-session-panel-switch=""
       variant={front ? 'default' : 'outline'}
       size="sm"
-      className="h-9 flex-none gap-1.5 px-2.5 finger:h-11 finger:min-w-11 min-[880px]:hidden"
+      className="relative h-9 flex-none gap-1.5 px-2.5 finger:h-7 finger:min-w-7 finger:px-1.5 finger:before:absolute finger:before:-inset-2 finger:before:content-[''] min-[880px]:hidden"
       aria-pressed={front}
       aria-label={name}
       title={name}
