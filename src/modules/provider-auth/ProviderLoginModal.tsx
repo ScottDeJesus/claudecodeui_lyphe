@@ -117,12 +117,12 @@ export default function ProviderLoginModal({
       {/* On mobile this panel is the whole screen, so it takes the PWA safe-area inset as padding
           (`pwa-notch-safe`, src/index.css) — its title and close button are the chrome that must
           clear the status bar, and the panel's own background has to reach the screen edge. */}
-      <div className="pwa-notch-safe flex h-3/4 w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl dark:bg-gray-800 max-md:m-0 max-md:h-full max-md:max-w-none max-md:rounded-none md:m-4 md:h-3/4 md:max-w-4xl md:rounded-lg">
-        <div className="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+      <div className="pwa-notch-safe flex h-3/4 w-full max-w-4xl flex-col rounded-lg bg-card shadow-xl max-md:m-0 max-md:h-full max-md:max-w-none max-md:rounded-none md:m-4 md:h-3/4 md:max-w-4xl md:rounded-lg">
+        <div className="flex items-center justify-between border-b border-border p-4">
+          <h3 className="text-lg font-semibold text-foreground">{title}</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+            className="text-muted-foreground transition-colors hover:text-foreground"
             aria-label="Close login modal"
           >
             <X className="h-6 w-6" />

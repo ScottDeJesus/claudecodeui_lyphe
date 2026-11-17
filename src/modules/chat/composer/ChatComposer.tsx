@@ -564,7 +564,7 @@ export default function ChatComposer({
             inside it. The form clips whatever overflows it, and a sentence that names two transcribers is several lines, whose
             first ones were cut off when this stood over the mic. Left-aligned, where the mic is, and wrapped inside the box's width. */}
         {voiceShown && voiceError !== null && (
-          <span className="absolute bottom-full left-0 z-50 mb-2 w-max max-w-[min(24rem,100%)] rounded bg-red-600 px-2 py-1 text-xs text-white shadow-lg">
+          <span className="absolute bottom-full left-0 z-50 mb-2 w-max max-w-[min(24rem,100%)] rounded bg-destructive px-2 py-1 text-xs text-destructive-foreground shadow-lg">
             {voiceError}
           </span>
         )}

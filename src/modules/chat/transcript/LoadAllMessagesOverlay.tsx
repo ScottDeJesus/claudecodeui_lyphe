@@ -53,7 +53,7 @@ export default function LoadAllMessagesOverlay({
         </div>
       ) : (
         <button
-          className="pointer-events-auto flex items-center space-x-2 rounded border border-border bg-card px-4 py-1.5 text-xs font-medium text-foreground shadow-overlay transition-colors duration-200 hover:border-[var(--accent)] disabled:cursor-wait disabled:opacity-75 dark:bg-blue-500 dark:hover:bg-blue-600"
+          className="pointer-events-auto flex items-center space-x-2 rounded border border-border bg-card px-4 py-1.5 text-xs font-medium text-foreground shadow-overlay transition-colors duration-200 hover:border-[var(--accent)] disabled:cursor-wait disabled:opacity-75 dark:bg-[var(--info-dot)] dark:hover:bg-[var(--info-dot)]"
           onClick={onLoadAllMessages}
           disabled={isLoadingAllMessages}
         >

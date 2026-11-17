@@ -106,7 +106,7 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
       className={cn(
         'group/cmd backdrop-blur-sm transition-all duration-200',
         TOOL_ROW_FRAME,
-        isError && 'border-red-500/30',
+        isError && 'border-[var(--danger-dot)]',
         canExpand && !open && 'hover:border-border hover:bg-muted/60',
         open && 'bg-muted/50 shadow-sm',
       )}
@@ -129,7 +129,7 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
           canExpand && 'cursor-pointer focus-visible:ring-1 focus-visible:ring-ring',
         )}
       >
-        <ToolRowIcon icon="terminal" className="text-emerald-500 dark:text-emerald-400" />
+        <ToolRowIcon icon="terminal" className="text-[var(--pos-ink)]" />
         <span className={TOOL_ROW_LABEL}>{label}</span>
         <span className={TOOL_ROW_SEPARATOR}>/</span>
         {/* Not a <code> tag: the global `.chat-message code` rule forces
@@ -149,7 +149,7 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
         )}
 
         {isRunning && (
-          <span className="h-2.5 w-2.5 flex-shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-emerald-400" />
+          <span className="h-2.5 w-2.5 flex-shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-[var(--pos-dot)]" />
         )}
         <button
           onClick={handleCopy}
@@ -158,7 +158,7 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
           title="Copy command"
           aria-label="Copy command"
         >
-          {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? <Check className="h-3.5 w-3.5 text-[var(--pos-ink)]" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
 
         {!open && hasOutput && !isRunning && (
@@ -186,7 +186,7 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
                 !hasOutput && 'pb-2',
               )}
             >
-              <span className="select-none font-semibold text-emerald-500 dark:text-emerald-400">$ </span>
+              <span className="select-none font-semibold text-[var(--pos-ink)]">$ </span>
               {command}
             </div>
           )}
@@ -194,7 +194,7 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
             <pre
               className={cn(
                 'max-h-80 overflow-auto whitespace-pre-wrap break-all px-3 py-2 font-mono text-xs leading-relaxed',
-                isError ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground',
+                isError ? 'text-[var(--danger-ink)]' : 'text-muted-foreground',
               )}
             >
               {trimmedOutput}

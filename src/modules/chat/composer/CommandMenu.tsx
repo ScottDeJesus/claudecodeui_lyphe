@@ -47,7 +47,7 @@ const menuBaseStyle: CSSProperties = {
   maxHeight: '360px',
   overflowY: 'auto',
   borderRadius: '8px',
-  boxShadow: '0 24px 60px rgba(2, 6, 23, 0.38), 0 0 0 1px rgba(148, 163, 184, 0.12)',
+  boxShadow: 'var(--shadow-overlay)',
   zIndex: 1000,
   padding: '6px',
   transition: 'opacity 150ms ease-in-out, transform 150ms ease-in-out',
@@ -75,13 +75,13 @@ const namespaceIcons: Record<string, LucideIcon> = {
 };
 
 const namespaceAccentClasses: Record<string, string> = {
-  frequent: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200',
-  builtin: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-200',
-  engine: 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-200',
-  skill: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200',
-  project: 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-200',
-  user: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200',
-  other: 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-500/20 dark:bg-gray-500/10 dark:text-gray-200',
+  frequent: 'border-border bg-[var(--warn-soft)] text-[var(--warn-ink)]',
+  builtin: 'border-border bg-[var(--info-soft)] text-[var(--info-ink)]',
+  engine: 'border-border bg-[var(--info-soft)] text-[var(--info-ink)]',
+  skill: 'border-border bg-[var(--pos-soft)] text-[var(--pos-ink)]',
+  project: 'border-border bg-[var(--info-soft)] text-[var(--info-ink)]',
+  user: 'border-border bg-[var(--danger-soft)] text-[var(--danger-ink)]',
+  other: 'border-border bg-muted text-muted-foreground',
 };
 
 const MENU_EDGE_GAP = 16;

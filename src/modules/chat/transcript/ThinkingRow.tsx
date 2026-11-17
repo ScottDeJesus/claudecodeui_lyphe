@@ -102,7 +102,7 @@ export function ThinkingRow({ content }: { content: string }) {
             title={t('thinking.copy', { defaultValue: 'Copy thinking' })}
             aria-label={t('thinking.copy', { defaultValue: 'Copy thinking' })}
           >
-            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? <Check className="h-3.5 w-3.5 text-[var(--pos-ink)]" /> : <Copy className="h-3.5 w-3.5" />}
           </button>
         )}
       </div>

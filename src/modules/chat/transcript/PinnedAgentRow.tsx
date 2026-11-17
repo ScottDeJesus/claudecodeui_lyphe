@@ -72,7 +72,7 @@ function PinnedAgentRow({ id, latest, summary, provider, modelLabel, onDismiss, 
         // agent at work, drawn again while it runs.
         <LLMProviderLogo provider={provider} claudeMark="mascot" className="h-4 w-4 flex-shrink-0" />
       ) : (
-        <Bot className={`h-4 w-4 flex-shrink-0 ${running ? 'text-purple-500 dark:text-purple-400' : 'text-muted-foreground/70'}`} />
+        <Bot className={`h-4 w-4 flex-shrink-0 ${running ? 'text-[var(--info-ink)]' : 'text-muted-foreground/70'}`} />
       )}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {/* Wraps rather than clips the description: it keeps a floor of `basis-40` (10rem), so on a phone,
@@ -105,8 +105,8 @@ function PinnedAgentRow({ id, latest, summary, provider, modelLabel, onDismiss, 
             // — the word and the count with it — and the pulsing dot, lit in its colour, says "running"
             // from the second line, where the count joins the figures. The description keeps the room
             // the chip took, and a lone dot never wraps onto a line of its own.
-            <span className="ml-auto flex flex-shrink-0 items-center gap-1 text-[11px] text-purple-600 dark:text-purple-300 max-sm:hidden">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-purple-500 dark:bg-purple-400" />
+            <span className="ml-auto flex flex-shrink-0 items-center gap-1 text-[11px] text-[var(--info-ink)] max-sm:hidden">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--info-dot)]" />
               running
               {toolCountText && <span className="text-muted-foreground/70">· {toolCountText}</span>}
             </span>
@@ -116,10 +116,10 @@ function PinnedAgentRow({ id, latest, summary, provider, modelLabel, onDismiss, 
                * it is not painted as a failure. */}
               <span className={
                 summary.status === 'failed'
-                  ? 'text-red-600 dark:text-red-400'
+                  ? 'text-[var(--danger-ink)]'
                   : summary.status === 'stopped'
-                    ? 'text-amber-700 dark:text-amber-400'
-                    : 'text-emerald-700 dark:text-emerald-400'
+                    ? 'text-[var(--warn-ink)]'
+                    : 'text-[var(--pos-ink)]'
               }>
                 {summary.status === 'failed' ? 'failed' : summary.status === 'stopped' ? 'stopped' : 'finished'}
                 {summary.finishedAt && ` ${formatSubagentFinishTime(summary.finishedAt)}`}
@@ -150,7 +150,7 @@ function PinnedAgentRow({ id, latest, summary, provider, modelLabel, onDismiss, 
         {(latest || tokens || running) && (
           <div className={cn('flex items-baseline gap-2 text-[11px] text-muted-foreground/80', !latest && !tokens && 'sm:hidden')}>
             {running && (
-              <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse self-center rounded-full bg-purple-500 dark:bg-purple-400 sm:hidden" />
+              <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse self-center rounded-full bg-[var(--info-dot)] sm:hidden" />
             )}
             {latest && (
               <span className="min-w-0 flex-1 truncate font-mono" title={latest}>

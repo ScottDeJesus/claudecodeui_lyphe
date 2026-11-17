@@ -106,8 +106,8 @@ export default function SidebarModals({
             <div className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
               <div className="p-6">
                 <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30">
-                    <AlertTriangle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[var(--warn-soft)]">
+                    <AlertTriangle className="h-6 w-6 text-[var(--warn-ink)]" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="mb-2 text-lg font-semibold text-foreground">

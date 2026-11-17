@@ -25,14 +25,14 @@ type CollapsibleDisplayProps = {
 };
 
 const borderColorMap: Record<string, string> = {
-  edit: 'border-l-amber-500 dark:border-l-amber-400',
+  edit: 'border-l-[var(--warn-dot)]',
   search: 'border-l-muted-foreground/40',
-  bash: 'border-l-green-500 dark:border-l-green-400',
-  todo: 'border-l-violet-500 dark:border-l-violet-400',
-  task: 'border-l-violet-500 dark:border-l-violet-400',
-  agent: 'border-l-purple-500 dark:border-l-purple-400',
-  plan: 'border-l-indigo-500 dark:border-l-indigo-400',
-  question: 'border-l-blue-500 dark:border-l-blue-400',
+  bash: 'border-l-[var(--pos-dot)]',
+  todo: 'border-l-[var(--info-dot)]',
+  task: 'border-l-[var(--info-dot)]',
+  agent: 'border-l-[var(--info-dot)]',
+  plan: 'border-l-[var(--info-dot)]',
+  question: 'border-l-[var(--info-dot)]',
   default: 'border-l-border',
 };
 

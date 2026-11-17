@@ -202,7 +202,7 @@ export const SubagentPanel = memo(({
             <span
               role="img"
               aria-label="running"
-              className="h-2.5 w-2.5 flex-shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-emerald-400"
+              className="h-2.5 w-2.5 flex-shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-[var(--pos-dot)]"
             />
           )}
           {status === 'running' && <span aria-hidden className="subagent-row__running-word text-[10px] text-muted-foreground/70">running</span>}

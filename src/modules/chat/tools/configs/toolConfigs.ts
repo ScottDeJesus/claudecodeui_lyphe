@@ -122,10 +122,10 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       style: 'terminal',
       wrapText: true,
       colorScheme: {
-        primary: 'text-green-400 font-mono',
-        secondary: 'text-gray-400',
+        primary: 'text-[var(--pos-ink)] font-mono',
+        secondary: 'text-muted-foreground',
         background: '',
-        icon: 'text-green-500 dark:text-green-400'
+        icon: 'text-[var(--pos-ink)]'
       }
     },
     result: {
@@ -147,10 +147,10 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       style: 'terminal',
       wrapText: true,
       colorScheme: {
-        primary: 'text-green-400 font-mono',
-        secondary: 'text-gray-400',
+        primary: 'text-[var(--pos-ink)] font-mono',
+        secondary: 'text-muted-foreground',
         background: '',
-        icon: 'text-green-500 dark:text-green-400'
+        icon: 'text-[var(--pos-ink)]'
       }
     },
     result: {
@@ -171,8 +171,8 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       getValue: (input) => input.query || '',
       action: 'none',
       colorScheme: {
-        primary: 'text-gray-700 dark:text-gray-300',
-        icon: 'text-sky-500 dark:text-sky-400'
+        primary: 'text-foreground',
+        icon: 'text-[var(--info-ink)]'
       }
     },
     result: {
@@ -192,8 +192,8 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       getValue: (input) => input.url || '',
       action: 'none',
       colorScheme: {
-        primary: 'text-gray-700 dark:text-gray-300',
-        icon: 'text-sky-500 dark:text-sky-400'
+        primary: 'text-foreground',
+        icon: 'text-[var(--info-ink)]'
       }
     },
     result: {
@@ -217,9 +217,9 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       getValue: (input) => input.file_path || '',
       action: 'open-file',
       colorScheme: {
-        primary: 'text-gray-700 dark:text-gray-300',
+        primary: 'text-foreground',
         background: '',
-        icon: 'text-gray-500 dark:text-gray-400'
+        icon: 'text-muted-foreground'
       }
     },
     result: {
@@ -238,7 +238,7 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       contentType: 'diff',
       actionButton: 'none',
       icon: 'pencil',
-      colorScheme: { icon: 'text-amber-500 dark:text-amber-400' },
+      colorScheme: { icon: 'text-[var(--warn-ink)]' },
       getContentProps: (input) => ({
         oldContent: input.old_string,
         newContent: input.new_string,
@@ -263,7 +263,7 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       contentType: 'diff',
       actionButton: 'none',
       icon: 'pencil',
-      colorScheme: { icon: 'text-amber-500 dark:text-amber-400' },
+      colorScheme: { icon: 'text-[var(--warn-ink)]' },
       getContentProps: (input) => ({
         oldContent: '',
         newContent: input.content,
@@ -288,7 +288,7 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       contentType: 'diff',
       actionButton: 'none',
       icon: 'pencil',
-      colorScheme: { icon: 'text-amber-500 dark:text-amber-400' },
+      colorScheme: { icon: 'text-[var(--warn-ink)]' },
       getContentProps: (input) => ({
         oldContent: input.old_string,
         newContent: input.new_string,
@@ -315,10 +315,10 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       getSecondary: (input) => input.path ? `in ${input.path}` : undefined,
       action: 'jump-to-results',
       colorScheme: {
-        primary: 'text-gray-700 dark:text-gray-300',
-        secondary: 'text-gray-500 dark:text-gray-400',
+        primary: 'text-foreground',
+        secondary: 'text-muted-foreground',
         background: '',
-        icon: 'text-gray-500 dark:text-gray-400'
+        icon: 'text-muted-foreground'
       }
     },
     result: {
@@ -348,10 +348,10 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       getSecondary: (input) => input.path ? `in ${input.path}` : undefined,
       action: 'jump-to-results',
       colorScheme: {
-        primary: 'text-gray-700 dark:text-gray-300',
-        secondary: 'text-gray-500 dark:text-gray-400',
+        primary: 'text-foreground',
+        secondary: 'text-muted-foreground',
         background: '',
-        icon: 'text-gray-500 dark:text-gray-400'
+        icon: 'text-muted-foreground'
       }
     },
     result: {
@@ -419,7 +419,7 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       getValue: () => 'reading list',
       action: 'none',
       colorScheme: {
-        primary: 'text-gray-500 dark:text-gray-400',
+        primary: 'text-muted-foreground',
       }
     },
     result: {
@@ -453,8 +453,8 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       getSecondary: (input) => input.status || undefined,
       action: 'none',
       colorScheme: {
-        primary: 'text-gray-700 dark:text-gray-300',
-        icon: 'text-violet-500 dark:text-violet-400'
+        primary: 'text-foreground',
+        icon: 'text-[var(--info-ink)]'
       }
     },
     result: {
@@ -475,8 +475,8 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       },
       action: 'none',
       colorScheme: {
-        primary: 'text-gray-700 dark:text-gray-300',
-        icon: 'text-violet-500 dark:text-violet-400'
+        primary: 'text-foreground',
+        icon: 'text-[var(--info-ink)]'
       }
     },
     result: {
@@ -491,8 +491,8 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       getValue: () => 'listing tasks',
       action: 'none',
       colorScheme: {
-        primary: 'text-gray-500 dark:text-gray-400',
-        icon: 'text-violet-500 dark:text-violet-400'
+        primary: 'text-muted-foreground',
+        icon: 'text-[var(--info-ink)]'
       }
     },
     result: {
@@ -513,8 +513,8 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       getValue: (input) => input.taskId ? `#${input.taskId}` : 'fetching',
       action: 'none',
       colorScheme: {
-        primary: 'text-gray-700 dark:text-gray-300',
-        icon: 'text-violet-500 dark:text-violet-400'
+        primary: 'text-foreground',
+        icon: 'text-[var(--info-ink)]'
       }
     },
     result: {
@@ -591,7 +591,7 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
         };
       },
       colorScheme: {
-        icon: 'text-purple-500 dark:text-purple-400'
+        icon: 'text-[var(--info-ink)]'
       }
     },
     result: {

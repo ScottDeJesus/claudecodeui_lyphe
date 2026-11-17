@@ -73,10 +73,10 @@ const SCOPE_LABELS: Record<SkillsScope, string> = {
 
 const SCOPE_BADGE_CLASSES: Record<SkillsScope, string> = {
   user: 'bg-[var(--pos-soft)] text-[var(--pos-ink)]',
-  plugin: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  plugin: 'border-[var(--info-dot)] bg-[var(--info-soft)] text-[var(--info-ink)]',
   repo: 'bg-[var(--warn-soft)] text-[var(--warn-ink)]',
   project: 'bg-[var(--warn-soft)] text-[var(--warn-ink)]',
-  admin: 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300',
+  admin: 'border-[var(--danger-dot)] bg-[var(--danger-soft)] text-[var(--danger-ink)]',
   system: 'bg-secondary text-muted-foreground',
 };
 

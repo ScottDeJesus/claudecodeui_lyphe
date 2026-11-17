@@ -43,7 +43,7 @@ const DOT_INK: Record<SimpleChatMark, string> = {
   awaitingInput: 'bg-warn-ink',
   unread: 'bg-primary',
   running: 'bg-muted-foreground animate-pulse',
-  subagents: 'bg-purple-500 dark:bg-purple-400 animate-pulse',
+  subagents: 'bg-[var(--info-dot)] animate-pulse',
 };
 
 /**
