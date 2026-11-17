@@ -17,7 +17,7 @@ import { HeldPage } from '@/shared/ui';
 /**
  * Where her `open` lands while the station is the page on screen: the workspace's host (`CompanionHost`) hands her every order to the station first
  * (`openOnStage`), and this registers the answer. It puts what she opened on the stage — a chat, a card, a page or a check, named by the label her door
- * resolved — and the workspace's navigation is not used. It stands INSIDE `StationProvider` because the stage is the station's. Draws nothing.
+ * resolved, as the companion's own placing (the stage marks it) — and the workspace's navigation is not used. It stands INSIDE `StationProvider` because the stage is the station's. Draws nothing.
  */
 function StageOpensForHer() {
   const { setFocus } = useStation();
@@ -28,16 +28,16 @@ function StageOpensForHer() {
       switch (target.kind) {
         // A server a moment older than this page sends no label: the thing's own id names it until it is drawn.
         case 'chat':
-          setFocus({ kind: 'chat', sessionId: target.sessionId, label: label || target.sessionId });
+          setFocus({ kind: 'chat', sessionId: target.sessionId, label: label || target.sessionId }, 'companion');
           return;
         case 'card':
-          setFocus({ kind: 'card', plan: target.plan, label: label || target.plan });
+          setFocus({ kind: 'card', plan: target.plan, label: label || target.plan }, 'companion');
           return;
         case 'page':
-          setFocus({ kind: 'page', pageId: target.pageId, blockId: target.blockId, label: label || target.pageId });
+          setFocus({ kind: 'page', pageId: target.pageId, blockId: target.blockId, label: label || target.pageId }, 'companion');
           return;
         case 'check':
-          setFocus({ kind: 'check', node: target.node, key: target.key, label: label || target.key });
+          setFocus({ kind: 'check', node: target.node, key: target.key, label: label || target.key }, 'companion');
           return;
       }
     };

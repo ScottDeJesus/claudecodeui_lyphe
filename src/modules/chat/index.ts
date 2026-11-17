@@ -29,6 +29,9 @@ export { useEmbedWidgetState } from '@/modules/chat/embeds/embedSource';
 // as a question in the chat, and the companion module's `CompanionActionCard`, which draws the
 // prompt of an action waiting for his word (an Accept census, a round's questions) as the Roadmap does.
 export { QuestionText } from '@/modules/chat/tools/ContentRenderers/QuestionText';
+// The material a model's replies wear (Opus the tube, Haiku the wire, Sonnet the plasma, the rest Mercury): the station's chat panel
+// marks a chat's latest reply with it, as the transcript marks each reply.
+export { replyMaterialOf } from '@/modules/chat/transcript/replyMark';
 // The chips of the files waiting to be sent (with the warn line for the files an intake did not take), and the "Drop files here" overlay
 // drawn while files are dragged onto a box. Consumer: the companion module's `CompanionComposer`, her box, which takes files as the chat does
 // (`useAttachmentIntake`) and draws them the way the chat does, so the chat module stays the one home of how an attachment looks.

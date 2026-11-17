@@ -1,4 +1,4 @@
-import { ArrowUpRight, FolderGit2, Pin, PinOff, Trash2 } from 'lucide-react';
+import { FolderGit2, Pin, PinOff, Trash2 } from 'lucide-react';
 import { Fragment, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,13 +11,14 @@ import { useStationSessions } from '@/modules/station/context/StationSessionsCon
 import { StageGone, StageReadFailed } from '@/modules/station/stageStates';
 import { useKeepFocusWhenGone } from '@/modules/station/hooks/useKeepFocusWhenGone';
 import { refusalMessage } from '@/modules/station/stageRefusal';
+import { StageOpen } from '@/modules/station/StageOpen';
 import { StageHeadActions } from '@/modules/station/stageSlots';
 import { docSpacePageUrl } from '@/modules/widgets';
 import type { CompanionNote, CompanionNoteRef } from '@/shared/companion-types';
 import { COMPANION_NOTE_KIND_GLYPHS, STATION_FOCUS_GLYPHS } from '@/shared/constants';
 import { useToast } from '@/shared/context/ToastContext';
 import type { StationFocus } from '@/shared/station-types';
-import { Button, buttonVariants, Card, DiffLines, Spinner } from '@/shared/ui';
+import { Button, DiffLines, Spinner } from '@/shared/ui';
 import { cn, formatRelativeTime } from '@/shared/utils';
 
 /** One of her cards on the stage, by its row id. */
@@ -80,32 +81,27 @@ function PathWithBreaks({ path }: { path: string }) {
 }
 
 /**
- * The way to what the card is about, under its facts: "Open its plan card" (the feature's card takes the stage), "Open the
- * session" (the chat takes the stage), "Open in DocSpace" (the page in a new tab, a real link), or a project's path in mono,
- * which has nothing to open. Each press names where it goes in words, with the stage's own glyph for the kind it opens.
+ * The way to what the card is about: "Open its plan card" (the feature's card takes the panel), "Open the session" (the chat
+ * takes the panel) and "Open in DocSpace" (the page, in a new tab) are the panel's Open at its foot (`StageOpen`), each naming where
+ * it goes, with the panel's own glyph for the kind it opens. A project has nothing to open: its path stands with the card's facts,
+ * in mono.
  */
 function NoteRef({ noteRef, pageHref, onOpenRef }: { noteRef: CompanionNoteRef; pageHref: string | null; onOpenRef: (ref: StagedRef) => void }) {
   const { t } = useTranslation();
   switch (noteRef.kind) {
     case 'card':
     case 'chat': {
-      const KindIcon = STATION_FOCUS_GLYPHS[noteRef.kind].icon;
-      return (
-        <Button variant="outline" size="sm" data-station-note-open={noteRef.kind} className="finger:h-11" onClick={() => onOpenRef(noteRef)}>
-          <KindIcon aria-hidden="true" />
-          {noteRef.kind === 'card'
-            ? t('station.cards.openCard', { defaultValue: 'Open its plan card' })
-            : t('station.cards.openChat', { defaultValue: 'Open the session' })}
-        </Button>
-      );
+      const words = noteRef.kind === 'card'
+        ? t('station.cards.openCard', { defaultValue: 'Open its plan card' })
+        : t('station.cards.openChat', { defaultValue: 'Open the session' });
+      return <StageOpen name={words} word={words} icon={STATION_FOCUS_GLYPHS[noteRef.kind].icon} data-station-note-open={noteRef.kind} onOpen={() => onOpenRef(noteRef)} />;
     }
-    case 'page':
-      return pageHref === null ? null : (
-        <a href={pageHref} target="_blank" rel="noreferrer" data-station-note-open="page" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'finger:h-11')}>
-          {t('station.cards.openInDocSpace', { defaultValue: 'Open in DocSpace' })}
-          <ArrowUpRight aria-hidden="true" />
-        </a>
-      );
+    case 'page': {
+      if (pageHref === null) return null;
+      const words = t('station.cards.openInDocSpace', { defaultValue: 'Open in DocSpace' });
+      // The page stands in DocSpace, outside the app: a real link, in a new tab.
+      return <StageOpen name={words} word={words} data-station-note-open="page" href={pageHref} />;
+    }
     case 'project':
       return (
         <p data-station-note-project="" className="flex min-w-0 items-start gap-2 text-sm text-muted-foreground">
@@ -125,9 +121,10 @@ function NoteRef({ noteRef, pageHref, onOpenRef }: { noteRef: CompanionNoteRef; 
  * each naming itself in words beside the stage's ✕, which only clears the stage: Pin, or Unpin on a pinned card, and Dismiss,
  * which takes it down, pinned or not.
  *
- * The body is one card: its facts (the kind as its glyph AND its word, when she put it up, and, pinned, the pin glyph and
- * "Pinned", never the tint alone: MAN-578), the way to what it is about when it is about something (`NoteRef`), then the
- * card's text drawn as its kind (`cardBodies.tsx`), at body size and a reading measure. A long body scrolls under the head.
+ * The body stands on the panel's own ground, with no box of its own: its facts (the kind as its glyph AND its word, when she put
+ * it up, and, pinned, the pin glyph and "Pinned", never the tint alone: MAN-578), a hairline, then the card's text drawn as its
+ * kind (`cardBodies.tsx`), at body size and a reading measure. A long body scrolls under the head. The way to what it is about,
+ * when it is about something, is the panel's Open at its foot (`NoteRef`).
  *
  * While her picture has not been read, a quiet "Reading her cards…" waits, so a stage restored on a reload never says a card
  * was taken down before it has looked, and a read that failed says so with a Try again (`StageReadFailed`) rather than wait for
@@ -199,8 +196,9 @@ export function NoteStageView({ focus, note, readFailed = null, pageHref, onPin,
           <span className="finger:hidden">{dismissLabel}</span>
         </Button>
       </StageHeadActions>
-      <Card className="flex min-w-0 flex-col overflow-hidden">
-        <div className="flex min-w-0 flex-col gap-3 border-b border-border px-4 py-3 lg:px-5">
+      {/* On the panel's own ground: the card's facts, a hairline, then its text. The panel is its frame. */}
+      <div className="flex min-w-0 flex-col">
+        <div className="flex min-w-0 flex-col gap-3 border-b border-border pb-3">
           <p data-station-note-facts="" className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
               <KindIcon aria-hidden="true" className="size-4 shrink-0" />
@@ -224,10 +222,10 @@ export function NoteStageView({ focus, note, readFailed = null, pageHref, onPin,
             </div>
           )}
         </div>
-        <div className={cn('min-w-0', note.kind === 'diff' ? 'py-2' : 'p-4 lg:p-5')}>
+        <div className={cn('min-w-0', note.kind === 'diff' ? 'py-2' : 'pt-4')}>
           <NoteKindBody note={note} pageHref={pageHref} />
         </div>
-      </Card>
+      </div>
     </article>
   );
 }

@@ -76,13 +76,76 @@
   background: var(--surface);
   animation: ast-arrive var(--duration-lock) var(--ease-lock) both;
 }
+/* It arrives out of the companion's side of the screen: from the start beside the companion's column, down from the companion's
+ * mark in one column. */
+[data-station-scene='staged'] [data-station-stage-cell] { --ast-from: translateX(-28px); }
 [data-station-arrangement='compact'] [data-station-scene='staged'] [data-station-stage-cell],
-[data-station-arrangement='phone'] [data-station-scene='staged'] [data-station-stage-cell] { margin: 0 8px 8px; }
+[data-station-arrangement='phone'] [data-station-scene='staged'] [data-station-stage-cell] { margin: 0 8px 8px; --ast-from: translateY(-22px); }
 @media (max-height: 520px) {
   [data-station-arrangement='compact'] [data-station-scene='staged'] [data-station-stage-cell],
   [data-station-arrangement='phone'] [data-station-scene='staged'] [data-station-stage-cell] { margin: 8px 8px 8px 0; }
 }
 [data-station-scene] [data-station-stage-body] { animation: ast-fade-in var(--duration-fade) ease both; }
+
+/* A feature's own card (the dispatcher's) on the panel: the panel is its frame, so it wears none of its own and stands on the
+ * panel's measure. What is inside it (its ask, its tasks) is the dispatcher's, unchanged. */
+[data-station-stage-body] [data-station-card='plan'] > .vv-card {
+  width: auto;
+  margin: -0.75rem;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/* ---------- the companion's mark: round what the companion placed on the panel itself ----------
+ * Four corners that come in from a little outside the panel and lock on the lock spring, with the companion's name on the top
+ * edge; they hold, then let go. Drawn over the panel, taking no press. `StationStageView` draws it for a placing and removes it
+ * once it is spent; the motion's length here is the view's `MARK_MS`. */
+.station-mark { position: absolute; inset: 5px; z-index: 5; pointer-events: none; animation: station-mark-life 1900ms linear both; }
+.station-mark__corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 0 solid var(--accent);
+  animation: station-mark-lock var(--duration-lock) var(--ease-lock) both;
+}
+.station-mark__corner--ts { top: 0; left: 0; border-top-width: 2px; border-left-width: 2px; --mark-from: translate(-9px, -9px); }
+.station-mark__corner--te { top: 0; right: 0; border-top-width: 2px; border-right-width: 2px; --mark-from: translate(9px, -9px); }
+.station-mark__corner--bs { bottom: 0; left: 0; border-bottom-width: 2px; border-left-width: 2px; --mark-from: translate(-9px, 9px); }
+.station-mark__corner--be { right: 0; bottom: 0; border-right-width: 2px; border-bottom-width: 2px; --mark-from: translate(9px, 9px); }
+.station-mark__name {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  padding: 2px 7px;
+  background: var(--surface);
+  color: var(--accent-ink, var(--accent));
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+/* The core's pointer, turned to the panel while the mark stands: the instrument's own triangle, just outside the core. Its place
+ * and bearing are the view's (a rotation about the core's middle, then out along it); it lives as long as the mark does. */
+.station-turn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  margin: -5px 0 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid var(--accent);
+  transform-origin: 0 5px;
+  pointer-events: none;
+  animation: station-mark-life 1900ms linear both;
+}
+@keyframes station-mark-lock { from { transform: var(--mark-from); } }
+@keyframes station-mark-life { 0% { opacity: 0; } 8% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
 
 /* ---------- the held rows: what the companion holds out for your word, over the box to type in ----------
  * The held row opens to the held piece's height while it arrives and closes as it settles (a grid row from 0fr to 1fr), so
@@ -104,5 +167,6 @@
   [data-arrival='arriving'], [data-arrival='arriving'][data-spring='lobe'] { animation: ast-fade-in var(--duration-fade) ease both; }
   [data-arrival='settling'] { animation: ast-fade-out var(--duration-fade) ease both; }
   [data-station-scene='staged'] [data-station-stage-cell] { animation: ast-fade-in var(--duration-fade) ease both; }
+  .station-mark__corner { animation: none; }
   [data-station-held], [data-station-held]:has([data-arrival='arriving'], [data-arrival='live']) { transition: none; }
 }

@@ -1,8 +1,9 @@
 import { ArrowLeft, Focus, X } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useCompanion } from '@/modules/companion';
 import { useStation } from '@/modules/station/context/StationContext';
 import { StageShelf } from '@/modules/station/StageShelf';
 import { StageSlotsProvider } from '@/modules/station/stageSlots';
@@ -29,7 +30,15 @@ type StationStageViewProps = {
   shelf?: ReactNode;
   /** The body scroller's ref: the station's scroll memory on the page. Absent on a fixture, which remembers nothing. */
   scrollRef?: (node: HTMLElement | null) => void;
+  /**
+   * The companion's mark, while it has just put this thing here itself: its name, and a count that moves with each placing, so a
+   * second placing draws the mark afresh. Null, or absent on a fixture, for a thing you put here: no mark.
+   */
+  mark?: { name: string; count: number } | null;
 };
+
+/** How long the companion's mark stands round what it placed, in ms: the corners lock, hold, and let go (`stationScene.css`). */
+const MARK_MS = 1900;
 
 /** The two presses of the head: 32 px to look at on a desk, a 44 px catch under a finger below 768 px (the touch law). */
 const HEAD_PRESS = 'h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground finger:h-11 finger:w-11';
@@ -68,6 +77,11 @@ const FOOT_BOX =
  * HER CARDS' SHELF stands above the head (`shelf`), and above the empty stage too: a pinned card is his keep, and it stays
  * one press away whatever the stage holds. It draws nothing while she has no cards.
  *
+ * THE COMPANION'S MARK. A thing the companion put here itself (its card, its walk, a thing it opened for you) is marked for a moment
+ * as it arrives: four corners lock round the panel with the companion's name on its top edge, then let go (`mark`,
+ * `data-station-stage-mark`). It is drawn over the panel and takes no press; a reader hears "<name> put this on the panel". A thing
+ * you put here yourself (the shelf, Back, a row) gets none.
+ *
  * WITH NONE, a quiet `EmptyState`: "Nothing on the stage", and how to put something there. No head: there is nothing
  * to name, go back from or clear. In the scene an empty stage gives the center to the companion: the shell folds it away,
  * or, while the shelf has cards, keeps the shelf alone (`StationShellView`, `data-station-stage-empty-message`); the words
@@ -80,7 +94,7 @@ const FOOT_BOX =
  * change from `empty` to a kind is the stage's arrival (`stationScene.css`). A pure view: `StationStage` below binds it to the station's
  * focus, and `.verify/kaylee-station-shots.mjs` draws it on the fixtures' pictures.
  */
-export function StationStageView({ focus, view, canGoBack, onBack, onClear, shelf, scrollRef }: StationStageViewProps) {
+export function StationStageView({ focus, view, canGoBack, onBack, onClear, shelf, scrollRef, mark = null }: StationStageViewProps) {
   const { t } = useTranslation();
   const labelId = useId();
   // The head's acts box once mounted, which the kind's view portals its own acts into (`StageSlotsProvider`). State and not a
@@ -91,12 +105,12 @@ export function StationStageView({ focus, view, canGoBack, onBack, onClear, shel
 
   if (focus === null) {
     return (
-      <section data-station-stage="empty" aria-label={t('station.stage.name', { defaultValue: 'Stage' })} className="flex min-h-0 flex-1 flex-col">
+      <section data-station-stage="empty" aria-label={t('station.stage.name', { defaultValue: 'Panel' })} className="flex min-h-0 flex-1 flex-col">
         {shelf}
         <div data-station-stage-empty-message="" className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden p-4 lg:p-6">
           <EmptyState
             icon={Focus}
-            title={t('station.stage.empty.title', { defaultValue: 'Nothing on the stage' })}
+            title={t('station.stage.empty.title', { defaultValue: 'Nothing on the panel' })}
             message={t('station.stage.empty.message', { defaultValue: 'Press anything, or ask to see something.' })}
           />
         </div>
@@ -107,10 +121,21 @@ export function StationStageView({ focus, view, canGoBack, onBack, onClear, shel
   const glyph = STATION_FOCUS_GLYPHS[focus.kind];
   const KindIcon = glyph.icon;
   const backLabel = t('station.stage.back', { defaultValue: 'Back' });
-  const clearLabel = t('station.stage.clear', { defaultValue: 'Clear the stage' });
+  const clearLabel = t('station.stage.clear', { defaultValue: 'Clear the panel' });
 
   return (
-    <section data-station-stage={focus.kind} aria-labelledby={labelId} className="flex min-h-0 flex-1 flex-col">
+    <section data-station-stage={focus.kind} aria-labelledby={labelId} className="relative flex min-h-0 flex-1 flex-col">
+      {mark !== null && (
+        // Keyed by the placing, so each one draws the mark from its start.
+        <div key={mark.count} data-station-stage-mark="" className="station-mark">
+          <span aria-hidden="true" className="station-mark__corner station-mark__corner--ts" />
+          <span aria-hidden="true" className="station-mark__corner station-mark__corner--te" />
+          <span aria-hidden="true" className="station-mark__corner station-mark__corner--bs" />
+          <span aria-hidden="true" className="station-mark__corner station-mark__corner--be" />
+          <span aria-hidden="true" className="station-mark__name">{mark.name}</span>
+          <span role="status" className="sr-only">{t('station.stage.placedBy', { name: mark.name, defaultValue: '{{name}} put this on the panel' })}</span>
+        </div>
+      )}
       {shelf}
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-3 [container-type:inline-size] lg:px-4">
         {canGoBack && (
@@ -155,13 +180,27 @@ export function StationStageView({ focus, view, canGoBack, onBack, onClear, shel
 
 /**
  * The stage on the page: what `StationShell` draws in the stage's place. It reads the focus, the back-stack and the
- * kind's view from the station and hands them to `StationStageView`, which draws every state, with her cards' shelf above.
+ * kind's view from the station and hands them to `StationStageView`, which draws every state, with her cards' shelf above and
+ * the companion's mark while it has just placed what stands there (`useStation().placed`).
  *
  * IT NEVER BRINGS ITSELF INTO VIEW: in the one-column arrangement the stage is a section, and a different thing put on it
  * pulls the switch to it (`useStationSection`, once, for every region's press); in the columns it is always on screen.
  */
 export function StationStage() {
-  const { focus, canGoBack, setFocus, back, scrollMemory } = useStation();
+  const { t } = useTranslation();
+  const { focus, canGoBack, setFocus, back, scrollMemory, placed } = useStation();
+  const { picture } = useCompanion();
+  // How many of the companion's placings have had their mark. State, because the mark is drawn while a placing is not yet spent. It
+  // starts at whatever was placed before this mounted, so only a placing made from now on is marked.
+  const [spent, setSpent] = useState(placed?.count ?? 0);
+  const fresh = placed !== null && placed.count > spent;
+  useEffect(() => {
+    if (placed === null || placed.count <= spent) return undefined;
+    const count = placed.count;
+    const done = window.setTimeout(() => setSpent(count), MARK_MS);
+    return () => window.clearTimeout(done);
+  }, [placed, spent]);
+  const name = picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
   // The registry keys each component to the kind it takes, so the one looked up by `focus.kind` takes this `focus`.
   const View = focus === null ? null : (STAGE_VIEWS[focus.kind] as ComponentType<{ focus: StationFocus }>);
   // Keyed by the thing, so a different thing in the same kind starts its view afresh, state and all.
@@ -176,6 +215,8 @@ export function StationStage() {
       onClear={() => setFocus(null)}
       shelf={<StageShelf />}
       scrollRef={scrollMemory('stage')}
+      // The mark stands only round the very thing the companion placed, and only while that placing is fresh.
+      mark={fresh && focus !== null && placed.key === focusKey(focus) ? { name, count: placed.count } : null}
     />
   );
 }

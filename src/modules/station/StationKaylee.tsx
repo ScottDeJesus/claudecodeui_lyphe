@@ -1,5 +1,5 @@
 import { Ear, EarOff, MessageSquare, SlidersHorizontal, Volume2 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -23,6 +23,9 @@ const CORE_PX: Record<StationKayleeForm, number> = { beside: 64, under: 64, mark
 
 /** How far outside the core's edge the account's week is drawn, in px. */
 const WEEK_GAP = 4;
+
+/** How long the core keeps its pointer on the panel after the companion places a thing there, in ms: as long as its mark stands. */
+const PLACING_LOOK_MS = 1900;
 
 /**
  * Where the companion stands on the scene. `beside`: at rest, at the foot of the room the roadmap stands in, the halo at the start with the
@@ -61,6 +64,12 @@ type StationKayleeViewProps = {
    * account switcher. Absent on a fixture, which draws the core alone.
    */
   week?: (radius: number) => ReactNode;
+  /**
+   * Which way the core is turned while the companion has just put a thing on the panel: the panel's bearing from the core in
+   * degrees (0 to the end side, clockwise), drawn as a pointer just outside the core for as long as the panel wears the companion's
+   * mark. Null, or absent on a fixture, at every other moment.
+   */
+  turnedTo?: number | null;
   /** The companion's picture, or null while it loads or its read has failed: the lines then draw nothing. */
   picture: CompanionPicture | null;
   /** The sentence this page's player is sounding, marked in the answer; null when none is. */
@@ -121,7 +130,7 @@ function clockOf(stamp: string): string {
  * `data-station-kaylee` reads the form. A pure view: `StationKaylee` below binds it.
  */
 export function StationKayleeView({
-  form, halo, name, presence, face, onHome, week, picture, speaking, controls, stop, ears, onSayAgain, failedSentence, running, waiting, transcript,
+  form, halo, name, presence, face, onHome, week, turnedTo = null, picture, speaking, controls, stop, ears, onSayAgain, failedSentence, running, waiting, transcript,
 }: StationKayleeViewProps) {
   const { t } = useTranslation();
   const nameId = useId();
@@ -143,6 +152,15 @@ export function StationKayleeView({
     // The core's own box: the account's week is centred on it, under the core's press, so only the band outside the core reaches it.
     <span className="relative grid shrink-0 place-items-center" style={{ width: CORE_PX[form], height: CORE_PX[form] }}>
       {week?.(CORE_PX[form] / 2 + WEEK_GAP)}
+      {turnedTo !== null && (
+        // The instrument's own pointer, drawn outside the core's square, where a core this small has no room for it.
+        <span
+          aria-hidden="true"
+          data-station-kaylee-turn={Math.round(turnedTo)}
+          className="station-turn"
+          style={{ transform: `rotate(${turnedTo}deg) translateX(${CORE_PX[form] / 2 + 13}px)` }}
+        />
+      )}
       <button
         type="button"
         data-station-kaylee-core=""
@@ -271,6 +289,9 @@ export function StationKayleeView({
  * chats the station holds as working, and what needs you by the station's one rule, `useNeedsCount`), the whole conversation for its
  * sheet, and the way home (`onHome`, the shell's, which takes the roadmap along). It adds no state of the companion's.
  *
+ * WHEN THE COMPANION PUTS A THING ON THE PANEL ITSELF (`useStation().placed`), the core turns its pointer to the panel for as long as
+ * the panel wears the companion's mark, then lets go. A thing you put there turns nothing.
+ *
  * THE CORE'S DEALINGS WITH A CHAT are the picture's own (`picture.activity`): while the companion reads a chat the halo draws a bead
  * coming in from that chat's slot, and while it drafts for one, a bead going out to it.
  *
@@ -282,8 +303,33 @@ export function StationKaylee({ form, haloWidth, onHome }: { form: StationKaylee
   const presence = useCompanionPresence();
   const { sessions } = useStationSessions();
   const waiting = useNeedsCount();
-  const { setFocus, scrollMemory } = useStation();
+  const { setFocus, scrollMemory, placed } = useStation();
   const doors = useStationDoors();
+  // The panel's bearing from the core, in degrees, while the companion has just placed a thing on it: the core's pointer stands
+  // there for as long as its mark does (`PLACING_LOOK_MS`), then lets go. State, because the view draws from it; null otherwise.
+  const [turnedTo, setTurnedTo] = useState<number | null>(null);
+  const placings = placed?.count ?? 0;
+  // The placings this page had seen as the station mounted: only a later one turns the core.
+  const [seenAtMount] = useState(placings);
+  useEffect(() => {
+    if (placings <= seenAtMount) return undefined;
+    let done = 0;
+    // Measured on the next frame, once the panel and the companion's column stand where the placing put them: the panel's middle
+    // from the core's.
+    const frame = window.requestAnimationFrame(() => {
+      const core = document.querySelector('[data-station-kaylee-core]')?.getBoundingClientRect();
+      const panel = document.querySelector('[data-station-stage-cell]')?.getBoundingClientRect();
+      if (!core || !panel || panel.width === 0) return;
+      const dx = panel.left + panel.width / 2 - (core.left + core.width / 2);
+      const dy = panel.top + panel.height / 2 - (core.top + core.height / 2);
+      setTurnedTo((Math.atan2(dy, dx) * 180) / Math.PI);
+      done = window.setTimeout(() => setTurnedTo(null), PLACING_LOOK_MS);
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(done);
+    };
+  }, [placings, seenAtMount]);
   const name = picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
   const turnRunning = picture?.turnId != null;
   const answered = picture !== null && picture.log.some((entry) => entry.role === 'kaylee' && entry.turnId !== null && entry.index !== null);
@@ -314,6 +360,7 @@ export function StationKaylee({ form, haloWidth, onHome }: { form: StationKaylee
       presence={presence}
       face={(px) => <CompanionFace size={px} />}
       onHome={onHome}
+      turnedTo={turnedTo}
       week={(radius) => <AccountWeekRing radius={radius} />}
       picture={picture}
       speaking={voice.speaking}

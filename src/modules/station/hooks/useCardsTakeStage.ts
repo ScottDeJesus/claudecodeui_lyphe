@@ -15,7 +15,8 @@ function newestId(notes: CompanionNote[]): number {
 /**
  * HER NEW CARD AND HER WALK TAKE THE STAGE ("one focus at a time"): a card she puts up, and a walk she starts or moves, are
  * put on the stage the moment her picture says so, whatever stood there. The focus they replace goes onto the back-stack
- * (`setFocus`), so Back returns him to what he was reading.
+ * (`setFocus`), so Back returns him to what he was reading. Each is staged as the companion's own placing, so the stage draws
+ * the companion's mark round it for a moment.
  *
  * WHAT IS NEW is measured against what this page had seen. The first picture that lands is only noted: its newest card id and
  * its walk's `updatedAt`, so a reload, or opening the station on a conversation that already holds cards and a walk, never
@@ -49,10 +50,10 @@ export function useCardsTakeStage(): void {
 
     if (now.noteId > before.noteId) {
       const card = picture.notes.find((note) => note.id === now.noteId);
-      if (card) setFocus({ kind: 'note', id: card.id, label: card.title });
+      if (card) setFocus({ kind: 'note', id: card.id, label: card.title }, 'companion');
     }
     if (picture.walk !== null && now.walkAt !== before.walkAt && !walkStands) {
-      setFocus({ kind: 'walk', label: picture.walk.session.name || picture.walk.session.sessionId });
+      setFocus({ kind: 'walk', label: picture.walk.session.name || picture.walk.session.sessionId }, 'companion');
     }
   }, [picture, setFocus, walkStands]);
 }

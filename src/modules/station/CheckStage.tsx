@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { CheckSheet, NeedCard, useCerberusNeedOf } from '@/modules/cerberus';
 import { useStation } from '@/modules/station/context/StationContext';
 import { stationArrangementOf } from '@/modules/station/stationArrangement';
+import { StageOpen } from '@/modules/station/StageOpen';
 import { StageGone } from '@/modules/station/stageStates';
 import type { CerberusNeed } from '@/shared/cerberus-types';
 import type { StationFocus } from '@/shared/station-types';
@@ -73,11 +74,9 @@ type CheckStageViewProps = {
 export function CheckStageView({ focus, found, onOpenSheet, onRetry }: CheckStageViewProps) {
   const { t } = useTranslation();
 
+  // The way to the check's own sheet: the panel's Open, at its foot.
   const openCheck = (target: CerberusSheetTarget) => (
-    <Button variant="outline" size="sm" data-station-check-open="" className="self-start finger:h-11" onClick={() => onOpenSheet(target)}>
-      <PanelRight aria-hidden="true" />
-      {t('station.needs.check.open', 'Open the check')}
-    </Button>
+    <StageOpen name={t('station.needs.check.open', 'Open the check')} icon={PanelRight} data-station-check-open="" onOpen={() => onOpenSheet(target)} />
   );
 
   switch (found.kind) {
@@ -99,8 +98,8 @@ export function CheckStageView({ focus, found, onOpenSheet, onRetry }: CheckStag
             <Button variant="outline" size="sm" data-station-check-retry="" className="finger:h-11" onClick={onRetry}>
               {t('station.needs.retry', 'Try again')}
             </Button>
-            {target !== null && openCheck(target)}
           </div>
+          {target !== null && openCheck(target)}
         </div>
       );
     }

@@ -18,6 +18,12 @@ import type { StationPrefKey, StationRegion, StationTier } from '@/shared/types'
 /** The stage: the one focus on it and the focuses Back returns through, newest last. */
 type StageState = { focus: StationFocus | null; stack: StationFocus[] };
 
+/** Who put a thing on the stage, where it was not you: the companion, by a card or a walk of its own or by opening something for you. */
+type StationPlacer = 'companion';
+
+/** The thing the companion last placed (`focusKey`) and how many things it has placed on this page so far. */
+export type StationPlaced = { key: string; count: number };
+
 type StationContextValue = {
   /** The one thing on the stage, or null for an empty stage. */
   focus: StationFocus | null;
@@ -27,7 +33,14 @@ type StationContextValue = {
    * Back, so it is the Back of the next, different thing staged. Staging that same thing again takes it off the stack, so a
    * Back never returns to what is already on the stage.
    */
-  setFocus: (next: StationFocus | null) => void;
+  setFocus: (next: StationFocus | null, by?: StationPlacer) => void;
+  /**
+   * What the companion last put on the stage itself (its card, its walk, a thing it opened), by the thing's key, with a count that
+   * moves each time it does: the stage draws the companion's mark round that thing for a moment, and the companion's core turns to
+   * it (`StationStage`, `StationKaylee`). Null until the companion has placed something on this page. A thing you put there
+   * yourself (a press on the shelf, Back, a row) never sets it. In memory only: a reload shows no mark.
+   */
+  placed: StationPlaced | null;
   /**
    * How many times `setFocus` has been handed the thing that already stands on the stage (it changes nothing there). A press on
    * what is already staged still asks to be shown it, and a focus that did not change cannot say so: the one-column station
@@ -177,6 +190,8 @@ export function StationProvider({ children }: { children: ReactNode }) {
   // because the sheet draws from it; memory only, so a reload starts with it shut. Anything put on the stage shuts it (`setFocus`),
   // so a row pressed in it is seen at once.
   const [whereOpen, setWhereOpen] = useState(false);
+  // What the companion last put on the stage itself. State, because the stage draws its mark from it and the core turns to it.
+  const [placed, setPlaced] = useState<StationPlaced | null>(null);
 
   // The stage as the last press left it: the truth `setFocus` and `back` decide from, so they never decide from a render
   // that predates the previous press.
@@ -197,8 +212,10 @@ export function StationProvider({ children }: { children: ReactNode }) {
     setStage(next);
   }, []);
 
-  const setFocus = useCallback((next: StationFocus | null) => {
+  const setFocus = useCallback((next: StationFocus | null, by?: StationPlacer) => {
     setWhereOpen(false);
+    // The companion's own placing is marked whether or not the thing already stood there: it has just pointed at it.
+    if (by === 'companion' && next !== null) setPlaced((held) => ({ key: focusKey(next), count: (held?.count ?? 0) + 1 }));
     const held = stageRef.current;
     const same = next === null ? held.focus === null : held.focus !== null && focusKey(held.focus) === focusKey(next);
     if (same) {
@@ -257,8 +274,8 @@ export function StationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<StationContextValue>(
-    () => ({ focus: stage.focus, setFocus, restaged, back, canGoBack: stage.stack.length > 0, tier, phone, sideways, scrollMemory }),
-    [stage, setFocus, restaged, back, tier, phone, sideways, scrollMemory],
+    () => ({ focus: stage.focus, setFocus, placed, restaged, back, canGoBack: stage.stack.length > 0, tier, phone, sideways, scrollMemory }),
+    [stage, setFocus, placed, restaged, back, tier, phone, sideways, scrollMemory],
   );
   const prefsValue = useMemo<StationPrefs>(() => ({ prefs, setPref }), [prefs, setPref]);
   const whereValue = useMemo<StationWhere>(() => ({ open: whereOpen, setOpen: setWhereOpen }), [whereOpen]);

@@ -1,11 +1,10 @@
-import { ArrowUpRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { FollowupsContext, FollowupsWidgetBody, useFollowups } from '@/modules/followups';
+import { StageOpen } from '@/modules/station/StageOpen';
 import { StageGone } from '@/modules/station/stageStates';
 import { useOpenChatInCloudcli } from '@/modules/station/hooks/useOpenChatInCloudcli';
 import type { StationFocus } from '@/shared/station-types';
-import { Button, Card } from '@/shared/ui';
 
 /** A chat's open follow-ups on the stage. */
 type FollowupsFocus = Extract<StationFocus, { kind: 'followups' }>;
@@ -23,14 +22,14 @@ type FollowupsStageViewProps = {
 
 /**
  * A CHAT'S FOLLOW-UPS ON THE STAGE, drawn by their owner and never redrawn here: the followups module's own Next steps body
- * (`FollowupsWidgetBody`) in a card, under its own context (`FollowupsContext`), so the station lists them, ticks one off and
+ * (`FollowupsWidgetBody`) on the panel's own ground, under its own context (`FollowupsContext`), so the station lists them, ticks one off and
  * gives one back exactly as the chat's gutter does — its groups ("Next steps", "Known gaps"), its Done fold, its reading and
- * its could-not-read states with Try again are its own. Then "Open the chat".
+ * its could-not-read states with Try again are its own. "Open" (the chat) stands at the panel's foot (`StageOpen`).
  *
  * GONE once the chat has none left open: its kind's line, "<chat> has no open follow-ups now", where the list stood, with
  * "Open the chat" still under it (the chat's own widget keeps the Done fold, where an item ticked by mistake comes back).
  *
- * The list's card is the keyboard's landing from the rail's Open (`data-station-fire`, a region that takes the focus, so Tab
+ * The list is the keyboard's landing from the rail's Open (`data-station-fire`, a region that takes the focus, so Tab
  * walks into its ticks); with nothing open, "Open the chat" is. Every tick, the Done fold and "Open the chat" are 44 px catches
  * under a finger below 768 px (the touch law; the ticks and the fold are the followups module's, sized there).
  *
@@ -47,29 +46,25 @@ export function FollowupsStageView({ focus, reading, onOpenChat }: FollowupsStag
       {gone ? (
         <StageGone focus={focus} />
       ) : (
-        <Card
+        // On the panel's own ground: the list is the panel's body, with no box of its own.
+        <div
           role="region"
           aria-label={t('station.needs.followups.list', { chat: focus.label, defaultValue: '{{chat}}’s follow-ups' })}
           tabIndex={-1}
           data-station-fire=""
-          className="min-w-0 p-4 lg:p-5"
+          className="min-w-0 outline-none"
         >
           <FollowupsContext.Provider value={reading}>
             <FollowupsWidgetBody />
           </FollowupsContext.Provider>
-        </Card>
+        </div>
       )}
-      <Button
-        variant="outline"
-        size="sm"
+      <StageOpen
+        name={t('station.needs.openChat', 'Open the chat')}
         data-station-followups-open=""
         data-station-fire={gone ? '' : undefined}
-        className="self-start finger:h-11"
-        onClick={onOpenChat}
-      >
-        {t('station.needs.openChat', 'Open the chat')}
-        <ArrowUpRight aria-hidden="true" />
-      </Button>
+        onOpen={onOpenChat}
+      />
     </div>
   );
 }

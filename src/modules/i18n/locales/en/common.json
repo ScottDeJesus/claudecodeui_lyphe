@@ -4055,11 +4055,13 @@
       "stagePress": "Stage: {{label}}"
     },
     "stage": {
-      "name": "Stage",
+      "name": "Panel",
       "back": "Back",
-      "clear": "Clear the stage",
+      "clear": "Clear the panel",
+      "placedBy": "{{name}} put this on the panel",
+      "open": "Open",
       "empty": {
-        "title": "Nothing on the stage",
+        "title": "Nothing on the panel",
         "message": "Press anything, or ask to see something."
       }
     },
@@ -4123,6 +4125,7 @@
         "yesterday": "yesterday {{clock}}",
         "day": "{{date}} {{clock}}"
       },
+      "reply": "Its latest reply",
       "open": "Open the chat",
       "say": "Say “What is {{name}} doing?”"
     },
