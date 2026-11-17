@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next';
 
 import { SessionTile } from '@/modules/sidebar/board/SessionTile';
 import { chatMarks } from '@/modules/sidebar/utils/simpleChatMarks';
-import type { RecentConversationListItem } from '@/shared/types';
+import type { RecentConversationListItem, SimpleListDragProps } from '@/shared/types';
 import { ActionMenu } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -29,6 +29,12 @@ type BoardChatRowProps = {
   onRename: (title: string) => void;
   /** The "Move to folder…" entry, or null while the board holds no folder to move this chat into. */
   onMoveToFolder: (() => void) | null;
+  /** The board's carry (`useBoardCarry`), spread on the row: press it anywhere that is not a control and carry it. */
+  dragProps?: SimpleListDragProps;
+  /** This row is the one in the hand. */
+  isDragging?: boolean;
+  /** A carried chat would land on this edge of this row. */
+  dropEdge?: 'before' | 'after' | null;
   t: TFunction;
 };
 
@@ -44,11 +50,14 @@ type BoardChatRowProps = {
  * QUIET UNTIL POINTED AT. With a pointer that hovers, the state's words and the menu wait for the pointer or the keyboard to reach the row: the tile has
  * already said the state. Under a finger both are always drawn.
  *
+ * CARRIED BY THE ROW ITSELF (`dragProps`): anywhere on it that is not a control. Where a carried chat would land beside this one is a
+ * line in the accent on that edge (`dropEdge`). While its title is open for typing the row is not carried.
+ *
  * Used by `BoardFolder`, once per chat of a column.
  */
 export function BoardChatRow({
   row, isRunning, isAwaitingInput, isSubagentRunning, isAsleep, isRemoveFailed, projectNameHint,
-  onSelect, onClose, onTogglePin, onDelete, onRename, onMoveToFolder, t,
+  onSelect, onClose, onTogglePin, onDelete, onRename, onMoveToFolder, dragProps, isDragging = false, dropEdge = null, t,
 }: BoardChatRowProps) {
   // Whether the title is open for typing: the menu's Rename opens it, Enter or a blur saves, Escape leaves it as it was.
   const [isEditing, setIsEditing] = useState(false);
@@ -78,11 +87,18 @@ export function BoardChatRow({
 
   return (
     <li
+      {...(isEditing ? undefined : dragProps)}
       data-board-row={row.sessionId}
       data-asleep={awake ? undefined : 'true'}
       data-pinned={row.pinned ? 'true' : undefined}
+      data-dragging={isDragging ? 'true' : undefined}
+      data-drop-edge={dropEdge ?? undefined}
       className="group/row relative flex min-w-0 items-center pl-3.5"
     >
+      {dropEdge !== null && (
+        // One step above the carried row (`z-40` over the kit's 30), which is drawn under the pointer, over this very row.
+        <span aria-hidden="true" className={cn('pointer-events-none absolute inset-x-0 z-40 h-0.5 bg-primary', dropEdge === 'before' ? '-top-px' : '-bottom-px')} />
+      )}
       <button
         type="button"
         data-board-pin

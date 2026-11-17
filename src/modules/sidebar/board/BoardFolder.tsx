@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Edit2, MoreHorizontal, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
-import type { SimpleListFolder } from '@/shared/types';
+import type { SimpleListDragProps, SimpleListFolder } from '@/shared/types';
 import { ActionMenu } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -18,8 +18,19 @@ type BoardFolderProps = {
   onDelete: () => void;
   /** The column's chats, each a `BoardChatRow`. */
   children: ReactNode;
+  /** The board's carry (`useBoardCarry`), spread on the folder's name: press it and carry the whole column. Absent on the column of the chats in no folder, which is not carried. */
+  dragProps?: SimpleListDragProps;
+  /** This column is the one in the hand. */
+  isDragging?: boolean;
+  /** A carried chat would land in this column with no chat to land beside: at its head (a folder with none), or out of every folder (the column of the chats in none). */
+  dropInto?: boolean;
+  /** A carried folder would land on this side of this column. */
+  dropSide?: 'before' | 'after' | null;
   t: TFunction;
 };
+
+/** Where a carried thing would land: a line in the accent, taking no press, one step above the thing in the hand (`z-40` over the kit's 30). */
+const DROP_MARK = 'pointer-events-none absolute z-40 bg-primary';
 
 /**
  * ONE FOLDER ON THE SESSIONS BOARD, as a column: its name in small capitals over its chats, which hang on one thread down the column's left edge, each by
@@ -28,9 +39,12 @@ type BoardFolderProps = {
  * It is the simple list's folder header redrawn (`SidebarSimpleFolderRow`), with its verbs unchanged: Rename opens the name for typing in place, a folder
  * just made opens its name by itself with the placeholder selected, and Delete folder is the list's. The board draws every folder open: a column has no fold.
  *
+ * CARRIED BY ITS NAME (`dragProps`): the whole column travels. Where a carried chat or folder would land is a line in the accent: across
+ * the head of its chats for a chat with no chat to land beside (`dropInto`), down one side of the column for a folder (`dropSide`).
+ *
  * Used by `SessionsBoard`, once per folder and once for the chats in none.
  */
-export function BoardFolder({ folder, isFresh, onFreshShown, onRename, onDelete, children, t }: BoardFolderProps) {
+export function BoardFolder({ folder, isFresh, onFreshShown, onRename, onDelete, children, dragProps, isDragging = false, dropInto = false, dropSide = null, t }: BoardFolderProps) {
   const name = folder?.name ?? t('simpleList.noFolder');
   // Whether the name is open for typing: a fresh folder opens it on its own, the menu's Rename by hand.
   const [isEditing, setIsEditing] = useState(false);
@@ -61,8 +75,21 @@ export function BoardFolder({ folder, isFresh, onFreshShown, onRename, onDelete,
   };
 
   return (
-    <section ref={rootRef} data-board-folder={folder?.folderId ?? 'none'} className="group/folder min-w-0">
-      <header className="mb-1.5 ml-[13px] flex min-h-7 items-center justify-between gap-2">
+    <section
+      ref={rootRef}
+      data-board-folder={folder?.folderId ?? 'none'}
+      data-dragging={isDragging ? 'true' : undefined}
+      data-drop-side={dropSide ?? undefined}
+      data-drop-into={dropInto ? 'true' : undefined}
+      className="group/folder relative min-w-0"
+    >
+      {/* Half way into the gap between two columns, so the line reads as between them. */}
+      {dropSide !== null && <span aria-hidden="true" className={cn(DROP_MARK, 'inset-y-0 w-0.5', dropSide === 'before' ? '-left-4' : '-right-4')} />}
+      <header
+        {...(folder !== null && !isEditing ? dragProps : undefined)}
+        data-board-folder-handle={folder !== null ? folder.folderId : undefined}
+        className={cn('mb-1.5 ml-[13px] flex min-h-7 items-center justify-between gap-2', folder !== null && dragProps !== undefined && !isEditing && 'cursor-grab')}
+      >
         {isEditing ? (
           <input
             type="text"
@@ -109,10 +136,11 @@ export function BoardFolder({ folder, isFresh, onFreshShown, onRename, onDelete,
       {/* The thread the folder's chats hang on. The chats in no folder hang on none: each stands by its own pin. */}
       <ul
         className={cn(
-          'm-0 min-h-11 list-none border-l-[1.25px] p-0 transition-colors',
+          'relative m-0 min-h-11 list-none border-l-[1.25px] p-0 transition-colors',
           folder === null ? 'border-transparent' : 'border-muted-foreground/50 group-focus-within/folder:border-foreground group-hover/folder:border-foreground',
         )}
       >
+        {dropInto && <span aria-hidden="true" className={cn(DROP_MARK, 'inset-x-0 -top-px h-0.5')} />}
         {children}
       </ul>
     </section>

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { BoardChatRow } from '@/modules/sidebar/board/BoardChatRow';
 import { BoardFolder } from '@/modules/sidebar/board/BoardFolder';
+import { useBoardCarry } from '@/modules/sidebar/hooks/useBoardCarry';
 import { useSimpleChatFolders } from '@/modules/sidebar/hooks/useSimpleChatFolders';
 import { useSimpleChatList } from '@/modules/sidebar/hooks/useSimpleChatList';
 import { useSimpleChatProject } from '@/modules/sidebar/hooks/useSimpleChatProject';
@@ -37,8 +38,12 @@ type SessionsBoardProps = {
  * (`useSimpleChatList`, a second copy of its rows, kept on the same frames), the same folder verbs (`useSimpleChatFolders`), the same disposals with their
  * questions (`useSimpleChatRemove`, the stop and delete dialogs), the same pin write and the same rename. What a press does here it does there.
  *
- * WHAT THE BOARD LEAVES TO THE LIST: carrying a chat or a folder by hand (the carry reads a single column's boxes; "Move to folder…" moves a chat here),
- * folding a folder (a column has no fold), and a chat's icon (the tile stands where the icon does).
+ * CARRIED BY HAND, as on the list (`useBoardCarry`, the list's carry for columns side by side, feeding the same one write): a chat by its row, to a
+ * place before or after a chat in any column, into a folder that holds none, or out of every folder; a folder by its name, with its whole column, to
+ * either side of another folder. Where it would land is a line in the accent. While a chat from a folder is in the hand and no chat is outside one, the
+ * "No folder" column is drawn empty, so there is somewhere to carry it out to. "Move to folder…" in a chat's menu still does it without a carry.
+ *
+ * WHAT THE BOARD LEAVES TO THE LIST: folding a folder (a column has no fold), and a chat's icon (the tile stands where the icon does).
  *
  * THE ORDER is the feed's: folders in the order the list draws them, each folder's chats in its own order, and the chats in no folder gathered, in their
  * order, in one last column.
@@ -91,8 +96,13 @@ export function SessionsBoard({ projects, enabled, onOpenChat, onNewChat, onSess
 
   const {
     freshFolderId, onFreshShown, pickerChat, pickerFolderId, pendingDeleteFolder, createFolder, renameFolder, requestDelete,
-    openFolderPicker, closeFolderPicker, moveToFolder, confirmDelete: confirmFolderDelete, cancelDelete: cancelFolderDelete,
+    openFolderPicker, closeFolderPicker, moveToFolder, move, confirmDelete: confirmFolderDelete, cancelDelete: cancelFolderDelete,
   } = useSimpleChatFolders({ items, reload, patchFolderLocal, moveLocal, t });
+
+  // The carry, feeding the folder hook's own `move`: a drop and a "Move to folder…" are one write.
+  const { dragging, dropTarget, dragProps, boardRef } = useBoardCarry({ items, onMove: move });
+  // Where the thing in the hand would land, as each row and column reads it.
+  const rowTarget = dropTarget !== null && dropTarget.at === 'row' ? dropTarget : null;
 
   const folders = items.flatMap((item) => (item.kind === 'folder' ? [item.folder] : []));
   const loose = items.flatMap((item) => (item.kind === 'chat' ? [item.chat] : []));
@@ -115,6 +125,9 @@ export function SessionsBoard({ projects, enabled, onOpenChat, onNewChat, onSess
       onRename={(title) => void handleRename(chat, title)}
       // A board with no folder offers no way into one.
       onMoveToFolder={folders.length === 0 ? null : () => openFolderPicker(chat)}
+      dragProps={dragProps}
+      isDragging={dragging !== null && dragging.kind === 'chat' && dragging.id === chat.sessionId}
+      dropEdge={rowTarget !== null && rowTarget.item.kind === 'chat' && rowTarget.item.id === chat.sessionId ? rowTarget.edge : null}
       t={t}
     />
   );
@@ -151,7 +164,7 @@ export function SessionsBoard({ projects, enabled, onOpenChat, onNewChat, onSess
   );
 
   return (
-    <div data-sessions-board className="mx-auto flex w-full min-w-0 max-w-[1180px] flex-col gap-7">
+    <div ref={boardRef} data-sessions-board data-board-carrying={dragging?.kind} className="mx-auto flex w-full min-w-0 max-w-[1180px] flex-col gap-7">
       {hasError && items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-10 text-sm text-muted-foreground">
           {t('recent.loadFailed', 'Could not load recent conversations')}
@@ -175,13 +188,26 @@ export function SessionsBoard({ projects, enabled, onOpenChat, onNewChat, onSess
                 onFreshShown={onFreshShown}
                 onRename={(name) => renameFolder(folder.folderId, name)}
                 onDelete={() => requestDelete(folder)}
+                dragProps={dragProps}
+                isDragging={dragging !== null && dragging.kind === 'folder' && dragging.id === folder.folderId}
+                dropInto={dropTarget !== null && dropTarget.at === 'into' && dropTarget.folderId === folder.folderId}
+                dropSide={rowTarget !== null && rowTarget.item.kind === 'folder' && rowTarget.item.id === folder.folderId ? rowTarget.edge : null}
                 t={t}
               >
                 {folder.chats.map(chatRow)}
               </BoardFolder>
             ))}
-            {loose.length > 0 && (
-              <BoardFolder folder={null} isFresh={false} onFreshShown={onFreshShown} onRename={NO_RENAME} onDelete={NO_PRESS} t={t}>
+            {/* The chats in no folder; and, with none, the same column drawn empty while a chat is in the hand, so it can be carried out of its folder. */}
+            {(loose.length > 0 || dragging?.kind === 'chat') && (
+              <BoardFolder
+                folder={null}
+                isFresh={false}
+                onFreshShown={onFreshShown}
+                onRename={NO_RENAME}
+                onDelete={NO_PRESS}
+                dropInto={dropTarget !== null && dropTarget.at === 'end'}
+                t={t}
+              >
                 {loose.map(chatRow)}
               </BoardFolder>
             )}
