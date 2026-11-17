@@ -23,7 +23,7 @@ import { ProjectWorkspaceRoute } from '@/modules/project-workspace';
 import { StationLayer } from '@/modules/station';
 import { i18n } from '@/modules/i18n';
 import { routerBasename } from '@/shared/cloudcliDoors';
-import { STATION_PATH } from '@/shared/constants';
+import { SESSIONS_HOME_PATH, STATION_PATH } from '@/shared/constants';
 
 /** Rendered by main.tsx; mounts the shared providers, the auth gate and the app's one layout: the project workspace with Kaylee Station drawn over it. */
 export default function App() {
@@ -83,14 +83,15 @@ export default function App() {
                       <CerberusProvider>
                       <Router basename={basename}>
                         <Routes>
-                          {/* ONE layout element for the app's three paths, so a move between them unmounts nothing: the workspace stays mounted while
-                              `/station` is on screen, and the station, drawn inside the workspace's own chat host and Kaylee's provider, stays mounted
+                          {/* ONE layout element for the app's four paths, so a move between them unmounts nothing: the workspace stays mounted while
+                              `/station` or `/home` is on screen (the sessions home is the workspace's own second page, drawn by its shell), and the station, drawn inside the workspace's own chat host and Kaylee's provider, stays mounted
                               after its first visit. The paths below only say which addresses exist; the layout reads the router and draws the right page, so each
                               has `element={null}`: a leaf with no element at all makes the router warn on every move that it will render an empty Outlet. */}
                           <Route element={<ProjectWorkspaceRoute stationLayer={<StationLayer />} />}>
                             <Route path="/" element={null} />
                             <Route path="/session/:sessionId" element={null} />
                             <Route path={STATION_PATH} element={null} />
+                            <Route path={SESSIONS_HOME_PATH} element={null} />
                           </Route>
                         </Routes>
                       </Router>

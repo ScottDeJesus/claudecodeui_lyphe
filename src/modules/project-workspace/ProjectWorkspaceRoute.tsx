@@ -35,20 +35,23 @@ function sessionIdOf(workspacePath: string): string | undefined {
 }
 
 /**
- * This module's only public export: THE APP'S ONE LAYOUT, rendered by App for `/`, `/session/:sessionId` and `/station` together, so a move between
- * the workspace and the station unmounts nothing. The workspace (its projects, its open chat, its scroll and its drafts) stays mounted while the station is
+ * This module's only public export: THE APP'S ONE LAYOUT, rendered by App for `/`, `/session/:sessionId`, `/station` and `/home` together, so a move between
+ * the workspace, the station and the sessions home unmounts nothing. The workspace (its projects, its open chat, its scroll and its drafts) stays mounted while the station is
  * the page on screen, and the station, once visited, stays mounted while the workspace is. `stationLayer` is the station, drawn inside the workspace's own
  * chat host and Kaylee's provider, so the page keeps one of each.
  *
- * WHICH PAGE IS ON SCREEN is the router's: `/station` is the station, every other path the workspace (`useHeldWorkspace`). While the station covers it
+ * A window opened at the bare root is taken to the sessions home (`useHeldWorkspace`): the home is where the app starts.
+ *
+ * WHICH PAGE IS ON SCREEN is the router's: `/station` is the station, `/home` the sessions home (this module's own `WorkspaceHomeLayer`, drawn by the shell
+ * beside the frame), every other path the workspace (`useHeldWorkspace`). While the station covers it
  * the workspace stands at the address it had and is held out of reach (`HeldPage`, worn by the frame and by the station's layer); the doors between the
  * pages (`StationLayerProvider`) tell the station where to send "CloudCLI" back to.
  */
 export default function ProjectWorkspaceRoute({ stationLayer }: { stationLayer: ReactNode }) {
-  const { stationShowing, workspacePath, navigate, holdNavigate } = useHeldWorkspace();
+  const { stationShowing, homeShowing, workspacePath, navigate, holdNavigate } = useHeldWorkspace();
 
   return (
-    <StationLayerProvider showing={stationShowing} workspacePath={workspacePath}>
+    <StationLayerProvider showing={stationShowing} homeShowing={homeShowing} workspacePath={workspacePath}>
       <SessionProtectionProvider>
         <PaletteOpsProvider>
           <MemoizedProjectWorkspaceRouteContent

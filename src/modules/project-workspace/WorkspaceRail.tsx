@@ -1,4 +1,4 @@
-import { Settings } from 'lucide-react';
+import { House, Settings } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,7 +9,9 @@ import { useProjectSidebarState } from '@/modules/project-workspace/context/Proj
 import { useRailBadges } from '@/modules/project-workspace/hooks/useRailBadges';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
 import RailButton from '@/modules/project-workspace/RailButton';
+import { openHome } from '@/shared/cloudcliDoors';
 import { PAGE_ANCHOR } from '@/shared/constants';
+import { useStationDoors } from '@/shared/context/StationLayerContext';
 import type { AppTab, DockPress, SidebarListState, WorkspaceView, WorkspaceViewGroup } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
@@ -24,10 +26,10 @@ function RailHairline({ className }: { className?: string }) {
 /**
  * THE VIEWS RAIL: the house's views as one column of glyphs down the sidebar's left edge, one of them lit.
  *
- * A `<nav>` of buttons, not a tablist, because two of its buttons are not views: Settings opens a dialog and the
- * account a panel. The lit view says so with `aria-current="page"`.
+ * A `<nav>` of buttons, not a tablist, because three of its buttons are not views: Home opens the sessions home over this page, Settings opens a dialog
+ * and the account a panel. The lit view says so with `aria-current="page"`.
  *
- * TOP TO BOTTOM: the app switcher's disc, a hairline, then the views in their runs — `chat`, `tools`, `plans`, `house`,
+ * TOP TO BOTTOM: the app switcher's disc, a hairline, Home, then the views in their runs — `chat`, `tools`, `plans`, `house`,
  * `plugins` — with a hairline between each pair of runs that are drawn, and at the foot the usage ring (the
  * week's: a status, not a button, always in its place), the Inbox, Settings and the account. The runs scroll
  * in a region of their own, so in a window too short for the rail the disc and the foot stay put. The region spans
@@ -64,6 +66,7 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
   const { activeTab, setActiveTab, setSidebarOpen, sidebarSharedProps } = useProjectSidebarState();
   const { views } = useWorkspaceViews();
   const badges = useRailBadges();
+  const doors = useStationDoors();
   // The rail — which is also the phone's drawer navigation, one tree — draws only the views the person has not hidden from
   // the navigation. A hidden view is still in `views` (the palette reaches it, the pane draws), so this is the one place
   // the choice takes effect, and every read below is of this list: no hidden view can reach a run, the foot or the reveal.
@@ -149,9 +152,18 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
         <div aria-hidden="true" className="pointer-events-none relative z-30 -mt-px mb-1 flex h-px w-full flex-none justify-center bg-background">
           <RailHairline />
         </div>
-        {runs.map((run, index) => (
+        {/* The way to the sessions home, first and apart: not a view of this page but the page over it (`openHome`). On a phone the drawer steps aside for it. */}
+        <RailButton
+          label={t('home.title')}
+          icon={House}
+          onPress={() => {
+            if (isMobile) setSidebarOpen(false);
+            openHome(doors.navigate);
+          }}
+        />
+        {runs.map((run) => (
           <Fragment key={run[0].group}>
-            {index > 0 && <RailHairline className="my-1" />}
+            <RailHairline className="my-1" />
             {run.map(viewButton)}
           </Fragment>
         ))}

@@ -1,4 +1,4 @@
-import { STATION_PATH } from '@/shared/constants';
+import { SESSIONS_HOME_PATH, STATION_PATH } from '@/shared/constants';
 
 // CloudCLI's own address book: where CloudCLI is served from, and the two doors between the workspace and Kaylee Station. The
 // two are pages of ONE tab, so a door is the app's own `navigate` and nothing else: no window is opened, nothing is loaded
@@ -110,6 +110,15 @@ export function routerBasename(): string {
  */
 export function openStation(navigate: (to: string) => void): void {
   navigate(STATION_PATH);
+}
+
+/**
+ * Opens the sessions home: it comes forward over the workspace, which stays mounted under it exactly as it is.
+ *
+ * Consumed by project-workspace: the views rail's Home button (`WorkspaceRail`) and the command palette's "Open home" (`ProjectCommandPalette`).
+ */
+export function openHome(navigate: (to: string) => void): void {
+  navigate(SESSIONS_HOME_PATH);
 }
 
 /**

@@ -6,7 +6,7 @@ import { ChatHostFloating, useChatHost } from '@/modules/chat-host';
 import { CompanionFab, CompanionPanel } from '@/modules/companion';
 import FloatingChatHeader from '@/modules/project-workspace/FloatingChatHeader';
 import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffects';
-import { useStationDoors, useStationShowing } from '@/shared/context/StationLayerContext';
+import { useHomeShowing, useStationDoors, useStationShowing } from '@/shared/context/StationLayerContext';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 import { HeldPage } from '@/shared/ui';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
@@ -25,16 +25,19 @@ function CoverReporter() {
   const { reportCovered } = useChatHost();
   const applicationUp = useCurrentApplication() !== null;
   const stationShowing = useStationShowing();
-  const covered = applicationUp || stationShowing;
+  const homeShowing = useHomeShowing();
+  const covered = applicationUp || stationShowing || homeShowing;
   useLayoutEffect(() => {
     reportCovered(covered);
   }, [covered, reportCovered]);
   return null;
 }
 
-/** Holds the frame while the station is the page on screen. Its own component, for the same reason as `CoverReporter`: `children` is the element the frame already built, so a switch re-renders this wrapper and nothing under it. */
+/** Holds the frame while the station or the sessions home is the page on screen. Its own component, for the same reason as `CoverReporter`: `children` is the element the frame already built, so a switch re-renders this wrapper and nothing under it. */
 function HeldWorkspace({ children }: { children: ReactNode }) {
-  return <HeldPage held={useStationShowing()}>{children}</HeldPage>;
+  const stationShowing = useStationShowing();
+  const homeShowing = useHomeShowing();
+  return <HeldPage held={stationShowing || homeShowing}>{children}</HeldPage>;
 }
 
 /**
@@ -50,7 +53,7 @@ function HeldWorkspace({ children }: { children: ReactNode }) {
  * Kaylee's button is mounted after the applications button, on the same floating layer, so it rides over every application
  * and her panel, one rung under the applications button.
  *
- * THE FRAME IS HELD WHILE THE STATION IS THE PAGE ON SCREEN (`HeldWorkspace`): it stays mounted with everything it keeps, and nothing of it, her button and
+ * THE FRAME IS HELD WHILE THE STATION OR THE SESSIONS HOME IS THE PAGE ON SCREEN (`HeldWorkspace`): it stays mounted with everything it keeps, and nothing of it, her button and
  * her panel included, is seen, focused or pressed. The chat under it is out of sight, which `CoverReporter` tells the chat's host, and the hotkey of the chat's
  * door stands down: it opens the chat of a page that is on screen.
  */
@@ -64,7 +67,7 @@ export default function WorkspaceFrame({
   const { reportAnchor, pipWindow } = useChatHost();
   const doors = useStationDoors();
   const toggleChatWhileOnScreen = useCallback(() => {
-    if (!doors.showing()) door.toggle();
+    if (!doors.showing() && !doors.homeShowing()) door.toggle();
   }, [door, doors]);
   useChatHotkey(toggleChatWhileOnScreen, pipWindow);
 

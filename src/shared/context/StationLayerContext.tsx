@@ -13,7 +13,12 @@ type StationDoors = {
   /** Whether the station is the page on screen, read at the moment of the call: for a handler that lives on a page the station covers (a hotkey) and must stand down. */
   showing: () => boolean;
   /**
-   * Calls `listener` each time the station comes on screen or leaves it, after the commit that moved it. For what must stand down on the covered page without
+   * Whether the sessions home is the page on screen, read at the moment of the call. The home covers the workspace as the station does, and says nothing of its
+   * own to the server: the chat's presence report (`useSessionPresence`) reads this to say its chat is out of sight while the home stands over it.
+   */
+  homeShowing: () => boolean;
+  /**
+   * Calls `listener` each time the station or the sessions home comes on screen or leaves it, after the commit that moved it. For what must stand down on the covered page without
    * being rendered again by the switch (the chat's presence report, which would otherwise re-render the transcript's owner). Returns the release.
    */
   onShowingChange: (listener: () => void) => () => void;
@@ -44,6 +49,7 @@ type StationDoors = {
 };
 
 const StationShowingContext = createStableContext(import.meta.hot, 'StationShowingContext', false);
+const HomeShowingContext = createStableContext(import.meta.hot, 'HomeShowingContext', false);
 const StationDoorsContext = createStableContext<StationDoors | null>(import.meta.hot, 'StationDoorsContext', null);
 
 /**
@@ -53,6 +59,15 @@ const StationDoorsContext = createStableContext<StationDoors | null>(import.meta
  */
 export function useStationShowing(): boolean {
   return useContext(StationShowingContext);
+}
+
+/**
+ * Whether the sessions home is the page on screen, i.e. the router stands at `/home`. Its own context, like the station's, so a switch re-renders only its
+ * readers. Read by project-workspace: its frame (held, with the chat out of sight, while the home covers it), its command palette (which stands down) and the
+ * home's own layer (`WorkspaceHomeLayer`, which holds the home while another page is on screen).
+ */
+export function useHomeShowing(): boolean {
+  return useContext(HomeShowingContext);
 }
 
 /**
@@ -72,9 +87,10 @@ export function useStationDoors(): StationDoors {
  * THE DOORS ARE READ FROM REFS, so their identity is one for the provider's life: a switch between the pages changes `showing` (one context, a few readers) and
  * nothing a page holds as a dependency.
  */
-export function StationLayerProvider({ showing, workspacePath, children }: { showing: boolean; workspacePath: string; children: ReactNode }) {
+export function StationLayerProvider({ showing, homeShowing, workspacePath, children }: { showing: boolean; homeShowing: boolean; workspacePath: string; children: ReactNode }) {
   // The newest of both, written after each commit, so a door that is called later (a frame off the socket, a press) answers from now and not from the render it was made in.
   const showingRef = useRef(showing);
+  const homeShowingRef = useRef(homeShowing);
   const workspacePathRef = useRef(workspacePath);
   const showingListenersRef = useRef(new Set<() => void>());
   // The router's newest `navigate`, called through one stable function (`doors.navigate`).
@@ -89,10 +105,11 @@ export function StationLayerProvider({ showing, workspacePath, children }: { sho
   }, [workspacePath]);
   // A layout effect, so a listener called from it (and any passive effect after it) reads the page that is on screen NOW.
   useLayoutEffect(() => {
-    if (showingRef.current === showing) return;
+    if (showingRef.current === showing && homeShowingRef.current === homeShowing) return;
     showingRef.current = showing;
+    homeShowingRef.current = homeShowing;
     showingListenersRef.current.forEach((listener) => listener());
-  }, [showing]);
+  }, [showing, homeShowing]);
 
   const onShowingChange = useCallback((listener: () => void) => {
     showingListenersRef.current.add(listener);
@@ -137,6 +154,7 @@ export function StationLayerProvider({ showing, workspacePath, children }: { sho
     () => ({
       navigate,
       showing: () => showingRef.current,
+      homeShowing: () => homeShowingRef.current,
       onShowingChange,
       workspacePath: () => workspacePathRef.current,
       registerStageOpen,
@@ -154,7 +172,9 @@ export function StationLayerProvider({ showing, workspacePath, children }: { sho
 
   return (
     <StationDoorsContext.Provider value={doors}>
-      <StationShowingContext.Provider value={showing}>{children}</StationShowingContext.Provider>
+      <StationShowingContext.Provider value={showing}>
+        <HomeShowingContext.Provider value={homeShowing}>{children}</HomeShowingContext.Provider>
+      </StationShowingContext.Provider>
     </StationDoorsContext.Provider>
   );
 }

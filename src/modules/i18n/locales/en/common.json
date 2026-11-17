@@ -33,6 +33,12 @@
     "notes": "Notes",
     "cerberus": "Cerberus"
   },
+  "home": {
+    "title": "Home",
+    "keywords": "home sessions chats folders pinned",
+    "station": "Open {{name}}'s station",
+    "places": "Other screens"
+  },
   "rail": {
     "label": "Views",
     "settings": "Settings",

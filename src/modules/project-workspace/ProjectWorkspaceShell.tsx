@@ -6,6 +6,7 @@ import { AppSwitcherProvider } from '@/modules/app-switcher';
 import { ChatHostProvider } from '@/modules/chat-host';
 import { useProjectChatState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import CompanionHost from '@/modules/project-workspace/CompanionHost';
+import { WorkspaceHomeLayer } from '@/modules/project-workspace/home/WorkspaceHomeLayer';
 import { PageAnchorsProvider } from '@/shared/context/PageAnchorsContext';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 import WorkspaceFrame from '@/modules/project-workspace/WorkspaceFrame';
@@ -37,6 +38,8 @@ function ProjectWorkspaceShell({
             <CompanionHost navigate={navigate}>
               <WorkspaceFrame isMobile={isMobile} ws={ws} sendMessage={sendMessage} navigate={navigate} />
               {stationLayer}
+              {/* The sessions home, the workspace's own second page: his chats by folder, drawn over the frame while the router stands at `/home`. */}
+              <WorkspaceHomeLayer />
             </CompanionHost>
           </AccountsProvider>
         </AppSwitcherProvider>

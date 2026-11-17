@@ -221,5 +221,10 @@
     "moveToFolder": "Move to folder…",
     "folderPickerTitle": "Move to folder",
     "noFolder": "No folder"
+  },
+  "board": {
+    "idle": "Idle",
+    "asleep": "Asleep",
+    "empty": "No chats yet."
   }
 }

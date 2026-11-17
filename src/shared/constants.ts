@@ -768,6 +768,13 @@ export const OUT_OF_REACH = { inert: '', 'aria-hidden': true } as unknown as HTM
 /** The router path Kaylee Station is shown at, under the basename. A page at it draws the station over the held workspace; deep-linking to it opens the station. */
 export const STATION_PATH = '/station';
 
+/**
+ * The router path the sessions home is shown at, under the basename: his chats laid out by folder, with Kaylee's core docked at the foot. A page at it draws
+ * the home over the held workspace, as the station's path does the station. Read by `src/App.tsx` (the route), project-workspace's `useHeldWorkspace` (which page
+ * is on screen) and `shared/cloudcliDoors.ts` (`openHome`).
+ */
+export const SESSIONS_HOME_PATH = '/home';
+
 // ---------------------------
 
 //----------------- THE STATION PHONE'S SIDEWAYS CATCH ------------
