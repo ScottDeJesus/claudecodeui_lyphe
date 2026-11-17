@@ -13,7 +13,7 @@ function isReading(body: unknown): body is CompanionMemoryReading {
 }
 
 /**
- * Used by this module's CompanionMemorySettings, which draws Settings > Voice > Companion's "Her memory" card from what it returns.
+ * Used by this module's CompanionMemorySettings, which draws Settings > Voice > Companion's "Memory" card from what it returns.
  *
  * The card's own read and clear of her memory bank: `GET /api/companion/memory` when the section opens, `DELETE` when he confirms Clear,
  * and the `GET` again after it. EVENTS, NOT A WATCHDOG: nothing here polls it or re-reads on a timer. The `companion_memory` frame the

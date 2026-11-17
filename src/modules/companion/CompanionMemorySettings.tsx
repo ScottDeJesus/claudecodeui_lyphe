@@ -28,12 +28,12 @@ type CompanionMemorySettingsViewProps = {
 };
 
 /**
- * Settings > Voice > Companion's "Her memory": how many things she keeps of what he told her to keep, where to read them,
+ * Settings > Voice > Companion's "Memory": how many things she keeps of what he told her to keep, where to read them,
  * and how to clear them, which is his act alone (her panel's Clear wipes her conversation and never this). Exported for
  * this file's CompanionMemorySettings and for `.verify/kaylee-memory-card.mjs`, which draws each state in its place:
  * after the talk button's card, directly above her four fields.
  *
- * READ, it is a card in the talk button's shape: "Her memory", the count under it ("Kaylee keeps 3 things you told her
+ * READ, it is a card in the talk button's shape: "Memory", the count under it ("Kaylee keeps 3 things you told her
  * to keep." in the ink; "Kaylee keeps nothing yet." in the muted ink), then one line at the card's width: Open her
  * memory, a link to her read-only DocSpace page in a new tab, and Clear her memory while she keeps one thing or more.
  * The count is a polite live region, so what a clear leaves is announced.
@@ -47,7 +47,7 @@ type CompanionMemorySettingsViewProps = {
  * Under a finger both controls are 44px tall, Verve's touch floor, as the module's other controls keep it: Clear stands
  * 8px from Open and raises a destructive question.
  *
- * WAITING for the first read, it is the section's own waiting row ("Reading her memory…"). UNREADABLE (the count null),
+ * WAITING for the first read, it is the section's own waiting row ("Reading the memory…"). UNREADABLE (the count null),
  * a warn Banner in the card's place carries the door's sentence: no count to show, nothing to clear.
  */
 export function CompanionMemorySettingsView({ name, reading, pageHref, clearing, onClear }: CompanionMemorySettingsViewProps) {
@@ -78,7 +78,7 @@ export function CompanionMemorySettingsView({ name, reading, pageHref, clearing,
     return (
       <div data-companion-memory="loading">
         <SettingsCard className="flex items-center justify-center px-4 py-8">
-          <Spinner size={24} label={t('voiceSettings.companion.memory.loading', { defaultValue: 'Reading her memory…' })} />
+          <Spinner size={24} label={t('voiceSettings.companion.memory.loading', { defaultValue: 'Reading the memory…' })} />
         </SettingsCard>
       </div>
     );
@@ -100,15 +100,15 @@ export function CompanionMemorySettingsView({ name, reading, pageHref, clearing,
     <div data-companion-memory={clearable ? 'kept' : 'empty'}>
       <SettingsCard>
         <SettingRow
-          label={t('voiceSettings.companion.memory.title', { defaultValue: 'Her memory' })}
+          label={t('voiceSettings.companion.memory.title', { defaultValue: 'Memory' })}
           description={(
             <span role="status" data-companion-memory-count={count} className={cn(clearable && 'font-medium text-foreground')}>
               {clearable
                 ? t('voiceSettings.companion.memory.count', {
                   name,
                   count,
-                  defaultValue_one: '{{name}} keeps {{count}} thing you told her to keep.',
-                  defaultValue_other: '{{name}} keeps {{count}} things you told her to keep.',
+                  defaultValue_one: '{{name}} keeps {{count}} thing you said to keep.',
+                  defaultValue_other: '{{name}} keeps {{count}} things you said to keep.',
                 })
                 : t('voiceSettings.companion.memory.empty', { name, defaultValue: '{{name}} keeps nothing yet.' })}
             </span>
@@ -123,11 +123,11 @@ export function CompanionMemorySettingsView({ name, reading, pageHref, clearing,
             href={pageHref}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={t('voiceSettings.companion.memory.openLabel', { defaultValue: 'Open her memory in DocSpace, in a new tab' })}
+            aria-label={t('voiceSettings.companion.memory.openLabel', { defaultValue: 'Open the memory in DocSpace, in a new tab' })}
             data-companion-memory-open=""
             className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), '[@media(pointer:coarse)]:min-h-11')}
           >
-            {t('voiceSettings.companion.memory.open', { defaultValue: 'Open her memory' })}
+            {t('voiceSettings.companion.memory.open', { defaultValue: 'Open the memory' })}
             <ExternalLink aria-hidden="true" />
           </a>
           {clearable && (
@@ -137,11 +137,11 @@ export function CompanionMemorySettingsView({ name, reading, pageHref, clearing,
               data-companion-memory-clear=""
               onClick={() => setConfirming(true)}
               className="text-muted-foreground hover:text-foreground finger:h-11 finger:w-11 finger:px-0 [@media(pointer:coarse)]:min-h-11"
-              aria-label={t('voiceSettings.companion.memory.clear', { defaultValue: 'Clear her memory' })}
-              title={t('voiceSettings.companion.memory.clear', { defaultValue: 'Clear her memory' })}
+              aria-label={t('voiceSettings.companion.memory.clear', { defaultValue: 'Clear the memory' })}
+              title={t('voiceSettings.companion.memory.clear', { defaultValue: 'Clear the memory' })}
             >
               <Trash2 aria-hidden="true" />
-              <span className="finger:hidden">{t('voiceSettings.companion.memory.clear', { defaultValue: 'Clear her memory' })}</span>
+              <span className="finger:hidden">{t('voiceSettings.companion.memory.clear', { defaultValue: 'Clear the memory' })}</span>
             </Button>
           )}
         </div>
@@ -154,14 +154,15 @@ export function CompanionMemorySettingsView({ name, reading, pageHref, clearing,
         title={t('voiceSettings.companion.memory.clearTitle', { name, defaultValue: "Clear {{name}}'s memory?" })}
         message={t('voiceSettings.companion.memory.clearMessage', {
           count,
-          defaultValue_one: "She forgets the {{count}} thing she keeps. The docstore's history keeps what was forgotten. Your conversation with her is not touched.",
-          defaultValue_other: "She forgets all {{count}} things she keeps. The docstore's history keeps what was forgotten. Your conversation with her is not touched.",
+          name,
+          defaultValue_one: "{{name}} forgets the {{count}} thing kept. The docstore's history keeps what was forgotten. Your conversation with {{name}} is not touched.",
+          defaultValue_other: "{{name}} forgets all {{count}} things kept. The docstore's history keeps what was forgotten. Your conversation with {{name}} is not touched.",
         })}
         actions={[
           { label: t('voiceSettings.companion.memory.cancel', { defaultValue: 'Cancel' }), variant: 'outline', onSelect: () => setConfirming(false), disabled: clearing },
           // Its words stay while it is busy: ConfirmDialog keys each answer by its label, so new words would be a new
           // button, and the pressed one, focus and all, would leave the page.
-          { label: t('voiceSettings.companion.memory.clearConfirm', { defaultValue: 'Clear her memory' }), variant: 'destructive', onSelect: onClear, busy: clearing },
+          { label: t('voiceSettings.companion.memory.clearConfirm', { defaultValue: 'Clear the memory' }), variant: 'destructive', onSelect: onClear, busy: clearing },
         ]}
         onDismiss={() => { if (!clearing) setConfirming(false); }}
       />

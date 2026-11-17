@@ -36,7 +36,7 @@ export async function acceptPhoto(bytes: Buffer): Promise<{ photoId: string }> {
   }
   if (format === undefined) throw faceInvalid(sentences.unreadable());
   if (!ACCEPTED_FORMATS.has(format)) {
-    throw faceInvalid(`That file is a ${format.toUpperCase()} picture, and her face is made from a JPEG, PNG or WebP photo. Choose one of those.`);
+    throw faceInvalid(`That file is a ${format.toUpperCase()} picture, and the face is made from a JPEG, PNG or WebP photo. Choose one of those.`);
   }
 
   try {

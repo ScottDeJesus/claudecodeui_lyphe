@@ -11,6 +11,6 @@ export { EmbedUrlFrame } from '@/modules/widgets/EmbedUrlFrame';
 // reachable host. The session panel's stage (`PanelStage`) is that surface.
 export { resolveEmbedUrl } from '@/modules/widgets/embedUrl';
 // A link into DocSpace's studio for a page, or one block of it, built on that same origin: the ONE builder of a DocSpace page
-// link. Its consumers are src/modules/companion (Settings' "Open her memory") and src/modules/station (the page stage's
-// "Open in DocSpace", the memory corner's "Open the full page" and the note stage's page card).
+// link. Its consumers are src/modules/companion (Settings' "Open the memory") and src/modules/station (the page stage's
+// "Open in DocSpace" and the note stage's page card).
 export { docSpacePageUrl } from '@/modules/widgets/docspaceOrigin';

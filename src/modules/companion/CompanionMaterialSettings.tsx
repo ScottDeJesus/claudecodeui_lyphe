@@ -25,7 +25,7 @@ type CompanionMaterialSettingsProps = {
 export function CompanionMaterialSettings({ name }: CompanionMaterialSettingsProps) {
   const { t } = useTranslation('settings');
   const { material, setMaterial } = useCompanionMaterial();
-  const title = t('voiceSettings.companion.material.title', { defaultValue: 'Her material' });
+  const title = t('voiceSettings.companion.material.title', { defaultValue: 'Material' });
   const options: { value: CompanionMaterial; label: string; detail: string }[] = [
     { value: 'mercury', label: t('voiceSettings.companion.material.mercury', { defaultValue: 'Mercury' }), detail: t('voiceSettings.companion.material.mercuryDetail', { defaultValue: 'Polished chrome. The default.' }) },
     { value: 'tube', label: t('voiceSettings.companion.material.tube', { defaultValue: 'Tube' }), detail: t('voiceSettings.companion.material.tubeDetail', { defaultValue: 'Amber vacuum-tube glass, for slow, reflective sessions.' }) },
@@ -46,7 +46,7 @@ export function CompanionMaterialSettings({ name }: CompanionMaterialSettingsPro
               label={title}
               description={t('voiceSettings.companion.material.description', {
                 name,
-                defaultValue: '{{name}} is drawn as an instrument, not a face: a chrome core that breathes, lobes with her voice and locks onto what she reads. Choose what it is made of.',
+                defaultValue: '{{name}} is drawn as an instrument, not a face: a chrome core that breathes, lobes with the voice and locks onto what is being read. Choose what it is made of.',
               })}
               className="min-w-0 p-0"
             >

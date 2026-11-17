@@ -246,7 +246,7 @@ export function GeminiVoiceSection({
               label={t('voiceSettings.gemini.speechModel', { defaultValue: 'Speech model' })}
               // The cheap model's name is one word: held whole, never broken at a hyphen across two lines.
               help={<WholeWords>{t('voiceSettings.gemini.speechModelHelp', {
-                defaultValue: "The Gemini model that speaks her sentences and the chat's read-aloud, by its exact name. gemini-3.8-flash-lite-tts is the cheap choice.",
+                defaultValue: "The Gemini model that speaks the companion's sentences and the chat's read-aloud, by its exact name. gemini-3.8-flash-lite-tts is the cheap choice.",
               })}</WholeWords>}
               invalid={modelInvalid}
               stored={speechModel}
@@ -260,7 +260,7 @@ export function GeminiVoiceSection({
           {voice !== undefined && onVoice && (
             <GeminiNameField
               label={t('voiceSettings.gemini.voice', { defaultValue: 'Voice' })}
-              help={t('voiceSettings.gemini.voiceHelp', { defaultValue: "The Gemini voice she speaks in, and the chat's read-aloud too, by its exact name." })}
+              help={t('voiceSettings.gemini.voiceHelp', { defaultValue: "The Gemini voice the companion speaks in, and the chat's read-aloud too, by its exact name." })}
               invalid={t('voiceSettings.gemini.voiceInvalid', { defaultValue: 'A voice name is 1–40 letters, digits, dashes or underscores.' })}
               stored={voice}
               placeholder="Kore"

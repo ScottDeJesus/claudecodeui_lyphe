@@ -54,7 +54,7 @@ export function TalkBindingField({ label, capturing, refusal, onBind, onClear, o
 
   const help = refusal === null ? (
     t('voiceSettings.companion.talkBinding.help', {
-      defaultValue: "Press it once to talk to her and again to send. A function key, a key held with Ctrl, Alt or Meta, or the mouse's middle, back or forward button.",
+      defaultValue: "Press it once to talk to the companion and again to send. A function key, a key held with Ctrl, Alt or Meta, or the mouse's middle, back or forward button.",
     })
   ) : (
     <span role="alert" data-tone="warn" className="font-medium text-tone-ink">
