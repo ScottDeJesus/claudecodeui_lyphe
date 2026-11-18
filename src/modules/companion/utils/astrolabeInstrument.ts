@@ -68,6 +68,14 @@ type Palette = {
   quiet: Rgb;
   warn: Rgb;
   danger: Rgb;
+  /**
+   * What a lone body's gauges are filled in, by how high the measure runs: grey, then yellow, then red, whatever the body is made
+   * of, so the colour says the reading and nothing else. By day each is lighter than the theme's own ink, which is made dark
+   * enough to be read as text and stood as a near-black band round the body.
+   */
+  gaugeQuiet: Rgb;
+  gaugeWarn: Rgb;
+  gaugeDanger: Rgb;
   chrome: [Rgb, Rgb, Rgb, Rgb, Rgb];
   mono: string;
   light: boolean;
@@ -118,6 +126,8 @@ function readPalette(host: HTMLElement, night: HTMLElement, material: CompanionM
   const lit = (name: string, fallback: string) => parseColour(nightStyle.getPropertyValue(`--${name}`), fallback);
   const prefix = material === 'mercury' ? '' : `${material}-`;
   const ground = token('canvas', '#08090b');
+  const light = luminance(ground) > 0.4;
+  const blend = (a: Rgb, b: Rgb, share: number): Rgb => [a[0] + (b[0] - a[0]) * share, a[1] + (b[1] - a[1]) * share, a[2] + (b[2] - a[2]) * share];
   return {
     ground,
     signalA: token(`${prefix}signal-a`, '#f2a65a'),
@@ -131,13 +141,16 @@ function readPalette(host: HTMLElement, night: HTMLElement, material: CompanionM
     quiet: token('ink-mid', '#c9ced3'),
     warn: token('warn-dot', '#e8c45a'),
     danger: token('danger-dot', '#ff7b6b'),
+    gaugeQuiet: light ? blend(token('ink-muted', '#555d65'), ground, 0.25) : token('ink-mid', '#c9ced3'),
+    gaugeWarn: light ? blend(lit('warn-dot', '#e8c45a'), token('warn-dot', '#a37900'), 0.4) : token('warn-dot', '#e8c45a'),
+    gaugeDanger: light ? blend(lit('danger-dot', '#ff7b6b'), token('danger-dot', '#c43a2f'), 0.4) : token('danger-dot', '#ff7b6b'),
     chrome: [token('chrome-highlight', '#ffffff'), token('chrome-light', '#dce1e6'), token('chrome-mid', '#8c939b'), token('chrome-dark', '#3b4046'), token('chrome-rim', '#b9c1c9')],
     mono: style.getPropertyValue('--font-mono').trim() || '"Geist Mono", ui-monospace, monospace',
-    light: luminance(ground) > 0.4,
+    light,
   };
 }
 
-const PALETTE_COLOURS = ['ground', 'signalA', 'signalB', 'loop', 'halo', 'bodyA', 'bodyB', 'bodyHalo', 'accent', 'quiet', 'warn', 'danger'] as const;
+const PALETTE_COLOURS = ['ground', 'signalA', 'signalB', 'loop', 'halo', 'bodyA', 'bodyB', 'bodyHalo', 'accent', 'quiet', 'warn', 'danger', 'gaugeQuiet', 'gaugeWarn', 'gaugeDanger'] as const;
 
 /** Eases the drawn palette toward the tokens' (a theme switch or a new material crossfades over about 180 ms). */
 function easePalette(drawn: Palette, target: Palette, dt: number): void {
@@ -163,6 +176,9 @@ const clonePalette = (p: Palette): Palette => ({
   quiet: [...p.quiet],
   warn: [...p.warn],
   danger: [...p.danger],
+  gaugeQuiet: [...p.gaugeQuiet],
+  gaugeWarn: [...p.gaugeWarn],
+  gaugeDanger: [...p.gaugeDanger],
 });
 
 /* ---------------- the core: raymarched ferrofluid in WebGL1 ---------------- */
@@ -1222,8 +1238,8 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
    * THE GAUGES A LONE BODY WEARS, as rings in orbit round it: the armillary rings' own geometry (a tilted circle that precesses, its
    * far half behind the body and its near half over it), each lit as far as its measure is full. The inner is the first gauge. A
    * ring is its track, faint all the way round; the lit arc runs from a point that travels the ring, with a bead at its head, so a
-   * full ring and an empty one are told apart at any tilt. The quiet ink until the measure runs high, then the warn ink, then the
-   * danger ink. They share the dial's drift, so they turn faster while the body works and lean toward the reader while it listens.
+   * full ring and an empty one are told apart at any tilt. ITS COLOUR IS ITS READING AND NOTHING ELSE: grey until the measure runs
+   * high, then yellow, then red (`gaugeQuiet`, `gaugeWarn`, `gaugeDanger`), the same round every body whatever it is made of. They share the dial's drift, so they turn faster while the body works and lean toward the reader while it listens.
    * Round a larger body they run further out and are drawn heavier (`coreGaugeScale`), so they read at a desk's distance.
    *
    * AT REST THEY LIE FLAT AND STILL (`v.rest`): each ring settles into the picture's own plane as a plain circle, filled clockwise
@@ -1234,9 +1250,6 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
    * light that travels the filled part from its start to its head, again and again, quicker while the body works; a bead at the
    * head that breathes with a ring opening out of it; and growth, which is shown (the filled part eases out to its measure) and
    * lights the whole ring for a moment. With reduced motion the glow stands and nothing travels or opens.
-   *
-   * BY DAY THE FILLED PART IS THE BODY'S OWN COLOUR, a little deepened to read on a pale page, as the body beside it is; the
-   * theme's dark ink there read as a black band round an amber core. By night it is the bright ink it was.
    *
    * `front` false draws what passes behind the body, true what passes over it.
    */
@@ -1265,13 +1278,11 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     const large = weight - 1;
     const calm = reducedMotion();
     const mixed = (a: Rgb, b: Rgb, share: number): Rgb => [a[0] + (b[0] - a[0]) * share, a[1] + (b[1] - a[1]) * share, a[2] + (b[2] - a[2]) * share];
-    // The filled part's ink while the measure is not running high: the theme's bright ink by night, the body's own colour by day.
-    const plain = palette.light ? mixed(palette.bodyHalo, palette.loop, 0.18) : palette.loop;
     for (const [index, gauge] of gauges.slice(0, 2).entries()) {
       const orbit = orbits[index];
       const radius = coreGaugeRadius(R, index === 0 ? 0 : 1);
       const basis = ringBasis(orbit.iota, orbit.omega);
-      const ink = gauge.tone === 'danger' ? palette.danger : gauge.tone === 'warn' ? palette.warn : plain;
+      const ink = gauge.tone === 'danger' ? palette.gaugeDanger : gauge.tone === 'warn' ? palette.gaugeWarn : palette.gaugeQuiet;
       // The ring's own breath, each ring on its own beat, and what is left of its last growth.
       const breath = calm ? 0.5 : 0.5 + 0.5 * Math.sin(v.t * 1.7 + index * 2.3);
       const surge = gaugeSurge[index];
@@ -1291,7 +1302,8 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
         }
       };
       arc(0, TAU);
-      ctx.strokeStyle = rgba(palette.quiet, front ? 0.34 + 0.22 * large : 0.16 + 0.12 * large);
+      // The track, fainter by day so that a grey filled part still stands out from it.
+      ctx.strokeStyle = rgba(palette.quiet, (front ? 0.34 + 0.22 * large : 0.16 + 0.12 * large) * (palette.light ? 0.6 : 1));
       ctx.lineWidth = 1.5 * (1 + 0.5 * large);
       ctx.stroke();
       const filled = gaugeShown[index];

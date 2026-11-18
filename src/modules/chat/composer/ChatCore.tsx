@@ -42,6 +42,9 @@ const DISC_APART_PX = 300;
 /** From this share of the context window the ring takes the warn ink: the window is nearly full. */
 const CONTEXT_WARN = 0.8;
 
+/** From this share its ring is red: the window is all but full, and the next turn may not fit. */
+const CONTEXT_DANGER = 0.95;
+
 /** The disc the rings open in: its side at most, its side at least, and the air it keeps from the chat column's edges, in px. */
 const DISC_PX = 250;
 const DISC_MIN_PX = 200;
@@ -113,8 +116,9 @@ type ChatCoreProps = {
  * while it reads; a tendril out toward the talk while it changes a file or sends an agent; lobes and spikes while its reply arrives;
  * and a dish turned to the reader while it waits on them. What it is doing is also in its name for a reader and its title for a
  * pointer. THE TWO RINGS IN ORBIT ROUND IT are its gauges, drawn by the instrument itself (`gauges`), each lit as far as it is full:
- * the inner is how full the context window is, in the warn ink once it is nearly full; the outer is the account's week
- * (`useAccountWeek`), and a press on the band where it orbits opens the account switcher (`AccountWeekRing`). AT REST THE TWO LIE FLAT
+ * the inner is how full the context window is; the outer is the account's week. Each is grey, then yellow, then red as it runs high
+ * (the context from 80% and 95%, the week by the account's own bands, `useAccountWeek`), whatever the model: the colour is the
+ * reading. A press on the band where it orbits opens the account switcher (`AccountWeekRing`). AT REST THE TWO LIE FLAT
  * AND STILL, plain circles filled clockwise from twelve; they tip into orbit while the chat works. At a desk each is a press where it
  * lies: the inner opens the count of what the context holds (`onContext`), the outer the accounts. THE DOTS ON AN ARC OVER IT are the chat's
  * subagents (`helpers`, drawn by `transcript/PinnedSubagents`), one each, in its model's colour.
@@ -289,7 +293,7 @@ export function ChatCore({
   const contextLabel = t('core.context', { defaultValue: 'Context · {{percent}}% used', percent: Math.round(filled * 100) });
   const week = useAccountWeek();
   const gauges = useMemo<AstrolabeGauge[]>(() => [
-    { value: context === null ? null : filled, tone: filled >= CONTEXT_WARN ? 'warn' : 'quiet' },
+    { value: context === null ? null : filled, tone: filled >= CONTEXT_DANGER ? 'danger' : filled >= CONTEXT_WARN ? 'warn' : 'quiet' },
     { value: week.percent === null ? null : Math.min(100, Math.max(0, week.percent)) / 100, tone: week.tone },
   ], [context, filled, week.percent, week.tone]);
 
@@ -356,7 +360,7 @@ export function ChatCore({
                 : <SignalLoop state={state === 'idle' || state === 'waiting' ? 'idle' : 'thinking'} size={28} />}
             </span>
             {/* The context's reading, for a script and a style: the ring itself is the core's own drawing, in orbit round it. */}
-            {context !== null && <span hidden data-chat-core-context={Math.round(filled * 100)} data-tone={filled >= CONTEXT_WARN ? 'warn' : undefined} />}
+            {context !== null && <span hidden data-chat-core-context={Math.round(filled * 100)} data-tone={filled >= CONTEXT_DANGER ? 'danger' : filled >= CONTEXT_WARN ? 'warn' : undefined} />}
           </button>
         </div>
       </div>
