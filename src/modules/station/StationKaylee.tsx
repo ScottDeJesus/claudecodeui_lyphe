@@ -11,6 +11,7 @@ import { useNeedsCount } from '@/modules/station/context/StationNeedsContext';
 import { StationArrival } from '@/modules/station/StationArrival';
 import { StationConversationView } from '@/modules/station/StationConversation';
 import { StationPortraitWords } from '@/modules/station/StationPortrait';
+import { StationTalk } from '@/modules/station/StationTalk';
 import { useStation } from '@/modules/station/context/StationContext';
 import type { CompanionLogEntry, CompanionPicture } from '@/shared/companion-types';
 import { useStationDoors } from '@/shared/context/StationLayerContext';
@@ -303,7 +304,7 @@ export function StationKaylee({ form, haloWidth, onHome }: { form: StationKaylee
   const presence = useCompanionPresence();
   const { sessions } = useStationSessions();
   const waiting = useNeedsCount();
-  const { setFocus, scrollMemory, placed } = useStation();
+  const { setFocus, scrollMemory, placed, tier } = useStation();
   const doors = useStationDoors();
   // The panel's bearing from the core, in degrees, while the companion has just placed a thing on it: the core's pointer stands
   // there for as long as its mark does (`PLACING_LOOK_MS`), then lets go. State, because the view draws from it; null otherwise.
@@ -386,17 +387,25 @@ export function StationKaylee({ form, haloWidth, onHome }: { form: StationKaylee
       running={sessions === null ? null : sessions.filter((row) => row.state === 'working').length}
       waiting={waiting}
       transcript={(
-        <StationConversationView
-          density="full"
-          picture={picture}
-          readFailure={readFailure}
-          onReread={reread}
-          name={name}
-          speaking={voice.speaking}
-          // A card pressed in the conversation goes on the panel, as it does from the conversation's own region.
-          onOpenCard={(note) => setFocus({ kind: 'note', id: note.id, label: note.title })}
-          scrollRef={scrollMemory('conversation')}
-        />
+        <>
+          <StationConversationView
+            density="full"
+            picture={picture}
+            readFailure={readFailure}
+            onReread={reread}
+            name={name}
+            speaking={voice.speaking}
+            // A card pressed in the conversation goes on the panel, as it does from the conversation's own region.
+            onOpenCard={(note) => setFocus({ kind: 'note', id: note.id, label: note.title })}
+            scrollRef={scrollMemory('conversation')}
+          />
+          {/* The station's own box again, under the conversation: the sheet stands over the page's box, and a conversation read as a
+              chat is answered where it is read. It is the same box (the words typed and the files attached are the station's), so
+              what is typed here is in the page's box when the sheet closes. */}
+          <div data-station-kaylee-transcript-talk="" className="flex-none border-t border-border">
+            <StationTalk tier={tier} density="full" part="box" />
+          </div>
+        </>
       )}
     />
   );
