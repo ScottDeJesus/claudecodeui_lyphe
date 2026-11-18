@@ -92,6 +92,8 @@ type ChatCoreProps = {
   open: boolean;
   /** The id of the row the press opens, for `aria-controls`. */
   controls: string;
+  /** The context ring, pressed: the count of what the window holds. Absent, the ring is a reading and no press. */
+  onContext?: () => void;
   /** The chat's helpers, drawn round the core at rest (its subagents' dots), given the radius of the core's outer ring in px; nothing while the settings are open. */
   helpers?: (ringRadius: number) => ReactNode;
   /** The core, pressed: the chat's settings open or close. */
@@ -112,7 +114,9 @@ type ChatCoreProps = {
  * and a dish turned to the reader while it waits on them. What it is doing is also in its name for a reader and its title for a
  * pointer. THE TWO RINGS IN ORBIT ROUND IT are its gauges, drawn by the instrument itself (`gauges`), each lit as far as it is full:
  * the inner is how full the context window is, in the warn ink once it is nearly full; the outer is the account's week
- * (`useAccountWeek`), and a press on the band where it orbits opens the account switcher (`AccountWeekRing`). THE DOTS ON AN ARC OVER IT are the chat's
+ * (`useAccountWeek`), and a press on the band where it orbits opens the account switcher (`AccountWeekRing`). AT REST THE TWO LIE FLAT
+ * AND STILL, plain circles filled clockwise from twelve; they tip into orbit while the chat works. At a desk each is a press where it
+ * lies: the inner opens the count of what the context holds (`onContext`), the outer the accounts. THE DOTS ON AN ARC OVER IT are the chat's
  * subagents (`helpers`, drawn by `transcript/PinnedSubagents`), one each, in its model's colour.
  *
  * PRESS THE CORE AND IT IS SET BY TURNING. The core rises out of its dock into a disc over the talk, with two flat rings round it
@@ -132,7 +136,7 @@ type ChatCoreProps = {
  * its stops as `data-ring-stop`, so a script can set one by pressing the core and then a stop. Used by `ChatComposer`.
  */
 export function ChatCore({
-  model, modelOptions, modelLabelsById, onSelectModel, effort, effortOptions, onSelectEffort, state, context, open, controls, helpers, onToggle, onClose, className,
+  model, modelOptions, modelLabelsById, onSelectModel, effort, effortOptions, onSelectEffort, state, context, open, controls, helpers, onContext, onToggle, onClose, className,
 }: ChatCoreProps) {
   const { t } = useTranslation('chat');
   const draw = useCoreDrawing();
@@ -272,7 +276,17 @@ export function ChatCore({
   const restPx = place !== null ? apartPx : CORE_PX;
   const corePx = place !== null ? apartPx : up ? Math.round(lift.size * CORE_SHARE_OF_DISC) : CORE_PX;
   // The two rings are the core's own drawing, in orbit close on its body (`gauges`); the outer one's press is a band at its radius.
-  const accountRadius = Math.round(coreGaugeRadius(corePx * CORE_BODY_SHARE, 1));
+  const bodyRadius = corePx * CORE_BODY_SHARE;
+  const contextRadius = coreGaugeRadius(bodyRadius, 0);
+  const accountRadius = Math.round(coreGaugeRadius(bodyRadius, 1));
+  // THREE PRESSES, ONE INSIDE THE OTHER, where the core stands apart at a desk and is large enough for them: each a disc with the
+  // smaller laid over it. The body is the core's own (its settings), the band round it is the context ring's, and the band round
+  // that the account ring's. Each ring's band runs from halfway to its inner neighbour to halfway to its outer one, so a press on
+  // a ring lands on that ring. Beside the line the core is small and under a finger: its whole square stays its own press there.
+  const layered = draw !== null && place !== null;
+  const bodyPress = 2 * Math.round((bodyRadius + contextRadius) / 2);
+  const contextPress = 2 * Math.round((contextRadius + accountRadius) / 2);
+  const contextLabel = t('core.context', { defaultValue: 'Context · {{percent}}% used', percent: Math.round(filled * 100) });
   const week = useAccountWeek();
   const gauges = useMemo<AstrolabeGauge[]>(() => [
     { value: context === null ? null : filled, tone: filled >= CONTEXT_WARN ? 'warn' : 'quiet' },
@@ -306,6 +320,18 @@ export function ChatCore({
               the band draws the week itself. A chat standing in a window of its own has no switcher to open beside it, so there it
               only reads. */}
           <AccountWeekRing radius={accountRadius} pressable={hostWindow === window} drawn={draw === null} />
+          {/* The context ring's press, over the account's and under the core's: the band where the inner ring lies. */}
+          {layered && context !== null && onContext !== undefined && (
+            <button
+              type="button"
+              data-chat-core-context-press=""
+              aria-label={contextLabel}
+              title={contextLabel}
+              onClick={onContext}
+              className="chat-inst__press rounded-full outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              style={{ width: contextPress, height: contextPress }}
+            />
+          )}
           {/* Its helpers, on an arc over it: out of the way while its own rings are open round it. */}
           {!up && helpers?.(accountRadius)}
           <button
@@ -317,11 +343,13 @@ export function ChatCore({
             aria-expanded={open}
             aria-controls={controls}
             onClick={onToggle}
-            className="chat-inst__press grid place-items-center rounded-full outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background"
-            style={{ width: corePx, height: corePx }}
+            className="chat-inst__press grid place-items-center rounded-full outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            // The body alone where the instrument draws the rings round it, so each ring keeps its own press; the whole square otherwise.
+            style={layered ? { width: bodyPress, height: bodyPress } : { width: corePx, height: corePx }}
           >
-            {/* The core's own accessible name is the companion's; here the button speaks for it. */}
-            <span aria-hidden="true" className="pointer-events-none grid size-full place-items-center">
+            {/* The core's own accessible name is the companion's; here the button speaks for it. The drawing keeps its own square,
+                centred on the press, whatever the press's size. */}
+            <span aria-hidden="true" className="pointer-events-none grid flex-none place-items-center" style={{ width: corePx, height: corePx }}>
               {draw !== null
                 ? draw({ material, state: FORM[state], drive, size: corePx, azimuth: place !== null ? TALK_FROM_PLACE : TALK_FROM_DOCK, gauges })
                 // No page gave the instrument (a surface that mounts the chat alone): the app's small loop stands in.

@@ -848,9 +848,9 @@ export function coreGaugeScale(bodyRadius: number): number {
 
 /**
  * The radius the lone core's gauge `index` orbits at (0 the context, 1 the account's week), in px, for a body of `bodyRadius` px:
- * `CORE_GAUGE_GAPS` outside the body, and up to 30% further for a larger body. Read by the instrument, which draws the ring there,
+ * `CORE_GAUGE_GAPS` outside the body, and up to half as far again for a larger body, so each ring keeps a band of its own to press. Read by the instrument, which draws the ring there,
  * and by the chat's core (`chat/composer/ChatCore`), which puts the account's press at the outer one.
  */
 export function coreGaugeRadius(bodyRadius: number, index: 0 | 1): number {
-  return bodyRadius + CORE_GAUGE_GAPS[index] * (1 + 0.3 * (coreGaugeScale(bodyRadius) - 1));
+  return bodyRadius + CORE_GAUGE_GAPS[index] * (1 + 0.5 * (coreGaugeScale(bodyRadius) - 1));
 }

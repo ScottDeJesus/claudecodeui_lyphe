@@ -542,6 +542,7 @@ export default function ChatComposer({
           open={settingsOpen}
           controls={settingsId}
           helpers={pinnedAgents}
+          onContext={onShowTokenUsage}
           onToggle={() => setSettingsOpen((open) => !open)}
           onClose={closeSettings}
         />

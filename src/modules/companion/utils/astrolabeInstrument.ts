@@ -689,7 +689,7 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
 
   // The instrument's envelopes and eases (`v`), the pointer and its lock (`dial`), the rings, the lobes and what rides out on an onset.
   // `work` is being at work at all (thinking, reading or writing): the rig follows it. `think`, `read` and `write` are the body's forms.
-  const v = { t: 0, think: 0, work: 0, read: 0, write: 0, speak: 0, listen: 0, rms: 0, low: 0, mid: 0, high: 0, energy: 0, spikeEnv: 0, f0: 0, f0vis: 150, voicing: 0, presence: 1, drive: 0 };
+  const v = { t: 0, rest: 1, think: 0, work: 0, read: 0, write: 0, speak: 0, listen: 0, rms: 0, low: 0, mid: 0, high: 0, energy: 0, spikeEnv: 0, f0: 0, f0vis: 150, voicing: 0, presence: 1, drive: 0 };
   // Where the body's mouth faces and its tendril runs, and how far the tendril is out (a spring, with its speed).
   let aim: Vec3 = norm3([0.4, 0.45, 0.8]);
   let tendril = 0;
@@ -926,6 +926,8 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
     const working = state === 'thinking' || state === 'reading' || state === 'writing';
     v.t += dt * asleepRate;
     clock += dt * rate;
+    // At rest outright (not working, speaking or listening): a lone body's gauges lie flat and still then (`drawGauges`).
+    v.rest = ease(v.rest, state === 'idle' ? 1 : 0, dt, state === 'idle' ? 0.3 : 0.12);
     v.think = ease(v.think, state === 'thinking' ? 1 : 0, dt, state === 'thinking' ? 0.07 : 0.2);
     v.work = ease(v.work, working ? 1 : 0, dt, working ? 0.07 : 0.2);
     v.read = ease(v.read, state === 'reading' ? 1 : 0, dt, 0.22);
@@ -1210,13 +1212,31 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
    * full ring and an empty one are told apart at any tilt. The quiet ink until the measure runs high, then the warn ink, then the
    * danger ink. They share the dial's drift, so they turn faster while the body works and lean toward the reader while it listens.
    * Round a larger body they run further out and are drawn heavier (`coreGaugeScale`), so they read at a desk's distance.
+   *
+   * AT REST THEY LIE FLAT AND STILL (`v.rest`): each ring settles into the picture's own plane as a plain circle, filled clockwise
+   * from twelve, so what it reads is where a pointer finds it (the chat's core lays a press over each there). As the body goes to
+   * work they tip back into orbit, and settle again when it stops.
+   *
    * `front` false draws what passes behind the body, true what passes over it.
    */
   const drawGauges = (ctx: CanvasRenderingContext2D, cx: number, cy: number, R: number, gauges: AstrolabeFrameInput['gauges'], front: boolean) => {
     if (!gauges || gauges.length === 0) return;
+    // Settled, it is exactly flat: an eased figure only ever nears its end, and a ring a hair off the plane would keep a far half.
+    const rest = v.rest > 0.995 ? 1 : v.rest;
+    const tipped = 1 - rest;
+    /** An angle brought into one turn, so a part of it can be taken. */
+    const folded = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle));
+    /**
+     * One ring's place: tipped and turning in orbit, and at rest flat with no turn left in it at all (the dial's own turn goes on
+     * under it, and a ring that kept even that would shimmer along its edge), its filled part starting at twelve.
+     */
+    const orbitOf = (tilt: number, omega: number, psi: number) => {
+      const turn = folded(omega) * tipped;
+      return { iota: tilt * tipped * DEG, omega: turn, psi: psi + rest * folded(Math.PI / 2 - (psi + turn)) };
+    };
     const orbits = [
-      { iota: (56 + 4 * Math.sin(v.t * 0.31) - 14 * v.listen) * DEG, omega: dial.inOmega, psi: dial.inPsi },
-      { iota: (44 + 3 * Math.sin(v.t * 0.23 + 1.3) - 12 * v.listen) * DEG, omega: dial.midOmega, psi: dial.midPsi },
+      orbitOf(56 + 4 * Math.sin(v.t * 0.31) - 14 * v.listen, dial.inOmega, dial.inPsi),
+      orbitOf(44 + 3 * Math.sin(v.t * 0.23 + 1.3) - 12 * v.listen, dial.midOmega, dial.midPsi),
     ];
     ctx.lineCap = 'round';
     const weight = coreGaugeScale(R);
@@ -1248,11 +1268,12 @@ export function createAstrolabeInstrument(host: HTMLElement, tier: AstrolabeTier
       ctx.stroke();
       const filled = gauge.value === null ? 0 : clamp(gauge.value, 0, 1);
       if (filled <= 0.002) continue;
-      arc(orbit.psi, orbit.psi + filled * TAU);
+      // The filled part runs back from its start, which on the flat ring is clockwise from twelve; its head is its far end.
+      arc(orbit.psi - filled * TAU, orbit.psi);
       ctx.strokeStyle = rgba(ink, front ? 0.95 : 0.42 + 0.14 * large);
       ctx.lineWidth = 2.5 * weight;
       ctx.stroke();
-      const head = ringPoint(basis, radius, orbit.psi + filled * TAU);
+      const head = ringPoint(basis, radius, orbit.psi - filled * TAU);
       if (head[2] >= 0 === front) {
         ctx.beginPath();
         ctx.arc(cx + head[0], cy - head[1], (front ? 2.6 : 2) * (1 + 0.7 * large), 0, TAU);

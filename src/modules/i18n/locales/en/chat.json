@@ -157,6 +157,7 @@
     "settings": "Chat settings · {{model}}",
     "settingsWithEffort": "Chat settings · {{model}}, {{effort}} effort",
     "rings": "How this chat is set",
+    "context": "Context · {{percent}}% used",
     "model": "Model",
     "effort": "Effort",
     "doing": {
