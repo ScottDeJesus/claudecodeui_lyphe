@@ -1,7 +1,7 @@
 import { ArrowUpRight, FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { docSpacePageUrl } from '@/modules/widgets';
+import { docSpacePageUrl, EmbedUrlFrame } from '@/modules/widgets';
 import type { StationFocus } from '@/shared/station-types';
 import { buttonVariants, Card } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -10,11 +10,12 @@ import { cn } from '@/shared/utils';
 type PageFocus = Extract<StationFocus, { kind: 'page' }>;
 
 /**
- * A DOCSPACE PAGE ON THE STAGE. The stage's head already names it (the page's glyph and word over its label), so the
- * body is the page as a document card: the page glyph, whether the focus is the page or one block of it, and "Open in
- * DocSpace", which opens it in a new tab, at the block when one is named. The open is a real link (a new tab is what
- * a link does, and the reader can copy it), drawn in the kit's outline button paint, and a 44 px catch under a finger
- * below 768 px (the touch law).
+ * A DOCSPACE PAGE ON THE STAGE, LIVE. The stage's head already names it (the page's glyph and word over its label), so the
+ * body is the page itself, drawn in the chat's embed frame (`EmbedUrlFrame`, which rewrites a loopback DocSpace address onto
+ * the reader's own host and refuses a plain-http frame inside an https page with a card that says why), at the block when
+ * one is named. Over it, one slim row: the page glyph, whether the focus is the page or one block of it, and "Open in
+ * DocSpace", a real link that opens it in a new tab, a 44 px catch under a finger below 768 px (the touch law). The frame
+ * takes the stage's height less its head, never under 420 px.
  *
  * Registered for the `page` kind in the station's stage views (`stageViews.ts`), which `StationStage` draws.
  */
@@ -24,27 +25,30 @@ export function PageStage({ focus }: { focus: PageFocus }) {
   const href = docSpacePageUrl(focus.pageId, focus.blockId);
 
   return (
-    <Card data-station-page={focus.pageId} className="flex min-w-0 flex-col gap-4 p-4 lg:p-5">
+    <Card data-station-page={focus.pageId} className="flex min-w-0 flex-col gap-3 p-3 lg:p-4">
       <div className="flex min-w-0 items-center gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
-          <FileText aria-hidden="true" className="size-4" />
+        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+          <FileText aria-hidden="true" className="size-3.5" />
         </span>
-        <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+        <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
           {focus.blockId === null
             ? t('station.page.page', { defaultValue: 'A page in DocSpace' })
             : t('station.page.block', { defaultValue: 'One block of a page in DocSpace' })}
         </p>
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          data-station-page-open=""
+          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'shrink-0 finger:h-11')}
+        >
+          {t('station.page.open', { defaultValue: 'Open in DocSpace' })}
+          <ArrowUpRight aria-hidden="true" />
+        </a>
       </div>
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        data-station-page-open=""
-        className={cn(buttonVariants({ variant: 'outline' }), 'self-start finger:h-11')}
-      >
-        {t('station.page.open', { defaultValue: 'Open in DocSpace' })}
-        <ArrowUpRight aria-hidden="true" />
-      </a>
+      <div data-station-page-frame="" className="h-[calc(100dvh-14rem)] min-h-[420px] min-w-0 overflow-hidden rounded-md border border-border">
+        <EmbedUrlFrame key={href} url={href} title={focus.label} framed fill />
+      </div>
     </Card>
   );
 }

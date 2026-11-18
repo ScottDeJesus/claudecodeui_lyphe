@@ -5780,7 +5780,7 @@ One launch of her CLI = one streaming-input `query()`. `companionQueryOptions(us
 | `allowedTools` | each tool's name under `mcp__companion__` | exactly hers, so a tool is never one prompt away |
 | `includePartialMessages` | `true` | text deltas feed the sentence stream |
 | `maxTurns` | 30 | per turn of hers: one answer to him, every tool call inside it |
-| `effort` | `'max'` | the operator's ruling of 2026-11-09: the deepest reasoning the CLI offers, on every model she may run (each of `sonnet`, `fable`, `opus` and `haiku` lists `max` in the CLI's model list, read 2026-11-09). Fixed, not a setting; applies from her next launch. Held as `COMPANION_EFFORT` (`companion-launch.ts`), which `read_settings` says from the same constant: `Her effort: max, set at her launch, not in Settings.` |
+| `effort` | `'high'` | the operator's ruling of 2026-11-18. Fixed, not a setting; applies from her next launch. Held as `COMPANION_EFFORT` (`companion-launch.ts`), which `read_settings` says from the same constant: `Her effort: high, set at her launch, not in Settings.` |
 | `cwd` | `companionWorkingDirectory(userId)` | below |
 | `env` | `{ ...userFacingEnv(), ...(await launchAccountEnv()).env, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '500000', DISABLE_COMPACT: '1' }` | the account the house chose, on the subscription. `DISABLE_COMPACT=1` is LAST so no account or house env turns it back on: her CLI never summarizes her conversation, automatic or manual, and no `compact_boundary` reaches her. Her own closing is her compaction (MAN-9455). The 500k window (`COMPANION_WINDOW_TOKENS`) is what her CLI's reading measures her against and her closing counts back from; it is NOT a refusal point: with compaction off the CLI sends past it and refuses only at the model's own limit (measured 2026-11-01 on a 100,000 window: messages read at 99,982 and 100,122 tokens were both sent). The CLI reads its env at launch: a change applies from her next launch |
 | `pathToClaudeCodeExecutable` | `resolveClaudeCodeExecutablePath(CLAUDE_CLI_PATH)`; key absent when it does not resolve | |
@@ -11258,7 +11258,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/station/cardLabel.ts
 
 ## MAN-9262 — src/modules/station — PageStage: a DocSpace page, or one block, on the stage with its link
 
-`PageStage` (`PageStage.tsx`): a DocSpace page, or one block of it, on the stage. Registered for `page` in `STAGE_VIEWS` (`stageViews.ts`). The stage frame, whose head already names the page (glyph + word over `focus.label`): MAN-9228. The link's one builder: `docSpacePageUrl` (MAN-485). Touch law: INV-10275.
+`PageStage` (`PageStage.tsx`): a DocSpace page, or one block of it, on the stage, drawn live in `EmbedUrlFrame` (`@/modules/widgets`, `fill`, in a box of `100dvh - 14rem`, never under 420 px) under one slim row carrying "Open in DocSpace" as a new-tab link (operator, 2026-11-18: embed it, not only a button). Registered for `page` in `STAGE_VIEWS` (`stageViews.ts`). The stage frame, whose head already names the page (glyph + word over `focus.label`): MAN-9228. The link's one builder: `docSpacePageUrl` (MAN-485). Touch law: INV-10275.
 
 ## Props
 | prop | type | meaning |

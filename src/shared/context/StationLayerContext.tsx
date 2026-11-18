@@ -18,6 +18,11 @@ type StationDoors = {
    */
   homeShowing: () => boolean;
   /**
+   * Which of the two pages over the workspace was on screen last, read at the moment of the call: `'station'` or `'home'` (`'home'` until either has shown). A chat's
+   * back arrow (`ChatHead`) returns there, so a chat opened from the station goes back to the station.
+   */
+  cameFrom: () => 'station' | 'home';
+  /**
    * Calls `listener` each time the station or the sessions home comes on screen or leaves it, after the commit that moved it. For what must stand down on the covered page without
    * being rendered again by the switch (the chat's presence report, which would otherwise re-render the transcript's owner). Returns the release.
    */
@@ -101,6 +106,7 @@ export function StationLayerProvider({ showing, homeShowing, workspacePath, chil
   // The newest of both, written after each commit, so a door that is called later (a frame off the socket, a press) answers from now and not from the render it was made in.
   const showingRef = useRef(showing);
   const homeShowingRef = useRef(homeShowing);
+  const cameFromRef = useRef<'station' | 'home'>(showing ? 'station' : 'home');
   const workspacePathRef = useRef(workspacePath);
   const showingListenersRef = useRef(new Set<() => void>());
   // The router's newest `navigate`, called through one stable function (`doors.navigate`).
@@ -118,6 +124,8 @@ export function StationLayerProvider({ showing, homeShowing, workspacePath, chil
     if (showingRef.current === showing && homeShowingRef.current === homeShowing) return;
     showingRef.current = showing;
     homeShowingRef.current = homeShowing;
+    if (showing) cameFromRef.current = 'station';
+    else if (homeShowing) cameFromRef.current = 'home';
     showingListenersRef.current.forEach((listener) => listener());
   }, [showing, homeShowing]);
 
@@ -177,6 +185,7 @@ export function StationLayerProvider({ showing, homeShowing, workspacePath, chil
       navigate,
       showing: () => showingRef.current,
       homeShowing: () => homeShowingRef.current,
+      cameFrom: () => cameFromRef.current,
       onShowingChange,
       workspacePath: () => workspacePathRef.current,
       registerStageOpen,

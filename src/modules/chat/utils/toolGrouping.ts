@@ -71,7 +71,8 @@ function rendersNothing(message: ChatMessage, showThinking: boolean): boolean {
   return Boolean(message.isThinking && !showThinking);
 }
 
-function parseToolInput(toolInput: unknown): unknown {
+/** A tool message's input as an object where it arrived as JSON text. Used here for a row's preview and by `coreDoingOf` for a command. */
+export function parseToolInput(toolInput: unknown): unknown {
   if (typeof toolInput !== 'string') {
     return toolInput;
   }

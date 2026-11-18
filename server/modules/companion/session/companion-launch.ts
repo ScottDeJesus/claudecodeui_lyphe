@@ -58,11 +58,11 @@ export const COMPANION_MCP_SERVER_NAME = 'companion';
 const COMPANION_MAX_TURNS = 30;
 
 /**
- * The reasoning effort of every launch of hers: the deepest the CLI offers, on any model she may run (sonnet, fable, opus and haiku all accept `max`:
- * the CLI's model list, read 2026-11-09). Fixed here and no setting of his, so it applies from her next launch. Consumed by `companionQueryOptions`
+ * The reasoning effort of every launch of hers: `high`, the operator's choice (2026-11-18). Fixed here and no setting of his, so it applies from her
+ * next launch. Consumed by `companionQueryOptions`
  * below and by `eyes/settings-lines.ts`, which says it in `read_settings` from this same constant, so what she is told and what she runs cannot drift.
  */
-export const COMPANION_EFFORT = 'max' satisfies Options['effort'];
+export const COMPANION_EFFORT = 'high' satisfies Options['effort'];
 
 /**
  * Her window: 500k tokens, half her models' 1M. With the CLI's compaction off (`DISABLE_COMPACT`, below) the CLI does not refuse at it — it sends past it —
